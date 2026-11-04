@@ -45,7 +45,7 @@ import { NeedsQueue, WorkbenchHead, buildNeedCards, NEEDS_CSS } from './project-
 import { ActivityRail, useRecentActivity, RAIL_CSS } from './project-list/activity-rail'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from './project-list/session-activity'
 import { ProjectCard, CARD_CSS } from './project-list/project-card'
-import { useSwarmProjection, normDir } from './project-list/swarm-projection'
+import { useSwarmProjection, swarmProjectMatches } from './project-list/swarm-projection'
 import FileBrowser from '../files/FileBrowser'
 import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronLeft, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, TargetIcon, WarnIcon, WindowsIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
@@ -942,7 +942,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     if (!isGit) return
     return pollWhileVisible(async signal => {
       const groups = await loadSwarmDirectory()
-      const matching = groups.filter(group => !group.archived && (normDir(group.target.directory || '') === normDir(dir) || group.target.projectId === proj?.key))
+      const matching = groups.filter(group => !group.archived && swarmProjectMatches(group.target, { key: proj?.key, dir }))
       if (!signal.aborted) setSwarms(matching)
     }, 10000).stop
   }, [isGit, dir, proj?.key, swarmScope])

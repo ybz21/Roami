@@ -39,7 +39,7 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
     geometry.translate(0, 0, -d / 2); return mesh(parent, geometry, material, at)
   }
   const floor = mesh(scene, new T.CylinderGeometry(6.9, 6.9, .22, 6), floorMat, [0, -.2, 0]); floor.rotation.y = Math.PI / 6
-  let rigs: Rig[] = [], selected = 'main', motion = true, reduced = false, disposed = false, lost = false, elapsed = 0, lastFrame = 0, eventUntil = 0
+  let rigs: Rig[] = [], selected = 'main', motion = true, reduced = false, historical = false, disposed = false, lost = false, elapsed = 0, lastFrame = 0, eventUntil = 0
   const routes: { id: string; curve: T.QuadraticBezierCurve3; particles: T.Mesh[]; reverse: boolean }[] = []
   const transport = mat('--accent', true)
   function build(node: StudioNode, index: number, total: number): Rig {
@@ -81,8 +81,10 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
   function render() {
     if (disposed || lost || document.hidden || !host.clientWidth || !host.clientHeight) return
     for (const rig of rigs) {
-      const active = motion && !reduced && ['running', 'preparing'].includes(rig.node.state)
-      rig.head.rotation.y = active ? Math.sin(elapsed * 1.1 + rig.position.x) * .1 : 0
+      const active = !historical && motion && !reduced && ['running', 'preparing'].includes(rig.node.state)
+      // Historical teams breathe at rest; they never type or emit task traffic.
+      const resting = historical && motion && !reduced
+      rig.head.rotation.y = active || resting ? Math.sin(elapsed * 1.1 + rig.position.x) * .1 : 0
       rig.robot.position.y = active ? Math.sin(elapsed * 2.2 + rig.position.z) * .016 : 0
       rig.hands.forEach((hand, i) => hand.position.y = .98 + (active ? Math.sin(elapsed * 11 + i * Math.PI) * .035 : 0))
       rig.bars.forEach((bar, i) => bar.scale.x = active ? .65 + Math.sin(elapsed * 2 + i) * .22 : 1)
@@ -90,15 +92,15 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
       const label = labels.querySelector<HTMLElement>(`[data-studio-id="${rig.node.id}"]`)
       if (label) { const point = rig.position.clone().add(new T.Vector3(0, 2.4, 0)).project(camera); label.style.left = `${(point.x + 1) * host.clientWidth / 2}px`; label.style.top = `${(1 - point.y) * host.clientHeight / 2}px` }
     }
-    for (const route of routes) route.particles.forEach((particle, i) => { particle.visible = motion && !reduced && performance.now() < eventUntil; const p = (elapsed * .8 + i / 3) % 1; particle.position.copy(route.curve.getPoint(route.reverse ? 1 - p : p)) })
+    for (const route of routes) route.particles.forEach((particle, i) => { particle.visible = !historical && motion && !reduced && performance.now() < eventUntil; const p = (elapsed * .8 + i / 3) % 1; particle.position.copy(route.curve.getPoint(route.reverse ? 1 - p : p)) })
     renderer.render(scene, camera)
   }
   function animate(time: number) {
-    if (time - lastFrame < (coarse ? 1000 / 30 : 1000 / 60) - 1) return
+    if (time - lastFrame < (historical ? 1000 / 15 : coarse ? 1000 / 30 : 1000 / 60) - 1) return
     elapsed += lastFrame ? Math.min((time - lastFrame) / 1000, .1) : 0; lastFrame = time; render(); schedule()
   }
   function schedule() {
-    const active = motion && !reduced && rigs.some(rig => ['running', 'preparing'].includes(rig.node.state))
+    const active = motion && !reduced && rigs.some(rig => historical || ['running', 'preparing'].includes(rig.node.state))
     renderer.setAnimationLoop(!document.hidden && host.clientWidth > 0 && host.clientHeight > 0 && !lost && (active || motion && !reduced && performance.now() < eventUntil) ? animate : null)
   }
   function resize() {
@@ -141,7 +143,7 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
       theme(); resize(); schedule()
     },
     select(id: string) { selected = id; render() },
-    motion(value: boolean, reduce: boolean) { motion = value; reduced = reduce; render(); schedule() },
+    motion(value: boolean, reduce: boolean, history = false) { motion = value; reduced = reduce; historical = history; render(); schedule() },
     dispose() { disposed = true; renderer.setAnimationLoop(null); observer.disconnect(); themeObserver.disconnect(); document.removeEventListener('visibilitychange', visibility); renderer.domElement.removeEventListener('pointerdown', pointerDown); renderer.domElement.removeEventListener('pointerup', pointerUp); renderer.domElement.removeEventListener('webglcontextlost', contextLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); renderer.dispose(); renderer.domElement.remove() },
   }
 }

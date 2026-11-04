@@ -106,6 +106,13 @@ html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm
 
 .swarm-legacy { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; }
 .swarm-legacy-content { flex:1; min-height:0; overflow:auto; padding:var(--sp-4); }
+.swarm-legacy [hidden] { display:none; }
+.swarm-legacy-studio { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(calc(var(--sp-5) * 10),calc(var(--sp-5) * 13)); }
+.swarm-legacy-studio details { padding-block:var(--sp-2); border-bottom:1px solid var(--border-subtle); }
+.swarm-legacy-studio summary { cursor:pointer; display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); min-height:var(--tap); }
+.swarm-legacy-studio summary small { color:var(--text-dim); font-size:var(--fs-meta); }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-legacy-studio { display:flex; flex-direction:column; overflow:auto; }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-legacy-studio .swarm-member-list { border:0; flex:none; overflow:visible; }
 .swarm-legacy-content h3 { font-size:var(--fs-body); margin:var(--sp-4) 0 var(--sp-2); }
 .swarm-legacy-content details { padding:var(--sp-2) 0; border-bottom:1px solid var(--border-subtle); }
 .swarm-legacy-content summary { cursor:pointer; overflow-wrap:anywhere; }

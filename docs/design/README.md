@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| OKR 活动场景与项目归属 | [20261104-okr-studio-project-ownership](20261104-okr-studio-project-ownership/README.md) | 历史场景、归属修复与分工验收 |
 | 工作区围栏启动诊断 | [20261103-workspace-launch-diagnostics](20261103-workspace-launch-diagnostics/README.md) | 启动前拒绝、阻塞执行证据、历史频次与回归 |
 | 蜂群 Main 编排与 Three.js | [20261103-swarm-main-three](20261103-swarm-main-three/README.md) | Roami Main、多执行器、三页签与受管验收 |
 | 思考强度四档与对齐 | [20261102-thinking-levels](20261102-thinking-levels/README.md) | 竞品调研、四档提案与旧配置兼容 |

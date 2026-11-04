@@ -421,11 +421,15 @@ func (s *Service) livingHomes(ctx context.Context) []sessionHome {
 		}
 	}
 	s.homes.reconcile(alive)
+	memberHomes := s.homes.registeredProjectHomes(ctx)
 	out := make([]sessionHome, 0, len(order))
 	for _, sessID := range order {
 		cwd := active[sessID]
 		if cwd == "" {
 			cwd = first[sessID]
+		}
+		if member, ok := memberHomes[name[sessID]]; ok && member.ID == sessID {
+			s.homes.bind(sessID, name[sessID], member.Home)
 		}
 		if home := s.homes.pin(sessID, name[sessID], cwd); home != "" {
 			out = append(out, sessionHome{ID: sessID, Name: name[sessID], Home: home})
@@ -433,6 +437,33 @@ func (s *Service) livingHomes(ctx context.Context) []sessionHome {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// CLI workers can be observed in the launcher worktree before entering their project.
+// A registered non-Git project in the stable ledger outranks that incidental runtime pin.
+func (h *homeStore) registeredProjectHomes(ctx context.Context) map[string]sessionHome {
+	result := map[string]sessionHome{}
+	if !h.db.OK() {
+		return result
+	}
+	rows, err := h.db.SQL().QueryContext(ctx, `SELECT s.id,s.tmux_id,s.home_dir
+		FROM sessions s JOIN projects p ON p.dir=s.home_dir
+		WHERE s.status='live' AND s.home_dir<>''`)
+	if err != nil {
+		return result
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var member sessionHome
+		if rows.Scan(&member.Name, &member.ID, &member.Home) == nil && member.ID != "" {
+			info, err := os.Stat(member.Home)
+			if err != nil || !info.IsDir() || resolveCwd(ctx, member.Home) != nil {
+				continue
+			}
+			result[member.Name] = member
+		}
+	}
+	return result
 }
 
 // homePanes 把归属拍回 pane 列表，让既有的「按 cwd 最长前缀归属」逻辑原样复用：

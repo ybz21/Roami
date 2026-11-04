@@ -73,6 +73,17 @@ describe('项目树读模型', () => {
 })
 
 describe('buildTaskTree placement', () => {
+  it('moves business sessions out of a stale worktree snapshot before the next repository scan', () => {
+    const tree = buildTaskTree({
+      projects: [{ key: 'code', name: 'Roami', dir: '/code', git: true }, { key: 'promotion', name: 'Promotion', dir: '/promotion', git: false }],
+      worktrees: { code: [{ path: '/code/.worktrees/dev', branch: 'dev', isMain: false, sessions: [{ session: 'data' }, { session: 'developer' }] }] },
+      sessions: [{ name: 'data' }, { name: 'developer' }],
+      placement: { data: { key: 'promotion' }, developer: { key: 'code', worktree: '/code/.worktrees/dev' } },
+    })
+    expect(tree.projects[0].tasks.flatMap(task => task.sessions.map(s => s.name))).toEqual(['developer'])
+    expect(tree.projects[1].tasks.flatMap(task => task.sessions.map(s => s.name))).toEqual(['data'])
+    expect(tree.loose).toEqual([])
+  })
   const proj = { key: 'x', name: 'X', dir: '/x', git: true }
   it('annotation 里已知 worktree 的新会话立刻挂到任务位，不等 worktree 轮询', () => {
     const tree = buildTaskTree({
