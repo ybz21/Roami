@@ -159,3 +159,5 @@ html[data-pointer="coarse"] .swarm-legacy-content summary::after { content:""; p
 html[data-pointer="coarse"] .swarm-relations button { position:relative; }
 html[data-pointer="coarse"] .swarm-relations .tt-act::after { content:''; position:absolute; inset-inline:calc(-1 * var(--sp-1)); top:50%; min-height:var(--tap); min-width:var(--tap); transform:translateY(-50%); }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:min(calc(100% - var(--sp-5)),calc(var(--sp-5) * 12)); overflow-x:auto; padding-bottom:var(--sp-2); }
+
+.swarm-relation-actions { display:flex; flex-wrap:wrap; gap:var(--sp-3); margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--border-subtle); }

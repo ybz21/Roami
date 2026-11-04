@@ -1,8 +1,8 @@
 import { useI18n } from '../../i18n'
-import { swarmStateToken, type SwarmSnapshot } from './swarm-protocol'
+import { swarmStateToken, type SwarmSnapshot, type SwarmWork } from './swarm-protocol'
 
-export default function SwarmRelations({ data, selected, onSelect, onMain }: {
-  data: SwarmSnapshot; selected: string; onSelect: (id: string) => void; onMain: () => void
+export default function SwarmRelations({ data, selected, onSelect, onMain, onWork, onChat }: {
+  data: SwarmSnapshot; selected: string; onSelect: (id: string) => void; onMain: () => void; onWork: (item: SwarmWork) => void; onChat: (item: SwarmWork) => void
 }) {
   const { t } = useI18n()
   const byId = new Map(data.work.map(item => [item.id, item]))
@@ -25,6 +25,10 @@ export default function SwarmRelations({ data, selected, onSelect, onMain }: {
             <div><dt>{t('swarm.relations.upstream')}</dt><dd>{!upstream.length ? <span>{t('swarm.relations.none')}</span> : upstream.map(dep => dep.work ? <button type="button" className="tt-act" key={dep.id} onClick={() => onSelect(dep.id)}>{dep.work.member_name}<small>{dep.work.title}</small></button> : <span key={dep.id}>{t('swarm.relations.unavailable')}</span>)}</dd></div>
             <div><dt>{t('swarm.relations.downstream')}</dt><dd>{!downstream.length ? <span>{t('swarm.relations.none')}</span> : downstream.map(next => <button type="button" className="tt-act" key={next.id} onClick={() => onSelect(next.id)}>{next.member_name}<small>{next.title}</small></button>)}</dd></div>
           </dl>
+          <div className="swarm-relation-actions">
+            <button type="button" className="tt-act" onClick={() => onWork(item)}>{t(item.task_id ? 'swarm.relations.openWork' : 'swarm.relations.viewPlan')}</button>
+            <button type="button" className="tt-act" disabled={!item.task_id && !data.mainConversationId} onClick={() => onChat(item)}>{t(item.task_id ? 'swarm.relations.chat' : 'swarm.relations.adjustMain')}</button>
+          </div>
         </article>
       })}
     </div>}

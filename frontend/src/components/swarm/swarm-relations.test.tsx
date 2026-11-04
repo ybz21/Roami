@@ -18,7 +18,7 @@ function card(member: string) {
 }
 it('shows the bound Main and each real assignment without exposing full instructions', () => {
   const main = vi.fn(), select = vi.fn()
-  render(<SwarmRelations data={snapshot()} selected="main" onMain={main} onSelect={select} />)
+  render(<SwarmRelations data={snapshot()} selected="main" onWork={vi.fn()} onChat={vi.fn()} onMain={main} onSelect={select} />)
   fireEvent.click(screen.getByRole('button', { name: /Roami Main/ }))
   expect(main).toHaveBeenCalledOnce()
   expect(within(card('Researcher')).getByText('Produce source report', { selector: '.swarm-relation-duty' })).toBeTruthy()
@@ -28,7 +28,7 @@ it('shows the bound Main and each real assignment without exposing full instruct
 })
 it('derives both directions only from work IDs, independently of member order or names', () => {
   const select = vi.fn()
-  render(<SwarmRelations data={snapshot()} selected="main" onMain={vi.fn()} onSelect={select} />)
+  render(<SwarmRelations data={snapshot()} selected="main" onWork={vi.fn()} onChat={vi.fn()} onMain={vi.fn()} onSelect={select} />)
   const reviewer = within(card('Reviewer')), researcher = within(card('Researcher')), publisher = within(card('Publisher'))
   const up = reviewer.getByText('swarm.relations.upstream').parentElement!
   expect(within(up).getByRole('button', { name: /Researcher.*Produce source report/ })).toBeTruthy()
@@ -40,13 +40,13 @@ it('derives both directions only from work IDs, independently of member order or
 })
 it('reports a missing upstream explicitly instead of guessing or dropping the dependency', () => {
   const data = snapshot(); data.work[2].dependencies = [{ upstreamId: 'not-in-snapshot', revision: 9 }]
-  render(<SwarmRelations data={data} selected="main" onMain={vi.fn()} onSelect={vi.fn()} />)
+  render(<SwarmRelations data={data} selected="main" onWork={vi.fn()} onChat={vi.fn()} onMain={vi.fn()} onSelect={vi.fn()} />)
   expect(within(card('Reviewer')).getByText('swarm.relations.unavailable')).toBeTruthy()
   expect(within(card('Researcher')).getAllByText('swarm.relations.none')).toHaveLength(2)
   expect(screen.queryByText('not-in-snapshot')).toBeNull()
 })
 it('does not invent a Main binding or members for incomplete snapshots', () => {
-  render(<SwarmRelations data={{ ...snapshot(), mainConversationId: '', work: [] }} selected="main" onMain={vi.fn()} onSelect={vi.fn()} />)
+  render(<SwarmRelations data={{ ...snapshot(), mainConversationId: '', work: [] }} selected="main" onWork={vi.fn()} onChat={vi.fn()} onMain={vi.fn()} onSelect={vi.fn()} />)
   expect(screen.queryByRole('button', { name: /Roami Main/ })).toBeNull()
   expect(screen.getByText('swarm.relations.mainUnavailable')).toBeTruthy()
   expect(screen.getByText('swarm.managed.planning')).toBeTruthy()

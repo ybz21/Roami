@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import ManagedSwarm from './ManagedSwarm'
@@ -171,4 +171,70 @@ it('keeps the real five kanban states rather than rendering a synthetic member l
   for (const column of ['backlog', 'doing', 'blocked', 'review', 'done']) expect(screen.getByRole('heading', { name: 'swarm.board.col.' + column })).toBeTruthy()
   const card = screen.getByRole('button', { name: /Build page/ })
   expect(card.closest('section')?.querySelector('h3')?.textContent).toBe('swarm.board.col.review')
+})
+
+it('opens an assigned member through its existing task page without sending or launching', () => {
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.openWork' }))
+  expect(test.openTask).toHaveBeenCalledWith('tasks', 'task')
+  expect(test.api).not.toHaveBeenCalled()
+})
+it.each(['entry', 'dropdown', 'reply'])('selects a member via %s consistently with an existing Main mention while preserving the body', async source => {
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  const input = screen.getByRole('textbox') as HTMLTextAreaElement
+  fireEvent.change(input, { target: { value: '@leader Keep this body\nAnd its second line' } })
+  if (source === 'entry') fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.chat' }))
+  else if (source === 'dropdown') fireEvent.change(screen.getByLabelText('recipient'), { target: { value: 'work' } })
+  else fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.replyMember' }))
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('work')
+  expect(input.value).toBe('@frontend Keep this body\nAnd its second line')
+  expect(test.api).not.toHaveBeenCalled()
+  if (source === 'entry') {
+    expect(screen.getByRole('button', { name: /swarm.managed.tab.chat/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(input)
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'common.send' }))
+  await waitFor(() => expect(test.api).toHaveBeenCalledOnce())
+  expect(test.api.mock.calls[0][2]).toMatchObject({ workId: 'work', taskRevision: 1, text: '@frontend Keep this body\nAnd its second line' })
+})
+it('explicitly selects Main after a member chat and keeps a plain or mentioned draft intact', () => {
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  const input = screen.getByRole('textbox') as HTMLTextAreaElement
+  fireEvent.change(input, { target: { value: '@frontend Keep the requirements' } })
+  fireEvent.click(screen.getByRole('button', { name: /Roami Main.*swarm.relations.coordinates/ }))
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('main')
+  expect(input.value).toBe('@leader Keep the requirements')
+  fireEvent.change(input, { target: { value: 'Plain body\nWith details' } })
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.chat' }))
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('work')
+  fireEvent.click(screen.getByRole('button', { name: /Roami Main.*swarm.relations.coordinates/ }))
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('main')
+  expect(input.value).toBe('Plain body\nWith details')
+  expect(test.api).not.toHaveBeenCalled()
+})
+it.each([false, true])('keeps undispatched plans local and routes adjustments to Main (phone=%s)', phone => {
+  test.phone = phone
+  test.data = { ...test.data!, work: test.data!.work.map(item => ({ ...item, task_id: null, revision: null, attempt: null })) }
+  const term = vi.fn()
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={term} />)
+  expect(screen.queryByRole('button', { name: 'swarm.relations.openWork' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'swarm.relations.chat' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.viewPlan' }))
+  const detail = phone ? within(screen.getByRole('dialog')) : within(document.querySelector('.swarm-work-detail') as HTMLElement)
+  expect(detail.getByText('Full instructions').closest('details')?.open).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.adjustMain' }))
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('main')
+  expect(screen.getByRole('button', { name: /swarm.managed.tab.chat/ }).getAttribute('aria-pressed')).toBe('true')
+  expect(test.openTask).not.toHaveBeenCalled()
+  expect(term).not.toHaveBeenCalled()
+  expect(test.api).not.toHaveBeenCalled()
+})
+it('keeps an explicitly typed recognized mention and the recipient label in agreement', () => {
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.chat' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '@MAIN This is for Main' } })
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('main')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '@frontend This is for the member' } })
+  expect((screen.getByLabelText('recipient') as HTMLSelectElement).value).toBe('work')
+  expect(test.api).not.toHaveBeenCalled()
 })
