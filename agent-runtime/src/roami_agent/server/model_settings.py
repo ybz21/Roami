@@ -16,7 +16,11 @@ from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
 from roami_agent.providers.model_capacity import resolve_model_capacity
 from roami_agent.providers.model_catalog import fetch_catalog
-from roami_agent.providers.reasoning_effort import reasoning_efforts, with_reasoning_effort
+from roami_agent.providers.reasoning_effort import (
+    reasoning_capability,
+    reasoning_support,
+    with_reasoning_effort,
+)
 
 KEY_NAMES = {"main": "ROAMI_AGENT_SAVED_MAIN_KEY", "worker": "ROAMI_AGENT_SAVED_WORKER_KEY"}
 
@@ -188,7 +192,9 @@ class ModelSettings:
                 "reasoningEffort": self.runtime.settings.route(role).parameters.get(
                     "reasoning_effort"
                 ),
-                "reasoningEfforts": reasoning_efforts(self.runtime.settings.route(role).name),
+                "reasoningEfforts": reasoning_capability(self.runtime.settings.route(role).name)
+                or [],
+                "reasoningSupport": reasoning_support(self.runtime.settings.route(role).name),
             }
             for role in ("main", "worker")
         }
@@ -430,7 +436,8 @@ class ModelSettings:
             "models": names[:200],
             "truncated": len(names) > 200,
             "contextWindows": {name: catalog[name] for name in names[:200] if catalog[name]},
-            "reasoningEfforts": {name: reasoning_efforts(name) for name in names[:200]},
+            "reasoningEfforts": {name: reasoning_capability(name) or [] for name in names[:200]},
+            "reasoningSupport": {name: reasoning_support(name) for name in names[:200]},
         }
 
     async def resolve_capacity(self, settings):

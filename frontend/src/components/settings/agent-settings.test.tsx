@@ -86,3 +86,16 @@ it('preserves connection drafts after a failed save without sending local billin
   expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('fixture')
   expect(vi.mocked(api).mock.calls.find(call => call[0] === 'PUT')?.[2]).not.toHaveProperty('proxy')
 })
+
+it('limits ordinary choices to four and preserves a custom raw value on unrelated saves', async () => {
+  const saved = { ...settings, main: { ...role, reasoningEffort: 'xhigh', reasoningSupport: 'supported', reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'] } }
+  vi.mocked(api).mockResolvedValue({ data: saved })
+  setup(); await screen.findByLabelText('agent.models.apiKey')
+  fireEvent.mouseDown(document.getElementById('agent-main-effort')!)
+  const list = await screen.findByRole('listbox')
+  expect([...list.querySelectorAll('[role="option"]')].map(option => option.textContent)).toEqual(['agent.reasoning.default', 'agent.reasoning.low', 'agent.reasoning.medium', 'agent.reasoning.high'])
+  fireEvent.keyDown(document.getElementById('agent-main-effort')!, { key: 'Escape', code: 'Escape' })
+  fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'fixture' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(vi.mocked(api).mock.calls.find(([method]) => method === 'PUT')?.[2].main.reasoningEffort).toBe('xhigh'))
+})

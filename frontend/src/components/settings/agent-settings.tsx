@@ -5,8 +5,8 @@ import { api } from '../../api'
 import { useCurrentNodeId } from '../cluster/node-url'
 import { RefreshIcon } from '../../icons'
 import { useI18n } from '../../i18n'
-import { modelFailure, saveAgentModels, type AgentModelSettings } from '../agent/agent-models'
-import { genericReasoningEfforts, reasoningValue } from '../agent/agent-reasoning'
+import { modelFailure, saveAgentModels, type AgentModelRole, type AgentModelSettings } from '../agent/agent-models'
+import { reasoningChoices, reasoningCustom, reasoningKnown, reasoningLabel, reasoningRawChoices, reasoningValue } from '../agent/agent-reasoning'
 import { readModelSettingsTab, writeModelSettingsTab, type ModelSettingsTab } from './model-settings-route'
 import { GatewaySettingsForm, GatewayReconciliation, useGatewaySettings } from './gateway-settings'
 import { useLayout } from '../../layout'
@@ -53,13 +53,13 @@ export function AgentSettingsForm({ onModelNames }: { onModelNames: (models: str
   const { t } = useI18n(), { message } = App.useApp()
   const [draft, setDraft] = useState<Draft | null>(null), [saved, setSaved] = useState<AgentModelSettings | null>(null)
   const [error, setError] = useState(''), [saving, setSaving] = useState(false), [version, setVersion] = useState(0)
-  const [efforts, setEfforts] = useState<Record<string, string[]>>({}), [models, setModels] = useState<string[] | null>(null)
+  const [efforts, setEfforts] = useState<Record<string, Pick<AgentModelRole, 'reasoningEfforts' | 'reasoningSupport'>>>({}), [models, setModels] = useState<string[] | null>(null)
   const [loadingModels, setLoadingModels] = useState(false), [catalogError, setCatalogError] = useState(''), [queries, setQueries] = useState({ main: '', worker: '' })
   const catalogRequest = useRef<AbortController | null>(null)
   const hydrate = (data: AgentModelSettings) => {
     setSaved(data); setDraft(settingsDraft(data)); setQueries({ main: '', worker: '' })
     onModelNames([data.main.model, data.worker.model].filter(Boolean))
-    setEfforts(current => ({ ...current, [data.main.model]: data.main.reasoningEfforts || genericReasoningEfforts, [data.worker.model]: data.worker.reasoningEfforts || genericReasoningEfforts }))
+    setEfforts(Object.fromEntries([data.main, data.worker].map(role => [role.model, { reasoningEfforts: role.reasoningEfforts, reasoningSupport: role.reasoningSupport }])))
   }
   useEffect(() => {
     const abort = new AbortController()
@@ -76,7 +76,7 @@ export function AgentSettingsForm({ onModelNames }: { onModelNames: (models: str
     setLoadingModels(true); setCatalogError('')
     try {
       const { data } = await api('POST', '/agent/models', { role: 'main', configuration: modelConfiguration(draft) }, { signal: abort.signal })
-      if (!abort.signal.aborted) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) }
+      if (!abort.signal.aborted) { setModels(data.models); setEfforts(Object.fromEntries(data.models.map((name: string) => [name, { reasoningEfforts: data.reasoningEfforts?.[name], reasoningSupport: data.reasoningSupport?.[name] }]))) }
     } catch (e) { if (!abort.signal.aborted) setCatalogError(modelFailure(e, t)) }
     finally { if (!abort.signal.aborted) setLoadingModels(false) }
   }
@@ -106,11 +106,17 @@ export function AgentSettingsForm({ onModelNames }: { onModelNames: (models: str
           const query = queries[role].trim(), names = Array.from(new Set([...(draft[role].model ? [draft[role].model] : []), ...(models || [])]))
           const options = names.filter(name => name.toLowerCase().includes(query.toLowerCase())).map(value => ({ value, label: value, title: value }))
           if (query && !names.includes(query)) options.push({ value: query, label: t('agent.models.use', { name: query }), title: query })
+          const capability = { ...draft[role], reasoningEfforts: efforts[draft[role].model]?.reasoningEfforts, reasoningSupport: efforts[draft[role].model]?.reasoningSupport }
           return <fieldset className="agent-settings-role" key={role} disabled={saving}>
             <legend>{t('agent.models.role.' + role)}</legend><p className="agent-settings-hint">{t('agent.models.roleHint.' + role)}</p>
-            <div className="agent-settings-field"><label htmlFor={`agent-${role}-model`}>{t('agent.composer.model')}</label><Select id={`agent-${role}-model`} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.composer.model')} showSearch popupClassName="agent-model-settings-options" virtual={false} disabled={saving} loading={loadingModels} value={draft[role].model || undefined} searchValue={queries[role]} filterOption={false} optionLabelProp="value" options={options} placeholder={t('agent.models.selectPlaceholder')} notFoundContent={t('agent.models.catalogEmpty')} onSearch={value => setQueries(current => ({ ...current, [role]: value.slice(0, 200) }))} onOpenChange={open => { setQueries(current => ({ ...current, [role]: '' })); if (open && models === null) void catalog() }} onChange={value => { update(role, { model: value, contextWindow: null, configuredContextWindow: null, reasoningEffort: null }); setQueries(current => ({ ...current, [role]: '' })) }} /></div>
-            <div className="agent-settings-field"><label htmlFor={`agent-${role}-effort`}>{t('agent.reasoning.title')}</label><Select id={`agent-${role}-effort`} disabled={saving} virtual={false} aria-label={t('agent.reasoning.roleLabel', { role: t('agent.models.role.' + role) })} value={reasoningValue(draft[role].reasoningEffort)} options={['default', ...(efforts[draft[role].model] || genericReasoningEfforts)].map(value => ({ value, label: t('agent.reasoning.' + value) }))} onChange={value => update(role, { reasoningEffort: value === 'default' ? null : value })} /></div>
-            <details className="agent-model-advanced"><summary>{t('agent.models.advanced')}</summary><div className="agent-model-advanced-fields"><label htmlFor={`agent-${role}-window`}>{t('agent.models.contextWindow')}</label><Input id={`agent-${role}-window`} disabled={saving} type="number" min={1} max={100000000} step={1} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.contextWindow')} value={draft[role].configuredContextWindow ?? ''} onChange={event => update(role, { configuredContextWindow: event.target.value ? Number(event.target.value) : null })} placeholder={t('agent.models.contextAuto')} />
+            <div className="agent-settings-field"><label htmlFor={`agent-${role}-model`}>{t('agent.composer.model')}</label><Select id={`agent-${role}-model`} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.composer.model')} showSearch popupClassName="agent-model-settings-options" virtual={false} disabled={saving} loading={loadingModels} value={draft[role].model || undefined} searchValue={queries[role]} filterOption={false} optionLabelProp="value" options={options} placeholder={t('agent.models.selectPlaceholder')} notFoundContent={t('agent.models.catalogEmpty')} onSearch={value => setQueries(current => ({ ...current, [role]: value.slice(0, 200) }))} onOpenChange={open => { setQueries(current => ({ ...current, [role]: '' })); if (open && models === null) void catalog() }} onChange={value => { if (value !== draft[role].model) update(role, { model: value, contextWindow: null, configuredContextWindow: null, reasoningEffort: null }); setQueries(current => ({ ...current, [role]: '' })) }} /></div>
+            {(capability.reasoningSupport !== 'unsupported' || capability.reasoningEffort) && <div className="agent-settings-field"><label htmlFor={`agent-${role}-effort`}>{t('agent.reasoning.title')}</label><Select id={`agent-${role}-effort`} disabled={saving} virtual={false} aria-label={t('agent.reasoning.roleLabel', { role: t('agent.models.role.' + role) })} value={reasoningValue(draft[role].reasoningEffort)} labelRender={() => t(reasoningLabel(draft[role].reasoningEffort))} options={reasoningChoices(capability).map(value => ({ value, label: t(reasoningLabel(value)) }))} onChange={value => update(role, { reasoningEffort: value === 'default' ? null : value })} />
+              {reasoningCustom(draft[role].reasoningEffort) && <p className="agent-settings-hint">{t('agent.reasoning.customCurrent')}</p>}
+              {!reasoningKnown(capability) && <p className="agent-settings-hint">{t('agent.reasoning.unknown')}</p>}
+            </div>}
+            <details className="agent-model-advanced"><summary>{t('agent.models.advanced')}</summary><div className="agent-model-advanced-fields">
+              <label htmlFor={`agent-${role}-raw-effort`}>{t('agent.reasoning.raw')}</label><Select id={`agent-${role}-raw-effort`} disabled={saving} virtual={false} aria-label={t('agent.reasoning.rawRoleLabel', { role: t('agent.models.role.' + role) })} value={reasoningValue(draft[role].reasoningEffort)} options={reasoningRawChoices(capability).map(value => ({ value, label: value === 'default' ? t(reasoningLabel(value)) : value }))} onChange={value => update(role, { reasoningEffort: value === 'default' ? null : value })} /><p className="agent-settings-hint">{t('agent.reasoning.rawHint')}</p>
+              <label htmlFor={`agent-${role}-window`}>{t('agent.models.contextWindow')}</label><Input id={`agent-${role}-window`} disabled={saving} type="number" min={1} max={100000000} step={1} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.contextWindow')} value={draft[role].configuredContextWindow ?? ''} onChange={event => update(role, { configuredContextWindow: event.target.value ? Number(event.target.value) : null })} placeholder={t('agent.models.contextAuto')} />
               <p className="agent-settings-hint">{t('agent.models.contextHint')}{draft[role].contextWindow ? ' ' + t('agent.models.contextDetected', { count: draft[role].contextWindow }) : ''}</p>
               <label className="agent-settings-switch"><span>{t('agent.models.images')}</span><Switch disabled={saving} checked={draft[role].images} onChange={value => update(role, { images: value })} aria-label={t('agent.models.role.' + role) + ' ' + t('agent.models.images')} /></label><p className="agent-settings-hint">{t('agent.models.imagesHint')}</p></div></details>
           </fieldset>
