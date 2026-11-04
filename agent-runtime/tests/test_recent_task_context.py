@@ -46,3 +46,40 @@ async def test_recent_tasks_preserve_identity_and_exclude_foreign_forgotten_and_
         assert result[0]["goal"] == "Original work" and result[0]["executor"] == "native"
     finally:
         await runtime.close()
+
+
+async def test_tasks_from_one_request_keep_individual_titles_and_full_user_source(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        source = "Create separate reports for north and south; do not send either report."
+        request = await runtime.conversations.accept("alice", conversation["id"], "reports", source)
+        message = await store.call(
+            lambda db: row(
+                db, "SELECT id FROM messages WHERE turn_id=? AND role='user'", (request["turnId"],)
+            )
+        )
+        goals = {}
+        for region in ("north", "south"):
+            goal = f"Prepare the {region} report"
+            task = await runtime.tasks.create(
+                "alice",
+                conversation["id"],
+                goal + "\n" + "EXECUTOR_ONLY_DETAIL " * 200,
+                key=region,
+                origin_message_id=message["id"],
+            )
+            goals[task["id"]] = goal
+        followup = await runtime.conversations.accept(
+            "alice", conversation["id"], "followup", "Add a chart to the north report only."
+        )
+        turn = await store.call(
+            lambda db: row(db, "SELECT * FROM turns WHERE id=?", (followup["turnId"],))
+        )
+        result = await store.call(lambda db: recent_task_context(db, dict(turn, owner_id="alice")))
+        assert {task["taskId"]: task["title"] for task in result} == goals
+        assert all(task["goal"] == source for task in result)
+        assert all(task["sourceMessageId"] == message["id"] for task in result)
+        assert "EXECUTOR_ONLY_DETAIL" not in str(result)
+    finally:
+        await runtime.close()

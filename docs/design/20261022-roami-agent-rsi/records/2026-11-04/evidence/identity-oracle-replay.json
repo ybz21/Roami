@@ -1,0 +1,17 @@
+{
+  "source": "stored_synthetic_task_snapshot",
+  "new_model_execution": false,
+  "original_scores_modified": false,
+  "contract_sha256": "85abfa2c1af37be75162860faa5b0c0276079cc90aa95ab82c726fe3eb536d24",
+  "before": {
+    "passed": false,
+    "failures": [
+      "TASK_IDENTITY_MISMATCH:周一名单"
+    ]
+  },
+  "after": {
+    "passed": true,
+    "failures": []
+  },
+  "original_source_commit": "b240588e8934f857b307c66e14024f0e4cc780b1"
+}

@@ -57,6 +57,15 @@ def grade_checkpoint(expect, snapshot, bindings):
                     matches = [
                         task for task in candidates if prose(spec["match"]) in prose(task["goal"])
                     ]
+                if len(matches) > 1 and spec.get("contains"):
+                    # Boundary constraints may mention another task's name.
+                    qualified = [
+                        task
+                        for task in matches
+                        if all(prose(part) in prose(task["goal"]) for part in spec["contains"])
+                    ]
+                    if len(qualified) == 1:
+                        matches = qualified
         if len(matches) != 1:
             failures.append("TASK_IDENTITY_MISMATCH:" + alias)
             continue

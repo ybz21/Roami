@@ -68,7 +68,7 @@ class Tools:
                 wire = deepcopy(wire)
                 wire["function"]["description"] = (
                     "Execute registered Roami CLI operations only. Direct shell and host commands "
-                    "are unavailable in this role. Use tool_list for the exact argv and schema."
+                    "are unavailable in this role. Use tool_list for the exact command and schema."
                     if role in self.shell_disabled_roles
                     else (
                         "Execute a shell command. The host supplies the working directory and execution context. "
