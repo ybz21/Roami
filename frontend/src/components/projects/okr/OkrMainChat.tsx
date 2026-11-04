@@ -6,6 +6,8 @@ import { useLayout } from '../../../layout'
 import { CloseIcon } from '../../../icons'
 import { useCurrentNodeId } from '../../cluster/node-url'
 import { useAgentThread } from '../../agent/useAgentThread'
+import { useAgentMessageFocus } from '../../agent/useAgentMessageFocus'
+import type { OkrMessageReference } from '../../agent/notification-destination'
 import AgentQuestion from '../../agent/AgentQuestion'
 import ConversationComposer from '../../chat/ConversationComposer'
 import Markdown from '../../markdown/Markdown'
@@ -15,19 +17,20 @@ import { dailyHistory, resultOverview, sourceObservations, type Configuration, t
 
 const contextMarker = '\n\n<roami-okr-context>\n'
 type Props = {
+  reference?: OkrMessageReference; onClearReference?: () => void
   projectId: string; projectDir?: string; draft: Configuration; workspace: Workspace | null; onClose: () => void; onUpdated?: () => void
 }
 export default function OkrMainChat(props: Props) {
   const node = useCurrentNodeId()
-  return <OkrMainInstance key={`${node}:${props.projectId}:${props.workspace?.swarm || ''}`} {...props} />
+  return <OkrMainInstance key={`${node}:${props.projectId}:${props.workspace?.swarm || ''}:${props.reference?.conversationId || ''}`} {...props} />
 }
-function OkrMainInstance({ projectId, projectDir, draft, workspace, onClose, onUpdated }: Props) {
+function OkrMainInstance({ reference, onClearReference, projectId, projectDir, draft, workspace, onClose, onUpdated }: Props) {
   const { t } = useI18n()
   const { phone, size } = useLayout()
   const secondaryPage = phone || size !== 'large'
   const node = useCurrentNodeId()
   const [cid, setCID] = useState('')
-  const thread = useAgentThread(cid, '', node)
+  const thread = useAgentThread(cid, reference?.branchId || '', node, reference?.messageId || '')
   const draftKey = `roami.okr.main.draft:${node || 'local'}:${projectId}`
   const [text, setText] = useState(() => localStorage.getItem(draftKey) || '')
   const [busy, setBusy] = useState(false)
@@ -51,7 +54,7 @@ function OkrMainInstance({ projectId, projectDir, draft, workspace, onClose, onU
       const status = await api('GET', '/agent/status')
       if (!alive.current) throw new Error('Conversation changed')
       let id: string
-      if (status.data?.projectOkrMain === true) {
+      if (status.data?.projectOkrMain === true && !reference) {
         const response = await api('POST', '/agent/conversations', create.current)
         id = response.data?.id
       } else if (workspace?.swarm.startsWith('sw-')) {
@@ -61,6 +64,7 @@ function OkrMainInstance({ projectId, projectDir, draft, workspace, onClose, onU
           api('GET', '/agent/swarms'),
         ])
         id = team.data?.mainConversationId
+        if (reference && id !== reference.conversationId) throw new Error('Referenced conversation changed')
         if (!id || team.data.archived || team.data.target?.projectId !== projectId || id === home.data?.id
           || !Array.isArray(directory.data) || (directory.data as SwarmSnapshot[]).some(item => item.mainConversationId === id && item.target?.projectId !== projectId)) throw new Error('Project Main unavailable')
       } else {
@@ -72,7 +76,7 @@ function OkrMainInstance({ projectId, projectDir, draft, workspace, onClose, onU
       return id
     })().finally(() => { acquiring.current = null })
     return acquiring.current
-  }, [projectId, workspace?.swarm])
+  }, [projectId, workspace?.swarm, reference?.conversationId])
   useEffect(() => {
     alive.current = true
     void acquire().catch(() => { if (alive.current) setFailed(true) }).finally(() => { if (alive.current) setRestoring(false) })
@@ -82,12 +86,14 @@ function OkrMainInstance({ projectId, projectDir, draft, workspace, onClose, onU
     const fresh = thread.view?.messages.filter(message => message.role === 'assistant' && message.status === 'completed' && !completed.current.has(message.id)) || []
     if (fresh.length) { fresh.forEach(message => completed.current.add(message.id)); onUpdated?.() }
   }, [thread.view, onUpdated])
+  const historical = !!thread.view && thread.view.branchId !== thread.view.conversation.active_branch_id
+  useAgentMessageFocus(scroll, cid, reference?.branchId || '', reference?.messageId || '', (thread.view?.messages || []).map(item => item.id).join(','), stick)
   const running = thread.view?.turns.some(turn => ['running', 'queued'].includes(turn.state)) || false
   const latestUser = Math.max(0, ...(thread.view?.messages.filter(message => message.role === 'user').map(message => message.seq) || []))
   const messages = thread.view?.messages.filter(message => ['user', 'assistant'].includes(message.role) && (message.content.text || message.content.question)) || []
   useEffect(() => { if (stick.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight }, [thread.view?.messages])
   const submit = async (answer = text, consumeDraft = true) => {
-    if (!answer.trim() || sending.current) return false
+    if (!answer.trim() || sending.current || historical) return false
     sending.current = true; setBusy(true); setFailed(false); setUpgradeRequired(false)
     if (!pending.current || pending.current.text !== answer) {
       const context = { projectId, projectDir, revision: workspace?.revision || 0, saved: !!workspace, draftStartDate: draft.startDate, draftEndDate: draft.endDate, objective: (workspace?.objective || draft.objective).slice(0, 6000), draftObjective: draft.objective !== workspace?.objective ? draft.objective.slice(0, 6000) : undefined, swarm: workspace?.swarm || draft.swarm, initiatives: workspace?.initiatives || draft.initiatives || [], dashboard: workspace?.dashboard || draft.dashboard, projectContext: workspace?.projectFiles ? { root: workspace.projectFiles.root, mainInstructions: workspace.projectFiles.mainInstructions, teamMemory: workspace.projectFiles.teamMemory, skills: workspace.projectFiles.skills } : undefined, snapshot: workspace ? { updatedAt: workspace.updatedAt, startDate: workspace.startDate, endDate: workspace.endDate, keyResults: workspace.keyResults.map(kr => resultOverview(workspace, kr)), metrics: workspace.metrics.map(metric => ({ ...metric, recentDays: dailyHistory(sourceObservations(workspace, metric)).slice(0, 14).map(day => ({ date: day.date, value: day.latest.value, delta: day.delta })) })), reviews: workspace.reviews.slice(-3) } : { keyResults: draft.keyResults, metrics: draft.metrics } }
@@ -113,16 +119,16 @@ function OkrMainInstance({ projectId, projectDir, draft, workspace, onClose, onU
   }
   const content = <aside className="okr-main-chat">
       {!secondaryPage && <header className="okr-chat-head"><strong>{t('okr.chatTitle')}</strong><button type="button" className="tt-act" aria-label={t('okr.endChat')} disabled={busy} onClick={onClose}><CloseIcon /></button></header>}
-      <p className="okr-chat-hint">{t('okr.chatHint')}</p>
+      {historical ? <div className="okr-chat-hint"><span>{t('agent.historicalBranch')}</span><Button onClick={onClearReference}>{t('agent.currentConversation')}</Button></div> : <p className="okr-chat-hint">{t('okr.chatHint')}</p>}
       <div ref={scroll} className="okr-chat-messages" aria-live="polite" onScroll={event => { const element = event.currentTarget; stick.current = element.scrollHeight - element.clientHeight - element.scrollTop < element.clientHeight * 0.1 }}>
         {!!thread.view?.page?.hasMore && <Button disabled={thread.loadingOlder} onClick={() => void thread.loadOlder()}>{t('okr.earlierMessages')}</Button>}
         {(thread.loading || restoring) && <Spin />}
         {!cid && <p className="okr-muted">{t('okr.chatEmpty')}</p>}
-        {messages.map(message => <article key={message.id} className={'okr-chat-message ' + message.role}><span className="okr-chat-speaker">{t(message.role === 'user' ? 'okr.you' : 'okr.mainAgent')}</span>{message.content.text && <Markdown>{message.role === 'user' ? message.content.text.split(contextMarker)[0] : message.content.text}</Markdown>}{message.content.question && <AgentQuestion question={message.content.question} disabled={busy || message.seq < latestUser} answer={answer => submit(answer, false)} />}</article>)}
+        {messages.map(message => <article key={message.id} data-message-id={message.id} className={'okr-chat-message ' + message.role}><span className="okr-chat-speaker">{t(message.role === 'user' ? 'okr.you' : 'okr.mainAgent')}</span>{message.content.text && <Markdown>{message.role === 'user' ? message.content.text.split(contextMarker)[0] : message.content.text}</Markdown>}{message.content.question && <AgentQuestion question={message.content.question} disabled={busy || historical || message.seq < latestUser} answer={answer => submit(answer, false)} />}</article>)}
         {running && <p className="okr-muted" role="status">{t('okr.agentWorking')}</p>}
       </div>
       {(failed || thread.failed || upgradeRequired) && <div className="okr-error" role="alert"><p>{t(upgradeRequired ? 'okr.agentUpgradeRequired' : 'agent.requestFailed')}</p>{(thread.failed || !cid) && <Button onClick={() => { if (cid) thread.refresh(); else { setFailed(false); setUpgradeRequired(false); void acquire().catch(() => setFailed(true)) } }}>{t('inbox.retry')}</Button>}</div>}
-      <ConversationComposer value={text} onChange={setText} label={t('okr.chatInput')} placeholder={t('okr.chatPlaceholder')} maxLength={workspace?.swarm.startsWith('sw-') ? 7992 : 20000} send={{ label: t('okr.send'), pending: busy, onClick: () => void submit() }} stop={running ? { label: t('agent.stop'), onClick: () => { void stop().catch(() => setFailed(true)) } } : undefined} />
+      <ConversationComposer disabled={historical} value={text} onChange={setText} label={t('okr.chatInput')} placeholder={t('okr.chatPlaceholder')} maxLength={workspace?.swarm.startsWith('sw-') ? 7992 : 20000} send={{ label: t('okr.send'), pending: busy, onClick: () => void submit() }} stop={running && !historical ? { label: t('agent.stop'), onClick: () => { void stop().catch(() => setFailed(true)) } } : undefined} />
     </aside>
   return secondaryPage ? <MobileSubPage title={t('okr.chatTitle')} onBack={onClose}>{content}</MobileSubPage> : content
 }

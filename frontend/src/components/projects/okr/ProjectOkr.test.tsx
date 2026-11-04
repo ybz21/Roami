@@ -11,8 +11,7 @@ vi.mock('../../swarm/useSwarmSnapshot', () => ({ useSwarmSnapshot: () => ({ data
 vi.mock('../../swarm/Swarm', () => ({ default: ({ initialSwarm }: { initialSwarm: string }) => <div data-testid="activities">{initialSwarm}</div> }))
 
 function panel(key: string) {
-  const choice = screen.queryByRole('radio', { name: 'okr.tab.' + ({ overview: 'okr', data: 'dashboard', review: 'status' }[key] || key) })
-  if (choice) fireEvent.click(choice)
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.' + ({ overview: 'okr', data: 'dashboard' }[key] || key) }))
 }
 
 const state = vi.hoisted(() => ({ phone: false, api: vi.fn() }))
@@ -41,7 +40,7 @@ it('keeps project navigation available and preserves a configuration draft acros
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.files' }))
   expect(await screen.findByTestId('project-files')).toHaveProperty('textContent', '/project')
   expect(screen.getByTestId('project-files').getAttribute('data-bundle-root')).toBeNull()
-  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.okr' }))
   expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('Unfinished goal edit')
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
 })
@@ -71,74 +70,6 @@ it('keeps an edited objective across 409, reloads revision and saves only config
   expect(body).not.toHaveProperty('reviews')
 })
 
-it('records manual zero and real review input, uses each returned revision and links to the existing swarm', async () => {
-  let revision = 3
-  state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/agent/swarms') return { data: [{ id: 'sw-11111111111111111111111111111111', name: 'real-team' }] }
-    if (method === 'POST') return { data: { ...initial, revision: ++revision, reviews: path.endsWith('/reviews') ? [{ id: 'review', ...body, evidenceRevision: revision - 1, date: '2026-11-03T01:00:00Z' }] : [] } }
-    return { data: initial }
-  })
-  render(<ProjectOkr projectId="stable-project" />)
-  await screen.findByText('Launch')
-  expect(screen.queryByTestId('activities')).toBeNull()
-  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.activities' }))
-  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', 'sw-11111111111111111111111111111111')
-  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.board' }))
-  panel('data')
-  fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '0' } })
-  fireEvent.change(screen.getByLabelText('okr.date'), { target: { value: '2026-11-02' } })
-  fireEvent.change(screen.getByLabelText('okr.note'), { target: { value: 'Actual count' } })
-  fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
-  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/observations', expect.objectContaining({ revision: 3, metricId: 'visits', value: 0, note: 'Actual count' })))
-  await waitFor(() => expect((screen.getByLabelText('okr.note') as HTMLInputElement).value).toBe(''))
-  panel('review')
-  fireEvent.change(screen.getByLabelText('okr.reviewSummary'), { target: { value: 'Observed outcome' } })
-  fireEvent.change(screen.getByLabelText('okr.reviewActions'), { target: { value: 'Next experiment' } })
-  fireEvent.click(screen.getByRole('button', { name: 'okr.submitReview' }))
-  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/reviews', { revision: 4, summary: 'Observed outcome', actions: 'Next experiment' }))
-  expect((await screen.findAllByText('Observed outcome')).length).toBeGreaterThan(0)
-})
-
-it('does not collect on template selection or page load; only collects saved sources on explicit action', async () => {
-  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: null })
-  const view = render(<ProjectOkr projectId="new-project" />)
-  fireEvent.click(await screen.findByRole('button', { name: 'okr.template.use' }))
-  expect((screen.getByLabelText('okr.objective') as HTMLTextAreaElement).value).toBe('okr.template.objective')
-  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
-  view.unmount()
-  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: initial })
-  render(<ProjectOkr projectId="stable-project" />)
-  await screen.findByText('Launch')
-  panel('data')
-  fireEvent.click(screen.getByRole('button', { name: 'okr.collect' }))
-  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/collect', { revision: 3 }))
-})
-
-it('keeps manual and review input on conflicts and never displays invented progress', async () => {
-  state.api.mockImplementation(async (method, path) => {
-    if (path === '/agent/swarms') return { data: [] }
-    if (method === 'POST') throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 })
-    return { data: initial }
-  })
-  render(<ProjectOkr projectId="stable-project" />)
-  await screen.findByText('Launch')
-  expect(screen.queryByText('okr.periodChange')).toBeNull()
-  panel('data')
-  fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '5' } })
-  fireEvent.change(screen.getByLabelText('okr.note'), { target: { value: 'Kept note' } })
-  panel('review')
-  fireEvent.change(screen.getByLabelText('okr.reviewSummary'), { target: { value: 'Kept review' } })
-  fireEvent.change(screen.getByLabelText('okr.reviewActions'), { target: { value: 'Kept actions' } })
-  fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
-  await screen.findByRole('alert')
-  fireEvent.click(screen.getByRole('button', { name: 'okr.loadLatest' }))
-  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-  expect((screen.getByLabelText('okr.value') as HTMLInputElement).value).toBe('5')
-  expect((screen.getByLabelText('okr.note') as HTMLInputElement).value).toBe('Kept note')
-  expect((screen.getByLabelText('okr.reviewSummary') as HTMLTextAreaElement).value).toBe('Kept review')
-  expect((screen.getByLabelText('okr.reviewActions') as HTMLTextAreaElement).value).toBe('Kept actions')
-})
-
 it('uses a URL-backed phone page without pushing overlay history and returns to the stable project', async () => {
   state.phone = true
   history.replaceState(null, '', '#/projects/stable-project/okr?node=remote')
@@ -149,41 +80,6 @@ it('uses a URL-backed phone page without pushing overlay history and returns to 
   fireEvent.click(screen.getByRole('button', { name: 'common.back' }))
   expect(location.hash).toBe('#/projects/stable-project?node=remote')
   push.mockRestore()
-})
-
-it('keeps a removed manual metric unselected after conflict instead of moving the draft to another metric', async () => {
-  let changed = false
-  state.api.mockImplementation(async (method, path) => {
-    if (path === '/agent/swarms') return { data: [] }
-    if (method === 'POST') { changed = true; throw Object.assign(new Error('OKR_CONFLICT'), { status: 409 }) }
-    return { data: changed ? { ...initial, revision: 8, metrics: [{ id: 'another', name: 'Another metric', source: 'manual', unit: '' }], keyResults: [{ ...initial.keyResults[0], metricId: 'another' }] } : initial }
-  })
-  render(<ProjectOkr projectId="stable-project" />)
-  await screen.findByText('Launch')
-  panel('data')
-  fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '5' } })
-  fireEvent.change(screen.getByLabelText('okr.note'), { target: { value: 'Original metric note' } })
-  fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
-  await screen.findByRole('alert')
-  fireEvent.click(screen.getByRole('button', { name: 'okr.loadLatest' }))
-  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-  fireEvent.submit(screen.getByLabelText('okr.value').closest('form')!)
-  expect(state.api.mock.calls.filter(c => c[0] === 'POST')).toHaveLength(1)
-  expect((screen.getByLabelText('okr.note') as HTMLInputElement).value).toBe('Original metric note')
-  panel('data')
-  expect((screen.getByRole('button', { name: 'okr.record' }) as HTMLButtonElement).disabled).toBe(true)
-})
-
-it('keeps removed-metric history traceable and marks reviews only after a subsequent revision', async () => {
-  const historical = { ...initial, revision: 4, reviews: [{ id: 'review', summary: 'Saved review', actions: '', date: '2026-11-03T01:00:00Z', evidenceRevision: 3 }], observations: [{ id: 'old', metricId: 'removed', date: '2026-11-01', value: 6, note: 'Retained evidence', source: 'manual', sourceKey: 'manual:removed', capturedAt: '2026-11-01T01:00:00Z' }] }
-  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: historical })
-  const view = render(<ProjectOkr projectId="stable-project" />)
-  expect(await screen.findByText('Retained evidence')).toBeTruthy()
-  expect(screen.queryByText('okr.reviewUpdated')).toBeNull()
-  view.unmount()
-  state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: { ...historical, revision: 5 } })
-  render(<ProjectOkr projectId="stable-project" />)
-  expect(await screen.findByText('okr.reviewUpdated')).toBeTruthy()
 })
 
 it('creates a workspace with an arbitrary manual metric and key result at revision zero', async () => {
@@ -266,7 +162,7 @@ it('updates visible snapshots every 30 seconds without loops, backs off errors a
   expect(reads()).toHaveLength(8)
 })
 
-it('discards a poll when editing starts in flight and preserves manual or review drafts with their original revision', async () => {
+it('discards a poll when editing starts in flight and preserves the configuration draft', async () => {
   vi.useFakeTimers()
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
   let next = initial, hold = false
@@ -294,28 +190,7 @@ it('discards a poll when editing starts in flight and preserves manual or review
   fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
   await advance(30_000)
   expect(screen.getByText('External revision four')).toBeTruthy()
-  panel('data')
-  fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '0' } })
-  next = { ...initial, revision: 5, objective: 'External revision five' }
-  await advance(60_000)
-  expect(reads()).toHaveLength(3)
-  expect((screen.getByLabelText('okr.value') as HTMLInputElement).value).toBe('0')
-  panel('data')
-  fireEvent.change(screen.getByLabelText('okr.value'), { target: { value: '' } })
-  await advance(30_000)
-  expect(screen.getByText('External revision five')).toBeTruthy()
-  panel('review')
-  fireEvent.change(screen.getByLabelText('okr.reviewSummary'), { target: { value: 'My review draft' } })
-  fireEvent.change(screen.getByLabelText('okr.reviewActions'), { target: { value: 'My actions' } })
-  next = { ...initial, revision: 6, objective: 'External revision six' }
-  await advance(60_000)
-  expect(reads()).toHaveLength(4)
-  expect(screen.queryByText('External revision six')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'okr.submitReview' }))
-  await advance(0)
-  expect(state.api).toHaveBeenCalledWith('POST', '/projects/stable-project/okr/reviews', { revision: 5, summary: 'My review draft', actions: 'My actions' })
-  expect((screen.getByLabelText('okr.reviewSummary') as HTMLTextAreaElement).value).toBe('My review draft')
-  expect(screen.getByRole('alert').textContent).toContain('okr.conflict')
+
 })
 
 
@@ -349,7 +224,7 @@ it('keeps the inner navigation during editing and saves initiatives with KR bind
   fireEvent.click(await screen.findByRole('button', { name: 'okr.edit' }))
   fireEvent.change(screen.getByLabelText('okr.initiativeTitle'), { target: { value: 'Weekly X walkthroughs' } })
   panel('data')
-  expect(screen.getByRole('radio', { name: 'okr.tab.okr' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'okr.tab.okr' })).toBeTruthy()
   panel('overview')
   expect((screen.getByLabelText('okr.initiativeTitle') as HTMLInputElement).value).toBe('Weekly X walkthroughs')
   fireEvent.click(screen.getByRole('button', { name: 'okr.save' }))
@@ -382,11 +257,26 @@ it('keeps a configuration draft on pending-file conflicts and offers file confir
   expect(state.api.mock.calls.filter(call => call[0] === 'PUT')[1][2]).toMatchObject({ revision: 4, objective: 'Preserved GUI draft' })
 })
 
-it('passes the saved bundle path to Files without assuming it exists for unsaved projects', async () => {
+it('opens the project root and exposes memory separately without configuration or review pages', async () => {
   state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: { ...initial, projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 3 } } })
   render(<ProjectOkr projectId="stable-project" projectDir="/project" />)
   await screen.findByText('Launch')
   fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.files' }))
-  expect((await screen.findByTestId('project-files')).getAttribute('data-bundle-root')).toBe('.roami/okr')
+  expect((await screen.findByTestId('project-files')).textContent).toBe('/project')
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.teamMemory' }))
+  expect((await screen.findAllByTestId('project-files')).some(item => item.textContent === '/project/.roami/okr/memory')).toBe(true)
+  expect(screen.queryByRole('tab', { name: 'okr.tab.status' })).toBeNull()
+  expect(screen.queryByText('okr.projectConfiguration')).toBeNull()
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})
+
+
+it('keeps data as a read-only dashboard and leaves reflection in project files', async () => {
+  render(<ProjectOkr projectId="stable-project" projectDir="/project" />)
+  await screen.findByText('Launch')
+  panel('data')
+  expect(await screen.findByTestId('trend')).toBeTruthy()
+  for (const label of ['okr.reviewSummary', 'okr.value', 'okr.note']) expect(screen.queryByLabelText(label)).toBeNull()
+  expect(screen.queryByRole('button', { name: 'okr.collect' })).toBeNull()
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
 })

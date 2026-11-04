@@ -2,6 +2,7 @@
 
 from roami_agent.protocol.identity import now_ms
 from roami_agent.storage.database import rows
+from roami_agent.storage.transcript_repository import owned
 
 NOTICE_FROM = (
     " FROM events e JOIN conversations c ON c.id=e.conversation_id "
@@ -14,23 +15,34 @@ NOTICE_FROM = (
 )
 
 
-def notification_summary(db, owner):
-    return dict(
+def notification_summary(db, owner, conversation_id=None):
+    if conversation_id:
+        owned(db, owner, conversation_id)
+    result = dict(
         db.execute(
             "SELECT COALESCE(SUM(e.id>COALESCE(r.event_cursor,0)),0) AS unread,COALESCE(MAX(e.id),0) AS cursor"
-            + NOTICE_FROM,
-            (owner,),
+            + NOTICE_FROM
+            + " AND (? IS NULL OR e.conversation_id=?)",
+            (owner, conversation_id, conversation_id),
         ).fetchone()
     )
+    if conversation_id:
+        result["conversationId"] = conversation_id
+    return result
 
 
-def notification_page(db, owner, *, before=None, limit=20, unread_only=False):
+def notification_page(db, owner, *, before=None, limit=20, unread_only=False, conversation_id=None):
+    if conversation_id:
+        owned(db, owner, conversation_id)
     query = (
         "SELECT e.id,e.conversation_id,e.message_id,m.branch_id,e.created_ms,substr(c.title,1,200) AS title,"
         "substr(json_extract(native_content(m.content_json),'$.text'),1,180) AS summary,"
         "(e.id<=COALESCE(r.event_cursor,0)) AS read" + NOTICE_FROM
     )
     args = [owner]
+    if conversation_id:
+        query += " AND e.conversation_id=?"
+        args.append(conversation_id)
     if unread_only:
         query += " AND e.id>COALESCE(r.event_cursor,0)"
     if before is not None:

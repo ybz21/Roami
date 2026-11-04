@@ -108,7 +108,7 @@ class SwarmPlans:
                 goal
                 + "\n\nSwarm collaboration ID: "
                 + result["id"]
-                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_plan and swarm_status using tool_list. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. Use task_steer for changes to existing tasks. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
+                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_plan and swarm_status using tool_list. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. For later rounds reuse the existing named member and task via task_steer; never append r2/r3 members to replace its conversation. task_steer forwards the current user request and records it in the group/member thread. swarm_post only writes discussion; it does not deliver work. Use session_send only for a verified unrelated legacy session with its durable reply channel. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
                 + " Use the exact registered CLI command and input schema returned by tool_list or roami swarm help. Submit each managed command alone: no cd prefix, shell chaining or pipes; the host binds the execution context. Never probe a write operation with placeholder goals or acceptance criteria. Planning dispatches real tasks, so every item must carry its complete actual instructions and acceptance before submission."
             )
             start = await self.conversations.accept(
@@ -403,9 +403,26 @@ class SwarmPlans:
                     raise DomainError("SWARM_ARCHIVED", 409)
                 author = "human"
                 task_id = None
+                if spec.get("workId"):
+                    target = row(
+                        db,
+                        "SELECT task_id FROM swarm_work_items WHERE swarm_id=? AND id=?",
+                        (sid, spec["workId"]),
+                    )
+                    if not target or not target["task_id"]:
+                        raise DomainError("SWARM_MEMBER_TASK_REQUIRED", 409)
+                    task_id = target["task_id"]
+                    revision = spec.get("taskRevision")
+                    if type(revision) is not int or revision < 1:
+                        raise DomainError("TASK_REVISION_REQUIRED", 409)
+                    current = row(db, "SELECT revision FROM tasks WHERE id=?", (task_id,))
+                    if not current or current["revision"] != revision:
+                        raise DomainError("TASK_REVISION_CHANGED", 409)
                 if binding:
-                    task_id = binding.get("taskId")
-                    if task_id:
+                    if binding.get("taskId"):
+                        if spec.get("workId"):
+                            raise DomainError("SWARM_MAIN_REQUIRED", 403)
+                        task_id = binding["taskId"]
                         member = row(
                             db,
                             "SELECT member_name FROM swarm_work_items WHERE swarm_id=? AND task_id=?",
@@ -660,16 +677,9 @@ class SwarmPlans:
 
         info = await self.db.call(lambda db: snapshot(db, owner, sid))
         spec = recipient(spec, info)
-        await self.post(owner, sid, spec)
+        posted = await self.post(owner, sid, spec)
         key = "swarm.message:" + spec["commandKey"]
-        post = await self.db.call(
-            lambda db: row(
-                db,
-                "SELECT receipt_json FROM swarm_commands WHERE owner_id=? AND command_key=?",
-                (owner, spec["commandKey"]),
-            )
-        )
-        post_id = json.loads(post["receipt_json"])["id"]
+        post_id = posted["id"]
         stored = await self.db.call(
             lambda db: row(db, "SELECT delivery_json FROM swarm_posts WHERE id=?", (post_id,))
         )

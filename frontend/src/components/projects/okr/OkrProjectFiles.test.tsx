@@ -35,22 +35,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 function view(props: Partial<Parameters<typeof OkrProjectFiles>[0]> = {}) {
-  return <I18nProvider><AntApp><OkrProjectFiles dir="/project" bundleRoot=".roami/okr" active {...props} /></AntApp></I18nProvider>
+  return <I18nProvider><AntApp><OkrProjectFiles dir="/project" active {...props} /></AntApp></I18nProvider>
 }
 
-it('opens the actual saved bundle and returns to assets or the bundle from nested directories', async () => {
+it('opens the entire project root without extra configuration navigation or focus', async () => {
   render(view())
-  expect(await screen.findByText('okr.json')).toBeTruthy()
-  expect(state.dirs[0]).toBe('/project/.roami/okr')
-  fireEvent.click(screen.getByText('agents'))
-  await screen.findByText('main.md')
-  fireEvent.click(screen.getByRole('button', { name: '项目目录' }))
-  expect(await screen.findByText('artifacts')).toBeTruthy()
-  expect(screen.queryByText('.roami')).toBeNull()
+  await screen.findByText('artifacts')
+  expect(state.dirs[0]).toBe('/project')
+  expect(screen.queryByRole('button', { name: 'OKR 配置' })).toBeNull()
   expect(screen.queryByTestId('desktop-file')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'OKR 配置' }))
-  await screen.findByText('dashboard.json')
-  expect(state.dirs[state.dirs.length - 1]).toBe('/project/.roami/okr')
+  expect(document.activeElement?.tagName).not.toBe('INPUT')
   expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === 'GET')).toBe(true)
 })
 
@@ -69,45 +63,15 @@ it('keeps existing external file requests and phone preview/back navigation', as
   await waitFor(() => expect(state.dirs).toContain('/project/artifacts'))
 })
 
-it('shows assets and an honest hint before an OKR bundle has been saved', async () => {
-  render(view({ bundleRoot: undefined }))
-  await screen.findByText('artifacts')
-  expect(screen.getByText('保存 OKR 后，此处会显示项目中的配置文件。')).toBeTruthy()
+it('uses the requested memory directory as a normal file workspace', async () => {
+  render(view({ dir: '/project/.roami/okr/memory' }))
+  await waitFor(() => expect(state.dirs).toContain('/project/.roami/okr/memory'))
   expect(screen.queryByRole('button', { name: 'OKR 配置' })).toBeNull()
-  expect(state.dirs).toEqual(['/project'])
 })
 
-it('retains the real missing-directory error and offers assets without stale bundle entries', async () => {
-  render(view())
-  await screen.findByText('okr.json')
-  fireEvent.click(screen.getByRole('button', { name: '项目目录' }))
-  await screen.findByText('artifacts')
+it('retains the actual missing-directory error without switching to another root', async () => {
   state.missing = true
-  fireEvent.click(screen.getByRole('button', { name: 'OKR 配置' }))
+  render(view({ dir: '/project/.roami/okr' }))
   expect((await screen.findByRole('alert')).textContent).toBe('Fixture directory does not exist')
-  expect(screen.queryByText('artifacts')).toBeNull()
-  expect(screen.queryByText('okr.json')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '项目目录' }))
-  await screen.findByText('artifacts')
-})
-
-it('opens team, memory, connectors and existing dated or historical directories directly', async () => {
-  state.history = true
-  render(view())
-  await screen.findByRole('button', { name: '2026 年产物' })
-  for (const [label, path] of [['团队', '/project/.roami/okr/agents'], ['记忆', '/project/.roami/okr/memory'], ['数据连接', '/project/.roami/okr/connectors'], ['2026 年产物', '/project/2026'], ['历史资料', '/project/archive']]) {
-    fireEvent.click(screen.getByRole('button', { name: label }))
-    await waitFor(() => expect(state.dirs).toContain(path))
-    expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed')).toBe('true')
-  }
-  expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === 'GET')).toBe(true)
-})
-
-it('keeps the goal file list focused and opens a preview only for a selected file', async () => {
-  render(view())
-  await screen.findByText('okr.json')
-  expect(screen.queryByText('选择左侧文件查看预览')).toBeNull()
-  expect(document.activeElement?.tagName).not.toBe('INPUT')
-  fireEvent.click(screen.getByText('okr.json'))
-  expect((await screen.findByTestId('desktop-file')).textContent).toBe('/project/.roami/okr/okr.json')
+  expect(state.dirs.every(path => path === '/project/.roami/okr')).toBe(true)
 })

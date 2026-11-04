@@ -16,7 +16,7 @@ afterEach(cleanup)
 it('restores the same persistent Main when reopened and closing the view never stops it', async () => {
   const close = vi.fn()
   const view = render(<OkrMainChat projectId="project" projectDir="/repo" draft={emptyConfiguration()} workspace={null} onClose={close} />)
-  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null))
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
   fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Help define my goal' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: expect.stringContaining('"projectId":"project"') })))
@@ -88,7 +88,7 @@ it('restores an existing exclusive team Main on older runtimes without creating 
   const team = { id: 'sw-existing', mainConversationId: 'existing-main', target: { projectId: 'project' } }
   state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? {} : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
-  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('existing-main', '', null))
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('existing-main', '', null, ''))
   expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations')).toBe(false)
   expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(false)
 })
@@ -106,13 +106,31 @@ it('restores the unsent project draft after closing and reopening', async () => 
   view.unmount()
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} />)
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep my next instruction')
-  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null))
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
 })
 it('records coordinator instructions in the existing shared team conversation', async () => {
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
-  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null))
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
   fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: '@writer needs a new plan' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/swarms/sw-existing/messages', expect.objectContaining({ text: '@leader @writer needs a new plan', commandKey: expect.any(String) })))
   expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations/independent/messages')).toBe(false)
+})
+
+
+it('opens a verified project notification in the existing Main without creating or sending anything', async () => {
+  const team = { id: 'sw-existing', mainConversationId: 'existing-main', target: { projectId: 'project' } }
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true } : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} reference={{ conversationId: 'existing-main', branchId: 'original-branch', messageId: 'original-message' }} onClose={vi.fn()} />)
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('existing-main', 'original-branch', null, 'original-message'))
+  expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations' || call[1].endsWith('/messages'))).toBe(false)
+})
+
+it('rejects a notification for another conversation and keeps the project draft', async () => {
+  const team = { id: 'sw-existing', mainConversationId: 'existing-main', target: { projectId: 'project' } }
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true } : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} reference={{ conversationId: 'another-project-main', branchId: '', messageId: '' }} onClose={vi.fn()} />)
+  await screen.findByRole('alert')
+  expect(state.thread.mock.calls.every(call => !call[0])).toBe(true)
+  expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations' || call[1].endsWith('/messages'))).toBe(false)
 })

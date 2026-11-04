@@ -6,6 +6,7 @@ import ManagedSwarm from './ManagedSwarm'
 import type { SwarmSnapshot } from './swarm-protocol'
 
 const test = vi.hoisted(() => ({ phone: false, api: vi.fn(), refresh: vi.fn(), openTask: vi.fn(), error: vi.fn(), data: null as SwarmSnapshot | null }))
+vi.mock('../../session-overview', () => ({ useSessionOverview: () => ({ value: [{ name: 'real-session', dormant: false }], failed: false }) }))
 vi.mock('../../api', () => ({ api: (...args: unknown[]) => test.api(...args) }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: test.phone }) }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))

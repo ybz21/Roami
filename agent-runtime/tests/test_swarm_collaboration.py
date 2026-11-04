@@ -1354,3 +1354,29 @@ async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, 
         )
     finally:
         await database.close()
+
+
+async def test_directed_chat_belongs_to_member_task_and_rejects_nonexistent_recipient(
+    collaboration,
+):
+    swarms, created = collaboration
+    await plan(swarms, created, [item("writer", executor="native")])
+    await advance(swarms, created)
+    work = (await swarms.snapshot("alice", created["id"]))["work"][0]
+    payload = {
+        "commandKey": "direct",
+        "text": "Continue the draft",
+        "workId": work["id"],
+        "taskRevision": 1,
+    }
+    await swarms.send("alice", created["id"], payload)
+    posts = (await swarms.snapshot("alice", created["id"]))["posts"]
+    assert posts[-1]["taskId"] == work["task_id"]
+    before = len(posts)
+    with pytest.raises(DomainError, match="SWARM_MEMBER_TASK_REQUIRED"):
+        await swarms.send(
+            "alice",
+            created["id"],
+            {**payload, "commandKey": "invalid", "workId": "another-team-work"},
+        )
+    assert len((await swarms.snapshot("alice", created["id"]))["posts"]) == before

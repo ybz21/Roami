@@ -12,7 +12,7 @@ const notices = [
   { id: 4, conversation_id: 'main', branch_id: 'branch', message_id: 'message', title: 'New report', summary: 'Report ready', created_ms: 1, read: false },
   { id: 2, conversation_id: 'main', branch_id: 'branch', title: 'Old report', summary: '', created_ms: 1, read: true },
 ]
-const inbox = () => ({ conversations: [], notices: [], unread: 1, cursor: 4, unavailable: false, refresh: vi.fn() })
+const inbox = () => ({ conversations: [{ id: 'main', title: 'Home', active_branch_id: 'branch', updated_ms: 0 }], notices: [], unread: 1, cursor: 4, unavailable: false, refresh: vi.fn() })
 it('loads a short page only when opened and applies Unread on the server', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => ({ data: { items: path.includes('unreadOnly=true') ? notices.slice(0, 1) : notices, nextCursor: null } }))
   const select = vi.fn()
@@ -25,7 +25,7 @@ it('loads a short page only when opened and applies Unread on the server', async
   expect(screen.queryByText('Future reminder')).toBeNull()
   expect(screen.queryByText('Old report')).toBeNull()
   fireEvent.click(screen.getByText('New report'))
-  expect(select).toHaveBeenCalledWith('main', 'branch', 'message')
+  await waitFor(() => expect(select).toHaveBeenCalledWith('main', 'branch', 'message'))
 })
 it('marks all notices through the observed watermark without downloading every page', async () => {
   vi.mocked(api).mockResolvedValue({ data: { items: notices, nextCursor: '2' } })
@@ -51,4 +51,15 @@ it('does not report an empty inbox while the first page is pending or failed', a
   expect(screen.queryByText('agent.noNotifications')).toBeNull()
   expect(await screen.findByRole('alert')).toBeTruthy()
   expect(screen.queryByText('agent.noNotifications')).toBeNull()
+})
+
+it('scopes a conversation workspace on the server and acknowledges only that conversation', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.includes('/summary') ? { conversationId: 'main', unread: 1, cursor: 4 } : { items: [...notices, { ...notices[0], id: 5, conversation_id: 'project-main', title: 'Another project' }], nextCursor: null } }))
+  render(<AgentInbox conversationId="main" inbox={inbox()} select={vi.fn()} />)
+  await screen.findByText('New report')
+  expect(screen.queryByText('Another project')).toBeNull()
+  expect(api).toHaveBeenCalledWith('GET', expect.stringContaining('conversationId=main'), undefined, expect.anything())
+  fireEvent.click(screen.getByRole('button', { name: 'agent.notification.readAll' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/conversations/main/read', { eventId: 4 }))
+  expect(vi.mocked(api).mock.calls.some(([method, path]) => method === 'POST' && path === '/agent/notifications/read')).toBe(false)
 })

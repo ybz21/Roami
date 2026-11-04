@@ -608,8 +608,12 @@ def create_app(runtime, *, manage_lifecycle=True):
         }
 
     @app.get("/v1/reminders")
-    async def reminders(owner: Owner):
-        items = await runtime.reminders.list(owner) + await runtime.briefs.reminders(owner)
+    async def reminders(owner: Owner, conversationId: str | None = None):
+        if conversationId:
+            await runtime.conversations.get(owner, conversationId)
+        items = await runtime.reminders.list(
+            owner, conversationId
+        ) + await runtime.briefs.reminders(owner, conversationId)
         items.sort(key=lambda item: (not item["enabled"], -item["createdMs"]))
         return {"data": items}
 
@@ -879,8 +883,8 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.notifications.mark_read(owner, cid, body.eventId)}
 
     @app.get("/v1/notifications/summary")
-    async def notice_summary(owner: Owner):
-        return {"data": await runtime.notifications.summary(owner)}
+    async def notice_summary(owner: Owner, conversationId: str | None = None):
+        return {"data": await runtime.notifications.summary(owner, conversationId)}
 
     @app.post("/v1/notifications/read")
     async def read_notices(owner: Owner, body: ReadCursor):
@@ -892,10 +896,15 @@ def create_app(runtime, *, manage_lifecycle=True):
         limit: int = Query(20, ge=1, le=50),
         before: int | None = Query(None, ge=1),
         unreadOnly: bool = False,
+        conversationId: str | None = None,
     ):
         return {
             "data": await runtime.notifications.page(
-                owner, before=before, limit=limit, unread_only=unreadOnly
+                owner,
+                before=before,
+                limit=limit,
+                unread_only=unreadOnly,
+                conversation_id=conversationId,
             )
         }
 
