@@ -259,7 +259,7 @@ func TestRevocationRejectsQueuedRequestBeforeItReachesUpstream(t *testing.T) {
 	waiting := false
 	for time.Now().Before(deadline) {
 		h.mu.Lock()
-		waiting = h.admissionChanged != nil
+		waiting = len(h.admissionQueue) > 0
 		h.mu.Unlock()
 		if waiting {
 			break

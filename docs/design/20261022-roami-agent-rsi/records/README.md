@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-05 | [Go 网关准入顺序与取消恢复](2026-11-05/gateway-admission-order.md) |
 | 2026-11-04 | [对话契约、任务身份与过程错误](2026-11-04/conversation-contract-parity.md) |
 | 2026-11-03 | [重复取消时完整保存停止收尾](2026-11-03/cancellation-settlement.md) |
 | 2026-11-03 | [取消期间完整保存执行失败记录](2026-11-03/failure-settlement-cancellation.md) |
