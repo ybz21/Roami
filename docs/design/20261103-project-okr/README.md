@@ -10,7 +10,7 @@
 
 浏览器上传：[设计（HTML）](browser-upload.html)、[调用契约与实际字节验收（HTML）](browser-upload-acceptance.html)。成功选择文件与平台上传、提交、公开分别验收。
 
-2026-11-04：当前主线基于已合入 PR648/650 的 main，补齐项目文件、方法与指标看板、按需目标对话工具、团队记忆和真实交付验收；本轮主线尚未部署。
+2026-11-04：当前主线基于已合入 PR648/650 的 main，补齐项目文件、方法与指标看板、按需目标对话工具、团队记忆和真实交付验收；展示与CLI已部署57008dd9，实际项目文件已生成；生产Go Agent/Python保持原进程，完整执行内核尚未部署。
 
 - [总体方案、完整用户故事与技术架构（HTML）](overall-solution.html)
 - [集成、桌面/真机及真实宣传验收（HTML）](integration-acceptance.html)
@@ -32,3 +32,5 @@
 - [旧蜂群恢复与验收（HTML）](legacy-recovery.html)
 - [活动场景与项目归属修复](../20261104-okr-studio-project-ownership/README.md)
 - [原输入/输出交互设计原型（HTML）](../20261030-okr每日行动/interaction-design.html)
+
+展示验收与当前运行团队的边界见[最终项目（HTML）](final-workspace.html)：生产旧历史已保留，新的受管团队有Main、共享群聊和真实依赖，当前暂停派发。Android页面能加载，系统输入焦点阻断的点按没有计为通过。
