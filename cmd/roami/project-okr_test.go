@@ -57,3 +57,28 @@ func TestProjectOKRRejectsMalformedOrMissingWriteInput(t *testing.T) {
 		t.Fatal("write without revision input accepted")
 	}
 }
+
+func TestProjectOKRSyncAndMemoryCommands(t *testing.T) {
+	t.Setenv("ROAMI_HOME", t.TempDir())
+	for _, tc := range []struct{ action, method, suffix, body string }{{"sync", "POST", "/sync", `{"revision":4}`}, {"memory", "PUT", "/memory", `{"content":"team","expectedSha256":"abc"}`}} {
+		t.Run(tc.action, func(t *testing.T) {
+			input := filepath.Join(t.TempDir(), "input.json")
+			if err := os.WriteFile(input, []byte(tc.body), 0600); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Method != tc.method || r.URL.Path != "/api/projects/project/okr"+tc.suffix {
+					t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{"revision":5}}`))
+			}))
+			defer server.Close()
+			if code := runProjectOKR([]string{tc.action, "project", "--file", input, "--server", server.URL, "--json"}); code != 0 || calls != 1 {
+				t.Fatal(code, calls)
+			}
+		})
+	}
+}

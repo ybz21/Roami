@@ -69,6 +69,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 			metadb.RetireLegacyFiles(dataDir)
 		}
 	}()
+	projects := project.NewStore(dataDir, meta)
 	return &API{GitFootprints: NewGitFootprintStore(dataDir), Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir), AgentProviders: agentproviders.NewStore(dataDir),
 		AgentVerification: NewAgentVerificationStore(dataDir), Prefs: NewPreferencesStore(dataDir), Workspace: NewWorkspaceStore(dataDir), Races: race.NewStore(dataDir, meta),
@@ -78,7 +79,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 			}
 			return nil
 		}),
-		Projects: project.NewStore(dataDir, meta), ProjectOKR: openProjectOKR(dataDir), FileIndex: search.NewFileIndex(), Meta: meta,
+		Projects: projects, ProjectOKR: openProjectOKR(dataDir, projects), FileIndex: search.NewFileIndex(), Meta: meta,
 		agentLink: newAgentLinker()}
 }
 

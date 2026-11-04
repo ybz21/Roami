@@ -10,6 +10,7 @@ class Payload(BaseModel):
 class CreateConversation(Payload):
     requestKey: str | None = Field(default=None, min_length=1, max_length=200)
     title: str = Field(default="New conversation", max_length=200)
+    projectId: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class SendMessage(Payload):
@@ -100,6 +101,7 @@ class ConfirmMemory(Confirm):
 
 
 class ConfirmTask(Confirm):
+    evidence: dict | None = None
     revision: int | None = Field(default=None, ge=1)
     runId: str | None = Field(default=None, min_length=1, max_length=200)
 

@@ -189,6 +189,11 @@ ROAMI_BROWSER_OBSERVATION
     else
         mv -f "$observation_tmp" "${CHROME_DIR}/browser-observation.mjs"
     fi
+    local upload_tmp="${CHROME_DIR}/file-upload.mjs.$$.tmp"
+    cat > "$upload_tmp" <<'ROAMI_FILE_UPLOAD'
+@@FILE_UPLOAD@@
+ROAMI_FILE_UPLOAD
+    mv -f "$upload_tmp" "${CHROME_DIR}/file-upload.mjs"
     local scoped_tmp="${CHROME_DIR}/scoped-cdp.mjs.$$.tmp"
     cat > "$scoped_tmp" <<'ROAMI_SCOPED_CDP'
 @@SCOPED_CDP@@
@@ -333,6 +338,7 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
   roami chrome click <选择器>            点击
   roami chrome fill  <选择器> <文本>     填表单（直接设值）
   roami chrome type  <选择器> <文本>     逐字键入
+  roami chrome upload <文件输入框选择器> <绝对文件路径> --target <id>  选择一个本机文件
   roami chrome press [选择器] <键>       按键（如 Enter / Control+a）
   roami chrome text  [选择器]            取可见文本（默认 body）
   roami chrome html  [选择器]            取 HTML（默认整页）
@@ -362,6 +368,10 @@ roami chrome — 浏览器自动化（Playwright over CDP，驱动 ttmux Web 镜
             --operation-id <32位ID> --receipt-root <私有目录>（持久化动作回执）
             --expected-browser <实例ID> --expected-scene <观察签名>（动作前验证）
             --timeout <ms>（默认 15000）  --cdp <地址>
+  上传限制: 当前 Playwright CDP 传输仅支持小于 50 MiB（不是网站平台限制）
+  上传选项: --file-root <绝对目录>（限定源文件范围）
+            --max-file-bytes <字节数> --expected-file-sha256 <摘要>
+            成功只表示文件已选入页面；继续观察上传/提交结果，unknown 不重放
   截图选项: --viewport 1280x800  --wait <ms>  --clip x,y,w,h  --fast
             --fresh --goto <url>（临时干净 Chrome 截图）  --quality <1-100>（jpg）
             --mobile（手机视口=iPhone）  --device iphone|iphone-se|pixel|ipad（指定机型）
@@ -403,6 +413,7 @@ else
     _write_driver
 fi
 no_start=0
+[ "$sub" != "upload" ] || no_start=1
 for arg in "$@"; do
     [ "$arg" != "--no-start" ] || no_start=1
 done

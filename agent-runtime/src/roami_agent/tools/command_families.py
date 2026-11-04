@@ -48,6 +48,8 @@ def chrome_operation(argv):
         args["selector"] = positionals[0]
     elif verb in {"fill", "type"} and len(positionals) == 2:
         args.update(selector=positionals[0], text=positionals[1])
+    elif verb == "upload" and len(positionals) == 2:
+        args.update(selector=positionals[0], path=positionals[1])
     elif verb == "press" and len(positionals) == 1:
         args["key"] = positionals[0]
     else:

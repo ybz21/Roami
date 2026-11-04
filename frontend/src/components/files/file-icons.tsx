@@ -135,7 +135,7 @@ export const Chevron = ({ open }: { open: boolean }) => (
 
 export const IconButton = ({ title, children, danger, onClick, disabled, width = 24 }: { title: string; children: ReactNode; danger?: boolean; onClick?: (e: React.MouseEvent) => void; disabled?: boolean; width?: number | string }) => (
   <Tooltip title={title}>
-    <Button type="text" size="small" disabled={disabled} danger={danger} onClick={(e) => { e.stopPropagation(); onClick?.(e) }}
+    <Button type="text" size="small" aria-label={title} disabled={disabled} danger={danger} onClick={(e) => { e.stopPropagation(); onClick?.(e) }}
       style={{ width, height: 24, minWidth: 24, padding: width === 24 ? 0 : '0 6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
       {children}
     </Button>

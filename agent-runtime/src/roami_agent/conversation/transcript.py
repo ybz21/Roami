@@ -61,10 +61,15 @@ class Conversations:
 
         return await self.db.call(write, write=True)
 
-    async def create(self, owner: str, title="New conversation", *, request_key=None):
+    async def create(
+        self, owner: str, title="New conversation", *, request_key=None, project_id=None
+    ):
         if request_key is not None and (not request_key or len(request_key) > 200):
             raise DomainError("INVALID_REQUEST_KEY")
-        digest = hashlib.sha256(encoded(["create_conversation", title]).encode()).hexdigest()
+        payload = ["create_conversation", title]
+        if project_id is not None:
+            payload.append({"projectId": project_id})
+        digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
 
         def write(db):
             if request_key:
@@ -79,6 +84,11 @@ class Conversations:
                     return owned(db, owner, prior["conversation_id"])
             conversation = self._new(db, owner, title)
             cid = conversation["id"]
+            if project_id is not None:
+                db.execute(
+                    "INSERT INTO project_okr_conversations VALUES(?,?,?)",
+                    (cid, owner, project_id),
+                )
             if request_key:
                 db.execute(
                     "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",

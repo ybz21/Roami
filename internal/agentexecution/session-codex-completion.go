@@ -43,6 +43,14 @@ type codexPayload struct {
 
 // A stable provider transcript can reconcile a lost callback, without replaying input.
 func codexCompletion(binding SessionBinding, turn, promptHash string) (*Result, string) {
+	return codexOutcome(binding, turn, promptHash, false)
+}
+
+func codexOutcome(binding SessionBinding, turn, promptHash string, cancelled bool) (*Result, string) {
+	return codexTranscriptOutcome(binding, turn, promptHash, cancelled, false)
+}
+
+func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, cancelled, initial bool) (*Result, string) {
 	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
 		return nil, ""
 	}
@@ -93,7 +101,7 @@ func codexCompletion(binding SessionBinding, turn, promptHash string) (*Result, 
 	line := tail[bytes.LastIndexByte(tail, '\n')+1:]
 	var last codexRecord
 	var end codexPayload
-	if json.Unmarshal(line, &last) != nil || last.Type != "event_msg" || json.Unmarshal(last.Payload, &end) != nil || end.Type != "task_complete" || end.TurnID != turn {
+	if json.Unmarshal(line, &last) != nil || last.Type != "event_msg" || json.Unmarshal(last.Payload, &end) != nil || (end.Type != "task_complete" && !(cancelled && end.Type == "turn_aborted")) || end.TurnID != turn {
 		return nil, ""
 	}
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
@@ -103,6 +111,7 @@ func codexCompletion(binding SessionBinding, turn, promptHash string) (*Result, 
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), hash))
 	active, assistant := "", ""
 	metadata, matched, finalAnswer, aborted := false, false, false, false
+	startedTurns := 0
 	calls := map[string]bool{}
 	var result *Result
 	for {
@@ -125,11 +134,22 @@ func codexCompletion(binding SessionBinding, turn, promptHash string) (*Result, 
 			metadata = true
 		case "event_msg":
 			if value.Type == "task_started" {
+				startedTurns++
+				if initial && (startedTurns != 1 || value.TurnID != turn || value.RootTurnID != turn) {
+					return nil, ""
+				}
 				active, assistant, matched, result = value.TurnID, "", false, nil
 				finalAnswer, aborted = false, false
 				calls = map[string]bool{}
 			} else if active == turn && (value.Type == "turn_aborted" || value.Type == "task_failed") {
 				aborted = true
+				if cancelled && value.Type == "turn_aborted" && value.TurnID == turn && (value.RootTurnID == "" || value.RootTurnID == turn) && matched && len(calls) == 0 {
+					stamp, e := time.Parse(time.RFC3339Nano, record.Timestamp)
+					if e != nil {
+						return nil, ""
+					}
+					result = &Result{State: "cancelled", Summary: "Session task stopped after cancellation request", FinishedMS: stamp.UnixMilli()}
+				}
 			} else if value.Type == "task_complete" {
 				if active != turn {
 					continue
@@ -190,7 +210,7 @@ func codexCompletion(binding SessionBinding, turn, promptHash string) (*Result, 
 }
 
 func (s Service) reconcileCodexCompletion(key string, status Status, state *sessionLifecycle, path string) (Status, bool, error) {
-	if state.Executor != "codex" || (state.State != "unknown" && state.State != "busy") || state.LaunchKey != key || state.Binding.ProviderID != status.Binding.ProviderID || len(state.Tools) != 0 {
+	if state.Executor != "codex" || (state.State != "unknown" && state.State != "busy") || state.LaunchKey != key || state.Binding.ProviderID != status.Binding.ProviderID {
 		return status, false, nil
 	}
 	dir, _ := s.directory(key)
@@ -198,9 +218,28 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 	if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" || workspaceHash(sessionPrompt(dir, spec)) != state.PromptHash {
 		return status, false, nil
 	}
-	result, evidence := codexCompletion(*status.Binding, state.TurnID, state.PromptHash)
+	_, cancelErr := os.Stat(filepath.Join(dir, "cancel.json"))
+	if cancelErr == nil {
+		switch state.UnknownReason {
+		case "", "SESSION_INTERRUPTED", "SESSION_STOP_UNCONFIRMED", "SESSION_COMPLETION_MISMATCH":
+		default:
+			return status, false, nil
+		}
+	}
+	result, evidence := codexOutcome(*status.Binding, state.TurnID, state.PromptHash, cancelErr == nil)
 	if result == nil || !sessionProcessesStopped(*status.Binding) {
 		return status, false, nil
+	}
+	if len(state.Tools) != 0 {
+		for tool := range state.Tools {
+			if strings.HasPrefix(tool, "subagent:") {
+				return status, false, nil
+			}
+		}
+		var interrupt sessionInterrupt
+		if result.State != "cancelled" || readJSON(filepath.Join(dir, "interrupt-request.json"), &interrupt) != nil || !interrupt.Delivered || interrupt.ResourceID != status.Binding.resourceID() || interrupt.ProviderID != state.Binding.ProviderID || interrupt.TurnID != state.TurnID || interrupt.PromptHash != state.PromptHash {
+			return status, false, nil
+		}
 	}
 	stopped := true
 	result.InputStopped, result.OutcomeKnown = &stopped, &stopped

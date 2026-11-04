@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Swarm 依赖版本与验收一致性</title><style>:root{--bg-base:#0d1117;--text-bright:#e6edf3;--text-dim:#8b949e;--border-subtle:#21262d;--accent:#58a6ff;--fs-meta:12px;--fs-body:14px;--fs-title:22px;--sp-2:8px;--sp-4:16px;--sp-5:24px}*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui}main{height:100%;overflow:auto;padding:var(--sp-5);max-width:100%;}h1{font-size:var(--fs-title)}h2{font-size:var(--fs-body);margin-top:var(--sp-5)}p,pre,table{margin-block:var(--sp-4)}pre{overflow:auto;padding:var(--sp-4);border-block:1px solid var(--border-subtle)}table{border-collapse:collapse;width:100%}td,th{text-align:left;vertical-align:top;padding:var(--sp-2);border-bottom:1px solid var(--border-subtle)}a{color:var(--accent)}small{color:var(--text-dim);font-size:var(--fs-meta)}</style><main>
+<h1>依赖更新后，旧验收不能充当新结果</h1>
+<p>保留原任务、执行器、目录和旧证据；依赖真正变更后，要求这个任务的新版本重新执行并验收。重绑只改变输入关系，不自动开任务、不自动重跑，也不直接宣布完成。</p>
+<h2>用户故事</h2>
+<p>宣传团队的素材成员已把视频推进到版本 3。复核成员的版本 2 虽然验收过，但当时读的是素材版本 1。Main 把复核依赖绑定到素材版本 3 后，工作台仍应显示“依赖待复核”。只有沿用原复核任务继续到版本 3、读新素材并完成验收，团队才可能完成。</p>
+<table><thead><tr><th>阶段</th><th>素材</th><th>复核任务</th><th>当前工作状态</th></tr></thead><tbody>
+<tr><td>素材已更新</td><td>版本 3 已验收</td><td>版本 2 已验收；依赖素材版本 1</td><td>阻塞：依赖过期</td></tr>
+<tr><td>Main 重绑依赖</td><td>绑定版本 3</td><td>旧版本 2 和旧产物继续保留；要求复核版本至少为 3</td><td>阻塞：需要复核新输入</td></tr>
+<tr><td>继续原任务</td><td>仍为版本 3</td><td>版本 3 排队、执行、待验收</td><td>按真实执行状态展示；不计为完成</td></tr>
+<tr><td>新结果验收</td><td>依赖仍有效</td><td>版本 3 实际通过验收</td><td>完成；团队还需满足所有工作及最终集成要求</td></tr></tbody></table>
+<h2>产品行为</h2>
+<ul><li>同一依赖集合再次保存、同一请求重试，不增加复核门槛。</li><li>更换依赖成员、版本、产物或删除依赖，都会改变已有任务的输入。门槛为原门槛与“当前任务版本加一”中的较大值。</li><li>待验收的旧结果不能靠点击接受绕过门槛。拒绝旧结果仍可记录，旧报告和文件可以继续追溯。</li><li>A 已更新而 B 尚未重绑时，C 即使依赖已验收的旧 B，也必须阻塞。传递依赖不能只看中间任务的原始成功状态。</li><li>保留现有 blocked 状态及 SWARM_DEPENDENCY_NOT_VERIFIED 原因，不新增布局，不把原始任务的历史成功误写为新的当前成功。</li></ul>
+<h2>持久结构</h2>
+<p>schema 18 在 <code>swarm_work_items</code> 新增 <code>required_task_revision INTEGER NOT NULL DEFAULT 1 CHECK(required_task_revision &gt;= 1)</code>。它是工作项对本身任务版本的门槛，与依赖边绑定的上游版本分别保存。门槛不放进错误字符串、日志或易丢失的内存。</p>
+<p>任务版本低于门槛时，工作项及所有传递下游均不能视为就绪。已有成功记录、attempt、artifact、任务 ID、执行器和目标目录均不重写。恢复进程只重新读取门槛，不创建新任务。迁移保留既有数据并默认门槛为 1；无法凭迁移推断历史版本缺失的依赖来源。</p>
+<h2>事务与并发</h2>
+<ol><li><code>SwarmPlans.dependencies</code> 在一个 BEGIN IMMEDIATE 事务内检查当前任务停止证据、变更依赖、检查环、比较规范依赖集合、提高门槛并记录回执和事件。</li><li><code>TaskDispatcher.complete</code> 在实际写结果的同一事务内复查当前任务版本、等待验收状态、当前 run、待执行 steer，以及工作门槛和完整传递依赖。验收前的异步文件检查不承担并发裁决。</li><li>如果验收先提交，随后重绑会把门槛提高并阻塞旧成功；如果重绑先提交，旧结果的接受请求会被拒绝。两种顺序都不能把团队留在伪完成状态。</li><li>仍在等待的 verifier 返回成功时也必须经过同一护栏。依赖已变则保留待验收状态，不能覆盖新门槛；旧证据不被删掉。</li></ol>
+<h2>模块边界</h2>
+<table><thead><tr><th>模块</th><th>责任</th></tr></thead><tbody>
+<tr><td>dispatch/swarm_plans.py</td><td>依赖变更、请求幂等、持久版本门槛</td></tr>
+<tr><td>storage/swarm_repository.py</td><td>工作态投影、迭代遍历传递依赖、一次 snapshot 的局部缓存和环保护</td></tr>
+<tr><td>dispatch/runner.py</td><td>接受与 verifier 的事务内最终裁决</td></tr>
+<tr><td>migrations/0018_swarm_dependency_lineage.sql</td><td>持久门槛及合法值约束</td></tr>
+<tr><td>internal/storage</td><td>Go 备份恢复接受 schema 18，仍拒绝未来 schema 19</td></tr></tbody></table>
+<h2>验收证据</h2>
+<p>先在真实 SQLite 中调用任务报告、verify、confirm、task revision 和依赖重绑复现两项红灯：旧成功被重新采用、旧 waiting_user 仍被接受。日志：<code>/tmp/roami-dependency-lineage-red.log</code>。不是用伪造模型回复或直接写成功状态完成复现。</p>
+<p>回归覆盖：新版本执行和验收闭环、旧报告与实际 artifact 保留、请求重试、no-op、传递阻塞、共享祖先缓存、遗留环、重启持久化、schema 17 升级、两种并发顺序与尚未返回的 verifier。所有实例和测试只走独立 launcher；不操作真实团队、设备、模型配置或平台发布。定向验收：Swarm 协作 41 项通过，Go 备份兼容测试通过。正常 quick 与最终组合门禁的结果随提交、主线交接及 PR 检查保留，不把组件回归写成真实宣传闭环通过。</p>
+<small>2026-11-04 · 此文只记录依赖与验收一致性；不代表完整 Swarm 宣传或 X、Bilibili 发布已经通过。</small></main></html>

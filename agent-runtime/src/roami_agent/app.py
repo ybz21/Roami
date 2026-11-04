@@ -79,6 +79,7 @@ from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.mcp_broker import MCPBroker, node_socket
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
+from roami_agent.tools.project_okr import register_project_okr_tools
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.swarm_catalog import register_swarm_tools
@@ -222,8 +223,16 @@ class Runtime:
         if self.desktop.config["enabled"]:
             register_computer_tools(self.tools, self.desktop)
 
-        self.swarms = SwarmPlans(database, self.tasks, self.conversations, self.wakeup)
-        register_swarm_tools(self.tools, self.swarms)
+        self.swarms = SwarmPlans(
+            database, self.tasks, self.conversations, self.wakeup, settings=self.settings
+        )
+        register_swarm_tools(
+            self.tools,
+            self.swarms,
+            confirm=lambda *args, **kwargs: self.dispatch.confirm(*args, **kwargs),
+            artifacts=self.artifacts,
+        )
+        register_project_okr_tools(self.tools, database, self.settings)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 
@@ -278,6 +287,7 @@ class Runtime:
                 skills=self.tools.optional_skill_metadata,
                 workflow_reads=self.tools.loaded_workflow_metadata,
                 execution_deadline=execution_deadline,
+                swarms=self.swarms,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True

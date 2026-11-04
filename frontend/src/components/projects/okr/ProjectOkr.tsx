@@ -9,10 +9,13 @@ import MobileSubPage from '../../MobileSubPage'
 import { getHashParams } from '../../../route-hash'
 import { loadSwarmDirectory } from '../../swarm/swarm-directory'
 import OkrConfiguration, { OkrField, type SwarmOption } from './OkrConfiguration'
-import { configurationOf, dailyHistory, emptyConfiguration, projectPath, resultOverview, resultAttainment, shanghaiDate, sourceObservations, type Configuration, type Workspace } from './okr-workspace'
+import { configurationOf, dailyHistory, emptyConfiguration, projectPath, resultOverview, shanghaiDate, sourceObservations, workspaceUpdated, type Configuration, type Workspace } from './okr-workspace'
 import OkrReviewEvidence from './OkrReviewEvidence'
 import OkrResult from './OkrResult'
-import OkrTrend from './OkrTrend'
+import OkrDashboard from './OkrDashboard'
+import OkrInitiatives from './OkrInitiatives'
+import OkrCurrentStatus from './OkrCurrentStatus'
+import OkrTeamMemory from './OkrTeamMemory'
 import { lazyRetry } from '../../lazy-retry'
 import './project-okr.css'
 import './okr-dashboard.css'
@@ -34,6 +37,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const [editing, setEditing] = useState(false)
   const [panel, setPanel] = useState('overview')
   const [mainPanel, setMainPanel] = useState('board')
+  const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number }>()
   const [chatting, setChatting] = useState(false)
   const [incoming, setIncoming] = useState<Workspace | null>(null)
   const [busy, setBusy] = useState(false)
@@ -50,9 +54,10 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const [note, setNote] = useState('')
   const [summary, setSummary] = useState('')
   const [actions, setActions] = useState('')
+  const [memoryDraft, setMemoryDraft] = useState(false)
   const rootPath = '/projects/' + encodeURIComponent(projectId) + '/okr'
   const observationSelection = useRef({ metricId: '', date })
-  const hasDraft = editing || value !== null || note !== '' || summary !== '' || actions !== ''
+  const hasDraft = editing || memoryDraft || value !== null || note !== '' || summary !== '' || actions !== ''
     || manualMetric !== observationSelection.current.metricId || date !== observationSelection.current.date
   const live = useRef({ loaded, blocked: hasDraft || busy || conflict, workspace, emptyBuilder: false })
   live.current = { loaded, blocked: hasDraft || busy || conflict, workspace, emptyBuilder: !workspace && editing && builderSeed.current === JSON.stringify(configurationOf(draft)) }
@@ -106,7 +111,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
       const response = await readWorkspace(signal)
       if (signal.aborted || live.current.blocked || writing.current) return
       const next = response.data
-      if (next && next.revision > (live.current.workspace?.revision || 0)) setWorkspace(next)
+      if (workspaceUpdated(live.current.workspace, next)) setWorkspace(next)
     }, 30_000)
     return poll.stop
   }, [loaded, readWorkspace])
@@ -131,8 +136,11 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
       setWorkspace(response.data)
       success?.()
     } catch (e) {
-      const err = e as Error & { status?: number }
-      if (err.status === 409) { setConflict(true); setError('okr.conflict') }
+      const err = e as Error & { status?: number; apiError?: { code?: string } }
+      if (err.status === 409 && (err.message === 'OKR_FILES_PENDING' || err.apiError?.code === 'OKR_FILES_PENDING')) {
+        setError('okr.filesPendingConflict')
+        setWorkspace(current => current?.projectFiles ? { ...current, projectFiles: { ...current.projectFiles, pendingChanges: true } } : current)
+      } else if (err.status === 409) { setConflict(true); setError('okr.conflict') }
       else setError(err.status === 502 ? 'okr.collectFailed' : err.status === 400 ? 'okr.invalidRequest' : 'okr.writeFailed')
       setErrorDetail(err.message)
     } finally { writing.current = false; setBusy(false) }
@@ -141,7 +149,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const day = (date: string) => new Intl.DateTimeFormat(locale, { timeZone: 'Asia/Shanghai', dateStyle: 'medium' }).format(new Date(date + (date.length === 10 ? 'T00:00:00+08:00' : '')))
   const timestamp = (date: string) => new Intl.DateTimeFormat(locale, { timeZone: 'Asia/Shanghai', dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(date))
   const save = () => {
-    if (!draft.objective.trim() || !draft.metrics.length || !draft.keyResults.length || draft.startDate > draft.endDate || draft.metrics.some(m => !m.name.trim() || (m.source === 'github' && (!/^[\w.-]+\/[\w.-]+$/.test(m.repo || '') || !m.field))) || draft.keyResults.some(k => !k.title.trim() || !Number.isFinite(k.target) || !draft.metrics.some(m => m.id === k.metricId) || k.dueDate < draft.startDate || k.dueDate > draft.endDate)) {
+    if (!draft.objective.trim() || !draft.metrics.length || !draft.keyResults.length || draft.startDate > draft.endDate || draft.metrics.some(m => !m.name.trim() || (m.source === 'github' && (!/^[\w.-]+\/[\w.-]+$/.test(m.repo || '') || !m.field))) || draft.keyResults.some(k => !k.title.trim() || !Number.isFinite(k.target) || !draft.metrics.some(m => m.id === k.metricId) || k.dueDate < draft.startDate || k.dueDate > draft.endDate) || (draft.initiatives || []).some(item => !item.title.trim() || !item.channel.trim() || item.keyResultIds.some(id => !draft.keyResults.some(kr => kr.id === id)))) {
       setError('okr.invalidConfiguration'); return
     }
     void mutate('PUT', '', configurationOf(draft), () => { setEditing(false); if (!workspace) { observationSelection.current.metricId = draft.metrics.find(m => m.source === 'manual')?.id || ''; setManualMetric(observationSelection.current.metricId) } })
@@ -153,9 +161,6 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const hasGithub = workspace?.metrics.some(m => m.source === 'github')
   const retiredObservations = (workspace?.observations || []).filter(o => !workspace.metrics.some(m => m.id === o.metricId))
   const results = workspace?.keyResults.map(kr => resultOverview(workspace, kr)) || []
-  const met = results.filter(kr => resultAttainment(kr, kr.baseline, kr.latest).met).length
-  const latestReview = workspace?.reviews.slice(-1)[0]
-  const missing = workspace?.metrics.filter(metric => !sourceObservations(workspace, metric).length).length || 0
   const applyDiscussion = (next: Workspace) => {
     setWorkspace(next); setDraft(configurationOf(next)); setEditing(false); setIncoming(null); setConflict(false)
     if (!workspace) { observationSelection.current.metricId = next.metrics.find(metric => metric.source === 'manual')?.id || ''; setManualMetric(observationSelection.current.metricId) }
@@ -163,17 +168,26 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const refreshDiscussion = async () => {
     try {
       const { data: next } = await readWorkspace()
-      if (!next || next.revision <= (live.current.workspace?.revision || 0)) return
+      if (!workspaceUpdated(live.current.workspace, next)) return
       const emptyBuilder = live.current.emptyBuilder
       if (live.current.blocked && !emptyBuilder) setIncoming(current => current && current.revision > next.revision ? current : next)
       else applyDiscussion(next)
     } catch (e) { setError('okr.loadFailed'); setErrorDetail((e as Error).message) }
+  }
+  const openProjectFile = (relative?: string) => {
+    if (projectDir && workspace?.projectFiles && relative) setFileRequest({ path: projectDir.replace(/\/$/, '') + '/' + workspace.projectFiles.root + '/' + relative, nonce: Date.now() })
+    setMainPanel('files')
+  }
+  const configureTeam = () => {
+    if (workspace && !editing) { setDraft(configurationOf(workspace)); setEditing(true) }
+    setMainPanel('board'); setPanel('overview')
   }
   const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-view={mainPanel} data-mobile-refresh-scroll>
     {!phone && <header className="tt-pagehead"><h2>{title}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')}</Button></div></header>}
     {error && <div className="okr-error" role="alert">
       <p>{t(error)}</p>
       {(conflict || !loaded || error === 'okr.loadFailed') && <Button disabled={busy} onClick={() => void reload()}>{t(conflict ? 'okr.loadLatest' : 'inbox.retry')}</Button>}
+      {error === 'okr.filesPendingConflict' && <div className="okr-actions"><Button disabled={busy} onClick={() => openProjectFile('okr.json')}>{t('okr.tab.files')}</Button><Button loading={busy} disabled={busy} onClick={() => void mutate('POST', '/sync', {})}>{t('okr.confirmFiles')}</Button></div>}
       {errorDetail && <details><summary>{t('okr.errorDetails')}</summary><p>{errorDetail}</p></details>}
     </div>}
     {!loaded && !error && <Spin />}
@@ -181,22 +195,19 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     {loaded && <>
       <Tabs className="okr-work-tabs" activeKey={mainPanel} onChange={setMainPanel} items={[
         { key: 'board', label: t('okr.tab.board'), children: <>
-          {editing ? <section className="okr-section"><div className="okr-actions"><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section> : workspace && <>
+          <div className="okr-board-toolbar"><Segmented value={panel} onChange={value => setPanel(String(value))} options={[{ value: 'overview', label: t('okr.tab.okr') }, { value: 'data', label: t('okr.tab.dashboard') }, { value: 'review', label: t('okr.tab.status') }]} /><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div>
+          <Tabs className="okr-inner-tabs" activeKey={panel} onChange={setPanel} tabBarStyle={{ display: 'none' }} items={[
+        { key: 'overview', label: t('okr.tab.okr'), forceRender: true, children: editing ? <section className="okr-section"><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section> : workspace && <>
           <section className="okr-objective-head">
-            <div><h2>{workspace.objective}</h2><div className="okr-goal-meta"><span>{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</span><span className="okr-completion">{t('okr.completedCount', { done: number(met), total: number(results.length) })}</span></div></div>
+            <div><h2>{workspace.objective}</h2><div className="okr-goal-meta"><span>{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</span></div></div>
             <Button icon={<PencilIcon />} onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button>
           </section>
-          <div className="okr-board-toolbar"><Segmented value={panel} onChange={value => setPanel(String(value))} options={['overview', 'data', 'review'].map(key => ({ value: key, label: t('okr.tab.' + key) }))} /><Button type="primary" icon={<BotIcon />} onClick={() => setChatting(true)}>{t('okr.chatOpen')}</Button></div>
-          <Tabs activeKey={panel} onChange={setPanel} tabBarStyle={{ display: 'none' }} items={[
-        { key: 'overview', label: t('okr.tab.overview'), forceRender: true, children: <>
           <section className="okr-board"><h3>{t('okr.keyResults')}</h3><div className="okr-results">{results.map(kr => <OkrResult key={kr.id} result={kr} />)}</div></section>
-          <div className="okr-insight-grid"><OkrTrend workspace={workspace} /><section className="okr-focus">
-            <h3>{t('okr.nextAction')}</h3>
-            {latestReview ? <><p className="okr-focus-action">{latestReview.actions || latestReview.summary}</p><p className="okr-muted okr-clamp">{latestReview.summary}</p><Button onClick={() => setPanel('review')}>{t('okr.openReview')}</Button></> : <><p className="okr-muted">{t('okr.noReviewAction')}</p><Button onClick={() => setPanel('review')}>{t('okr.writeFirstReview')}</Button></>}
-            {!!missing && <div className="okr-quality"><span>{t('okr.missingMetrics', { count: number(missing) })}</span><Button type="text" onClick={() => setPanel('data')}>{t('okr.tab.data')}</Button></div>}
-          </section></div>
+          <OkrInitiatives workspace={workspace} />
+          {workspace.projectFiles && <section className="okr-section"><div className="okr-section-head"><div><h3>{t('okr.projectConfiguration')}</h3><p className="okr-muted">{workspace.projectFiles.root}</p></div><Button onClick={() => openProjectFile('okr.json')}>{t('okr.tab.files')}</Button></div>{workspace.projectFiles.pendingChanges && <div className="okr-actions"><span>{t('okr.pendingFiles')}</span><Button loading={busy} disabled={busy || conflict} onClick={() => void mutate('POST', '/sync', {})}>{t('okr.confirmFiles')}</Button></div>}</section>}
         </> },
-        { key: 'data', label: t('okr.tab.data'), forceRender: true, children: <>
+        { key: 'data', label: t('okr.tab.dashboard'), forceRender: true, children: workspace ? <>
+          <OkrDashboard workspace={workspace} onReview={() => setPanel('review')} onConfigure={() => { setDraft(configurationOf(workspace)); setEditing(true); setPanel('overview') }} onSource={workspace.projectFiles ? metricId => openProjectFile('connectors/' + metricId + '/connector.json') : undefined} />
           <p className="okr-muted">{t(workspace.autoCollect ? 'okr.autoEnabled' : 'okr.autoDisabled')}</p>
         <section className="okr-section"><h3>{t('okr.observations')}</h3>
           {hasGithub && <div className="okr-actions"><Button loading={busy} disabled={busy || conflict} onClick={() => void mutate('POST', '/collect', {})}>{t('okr.collect')}</Button><span className="okr-muted">{t('okr.collectHint')}</span></div>}
@@ -234,8 +245,10 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
           })}
           {!!retiredObservations.length && <details><summary>{t('okr.retiredMetrics')}</summary>{retiredObservations.slice().reverse().map(o => <div className="okr-version" key={o.id}><span>{t('okr.retiredMetric', { id: o.metricId })}</span><time>{day(o.date)}</time><span>{number(o.value)}</span><code>{o.sourceKey}</code><time>{timestamp(o.capturedAt)}</time>{o.note && <p>{o.note}</p>}</div>)}</details>}
         </section>
-        </> },
-        { key: 'review', label: t('okr.tab.review'), forceRender: true, children: <>
+        </> : <p className="okr-muted">{t('okr.confirmBeforeData')}</p> },
+        { key: 'review', label: t('okr.tab.status'), forceRender: true, children: workspace ? <>
+        {panel === 'review' && mainPanel === 'board' && <OkrCurrentStatus swarm={workspace.swarm} onActivities={() => setMainPanel('activities')} onConfigure={configureTeam} />}
+        <OkrTeamMemory workspace={workspace} onUpdated={next => setWorkspace(current => current && current.revision > next.revision ? current : next)} onFiles={() => openProjectFile(workspace.projectFiles?.teamMemoryFile)} onDraftChange={setMemoryDraft} />
         <section className="okr-section"><h3>{t('okr.reviews')}</h3>
 
           {!(workspace.reviews || []).length && <p className="okr-muted">{t('okr.noReviews')}</p>}
@@ -249,12 +262,11 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
             </fieldset>
           </form>
         </section>
-        </> },
+        </> : <p className="okr-muted">{t('okr.confirmBeforeStatus')}</p> },
           ]} />
-          </>}
         </> },
-        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} projectId={projectId} onManage={() => { if (!editing) setDraft(configurationOf(workspace)); setEditing(true); setMainPanel('board') }} openTerm={onSession} onNav={() => setMainPanel('board')} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={() => { if (workspace) setDraft(configurationOf(workspace)); setEditing(true); setMainPanel('board') }}>{t('okr.edit')}</Button></div> : null },
-        { key: 'files', label: t('okr.tab.files'), children: <Suspense fallback={<Spin />}><OkrProjectFiles key={projectDir} dir={projectDir} active={mainPanel === 'files'} /></Suspense> },
+        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} embedded initialSwarm={workspace.swarm} openTerm={onSession} onNav={() => setMainPanel('board')} {...{ projectId: workspace.projectId, onManage: configureTeam }} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={configureTeam}>{t('okr.edit')}</Button></div> : null },
+        { key: 'files', label: t('okr.tab.files'), children: <Suspense fallback={<Spin />}><OkrProjectFiles key={projectDir} dir={projectDir} bundleRoot={workspace?.projectFiles?.root} active={mainPanel === 'files'} openRequest={fileRequest} /></Suspense> },
       ]} />
     </>}
   </div>

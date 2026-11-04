@@ -38,14 +38,19 @@ def register_browser_tools(registry, driver):
     registry.add(
         Tool(
             "browser_act",
-            "Perform one bounded action based on the latest observation. A successful action is not task acceptance. On a scene change, observe again. An unknown outcome must stop unless navigationRecoveryAvailable=true explicitly permits observing the stopped navigation in the same tab. Human takeover always stops input.",
+            "Perform one bounded action based on the latest observation. Upload selects a readable absolute file inside the prepared task workspace; it does not confirm server upload or publication. A successful action is not task acceptance. On a scene change, observe again. An unknown outcome must stop unless navigationRecoveryAvailable=true explicitly permits observing the stopped navigation in the same tab. Human takeover always stops input.",
             {
                 "type": "object",
                 "properties": {
                     "observationId": {"type": "string", "minLength": 1, "maxLength": 128},
-                    "kind": {"type": "string", "enum": ["click", "fill", "type", "press", "goto"]},
+                    "kind": {
+                        "type": "string",
+                        "enum": ["click", "fill", "type", "press", "goto", "upload"],
+                    },
                     "selector": {"type": "string", "minLength": 1, "maxLength": 1000},
                     "text": {"type": "string", "maxLength": 8000},
+                    "path": {"type": "string", "minLength": 1, "maxLength": 4000},
+                    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
                     "key": {"type": "string", "minLength": 1, "maxLength": 100},
                     "url": {"type": "string", "minLength": 1, "maxLength": 4000},
                 },
@@ -53,7 +58,9 @@ def register_browser_tools(registry, driver):
                 "additionalProperties": False,
                 "allOf": [
                     {
-                        "if": {"properties": {"kind": {"enum": ["click", "fill", "type"]}}},
+                        "if": {
+                            "properties": {"kind": {"enum": ["click", "fill", "type", "upload"]}}
+                        },
                         "then": {"required": ["selector"]},
                     },
                     {
@@ -63,6 +70,10 @@ def register_browser_tools(registry, driver):
                     {
                         "if": {"properties": {"kind": {"const": "press"}}},
                         "then": {"required": ["key"]},
+                    },
+                    {
+                        "if": {"properties": {"kind": {"const": "upload"}}},
+                        "then": {"required": ["path"]},
                     },
                     {
                         "if": {"properties": {"kind": {"const": "goto"}}},

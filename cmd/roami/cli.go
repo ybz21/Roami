@@ -261,7 +261,7 @@ func runChrome(args []string) int {
 		return 1
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("\n  Managed task forms (require the active Agent tool context):\n    roami chrome observe|screenshot --resource ID\n    roami chrome goto URL --observation ID\n    roami chrome click SELECTOR --observation ID\n    roami chrome fill|type SELECTOR TEXT --observation ID\n    roami chrome press KEY --observation ID")
+		fmt.Println("\n  Managed task forms (require the active Agent tool context):\n    roami chrome observe|screenshot --resource ID\n    roami chrome goto URL --observation ID\n    roami chrome click SELECTOR --observation ID\n    roami chrome fill|type SELECTOR TEXT --observation ID\n    roami chrome press KEY --observation ID\n    roami chrome upload SELECTOR ABSOLUTE_PATH --observation ID")
 	}
 	return 0
 }

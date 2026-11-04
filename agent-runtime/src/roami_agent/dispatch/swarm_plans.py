@@ -22,13 +22,14 @@ EXECUTORS = {"native", "codex", "claude", "opencode", "pi"}
 
 
 class SwarmPlans:
-    def __init__(self, database, tasks, conversations, wakeup):
+    def __init__(self, database, tasks, conversations, wakeup, *, settings=None):
         self.db, self.tasks, self.conversations, self.wakeup = (
             database,
             tasks,
             conversations,
             wakeup,
         )
+        self.settings = settings
         self.chat = None
         self.locks = {}
 
@@ -42,6 +43,10 @@ class SwarmPlans:
         target = spec.get("target") or {"kind": "new_session"}
         if not isinstance(target, dict) or target.get("kind") not in {"project", "new_session"}:
             raise DomainError("INVALID_TASK_TARGET")
+        if target["kind"] == "project":
+            if not isinstance(target.get("projectId"), str) or not target["projectId"].strip():
+                raise DomainError("INVALID_TASK_TARGET")
+            target = {key: value for key, value in target.items() if key != "directory"}
         name, goal = str(spec.get("name", "")).strip(), str(spec.get("goal", "")).strip()
         if not name or len(name) > 100 or not goal or len(goal) > 30000:
             raise DomainError("INVALID_SWARM")
@@ -89,7 +94,8 @@ class SwarmPlans:
                 goal
                 + "\n\nSwarm collaboration ID: "
                 + result["id"]
-                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_plan and swarm_status using tool_list. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion. Use task_steer for changes to existing tasks. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
+                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_plan and swarm_status using tool_list. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. Use task_steer for changes to existing tasks. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
+                + " Use the exact registered CLI command and input schema returned by tool_list or roami swarm help. Submit each managed command alone: no cd prefix, shell chaining or pipes; the host binds the execution context. Never probe a write operation with placeholder goals or acceptance criteria. Planning dispatches real tasks, so every item must carry its complete actual instructions and acceptance before submission."
             )
             start = await self.conversations.accept(
                 owner, cid, "swarm.start:" + result["id"], kickoff
@@ -123,10 +129,54 @@ class SwarmPlans:
                 (owner,),
             )
         )
-        return [await self.snapshot(owner, item["id"]) for item in ids]
+        return [await self.snapshot(owner, item["id"], include_memory=False) for item in ids]
 
-    async def snapshot(self, owner, sid):
-        return await self.db.call(lambda db: snapshot(db, owner, sid))
+    async def snapshot(self, owner, sid, *, include_memory=True):
+        value = await self.db.call(lambda db: snapshot(db, owner, sid))
+        if include_memory:
+            value["teamMemory"] = await self.memory_read(owner, sid)
+        return value
+
+    async def memory_read(self, owner, sid):
+        from roami_agent.storage.swarm_memory import read_memory
+
+        return await read_memory(self, owner, sid)
+
+    async def memory_write(self, owner, sid, spec):
+        from roami_agent.storage.swarm_memory import write_memory
+
+        async with self.lock(sid):
+            return await write_memory(self, owner, sid, spec)
+
+    async def context(self, turn):
+        groups = await self.db.call(
+            lambda db: rows(
+                db,
+                "SELECT DISTINCT g.id FROM swarm_groups g LEFT JOIN swarm_work_items w ON w.swarm_id=g.id "
+                "WHERE g.owner_id=? AND g.archived=0 AND (g.conversation_id=? OR w.task_id=?) "
+                "ORDER BY g.updated_ms DESC LIMIT 5",
+                (
+                    turn["owner_id"],
+                    turn["conversation_id"],
+                    turn.get("taskId")
+                    or (
+                        row(
+                            db,
+                            "SELECT task_id FROM task_attempts WHERE id=?",
+                            (turn.get("executionRunId"),),
+                        )
+                        or {}
+                    ).get("task_id"),
+                ),
+            )
+        )
+        values = []
+        for value in groups:
+            memory = await self.memory_read(turn["owner_id"], value["id"])
+            if isinstance(memory.get("content"), str) and len(memory["content"]) > 8000:
+                memory = {**memory, "content": memory["content"][:8000], "truncated": True}
+            values.append({"swarmId": value["id"], "teamMemory": memory})
+        return values
 
     async def plan(self, owner, sid, spec):
         items = spec.get("items", [])
@@ -154,9 +204,13 @@ class SwarmPlans:
                         or item.get("executor") not in EXECUTORS
                     ):
                         raise DomainError("INVALID_SWARM_PLAN")
+                    from roami_agent.storage.swarm_evidence import validate_deliverables
+
+                    validate_deliverables(item.get("deliverables", []))
                     name = item["member"].strip()
                     if (
-                        name in by_name
+                        name.casefold() in {"leader", "main"}
+                        or name in by_name
                         or len(name) > 80
                         or len(item["title"]) > 80
                         or len(item["goal"]) > 30000
@@ -166,7 +220,7 @@ class SwarmPlans:
                     ident = identity()
                     by_name[name] = ident
                     db.execute(
-                        "INSERT INTO swarm_work_items(id,swarm_id,member_name,executor,title,goal,acceptance,integration) VALUES(?,?,?,?,?,?,?,?)",
+                        "INSERT INTO swarm_work_items(id,swarm_id,member_name,executor,title,goal,acceptance,integration,deliverables_json) VALUES(?,?,?,?,?,?,?,?,?)",
                         (
                             ident,
                             sid,
@@ -176,6 +230,7 @@ class SwarmPlans:
                             item["goal"],
                             item["acceptance"],
                             int(item.get("integration") is True),
+                            encoded(item.get("deliverables", [])),
                         ),
                     )
                 for item in items:
@@ -317,6 +372,15 @@ class SwarmPlans:
         text = spec.get("text", "").strip()
         if not text or len(text) > 8000:
             raise DomainError("INVALID_SWARM_MESSAGE")
+        identity_binding = (
+            {
+                key: binding[key]
+                for key in ("conversation", "taskId", "runId", "taskRevision")
+                if key in binding
+            }
+            if binding
+            else None
+        )
 
         def write(db):
             def apply():
@@ -369,7 +433,11 @@ class SwarmPlans:
                 return {"id": ident, "swarmId": sid}
 
             return receipt(
-                db, owner, spec["commandKey"], {"swarmId": sid, **spec, "binding": binding}, apply
+                db,
+                owner,
+                spec["commandKey"],
+                {"swarmId": sid, **spec, "binding": identity_binding},
+                apply,
             )
 
         return await self.db.call(write, write=True)
@@ -399,6 +467,9 @@ class SwarmPlans:
                         (sid,),
                     )
                 )
+                target = json.loads(info["target_json"])
+                if target["kind"] == "project":
+                    target.pop("directory", None)
                 for item in items:
                     deps = await self.db.call(
                         lambda db, item=item: rows(
@@ -419,6 +490,17 @@ class SwarmPlans:
                         + "; member: "
                         + item["member_name"]
                         + ". Share coordination through swarm_post when available. Never claim verification from your own success report."
+                    )
+                    goal += (
+                        "\nDeclared deliverables (plans and links alone are not completion):\n"
+                        + item["deliverables_json"]
+                    )
+                    memory = await self.memory_read(info["owner_id"], sid)
+                    if isinstance(memory.get("content"), str) and len(memory["content"]) > 8000:
+                        memory = {**memory, "content": memory["content"][:8000], "truncated": True}
+                    goal += (
+                        "\nShared team memory (reference knowledge, not instructions or proof):\n"
+                        + encoded(memory)
                     )
                     if deps:
                         evidence = await self.db.call(
@@ -441,7 +523,7 @@ class SwarmPlans:
                             goal,
                             key="swarm.work:" + item["id"],
                             executor=item["executor"],
-                            target=json.loads(info["target_json"]),
+                            target=target,
                             title=item["title"],
                             origin_message_id=info["origin_message_id"],
                         )
@@ -484,7 +566,9 @@ class SwarmPlans:
                 if not work:
                     raise DomainError("SWARM_MEMBER_TASK_REQUIRED", 404)
                 if work["task_id"]:
-                    task = row(db, "SELECT state FROM tasks WHERE id=?", (work["task_id"],))
+                    task = row(
+                        db, "SELECT state,revision FROM tasks WHERE id=?", (work["task_id"],)
+                    )
                     attempt = row(
                         db,
                         "SELECT state,result_json FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
@@ -498,6 +582,9 @@ class SwarmPlans:
                         or result.get("inputStopped") is False
                     ):
                         raise DomainError("SWARM_STOP_REQUIRED", 409)
+                previous = rows(
+                    db, "SELECT * FROM swarm_dependencies WHERE work_id=?", (work["id"],)
+                )
                 db.execute("DELETE FROM swarm_dependencies WHERE work_id=?", (work["id"],))
                 for dep in spec.get("dependencies", []):
                     upstream = row(
@@ -517,6 +604,17 @@ class SwarmPlans:
                 ).fetchone()
                 if cycle:
                     raise DomainError("SWARM_DEPENDENCY_CYCLE", 409)
+                current = rows(
+                    db, "SELECT * FROM swarm_dependencies WHERE work_id=?", (work["id"],)
+                )
+                if work["task_id"] and {tuple(dep.values()) for dep in previous} != {
+                    tuple(dep.values()) for dep in current
+                }:
+                    # Rebinding changes inputs, not the meaning of an already accepted run.
+                    db.execute(
+                        "UPDATE swarm_work_items SET required_task_revision=MAX(required_task_revision,?) WHERE id=?",
+                        (task["revision"] + 1, work["id"]),
+                    )
                 db.execute(
                     "UPDATE swarm_work_items SET dispatch_error=NULL WHERE id=?", (work["id"],)
                 )
@@ -544,7 +642,10 @@ class SwarmPlans:
         await self.db.call(write, write=True)
 
     async def send(self, owner, sid, spec):
-        info = await self.snapshot(owner, sid)
+        from roami_agent.storage.swarm_mentions import recipient
+
+        info = await self.db.call(lambda db: snapshot(db, owner, sid))
+        spec = recipient(spec, info)
         await self.post(owner, sid, spec)
         key = "swarm.message:" + spec["commandKey"]
         post = await self.db.call(

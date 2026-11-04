@@ -518,6 +518,12 @@ class TaskDispatcher:
                     }
             else:
                 verified = await self.native_result_verified(task, run, result)
+        from roami_agent.storage.swarm_evidence import validate_evidence
+
+        declared = await validate_evidence(self.db, task, run)
+        if declared and result["state"] == "succeeded":
+            result["verification"] = declared
+            verified = False
         state = (
             "interrupted"
             if uncertain_result
@@ -630,6 +636,13 @@ class TaskDispatcher:
                 }
                 if uncertain:
                     result.update(outcomeKnown=False, retryable=False)
+            if state == "succeeded":
+                from roami_agent.storage.swarm_repository import task_dependencies_ready
+
+                if not task_dependencies_ready(db, current):
+                    if confirmation:
+                        raise DomainError("SWARM_DEPENDENCY_NOT_VERIFIED", 409)
+                    state = "waiting_user"
             completion = {
                 "taskId": task["id"],
                 "taskRevision": run["task_revision"],
@@ -691,7 +704,7 @@ class TaskDispatcher:
 
         await self.db.call(write, write=True)
 
-    async def confirm(self, owner, task_id, accepted, *, revision=None, run_id=None):
+    async def confirm(self, owner, task_id, accepted, *, revision=None, run_id=None, evidence=None):
         task = await self.db.call(
             lambda db: row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
         )
@@ -710,10 +723,19 @@ class TaskDispatcher:
         )
         if run_id is not None and run["id"] != run_id:
             raise DomainError("TASK_RESULT_SUPERSEDED", 409)
+        result = json.loads(run["result_json"])
+        if accepted:
+            from roami_agent.storage.swarm_evidence import validate_evidence
+
+            declared = await validate_evidence(self.db, task, run, acceptance=evidence)
+            if declared:
+                if declared["missing"] or declared["externalAction"] == "unconfirmed":
+                    raise DomainError("SWARM_DELIVERABLE_EVIDENCE_REQUIRED", 409)
+                result["verification"] = {**declared, "state": "accepted", "actor": owner}
         await self.complete(
             task,
             run,
-            json.loads(run["result_json"]),
+            result,
             "succeeded" if accepted else "failed",
             confirmation=True,
         )

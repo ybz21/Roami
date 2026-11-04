@@ -167,6 +167,19 @@ func TestCodeModeHostPreservesTaskProcessBoundaries(t *testing.T) {
 			if got := codexCodeModeHost(binding, snapshot, pids["host"]); got != expected {
 				t.Fatalf("host %s classification=%v", mode, got)
 			}
+			if expected {
+				current, _, scoped, err := paneProcessSnapshot(binding.PID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				captured := capturedSessionTools(binding, current, scoped)
+				if captured[pids["host"]] != "" || captured[command.Process.Pid] != "" || captured[binding.PID] != "" {
+					t.Fatalf("resident process captured for interruption: %v", captured)
+				}
+				if mode == "worker" && captured[pids["worker"]] == "" {
+					t.Fatal("owned worker was not captured")
+				}
+			}
 			if got := sessionProcessesStopped(binding); got != (mode == "bundled") {
 				t.Fatalf("process proof %s=%v", mode, got)
 			}

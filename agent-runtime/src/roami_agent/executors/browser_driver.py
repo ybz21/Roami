@@ -836,10 +836,27 @@ class BrowserDriver:
         body = json.loads(observed["body_json"])
         choice = args["kind"]
         arguments = ["--target", target_id]
-        if choice in {"click", "fill", "type"}:
+        if choice in {"click", "fill", "type", "upload"}:
             arguments += [args["selector"]]
         if choice in {"fill", "type"}:
             arguments += [args["text"]]
+        if choice == "upload":
+            workspace = binding.get("workspace") or {}
+            directory = workspace.get("directory")
+            if not isinstance(directory, str) or not Path(directory).is_absolute():
+                raise DomainError("TASK_WORKSPACE_REQUIRED")
+            path = args.get("path")
+            if not isinstance(path, str) or not Path(path).is_absolute() or "\0" in path:
+                raise DomainError("INVALID_FILE_PATH")
+            root = Path(directory).resolve()
+            requested = Path(os.path.normpath(path))
+            if root not in requested.parents:
+                raise DomainError("WORKSPACE_OUTSIDE_CONFIGURED_ROOTS")
+            arguments += [str(requested), "--file-root", str(root)]
+            if args.get("sha256"):
+                arguments += ["--expected-file-sha256", args["sha256"]]
+            if self.artifacts.max_bytes:
+                arguments += ["--max-file-bytes", str(self.artifacts.max_bytes)]
         if choice == "press":
             arguments += [args["key"]]
         if choice == "goto":
@@ -870,6 +887,16 @@ class BrowserDriver:
             phase=phase,
         )
         action = {"operationId": result["operationId"], "state": "succeeded"}
+        if choice == "upload":
+            try:
+                selection = json.loads(result["output"])
+                if selection.get("selected") is not True or not isinstance(
+                    selection.get("file"), dict
+                ):
+                    raise ValueError
+            except (ValueError, KeyError, TypeError, AttributeError):
+                raise DomainError("BROWSER_DRIVER_PROTOCOL_INVALID", 503) from None
+            action.update(selected=True, file=selection["file"])
         recovery = {}
         if result["driverState"] == "unknown":
             action.update(state="unknown", inputStopped=True, outcomeKnown=False)

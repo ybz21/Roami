@@ -1,7 +1,6 @@
 package okr
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -69,22 +68,13 @@ func overview(w Workspace) Overview {
 
 // Overviews reads only saved objectives; browsing projects never creates a workspace.
 func (s *Store) Overviews() ([]Overview, error) {
-	rows, err := s.db.Query(`SELECT body FROM workspaces ORDER BY project_id`)
+	workspaces, err := s.workspaces()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	result := []Overview{}
-	for rows.Next() {
-		var body string
-		if err := rows.Scan(&body); err != nil {
-			return nil, err
-		}
-		var w Workspace
-		if err := json.Unmarshal([]byte(body), &w); err != nil {
-			return nil, err
-		}
+	for _, w := range workspaces {
 		result = append(result, overview(w))
 	}
-	return result, rows.Err()
+	return result, nil
 }

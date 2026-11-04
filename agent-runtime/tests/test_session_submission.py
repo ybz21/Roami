@@ -134,7 +134,35 @@ async def test_busy_followup_survives_restart_and_returns_only_its_own_result(
     assert (await latest_job(store))["state"] == "done"
     assert len({launch["key"] for launch in launches}) == 1
     assert all(launch["sessionId"] == "original-session" for launch in launches)
-    assert all(launch["prompt"] == "Add more detail" for launch in launches)
+    continued = await store.call(
+        lambda db: row(
+            db, "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=2", (task["id"],)
+        )
+    )
+    context_file = next((store.data_root / "agents/capability-contexts").glob("*.json"))
+    context = json.loads(context_file.read_text())
+    assert context["runId"] == continued["id"] and context["revision"] == 2
+    source = await store.call(
+        lambda db: row(
+            db,
+            "SELECT m.content_json FROM messages m JOIN tasks t ON t.origin_message_id=m.id WHERE t.id=?",
+            (task["id"],),
+        )
+    )
+    assert json.loads(source["content_json"])["text"] == "Add more detail"
+    for launch in launches:
+        assert launch["executor"] == json.loads(task["intent_json"])["executor"]
+        assert launch["title"] == "Create a research page"
+        assert "permission" not in launch
+        prompt = launch["prompt"]
+        assert str(context_file) in prompt and context["signature"] not in prompt
+        assert prompt.startswith("\n\n[Roami platform capabilities]\n")
+        assert (
+            prompt.split("\n\n[Roami continuation handoff]\n", 1)[0].rsplit("\n\n", 1)[-1]
+            == "Add more detail"
+        )
+        assert prompt.count("Add more detail") == 1
+        assert "Create a research page" not in prompt and "routing" not in prompt
     await executor.poll(runtime.tasks)
     verification = await store.call(
         lambda db: row(

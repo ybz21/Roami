@@ -34,20 +34,30 @@ type SessionBinding struct {
 }
 
 type sessionLifecycle struct {
-	Structured    bool            `json:"structured,omitempty"`
-	Model         string          `json:"model,omitempty"`
-	Permission    string          `json:"permission,omitempty"`
-	InitialLaunch bool            `json:"initialLaunch,omitempty"`
-	Binding       SessionBinding  `json:"binding"`
-	Executor      string          `json:"executor"`
-	State         string          `json:"state"`
-	UnknownReason string          `json:"unknownReason,omitempty"`
-	TurnID        string          `json:"turnId"`
-	PromptHash    string          `json:"promptHash"`
-	LaunchKey     string          `json:"launchKey,omitempty"`
-	Tools         map[string]bool `json:"tools"`
-	ClaudeStop    *claudeStop     `json:"claudeStop,omitempty"`
-	UpdatedMS     int64           `json:"updatedMs"`
+	Structured       bool                     `json:"structured,omitempty"`
+	Model            string                   `json:"model,omitempty"`
+	Permission       string                   `json:"permission,omitempty"`
+	InitialLaunch    bool                     `json:"initialLaunch,omitempty"`
+	Binding          SessionBinding           `json:"binding"`
+	Executor         string                   `json:"executor"`
+	State            string                   `json:"state"`
+	UnknownReason    string                   `json:"unknownReason,omitempty"`
+	ProviderConflict *sessionProviderConflict `json:"providerConflict,omitempty"`
+	TurnID           string                   `json:"turnId"`
+	PromptHash       string                   `json:"promptHash"`
+	LaunchKey        string                   `json:"launchKey,omitempty"`
+	Tools            map[string]bool          `json:"tools"`
+	ClaudeStop       *claudeStop              `json:"claudeStop,omitempty"`
+	UpdatedMS        int64                    `json:"updatedMs"`
+}
+
+// Record identities only; hook input and tool output can contain private content.
+type sessionProviderConflict struct {
+	Executor   string `json:"executor"`
+	ProviderID string `json:"providerConversationId"`
+	TurnID     string `json:"turnId"`
+	Hook       string `json:"hook"`
+	Type       string `json:"type"`
 }
 
 type SessionEvent struct {
@@ -184,8 +194,27 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 	if state.Tools == nil {
 		state.Tools = map[string]bool{}
 	}
+	if executor == "codex" && state.Executor == "codex" && state.InitialLaunch && state.TurnID == "" && state.PromptHash == "" {
+		// SessionStart can belong to an internal thread; only assigned input authenticates a root.
+		if event.Hook != "UserPromptSubmit" {
+			return nil
+		}
+		dir, _ := s.directory(state.LaunchKey)
+		var spec Spec
+		var receipt Receipt
+		if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" || !spec.Persistent || spec.SessionID != "" || spec.Key != state.LaunchKey || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding != nil || workspaceHash(event.Prompt) != workspaceHash(sessionPrompt(dir, spec)) || event.TurnID == "" {
+			return nil
+		}
+		state.Binding.ProviderID, state.State = "", "submitting"
+	}
 	if state.Binding.ProviderID != "" && (state.Binding.ProviderID != event.ProviderID || state.Executor != executor) {
-		markSessionUnknown(&state, "SESSION_PROVIDER_CHANGED")
+		if state.ProviderConflict == nil {
+			state.ProviderConflict = &sessionProviderConflict{Executor: executor, ProviderID: event.ProviderID, TurnID: truncate(event.TurnID, 300), Hook: truncate(event.Hook, 100), Type: truncate(event.Type, 100)}
+		}
+		// Internal Codex threads inherit notify; their completion says nothing about this turn.
+		if !completed || state.Executor != executor {
+			markSessionUnknown(&state, "SESSION_PROVIDER_CHANGED")
+		}
 		state.UpdatedMS = time.Now().UnixMilli()
 		return writeJSON(path, state)
 	}
@@ -458,7 +487,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if _, err := os.Stat(filepath.Join(dir, "cancel.json")); err == nil {
 		status.State = "cancelling"
 	}
-	if status.DeadlineMS != 0 && time.Now().UnixMilli() >= status.DeadlineMS {
+	if status.State != "cancelling" && status.DeadlineMS != 0 && time.Now().UnixMilli() >= status.DeadlineMS {
 		status.State, status.ObservationErrorCode = "unknown", "EXECUTION_DEADLINE"
 	}
 	return status, nil

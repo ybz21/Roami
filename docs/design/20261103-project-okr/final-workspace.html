@@ -1,0 +1,35 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OKR 最终项目与展示态</title><style>
+:root{--bg-base:#0d1117;--text-bright:#e6edf3;--text-dim:#8b949e;--border-subtle:#21262d;--accent:#58a6ff;--ok:#3fb950;--fs-meta:12px;--fs-body:14px;--fs-title:22px;--sp-2:8px;--sp-4:16px;--sp-5:24px;--content-form:920px}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui,sans-serif}
+h3{font-size:var(--fs-body)}main{height:100%;overflow:auto;padding:var(--sp-5)}article{max-width:var(--content-form);margin:auto}h1,h2{font-size:var(--fs-title)}section{padding-block:var(--sp-4);border-bottom:1px solid var(--border-subtle)}a{color:var(--accent)}code,pre{white-space:pre-wrap;overflow-wrap:anywhere}small{font-size:var(--fs-meta);color:var(--text-dim)}table{width:100%;border-collapse:collapse}th,td{padding:var(--sp-2);border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}summary{cursor:pointer;padding-block:var(--sp-2)}.passed{color:var(--ok)}
+</style></head><body><main><article><header class="tt-pagehead"><h1>从最终项目看 OKR</h1><p>2026-11-04：先交付展示态与真实项目文件，Swarm 先接入，执行细节继续独立迭代。</p></header>
+<section><h2>打开后应该看到什么</h2><table><tr><th>位置</th><th>真实内容</th><th>下一步</th></tr><tr><td>OKR</td><td>目标、长短 KR、方法。例如 X 图文和 B站配音视频属于方法，star/fork 属于结果。</td><td>按需讨论和修订，先确认口径再保存。</td></tr><tr><td>数据看板</td><td>dashboard.json 绑定 KR 与指标，展示按日期记录的数值、增量及同日修订。</td><td>看来源；未取得曝光、完播率或平均观看时长时保持未知。</td></tr><tr><td>当前状态</td><td>关联团队、当前任务、真实产物与核验/外部动作状态。</td><td>进入同一团队查看、暂停、停止或纠偏。</td></tr><tr><td>文件</td><td>默认直接打开项目 .roami/okr，明确切换到项目素材目录。</td><td>查看定义、代码、skill、数据和视频，而非一张演示列表。</td></tr></table></section>
+<section><h2>保存后实际落盘的目录</h2><pre>.roami/okr/
+  README.md
+  okr.json
+  dashboard.json
+  connectors/&lt;metric-id&gt;/
+    connector.json
+    github.go + collector.go / store.go
+    README.md
+  agents/
+    main.json
+    main.md
+    swarm.json
+  skills/
+    okr-planning/SKILL.md
+    metric-collection/SKILL.md
+    swarm-execution/SKILL.md
+  data/
+    observations.jsonl
+    reviews.jsonl
+  memory/
+    team.md
+    decisions.jsonl
+  evidence/&lt;review-id&gt;.json
+  state/
+    current.json
+    confirmed-revisions/&lt;revision&gt;-&lt;id&gt;.json</pre><p>只有已保存 OKR 的项目才生成目录。已有目标迁移原始定义、日期观测及复盘证据；普通项目不凭空创建目标。空观测文件表示尚无证据，不生成虚假基线或零值。</p></section>
+<section><h2>每种文件如何使用</h2><table><tr><th>定义</th><th>展示与执行</th></tr><tr><td>okr.json</td><td>目标、KR、指标、方法、周期及关联团队。用户确认后的配置驱动页面；模型可以按目标动态决定数量和组合。</td></tr><tr><td>dashboard.json</td><td>注册组件 keyResults、metricTrend、nextAction；组件顺序、选择哪些 KR/指标由定义决定。React 渲染为 HTML，并非写死一张业务看板。</td></tr><tr><td>connector.json 与代码</td><td>GitHub 内置采集器实际读取公开仓库 star/fork。manual 指标由授权成员观察真实账号后记录日期、数值和来源。导出的 Go 代码解释运行实现，修改参考代码不会偷偷执行。</td></tr><tr><td>Main 配置与 skill</td><td>main.json 列出真实 SKILL.md 路径，main.md 给出协调约定。目标对话可读取这些项目能力，团队上下文携带相同说明及内容摘要；不是放三个没人读取的空目录。</td></tr><tr><td>团队绑定、记忆和运行态</td><td>swarm.json 关联既有团队；共享同一任务板和群聊。记忆保留事实与决定，宿主记录实际任务/run、控制和验收状态。配置或执行器自述不替代交付证据。</td></tr></table></section>
+<section><h2>动态聊出来，再按确认的定义执行</h2><ol><li>用户给出目标，例如“宣传 Roami，提高 star 和 fork”。按需 Main 读取当前定义和已有事实。</li><li>Main 提出 KR、短期实验、X/B站方法、指标与看板绑定。完播率、观看时长、曝光与点击先确认账号、口径和来源，缺数不填零。</li><li>用户确认后，受管项目工具带当前 revision 保存；文件和页面使用同一份定义。文件编辑中的草稿与已确认版本分开。</li><li>已支持来源通过实际 collect/record 写入日期事实；具体内容工作接入既有 Swarm。观察、准备、上传、提交、审核与公开分别记录。</li><li>人看真实结果作决定，Main 再提出下一轮方法。目标对话按需创建，关闭时只结束该实例；没有调度器就不宣称已长期日更。</li></ol><p>任意脚本 connector 的自动运行、自由 HTML 脚本看板及模型任意改系统配置均不在当前能力中。先把现有定义、数据、素材和团队真正组织起来。</p></section>
+<section><h2>验收与上线边界</h2><p>2026-11-04 最终运行代码为 45944053 / tree 825aaac4，已基于 main/PR653。Web/CLI 已上线 okr-ready-825aaac4。生产宣传项目真实生成 .roami/okr 和项目 AGENTS.md，保留 11 条原观测、1 次复盘及原始证据；用户明确指定的 X/B站方法已补入配置 revision 10，原数值目标与观测不变。</p><p>最终 full 和正常提交钩子 quick 均通过：Go 全量、Python 3414 通过/48 跳过、ruff、5131 条 i18n、hover/typecheck/build及策略扫描；前端全量186文件1326测试通过。PR653 集成、Main独立核验及项目上下文专项79项通过。早先并发取消观察与继承旧环境变量的失败保留，最终隔离旧别名后的完整复验通过，不回写成首次成功。</p><p>真实模型在独立验收项目先讨论后保存：动态形成4个KR、6个指标、2种方法和4个注册组件，生成37个实际文件；授权采集记录2026-11-04的GitHub star 11、fork 5。没有确认时目录未生成，社媒未知不填零；这不构成生产目标的新批准或增长归因。</p><p>旧活动原绑定只读历史，现保留历史并绑定真实“Roami宣传执行”团队，显示Main、X/B站、数据、复盘及真实上下游。用户随后点击继续，宿主记录resume revision 4。两名创作成员已取得真实任务；后续终端工作与原宿主结果存在差异，没有直接篡改验收状态。群聊与五列任务板使用宿主真实数据。</p><p>成员卡新增“进入工作/对话”；未派发成员为“查看计划/向 Main 调整”。桌面实际打开原任务，切换成员与Main保持草稿正文并同步开头@，不自动发送。Redmi Note 8 实际ADB滚动0→445.45、命中原任务/返回/定向对话，键盘打开时发送可达；HTTPS、compact/coarse、无文档横溢出。原剪贴板/焦点和返回后未滚动的失败记录保留，完成复验才计通过。测试cookie精确恢复、私有站点剪贴板权限恢复prompt、证书覆盖撤销，测试页与19696转发已回收，手机释放。</p><p>生产目录318个历史文件按原mtime归入2026/202611/20261103与20261104；副本摘要与原文件一致，旧路径与mtime保留，manifest明确legacy-copy、不猜测task/run、不登记新交付。<a href="daily-workflow.html">每日协作设计</a>规定新任务使用日期/方法/task/修订/run目录，Main维护当日索引。</p><p>X成员经具体内容与“发！”批准后实际发布；独立读取官方公开oEmbed接口得到HTTP 200，同一作者、正文、图片链接与<a href="https://x.com/ybz21_/status/2117912655830876636">真实帖子</a>匹配。原宿主摘要仍为此前暂停结果，后续终端工作未同步为宿主验收，增长归因未知。B站仍待登录，未上传或投稿。</p><p>本次只更新Web与CLI。Go Agent PID3428118、Python PID3428203及旧runtime路径、两份service.env、模型路由/参数/限额/账目均保留。旧busy不强制解除，新Python能力未激活；生产项目目标对话明确提示需升级并保留输入，不退化成无项目约束的Main。</p><p><a href="execution-acceptance.html">历史执行记录</a> · <a href="overall-solution.html">整体故事与架构</a></p></section></article></main></body></html>

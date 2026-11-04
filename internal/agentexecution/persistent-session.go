@@ -41,6 +41,13 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	if err != nil {
 		return err
 	}
+	if spec.Executor == "codex" {
+		_, scope, processes, observeErr := paneProcessSnapshot(binding.PID)
+		if observeErr != nil {
+			return observeErr
+		}
+		binding.Scope, binding.Processes = scope, processes
+	}
 	state := sessionLifecycle{Binding: binding, Executor: spec.Executor, State: "submitting", LaunchKey: spec.Key, InitialLaunch: true, Tools: map[string]bool{}, UpdatedMS: time.Now().UnixMilli()}
 	if err = writeJSON(path, state); err != nil {
 		return err
@@ -69,6 +76,9 @@ func (s Service) bindInitialSession(dir string, state *sessionLifecycle, binding
 	snapshot, scope, scoped, err := paneProcessSnapshot(binding.PID)
 	if err != nil {
 		return err
+	}
+	if state.Executor == "codex" && (state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || state.Binding.Scope != "" && state.Binding.Scope != scope || state.Binding.Processes[binding.PID] != "" && state.Binding.Processes[binding.PID] != snapshot[binding.PID].Token) {
+		return fmt.Errorf("SESSION_BINDING_CONFLICT")
 	}
 	binding.Scope, binding.Processes, binding.ProviderID = scope, scoped, provider
 	binding.ForeignProcesses = map[int]string{}

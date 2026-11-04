@@ -269,6 +269,9 @@ func (s Service) Status(key string) (status Status, err error) {
 	if status.Binding != nil {
 		return s.sessionExecutionStatus(key, status)
 	}
+	if recovered, ok, problem := s.reconcileInitialCodex(key, status); ok || problem != nil {
+		return recovered, problem
+	}
 	// Query success matters: a transport failure is not proof that an agent stopped.
 	out, err := s.Runtime.TmuxOutput("list-sessions", "-F", "#{session_name}\t#{ROAMI_AGENT_LAUNCH}")
 	if err != nil {
@@ -302,17 +305,13 @@ func (s Service) Cancel(key string) (Status, error) {
 		return status, err
 	}
 	if status.Binding != nil {
-		dir, _ := s.directory(key)
-		if err = writeJSON(filepath.Join(dir, "cancel.json"), map[string]bool{"cancel": true}); err != nil {
-			return status, err
-		}
-		if status.State == "running" {
-			status.State = "cancelling"
-		}
-		return status, nil
+		return s.cancelSession(key, status)
 	}
 	if status.State != "running" {
 		return status, fmt.Errorf("EXECUTION_STATE_UNKNOWN")
+	}
+	if cancelled, ok, problem := s.cancelInitialCodex(key, status); ok || problem != nil {
+		return cancelled, problem
 	}
 	dir, _ := s.directory(key)
 	if err = writeJSON(filepath.Join(dir, "cancel.json"), map[string]bool{"cancel": true}); err != nil {

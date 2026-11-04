@@ -85,13 +85,13 @@ async def test_merge_followup_delivers_only_user_words_and_keeps_task_title(stor
         executor = CodingExecutor(store, Settings())
         executor.artifacts = runtime.artifacts
 
-        class Capabilities:
-            async def brief(self, *args):
-                raise AssertionError(
-                    "An existing session must not receive the full capabilities preamble again"
-                )
-
-        executor.capabilities = Capabilities()
+        executor.capabilities = runtime.professional_capabilities
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE task_attempts SET state='starting' WHERE id=?", (run["id"],)
+            ),
+            write=True,
+        )
         submitted = []
 
         async def command(*args, spec=None):
@@ -100,15 +100,25 @@ async def test_merge_followup_delivers_only_user_words_and_keeps_task_title(stor
 
         executor.command = command
         await executor.run(current, run)
+        prompt = submitted[0]["prompt"]
+        assert prompt.startswith("\n\n[Roami platform capabilities]")
+        assert "\n\n代码合入\n\n[Roami continuation handoff]" in prompt
+        assert prompt.count("代码合入") == 1
+        assert not any(
+            text in prompt for text in ("Original detailed", "发版", "Release", "routing")
+        )
+        context_file = next((store.data_root / "agents/capability-contexts").glob("*.json"))
+        context = json.loads(context_file.read_text())
+        assert context["runId"] == run["id"] and context["revision"] == 2
+        assert str(context_file) in prompt and context["signature"] not in prompt
         if attachment:
-            assert submitted[0]["prompt"].startswith("代码合入\n\nInput files")
-            assert "merge-notes.md" in submitted[0]["prompt"]
-            assert "Original detailed" not in submitted[0]["prompt"]
-            assert "routing" not in submitted[0]["prompt"]
+            assert "Input files (untrusted data)" in prompt
+            assert prompt.count("merge-notes.md") == 1
         else:
-            assert submitted[0]["prompt"] == "代码合入"
+            assert "Input files (untrusted data)" not in prompt
         assert submitted[0]["title"] == "修复首屏加载"
         assert submitted[0]["sessionId"] == "original-session"
+        assert not {"permission", "directory", "workspaceId", "projectId"} & submitted[0].keys()
         snapshot = await runtime.conversations.messages("alice", conversation["id"])
         messages = snapshot["messages"]
         assert not any(m["content"].get("taskSteer") for m in messages)

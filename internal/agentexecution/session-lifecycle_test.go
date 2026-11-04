@@ -203,7 +203,11 @@ func TestSessionCompletionQuarantinesMismatchesAndLiveChildren(t *testing.T) {
 				t.Fatal(err)
 			}
 			status, err := s.Status(spec.Key)
-			if err != nil || status.State != "unknown" || status.Result != nil {
+			want := "unknown"
+			if mode == "wrong-provider" {
+				want = "running"
+			}
+			if err != nil || status.State != want || status.Result != nil {
 				t.Fatalf("false completion: %+v %v", status, err)
 			}
 			if _, err = s.claimWorkspace(context.Background(), binding.Directory, "unsafe-reuse"); err == nil {

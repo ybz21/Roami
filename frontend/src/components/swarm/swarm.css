@@ -78,8 +78,9 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-board-columns { grid-
 .swarm-managed[data-tab="chat"] .swarm-main-area,
 .swarm-managed[data-tab="studio"] .swarm-board,
 .swarm-managed[data-tab="board"] .swarm-studio-area { display:none; }
-.swarm-managed[data-tab="studio"] .swarm-main-area { overflow:hidden; }
-.swarm-studio-area { height:100%; display:grid; grid-template-columns:minmax(0,1fr) minmax(calc(var(--sp-5) * 10),calc(var(--sp-5) * 13)); }
+.swarm-managed[data-tab="studio"] .swarm-main-area { overflow:auto; }
+.swarm-studio-area { min-height:100%; display:flex; flex-direction:column; }
+.swarm-studio-area > .swarm-studio { flex:1; height:auto; min-height:calc(var(--sp-5) * 10); }
 .swarm-studio { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; }
 .swarm-chat-message { max-width:calc(var(--sp-5) * 32); margin-inline:auto; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-studio-area { display:flex; flex-direction:column; }
@@ -104,6 +105,15 @@ html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm
 .swarm-project-card p { color:var(--text-dim); font-size:var(--fs-sm); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .swarm-project-card small { font-size:var(--fs-meta); color:var(--text-dim); }
 
+.swarm-managed-grid[hidden] { display:none; }
+.swarm-memory { flex:1; min-height:0; overflow:auto; padding:var(--sp-4); }
+.swarm-memory textarea { font-size:var(--fs-body); }
+.swarm-memory > details { margin-top:var(--sp-4); }
+
+.swarm-external-acceptance { display:flex; flex-direction:column; gap:var(--sp-3); align-items:flex-start; }
+.swarm-external-acceptance label { display:flex; flex-direction:column; gap:var(--sp-1); width:100%; }
+.swarm-external-acceptance .ant-select { width:100%; }
+
 .swarm-legacy { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; }
 .swarm-legacy-content { flex:1; min-height:0; overflow:auto; padding:var(--sp-4); }
 .swarm-legacy [hidden] { display:none; }
@@ -121,3 +131,33 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-legacy-studio .swarm-
 html[data-pointer="coarse"] .swarm-legacy-content details { padding-block:var(--sp-3); }
 html[data-pointer="coarse"] .swarm-legacy-content summary { position:relative; }
 html[data-pointer="coarse"] .swarm-legacy-content summary::after { content:""; position:absolute; inset-inline:0; top:50%; height:var(--tap); transform:translateY(-50%); }
+
+.swarm-relations { flex-shrink:0; min-width:0; padding:var(--sp-3) var(--sp-4) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.swarm-relations h3 { margin:0 0 var(--sp-3); font-size:var(--fs-sm); font-weight:500; color:var(--text-dim); }
+.swarm-relations-main { display:flex; justify-content:center; padding-bottom:var(--sp-4); }
+.swarm-relation-main { position:relative; display:flex; flex-direction:column; gap:var(--sp-1); align-items:center; background:var(--bg-container); border:1px solid var(--border-subtle); border-radius:var(--r-card); padding:var(--sp-2) var(--sp-4); color:var(--text-bright); font:inherit; cursor:pointer; }
+.swarm-relation-main > span { color:var(--text-dim); font-size:var(--fs-meta); }
+.swarm-relations-main[data-members="true"] > .swarm-relation-main::after { content:''; position:absolute; top:100%; height:var(--sp-4); border-left:1px solid var(--border-subtle); }
+.swarm-relations-members { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5) * 10)),1fr)); gap:var(--sp-3); min-width:0; }
+.swarm-relations-members[data-coordinated="true"] { border-top:1px solid var(--border-subtle); padding-top:var(--sp-3); }
+.swarm-relation-member { position:relative; min-width:0; padding:var(--sp-3); border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-container); overflow-wrap:anywhere; }
+.swarm-relations-members[data-coordinated="true"] > .swarm-relation-member::before { content:''; position:absolute; bottom:100%; left:50%; height:var(--sp-3); border-left:1px solid var(--border-subtle); }
+.swarm-relation-member[data-selected="true"],.swarm-relation-main[aria-pressed="true"] { border-color:var(--accent-border); }
+.swarm-relation-member header { display:flex; gap:var(--sp-2); align-items:center; justify-content:space-between; }
+.swarm-relation-member header > button { font-weight:600; }
+.swarm-relation-member small { color:var(--text-dim); font-size:var(--fs-meta); }
+.swarm-relation-duty { margin:var(--sp-2) 0; font-size:var(--fs-sm); }
+.swarm-relation-member dl { margin:var(--sp-3) 0 0; font-size:var(--fs-meta); }
+.swarm-relation-member dl > div { display:flex; gap:var(--sp-2); align-items:baseline; margin-top:var(--sp-2); }
+.swarm-relation-member dt { flex-shrink:0; color:var(--text-dim); }
+.swarm-relation-member dd { margin:0; min-width:0; display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.swarm-relation-member dd > span { color:var(--text-dim); }
+.swarm-relation-member dd button { display:flex; flex-direction:column; align-items:flex-start; text-align:start; white-space:normal; overflow-wrap:anywhere; }
+.swarm-relation-member dd small { display:block; font-weight:400; }
+.swarm-relations button:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
+:where(html[data-pointer="fine"]) .swarm-relation-main:hover { background:var(--list-hover); }
+html[data-pointer="coarse"] .swarm-relations button { position:relative; }
+html[data-pointer="coarse"] .swarm-relations .tt-act::after { content:''; position:absolute; inset-inline:calc(-1 * var(--sp-1)); top:50%; min-height:var(--tap); min-width:var(--tap); transform:translateY(-50%); }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:min(calc(100% - var(--sp-5)),calc(var(--sp-5) * 12)); overflow-x:auto; padding-bottom:var(--sp-2); }
+
+.swarm-relation-actions { display:flex; flex-wrap:wrap; gap:var(--sp-3); margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--border-subtle); }

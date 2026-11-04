@@ -13,15 +13,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/backend/okr"
+	"github.com/ybz21/Roami/backend/project"
 	storage "github.com/ybz21/Roami/internal/storage"
 )
 
-func openProjectOKR(dataDir string) *okr.Store {
+func openProjectOKR(dataDir string, projects *project.Store) *okr.Store {
 	paths, err := storage.ResolvePaths("", dataDir)
 	if err == nil {
 		var store *okr.Store
 		store, err = okr.Open(paths)
 		if err == nil {
+			store.SetProjects(func() map[string]string {
+				result := map[string]string{}
+				for id, entry := range projects.Entries() {
+					result[id] = entry.Dir
+				}
+				return result
+			})
 			return store
 		}
 	}
@@ -34,6 +42,8 @@ func okrError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, okr.ErrInvalid):
 		status, code = http.StatusBadRequest, "OKR_INVALID"
+	case errors.Is(err, okr.ErrPending):
+		status, code = http.StatusConflict, "OKR_FILES_PENDING"
 	case errors.Is(err, okr.ErrConflict):
 		status, code = http.StatusConflict, "OKR_CONFLICT"
 	case errors.Is(err, okr.ErrNotFound):
@@ -276,4 +286,55 @@ func (a *API) ProjectOKRCollector(ctx context.Context) {
 		entry, ok := a.Projects.Entry(projectID)
 		return ok && entry.ID == projectID
 	})
+}
+
+func (a *API) ProjectOKRSync(c *gin.Context) {
+	projectID, ok := a.okrProject(c)
+	if !ok {
+		return
+	}
+	var body struct {
+		Revision int64 `json:"revision"`
+	}
+	if !decodeOKR(c, &body) {
+		return
+	}
+	// Validate the stable managed swarm reference before confirming edited definitions.
+	w, err := a.ProjectOKR.SyncValidated(projectID, body.Revision, func(config *okr.Config) error {
+		swarm, err := a.resolveOKRSwarm(c.Request.Context(), config.Swarm)
+		if err != nil {
+			return err
+		}
+		config.Swarm = swarm
+		return nil
+	})
+	if err != nil {
+		okrError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": w})
+}
+
+func (a *API) ProjectOKRMemory(c *gin.Context) {
+	projectID, ok := a.okrProject(c)
+	if !ok {
+		return
+	}
+	var body struct {
+		Content        *string `json:"content"`
+		ExpectedSha256 string  `json:"expectedSha256"`
+		Revision       *int64  `json:"revision,omitempty"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&body) != nil || body.Content == nil || decoder.Decode(new(any)) != io.EOF {
+		okrError(c, okr.ErrInvalid)
+		return
+	}
+	w, err := a.ProjectOKR.WriteMemory(projectID, *body.Content, body.ExpectedSha256)
+	if err != nil {
+		okrError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": w})
 }

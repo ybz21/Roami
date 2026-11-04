@@ -316,8 +316,18 @@ class ToolDirectory:
         if not entries:
             raise DomainError("TOOL_UNAVAILABLE")
 
+        entry = deepcopy(entries[0])
+        prefix = argv[1:-1]
+        if family == "roami" and prefix:
+            entry["commands"] = [
+                item for item in entry["commands"] if item["argv"][1 : len(prefix) + 1] == prefix
+            ]
+            if not entry["commands"]:
+                raise DomainError("TOOL_UNAVAILABLE")
+            entry["name"] = "roami " + " ".join(prefix)
+
         async def help_command(args, binding):
-            return command_strings(entries[0])
+            return command_strings(entry)
 
         return Tool(
             "command_help",
@@ -414,7 +424,11 @@ class ToolDirectory:
             if (
                 argv
                 and argv[0] in {"roami", self.settings.cli_bin}
-                and argv[1:] in (["help"], ["--help"], ["chrome", "help"], ["chrome", "--help"])
+                and argv[-1] in {"help", "--help"}
+                and (
+                    argv[1:-1] in ([], ["chrome"])
+                    or any(path[: len(argv) - 2] == argv[1:-1] for path in COMMANDS.values())
+                )
             ):
                 return self.help_tool(argv, role)
             operation = self.operation(argv)

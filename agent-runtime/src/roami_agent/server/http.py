@@ -663,6 +663,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
+                "projectOkr": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
@@ -737,9 +738,15 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):
+        project_id = None
+        if body.projectId is not None:
+            from roami_agent.conversation.project_okr import registered_project
+
+            project_id = await registered_project(runtime.settings, body.projectId)
+            await runtime.conversations.main(owner)
         return {
             "data": await runtime.conversations.create(
-                owner, body.title, request_key=body.requestKey
+                owner, body.title, request_key=body.requestKey, project_id=project_id
             )
         }
 
@@ -1018,7 +1025,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def verify_task(task_id: str, body: ConfirmTask, owner: Owner):
         return {
             "data": await runtime.dispatch.confirm(
-                owner, task_id, body.accepted, revision=body.revision, run_id=body.runId
+                owner,
+                task_id,
+                body.accepted,
+                revision=body.revision,
+                run_id=body.runId,
+                evidence=body.evidence,
             )
         }
 

@@ -151,7 +151,7 @@ class CodingExecutor:
             launch["prompt"] += await professional_brief(
                 self.db, self.artifacts, task, run, continuation=bool(continuing_session)
             )
-        if self.capabilities and not continuing_session:
+        if self.capabilities:
             launch["prompt"] = await self.capabilities.brief(task, run) + "\n\n" + launch["prompt"]
         if target.get("nodeId", "local") != "local":
             raise DomainError("CODING_NODE_UNAVAILABLE")
