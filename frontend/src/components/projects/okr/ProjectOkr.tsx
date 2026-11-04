@@ -13,6 +13,7 @@ import OkrConfiguration, { type SwarmOption } from './OkrConfiguration'
 import { configurationOf, emptyConfiguration, projectPath, shanghaiDate, workspaceUpdated, type Configuration, type Workspace } from './okr-workspace'
 import OkrDashboard from './OkrDashboard'
 import OkrGoalMap from './OkrGoalMap'
+import { useOkrView } from './okr-view'
 import { lazyRetry } from '../../lazy-retry'
 import './project-okr.css'
 import './okr-dashboard.css'
@@ -32,7 +33,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const [loaded, setLoaded] = useState(false)
   const [draft, setDraft] = useState<Configuration>(emptyConfiguration)
   const [editing, setEditing] = useState(false)
-  const [mainPanel, setMainPanel] = useState('okr')
+  const { mainPanel, setMainPanel } = useOkrView(projectId)
   const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number }>()
   const reference = readOkrMessageReference()
   const [chatting, setChatting] = useState(!!reference)

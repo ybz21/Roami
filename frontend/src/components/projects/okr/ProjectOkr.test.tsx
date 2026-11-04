@@ -26,12 +26,32 @@ const initial: Workspace = {
   swarm: 'sw-11111111111111111111111111111111', autoCollect: false, observations: [], reviews: [], updatedAt: '2026-11-03T00:00:00Z',
 }
 beforeEach(() => {
+  localStorage.clear()
   state.phone = false
   state.api.mockReset()
   state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [{ id: 'sw-11111111111111111111111111111111', name: 'real-team' }] } : { data: initial })
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
+
+it.each([false, true])('restores the project view after leaving the workspace (phone=%s)', async phone => {
+  state.phone = phone
+  const first = render(<ProjectOkr projectId="stable-project" />)
+  await screen.findByRole('button', { name: 'okr.edit' })
+  panel('data')
+  fireEvent.click(screen.getByRole('tab', { name: 'okr.tab.files' }))
+  await screen.findByTestId('project-files')
+  first.unmount()
+  render(<ProjectOkr projectId="stable-project" />)
+  expect(await screen.findByTestId('project-files')).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'okr.tab.files' }).getAttribute('aria-selected')).toBe('true')
+  panel('data')
+  expect(screen.getByRole('tab', { name: 'okr.tab.dashboard' }).getAttribute('aria-selected')).toBe('true')
+  cleanup()
+  render(<ProjectOkr projectId="another-project" />)
+  await screen.findByRole('button', { name: 'okr.edit' })
+  expect(screen.getByRole('tab', { name: 'okr.tab.okr' }).getAttribute('aria-selected')).toBe('true')
+})
 
 it('keeps project navigation available and preserves a configuration draft across files', async () => {
   render(<ProjectOkr projectId="stable-project" projectDir="/project" />)
@@ -279,4 +299,13 @@ it('keeps data as a read-only dashboard and leaves reflection in project files',
   for (const label of ['okr.reviewSummary', 'okr.value', 'okr.note']) expect(screen.queryByLabelText(label)).toBeNull()
   expect(screen.queryByRole('button', { name: 'okr.collect' })).toBeNull()
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})
+
+
+it('restores the former dashboard choice without restoring removed review navigation', async () => {
+  localStorage.setItem('roam.okr.view:' + JSON.stringify([null, 'stable-project']), JSON.stringify({ mainPanel: 'board', panel: 'data' }))
+  render(<ProjectOkr projectId="stable-project" />)
+  await screen.findByRole('tab', { name: 'okr.tab.dashboard', selected: true })
+  expect(screen.getByRole('tab', { name: 'okr.tab.dashboard' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByRole('tab', { name: 'okr.tab.review' })).toBeNull()
 })
