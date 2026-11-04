@@ -14,7 +14,7 @@ vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => path, current
 vi.mock('../agent/agent-page-route', () => ({ openAgentPage: (...args: unknown[]) => test.openTask(...args) }))
 vi.mock('../markdown/Markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
 vi.mock('../MobileSubPage', () => ({ default: ({ children }: { children: ReactNode }) => <div role="dialog">{children}</div> }))
-vi.mock('./SwarmStudio', () => ({ default: ({ selected }: { selected: string }) => <div data-testid="studio-selection">{selected}</div> }))
+vi.mock('./SwarmStudio', () => ({ default: ({ selected, active = true }: { selected: string; active?: boolean }) => <div data-testid="studio-selection" data-active={active}>{selected}</div> }))
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: { error: test.error }, modal: { confirm: vi.fn() } }) },
   Spin: () => <span>loading</span>,
@@ -140,6 +140,7 @@ it('keeps a reopened memory draft tied to its original version until explicit me
   fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.memory' }))
   await waitFor(() => expect(screen.getByRole('textbox', { name: 'swarm.managed.memory' })).toBeTruthy())
   expect((screen.getByRole('textbox', { name: 'swarm.managed.memory' }) as HTMLTextAreaElement).value).toBe('My revised decision')
+  expect(screen.getByTestId('studio-selection').getAttribute('data-active')).toBe('false')
   expect((screen.getByRole('button', { name: 'swarm.managed.memorySave' }) as HTMLButtonElement).disabled).toBe(true)
   expect(screen.getByText('New remote decision')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.memoryMerged' }))

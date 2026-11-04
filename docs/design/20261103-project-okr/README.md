@@ -15,3 +15,7 @@
 页面层级：项目页头后直接进入三个标签；目标摘要和配置编辑器归属“OKR 与看板”，编辑时仍可切到活动或文件并保留草稿。
 
 - [升级后的旧蜂群恢复与验收（HTML）](legacy-recovery.html)
+
+- [总体方案：目标、方法、项目文件、团队记忆与真实交付（HTML）](overall-solution.html)
+
+- [旧成员交付验收与回收（HTML）](member-acceptance.html)
