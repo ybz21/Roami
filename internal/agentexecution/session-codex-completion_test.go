@@ -151,9 +151,9 @@ func TestCodexCompletionIgnoresEarlierCompletedTurns(t *testing.T) {
 }
 
 func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
-	for _, mode := range []string{"unknown", "busy", "cancelled", "lost-post-hook", "pending-subagent", "evidence-conflict"} {
+	for _, mode := range []string{"unknown", "busy", "cancelled", "cancelled-manual-input", "lost-post-hook", "pending-subagent", "evidence-conflict", "aborted", "aborted-without-request", "aborted-other-turn", "aborted-live-process", "aborted-manual-input"} {
 		t.Run(mode, func(t *testing.T) {
-			cancelled := mode == "cancelled"
+			cancelled := strings.HasPrefix(mode, "cancelled") || strings.HasPrefix(mode, "aborted") && mode != "aborted-without-request"
 			s, binding := sessionFixture(t)
 			// The pane must not own unrelated subprocesses of the Go test runner.
 			pane := exec.Command("sleep", "120")
@@ -198,15 +198,39 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 			if mode == "pending-subagent" {
 				state.Tools = map[string]bool{"subagent:child": true}
 			}
+			if mode == "aborted-manual-input" || mode == "cancelled-manual-input" {
+				state.UnknownReason = "SESSION_PROMPT_MISMATCH"
+			}
+			if mode == "aborted" {
+				state.UnknownReason = "SESSION_INTERRUPTED"
+			}
 			if err := writeJSON(path, state); err != nil {
 				t.Fatal(err)
 			}
 			t.Setenv("CODEX_HOME", t.TempDir())
 			binding.ProviderID = completionThread
-			saveCompletionRecords(t, os.Getenv("CODEX_HOME"), completionRecords(binding, "turn-1", string(prompt)))
+			records := completionRecords(binding, "turn-1", string(prompt))
+			if strings.HasPrefix(mode, "aborted") {
+				abort := map[string]any{"type": "event_msg", "timestamp": "2026-10-26T11:15:35.727Z", "payload": map[string]any{"type": "turn_aborted", "turn_id": "turn-1", "reason": "interrupted"}}
+				if mode == "aborted-other-turn" {
+					abort["payload"].(map[string]any)["turn_id"] = "other-turn"
+				}
+				records = append(records[:5], abort)
+			}
+			saveCompletionRecords(t, os.Getenv("CODEX_HOME"), records)
 			dir, _ := s.directory(spec.Key)
 			if cancelled {
 				if err := os.WriteFile(filepath.Join(dir, "cancel.json"), []byte("{}"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "aborted-live-process" {
+				var receipt Receipt
+				if err := readJSON(filepath.Join(dir, "receipt.json"), &receipt); err != nil {
+					t.Fatal(err)
+				}
+				receipt.Binding.Processes[binding.PID] = "unconfirmed-process-token"
+				if err := writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -224,7 +248,7 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 				return
 			}
 			status, err := s.Status(spec.Key)
-			if mode == "lost-post-hook" || mode == "pending-subagent" {
+			if mode == "lost-post-hook" || mode == "pending-subagent" || mode == "aborted-without-request" || mode == "aborted-other-turn" || mode == "aborted-live-process" || mode == "aborted-manual-input" || mode == "cancelled-manual-input" {
 				if err != nil || status.Result != nil || status.State != "unknown" {
 					t.Fatalf("pending work accepted: %v", err)
 				}

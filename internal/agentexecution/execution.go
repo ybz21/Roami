@@ -302,14 +302,7 @@ func (s Service) Cancel(key string) (Status, error) {
 		return status, err
 	}
 	if status.Binding != nil {
-		dir, _ := s.directory(key)
-		if err = writeJSON(filepath.Join(dir, "cancel.json"), map[string]bool{"cancel": true}); err != nil {
-			return status, err
-		}
-		if status.State == "running" {
-			status.State = "cancelling"
-		}
-		return status, nil
+		return s.cancelSession(key, status)
 	}
 	if status.State != "running" {
 		return status, fmt.Errorf("EXECUTION_STATE_UNKNOWN")
