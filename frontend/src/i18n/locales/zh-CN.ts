@@ -5212,6 +5212,13 @@ const zhCN = {
   'swarm.managed.mainFailed': 'Main 暂时未能继续，请检查模型连接后在群聊重试。',
   'swarm.managed.memoryChanged': '团队记忆已更新，请对照最新内容合并草稿。',
   'swarm.managed.memoryMerged': '已合并，继续保存',
+  'swarm.chat.team': '团队',
+  'swarm.chat.conversations': '团队对话',
+  'swarm.chat.withMain': '与 Main 对话',
+  'swarm.chat.withMember': '与 {name} 对话',
+  'swarm.chat.memberPlan': '查看 {name} 的计划',
+  'swarm.chat.notStarted': '未启动',
+  'swarm.chat.teamVisible': '团队共享记录',
 }
 
 export default zhCN

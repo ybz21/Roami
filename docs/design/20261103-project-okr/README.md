@@ -36,3 +36,4 @@
 展示验收与当前运行团队的边界见[最终项目（HTML）](final-workspace.html)：生产旧历史已保留，新的受管团队有Main、共享群聊和真实依赖，当前暂停派发。Android页面能加载，系统输入焦点阻断的点按没有计为通过。
 
 - [每日产物与多智能体协作（HTML）](daily-workflow.html)：项目 AGENTS.md、按年/月/日归档、任务/run 身份、共享群聊/记忆与历史整理边界。
+- [团队与群聊合一页（HTML）](conversation-workspace.html)：同屏协作、按任务查看交流与进入真实成员会话。
