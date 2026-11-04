@@ -1,21 +1,24 @@
 # 项目 OKR 工作台
 
-桌面左栏有独立 OKR 入口 `#/okr`，只展示已保存目标；新建时才选择关联项目，进入 `#/okr/PROJECT_ID` 搭建；手机项目顶栏同样可进入。原有项目详情入口 `#/projects/PROJECT_ID/okr` 保留。
+2026-11-04：当前主线基于已合入 PR648/650 的 main，补齐项目文件、方法与指标看板、按需目标对话工具、团队记忆和真实交付验收；本轮主线尚未部署。
 
-- [产品、用户故事与技术实现（HTML）](implementation.html)
-- [接口与任务规格（HTML）](spec.html)
-- [重点重设计与上线验收（HTML）](acceptance-redesign.html)
+- [总体方案、完整用户故事与技术架构（HTML）](overall-solution.html)
+- [集成、桌面/真机及真实宣传验收（HTML）](integration-acceptance.html)
+- [六名旧成员交付验收与回收（HTML）](member-acceptance.html)
 
-代码：`backend/okr/`、`backend/api/project-okr.go`、`frontend/src/components/projects/okr/`、`cmd/roami/project-okr.go`。真实演示项目为“Roami 宣传”，不把原型数据写入正式库。
+左栏 `#/okr` 只展示已保存目标；新建时选择关联项目。详情外层为“OKR 与看板 / 具体活动 / 文件”，工作台内为“OKR / 数据看板 / 当前状态”。不是每个项目都有 OKR。只有保存确认的目标才生成项目 `.roami/okr` 文件包，现有旧目标按需迁移。
 
-验收：本轮桌面7档布局、Android ADB真机两个标签与独立对话流程通过；集成 full 门禁通过，最终前端174文件/1261测试通过。本轮未改Python；首版Python3180通过48跳过。详细范围、上线树和限制见验收HTML。
+代码位于 `backend/okr/`、`backend/api/project-okr.go`、`cmd/roami/project-okr.go`、`frontend/src/components/projects/okr/` 与 `agent-runtime/src/roami_agent/` 的项目工具、Swarm、记忆和证据模块。任务、群聊与调度继续复用既有运行时。
 
-最新设计：目标详情分“OKR 与看板 / 具体活动 / 文件”；看板带按需创建的新 Main Agent 对话，活动复用关联蜂群。详见 HTML 的修订章节。
+本轮 full 门禁通过；Python 3321通过/48跳过，前端184文件/1301测试通过，受影响Go模块race通过。桌面四档×对话开关八组和Android ADB真机检查通过。接口验收使用独立实例及合成项目，没有模型调用，不代表已自动发布或完成日更。
 
-页面层级：项目页头后直接进入三个标签；目标摘要和配置编辑器归属“OKR 与看板”，编辑时仍可切到活动或文件并保留草稿。
+真实“Roami 宣传”的配音/字幕MP4已生成，X保存草稿，B站待登录；均未公开发布，原文案验收2/2未改写为视频或发布完成。详情见验收HTML。
 
-- [升级后的旧蜂群恢复与验收（HTML）](legacy-recovery.html)
+历史记录：
 
-- [总体方案：目标、方法、项目文件、团队记忆与真实交付（HTML）](overall-solution.html)
-
-- [旧成员交付验收与回收（HTML）](member-acceptance.html)
+- [首版产品、用户故事与技术实现（HTML）](implementation.html)
+- [首版接口与任务规格（HTML）](spec.html)
+- [前轮重设计与上线验收（HTML）](acceptance-redesign.html)
+- [旧蜂群恢复与验收（HTML）](legacy-recovery.html)
+- [活动场景与项目归属修复](../20261104-okr-studio-project-ownership/README.md)
+- [原输入/输出交互设计原型（HTML）](../20261030-okr每日行动/interaction-design.html)
