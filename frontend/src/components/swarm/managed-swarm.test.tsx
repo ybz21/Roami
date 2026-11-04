@@ -300,3 +300,19 @@ it('enters a bound native conversation instead of creating a new agent', async (
  expect(test.api).toHaveBeenCalledWith('GET','/agent/tasks/task')
  expect(test.api).toHaveBeenCalledOnce()
 })
+
+it('does not open an obsolete session when the same member advances while its identity read is pending', async () => {
+ let resolve!: (value: unknown) => void
+ test.api.mockReturnValueOnce(new Promise(value => { resolve = value }))
+ const session = vi.fn()
+ const view = render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={session} />)
+ fireEvent.click(screen.getByRole('button', {name:'swarm.chat.withMember'}))
+ fireEvent.click(screen.getByRole('button', {name:'swarm.managed.openSession'}))
+ expect(test.api).toHaveBeenCalledWith('GET','/agent/tasks/task')
+ test.data = {...test.data!,work:test.data!.work.map(work=>({...work,revision:2,attempt:{...work.attempt!,runId:'run-new'}}))}
+ view.rerender(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={session} />)
+ resolve({data:{task:{id:'task',revision:1},attempts:[{id:'run',revision:1,sessionId:'obsolete-session'}]}})
+ await waitFor(()=>expect(test.openTask).toHaveBeenCalledWith('tasks','task'))
+ expect(session).not.toHaveBeenCalled()
+ expect(test.api).toHaveBeenCalledOnce()
+})

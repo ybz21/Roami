@@ -123,17 +123,21 @@ function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSessi
     ...data.work.filter(item => item.attempt?.summary).map(item => ({ id: 'result:' + item.id, taskId: item.task_id, author: item.member_name, text: item.attempt!.summary!, time: item.attempt?.finishedMs || 0, pending: false, work: item })),
   ].sort((a, b) => a.time - b.time), [data.posts, data.mainMessages, data.work, t])
   const currentWork = data.work.find(item => item.id === scope && item.task_id)
+  const latestWork = useRef(currentWork); latestWork.current = currentWork
   const thread = scope === 'main' || currentWork ? scope : 'group'
   const visibleMessages = messages.filter(item => thread === 'group' || thread === 'main' && !item.taskId || item.work?.id === thread)
   const enterConversation = async () => {
     if (!currentWork?.task_id || openingRef.current) return
     openingRef.current = true; setOpening(true)
-    const taskId = currentWork.task_id, requestedScope = scope
+    const taskId = currentWork.task_id, requestedScope = scope, requestedRevision = currentWork.revision, requestedRun = currentWork.attempt?.runId
     const fallback = () => openAgentPage('tasks', taskId)
     try {
       const response = await api('GET', '/agent/tasks/' + encodeURIComponent(taskId))
       const detail: TaskDetail = response.data
       if (!alive.current || latestScope.current !== requestedScope) return
+      const observed = latestWork.current
+      if (!observed) return
+      if (observed.task_id !== taskId || observed.revision !== requestedRevision || observed.attempt?.runId !== requestedRun) { if (observed.task_id) openAgentPage('tasks', observed.task_id); return }
       const attempt = detail.attempts[0]
       if (detail.task.id !== taskId || detail.task.revision !== currentWork.revision || !attempt || attempt.revision !== detail.task.revision || attempt.id !== currentWork.attempt?.runId || ['closing', 'closed'].includes(detail.sessionClosure?.state || '')) { fallback(); return }
       if (detail.task.nativeSession) openAgentPage('session', detail.task.nativeSession.id)
