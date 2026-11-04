@@ -15,11 +15,13 @@ from roami_agent.improvement.evaluation.conversation_actor import ScriptedConver
 from roami_agent.improvement.evaluation.conversation_oracle import grade_checkpoint
 from roami_agent.improvement.evaluation.execution.executors import committed_answer
 from roami_agent.improvement.integrations.measurements import EpisodeBudget, MeteredModel
+from roami_agent.improvement.integrations.tool_process import tool_process_metrics
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import Database, row, rows
 from roami_agent.storage.task_request import task_user_request
 from roami_agent.tools.main_catalog import register_main_tools
+from roami_agent.tools.model_inputs import register_model_inputs
 from roami_agent.tools.registry import Tools
 
 log = logging.getLogger(__name__)
@@ -267,6 +269,8 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         TaskRouter(database, targets, runtime.settings, runtime.memory),
     )
     runtime.tools.registry.update(registry.registry)
+    register_model_inputs(runtime.tools)
+    runtime.tools.shell_disabled_roles.add("main")
 
     async def registered_only(args, binding):
         raise DomainError("RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED")
@@ -377,6 +381,13 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         failure = getattr(error, "code", type(error).__name__)
     finally:
         await runtime.close()
+        tool_records = await database.call(
+            lambda db: rows(
+                db,
+                "SELECT t.*,native_content(m.content_json) AS result_json FROM tool_calls t "
+                "LEFT JOIN messages m ON m.id=t.result_message_id ORDER BY t.rowid",
+            )
+        )
         await database.close()
     result = {
         "scenario": scenario["id"],
@@ -397,7 +408,10 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         else "failed",
         "expected_turns": len(scenario["turns"]),
         "checkpoints": checkpoints,
-        "metrics": budget.metrics(),
+        "metrics": {
+            **budget.metrics(),
+            **tool_process_metrics(tool_records, complete=failure is None),
+        },
         "background_execution": "synthetic_checkpoint",
         "live_model_semantics_tested": actor is None
         and any(c["semantic_checked"] for c in checkpoints),
@@ -407,6 +421,7 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         ("receipt.json", result),
         ("transcript.json", transcripts),
         ("model-journal.json", journal),
+        ("execution-log.json", {"tool_calls": tool_records, "complete": failure is None}),
     ]:
         path = root / name
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")

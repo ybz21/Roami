@@ -1,6 +1,7 @@
 """Exclude forgotten task provenance from model-facing status responses."""
 
 import json
+from collections import Counter
 
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.task_request import task_user_request
@@ -19,6 +20,7 @@ def recent_task_context(db, turn):
         "AND o.message_id=t.origin_message_id) ORDER BY t.created_ms DESC,t.id LIMIT 3",
         (turn["owner_id"], turn["conversation_id"], turn["branch_id"], turn["created_ms"]),
     )
+    source_counts = Counter(task["origin_message_id"] for task in tasks)
     result = []
     for task in tasks:
         source = task_user_request(db, {**task, "id": task["origin_message_id"]})
@@ -33,6 +35,14 @@ def recent_task_context(db, turn):
                 "revision": task["revision"],
                 "state": task["state"],
                 "goal": json.loads(source["content_json"]).get("text", ""),
+                **(
+                    {
+                        "title": intent.get("title")
+                        or intent.get("initialIntent", intent)["goal"].strip().splitlines()[0][:80]
+                    }
+                    if source_counts[task["origin_message_id"]] > 1
+                    else {}
+                ),
                 "executor": intent["executor"],
                 "unresolved": task["attempt_state"] == "unknown"
                 or evidence.get("outcomeKnown") is False

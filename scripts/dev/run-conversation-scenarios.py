@@ -131,7 +131,25 @@ async def episodes(args, cases):
 
 def execution_summary(evaluated):
     results = evaluated["results"]
+    metrics = [r["metrics"] for r in results]
+    process_complete = (
+        not evaluated.get("failure")
+        and evaluated.get("usage_known", True)
+        and bool(metrics)
+        and all(m.get("tool_process_coverage") == "complete" for m in metrics)
+    )
+    calls = sum(m.get("tool_calls", 0) for m in metrics)
+    errors = sum(m.get("tool_errors", 0) for m in metrics)
+    first_calls = sum(m.get("tool_first_calls", 0) for m in metrics)
+    first_successes = sum(m.get("tool_first_successes", 0) for m in metrics)
     return {
+        "tool_process_coverage": "complete" if process_complete else "partial",
+        "tool_calls": calls,
+        "tool_errors": errors,
+        "tool_error_rate": errors / calls if process_complete and calls else None,
+        "tool_first_attempt_success_rate": first_successes / first_calls
+        if process_complete and first_calls
+        else None,
         "failure": evaluated["failure"]
         or next((r["failure"] for r in results if r["failure"]), None),
         "blocked_scenarios": sum(r["state"] == "blocked" for r in results),
@@ -139,9 +157,7 @@ def execution_summary(evaluated):
         "semantic_checked_user_turns": sum(
             c["semantic_checked"] for r in results for c in r["checkpoints"]
         ),
-        "live_model_semantics_tested": any(
-            r["live_model_semantics_tested"] for r in results
-        ),
+        "live_model_semantics_tested": any(r["live_model_semantics_tested"] for r in results),
     }
 
 

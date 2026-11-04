@@ -1,0 +1,15 @@
+Final source checks
+
+Targeted runtime regressions: 89 passed in 38.47s
+
+Command: scripts/dev/isolated-roami.sh PRIVATE_TEST_DIRECTORY bash scripts/dev/quality/check.sh full
+Python: 3304 passed, 48 skipped in 924.48s (0:15:24)
+Go, CLI audit, formatting, frontend i18n/hover/typecheck/build: passed
+Secret scan and staged file policy: passed
+Full log SHA256: d15a09a726e99673c4154f62e96d17e3c79a0e8f00da4359cd8c7aaaa7e3f77f
+
+Legacy source control: b240588e8934f857b307c66e14024f0e4cc780b1
+New same-source task-title test: expected failure (KeyError: title); existing single-task test passed
+1 failed, 1 passed in 1.73s
+
+Quick: enforced by the commit hook; final receipt is recorded in the PR.

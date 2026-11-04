@@ -66,12 +66,59 @@ async def test_admission_rejection_is_unscored_and_reaches_top_summary(tmp_path,
     assert result["metrics"]["request_attempts"] == result["metrics"]["observed_tokens"] == 0
     assert result["metrics"]["token_coverage"] == "complete"
     assert summary(result) == {
+        "tool_process_coverage": "partial",
+        "tool_calls": 0,
+        "tool_errors": 0,
+        "tool_error_rate": None,
+        "tool_first_attempt_success_rate": None,
         "failure": code,
         "blocked_scenarios": 1,
         "failed_scenarios": 0,
         "semantic_checked_user_turns": 0,
         "live_model_semantics_tested": False,
     }
+
+
+def test_process_summary_weights_actual_calls_and_keeps_incomplete_evidence_unknown():
+    module = runpy.run_path(str(REPOSITORY / "scripts/dev/run-conversation-scenarios.py"))
+    result = {
+        "failure": None,
+        "state": "passed",
+        "checkpoints": [],
+        "live_model_semantics_tested": True,
+    }
+    first = {
+        **result,
+        "metrics": {
+            "tool_process_coverage": "complete",
+            "tool_calls": 1,
+            "tool_errors": 1,
+            "tool_first_calls": 1,
+            "tool_first_successes": 0,
+        },
+    }
+    second = {
+        **result,
+        "metrics": {
+            "tool_process_coverage": "complete",
+            "tool_calls": 3,
+            "tool_errors": 0,
+            "tool_first_calls": 1,
+            "tool_first_successes": 1,
+        },
+    }
+    report = module["execution_summary"]({"results": [first, second], "failure": None})
+    assert report["tool_error_rate"] == 0.25
+    assert report["tool_first_attempt_success_rate"] == 0.5
+    second["metrics"]["tool_process_coverage"] = "partial"
+    report = module["execution_summary"]({"results": [first, second], "failure": None})
+    assert report["tool_errors"] == 1
+    assert report["tool_error_rate"] is report["tool_first_attempt_success_rate"] is None
+    report = module["execution_summary"](
+        {"results": [first], "failure": "EPISODE_RECEIPT_UNAVAILABLE", "usage_known": False}
+    )
+    assert report["tool_process_coverage"] == "partial"
+    assert report["tool_error_rate"] is report["tool_first_attempt_success_rate"] is None
 
 
 async def test_second_turn_block_keeps_first_semantic_result(tmp_path):

@@ -3,15 +3,19 @@
 import copy
 import json
 import runpy
+import shlex
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from roami_agent.improvement.evaluation.conversation_actor import ScriptedConversationActor
 from roami_agent.improvement.evaluation.conversation_oracle import grade_checkpoint
 from roami_agent.improvement.evaluation.conversation_scenarios import run_conversation
+from roami_agent.improvement.integrations.tool_process import logged_tool_process
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
+from roami_agent.tools.command_families import COMMANDS
 
 REPOSITORY = Path(__file__).parents[3]
 SCENARIOS = [
@@ -260,10 +264,7 @@ async def test_live_profile_cannot_execute_a_host_shell_command(tmp_path):
                     },
                 )
             else:
-                assert (
-                    json.loads(messages[-1]["content"])["error"]
-                    == "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED"
-                )
+                assert json.loads(messages[-1]["content"])["error"] == "TOOL_UNAVAILABLE"
                 yield ModelEvent("text", '{"主题":"读书会","人数":30,"预算":3000}')
             yield ModelEvent(
                 "usage",
@@ -277,6 +278,64 @@ async def test_live_profile_cannot_execute_a_host_shell_command(tmp_path):
 
     result = await run_conversation(scenario, tmp_path / "contained", provider=Actor())
     assert result["passed"] and not outside.exists()
+    metrics = result["metrics"]
+    assert metrics["tool_calls"] == metrics["tool_errors"] == 1
+    assert metrics["tool_admission_failures"] == 1
+    assert metrics["tool_error_rate"] == 1
+    assert metrics["tool_first_attempt_success_rate"] == 0
+    assert logged_tool_process(tmp_path / "contained")["tool_errors"] == 1
+
+
+async def test_scenario_uses_current_main_schemas_and_executes_compact_registered_commands(
+    tmp_path, monkeypatch
+):
+    from roami_agent.improvement.evaluation import conversation_scenarios
+
+    scenario = next(s for s in SCENARIOS if s["id"] == "ambiguous-followup-needs-target-choice")
+
+    class CompactActor(ScriptedConversationActor):
+        def __init__(self):
+            super().__init__()
+            self.seen = set()
+
+        def turn(self, actions):
+            if actions[-1].get("tool") in {"delegate", "task_steer"}:
+                actions = [*actions, {"text": "已提交。"}]
+            super().turn(actions)
+
+        async def stream(self, messages, tools):
+            schemas = {t["function"]["name"]: t["function"]["parameters"] for t in tools}
+            assert set(schemas["reply"]["properties"]) == {"text"}
+            assert schemas["delegate"]["required"] == ["goal"]
+            assert schemas["ask_user"]["properties"]["options"]["items"]["type"] == "string"
+            assert "task_steer" not in schemas
+            async for event in super().stream(messages, tools):
+                if event.kind == "tool":
+                    function = event.value["function"]
+                    name = function["name"]
+                    self.seen.add(name)
+                    args = json.loads(function["arguments"])
+                    if name == "delegate":
+                        args = {"goal": args["goal"], "executor": "native"}
+                    elif name == "ask_user":
+                        args["options"] = [option["label"] for option in args["options"]]
+                    elif name in {"task_status", "task_steer"}:
+                        if name == "task_steer":
+                            args = {key: args[key] for key in ("taskId", "text")}
+                        command = ["roami", *COMMANDS[name], "--input", json.dumps(args)]
+                        function["name"] = "bash"
+                        args = {"command": shlex.join(command)}
+                    function["arguments"] = json.dumps(args)
+                yield event
+
+    actor = CompactActor()
+    monkeypatch.setattr(conversation_scenarios, "ScriptedConversationActor", lambda: actor)
+    result = await run_conversation(scenario, tmp_path / "compact")
+    assert result["passed"], result
+    assert {"delegate", "ask_user", "task_status", "task_steer"} <= actor.seen
+    assert result["metrics"]["tool_calls"] == 5
+    assert result["metrics"]["tool_errors"] == 0
+    assert result["metrics"]["tool_first_attempt_success_rate"] == 1
 
 
 def test_identity_uses_source_turn_and_title_without_mistaking_boundary_mentions():
@@ -319,6 +378,64 @@ def test_identity_uses_source_turn_and_title_without_mistaking_boundary_mentions
     assert bindings == {"周一清单": "a", "周二清单": "b"}
     tasks[1]["title"], tasks[1]["goal"] = "无关任务", "错误的另一项工作"
     assert not grade_checkpoint(expected, snapshot, {})["passed"]
+
+
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_boundary_mentions_require_a_unique_match_for_frozen_output_requirements(ambiguous):
+    tasks = [
+        {
+            "id": ident,
+            "title": "",
+            "goal": goal,
+            "created_turn": 1,
+            "revision": 1,
+            "executor": "native",
+            "conversation_id": "c",
+            "attempt_count": 1,
+            "current_run_count": 1,
+        }
+        for ident, goal in [
+            ("a", "Create the north report in Markdown with columns name and group"),
+            (
+                "b",
+                "Create the south report in CSV with columns item and quantity; keep the north report unchanged",
+            ),
+        ]
+    ]
+    if ambiguous:
+        tasks[1]["goal"] += "; Markdown with columns name and group"
+    snapshot = {
+        "tasks": tasks,
+        "conversation_id": "c",
+        "answer": "",
+        "tools": [],
+        "turn_state": "completed",
+        "pending_steers": 0,
+    }
+    expected = {
+        "task_count": 2,
+        "tasks": [
+            {
+                "alias": "north",
+                "match": "north report",
+                "created_turn": 1,
+                "revision": 1,
+                "contains": ["Markdown", "name", "group"],
+            },
+            {
+                "alias": "south",
+                "match": "south report",
+                "created_turn": 1,
+                "revision": 1,
+                "contains": ["CSV", "item", "quantity"],
+            },
+        ],
+    }
+    bindings = {}
+    assert grade_checkpoint(expected, snapshot, bindings)["passed"] is not ambiguous
+    if not ambiguous:
+        assert bindings == {"north": "a", "south": "b"}
+        assert not grade_checkpoint(expected, snapshot, {"north": "b", "south": "a"})["passed"]
 
 
 def test_single_task_can_be_identified_by_admission_source_without_ordinal_in_title():

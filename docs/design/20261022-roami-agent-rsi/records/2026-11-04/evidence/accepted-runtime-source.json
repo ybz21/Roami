@@ -1,0 +1,10 @@
+{
+  "source_matches_focused_live_run": true,
+  "files": {
+    "agent-runtime/src/roami_agent/improvement/evaluation/conversation_oracle.py": "b63fde21d203306a152ac0352b8107bbc1de2262442f16a95385783a6063c8fa",
+    "agent-runtime/src/roami_agent/improvement/evaluation/conversation_scenarios.py": "e85d38679c471f795368234a95a6fc900c145b0c702586951211be2a0210cea6",
+    "agent-runtime/src/roami_agent/storage/task_context.py": "d0a353e7db59e26d419bb0896a5ae2ef33f97f8ecea575435e532e096e26c494",
+    "agent-runtime/src/roami_agent/tools/registry.py": "bbcbbfa30600eafc235fd073d7f08873f51366325c426fbc2060619cf034e45d",
+    "scripts/dev/run-conversation-scenarios.py": "5856dad6a93d31045c3d66f4ffc7f33b417a58cd2d150f13cd257ff7ab0bbe1a"
+  }
+}

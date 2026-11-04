@@ -1,0 +1,793 @@
+{
+  "runs": {
+    "baseline": {
+      "mode": "saved-model",
+      "passed": false,
+      "selected_passed": false,
+      "complete_cases": false,
+      "expected_scenarios": 2,
+      "observed_scenarios": 2,
+      "passed_scenarios": 1,
+      "observed_user_turns": 5,
+      "verified_user_turns": 4,
+      "expected_user_turns": 8,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "21035c42d130817f369c6af79968be9cd3752170d6104aac4b4386b2d8df9f0c",
+      "contracts_sha256": "0dc4e2e8a4077dcd6593b8a8bf453c406058b40f63654e80b7c916a2e0925117",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 12,
+      "observed_tokens": 98161,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "original_main_runner",
+      "scenarios": [
+        {
+          "scenario": "ambiguous-followup-needs-target-choice",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": null,
+          "tool_errors": null,
+          "tool_failure_codes": null
+        },
+        {
+          "scenario": "chat-correction-and-removal",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 2,
+          "failures": [
+            {
+              "turn": 2,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": null,
+          "tool_errors": null,
+          "tool_failure_codes": null
+        }
+      ],
+      "model_tool_fields": {
+        "reply": {
+          "properties": [
+            "language",
+            "languageQuote",
+            "mode",
+            "requestCoverage",
+            "scopeQuote",
+            "text"
+          ],
+          "required": [
+            "text"
+          ]
+        },
+        "ask_user": {
+          "properties": [
+            "options",
+            "prompt"
+          ],
+          "required": [
+            "prompt",
+            "options"
+          ]
+        },
+        "delegate": {
+          "properties": [
+            "directory",
+            "executor",
+            "fromMessageId",
+            "goal",
+            "projectId",
+            "requestComplete",
+            "requestCoverage",
+            "routing",
+            "sessionId",
+            "target",
+            "title"
+          ],
+          "required": [
+            "goal",
+            "requestComplete"
+          ]
+        },
+        "bash": {
+          "properties": [
+            "command",
+            "timeout"
+          ],
+          "required": [
+            "command"
+          ]
+        }
+      }
+    },
+    "current-contract": {
+      "mode": "saved-model",
+      "passed": false,
+      "selected_passed": false,
+      "complete_cases": false,
+      "expected_scenarios": 4,
+      "observed_scenarios": 4,
+      "passed_scenarios": 1,
+      "observed_user_turns": 9,
+      "verified_user_turns": 6,
+      "expected_user_turns": 17,
+      "tool_process_coverage": "complete",
+      "tool_calls": 8,
+      "tool_errors": 1,
+      "tool_error_rate": 0.125,
+      "tool_first_attempt_success_rate": 0.8,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "926841a3c5f1b7989632206898058208e81685844b94a813ac12bbc30e961ddd",
+      "contracts_sha256": "6b9ec13c6c3a90ff15b3679be08854237138d46f998b4d228d618df50721d38b",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 14,
+      "observed_tokens": 55895,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "compact_tools_with_rejected_full_goal_context",
+      "scenarios": [
+        {
+          "scenario": "ambiguous-followup-needs-target-choice",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 6,
+          "tool_errors": 1,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 1
+          }
+        },
+        {
+          "scenario": "chat-constraints-accumulate",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-correction-and-removal",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 4,
+          "failures": [
+            {
+              "turn": 4,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 1,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-language-and-format",
+          "passed": false,
+          "expected_turns": 4,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 1,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        }
+      ]
+    },
+    "prose-contract": {
+      "mode": "saved-model",
+      "passed": true,
+      "selected_passed": true,
+      "complete_cases": true,
+      "expected_scenarios": 4,
+      "observed_scenarios": 4,
+      "passed_scenarios": 4,
+      "observed_user_turns": 18,
+      "verified_user_turns": 18,
+      "expected_user_turns": 18,
+      "tool_process_coverage": "complete",
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "tool_error_rate": 0.0,
+      "tool_first_attempt_success_rate": 1.0,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "a40de23c8a7ba904db799c416bbf13aca52e07282bbb3b7d7b7ccd48bf7e1d79",
+      "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 18,
+      "observed_tokens": 65015,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "rejected_prose_prompt_candidate_first_run",
+      "scenarios": [
+        {
+          "scenario": "chat-constraints-accumulate",
+          "passed": true,
+          "expected_turns": 5,
+          "observed_turns": 5,
+          "failures": [],
+          "tool_calls": 1,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-correction-and-removal",
+          "passed": true,
+          "expected_turns": 5,
+          "observed_turns": 5,
+          "failures": [],
+          "tool_calls": 1,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-language-and-format",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-topic-interleave",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        }
+      ]
+    },
+    "full-conversations": {
+      "mode": "saved-model",
+      "passed": false,
+      "selected_passed": false,
+      "complete_cases": true,
+      "expected_scenarios": 16,
+      "observed_scenarios": 16,
+      "passed_scenarios": 11,
+      "observed_user_turns": 49,
+      "verified_user_turns": 44,
+      "expected_user_turns": 62,
+      "tool_process_coverage": "complete",
+      "tool_calls": 84,
+      "tool_errors": 23,
+      "tool_error_rate": 0.27380952380952384,
+      "tool_first_attempt_success_rate": 0.6774193548387096,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "1eec0743f77ff0f9818419c65ca3b5e125b79e5d253c129bbbbf92d8c9e1e88a",
+      "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 112,
+      "observed_tokens": 540293,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "rejected_prose_prompt_candidate_second_run",
+      "scenarios": [
+        {
+          "scenario": "ambiguous-followup-needs-target-choice",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 6,
+          "tool_errors": 1,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 1
+          }
+        },
+        {
+          "scenario": "chat-constraints-accumulate",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-correction-and-removal",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 4,
+          "failures": [
+            {
+              "turn": 4,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-first-create-after-confirmation",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 2,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-language-and-format",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "chat-topic-interleave",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "create-separate-user-turns",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 5,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "create-similar-titles-distinct-work",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 2,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "create-three-independent-outcomes",
+          "passed": false,
+          "expected_turns": 3,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "TASK_REQUIREMENTS_MISSING:周一名单",
+                "TASK_IDENTITY_MISMATCH:周二物料",
+                "TASK_IDENTITY_MISMATCH:周三时间表"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 4,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "intake-replay-vs-explicit-duplicate-work",
+          "passed": false,
+          "expected_turns": 3,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "TASK_COUNT_MISMATCH",
+                "TASK_IDENTITY_MISMATCH:第一份名册"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 1,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "status-and-chat-do-not-recreate-work",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 8,
+          "tool_errors": 2,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 2
+          }
+        },
+        {
+          "scenario": "steer-four-cumulative-updates",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "TASK_COUNT_MISMATCH",
+                "TASK_IDENTITY_MISMATCH:读书会清单"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "steer-inputs-with-unrelated-chat-image",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 12,
+          "tool_errors": 3,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 3
+          }
+        },
+        {
+          "scenario": "steer-preserves-project-and-provider",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 19,
+          "tool_errors": 9,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 7,
+            "INVALID_CLI_ARGUMENTS": 2
+          }
+        },
+        {
+          "scenario": "steer-two-tasks-without-cross-contamination",
+          "passed": true,
+          "expected_turns": 4,
+          "observed_turns": 4,
+          "failures": [],
+          "tool_calls": 12,
+          "tool_errors": 4,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 4
+          }
+        },
+        {
+          "scenario": "two-projects-keep-original-provider",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 13,
+          "tool_errors": 4,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 4
+          }
+        }
+      ]
+    },
+    "identity-verification": {
+      "mode": "saved-model",
+      "passed": false,
+      "selected_passed": false,
+      "complete_cases": false,
+      "expected_scenarios": 2,
+      "observed_scenarios": 2,
+      "passed_scenarios": 1,
+      "observed_user_turns": 4,
+      "verified_user_turns": 3,
+      "expected_user_turns": 6,
+      "tool_process_coverage": "complete",
+      "tool_calls": 9,
+      "tool_errors": 1,
+      "tool_error_rate": 0.1111111111111111,
+      "tool_first_attempt_success_rate": 0.75,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "38e1def1c417ac2174cb936df9e3634a4cdd2773dd540eaa4c984303849697a3",
+      "contracts_sha256": "1c8e80f48f5499cb18fa49da7c717ec160d63083fd204598734c0d925130d112",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 9,
+      "observed_tokens": 39772,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "short_titles_before_identity_oracle_fix",
+      "scenarios": [
+        {
+          "scenario": "ambiguous-followup-needs-target-choice",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 6,
+          "tool_errors": 1,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 1
+          }
+        },
+        {
+          "scenario": "create-three-independent-outcomes",
+          "passed": false,
+          "expected_turns": 3,
+          "observed_turns": 1,
+          "failures": [
+            {
+              "turn": 1,
+              "codes": [
+                "TASK_IDENTITY_MISMATCH:周一名单"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 3,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        }
+      ]
+    },
+    "final-verification": {
+      "mode": "saved-model",
+      "passed": false,
+      "selected_passed": false,
+      "complete_cases": false,
+      "expected_scenarios": 3,
+      "observed_scenarios": 3,
+      "passed_scenarios": 2,
+      "observed_user_turns": 10,
+      "verified_user_turns": 9,
+      "expected_user_turns": 11,
+      "tool_process_coverage": "complete",
+      "tool_calls": 16,
+      "tool_errors": 3,
+      "tool_error_rate": 0.1875,
+      "tool_first_attempt_success_rate": 0.4,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "164dfdb3f4f3d8e2bf88a0d92e4ca26b40990f9778d898f7260f0ef1a221e57e",
+      "contracts_sha256": "983672cf2a961fac875232caee694205e4d5a146e42dd660ca32eeff4bb9907a",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 20,
+      "observed_tokens": 85266,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "short_titles_and_identity_oracle_before_shell_scope_fix",
+      "scenarios": [
+        {
+          "scenario": "ambiguous-followup-needs-target-choice",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 7,
+          "tool_errors": 1,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 1
+          }
+        },
+        {
+          "scenario": "chat-correction-and-removal",
+          "passed": false,
+          "expected_turns": 5,
+          "observed_turns": 4,
+          "failures": [
+            {
+              "turn": 4,
+              "codes": [
+                "CHAT_CONSTRAINTS_MISMATCH"
+              ],
+              "failure": null
+            }
+          ],
+          "tool_calls": 0,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        },
+        {
+          "scenario": "create-three-independent-outcomes",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 9,
+          "tool_errors": 2,
+          "tool_failure_codes": {
+            "RSI_SCENARIO_REGISTERED_COMMAND_REQUIRED": 2
+          }
+        }
+      ]
+    },
+    "profile-verification": {
+      "mode": "saved-model",
+      "passed": false,
+      "selected_passed": true,
+      "complete_cases": false,
+      "expected_scenarios": 2,
+      "observed_scenarios": 2,
+      "passed_scenarios": 2,
+      "observed_user_turns": 6,
+      "verified_user_turns": 6,
+      "expected_user_turns": 6,
+      "tool_process_coverage": "complete",
+      "tool_calls": 14,
+      "tool_errors": 4,
+      "tool_error_rate": 0.2857142857142857,
+      "tool_first_attempt_success_rate": 0.8,
+      "failure": null,
+      "cleanup_exit_code": 0,
+      "source_unchanged": true,
+      "frozen_sha256": "4729cd0598d20d6547ebe56df601b87b01c9a2d13291970c49d5b06cb1f20892",
+      "contracts_sha256": "1c8e80f48f5499cb18fa49da7c717ec160d63083fd204598734c0d925130d112",
+      "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+      "model_calls": 13,
+      "observed_tokens": 58252,
+      "usage_known": true,
+      "historical_suite_updated": false,
+      "eligible_for_promotion": false,
+      "background_execution": "synthetic_checkpoint",
+      "variant": "accepted_source_focused_original_task_cases",
+      "scenarios": [
+        {
+          "scenario": "ambiguous-followup-needs-target-choice",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 10,
+          "tool_errors": 4,
+          "tool_failure_codes": {
+            "TOOL_UNAVAILABLE": 2,
+            "QUESTION_MUST_BE_ONLY_TOOL": 2
+          }
+        },
+        {
+          "scenario": "create-three-independent-outcomes",
+          "passed": true,
+          "expected_turns": 3,
+          "observed_turns": 3,
+          "failures": [],
+          "tool_calls": 4,
+          "tool_errors": 0,
+          "tool_failure_codes": {}
+        }
+      ],
+      "model_tool_fields": {
+        "reply": {
+          "properties": [
+            "text"
+          ],
+          "required": [
+            "text"
+          ]
+        },
+        "ask_user": {
+          "properties": [
+            "options",
+            "prompt"
+          ],
+          "required": [
+            "prompt"
+          ]
+        },
+        "delegate": {
+          "properties": [
+            "directory",
+            "executor",
+            "fromMessageId",
+            "goal",
+            "projectId",
+            "sessionId"
+          ],
+          "required": [
+            "goal"
+          ]
+        },
+        "bash": {
+          "properties": [
+            "command",
+            "timeout"
+          ],
+          "required": [
+            "command"
+          ]
+        }
+      }
+    }
+  },
+  "contracts": {
+    "ambiguous-followup-needs-target-choice": "f8f1e8251b276763ec6328a56f9f0906755384c242f515f1fa2b422c78d5f6ef",
+    "chat-correction-and-removal": "fafa80eafec31f46cb803ba81f20f034be151c0c635c97f666d4a140cc2e88a2",
+    "chat-constraints-accumulate": "f79c95891351861a15680f86a38ede0ac9ef0dbf9c1c446ff33d219e40baeac7",
+    "chat-language-and-format": "94da97a1b5b9fa16e42508a1aad8931a178d15d3ac27ed7264aecda1d1148e6c",
+    "chat-topic-interleave": "24fd39c3691062221942083703e0b9b1755bc570927cc9164d3d3600249703da",
+    "chat-first-create-after-confirmation": "1788b5d760a2fa1a4c4e42af109bd8fb562d265154c228a690980b434eb004a6",
+    "create-separate-user-turns": "ee886ae211ba8274536db6c9ec6422ef00a6c2794ca39bc45b6cc7a1768f7fcb",
+    "create-similar-titles-distinct-work": "76e614d5637ad774c6975c41ec7596ad5c4938e4f385a8170829042f9585c0b0",
+    "create-three-independent-outcomes": "85abfa2c1af37be75162860faa5b0c0276079cc90aa95ab82c726fe3eb536d24",
+    "intake-replay-vs-explicit-duplicate-work": "30e4795f529fcd72b358b6c6fc93cf5c9f2af6e4f3d7d152f6d0a05662bfd30d",
+    "status-and-chat-do-not-recreate-work": "ed256377ca6c4a55be83e0585110128572c6c5625c7ec2cf3de64414214beb89",
+    "steer-four-cumulative-updates": "c0281dbbfbde0743f7fe272811d68402dbb914acda5c0537ca0ef153a855da06",
+    "steer-inputs-with-unrelated-chat-image": "09301753ed096616e72c5d9f1120b14e60cf93c14067249109fdbded7c06d2ab",
+    "steer-preserves-project-and-provider": "ca7e4e4c181e65ce2324eaacc39e7cefd43518d9bf5db8ade02c223ae32a3df7",
+    "steer-two-tasks-without-cross-contamination": "470d50b3246a81b852e7c1bd676e0be3ea8c13548ac932d58cac5f49949f01b8",
+    "two-projects-keep-original-provider": "e91d4f7bcb8eaa6654fa09b160b16e74d47cc67f13b9ecf4010db74dc242336f"
+  },
+  "gateway": {
+    "distinct_diagnostic_requests": 198,
+    "matched_gateway_calls": 198,
+    "missing_requests": 0,
+    "known_http_200_calls": 198,
+    "tokens": 942654,
+    "costs": {
+      "CNY": 0.2998368
+    },
+    "historical_records_modified": false
+  },
+  "same_saved_main_route": true
+}
