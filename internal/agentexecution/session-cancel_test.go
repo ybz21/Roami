@@ -175,3 +175,77 @@ func TestSessionCancelRechecksThePaneBeforeSendingInput(t *testing.T) {
 		t.Fatalf("changed pane received input: %s", input)
 	}
 }
+
+func TestSessionCancelAfterDeadlineStillInterruptsBoundTurn(t *testing.T) {
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			s, binding := sessionFixture(t)
+			var spec Spec
+			if provider == "codex" {
+				seedSession(t, s, binding)
+				spec, _ = startSessionTask(t, s, binding, "expired-cancel")
+			} else {
+				seedClaudeSession(t, s, binding)
+				spec = startClaudeTask(t, s, binding, "expired-cancel")
+			}
+			dir, _ := s.directory(spec.Key)
+			var receipt Receipt
+			if err := readJSON(filepath.Join(dir, "receipt.json"), &receipt); err != nil {
+				t.Fatal(err)
+			}
+			receipt.DeadlineMS = 1
+			if err := writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
+				t.Fatal(err)
+			}
+			before, err := s.Status(spec.Key)
+			if err != nil || before.ObservationErrorCode != "EXECUTION_DEADLINE" {
+				t.Fatalf("expected overdue observation: %+v %v", before, err)
+			}
+			keys := cancellationKeyLog(t, s, false)
+			for range 2 {
+				status, err := s.Cancel(spec.Key)
+				if err != nil || status.State != "cancelling" || status.Result != nil || status.ObservationErrorCode != "" {
+					t.Fatalf("deadline prevented cancellation: %+v %v", status, err)
+				}
+			}
+			input, err := os.ReadFile(keys)
+			if err != nil || string(input) != "send-keys -t %3 Escape\n" {
+				t.Fatalf("overdue interrupt missing or replayed: %s %v", input, err)
+			}
+			status, err := s.Status(spec.Key)
+			if err != nil || status.State != "cancelling" || status.Result != nil || status.ObservationErrorCode != "" {
+				t.Fatalf("deadline hid pending cancellation: %+v %v", status, err)
+			}
+		})
+	}
+}
+
+func TestSessionProviderConflictPreservesBoundIdentityAndCannotInterrupt(t *testing.T) {
+	s, binding := sessionFixture(t)
+	seedSession(t, s, binding)
+	spec, _ := startSessionTask(t, s, binding, "provider-conflict")
+	keys := cancellationKeyLog(t, s, false)
+	event := SessionEvent{Hook: "PostToolUse", ProviderID: "foreign-thread", TurnID: "foreign-turn", ToolID: "foreign-tool", Prompt: "private input"}
+	if err := s.applySessionEvent("codex", binding, event); err != nil {
+		t.Fatal(err)
+	}
+	path, _ := s.lifecycleFile(binding)
+	var state sessionLifecycle
+	if err := readJSON(path, &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.UnknownReason != "SESSION_PROVIDER_CHANGED" || state.Binding.ProviderID != "provider-thread" || state.ProviderConflict == nil || state.ProviderConflict.ProviderID != "foreign-thread" || state.ProviderConflict.TurnID != "foreign-turn" || state.ProviderConflict.Hook != "PostToolUse" {
+		t.Fatalf("missing identity-only conflict evidence: %+v", state)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || strings.Contains(string(raw), "private input") || strings.Contains(string(raw), "foreign-tool") {
+		t.Fatalf("conflict leaked event content: %s %v", raw, err)
+	}
+	status, err := s.Cancel(spec.Key)
+	if err != nil || status.State != "unknown" || status.ObservationErrorCode != "SESSION_PROVIDER_CHANGED" || status.Result != nil {
+		t.Fatalf("provider conflict was accepted: %+v %v", status, err)
+	}
+	if input, _ := os.ReadFile(keys); len(input) != 0 {
+		t.Fatalf("foreign callback caused interrupt: %s", input)
+	}
+}

@@ -22,10 +22,12 @@ func (s Service) cancelSession(key string, status Status) (Status, error) {
 	if err := writeJSON(filepath.Join(dir, "cancel.json"), map[string]bool{"cancel": true}); err != nil {
 		return status, err
 	}
-	if status.State != "running" && status.State != "cancelling" {
+	// An elapsed observation deadline does not make the still-bound turn uninterruptible.
+	expired := status.State == "unknown" && status.ObservationErrorCode == "EXECUTION_DEADLINE"
+	if status.State != "running" && status.State != "cancelling" && !expired {
 		return status, nil
 	}
-	status.State = "cancelling"
+	status.State, status.ObservationErrorCode = "cancelling", ""
 	binding, err := s.paneBinding(status.Binding.Name, false)
 	if err != nil || binding.resourceID() != status.Binding.resourceID() || binding.PID != status.Binding.PID || binding.Directory != status.Binding.Directory {
 		status.State, status.ObservationErrorCode = "unknown", "SESSION_BINDING_UNAVAILABLE"
