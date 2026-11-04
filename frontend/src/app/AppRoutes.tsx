@@ -72,7 +72,7 @@ export default function AppRoutes({ routing, isMobile, active, projects, project
     okr: okrProject ? <ProjectOkr key={`${curNodeId || 'local'}:${okrProject}`} projectId={okrProject} projectName={projects.find(p => p.key === okrProject)?.name} projectDir={projects.find(p => p.key === okrProject)?.dir} onSession={openTerm} fromOverview />
       : <OkrProjects projects={projects} loaded={projectDirectory?.loaded ?? true} error={projectDirectory?.error ?? false} retry={projectDirectory?.retry || (() => {})} />,
     swarm: <Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => { location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm' }} />,
-    projects: projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} projectDir={projects.find(p => p.key === projectSub)?.dir} onSession={openTerm} /> : isMobile
+    projects: projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} projectName={projects.find(p => p.key === projectSub)?.name} projectDir={projects.find(p => p.key === projectSub)?.dir} onSession={openTerm} /> : isMobile
       ? mobileSessions
       : <Projects openTerm={openTerm} closeTerm={closeTerm} initialKey={projectSub || undefined} activeTerm={active} />,
     sessions: isMobile
