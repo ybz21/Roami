@@ -1,0 +1,712 @@
+{
+  "scope": "local saved-route diagnostic; review shares Main; background synthetic; not production, formal60, independent rating or stability proof",
+  "strategy": "source-drafts-v5-source-admission",
+  "baseCommit": "4381941599f4cced5e39c04610c50b3d7efbfcef",
+  "codeCommit": "dde6c9ceefc544cc7600605a2b93bfe4272dfcc4",
+  "conversations": {
+    "live": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 16,
+        "observed_scenarios": 16,
+        "passed_scenarios": 16,
+        "observed_user_turns": 62,
+        "verified_user_turns": 62,
+        "expected_user_turns": 62,
+        "tool_process_coverage": "complete",
+        "tool_calls": 87,
+        "tool_errors": 7,
+        "tool_error_rate": 0.08045977011494253,
+        "tool_first_attempt_success_rate": 0.9148936170212766,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 62,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "94abfdad2303fdb02c3c6a2847136e2fc0d10e5c44223e9855e568e1fd647cd2",
+        "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 208,
+        "external_model_calls": 208,
+        "observed_tokens": 844775,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 208,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 208,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 208
+        },
+        "gateway_http_statuses": {
+          "200": 208
+        },
+        "known_tokens": 844775,
+        "known_cost_by_currency": {
+          "CNY": 0.3549788
+        },
+        "scenarios_observed": 16,
+        "scenarios_passed": 16,
+        "checkpoints_observed": 62,
+        "checkpoints_passed": 62,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    "repeat-a": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 4,
+        "passed_scenarios": 4,
+        "observed_user_turns": 18,
+        "verified_user_turns": 18,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "complete",
+        "tool_calls": 11,
+        "tool_errors": 2,
+        "tool_error_rate": 0.18181818181818182,
+        "tool_first_attempt_success_rate": 0.7777777777777778,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 18,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "94abfdad2303fdb02c3c6a2847136e2fc0d10e5c44223e9855e568e1fd647cd2",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 58,
+        "external_model_calls": 58,
+        "observed_tokens": 142834,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 58,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 58,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 58
+        },
+        "gateway_http_statuses": {
+          "200": 58
+        },
+        "known_tokens": 142834,
+        "known_cost_by_currency": {
+          "CNY": 0.0547251
+        },
+        "scenarios_observed": 4,
+        "scenarios_passed": 4,
+        "checkpoints_observed": 18,
+        "checkpoints_passed": 18,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    "repeat-b": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": false,
+        "selected_passed": false,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 1,
+        "passed_scenarios": 0,
+        "observed_user_turns": 4,
+        "verified_user_turns": 4,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "partial",
+        "tool_calls": 1,
+        "tool_errors": 0,
+        "tool_error_rate": null,
+        "tool_first_attempt_success_rate": null,
+        "failure": "TimeoutError",
+        "blocked_scenarios": 0,
+        "failed_scenarios": 1,
+        "semantic_checked_user_turns": 4,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 1,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "94abfdad2303fdb02c3c6a2847136e2fc0d10e5c44223e9855e568e1fd647cd2",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 14,
+        "external_model_calls": null,
+        "observed_tokens": 32232,
+        "usage_known": false,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 14,
+        "wrappers_without_gateway_id": 1,
+        "gateway_calls": 13,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 13
+        },
+        "gateway_http_statuses": {
+          "200": 13
+        },
+        "known_tokens": 32232,
+        "known_cost_by_currency": {
+          "CNY": 0.010654
+        },
+        "scenarios_observed": 1,
+        "scenarios_passed": 0,
+        "checkpoints_observed": 4,
+        "checkpoints_passed": 4,
+        "local_unknown_usage_retained": true,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    "sequential-chat": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": false,
+        "selected_passed": false,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 4,
+        "passed_scenarios": 3,
+        "observed_user_turns": 14,
+        "verified_user_turns": 13,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "complete",
+        "tool_calls": 5,
+        "tool_errors": 1,
+        "tool_error_rate": 0.2,
+        "tool_first_attempt_success_rate": 0.75,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 1,
+        "semantic_checked_user_turns": 14,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 1,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "94abfdad2303fdb02c3c6a2847136e2fc0d10e5c44223e9855e568e1fd647cd2",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 43,
+        "external_model_calls": 43,
+        "observed_tokens": 107153,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 43,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 43,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 43
+        },
+        "gateway_http_statuses": {
+          "200": 43
+        },
+        "known_tokens": 107153,
+        "known_cost_by_currency": {
+          "CNY": 0.0403339
+        },
+        "scenarios_observed": 4,
+        "scenarios_passed": 3,
+        "checkpoints_observed": 14,
+        "checkpoints_passed": 13,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    }
+  },
+  "containers": {
+    "container-live": {
+      "results": [
+        {
+          "case": "finqa:88dabae584587913",
+          "grade": {
+            "quality": 0,
+            "passed": false,
+            "pending": false,
+            "hard_passed": false,
+            "reason": "RSI_TIME_BUDGET",
+            "artifact_assessment": {
+              "quality": 0,
+              "passed": false,
+              "pending": false,
+              "hard_passed": false,
+              "reason": "RSI_TIME_BUDGET"
+            },
+            "artifact_check_reason": "RSI_TIME_BUDGET",
+            "execution_error": "RSI_TIME_BUDGET"
+          },
+          "output": null,
+          "metrics": {
+            "tokens": null,
+            "token_coverage": "unknown",
+            "model_calls": 5
+          }
+        },
+        {
+          "case": "finqa:4a00d7dc1848a85e",
+          "grade": {
+            "dimensions": {
+              "correctness": 3,
+              "completeness": 3,
+              "usability": 3,
+              "grounding": 3
+            },
+            "quality": 80.0,
+            "hard_passed": true,
+            "pending": false,
+            "passed": true,
+            "judge_kind": "numeric",
+            "grade_scope": "objective_contract",
+            "native_metric": 1.0,
+            "reason": "assertions_passed"
+          },
+          "output": null,
+          "metrics": {
+            "tokens": 38830,
+            "token_coverage": "complete",
+            "model_calls": 10
+          }
+        },
+        {
+          "case": "finqa:6db35f5f25b0d831",
+          "grade": {
+            "dimensions": {
+              "correctness": 3,
+              "completeness": 3,
+              "usability": 3,
+              "grounding": 3
+            },
+            "quality": 80.0,
+            "hard_passed": true,
+            "pending": false,
+            "passed": true,
+            "judge_kind": "numeric",
+            "grade_scope": "objective_contract",
+            "native_metric": 1.0,
+            "reason": "assertions_passed"
+          },
+          "output": null,
+          "metrics": {
+            "tokens": 74838,
+            "token_coverage": "complete",
+            "model_calls": 15
+          }
+        }
+      ],
+      "gatewayAudit": {
+        "model_wrappers": 30,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 30,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 29,
+          "unknown": 1
+        },
+        "gateway_http_statuses": {
+          "200": 30
+        },
+        "known_tokens": 135364,
+        "known_cost_by_currency": {
+          "CNY": 0.0612584
+        },
+        "scenarios_observed": 0,
+        "scenarios_passed": 0,
+        "checkpoints_observed": 0,
+        "checkpoints_passed": 0,
+        "local_unknown_usage_retained": true,
+        "scope": "local candidate-container diagnostic, saved Main/Worker, frozen units-v3 contract; no production, old-suite score improvement or full60 claim",
+        "cases_observed": 3,
+        "cases_passed": 2
+      }
+    }
+  },
+  "quality": {
+    "full": {
+      "exit": 0,
+      "pythonSummary": "3532 passed, 48 skipped in 1055.67s (0:17:35)"
+    },
+    "commit": {
+      "exit": 0,
+      "pythonSummary": "3532 passed, 48 skipped in 1039.21s (0:17:19)"
+    },
+    "relatedTests": 249,
+    "offlineImageTests": 74,
+    "previousBoundaryFailures": 10
+  },
+  "candidateImage": {
+    "image": "roami-rsi-eval:source-admission-candidate-20261105",
+    "imageId": "sha256:3196cf280049cb00ad75955afa92737d0b3c02e3beec1db94c6abd4fb0d103c4",
+    "runtimeFileCount": 355,
+    "mismatches": [],
+    "excludedByDockerfile": [
+      "roami_agent/improvement/evaluation/authored_fixtures.py",
+      "roami_agent/improvement/evaluation/authored_grading.py",
+      "roami_agent/improvement/evaluation/corpus.py"
+    ],
+    "labels": {
+      "org.roami.rsi.login-runtime-path": "1",
+      "org.roami.rsi.model-image-input": "1",
+      "org.roami.rsi.role-instructions": "1",
+      "org.roami.rsi.shared-daily-policy": "6",
+      "org.roami.rsi.source-reply-review": "3",
+      "org.roami.rsi.workspace-image-input": "1"
+    },
+    "reviewVersion": "source-drafts-v5-source-admission"
+  },
+  "version4Runs": {
+    "live": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 16,
+        "observed_scenarios": 16,
+        "passed_scenarios": 16,
+        "observed_user_turns": 62,
+        "verified_user_turns": 62,
+        "expected_user_turns": 62,
+        "tool_process_coverage": "complete",
+        "tool_calls": 96,
+        "tool_errors": 14,
+        "tool_error_rate": 0.14583333333333334,
+        "tool_first_attempt_success_rate": 0.875,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 62,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "311fd3b3b48faa0c4ca4654700a614f944bbdbb8c4506f862b432d496556d98f",
+        "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 214,
+        "external_model_calls": 214,
+        "observed_tokens": 932043,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 214,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 214,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 214
+        },
+        "gateway_http_statuses": {
+          "200": 214
+        },
+        "known_tokens": 932043,
+        "known_cost_by_currency": {
+          "CNY": 0.3765502
+        },
+        "scenarios_observed": 16,
+        "scenarios_passed": 16,
+        "checkpoints_observed": 62,
+        "checkpoints_passed": 62,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    "repeat-a": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 4,
+        "passed_scenarios": 4,
+        "observed_user_turns": 18,
+        "verified_user_turns": 18,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "complete",
+        "tool_calls": 7,
+        "tool_errors": 1,
+        "tool_error_rate": 0.14285714285714285,
+        "tool_first_attempt_success_rate": 0.8333333333333334,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 18,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "311fd3b3b48faa0c4ca4654700a614f944bbdbb8c4506f862b432d496556d98f",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 56,
+        "external_model_calls": 56,
+        "observed_tokens": 143646,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 56,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 56,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 56
+        },
+        "gateway_http_statuses": {
+          "200": 56
+        },
+        "known_tokens": 143646,
+        "known_cost_by_currency": {
+          "CNY": 0.0568144
+        },
+        "scenarios_observed": 4,
+        "scenarios_passed": 4,
+        "checkpoints_observed": 18,
+        "checkpoints_passed": 18,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    "repeat-b": {
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 4,
+        "passed_scenarios": 4,
+        "observed_user_turns": 18,
+        "verified_user_turns": 18,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "complete",
+        "tool_calls": 12,
+        "tool_errors": 2,
+        "tool_error_rate": 0.16666666666666666,
+        "tool_first_attempt_success_rate": 0.9,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 18,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "311fd3b3b48faa0c4ca4654700a614f944bbdbb8c4506f862b432d496556d98f",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 57,
+        "external_model_calls": 57,
+        "observed_tokens": 140692,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "gatewayAudit": {
+        "model_wrappers": 57,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 57,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 57
+        },
+        "gateway_http_statuses": {
+          "200": 57
+        },
+        "known_tokens": 140692,
+        "known_cost_by_currency": {
+          "CNY": 0.0486216
+        },
+        "scenarios_observed": 4,
+        "scenarios_passed": 4,
+        "checkpoints_observed": 18,
+        "checkpoints_passed": 18,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    }
+  },
+  "version3Runs": {
+    "live": {
+      "model_wrappers": 211,
+      "wrappers_without_gateway_id": 0,
+      "gateway_calls": 211,
+      "missing_gateway_calls": 0,
+      "gateway_states": {
+        "known": 211
+      },
+      "gateway_http_statuses": {
+        "200": 211
+      },
+      "known_tokens": 890432,
+      "known_cost_by_currency": {
+        "CNY": 0.3742436
+      },
+      "scenarios_observed": 16,
+      "scenarios_passed": 16,
+      "checkpoints_observed": 62,
+      "checkpoints_passed": 62,
+      "local_unknown_usage_retained": false,
+      "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+    },
+    "repeat-a": {
+      "model_wrappers": 55,
+      "wrappers_without_gateway_id": 0,
+      "gateway_calls": 55,
+      "missing_gateway_calls": 0,
+      "gateway_states": {
+        "known": 55
+      },
+      "gateway_http_statuses": {
+        "200": 55
+      },
+      "known_tokens": 140003,
+      "known_cost_by_currency": {
+        "CNY": 0.0564649
+      },
+      "scenarios_observed": 4,
+      "scenarios_passed": 3,
+      "checkpoints_observed": 17,
+      "checkpoints_passed": 16,
+      "local_unknown_usage_retained": false,
+      "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+    },
+    "repeat-b": {
+      "model_wrappers": 53,
+      "wrappers_without_gateway_id": 0,
+      "gateway_calls": 53,
+      "missing_gateway_calls": 0,
+      "gateway_states": {
+        "known": 53
+      },
+      "gateway_http_statuses": {
+        "200": 53
+      },
+      "known_tokens": 130513,
+      "known_cost_by_currency": {
+        "CNY": 0.049778
+      },
+      "scenarios_observed": 4,
+      "scenarios_passed": 4,
+      "checkpoints_observed": 18,
+      "checkpoints_passed": 18,
+      "local_unknown_usage_retained": false,
+      "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+    }
+  },
+  "version4CausalRefusals": {
+    "scope": "public original synthetic conversation; exact Main tool input and source refusal; no host answer replacement",
+    "events": [
+      {
+        "run": "repeat-a",
+        "case": "chat-correction-and-removal",
+        "input": {
+          "text": "{\"颜色\":\"绿色\",\"语言\":\"中文\",\"标题\":null}"
+        },
+        "rejection": {
+          "error": "REPLY_SOURCE_REVIEW_REQUIRED",
+          "executionStarted": false,
+          "failurePhase": "validation",
+          "feedback": "“标题”被写成 null，但用户新增的约束是“标题一起阅读”，字面值“一起阅读”应保留，当前回复遗漏了该值；颜色绿色、语言中文保持，版式已删除。"
+        }
+      },
+      {
+        "run": "repeat-b",
+        "case": "chat-correction-and-removal",
+        "input": {
+          "text": "{\"颜色\": \"绿色\", \"语言\": \"中文\", \"标题\": null}"
+        },
+        "rejection": {
+          "error": "REPLY_SOURCE_REVIEW_REQUIRED",
+          "executionStarted": false,
+          "failurePhase": "validation",
+          "feedback": "This field rewrites a literal user value without source support. Preserve the original wording and requested type: {\"field\":\"标题\",\"quote\":\"标题一起阅读\"}"
+        }
+      },
+      {
+        "run": "repeat-b",
+        "case": "chat-correction-and-removal",
+        "input": {
+          "text": "{\"颜色\": \"绿色\", \"语言\": \"中文\", \"标题\": \"标题一起阅读\"}"
+        },
+        "rejection": {
+          "error": "REPLY_SOURCE_REVIEW_REQUIRED",
+          "executionStarted": false,
+          "failurePhase": "validation",
+          "feedback": "The field name was copied into its value. Keep only the value portion of this original field assignment: {\"field\":\"标题\",\"quote\":\"标题一起阅读\"}"
+        }
+      }
+    ]
+  },
+  "parallelQueueDiagnostic": {
+    "scope": "read-only queue diagnostic; no ledger rewrite or request replay",
+    "lastWrapperMs": 162309.35,
+    "lastWrapperGatewayRows": 0,
+    "otherGatewayCallsDuringWait": 52,
+    "otherGatewayKnownHttp200": 52,
+    "longestActualOtherGatewayMs": 20227,
+    "localUnknownUsageRetained": true,
+    "priorTwoWrapperVsGatewayMs": [
+      {
+        "wrapperMs": 37238.259,
+        "gatewayMs": 1765
+      },
+      {
+        "wrapperMs": 54442.849,
+        "gatewayMs": 1413
+      }
+    ]
+  },
+  "serialWrapperFailure": {
+    "scope": "public synthetic original conversation; first turn, no task created; preserved exact model text",
+    "oracleFailure": "CHAT_JSON_REQUIRED",
+    "modelTexts": [
+      {
+        "modelRequest": 1,
+        "text": "<reply>\n{\"颜色\":\"蓝色\",\"版式\":\"双栏\",\"语言\":\"中文\"}</reply>"
+      },
+      {
+        "modelRequest": 2,
+        "text": "{\"accepted\":true,\"feedback\":\"Proposed reply returns only the requested JSON object with exactly the three keys 颜色/版式/语言 bound to the constraint values 蓝色/双栏/中文, no extra fields or prose, and it creates no task.\"}"
+      }
+    ]
+  },
+  "productionActivated": false,
+  "suiteScoresUpdated": false,
+  "modelRoutesOverridden": false,
+  "historicalFailuresRetained": true,
+  "unknownUsageRewritten": false
+}
