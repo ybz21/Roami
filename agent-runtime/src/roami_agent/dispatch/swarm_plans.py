@@ -38,8 +38,6 @@ class SwarmPlans:
 
     async def create(self, owner, spec, *, binding=None):
         cid = spec.get("mainConversationId")
-        if not cid:
-            cid = (await self.conversations.main(owner))["id"]
         target = spec.get("target") or {"kind": "new_session"}
         if not isinstance(target, dict) or target.get("kind") not in {"project", "new_session"}:
             raise DomainError("INVALID_TASK_TARGET")
@@ -50,6 +48,12 @@ class SwarmPlans:
         name, goal = str(spec.get("name", "")).strip(), str(spec.get("goal", "")).strip()
         if not name or len(name) > 100 or not goal or len(goal) > 30000:
             raise DomainError("INVALID_SWARM")
+        if not cid:
+            cid = (
+                await self.conversations.create(owner, name, project_id=target["projectId"])
+                if target["kind"] == "project"
+                else await self.conversations.main(owner)
+            )["id"]
         payload = {**spec, "mainConversationId": cid, "target": target}
 
         def write(db):
@@ -57,6 +61,16 @@ class SwarmPlans:
                 conversation = owned(db, owner, cid)
                 if row(db, "SELECT id FROM native_sessions WHERE conversation_id=?", (cid,)):
                     raise DomainError("SWARM_MAIN_REQUIRED", 409)
+                project = row(
+                    db,
+                    "SELECT project_id FROM project_okr_conversations WHERE conversation_id=? AND owner_id=?",
+                    (cid, owner),
+                )
+                if project and (
+                    target.get("kind") != "project"
+                    or target.get("projectId") != project["project_id"]
+                ):
+                    raise DomainError("PROJECT_OKR_TEAM_CONFLICT", 409)
                 sid = "sw-" + identity()
                 db.execute(
                     "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?)",

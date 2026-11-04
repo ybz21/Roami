@@ -664,6 +664,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "projectOkr": True,
+                "projectOkrMain": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
@@ -739,14 +740,21 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):
         project_id = None
+        swarm_id = None
         if body.projectId is not None:
-            from roami_agent.conversation.project_okr import registered_project
+            from roami_agent.conversation.project_okr import operation, registered_project
 
             project_id = await registered_project(runtime.settings, body.projectId)
+            workspace = await operation(runtime.settings, project_id, "show")
+            swarm_id = workspace.get("swarm") if workspace else None
             await runtime.conversations.main(owner)
         return {
             "data": await runtime.conversations.create(
-                owner, body.title, request_key=body.requestKey, project_id=project_id
+                owner,
+                body.title,
+                request_key=body.requestKey,
+                project_id=project_id,
+                swarm_id=swarm_id,
             )
         }
 

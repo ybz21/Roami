@@ -110,5 +110,6 @@ html[data-pointer="coarse"] .okr-board-toolbar .ant-segmented-item-label{min-hei
 a.okr-deliverable{color:var(--accent)}
 
 .okr-files-nav{display:flex;flex-shrink:0;flex-wrap:wrap;gap:var(--sp-3);padding:var(--sp-3) var(--pad-page);border-bottom:1px solid var(--border-subtle)}
+.okr-files-nav button[aria-pressed="true"]{color:var(--accent);border-color:var(--accent-border);background:var(--sel-bg)}
 .okr-files-browser{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}
 .okr-files-hint{margin:var(--sp-3) var(--pad-page)}

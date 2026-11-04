@@ -1350,7 +1350,7 @@ async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, 
             await database.call(
                 lambda db: db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
             )
-            == 18
+            == migrations.SCHEMA_VERSION
         )
     finally:
         await database.close()
