@@ -1,0 +1,281 @@
+{
+  "run_id": "0a8247b02400b6550ca2d577d5e628f4b59bb0ecc5858ac5eb91e2e6295a553c",
+  "state": "report_queued",
+  "summary": {
+    "cases": 10,
+    "passed": 5,
+    "pending": 1,
+    "blocked": 0,
+    "not_run": 0,
+    "usage_blocker": null,
+    "generation_tokens": 781442,
+    "known_generation_tokens": 781442,
+    "artifact_review_tokens": 0,
+    "provider_requests": 105,
+    "known_provider_requests": 105
+  },
+  "cases": [
+    {
+      "case_id": "CODE-01",
+      "state": "failed",
+      "passed": false,
+      "pending": false,
+      "signals": [
+        "TOOL_FAILED",
+        "check:default_page",
+        "check:outside_page",
+        "check:third_page",
+        "hard_assertion_failed"
+      ],
+      "metrics": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 8,
+        "tool_failures": 1,
+        "tool_unknowns": 0,
+        "tool_errors": 1,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {
+          "COMMAND_NONZERO_EXIT": 1
+        },
+        "tool_failure_rate": 0.125,
+        "tool_error_rate": 0.125,
+        "tool_process_score": 87.5,
+        "tool_first_calls": 2,
+        "tool_first_successes": 2,
+        "tool_first_attempt_success_rate": 1.0,
+        "tokens": 58447,
+        "token_coverage": "complete",
+        "model_calls": 13,
+        "elapsed_ms": null,
+        "model_ms": 129677.722
+      }
+    },
+    {
+      "case_id": "DEMO-01",
+      "state": "pending_score",
+      "passed": false,
+      "pending": true,
+      "signals": [
+        "TOOL_FAILED",
+        "independent_rubric_required"
+      ],
+      "metrics": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 17,
+        "tool_failures": 2,
+        "tool_unknowns": 0,
+        "tool_errors": 2,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {
+          "COMMAND_NONZERO_EXIT": 2
+        },
+        "tool_failure_rate": 0.11764705882352941,
+        "tool_error_rate": 0.11764705882352941,
+        "tool_process_score": 88.23529411764706,
+        "tool_first_calls": 2,
+        "tool_first_successes": 2,
+        "tool_first_attempt_success_rate": 1.0,
+        "tokens": 191641,
+        "token_coverage": "complete",
+        "model_calls": 22,
+        "elapsed_ms": null,
+        "model_ms": 354741.624
+      }
+    },
+    {
+      "case_id": "DOC-05",
+      "state": "failed",
+      "passed": false,
+      "pending": false,
+      "signals": [
+        "TOOL_FAILED",
+        "check:constraints",
+        "check:stories_acceptance",
+        "hard_assertion_failed"
+      ],
+      "metrics": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 20,
+        "tool_failures": 2,
+        "tool_unknowns": 0,
+        "tool_errors": 2,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {
+          "COMMAND_NONZERO_EXIT": 2
+        },
+        "tool_failure_rate": 0.1,
+        "tool_error_rate": 0.1,
+        "tool_process_score": 90.0,
+        "tool_first_calls": 2,
+        "tool_first_successes": 2,
+        "tool_first_attempt_success_rate": 1.0,
+        "tokens": 263841,
+        "token_coverage": "complete",
+        "model_calls": 26,
+        "elapsed_ms": null,
+        "model_ms": 762011.706
+      }
+    },
+    {
+      "case_id": "MECH-CT01",
+      "state": "passed",
+      "passed": true,
+      "pending": false,
+      "signals": [],
+      "metrics": {
+        "tokens": 0,
+        "token_coverage": null,
+        "model_calls": 0,
+        "elapsed_ms": 1116.2850698456168,
+        "model_ms": null
+      }
+    },
+    {
+      "case_id": "MECH-MB01",
+      "state": "passed",
+      "passed": true,
+      "pending": false,
+      "signals": [],
+      "metrics": {
+        "tokens": 0,
+        "token_coverage": null,
+        "model_calls": 0,
+        "elapsed_ms": 1575.3658032044768,
+        "model_ms": null
+      }
+    },
+    {
+      "case_id": "MECH-MR01",
+      "state": "passed",
+      "passed": true,
+      "pending": false,
+      "signals": [],
+      "metrics": {
+        "tokens": 0,
+        "token_coverage": null,
+        "model_calls": 0,
+        "elapsed_ms": 1536.069299094379,
+        "model_ms": null
+      }
+    },
+    {
+      "case_id": "MECH-TL01",
+      "state": "passed",
+      "passed": true,
+      "pending": false,
+      "signals": [],
+      "metrics": {
+        "tokens": 0,
+        "token_coverage": null,
+        "model_calls": 0,
+        "elapsed_ms": 1919.7228769771755,
+        "model_ms": null
+      }
+    },
+    {
+      "case_id": "NEWS-01",
+      "state": "passed",
+      "passed": true,
+      "pending": false,
+      "signals": [
+        "TASK_ALREADY_HANDED_OFF"
+      ],
+      "metrics": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 9,
+        "tool_failures": 1,
+        "tool_unknowns": 0,
+        "tool_errors": 1,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 1,
+        "tool_failure_codes": {
+          "TASK_ALREADY_HANDED_OFF": 1
+        },
+        "tool_failure_rate": 0.1111111111111111,
+        "tool_error_rate": 0.1111111111111111,
+        "tool_process_score": 88.88888888888889,
+        "tool_first_calls": 2,
+        "tool_first_successes": 2,
+        "tool_first_attempt_success_rate": 1.0,
+        "tokens": 78030,
+        "token_coverage": "complete",
+        "model_calls": 15,
+        "elapsed_ms": 143379.13200585172,
+        "model_ms": 198559.201
+      }
+    },
+    {
+      "case_id": "QUANT-01",
+      "state": "failed",
+      "passed": false,
+      "pending": false,
+      "signals": [
+        "TASK_ALREADY_HANDED_OFF",
+        "TOOL_FAILED",
+        "check:reproducible_code",
+        "check:structured_result",
+        "check:transaction_file",
+        "hard_assertion_failed"
+      ],
+      "metrics": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 15,
+        "tool_failures": 3,
+        "tool_unknowns": 0,
+        "tool_errors": 3,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 1,
+        "tool_failure_codes": {
+          "COMMAND_NONZERO_EXIT": 2,
+          "TASK_ALREADY_HANDED_OFF": 1
+        },
+        "tool_failure_rate": 0.2,
+        "tool_error_rate": 0.2,
+        "tool_process_score": 80.0,
+        "tool_first_calls": 2,
+        "tool_first_successes": 2,
+        "tool_first_attempt_success_rate": 1.0,
+        "tokens": 165853,
+        "token_coverage": "complete",
+        "model_calls": 21,
+        "elapsed_ms": null,
+        "model_ms": 245464.26
+      }
+    },
+    {
+      "case_id": "finqa:4f978c08853a6db6",
+      "state": "failed",
+      "passed": false,
+      "pending": false,
+      "signals": [
+        "assertion_failed"
+      ],
+      "metrics": {
+        "tool_process_coverage": "complete",
+        "tool_calls": 1,
+        "tool_failures": 0,
+        "tool_unknowns": 0,
+        "tool_errors": 0,
+        "tool_argument_failures": 0,
+        "tool_admission_failures": 0,
+        "tool_failure_codes": {},
+        "tool_failure_rate": 0.0,
+        "tool_error_rate": 0.0,
+        "tool_process_score": 100.0,
+        "tool_first_calls": 1,
+        "tool_first_successes": 1,
+        "tool_first_attempt_success_rate": 1.0,
+        "tokens": 23630,
+        "token_coverage": "complete",
+        "model_calls": 8,
+        "elapsed_ms": null,
+        "model_ms": 84113.649
+      }
+    }
+  ],
+  "production_ledger_modified": false,
+  "publication_executed": false
+}

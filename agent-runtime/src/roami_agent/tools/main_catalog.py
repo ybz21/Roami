@@ -12,7 +12,10 @@ from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
 from roami_agent.storage.request_quotes import quote_text
-from roami_agent.storage.task_continuation import continuation_candidates
+from roami_agent.storage.task_continuation import (
+    continuation_candidates,
+    unresolved_repeated_requests,
+)
 from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
@@ -405,6 +408,17 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 }
             if exc.code != "TASK_FAILURE_REVIEW_REQUIRED":
                 raise
+            repeated = await tasks.db.call(
+                lambda db: unresolved_repeated_requests(
+                    db,
+                    dict(
+                        row(db, "SELECT * FROM turns WHERE id=?", (binding["turnId"],)),
+                        owner_id=binding["owner"],
+                    ),
+                    row(db, "SELECT * FROM messages WHERE id=?", (binding["originMessageId"],)),
+                )
+            )
+            repeated_ids = {item["id"] for item in repeated}
             previous = await tasks.list(binding["owner"], binding["conversation"], for_model=True)
             evidence = [
                 {
@@ -415,7 +429,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 }
                 for item in previous
                 if item.get("origin_message_id") == binding["originMessageId"]
-            ][:3]
+                or item["id"] in repeated_ids
+            ][:8]
             return {
                 "code": exc.code,
                 "acceptedOnly": False,

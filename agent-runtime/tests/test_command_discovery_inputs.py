@@ -73,3 +73,46 @@ async def test_help_uses_compact_commands_without_mutating_internal_directory(st
             assert all("argv" in entry and "command" not in entry for entry in internal["commands"])
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("query", ["task_status", "task status", "roami agent task status"])
+async def test_named_builtin_discovery_returns_its_executable_command_and_schema(store, query):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        result = await runtime.tools.invoke(call("tool_list", {"query": query}), "main", {})
+        assert (
+            result["catalogVersion"] == runtime.tools.directory.list(role="main")["catalogVersion"]
+        )
+        entry = result["items"][0]
+        assert entry["name"] == "task_status" and "commands" not in entry
+        argv = shlex.split(entry["command"])
+        assert argv == ["roami", "agent", "task", "status", "--input", "JSON"]
+        assert "taskId" in entry["inputSchema"]["properties"]
+        conversation = await runtime.conversations.create("alice")
+        argv[-1] = "{}"
+        assert (
+            await runtime.tools.invoke(
+                call("bash", {"command": shlex.join(argv)}),
+                "main",
+                {"owner": "alice", "conversation": conversation["id"]},
+            )
+            == []
+        )
+    finally:
+        await runtime.close()
+
+
+async def test_named_builtin_discovery_keeps_disabled_and_worker_only_operations_out(store):
+    from roami_agent.server.configuration import Settings
+
+    runtime = Runtime(store, ConversationModel(), settings=Settings(browser={"enabled": True}))
+    try:
+        main = runtime.tools.directory.list("browser_open", role="main")
+        assert not any("inputSchema" in item for item in main["items"])
+        runtime.tools.disabled_tools.add("task_steer")
+        result = await runtime.tools.invoke(call("tool_list", {"query": "task_steer"}), "main", {})
+        commands = json.dumps(result)
+        assert "roami agent task steer --input" not in commands
+        assert "task_steer" not in [entry["name"] for entry in result["items"]]
+    finally:
+        await runtime.close()

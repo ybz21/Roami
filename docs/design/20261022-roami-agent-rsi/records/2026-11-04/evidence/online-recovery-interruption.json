@@ -1,0 +1,13 @@
+{
+  "host_process_missing": true,
+  "cycle_marked_interrupted": true,
+  "observed": {
+    "source_sha256": "5e83e1084cdebcfe78892cc345d38a8d584d2533e58efab722294a94edf1874c",
+    "outputs": {}
+  },
+  "owned_container_removed": "roami-rsi-company-5631f63c8dd8e54b-owncloud",
+  "owned_network_removed": "roami-rsi-company-5631f63c8dd8e54b-net",
+  "unknown_history_preserved": true,
+  "model_calls": 0,
+  "operations_replayed": 0
+}

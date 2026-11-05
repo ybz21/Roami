@@ -1,0 +1,55 @@
+{
+  "observed_at": "2026-11-05T00:42:15.815821+08:00",
+  "formal_partial": {
+    "completed": 39,
+    "total": 60,
+    "counts": {
+      "passed": 23,
+      "failed": 10,
+      "pending": 6
+    },
+    "final": false,
+    "frozen_source_and_image": true,
+    "previous_formal_scores_overwritten": false,
+    "historical_snapshot": true
+  },
+  "independent_followup": {
+    "numeric_delivery_selection": "old selector took queue acknowledgement despite source-bound final result; candidate kept separate",
+    "native_delivery_selection_regressions": 11,
+    "original_committed_answer_controls_preserved": true,
+    "fresh_numeric_cases": {
+      "convfinqa": "RSI_TIME_BUDGET after answer generated; failure retained",
+      "finqa_ab": "source-bound answer selected; -0.538 sign differs from original +0.538, not rounding"
+    },
+    "promoted": false,
+    "strict_all_handoff_fresh_cases": {
+      "convfinqa": "passed original case with saved routes",
+      "finqa_ab": "failed original numeric tolerance: -0.538 vs +0.538; sign error"
+    },
+    "source_selection_fix_pr": 664,
+    "finqa_d587": "old frozen exe_ans=324.5 contradicts upstream displayed answer=215.33 and public 646/3 arithmetic; old grade retained; existing v2 importer excludes inconsistent annotations"
+  },
+  "upstream_authentication": {
+    "new_401_reproduced": true,
+    "go_http_status": 401,
+    "go_upstream_http_status": 401,
+    "subsequent_same_saved_routes_http_200": true,
+    "credentials_or_routes_changed": false,
+    "historical_unknowns_cleared": false
+  },
+  "formal_final": {
+    "completed": 60,
+    "total": 60,
+    "counts": {
+      "passed": 43,
+      "failed": 11,
+      "pending": 6
+    },
+    "full_suite_complete": true,
+    "evaluation_complete": false,
+    "daily_complete": false,
+    "report_phase": "evaluated_waiting_semantic_review",
+    "evidence": "online-recovery-full-sixty.json",
+    "old_scores_overwritten": false
+  }
+}

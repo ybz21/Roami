@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 from roami_agent.storage.database import rows
+from roami_agent.storage.request_quotes import quote_text
+from roami_agent.storage.task_request import task_user_request
 
 
 def continuation_candidates(db, owner, conversation, turn_id, target):
@@ -66,4 +68,43 @@ def continuation_candidates(db, owner, conversation, turn_id, target):
                 "executor": intent["executor"],
             }
         )
+    return matched
+
+
+def unresolved_repeated_requests(db, turn, origin):
+    source = task_user_request(db, origin) if origin else None
+    text = json.loads(source["content_json"]).get("text", "") if source else ""
+    if not text.strip():
+        return []
+    candidates = rows(
+        db,
+        "SELECT t.*,m.content_json,m.conversation_id,a.state AS attempt_state,a.result_json "
+        "FROM tasks t JOIN messages m ON m.id=t.origin_message_id "
+        "JOIN task_attempts a ON a.id=(SELECT id FROM task_attempts WHERE task_id=t.id "
+        "AND task_revision=t.revision ORDER BY attempt_no DESC LIMIT 1) "
+        "WHERE t.owner_id=? AND t.origin_conversation_id=? AND t.origin_branch_id=? "
+        "AND t.parent_task_id IS NULL AND t.created_ms<=? AND m.created_ms<=? "
+        "AND t.origin_message_id!=? AND m.deleted_ms IS NULL "
+        "AND (a.state='unknown' OR json_extract(native_content(a.result_json),'$.outcomeKnown')=0 "
+        "OR json_extract(native_content(a.result_json),'$.inputStopped')=0) "
+        "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id "
+        "AND o.message_id=t.origin_message_id) "
+        "AND NOT EXISTS(SELECT 1 FROM task_session_closures z WHERE z.task_id=t.id AND z.state='closed') "
+        "ORDER BY t.created_ms DESC,t.id",
+        (
+            turn["owner_id"],
+            turn["conversation_id"],
+            turn["branch_id"],
+            turn["created_ms"],
+            source["created_ms"],
+            source["id"],
+        ),
+    )
+    matched = []
+    for task in candidates:
+        previous = task_user_request(db, dict(task, id=task["origin_message_id"]))
+        if previous and quote_text(
+            json.loads(previous["content_json"]).get("text", "")
+        ) == quote_text(text):
+            matched.append(task)
     return matched

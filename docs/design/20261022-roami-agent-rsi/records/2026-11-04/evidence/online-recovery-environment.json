@@ -1,0 +1,197 @@
+{
+  "directory_comparison": {
+    "results": [
+      {
+        "query": "task_status",
+        "before_bytes": 13832,
+        "after_bytes": 1920,
+        "before_first_name": "roami",
+        "after_first_name": "task_status",
+        "same_catalog_version": true
+      },
+      {
+        "query": "task_steer",
+        "before_bytes": 13832,
+        "after_bytes": 1403,
+        "before_first_name": "roami",
+        "after_first_name": "task_steer",
+        "same_catalog_version": true
+      },
+      {
+        "query": "target_search",
+        "before_bytes": 13857,
+        "after_bytes": 1890,
+        "before_first_name": "roami",
+        "after_first_name": "target_search",
+        "same_catalog_version": true
+      },
+      {
+        "query": "roami",
+        "before_bytes": 14160,
+        "after_bytes": 14160,
+        "before_first_name": "roami",
+        "after_first_name": "roami",
+        "same_catalog_version": true
+      }
+    ],
+    "model_calls": 0,
+    "role": "main",
+    "main_tool_count": 11,
+    "old_source_sha256": "e0491292bc72246b5935dc5f01265968ea068a19afa9e5e0dcd6b80c36c5b7bf"
+  },
+  "image_activation": {
+    "previous_image": "sha256:6fa5cfb10dbbbe928289844a14e2b6d00dda9081f1fdc09a1263dff8ac9fa4fe",
+    "active_image": "sha256:190aae6f9835bf464a76c30b58fb16414f002bff8ac68101f3cc741eb66b3683",
+    "services_restarted": false,
+    "model_routes_changed": false,
+    "previous_runs_modified": false
+  },
+  "image_source": {
+    "files": 340,
+    "source_matches": true,
+    "module": "/opt/roami-agent/src/roami_agent/app.py",
+    "pypdf": "6.21.1",
+    "mcp": "1.30.0",
+    "cases_present": false,
+    "fixture_present": false
+  },
+  "source_labels": {
+    "tested_image": "sha256:190aae6f9835bf464a76c30b58fb16414f002bff8ac68101f3cc741eb66b3683",
+    "active_image": "sha256:ff250e9b70864fea9b7984ebfa1298755cba2472239282d69dddd2579789547c",
+    "filesystem_layers_identical": true,
+    "changed_configuration": "source labels only",
+    "running_trials_remain_pinned_to_tested_image": true,
+    "labels": {
+      "org.roami.rsi.actor-source-core": "f5aad92812839a91020ded4dbfbb1c341510af02ceab45064b76f132873992a9",
+      "org.roami.rsi.source-head": "worktree-sha256:32bd2ca0309363b096cf9312cfc0c7500223456178ceffb67619a677784a80f8"
+    }
+  },
+  "suite_preparation": {
+    "old_suite": "roami-formal-60-v8",
+    "old_hash": "0b6dc53cdeb1996cd5b7bf02dcdd4687dafe1eedf10dfb5d185f485f5350bdbc",
+    "new_suite": "roami-formal-60-v18-online-recovery-20261104",
+    "new_hash": "90b2932b4d5da1c2269f5c52b7d5b3bfd3fd3effc1f4f08d563ce0ecb9f7b35a",
+    "same_60_ids": true,
+    "public_cases_unchanged": true,
+    "coverage": {
+      "contract": "roami-daily-60-v1",
+      "complete": true,
+      "checks": {
+        "count": true,
+        "unique_ids": true,
+        "public_quotas": true,
+        "unique_public_tasks": true,
+        "pinned_public_revisions": true,
+        "authored_selection": true,
+        "mechanism_selection": true,
+        "formal_splits": true,
+        "no_smoke": true,
+        "mechanism_grader": true
+      },
+      "public": {
+        "swe_verified": {
+          "expected": 2,
+          "actual": 2
+        },
+        "terminal_bench": {
+          "expected": 2,
+          "actual": 2
+        },
+        "the_agent_company": {
+          "expected": 2,
+          "actual": 2
+        },
+        "osworld": {
+          "expected": 2,
+          "actual": 2
+        },
+        "agentic_vbench": {
+          "expected": 2,
+          "actual": 2
+        },
+        "dsbench": {
+          "expected": 2,
+          "actual": 2
+        },
+        "spreadsheetbench": {
+          "expected": 1,
+          "actual": 1
+        },
+        "gaia": {
+          "expected": 1,
+          "actual": 1
+        },
+        "longmemeval_v2": {
+          "expected": 1,
+          "actual": 1
+        },
+        "finqa": {
+          "expected": 3,
+          "actual": 3
+        },
+        "convfinqa": {
+          "expected": 1,
+          "actual": 1
+        },
+        "mlagentbench": {
+          "expected": 1,
+          "actual": 1
+        }
+      },
+      "missing_authored": [],
+      "missing_mechanisms": [],
+      "scope": "composition_only; environment and graders require separate acceptance"
+    },
+    "production_preferences_changed": false,
+    "historical_results_changed": false
+  },
+  "suite_activation": {
+    "before": {
+      "revision": 4,
+      "enabled": false,
+      "timezone": "Asia/Shanghai",
+      "hour": 3,
+      "cases_per_day": 60,
+      "suite_id": "roami-formal-60-v8",
+      "machine_ids": [
+        "local-container"
+      ],
+      "auto_candidates": false,
+      "candidate_policy": {}
+    },
+    "after": {
+      "revision": 5,
+      "enabled": false,
+      "timezone": "Asia/Shanghai",
+      "hour": 3,
+      "cases_per_day": 60,
+      "suite_id": "roami-formal-60-v18-online-recovery-20261104",
+      "machine_ids": [
+        "local-container"
+      ],
+      "auto_candidates": false,
+      "candidate_policy": {}
+    },
+    "suite_hash": "90b2932b4d5da1c2269f5c52b7d5b3bfd3fd3effc1f4f08d563ce0ecb9f7b35a",
+    "old_suites_and_results_preserved": true,
+    "model_routes_changed": false,
+    "schedule_enabled": false,
+    "consistent_backup_created": true
+  },
+  "rater_preflight": {
+    "error": "MODEL_IMAGES_UNSUPPORTED",
+    "roles": {
+      "main": {
+        "model": "deepseek-4.1-flash",
+        "images": true
+      },
+      "worker": {
+        "model": "deepseek-4.1-flash",
+        "images": false
+      }
+    },
+    "distinct_endpoint_model_identities": 1,
+    "external_model_calls": 0,
+    "saved_routes_changed": false
+  }
+}

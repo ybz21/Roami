@@ -292,6 +292,27 @@ CASES = [
 ]
 
 
+def executor_selection_matches(plan, source_message_id, calls, executor):
+    decision = plan.get("routingDecision", {})
+    if (
+        plan.get("executor") != executor
+        or decision.get("executor") != executor
+        or decision.get("sourceMessageId") != source_message_id
+    ):
+        return False
+    for call in calls:
+        if call["tool_name"] != "delegate" or call["state"] != "succeeded":
+            continue
+        arguments = call["arguments_json"]
+        arguments = json.loads(arguments) if isinstance(arguments, str) else arguments
+        if (
+            arguments.get("executor") == executor
+            or arguments.get("routing", {}).get("explicitExecutor") == executor
+        ):
+            return True
+    return False
+
+
 async def run_case(provider, settings, output, number, case):
     ident, question, expected, kind = case
     root = output / f"round-{number}" / ident
@@ -469,8 +490,8 @@ async def run_case(provider, settings, output, number, case):
                 == ("proj-swarm" if kind == "complex" else "proj-roami")
             )
             if kind == "explicit":
-                passed = passed and (
-                    plans[0].get("routingDecision", {}).get("reasonCode") == "explicit_executor"
+                passed = passed and executor_selection_matches(
+                    plans[0], created[0]["origin_message_id"], tools, "codex"
                 )
         elif kind == "file":
             passed = (
