@@ -9,7 +9,13 @@ Turn the user's goal into a working project bundle, not a report about a possibl
 OKR. Use this workflow for creation and changes to an existing OKR. Ordinary team
 chat or a progress question does not require rebuilding the bundle.
 
-Read [the bundle contract](references/bundle.md) when preparing the configuration.
+Read [the bundle contract](references/bundle.md) when preparing configuration.
+For creation or a new layout, read [templates](references/templates.md) and choose
+the complete `assets/` first, then combine the needed parts.
+Read [the file-by-file authoring guide](references/authoring.md); edit existing
+definitions in an isolated draft, preserving unrelated confirmed content.
+For user-authored HTML, read [dashboard data](references/dashboard-data.md).
+For Python/MCP collection, read [Connector Skills](references/connectors.md).
 The project directory is the workspace; `.roami/okr/` contains its definitions
 and confirmed data. Keep existing directories, identities and history.
 
@@ -18,7 +24,7 @@ and confirmed data. Keep existing directories, identities and history.
 Read the bound project and current OKR before proposing changes. Reuse the user's
 answers and existing authorization. Resolve only missing decisions that affect
 the result: the objective and period, measurable outcomes, methods, data sources,
-dashboard views and team duties. Choose their number for this goal; there is no
+dashboard views, team duties and recurring collection needs. Choose their number for this goal; there is no
 default number of KRs, charts or agents. Unknown baselines remain unknown.
 
 Explain the proposed changes in the conversation. Show the goal and decisions,
@@ -66,6 +72,29 @@ snapshot, which drives the dashboard. Source failures preserve existing facts;
 they never become zero. Unsupported Connector execution or chart types require
 a product change, not a claim that an arbitrary local script was loaded.
 
+## Develop Connector Skills
+
+Use a Skill as the entrypoint for each data-collection workflow. Keep each package under `.roami/okr/connectors/<name>/`, with `SKILL.md` at
+its root. Keep Python fetching/normalization code in that Skill's `scripts/`; an MCP-backed Skill uses
+available MCP tools and documents their account, inputs and output mapping.
+Do not create a separate executable Connector plugin convention. Reuse one
+Skill when several metrics share the same source and collection operation.
+Read the Connector Skill and scheduling contract in
+[the bundle contract](references/bundle.md#connector-skills-and-scheduling).
+
+Separate the Skill, its confirmed source/metric bindings, and its daily schedule.
+Ask for a missing collection time/timezone when enabling a schedule; a disabled
+proposal can be prepared without it. Use a real scheduler receipt and next due
+time to report activation. A reminder, an idle member, `autoCollect`, or a saved
+schedule proposal does not prove that a custom Skill will run every day.
+
+The current execution adapters support registered GitHub collection and verified
+manual observations. Python/MCP-backed workflows can prepare evidence in an
+authorized managed task and Main can record it through the project operation.
+They are not yet automatically scheduled by this product. Keep unsupported
+execution pending instead of installing an ad hoc cron job or pretending a file
+is an active timer. Preserve the original Main and long-lived team identities.
+
 ## Verify the result
 
 Reread the saved workspace and actual files. Check widget/metric bindings, source
@@ -74,3 +103,32 @@ managed team's current roster and receipts with the plan. Report what was
 created, what data was actually obtained, and any missing access or unsupported
 view. Return the project entry and usable files. Do not say the team ran, a post
 was published, or a dashboard is live merely because its definition was saved.
+
+
+## Author from templates
+
+The repository's `skills/okr-development/` is the canonical package. Runtime
+wheels and native installers ship this same package, including templates. Read
+only the resources needed for the requested change.
+
+First copy `assets/.` to an empty draft with `cp -R`, including
+the project AGENTS.md and hidden .roami/okr/AGENTS.md. Then combine `parts/` for sources, HTML and roles.
+Content-growth, product-delivery and operations under `examples/` are optional
+reference overlays, not a substitute for the complete generic directory. Fill
+intentional `{{...}}` template parameters from the user/project; targets, dates,
+repo, role duties and widget count remain editable. Copy only useful assets into
+an isolated draft. Never put the package's fixtures or example counts into live
+observations. Do not manufacture Main/member/provider IDs or current.json.
+
+Produce the objective/KRs/methods, dashboard definition, user HTML/CSS/JS,
+Connector Skill packages, desired team, instructions/memory locations and a
+schedule proposal. Show the resulting runtime preview and meaningful diff.
+Apply only supported definitions with the current project revision, then reread
+the actual result. Keep unsupported HTML/Skill-scheduler definitions as drafts;
+current JSON widgets and builtin/manual sources remain the compatibility path.
+
+A template choice does not replace long-lived members in an existing project.
+Saving the desired team, registering it, dispatching work and activating a daily
+schedule have separate receipts. Preserve the user's input on conflicts. Never
+claim a template, script, HTML page or scheduled proposal has executed merely
+because its files exist.

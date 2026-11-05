@@ -63,3 +63,7 @@ view. Saved role parameters, capabilities, context windows and retries stay auth
 model preflight rejects older actors; model-free rendering can keep its pinned image. Historical
 configuration and receipts remain readable without reactivating their old quotas. Benchmark
 execution and grading deadlines remain part of the frozen acceptance contract.
+
+The image build context is the repository root so it can include the canonical
+OKR authoring Skill: `docker build -f agent-runtime/improvement.Dockerfile -t roami-rsi-eval:local .`.
+This changes package resources only; saved model routes, admission and budgets remain authoritative.

@@ -39,10 +39,27 @@ roami_skills() {
         -o "${local_tmp}/babysit-pr.md" 2>/dev/null || all_ok=false
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/skills/babysit-pr/wait-codex-review.sh" \
         -o "${local_tmp}/wait-codex-review.sh" 2>/dev/null || all_ok=false
-    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/agent-runtime/src/roami_agent/skills/okr-development/SKILL.md" \
-        -o "${local_tmp}/okr-development.md" 2>/dev/null || all_ok=false
-    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/agent-runtime/src/roami_agent/skills/okr-development/references/bundle.md" \
-        -o "${local_tmp}/okr-bundle.md" 2>/dev/null || all_ok=false
+    mkdir -p "${local_tmp}/okr-development"
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/skills/okr-development/package.files" \
+        -o "${local_tmp}/okr-development/package.files" 2>/dev/null || all_ok=false
+    if $all_ok; then
+        local expected resource extra actual
+        while read -r expected resource extra; do
+            if [[ ! "$expected" =~ ^[0-9a-f]{64}$ || ! "$resource" =~ ^[A-Za-z0-9_./-]+$ || "$resource" == /* || "$resource" == *..* || -n "$extra" ]]; then
+                all_ok=false; break
+            fi
+            mkdir -p "${local_tmp}/okr-development/$(dirname "$resource")"
+            curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/skills/okr-development/${resource}" \
+                -o "${local_tmp}/okr-development/${resource}" 2>/dev/null || { all_ok=false; break; }
+            if command -v sha256sum >/dev/null 2>&1; then
+                actual="$(sha256sum "${local_tmp}/okr-development/${resource}")"
+            else
+                actual="$(shasum -a 256 "${local_tmp}/okr-development/${resource}")"
+            fi
+            [[ "${actual%% *}" == "$expected" ]] || { all_ok=false; break; }
+        done < "${local_tmp}/okr-development/package.files"
+        [[ -s "${local_tmp}/okr-development/SKILL.md" && -f "${local_tmp}/okr-development/assets/.roami/okr/okr.json" ]] || all_ok=false
+    fi
     local d
     # dev-roles 各角色子文档（顺序与 skills/sync-skills.sh 的 DEV_ROLES_DOCS 保持一致）
     for d in plaza board chrome pm architect frontend backend fullstack qa designer reviewer devops docs; do
@@ -64,9 +81,8 @@ roami_skills() {
             cp "${local_tmp}/babysit-pr.md" "${sd}/babysit-pr/SKILL.md"
             cp "${local_tmp}/wait-codex-review.sh" "${sd}/babysit-pr/wait-codex-review.sh"
             chmod +x "${sd}/babysit-pr/wait-codex-review.sh"
-            mkdir -p "${sd}/okr-development/references"
-            cp "${local_tmp}/okr-development.md" "${sd}/okr-development/SKILL.md"
-            cp "${local_tmp}/okr-bundle.md" "${sd}/okr-development/references/bundle.md"
+            mkdir -p "${sd}/okr-development"
+            cp -R "${local_tmp}/okr-development/." "${sd}/okr-development/"
         done
         info "skills 已安装 (roami-session, cc-swarm, dev-roles, babysit-pr, okr-development)"
     fi

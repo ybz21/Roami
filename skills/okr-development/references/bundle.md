@@ -7,9 +7,13 @@ PROJECT/
   AGENTS.md
   .roami/okr/
     okr.json                         objective, KRs, methods and metric definitions
-    dashboard.json                   registered widgets, order and metric bindings
-    connectors/METRIC_ID/
-      connector.json                 source binding and execution type
+    dashboard.json                   registered widgets, or proposed HTML entry/bindings
+    dashboard/index.html             user-authored display (host SDK pending)
+    connectors/NAME/
+      SKILL.md                       collection workflow (new package protocol)
+      connector.json                 source/metric binding
+      scripts/                       Python when needed
+      references/                    MCP/source details when needed
     agents/
       main.json                      coordinator instructions and project skills
       main.md
@@ -80,4 +84,52 @@ measurement window and evidence; missing login is unknown, not zero.
 After a source change, old source identities remain in history and are not
 relabeled as the new source. Preserve the last confirmed revision on failure or
 concurrent edits. Do not edit Connector Go references and call them executable
-plugins; custom HTTP/SQL/scripts need a registered Connector protocol first.
+plugins. Custom Python/MCP execution follows the Skill contract below; it is not
+an executable Go-reference or JSON command plugin protocol.
+
+
+## Connector Skills and scheduling
+
+A Connector is a data-collection **Skill**. `SKILL.md` is its workflow entrypoint;
+Python and MCP are implementation choices within it. Keep a source shared by
+several metrics in one Skill when collection is naturally atomic. A typical
+project-owned Skill uses this structure:
+
+```text
+connectors/collect-SOURCE/
+  SKILL.md                 source/account, metric scope, collection and validation
+  scripts/                 Python code when deterministic fetching is useful
+  references/              MCP tools or source contracts when needed
+```
+
+Do not create empty script/reference directories for an MCP-only or simple Skill.
+Source binding JSON describes the configured source; it is not another plugin
+entrypoint. Keep secrets in the existing credential system, outside the bundle.
+The Connector package location is `connectors/<name>/`, not project `skills/`.
+Current project discovery only reads registered `skills/<name>/SKILL.md`; the
+new Connector reader/protocol is pending. Do not claim a source was loaded merely
+from saving these files. See [Connector Skills](connectors.md).
+
+Before enabling a collection Skill, establish the source/account, permission,
+metric IDs, date window, unit and evidence required for each output. Python
+scripts fetch and normalize; MCP Skills invoke actual available tools. Fetching
+an MCP tool list is not collection. Neither path may invent missing values,
+write runtime SQLite, replace confirmed snapshots, or bypass project revision
+checks. Main submits validated facts through the registered project operation.
+
+A daily schedule refers to the confirmed Skill and project, with a local time,
+IANA timezone, enabled state and next due time. The scheduler owns execution
+identity, deduplication and retry records in its database; the project files own
+the Skill/source definitions and confirmed dashboard data. A scheduled run must
+retain the Skill version, source binding, metric date, real evidence and publish
+receipt. Recheck definition revision before publishing; concurrent changes need
+reconciliation. Failed collection keeps the previous valid snapshot and reports
+unknown/stale data; it does not write zero or claim success. Unknown publishing
+outcomes require rereading the same run before retrying.
+
+Current capability boundary: `autoCollect` schedules only the existing builtin
+GitHub adapter. General daily execution of a Python/MCP-backed Skill is pending;
+a reminder only sends a notification. Do not activate a second overlapping
+collector or claim a custom schedule exists from either setting. When that
+scheduler is implemented, use its persisted receipt rather than shell cron,
+model-generated dates or keeping an agent alive as a timer.

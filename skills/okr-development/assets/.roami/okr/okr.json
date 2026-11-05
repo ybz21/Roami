@@ -1,0 +1,39 @@
+{
+  "revision": 0,
+  "objective": "{{objective}}",
+  "startDate": "{{startDate}}",
+  "endDate": "{{endDate}}",
+  "metrics": [
+    {
+      "id": "metric",
+      "name": "{{metricName}}",
+      "unit": "{{unit}}",
+      "source": "manual"
+    }
+  ],
+  "keyResults": [
+    {
+      "id": "result",
+      "title": "{{resultTitle}}",
+      "horizon": "short",
+      "metricId": "metric",
+      "target": "{{target}}",
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    }
+  ],
+  "initiatives": [
+    {
+      "id": "method",
+      "title": "{{methodTitle}}",
+      "channel": "{{channel}}",
+      "keyResultIds": [
+        "result"
+      ],
+      "description": "{{methodDescription}}",
+      "acceptance": "{{acceptance}}"
+    }
+  ],
+  "swarm": "",
+  "autoCollect": false
+}

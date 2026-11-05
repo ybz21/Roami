@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "widgets": [
+    {
+      "id": "metrics",
+      "type": "metricTrend",
+      "metricIds": [
+        "metric"
+      ]
+    }
+  ]
+}

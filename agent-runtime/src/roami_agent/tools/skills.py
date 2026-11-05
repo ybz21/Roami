@@ -12,24 +12,46 @@ from roami_agent.protocol.tools import Tool, object_schema
 def register_skills(registry, settings):
     skills = registry.skills
     builtin = Path(__file__).resolve().parents[1] / "skills"
-    for root in (builtin, *settings.skill_roots):
+    roots = [(builtin, tuple(builtin.glob("*/SKILL.md")), "builtin")]
+    if not (builtin / "okr-development/SKILL.md").is_file():
+        project = Path(__file__).resolve().parents[3]
+        for source in (project.parent / "skills", project / "skills"):
+            entry = source / "okr-development/SKILL.md"
+            if entry.is_file():
+                roots.append((source, (entry,), "builtin"))
+                break
+    roots.extend(
+        (root, tuple(root.glob("*/SKILL.md")), "configured") for root in settings.skill_roots
+    )
+    for root, entries, origin in roots:
         if not root.is_dir():
             continue
-        for path in root.glob("*/SKILL.md"):
+        for path in entries:
             resolved = path.resolve()
             if root not in resolved.parents or resolved.stat().st_size > 64_000:
                 continue
             text = resolved.read_text()
             references = {}
-            for reference in sorted((resolved.parent / "references").glob("*.md")):
+            resources = [
+                path
+                for name in ("references", "assets", "parts", "examples")
+                for path in (resolved.parent / name).rglob("*")
+                if path.is_file()
+                and path.suffix in {".md", ".json", ".jsonl", ".html", ".css", ".js", ".py"}
+            ]
+            for reference in sorted(resources):
                 target = reference.resolve()
                 if (
-                    target.parent != resolved.parent / "references"
+                    not target.is_relative_to(resolved.parent)
+                    or reference.is_symlink()
                     or target.stat().st_size > 64_000
                 ):
                     continue
-                content = target.read_text()
-                references["references/" + reference.name] = {
+                try:
+                    content = target.read_text()
+                except UnicodeDecodeError:
+                    continue
+                references[reference.relative_to(resolved.parent).as_posix()] = {
                     "text": content,
                     "version": hashlib.sha256(content.encode()).hexdigest(),
                 }
@@ -43,8 +65,8 @@ def register_skills(registry, settings):
                 "text": text,
                 "version": digest.hexdigest(),
                 "references": references,
-                "source": "builtin" if root == builtin else "configured",
-                **({"packagePath": str(resolved.parent)} if root != builtin else {}),
+                "source": origin,
+                **({"packagePath": str(resolved.parent)} if origin != "builtin" else {}),
                 "description": next(
                     (
                         line.partition(":")[2].strip().strip("\"'")

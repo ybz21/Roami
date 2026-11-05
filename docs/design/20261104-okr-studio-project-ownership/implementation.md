@@ -62,8 +62,8 @@ PROJECT/
 
 ## 开发编辑 Skill 与预置模板
 
-canonical 入口沿用 `agent-runtime/src/roami_agent/skills/okr-development/`，安装到
-Codex/Claude 使用同一份正文。新增模板资源建议放在该 Skill 的 `assets/templates/`，
+canonical 入口统一为仓库 `skills/okr-development/`，安装到
+Codex/Claude 使用同一份正文。新增模板资源建议放在该 Skill 的 `assets/`，
 避免另建模板引擎与第三套 Connector 扩展协议。原型示例在本目录 `templates/`。
 
 模板包包含版本、适用场景与文件种子：目标/指标/看板、职责计划、项目指引、取数
@@ -324,7 +324,7 @@ Skill Runner 已实现；正式实现需要覆盖越权 dataset、跨项目、�
 4. 只有用户要求且宿主能力已接通时，依据真实登记/派工/调度回执继续；不能把定义或
    HTML 已加载说成取数成功或日更已启用。
 
-模板包随 Skill 的 `assets/templates/` 版本化分发，至少含 `template.json`、dashboard
+模板包随 Skill 的 `assets/` 版本化分发，至少含 `template.json`、dashboard
 布局种子、Connector Skill 种子、目标/职责种子与必要资料。模板内容不包含凭证、实例
 ID、模拟事实；调度默认关闭。开发 Skill 按用户已有答案填充并校验，缺口留为未知；
 人数、KR 和图表数量可以增减。预置内容增长、产品交付、运营指标，支持将用户自己
@@ -335,3 +335,18 @@ ID、模拟事实；调度默认关闭。开发 Skill 按用户已有答案填�
 用户 JS 绝无出站请求。生产加载器须明确脚本信任与授权范围；若要求严格禁止所有
 外联，还需宿主网络策略/代理控制，而不是只加 iframe 属性。样例用于证明只读数据
 通道与源隔离，不把它当作完整生产安全实现。
+
+
+## 通用编写包的实际落点
+
+仓库 `skills/okr-development/` 是唯一正文/模板源；runtime wheel/sdist 把同包收进
+内置资源，源码态读取仓库源。Codex/Claude 本地与远程安装同步完整包并核对每个
+资源的哈希，不只复制 SKILL.md。模板资源可通过 skill:// 的只读资源入口发现。
+
+`assets/` 是完整通用项目根，先 cp -R assets/. 到空草稿，再组合 parts/。
+`.roami` 隐藏目录也包含在内。Python/MCP Connector、看板片段和角色片段在 parts/；
+三个业务方向只在 examples/ 作为参考。references/authoring.md 逐个文件说明用途、
+字段、组合方法及禁止手填的宿主状态。已有项目只在草稿合并，不覆盖历史和实例。
+
+隔离验证已经覆盖：复制通用骨架、填参数、当前 Go Store 保存确认、无初始假观测、
+追加测试观测，以及旧修订保存拒绝。该验证不等于 HTML SDK/通用 Skill 日更已上线。

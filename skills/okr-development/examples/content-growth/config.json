@@ -1,0 +1,83 @@
+{
+  "revision": 0,
+  "objective": "让更多开发者认识并使用产品",
+  "startDate": "{{startDate}}",
+  "endDate": "{{endDate}}",
+  "metrics": [
+    {
+      "id": "github-stars",
+      "name": "GitHub star",
+      "unit": "个",
+      "source": "github",
+      "repo": "{{githubRepo}}",
+      "field": "stars"
+    },
+    {
+      "id": "github-forks",
+      "name": "GitHub fork",
+      "unit": "个",
+      "source": "github",
+      "repo": "{{githubRepo}}",
+      "field": "forks"
+    }
+  ],
+  "keyResults": [
+    {
+      "id": "recognition",
+      "title": "让感兴趣的人留下来",
+      "horizon": "short",
+      "metricId": "github-stars",
+      "target": 30,
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    },
+    {
+      "id": "trial",
+      "title": "推动开发者动手尝试",
+      "horizon": "short",
+      "metricId": "github-forks",
+      "target": 10,
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    }
+  ],
+  "initiatives": [],
+  "dashboard": {
+    "schemaVersion": 1,
+    "widgets": [
+      {
+        "id": "metrics",
+        "type": "metricTrend",
+        "metricIds": [
+          "github-stars",
+          "github-forks"
+        ]
+      }
+    ]
+  },
+  "team": {
+    "schemaVersion": 1,
+    "roles": [
+      {
+        "id": "content",
+        "name": "内容编辑",
+        "executor": "native",
+        "duty": "整理真实来源，交付图文与脚本"
+      },
+      {
+        "id": "video",
+        "name": "视频制作",
+        "executor": "native",
+        "duty": "制作操作演示并提交可核对产物"
+      },
+      {
+        "id": "data",
+        "name": "数据分析",
+        "executor": "native",
+        "duty": "核对指标来源、日期与反馈"
+      }
+    ]
+  },
+  "swarm": "",
+  "autoCollect": false
+}
