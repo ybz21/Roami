@@ -29,3 +29,15 @@
 测试 HTTP 服务与独立 tmux 在交接前停止；只回收本次两个测试会话。手机旋转恢复原值 1、9567 转发移除；本任务浏览器标签关闭。
 
 本次不部署、不重启线上服务、不修改线上原始业务数据；真实部署与整体 OKR 验收由主会话统筹。
+
+## 2026-11-05：运行态与开发 Studio 原型
+
+按用户要求，先看[最终运行态](../20261104-okr-main-workspace/index.html)，再看[Studio](index.html)，最后看[技术实现 HTML](implementation.html) / [完整方案](implementation.md)。
+
+本轮将“团队活动场景”和“开发 Studio”明确区分。前者在运行态与聊天同页，移除下方重复成员长表；后者以对话、模板、运行预览和草稿应用开发同一个 OKR。项目归属与原实例保持是两种状态共同的底层约束。旧 index 保存在 revisions/20261105-before.html，不删除历史归属修复证据。
+
+预置[模板样例](templates/README.md)含内容增长、产品交付、运营指标，明确无凭证/实例 ID/模拟观测，调度默认关闭。它们是设计种子，模板装配与通用 Skill 日更尚未实现。本轮不部署原型、不修改真实项目和团队、不触碰手机。
+
+[本轮原型验收](acceptance.md)。
+
+补充：Connector 位于 connectors/ 的 Skill 包；[用户 HTML 读取数据的可运行样例](dashboard-example.html)，以及[生成/编辑 Skill 扩展示例](templates/okr-development/SKILL.md)。数据保存、读取 API、组件与模板规范均见技术方案。

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "templateId": "product-delivery",
+  "version": 1,
+  "name": "产品交付",
+  "prototypeOnly": true,
+  "objectiveSeed": "按期交付一个可用的产品版本",
+  "roles": [
+    {
+      "id": "product-delivery-role-1",
+      "name": "产品设计",
+      "executor": "native",
+      "duty": "产品设计职责，创建时与用户明确范围"
+    },
+    {
+      "id": "product-delivery-role-2",
+      "name": "功能实现",
+      "executor": "native",
+      "duty": "功能实现职责，创建时与用户明确范围"
+    },
+    {
+      "id": "product-delivery-role-3",
+      "name": "独立测试",
+      "executor": "native",
+      "duty": "独立测试职责，创建时与用户明确范围"
+    }
+  ],
+  "skillSeeds": [
+    "collect-milestones"
+  ],
+  "scheduleSeed": {
+    "enabled": false,
+    "dailyAt": null,
+    "timezone": null
+  },
+  "preserveOnEdit": [
+    "projectIdentity",
+    "mainConversation",
+    "members",
+    "providerConversations",
+    "observations",
+    "history"
+  ],
+  "requiresProjectDecisions": [
+    "objectivePeriod",
+    "keyResults",
+    "metricsAndUnits",
+    "sourceAccount",
+    "evidence",
+    "roleDuties",
+    "scheduleTimeAndTimezone"
+  ],
+  "exclude": [
+    "credentials",
+    "liveInstanceIds",
+    "observations",
+    "completedState"
+  ],
+  "connectorRoot": ".roami/okr/connectors",
+  "dashboardFiles": [
+    ".roami/okr/dashboard.json",
+    ".roami/okr/dashboard/index.html",
+    ".roami/okr/dashboard/style.css",
+    ".roami/okr/dashboard/page.js"
+  ],
+  "dataContract": {
+    "authority": "confirmedSnapshot",
+    "pointer": ".roami/okr/state/current.json",
+    "observationsExport": ".roami/okr/data/observations.jsonl",
+    "frontend": "host-scoped readonly okr.data SDK",
+    "unknown": null
+  }
+}
