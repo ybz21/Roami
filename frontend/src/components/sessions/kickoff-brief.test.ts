@@ -13,29 +13,32 @@ const t = (k: string, v?: Record<string, unknown>) => {
     'session.wt.briefPlain': '你在 {path}，会话 {sess}',
     'session.wt.briefReview': '\n另有互审。',
     'session.wt.briefTask': '# 任务：',
+    'session.wt.briefSetup': '# 开工准备',
   }
   return (table[k] || k).replace(/\{(\w+)\}/g, (_, n) => String(v?.[n] ?? ''))
 }
 const where = { kind: 'new' as const, path: '/w', base: 'main', branch: 'tmp' }
 
 describe('开工简报', () => {
-  it('任务本体前有独立的一级标题', () => {
+  it('任务标题和原文位于第一段，准备事项随后', () => {
     const b = kickoffBrief(where, 's1', false, '把 /pools 改成 /pools/{id}', t)
-    expect(b).toMatch(/roami session rename s1 <新名字>\n\n# 任务：\n\n把 \/pools 改成/)
+    expect(b).toBe('# 任务：\n\n把 /pools 改成 /pools/{id}\n\n# 开工准备\n\n开工前先做三件事，做完再开始下面的任务：\n1. 工作区 /w（从 main 切，占位分支 tmp）\n3. roami session rename s1 <新名字>')
   })
-  it('任务原文前后空白去掉，内容原样保留', () => {
-    expect(kickoffBrief(where, 's1', false, '  第一行\n第二行  \n', t).endsWith('# 任务：\n\n第一行\n第二行')).toBe(true)
+  it('去掉首尾空白，保留任务内的多行、标题与代码', () => {
+    const body = '第一行\n# 用户标题\n```sh\necho task\n```'
+    expect(kickoffBrief(where, 's1', false, `  ${body}  \n`, t).startsWith(`# 任务：\n\n${body}\n\n# 开工准备`)).toBe(true)
   })
-  it('没有任务就不拼 —— 调用方直接起 agent', () => {
-    expect(kickoffBrief(where, 's1', false, '   ', t)).toBe('')
+  it('没有任务就不拼准备事项或能力说明', () => {
+    expect(kickoffBrief(where, 's1', true, '   ', t, '# Roami 会话能力')).toBe('')
   })
-  it('互审那句跟在前言后面、标题前面', () => {
+  it('互审说明归于准备事项，仍位于任务原文之后', () => {
     const b = kickoffBrief({ kind: 'plain', path: '/p' }, 's2', true, 'x', t)
-    expect(b).toBe('你在 /p，会话 s2\n另有互审。\n\n# 任务：\n\nx')
+    expect(b).toBe('# 任务：\n\nx\n\n# 开工准备\n\n你在 /p，会话 s2\n另有互审。')
   })
-  it('能力说明位于任务前，任务原文保持不变', () => {
+  it('能力说明跟随准备事项，不能抢占任务的首段', () => {
     const b = kickoffBrief(where, 's1', false, '生成视频', t, '# Roami 会话能力\n\n文件入口：/api/file')
-    expect(b).toMatch(/roami session rename s1 <新名字>\n\n# Roami 会话能力\n\n文件入口：\/api\/file\n\n# 任务：\n\n生成视频$/)
+    expect(b.startsWith('# 任务：\n\n生成视频\n\n# 开工准备')).toBe(true)
+    expect(b.endsWith('# Roami 会话能力\n\n文件入口：/api/file')).toBe(true)
   })
   it.each([null, 'remote node'])('从当前节点 %s 读取模板，并将所有文件入口绑定到该节点', async (node) => {
     setCurrentNode(node)
@@ -48,7 +51,7 @@ describe('开工简报', () => {
     expect(fetchMock.mock.calls[0][0]).toBe(`${prefix}/api/agent/capabilities`)
   })
   it('文件启动 Agent 也携带能力说明和原任务', () => {
-    expect(taskWithCapabilities('查看 /tmp/demo.md', t, 'Roami 能力')).toBe('Roami 能力\n\n# 任务：\n\n查看 /tmp/demo.md')
+    expect(taskWithCapabilities('查看 /tmp/demo.md', t, 'Roami 能力')).toBe('# 任务：\n\n查看 /tmp/demo.md\n\nRoami 能力')
   })
   it('模板不可读时中止提交，调用方不会创建空会话', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({

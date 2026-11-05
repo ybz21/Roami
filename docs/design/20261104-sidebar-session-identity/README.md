@@ -13,6 +13,14 @@
 
 [设计示意](proposal.html)
 
+### 2026-11-05：真实父子关系与任务优先
+
+RSI 的回归、数值验收、门禁等辅助工作先复用已有会话；确需新开时优先从当前会话 fork，不再为每条命令独立新建。侧栏会话菜单增加派生入口，工作区派生和终端新建入口在有可用父会话时使用相同 fork 接口，失败不降级为无关顶层会话。
+
+按记录的 `parent` 展示子会话与孙会话：每层缩进并加归属线。不用名称中的 RSI 前缀猜亲缘关系。跨工作区子会话也挂在父会话下，同时注明自己的工作区，点击仍进入真实工作区；缺失父节点或循环记录回退为可达根节点。工作区与项目的真实归属不被改写。
+
+总入口简报依次为 `# 任务：`、原始任务文本、`# 开工准备`、本机能力说明。新建 worktree、进入已有分支、普通目录与文件启动 Agent 的入口共用这一规则。默认能力模板增加复用和派生优先策略；历史原版模板自动升级，用户自定义模板继续保留。
+
 ## User Stories
 
 1. 我同时开着修复 Agent 和回归终端，需要一眼看出它们属于同一个工作区。
@@ -20,12 +28,20 @@
 3. 我在多个会话间切换时，需要准确识别当前会话，不能把父组也误读为另一个选中会话。
 4. 只有一个会话时，我仍希望侧栏紧凑；长标题、休眠和互审会话不能丢失状态或操作。
 
+5. 我需要看出 RSI 回归由哪个主会话派生，即使它在独立 worktree 中运行。
+6. 我第一次读 Agent 的启动消息时，希望先看到任务正文，再看准备事项与能力说明。
+
 ## Technical Design
 
 - `frontend/src/components/shell/ProjectTree.tsx`：沿用 `TreeTask` / `TreeSession`，只改变呈现；显式组提供 `role="group"` 与可访问名称，运行/等待点提供状态名称。
 - `frontend/src/index.css`：为工作区标题增加类型副标题，为显式组增加缩进与一条细线，恢复行级中性选中背景；复用颜色、字体、间距与触控令牌。
 - `frontend/src/i18n/locales/{zh-CN,en-US}.ts`：工作区类型、会话数量、分组可访问名称以及重命名文案。
-- 数据接口、轮询、worktree 和会话名称持久化、路由及手机一级导航沿用现有实现；不新增请求。
+- `internal/session/collect.go` 与 `internal/sessionstore/sessmeta.go`：平铺 `/sessions` 返回已记录的 parent/created_by；复用现有会话集合判断父节点可见性，不增加 tmux 扫描。新增一次台账关系查询，不增加请求或轮询。
+- `frontend/src/app/useSessionDirectory.ts`：保留 parent，稳定引用比较包含关系变化。
+- `frontend/src/components/shell/session-lineage.ts`：视图森林保留每个节点的真实 TreeTask，支持跨 worktree 子会话、失联父节点和环回退。
+- `frontend/src/app/useProjectActions.tsx`：当前会话、菜单明确选择的父会话、目录中可用会话优先派生；没有可用父会话才独立新建。派生失败保留错误，不另建会话。
+- `kickoff-brief.ts`、中英文简报文案、默认能力模板与 `skills/roami-session/SKILL.md`：任务置顶，统一复用及 fork 优先；能力模板的旧版本精确摘要迁移保留自定义内容。
+- worktree 和会话名称持久化、路由及手机一级导航沿用现有实现。
 - 验收使用独立实例和真实 React 组件的隔离数据，覆盖截图中的同名双会话、单会话、长名称、互审、等待及休眠。图片仅交付于 PR 的 `pr-shots` 分支。
 
 ## Acceptance

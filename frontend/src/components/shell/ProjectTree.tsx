@@ -6,6 +6,7 @@ import type { AgentKind } from '../../agent-kind'
 
 import { AgentLogo, ArchiveIcon, ChevronDown, CloseIcon, HomeIcon, MoreIcon, OpenInIcon, PencilIcon, PlusIcon, TerminalIcon, TrashIcon, WorktreeIcon } from '../../icons'
 import { isLooseTask, taskKeyOf, type TaskKey } from '../sessions/task-key'
+import { sessionBranches, type SessionBranch } from './session-lineage'
 import type { TaskTree, TreeSession, TreeTask } from './task-tree'
 
 const CLOSED_KEY = 'roam.tree.closed'
@@ -56,11 +57,12 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
   /** 右键任务行「收尾」：关掉它的会话并处理 worktree */
   onFinishTask?: (task: TreeTask) => void
   /** 右键任务行：在它的 worktree 里派生一个终端 / Claude / Codex */
-  onNewInTask?: (key: TaskKey, kind: 'shell' | AgentKind) => void
+  onNewInTask?: (key: TaskKey, kind: 'shell' | AgentKind, parent?: string) => void
   /** 项目行「…」菜单里的「移除项目」（只动台账，不动目录和会话） */
   onRemoveProject?: (key: string) => void
 }) {
   const { t, locale } = useI18n()
+  const tasks = new Map(tree.projects.flatMap(project => project.tasks.map(task => [task.key, task] as const)))
   const [closed, setClosed] = useState<Set<string>>(readClosed)
   // 「显示空闲 worktree」：没会话的 worktree 平时不进树（Orca 的 hidden worktrees），从「…」菜单打开才列出来；纯视图态
   const [showIdle, setShowIdle] = useState<Set<string>>(() => new Set())
@@ -78,20 +80,20 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     ? [{ key: 'rename', icon: <PencilIcon size={14} />, label: t('session.rename'), onClick: () => onRename(s.name) }] : []
   const renameTask = (task: TreeTask) => onRenameTask
     ? [{ key: 'name', icon: <PencilIcon size={14} />, label: t('tree.renameTask'), onClick: () => onRenameTask(task.key, task.name) }] : []
-  const derive = (task: TreeTask) => onNewInTask
+  const derive = (task: TreeTask, parent?: string) => onNewInTask
     ? [{ type: 'group' as const, label: t('tree.menu.deriveHere'), children: [
-      { key: 'sh', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: () => onNewInTask(task.key, 'shell') },
-      { key: 'cc', icon: <AgentLogo kind="claude" size={14} />, label: t('tabs.newClaude'), onClick: () => onNewInTask(task.key, 'claude') },
-      { key: 'cx', icon: <AgentLogo kind="codex" size={14} />, label: t('tabs.newCodex'), onClick: () => onNewInTask(task.key, 'codex') },
-      { key: 'pi', icon: <AgentLogo kind="pi" size={14} />, label: t('tabs.newPi'), onClick: () => onNewInTask(task.key, 'pi') },
-      { key: 'oc', icon: <AgentLogo kind="opencode" size={14} />, label: t('tabs.newOpenCode'), onClick: () => onNewInTask(task.key, 'opencode') },
+      { key: 'sh', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: () => onNewInTask(task.key, 'shell', parent) },
+      { key: 'cc', icon: <AgentLogo kind="claude" size={14} />, label: t('tabs.newClaude'), onClick: () => onNewInTask(task.key, 'claude', parent) },
+      { key: 'cx', icon: <AgentLogo kind="codex" size={14} />, label: t('tabs.newCodex'), onClick: () => onNewInTask(task.key, 'codex', parent) },
+      { key: 'pi', icon: <AgentLogo kind="pi" size={14} />, label: t('tabs.newPi'), onClick: () => onNewInTask(task.key, 'pi', parent) },
+      { key: 'oc', icon: <AgentLogo kind="opencode" size={14} />, label: t('tabs.newOpenCode'), onClick: () => onNewInTask(task.key, 'opencode', parent) },
     ] }] : []
   const killSession = (s: TreeSession) => onKill
     ? [{ type: 'divider' as const }, { key: 'kill', icon: <CloseIcon size={14} />, label: t('tree.menu.close'), danger: true, onClick: () => onKill(s.name) }] : []
   const finishTask = (task: TreeTask) => onFinishTask && !task.main
     ? [{ type: 'divider' as const }, { key: 'finish', icon: <ArchiveIcon size={14} />, label: t('tree.menu.finish'), danger: true, onClick: () => onFinishTask(task) }] : []
 
-  const sessionMenu = (task: TaskKey, s: TreeSession) => ({ items: [openItem(task, s), ...renameSession(s), ...killSession(s)] })
+  const sessionMenu = (task: TaskKey, s: TreeSession) => ({ items: [openItem(task, s), ...renameSession(s), ...(tasks.has(task) ? derive(tasks.get(task)!, s.name) : []), ...killSession(s)] })
   const taskMenu = (task: TreeTask) => ({ items: [...renameTask(task), ...derive(task), ...finishTask(task)] })
 
   /**
@@ -105,7 +107,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
   const soleMenu = (task: TreeTask, s: TreeSession) => ({ items: [
     openItem(task.key, s),
     ...renameSession(s),
-    ...derive(task),
+    ...derive(task, s.name),
     ...(onKill ? killSession(s) : finishTask(task)),
   ] })
 
@@ -113,14 +115,17 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
   // 它自己的会话名是一串 id（<被审id>-review），照原样印出来没人认得出这是什么。
   const rowLabel = (s: TreeSession) => (s.reviewOf ? t('tree.reviewOf', { name: s.reviewOf }) : s.label)
 
-  const sessionRow = (task: TaskKey, s: TreeSession, showTime = true) => (
+  const sessionRow = (task: TaskKey, s: TreeSession, showTime = true, workspace?: string) => (
     <Dropdown key={s.name} trigger={['contextMenu']} menu={sessionMenu(task, s)}>
       <button type="button"
-        className={`tt-nav-item tt-tree-row${activeTask === task && activeSession === s.name ? ' on' : ''}${s.dormant ? ' dormant' : ''}${s.reviewOf ? ' review' : ''}`}
+        className={`tt-nav-item tt-tree-row${activeTask === task && activeSession === s.name ? ' on' : ''}${s.dormant ? ' dormant' : ''}`}
         onClick={() => onSession(task, s.name)} title={s.dormant ? t('session.dormant.hint') : s.name} onDoubleClick={onRename ? () => onRename(s.name) : undefined}
         aria-current={activeTask === task && activeSession === s.name ? 'true' : undefined}>
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
-        <span className="nm">{rowLabel(s)}</span>
+        <span className="session-title">
+          <span className="nm">{rowLabel(s)}</span>
+          {workspace && <span className="lineage-origin">{t('tree.workspaceName', { name: workspace })}</span>}
+        </span>
         {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, t(s.waiting ? 'mobile.st.waiting' : 'mobile.st.running'))}
         {showTime && !s.dormant && s.at ? <span className="tm">{ago(s.at, t)}</span> : null}
       </button>
@@ -166,13 +171,24 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     </Dropdown>
   )
 
-  // 会话直接列出，项目行统一控制折叠。
-  const taskRows = (task: TreeTask, projName?: string) => {
+  const branchRows = (branch: SessionBranch, anchor: TreeTask | null, showTime: boolean): ReactNode => (
+    <div key={branch.session.name} className="tt-tree-session-branch">
+      {sessionRow(branch.task?.key || taskKeyOf(branch.session.name), branch.session, showTime,
+        branch.task && branch.task.key !== anchor?.key ? branch.task.name : undefined)}
+      {branch.children.length > 0 && <div className="tt-tree-children" role="group" aria-label={t('session.fork.childOf', { parent: branch.session.label })}>{branch.children.map(child => branchRows(child, anchor, showTime))}</div>}
+    </div>
+  )
+
+  const taskRows = (task: TreeTask, branches: SessionBranch[], projName?: string) => {
+    if (!branches.length) return null
     const on = activeTask === task.key
     const hasActive = task.sessions.some((s) => s.name === activeSession)
     const own = task.sessions.filter((x) => !x.reviewOf) // 互审是附属，不算「这个任务有几个会话」
     const sole = own.length === 1 && task.sessions.length === 1 && own[0].label === task.name ? own[0] : null
-    if (sole) return <div key={task.key} className={`tt-tree-task${on ? ' on' : ''}`}>{soleRow(task, sole)}</div>
+    if (sole) return <div key={task.key} className={`tt-tree-task${on ? ' on' : ''}`}>
+      {soleRow(task, sole)}
+      {branches[0].children.length > 0 && <div className="tt-tree-sessions tt-tree-children" role="group" aria-label={t('session.fork.childOf', { parent: sole.label })}>{branches[0].children.map(child => branchRows(child, task, false))}</div>}
+    </div>
     // 「项目目录」这张兜底卡（非 git 项目的会话都挂在这儿）跟项目行同名：
     // 头行再印一遍项目名是纯噪音——项目行本来就在它上面一行。只画会话，
     // 派生/收尾这些动作项目行的 ⋯ 里都有。
@@ -180,7 +196,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
     return (
       <div key={task.key} className={`tt-tree-task${bare ? '' : ' grouped'}${on ? ' on' : ''}`} role="group" aria-label={t('tree.workspaceName', { name: task.name })}>
         {!bare && taskHead(task, taskBadge(task), on && !hasActive)}
-        <div className="tt-tree-sessions">{task.sessions.map((s) => sessionRow(task.key, s, bare))}</div>
+        <div className="tt-tree-sessions">{branches.map(branch => branchRows(branch, task, bare))}</div>
       </div>
     )
   }
@@ -208,6 +224,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
         // 项目下只列**有会话的任务**。没会话的 worktree（待收尾 / 空闲）不进树：它们是 worktree
         // 不是活着的任务，用户记不住也不该在这里管——待收尾的数量在项目行徽标上，处理去右栏
         // Worktree 面板或项目主页
+        const branches = sessionBranches(p.tasks.flatMap(task => task.sessions.map(session => ({ session, task }))))
         const live = p.tasks.filter((x) => x.sessions.length > 0)
         const idle = p.tasks.filter((x) => x.sessions.length === 0)
         return (
@@ -238,7 +255,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
             </button>
             {open && (
               <>
-                {live.map((x) => taskRows(x, p.name))}
+                {live.map((x) => taskRows(x, branches.filter(branch => branch.task?.key === x.key), p.name))}
                 {showIdle.has(p.key) && idle.map((x) => idleCard(x))}
               </>
             )}
@@ -249,7 +266,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onTask
       {tree.loose.length > 0 && (
         <div className="tt-tree-proj loose">
           <div className="gl">{t('tree.loose')}</div>
-          {tree.loose.map((s) => sessionRow(taskKeyOf(s.name), s))}
+          {sessionBranches(tree.loose.map(session => ({ session, task: null }))).map(branch => branchRows(branch, null, true))}
         </div>
       )}
 

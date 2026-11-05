@@ -1,6 +1,4 @@
-// 开工简报：新会话里 agent 收到的第一条消息 =「开工前先做几件事」+ 任务本体。
-//
-// 用一级任务标题分开能力说明和用户任务，避免被读成前面步骤的续文。
+// 任务原文置顶，工作区准备与能力说明随后补充。
 
 import { api } from '../../api'
 import { nodeApi } from '../cluster/node-url'
@@ -35,12 +33,13 @@ export async function loadAgentCapabilities(): Promise<string> {
 
 export function taskWithCapabilities(task: string, t: T, capabilities: string): string {
   const guide = capabilities.trim()
-  return `${guide ? `${guide}\n\n` : ''}${t('session.wt.briefTask')}\n\n${task.trim()}`
+  return `${t('session.wt.briefTask')}\n\n${task.trim()}${guide ? `\n\n${guide}` : ''}`
 }
 
-/** 完整简报：前言、能力说明、任务原文。任务为空返回空串。 */
+/** 任务为空不发送准备事项或能力说明。 */
 export function kickoffBrief(where: BriefWhere, sess: string, autoReview: boolean, task: string, t: T, capabilities = ''): string {
   const body = task.trim()
   if (!body) return ''
-  return `${briefPreamble(where, sess, autoReview, t)}\n\n${taskWithCapabilities(body, t, capabilities)}`
+  const instructions = `${t('session.wt.briefSetup')}\n\n${briefPreamble(where, sess, autoReview, t)}`
+  return taskWithCapabilities(body, t, [instructions, capabilities.trim()].filter(Boolean).join('\n\n'))
 }

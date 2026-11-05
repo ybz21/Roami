@@ -219,3 +219,12 @@ it('worktree 已经安置过的不重复挂一遍', () => {
   expect(proj.tasks[0].path).toBe('/repo/.worktrees/a')
   expect(proj.tasks[0].sessions).toHaveLength(1)
 })
+
+it('keeps recorded parents through dormant worktree enrichment', () => {
+  const tree = buildTaskTree({
+    projects: [{ key: 'x', name: 'X', dir: '/x', git: true }],
+    worktrees: { x: [{ path: '/x', branch: 'main', isMain: true, sessions: [{ session: 'parent' }, { session: 'child', dormant: true }] }] },
+    sessions: [{ name: 'parent', label: 'RSI' }, { name: 'child', label: '回归', parent: 'parent' }],
+  })
+  expect(tree.projects[0].tasks[0].sessions[1].parent).toBe('parent')
+})

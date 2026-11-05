@@ -207,7 +207,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
                 onRename={projectActions.renameSession}
                 onRenameTask={projectActions.renameTask}
                 onNewTask={projectActions.newTask} onKill={projectActions.kill} onFinishTask={finishTask}
-                onNewInTask={(key, kind) => { void newTerminalInTask(kind, key) }}
+                onNewInTask={(key, kind, parent) => { void newTerminalInTask(kind, key, parent) }}
                 onRemoveProject={projectActions.removeProject} />}
               hubAlarm={hubHealth.level === 'ok' ? undefined : hubReasonText(hubHealth, t)}
               node={curNode ? {

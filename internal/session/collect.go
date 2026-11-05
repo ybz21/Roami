@@ -100,7 +100,7 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 			}
 		}
 	}
-	return appendDormant(live, meta, exclude)
+	return attachLineage(appendDormant(live, meta, exclude), meta)
 }
 
 // memSample 一个会话此刻的内存画像。
@@ -230,6 +230,29 @@ func appendDormant(sessions []sessionInfo, meta *sessmeta.Store, exclude map[str
 			CreatedBy: r.CreatedBy,
 			Parent:    r.Parent,
 		})
+	}
+	return sessions
+}
+
+// Reuse the collected session set to avoid an extra tmux scan for parent links.
+func attachLineage(sessions []sessionInfo, meta *sessmeta.Store) []sessionInfo {
+	if meta == nil {
+		return sessions
+	}
+	rows := meta.Lineage()
+	present := make(map[string]bool, len(sessions))
+	for _, session := range sessions {
+		present[session.Name] = true
+	}
+	for i := range sessions {
+		session := &sessions[i]
+		if row, ok := rows[session.Name]; ok {
+			session.Parent = row.Parent
+			session.CreatedBy = row.CreatedBy
+		}
+		if session.Parent == session.Name || !present[session.Parent] {
+			session.Parent = ""
+		}
 	}
 	return sessions
 }

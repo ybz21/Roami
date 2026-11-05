@@ -638,6 +638,10 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-tree-row .workspace-meta { color: var(--text-dim); font-size: var(--fs-meta); line-height: 1.4; }
 /* 连接线只用于显式工作区分组，主目录的平铺会话保持原层级。 */
 .tt-tree-task.grouped > .tt-tree-sessions { margin-left: calc(var(--sp-3) + var(--sp-2)); padding-left: var(--sp-2); border-left: 1px solid var(--border-subtle); }
+.tt-tree-children { margin-left: var(--sp-3); padding-left: var(--sp-2); border-left: 1px solid var(--border-subtle); }
+.tt-tree-task > .tt-tree-children { margin-left: calc(var(--sp-3) + var(--sp-2)); }
+.tt-tree-row .session-title { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.tt-tree-row .lineage-origin { color: var(--text-dim); font-size: var(--fs-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 /* 头行右端的分支状态图标（Orca 卡片右上角那枚）：颜色说状态，悬停看分支和数字 */
 .wtst { flex: 0 0 auto; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
@@ -668,9 +672,6 @@ html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 .tt-tree-sessions .tt-tree-row .nm { color: var(--text-dim); font-size: var(--fs-sm); font-weight: 400; }
 /* 休眠会话（重启带走、点开即在原目录重开）：整行淡一档 */
 .tt-tree-row.dormant .ic, .tt-tree-row.dormant .nm { opacity: .55; }
-/* 互审陪跑：缩进半格挂在被审那条下面，字弱一档——它是附属，不是并列的另一个会话 */
-.tt-tree-sessions .tt-tree-row.review { padding-left: calc(var(--sp-3) * 2); }
-.tt-tree-sessions .tt-tree-row.review .nm { color: var(--text-dimmer); }
 .tt-tree-sessions .tt-tree-row.on .nm { color: var(--text-bright); }
 :where(html[data-pointer="fine"]) .tt-tree-sessions .tt-tree-row:hover .nm { color: var(--text-bright); }
 /* 行尾时间在会话行和单会话任务卡头行都出现：不许收缩、不许折行——名字一长「刚刚」会被挤成竖排两个字 */
