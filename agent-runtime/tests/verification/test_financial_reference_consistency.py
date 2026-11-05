@@ -48,9 +48,11 @@ def test_inconsistent_annotations_are_excluded_before_sampling_without_rewriting
         assert case["judge"]["expected"] == expected[case["origin"]["task_id"]]
         assert "hidden_reference_program" not in json.dumps(agent_view(case, tmp_path))
         assert "0.0001" in case["prompt"]
-        assert case["origin"]["adapter_revision"] == "financial-numeric-v2-consistent-reference"
+        assert "keep the unit of the source figures relevant to the question" in case["prompt"]
+        assert "unrelated table" in case["prompt"]
+        assert case["origin"]["adapter_revision"] == "financial-numeric-v3-source-units"
     assert path.read_bytes() == before
-    assert suite["id"] == "finqa-sample-v2"
+    assert suite["id"] == "finqa-sample-v3"
     assert (
         import_finqa(path, revision="a" * 40, source_split="dev", count=3)["content_hash"]
         == suite["content_hash"]
