@@ -10,7 +10,7 @@ INPUTS = {
     "write": ("path content", "path content"),
     "edit": ("path oldText newText", "path oldText newText"),
     "tool_list": ("query kind offset", ""),
-    "delegate": ("goal executor directory projectId sessionId fromMessageId", "goal"),
+    "delegate": ("goal title executor directory projectId sessionId fromMessageId", "goal"),
     "ask_user": ("prompt options", "prompt"),
     "reply": ("text json", ""),
     "task_reply": ("taskId", "taskId"),

@@ -124,3 +124,40 @@ async def test_question_still_ends_the_turn_without_a_reply(store):
         assert model.calls == 1
     finally:
         await runtime.close()
+
+
+async def test_accepting_reviewer_cannot_publish_unsubmitted_markup(store):
+    from roami_agent.replies.source_review import REVIEW_INSTRUCTIONS
+
+    value = {"label": "original text", "enabled": False}
+
+    class AcceptingReviewer(ReplyModel):
+        def __init__(self):
+            super().__init__(["<reply>invalid transport</reply>", ("reply", {"json": value})])
+            self.reviews, self.readings = 0, 0
+
+        async def stream(self, messages, tools):
+            if messages[0]["content"] == REVIEW_INSTRUCTIONS:
+                self.reviews += 1
+                yield ModelEvent(
+                    "tool", call("source_review_verdict", {"accepted": True, "feedback": ""})
+                )
+            elif not tools:
+                self.readings += 1
+                yield ModelEvent("text", json.dumps(value))
+            else:
+                async for part in super().stream(messages, tools):
+                    yield part
+
+    model = AcceptingReviewer()
+    runtime = Runtime(store, model, review_replies=True, require_final_tool=True)
+    try:
+        turn = await claimed_turn(runtime)
+        assert json.loads(await runtime.loop.run(turn, "main")) == value
+        assert model.calls == 2 and model.reviews == model.readings == 1
+        events = await runtime.conversations.events("alice", turn["conversation_id"])
+        assert [e["payload"]["text"] for e in events if e["kind"] == "message.delta"] == [
+            json.dumps(value, ensure_ascii=False)
+        ]
+    finally:
+        await runtime.close()
