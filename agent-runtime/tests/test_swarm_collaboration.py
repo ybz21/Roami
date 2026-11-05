@@ -1309,8 +1309,30 @@ async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, 
                 },
                 binding={"turnId": origin["turnId"]},
             )
-            await plan(swarms, created, [item("original")])
-            await advance(swarms, created)
+            task = await tasks.create(
+                "alice",
+                main["id"],
+                "Implement original",
+                key="legacy-task",
+                executor="codex",
+                origin_message_id=origin["messageId"],
+            )
+            await database.call(
+                lambda db: db.execute(
+                    "INSERT INTO swarm_work_items(id,swarm_id,member_name,executor,title,goal,acceptance,task_id) VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        "legacy-work",
+                        created["id"],
+                        "original",
+                        "codex",
+                        "Original",
+                        "Implement original",
+                        "Check outputs",
+                        task["id"],
+                    ),
+                ),
+                write=True,
+            )
             work = await database.call(
                 lambda db: row(
                     db, "SELECT * FROM swarm_work_items WHERE swarm_id=?", (created["id"],)

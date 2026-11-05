@@ -108,7 +108,7 @@ class SwarmPlans:
                 goal
                 + "\n\nSwarm collaboration ID: "
                 + result["id"]
-                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_plan and swarm_status using tool_list. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. For later rounds reuse the existing named member and task via task_steer; never append r2/r3 members to replace its conversation. task_steer forwards the current user request and records it in the group/member thread. swarm_post only writes discussion; it does not deliver work. Use session_send only for a verified unrelated legacy session with its durable reply channel. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
+                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_members_register, swarm_plan and swarm_status using tool_list. Register genuine long-lived roles first, then assign work with their stable memberId. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. For later rounds reuse the existing named member and task via task_steer; never append r2/r3 members to replace its conversation. task_steer forwards the current user request and records it in the group/member thread. swarm_post only writes discussion; it does not deliver work. Use session_send only for a verified unrelated legacy session with its durable reply channel. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
                 + " Use the exact registered CLI command and input schema returned by tool_list or roami swarm help. Submit each managed command alone: no cd prefix, shell chaining or pipes; the host binds the execution context. Never probe a write operation with placeholder goals or acceptance criteria. Planning dispatches real tasks, so every item must carry its complete actual instructions and acceptance before submission."
             )
             start = await self.conversations.accept(
@@ -150,6 +150,63 @@ class SwarmPlans:
         if include_memory:
             value["teamMemory"] = await self.memory_read(owner, sid)
         return value
+
+    async def register_members(self, owner, sid, spec):
+        items = spec.get("members")
+        if not isinstance(items, list) or not items or len(items) > 100:
+            raise DomainError("INVALID_SWARM_MEMBERS")
+
+        def write(db):
+            def apply():
+                value = group(db, owner, sid)
+                self.mutable(value, spec)
+                from roami_agent.storage.swarm_members import member_for_plan
+
+                result = []
+                for item in items:
+                    if not isinstance(item, dict):
+                        raise DomainError("INVALID_SWARM_MEMBER")
+                    member = member_for_plan(
+                        db, value, item.get("name"), item.get("executor"), item.get("duty")
+                    )
+                    if member["duty"] != item["duty"].strip():
+                        raise DomainError("SWARM_MEMBER_DUTY_CONFLICT", 409)
+                    result.append(member)
+                db.execute(
+                    "UPDATE swarm_groups SET revision=revision+1,member_protocol=1 WHERE id=?",
+                    (sid,),
+                )
+                value["revision"] += 1
+                changed(db, value, "swarm.members_changed")
+                return {"id": sid, "revision": value["revision"], "members": result}
+
+            return receipt(db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply)
+
+        async with self.lock(sid):
+            return await self.db.call(write, write=True)
+
+    async def member(self, owner, sid, member_id, *, before=None, limit=20):
+        if (
+            type(limit) is not int
+            or not 1 <= limit <= 50
+            or before is not None
+            and (type(before) is not int or before < 1)
+        ):
+            raise DomainError("INVALID_SWARM_MEMBER_PAGE")
+
+        def read(db):
+            info = snapshot(db, owner, sid)
+            member = next((item for item in info["members"] if item["id"] == member_id), None)
+            if not member:
+                raise DomainError("SWARM_MEMBER_NOT_FOUND", 404)
+            member["duty"] = row(db, "SELECT duty FROM swarm_members WHERE id=?", (member_id,))[
+                "duty"
+            ]
+            from roami_agent.storage.swarm_members import round_page
+
+            return {"member": member, "rounds": round_page(db, owner, member_id, before, limit)}
+
+        return await self.db.call(read)
 
     async def memory_read(self, owner, sid):
         from roami_agent.storage.swarm_memory import read_memory
@@ -231,6 +288,19 @@ class SwarmPlans:
                         or len(item["acceptance"]) > 8000
                     ):
                         raise DomainError("INVALID_SWARM_MEMBER")
+                    from roami_agent.storage.swarm_members import member_for_plan
+
+                    if value["member_protocol"] and not item.get("memberId"):
+                        raise DomainError("SWARM_MEMBER_ID_REQUIRED", 409)
+                    member = member_for_plan(
+                        db, value, name, item["executor"], item["title"], item.get("memberId")
+                    )
+                    if row(
+                        db,
+                        "SELECT work_id FROM swarm_member_work WHERE member_id=?",
+                        (member["id"],),
+                    ):
+                        raise DomainError("INVALID_SWARM_MEMBER")
                     ident = identity()
                     by_name[name] = ident
                     db.execute(
@@ -246,6 +316,11 @@ class SwarmPlans:
                             int(item.get("integration") is True),
                             encoded(item.get("deliverables", [])),
                         ),
+                    )
+                    db.execute("INSERT INTO swarm_member_work VALUES(?,?)", (member["id"], ident))
+                    db.execute(
+                        "UPDATE swarm_members SET current_work_id=? WHERE id=?",
+                        (ident, member["id"]),
                     )
                 for item in items:
                     dependencies = list(item.get("dependencies", []))
@@ -575,6 +650,15 @@ class SwarmPlans:
                             "UPDATE swarm_work_items SET task_id=? WHERE id=?",
                             (task["id"], item["id"]),
                         )
+                        from roami_agent.storage.swarm_members import record_round
+
+                        record_round(
+                            db,
+                            task["id"],
+                            task["revision"],
+                            task["origin_message_id"],
+                            json.loads(task["intent_json"])["goal"],
+                        )
                         changed(db, info, "swarm.assigned")
 
                     await self.db.call(bind, write=True)
@@ -649,7 +733,10 @@ class SwarmPlans:
                 db.execute(
                     "UPDATE swarm_work_items SET dispatch_error=NULL WHERE id=?", (work["id"],)
                 )
-                db.execute("UPDATE swarm_groups SET revision=revision+1 WHERE id=?", (sid,))
+                db.execute(
+                    "UPDATE swarm_groups SET revision=revision+1,member_protocol=1 WHERE id=?",
+                    (sid,),
+                )
                 value["revision"] += 1
                 changed(db, value, "swarm.dependencies_changed")
                 enqueue(db, sid, identity())

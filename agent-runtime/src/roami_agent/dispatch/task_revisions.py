@@ -501,6 +501,15 @@ class TaskRevisions:
                     "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) VALUES(?,'task.run',?,?,?,'queued',?)",
                     (identity(), task["id"], "run:" + rid, encoded({"runId": rid}), now_ms()),
                 )
+                from roami_agent.storage.swarm_members import record_round
+
+                record_round(
+                    db,
+                    task["id"],
+                    revision,
+                    payload["messageId"],
+                    payload.get("executionText", payload["text"]),
+                )
                 payload.update(status="applied", appliedRevision=revision, runId=rid)
                 db.execute(
                     "UPDATE jobs SET state='done',payload_json=? WHERE id=?",

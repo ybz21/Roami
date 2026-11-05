@@ -39,6 +39,7 @@ class MemorySwarm(Payload):
 
 
 class WorkSpec(Payload):
+    memberId: str | None = Field(default=None, min_length=1, max_length=200)
     member: str = Field(min_length=1, max_length=80)
     executor: Literal["native", "codex", "claude", "opencode", "pi"]
     title: str = Field(min_length=1, max_length=80)
@@ -47,6 +48,18 @@ class WorkSpec(Payload):
     integration: bool = False
     deliverables: list[DeliverableSpec] = Field(default_factory=list, max_length=30)
     dependencies: list[DependencySpec] = Field(default_factory=list, max_length=100)
+
+
+class RoleSpec(Payload):
+    name: str = Field(min_length=1, max_length=80)
+    executor: Literal["native", "codex", "claude", "opencode", "pi"]
+    duty: str = Field(min_length=1, max_length=8000)
+
+
+class RegisterMembers(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    expectedRevision: int = Field(ge=1)
+    members: list[RoleSpec] = Field(min_length=1, max_length=100)
 
 
 class PlanSwarm(Payload):
@@ -93,6 +106,27 @@ def mount_swarm_routes(app, runtime):
     @app.get("/v1/swarms/{sid}")
     async def swarm_snapshot(sid: str, owner: Owner):
         return {"data": await runtime.swarms.snapshot(owner, sid)}
+
+    @app.get("/v1/swarms/{sid}/members")
+    async def members(sid: str, owner: Owner):
+        value = await runtime.swarms.snapshot(owner, sid, include_memory=False)
+        return {"data": value["members"]}
+
+    @app.post("/v1/swarms/{sid}/members")
+    async def register_members(sid: str, body: RegisterMembers, owner: Owner):
+        return {"data": await runtime.swarms.register_members(owner, sid, body.model_dump())}
+
+    @app.get("/v1/swarms/{sid}/members/{member_id}")
+    async def member(
+        sid: str,
+        member_id: str,
+        owner: Owner,
+        before: int | None = Query(None, ge=1),
+        limit: int = Query(20, ge=1, le=50),
+    ):
+        return {
+            "data": await runtime.swarms.member(owner, sid, member_id, before=before, limit=limit)
+        }
 
     @app.post("/v1/swarms/{sid}/plan")
     async def swarm_plan(sid: str, body: PlanSwarm, owner: Owner):
