@@ -59,3 +59,9 @@ html[data-pointer="coarse"] :is(.native-session,.native-session-confirm) .ant-bt
 html[data-pointer="coarse"] .native-session-meta > a { position:relative; }
 html[data-pointer="coarse"] .native-session-meta > a::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
 .native-session-messages .cc-msg .agent-collapsed-message .tt-act { color:inherit; }
+
+.native-project-entry { display:flex; align-items:center; border-bottom:1px solid var(--border-subtle); }
+.native-project-entry > .native-project-session { flex:1; min-width:0; }
+.native-project-entry .tt-msess-row.native-project-session { border-bottom:0; }
+.native-project-remove { position:relative; flex:none; display:grid; place-items:center; margin-inline:var(--sp-2); padding:var(--sp-1); }
+html[data-pointer="coarse"] .native-project-remove::after { content:''; position:absolute; top:50%; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); min-width:var(--tap); height:var(--tap); transform:translateY(-50%); }

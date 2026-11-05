@@ -3,7 +3,7 @@ import { App } from 'antd'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
-import { NewProjectModal } from './Projects'
+import Projects, { NewProjectModal } from './Projects'
 
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
@@ -13,6 +13,13 @@ beforeEach(() => {
   vi.mocked(api).mockReset().mockResolvedValue({ data: { key: 'project', dir: '/work/repo', git: true, name: 'repo' } } as any)
 })
 afterEach(() => { cleanup(); location.hash = '' })
+
+it('waits for the project identity before reading native sessions on a deep link', async () => {
+  vi.mocked(api).mockImplementation(() => new Promise(() => {}))
+  render(<App><Projects initialKey="project" openTerm={vi.fn()} closeTerm={vi.fn()} /></App>)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/projects'))
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.startsWith('/agent/native-sessions'))).toBe(false)
+})
 
 it.each([false, true])('keeps local-directory and clone workflows available with inline=%s', async inline => {
   const created = vi.fn()

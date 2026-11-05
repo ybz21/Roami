@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import AgentTasks from './AgentTasks'
 import NativeSession from './NativeSession'
 import NativeSessionArtifacts from './NativeSessionArtifacts'
 import NativeProjectSessions from './NativeProjectSessions'
-import { clearAgentDataCache } from './agent-data-cache'
+import { agentDataKey, clearAgentDataCache } from './agent-data-cache'
 import { api } from '../../api'
 
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
@@ -510,11 +510,11 @@ it('keeps the completed professional session reachable and closes it only after 
   fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.closeSession' }))
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.completeAndClose' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'agent.task.closeSession' }))
   await screen.findByText('agent.task.sessionClosed')
   expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/close-session', { revision: 1, runId: 'attempt-one' })
   expect(screen.queryByRole('button', { name: 'agent.openSession' })).toBeNull()
-  expect(screen.getByRole('button', { name: 'agent.task.continue' }).hasAttribute('disabled')).toBe(true)
+  expect(screen.queryByRole('button', { name: 'agent.task.continue' })).toBeNull()
   expect(screen.getByText('Result one')).toBeTruthy()
 })
 
@@ -665,11 +665,86 @@ it('separates native deliverables by execution and keeps task failure visible du
 
 it('opens a native project row directly without per-row detail requests', () => {
   render(<NativeProjectSessions projectId="project-a" entries={[{ nativeSessionId: 'native-list-entry', title: 'Review the delivery', taskState: 'waiting_user', createdAt: new Date().toISOString() }]} />)
-  expect(screen.getByText('agent.state.waiting_user')).toBeTruthy()
+  expect(screen.getByText('mobile.st.idle')).toBeTruthy()
   expect(screen.queryByText('agent.task.enterSession')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: /Review the delivery/ }))
   expect(decodeURIComponent(location.hash)).toContain('/native-list-entry')
   expect(api).not.toHaveBeenCalled()
+})
+
+it('removes a project session with the current task identity and keeps failures retryable', async () => {
+  const changed = vi.fn()
+  let revision = 1, fail = true
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') {
+      if (fail) throw { apiError: { code: 'TASK_REVISION_CHANGED' } }
+      return { data: { state: 'closing' } }
+    }
+    expect(path).toBe('/agent/tasks/one')
+    return { data: { ...detail('one', [], revision), task: { ...task('one', undefined, revision), nativeSession: { id: 'session-one' } } } }
+  })
+  location.hash = '#/projects'
+  render(<NativeProjectSessions projectId="project-a" entries={[{ nativeSessionId: 'session-one', taskId: 'one', title: 'Old conversation', taskState: 'waiting_user' }]} onChanged={changed} />)
+  expect(api).not.toHaveBeenCalled()
+  expect(screen.getByText('mobile.st.idle')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.removeSession' }))
+  expect(location.hash).toBe('#/projects')
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'agent.task.removeSession' }))
+  await screen.findByRole('alert')
+  expect(screen.getByText('Old conversation')).toBeTruthy()
+  expect(changed).not.toHaveBeenCalled()
+  revision = 2; fail = false
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'agent.task.removeSession' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(api).toHaveBeenLastCalledWith('POST', '/agent/tasks/one/close-session', { revision: 2, runId: 'attempt-one' })
+  expect(changed).toHaveBeenCalledOnce()
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/verify'))).toBe(false)
+})
+
+it('hides removed project sessions and disables removal while closure is pending', () => {
+  render(<NativeProjectSessions projectId="project-a" entries={[
+    { nativeSessionId: 'closed', title: 'Removed', taskState: 'waiting_user', lifecycle: 'closed' },
+    { nativeSessionId: 'closing', title: 'Closing', taskState: 'cancelled', lifecycle: 'closing' },
+  ]} />)
+  expect(screen.queryByText('Removed')).toBeNull()
+  expect(screen.getByText('agent.task.sessionClosing')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'agent.task.removeSession' }).hasAttribute('disabled')).toBe(true)
+})
+
+it.each([false, true])('accepts a retained task independently of session closure (%s)', async closed => {
+  const waiting = { ...task('one'), state: 'waiting_user', nativeSession: { id: 'native-one' }, sessionClosure: closed ? { state: 'closed' } : null }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') return { data: {} }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: waiting, sessionClosure: waiting.sessionClosure } }
+  })
+  render(<AgentTasks selectedTask="one" cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.task.accept' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/verify', { accepted: true, revision: 1, runId: 'attempt-one' }))
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/close-session'))).toBe(false)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  if (closed) expect(screen.getByRole('button', { name: 'agent.task.sessionRecord' })).toBeTruthy()
+})
+
+it('keeps a removed native session and its unsent draft readable without a composer or periodic requests', async () => {
+  localStorage.setItem('roami.native.draft.' + agentDataKey('/agent/native-sessions/native-one/conversation'), 'Keep my unsent draft')
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/native-sessions/native-one') return { data: { nativeSessionId: 'native-one', taskId: 'one' } }
+    if (path.endsWith('/conversation')) return { data: { messages: [{ id: 'm', role: 'assistant', seq: 1, content: { text: 'Preserved result' } }], before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: { ...task('one'), state: 'waiting_user' }, sessionClosure: { state: 'closed' } } }
+  })
+  render(<NativeSession id="native-one" node={null} projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Preserved result')
+  expect(screen.getByText('Keep my unsent draft')).toBeTruthy()
+  expect(screen.getByText('agent.state.waiting_user')).toBeTruthy()
+  expect(screen.queryByRole('textbox')).toBeNull()
+  const calls = vi.mocked(api).mock.calls.length
+  await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+  expect(api).toHaveBeenCalledTimes(calls)
 })
 
 
@@ -724,7 +799,7 @@ it('accepts closing a running session and shows asynchronous cleanup failures wi
   const view = render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
   fireEvent.click(await screen.findByRole('button', { name: 'agent.task.closeSession' }))
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.completeAndClose' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'agent.task.closeSession' }))
   await screen.findByText('agent.task.sessionClosing')
   expect(screen.getByRole('button', { name: 'agent.task.closeSession' }).hasAttribute('disabled')).toBe(true)
   view.unmount(); clearAgentDataCache(); phase = 'failed'

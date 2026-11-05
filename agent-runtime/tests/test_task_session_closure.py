@@ -24,11 +24,11 @@ async def prepare(store):
             calls.append(args)
             return {"state": "closed", "session": "original-session"}
 
-    service = TaskSessions(store, Executor(), runtime.dispatch.confirm)
+    service = TaskSessions(store, Executor())
     return runtime, task, run, calls, service
 
 
-async def test_explicit_close_accepts_waiting_result_and_preserves_history(store):
+async def test_explicit_close_preserves_waiting_result_and_history(store):
     runtime, task, run, calls, service = await prepare(store)
     try:
         assert not calls
@@ -39,7 +39,8 @@ async def test_explicit_close_accepts_waiting_result_and_preserves_history(store
         ) == 1
         detail = await runtime.tasks.get("alice", task["id"])
         assert (
-            detail["sessionClosure"]["state"] == "closed" and detail["task"]["state"] == "succeeded"
+            detail["sessionClosure"]["state"] == "closed"
+            and detail["task"]["state"] == "waiting_user"
         )
         assert detail["attempts"][0]["result"]["summary"] == "Design files exist"
         assert not await store.call(
@@ -142,22 +143,15 @@ async def test_unresolved_old_execution_cannot_be_closed_as_verified_completion(
         await runtime.close()
 
 
-async def test_retry_after_acceptance_failure_does_not_close_the_professional_session_twice(store):
+async def test_acceptance_is_independent_after_session_removal(store):
     runtime, task, run, calls, service = await prepare(store)
-    original = service.confirm
-
-    async def unavailable(*args, **kwargs):
-        raise DomainError("INJECTED_ACCEPTANCE_FAILURE", 503)
-
-    service.confirm = unavailable
     try:
-        with pytest.raises(DomainError, match="INJECTED_ACCEPTANCE_FAILURE"):
-            await service.close("alice", task["id"], 1, run["id"])
-        assert len(calls) == 1
-        service.confirm = original
+        await service.close("alice", task["id"], 1, run["id"])
+        assert (await runtime.tasks.get("alice", task["id"]))["task"]["state"] == "waiting_user"
+        await runtime.dispatch.confirm("alice", task["id"], True, revision=1, run_id=run["id"])
+        assert (await runtime.tasks.get("alice", task["id"]))["task"]["state"] == "succeeded"
         await service.close("alice", task["id"], 1, run["id"])
         assert len(calls) == 1
-        assert (await runtime.tasks.get("alice", task["id"]))["task"]["state"] == "succeeded"
     finally:
         await runtime.close()
 
@@ -179,38 +173,38 @@ async def test_queued_close_survives_a_new_service_and_fences_continuations(stor
         assert not calls
         with pytest.raises(DomainError, match="TASK_SESSION_CLOSING"):
             await runtime.tasks.revisions.request("alice", task["id"], "racing edit", 1, "racing")
-        recovered = TaskSessions(store, service.executor, runtime.dispatch.confirm)
+        recovered = TaskSessions(store, service.executor)
         await recovered.advance(await close_job(store, task["id"]))
         detail = await runtime.tasks.get("alice", task["id"])
         assert detail["sessionClosure"]["state"] == "closed"
-        assert detail["task"]["state"] == "succeeded"
+        assert detail["task"]["state"] == "waiting_user"
         assert len(calls) == 1
         assert (await close_job(store, task["id"]))["state"] == "done"
     finally:
         await runtime.close()
 
 
-async def test_cleanup_failure_is_visible_and_retry_keeps_the_exact_run(store):
-    runtime, task, run, _calls, service = await prepare(store)
-    cleaned = []
-
-    async def cleanup(task, run):
-        cleaned.append(run["id"])
-        if len(cleaned) == 1:
-            raise DomainError("WORKTREE_DIRTY", 409)
-
-    service.cleanup = cleanup
+@pytest.mark.parametrize(
+    "state", ["succeeded", "failed", "cancelled", "interrupted", "waiting_user"]
+)
+async def test_close_preserves_task_state_and_never_cleans_workspace(store, state):
+    runtime, task, run, calls, service = await prepare(store)
+    workspace = store.data_root / "retained-workspace"
+    workspace.mkdir()
+    draft = workspace / "uncommitted.txt"
+    draft.write_text("keep this draft")
     try:
+        await store.call(
+            lambda db: db.execute("UPDATE tasks SET state=? WHERE id=?", (state, task["id"])),
+            write=True,
+        )
         await service.request("alice", task["id"], 1, run["id"])
         await service.advance(await close_job(store, task["id"]))
         detail = await runtime.tasks.get("alice", task["id"])
-        assert detail["sessionClosure"]["state"] == "failed"
-        assert detail["sessionClosure"]["error_code"] == "WORKTREE_DIRTY"
-        assert detail["task"]["state"] == "waiting_user"
-        await service.request("alice", task["id"], 1, run["id"])
-        await service.advance(await close_job(store, task["id"]))
-        assert (await runtime.tasks.get("alice", task["id"]))["sessionClosure"]["state"] == "closed"
-        assert cleaned == [run["id"], run["id"]]
+        assert detail["sessionClosure"]["state"] == "closed"
+        assert detail["task"]["state"] == state
+        assert calls == [("close", "--key", run["launch_id"])]
+        assert draft.read_text() == "keep this draft"
     finally:
         await runtime.close()
 
@@ -328,6 +322,6 @@ async def test_close_request_finishes_waiting_child_sessions_before_the_parent(s
         for ident in (child["id"], task["id"]):
             detail = await runtime.tasks.get("alice", ident)
             assert detail["sessionClosure"]["state"] == "closed"
-            assert detail["task"]["state"] == "succeeded"
+            assert detail["task"]["state"] == "waiting_user"
     finally:
         await runtime.close()

@@ -53,6 +53,45 @@ async def test_native_identity_is_separate_from_main_and_idempotent(store):
         await service.get("bob", session["id"])
 
 
+@pytest.mark.parametrize("state", ["waiting_user", "succeeded", "failed"])
+async def test_removal_hides_only_session_and_retains_task_and_transcript(store, state):
+    from roami_agent.dispatch.task_sessions import TaskSessions
+
+    service, session, main, task = await native(store)
+
+    def complete(db):
+        db.execute("UPDATE tasks SET state=? WHERE id=?", (state, task["id"]))
+        db.execute(
+            "UPDATE task_attempts SET state='succeeded',finished_ms=1,result_json=? WHERE task_id=?",
+            (json.dumps({"summary": "Retained delivery"}), task["id"]),
+        )
+        message(
+            db,
+            session["conversation_id"],
+            session["branch_id"],
+            "assistant",
+            {"text": "Saved answer"},
+        )
+        return row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+
+    run = await store.call(complete, write=True)
+    await service.flush()
+    before = await service.conversation("alice", session["id"])
+    assert [entry["nativeSessionId"] for entry in await service.list("alice")] == [session["id"]]
+    await TaskSessions(store, None).close("alice", task["id"], 1, run["id"])
+    assert await service.list("alice") == []
+    assert (await service.get("alice", session["id"]))["lifecycle"] == "closed"
+    assert await service.conversation("alice", session["id"]) == before
+    detail = await Tasks(store, Conversations(store)).get("alice", task["id"])
+    assert detail["task"]["state"] == state
+    assert detail["attempts"][0]["result"]["summary"] == "Retained delivery"
+    assert detail["task"]["nativeSession"]["id"] == session["id"]
+    assert (await Conversations(store).get("alice", main["id"]))["id"] == main["id"]
+    assert (service.root / session["id"] / ".chat.jsonl").exists()
+    with pytest.raises(DomainError, match="NATIVE_SESSION_NOT_FOUND"):
+        await service.conversation("bob", session["id"])
+
+
 async def test_append_retry_and_partial_tail_do_not_duplicate_events(store):
     service, session, _, _ = await native(store)
     entries = await store.call(
@@ -444,7 +483,7 @@ async def test_closing_parent_checks_pending_work_in_descendants(store, pending)
     async def confirm(*args, **kwargs):
         raise AssertionError("Unsettled parent must not be confirmed")
 
-    closer = TaskSessions(store, None, confirm)
+    closer = TaskSessions(store, None)
     expected = {
         "tool": "TASK_SESSION_BUSY",
         "steering": "TASK_STEER_PENDING",
@@ -484,7 +523,7 @@ async def test_native_close_database_failure_rolls_back_the_input_fence(store, m
         raise DomainError("INJECTED_DATABASE_FAILURE", 503)
 
     monkeypatch.setattr(task_sessions, "event", fail_event)
-    closer = task_sessions.TaskSessions(store, None, confirm)
+    closer = task_sessions.TaskSessions(store, None)
     with pytest.raises(DomainError, match="INJECTED_DATABASE_FAILURE"):
         await closer.close("alice", task["id"], 1, run["id"])
     assert (

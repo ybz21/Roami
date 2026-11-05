@@ -4,7 +4,8 @@ import { loadSwarmDirectory } from '../swarm/swarm-directory'
 import { swarmStateToken, type SwarmSnapshot } from '../swarm/swarm-protocol'
 import { pollWhileVisible } from '../../visible-poll'
 import { useSettingsDraft } from '../settings/settings-draft'
-import NativeProjectSessions from '../agent/NativeProjectSessions'
+import NativeProjectSessions, { type NativeProjectSession } from '../agent/NativeProjectSessions'
+import { useAgentData } from '../agent/useAgentData'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
 // 项目页（08 设计）——「项目 = 目录（git 可选），任务驱动」：
@@ -80,8 +81,8 @@ const ICON_CHEVRON = (
 
 // ── 页面级样式（一次注入；产品 token 之上只做布局/微交互）──
 const PRJ_CSS = `
-/* 左对齐不居中：全站页面统一从 tt-page 的 (16,16) 起笔，限宽只管可读性 */
-.prj-wrap{max-width:880px;margin:0;padding:0 0 32px}
+.prj-wrap{width:100%;min-width:0;margin:0;padding:0 var(--pad-page) var(--sp-5)}
+.prj-task-composer{max-width:var(--content-form)}
 /* 概览并进来之后这一页带右轨：1180 是没有右轨时定的，减掉 320 只剩一列半 */
 .prj-wrap-wide{width:100%;min-width:0;margin:0;padding:0 0 var(--sp-5);
   display:flex;flex-direction:column;gap:var(--sp-4)}
@@ -133,13 +134,13 @@ const PRJ_CSS = `
 .prj-tabs{position:sticky;top:64px;z-index:var(--z-sticky);
   display:flex;gap:2px;margin:20px 0 2px;min-height:40px;padding-inline:var(--pad-page);
   background:var(--bg-base);border-bottom:1px solid var(--border-subtle)}
-.prj-tab{padding:8px 13px 9px;font-size:13px;color:var(--text-dim);cursor:pointer;user-select:none;
-  display:inline-flex;align-items:center;gap:6px;border-bottom:2px solid transparent;margin-bottom:-1px;
+.prj-tab{padding:var(--sp-2) var(--sp-3);font:inherit;font-size:var(--fs-sm);color:var(--text-dim);cursor:pointer;user-select:none;
+  display:inline-flex;align-items:center;gap:var(--sp-2);border:0;border-bottom:2px solid transparent;background:none;margin-bottom:-1px;
   transition:color .15s}
 :where(html[data-pointer="fine"]) .prj-tab:hover{color:var(--text-bright)}
 .prj-tab.on{color:var(--text-bright);border-bottom-color:var(--accent);font-weight:600}
-.prj-tab .n{font-size:10.5px;font-family:ui-monospace,monospace;color:var(--text-dimmer);
-  background:rgba(177,186,196,.08);border-radius:999px;padding:1px 6px}
+.prj-tab .n{font-size:var(--fs-meta);font-family:ui-monospace,monospace;color:var(--text-dimmer);
+  background:var(--sel-bg);border-radius:var(--r-pill);padding:0 var(--sp-2)}
 
 .prj-sect{display:flex;align-items:center;gap:var(--sp-2);margin:var(--sp-4) 0 var(--sp-2);
   font-size:var(--fs-sm);color:var(--text-bright);font-weight:600}
@@ -812,6 +813,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const { message } = AntApp.useApp()
   const [prefs] = usePreferences()
   const [tab, setTab] = useState<'tasks' | 'wt' | 'race' | 'act' | 'files'>('tasks')
+  const native = useAgentData<NativeProjectSession[]>(proj ? '/agent/native-sessions?projectId=' + encodeURIComponent(proj.key) : null, 5000, 5000)
   const [wtsAll, setWtsAll] = useState<any[]>([])
   const [defBranch, setDefBranch] = useState('')
   const [sessions, setSessions] = useState<any[]>([])
@@ -1278,9 +1280,9 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   }
 
   const tabBtn = (k: typeof tab, label: string, n?: number) => (
-    <span key={k} className={`prj-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
-      {label}{n !== undefined && <span className="n">{n}</span>}
-    </span>
+    <button type="button" key={k} className={`prj-tab${tab === k ? ' on' : ''}`} aria-pressed={tab === k} onClick={() => setTab(k)}>
+      {label}{n !== undefined && n > 0 && <span className="n">{n}</span>}
+    </button>
   )
 
   return (
@@ -1334,13 +1336,13 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
         </div>
 
         {/* Composer（hero）：需求 ⏎ 开干——抽成 TaskComposer，项目行「+」/ ⌘N 的弹窗用同一份 */}
-        <div ref={composerRef}>
+        <div ref={composerRef} className="prj-task-composer">
           <TaskComposer ref={composerApi} dir={dir} isGit={isGit} openTerm={openTerm} onCreated={() => refresh()} />
         </div>
 
         {/* Tabs：任务 | Worktree | 编队 | 活动（非 git 只有任务）。同样 sticky，贴在项目头下面 */}
         <div className="prj-tabs prj-in" style={{ animationDelay: '110ms' }}>
-          {tabBtn('tasks', t('project.tasks'), mine.length + unfinished.length + cleanable.length + clean.length)}
+          {tabBtn('tasks', t('nav.sessions'), mine.length + (native.value?.length || 0))}
           {isGit && tabBtn('wt', 'Worktree', wts.length)}
           {isGit && tabBtn('race', t('project.tab.race'), races.length + swarms.length)}
           {isGit && tabBtn('act', t('project.tab.activity'))}
@@ -1349,8 +1351,8 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
 
         {/* ── 任务流 ── */}
         {tab === 'tasks' && (<>
-          <NativeProjectSessions projectId={proj.key} />
-          {sect(t('project.section.active'), mine.length)}
+          <NativeProjectSessions projectId={proj.key} entries={native.value || []} onChanged={native.refresh} failed={native.failed} />
+          {mine.length > 0 && sect(t('project.section.active'), mine.length)}
           {/* 分组优先级 蜂群 ⬡ > parent 树 > 平铺（08 §2.2）：成员按编队组头聚合，组头 → 蜂群台 */}
           {(() => {
             const groups = new Map<string, any[]>()
@@ -1383,7 +1385,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
               {rest.map(row)}
             </>)
           })()}
-          {mine.length === 0 && <div className="prj-empty">{t('project.noTasks')}</div>}
+          {mine.length === 0 && !native.value?.length && !native.failed && <div className="prj-empty">{t('session.empty')}</div>}
 
           {cleanable.length > 0 && (<>
             {sect(t('project.section.cleanable'), cleanable.length, 'ok')}

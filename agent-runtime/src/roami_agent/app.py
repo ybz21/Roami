@@ -33,7 +33,6 @@ from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.task_sessions import TaskSessions
-from roami_agent.dispatch.task_workspace_cleanup import TaskWorkspaceCleanup
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
@@ -269,12 +268,7 @@ class Runtime:
             self.wakeup,
             self.active,
         )
-        self.task_sessions = TaskSessions(
-            database,
-            self.executor,
-            self.dispatch.confirm,
-            cleanup=TaskWorkspaceCleanup(database, self.settings, self.tasks),
-        )
+        self.task_sessions = TaskSessions(database, self.executor)
         self.loop = AgentLoop(
             model,
             self.worker_model,

@@ -32,7 +32,7 @@ class NativeSessions:
     def _get(db, owner, ident):
         value = row(
             db,
-            "SELECT n.*,t.parent_task_id,t.target_json,t.intent_json,t.state AS task_state,t.revision,t.origin_message_id,(SELECT state FROM task_session_closures WHERE task_id=t.id) AS session_closure FROM native_sessions n JOIN tasks t ON t.id=n.task_id JOIN messages m ON m.id=t.origin_message_id JOIN conversations c ON c.id=t.origin_conversation_id WHERE n.id=? AND n.owner_id=? AND m.deleted_ms IS NULL AND c.deleted_ms IS NULL AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=n.owner_id AND o.message_id=t.origin_message_id)",
+            "SELECT n.*,t.parent_task_id,t.target_json,t.intent_json,t.state AS task_state,t.revision,t.origin_message_id,(SELECT state FROM task_session_closures WHERE task_id=t.id) AS session_closure,(SELECT error_code FROM task_session_closures WHERE task_id=t.id) AS session_close_error FROM native_sessions n JOIN tasks t ON t.id=n.task_id JOIN messages m ON m.id=t.origin_message_id JOIN conversations c ON c.id=t.origin_conversation_id WHERE n.id=? AND n.owner_id=? AND m.deleted_ms IS NULL AND c.deleted_ms IS NULL AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=n.owner_id AND o.message_id=t.origin_message_id)",
             (ident, owner),
         )
         if not value:
@@ -165,6 +165,7 @@ class NativeSessions:
             else "closing"
             if session.get("session_closure") in {"closing", "unknown"}
             else "open",
+            "closureError": session.get("session_close_error"),
             "revision": session["revision"],
             "createdAt": datetime.fromtimestamp(session["created_ms"] / 1000, UTC).isoformat(),
             "storageDirectory": str(self.root / session["id"]),
