@@ -884,7 +884,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
                     "includeResult": {
                         "type": "boolean",
-                        "description": "Return the full current-revision executor report for an explicit result/recap or raw/debug-field request; default false for progress. Use true also when earlier conversation references are needed; it restores full history. Missing fields remain unknown; never infer stop/verification flags from succeeded alone.",
+                        "description": "Return the full current-revision executor report for an explicit result/recap or raw/debug-field request; default false for progress. This adds the requested task result, not earlier conversation records; use conversation_history to restore those. Missing fields remain unknown; never infer stop/verification flags from succeeded alone.",
                     },
                 }
             ),

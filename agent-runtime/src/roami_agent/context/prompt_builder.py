@@ -221,7 +221,7 @@ class PromptBuilder:
                 lambda db: row(
                     db,
                     "SELECT id FROM tool_calls WHERE turn_id=? AND state='succeeded' AND "
-                    "(tool_name='conversation_history' OR (tool_name='task_status' AND json_extract(native_content(arguments_json),'$.includeResult')=1)) LIMIT 1",
+                    "tool_name='conversation_history' LIMIT 1",
                     (turn["id"],),
                 )
             )
@@ -250,7 +250,6 @@ class PromptBuilder:
                 )
                 plan = main_history(plan, configuration)
             if status_scope and not include_result and not history_requested:
-                # A progress read does not need historical answers; full-result reads restore them.
                 visible = plan["messages"][plan["currentTurnStart"] :]
                 current_ids = await self.db.call(
                     lambda db: [
@@ -349,7 +348,8 @@ class PromptBuilder:
                     "task_steer using taskId and new instructions for edits, additions and missing deliverables, even after completion. "
                     "Preserve the bound executor without a new quote; do not delegate into its workspace or substitute similarly named sessions. "
                     "unresolved=true requires stop evidence before continuation. For progress questions, reply with only state and essential blockers; "
-                    "do not reproduce prior reports or facts. Explicit full results or earlier conversation references use task_status includeResult=true. Query task_status "
+                    "do not reproduce prior reports or facts. Explicit full results use task_status includeResult=true; "
+                    "earlier conversation records use conversation_history. Query task_status "
                     "for missing/stale details or older tasks: " + encoded(recent_tasks)
                 )
             if not completion and not turn.get("executionRunId"):
