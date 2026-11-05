@@ -69,6 +69,7 @@ type sessionProviderConflict struct {
 }
 
 type SessionEvent struct {
+	Source           string            `json:"source"`
 	PromptID         string            `json:"prompt_id"`
 	NotificationType string            `json:"notification_type"`
 	StopAssistant    string            `json:"last_assistant_message"`
@@ -255,6 +256,10 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 	switch {
 	case claudeHandled:
 	case event.Hook == "SessionStart":
+		// Compaction keeps the authenticated turn, but invalidates an earlier Stop candidate.
+		if executor == "claude" && event.Source == "compact" && !state.InitialLaunch && (state.State == "busy" || state.State == "idle") && state.TurnID != "" && state.PromptHash != "" && (event.TurnID == "" || event.TurnID == state.TurnID) {
+			break
+		}
 		if state.InitialLaunch {
 			state.State = "submitting"
 		} else {

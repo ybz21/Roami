@@ -204,3 +204,5 @@
 - [演示稿字体预检与真实股票任务复核](2026-11-02/presentation-rendering-review.md)：三次原题运行、网关账务、26页复核、字体定位及仍未通过的内容问题。
 
 - [用户目录与最终交付的来源绑定](2026-11-05/source-bound-delivery.md)：目录拒绝恢复、逐轮 Native 交付证明、实模与原分数边界。
+
+- [Claude 压缩后的会话状态](2026-11-05/claude-compaction-state.md)：保留已认证回合与工具，仍要求完整停止证明。
