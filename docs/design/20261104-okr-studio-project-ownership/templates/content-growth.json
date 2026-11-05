@@ -62,5 +62,19 @@
     "liveInstanceIds",
     "observations",
     "completedState"
-  ]
+  ],
+  "connectorRoot": ".roami/okr/connectors",
+  "dashboardFiles": [
+    ".roami/okr/dashboard.json",
+    ".roami/okr/dashboard/index.html",
+    ".roami/okr/dashboard/style.css",
+    ".roami/okr/dashboard/page.js"
+  ],
+  "dataContract": {
+    "authority": "confirmedSnapshot",
+    "pointer": ".roami/okr/state/current.json",
+    "observationsExport": ".roami/okr/data/observations.jsonl",
+    "frontend": "host-scoped readonly okr.data SDK",
+    "unknown": null
+  }
 }

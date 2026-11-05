@@ -39,3 +39,5 @@
 预置[模板样例](templates/README.md)含内容增长、产品交付、运营指标，明确无凭证/实例 ID/模拟观测，调度默认关闭。它们是设计种子，模板装配与通用 Skill 日更尚未实现。本轮不部署原型、不修改真实项目和团队、不触碰手机。
 
 [本轮原型验收](acceptance.md)。
+
+补充：Connector 位于 connectors/ 的 Skill 包；[用户 HTML 读取数据的可运行样例](dashboard-example.html)，以及[生成/编辑 Skill 扩展示例](templates/okr-development/SKILL.md)。数据保存、读取 API、组件与模板规范均见技术方案。

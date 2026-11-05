@@ -37,12 +37,13 @@ PROJECT/
   .roami/okr/
     okr.json
     dashboard.json
+    dashboard/{index.html,style.css,page.js}
     agents/{main.json,main.md,team.json,swarm.json}
-    skills/collect-SOURCE/
+    connectors/collect-SOURCE/
       SKILL.md
       scripts/collect.py       # Python 按需提供
       references/mcp.md        # MCP 按需提供
-    connectors/SOURCE/connector.json
+      connector.json           # 来源/指标绑定；与 SKILL.md 同包
     schedules/daily.json       # 拟新增：调度的确认输入
     memory/{team.md,decisions.md}
     memory/members/MEMBER_ID/memory.md
@@ -177,3 +178,160 @@ owner/node/project/member、执行器、workspace、当前 task/revision/run、�
 本轮原型不部署为产品，不触手机，不改路由、费用、账目、busy、真实项目文件或团队。
 界面实现草稿保留在 feat/okr-unified-collaboration；Connector 规范提交保留在
 feat/okr-connector-skills。原型确认后再接续实现和分批 PR/发布。
+
+
+## 用户确认的 Connector 位置
+
+Connector Skill 统一放在 `/home/ai/codes/roami-promotion/.roami/okr/connectors/`
+这一层，而不是项目 `skills/` 下：
+
+```text
+.roami/okr/connectors/collect-github/
+  SKILL.md
+  connector.json
+  scripts/collect.py             # Python 实现时提供
+  references/mcp.md              # MCP 实现时提供
+```
+
+项目 `skills/` 可继续保存规划、执行、复盘等工作流。开发/编辑原始 Skill 仍是全局
+canonical `okr-development`，它生成上述 Connector 包。ProjectSkill discovery 要支持
+`connectors/<name>/SKILL.md`，并在 project 命名空间读取其脚本/引用；不能把别的项目
+同名 Skill 合并进来。当前只支持 skills 路径的 reader 必须随协议一起升级。
+
+只读核对的真实目录有七个 schema1 Connector：github-stars/github-forks 是内置
+GitHub，另五个是 manual，当前仅有 connector.json、README 和 Go 实现参考，**还
+不是 Skill 包**。迁移先补兼容协议与确认读取，再逐包转换；旧文件、来源键、指标 ID、
+观测与已确认历史保留。本轮没有移动或改写这些真实文件。
+
+## 看板定义与组件选型
+
+优先支持用户自己的 HTML。`dashboard.json` 是唯一看板入口描述；兼容现在的
+schema1/widgets，拟议 schema2 可选择 HTML 渲染并声明可读的数据绑定：
+
+```json
+{
+  "schemaVersion": 2,
+  "renderer": "html",
+  "entry": "dashboard/index.html",
+  "bindings": {
+    "github-stars": {"metricId": "github-stars", "range": "14d"},
+    "github-forks": {"metricId": "github-forks", "range": "14d"},
+    "channel-summary": {"datasetId": "channel-summary"}
+  }
+}
+```
+
+HTML、CSS、JS 都放在 `.roami/okr/dashboard/`，与绑定一起确认版本。组件数量与
+布局由这个项目决定；每个指标独立成卡。普通运行态不出现 HTML/JSON 配置表。
+
+| 内容 | 实现选择 | HTML 作者如何使用 |
+| --- | --- | --- |
+| KPI 数值、日期、增量与状态 | 小型展示组件，复用格式化与主题令牌 | 自己写 HTML，或选模板中的数值卡 |
+| 折线、柱状、分布 | 复用仓库已有 Apache ECharts，按需打包图表类型 | SDK 返回数据；页面调用 setOption 更新 |
+| KR 进度 | 受控的进度组件；目标、单位、未知值统一处理 | 读取 KR 投影或模板组件 |
+| 明细表 | 原生语义 table 或既有 antd Table；大表分页取数 | 读取声明的 dataset，不把数据库整表送前端 |
+| 说明/富文本 | HTML/CSS 布局或受控 Markdown | 与图表并列，不在主应用 DOM 插入任意脚本 |
+
+ECharts 不是新引入的图表框架，现有 OkrTrend 已采用其 core/LineChart/CanvasRenderer。
+后续把图表纯渲染层复用给默认 React 看板与 HTML SDK。数据与图表配置分开，采用
+`dataset`/系列映射，数据变化通过 `setOption` 更新，容器变化用已有 ResizeObserver。
+参见 [ECharts dataset](https://echarts.apache.org/handbook/en/concepts/dataset/) 与
+[动态数据](https://echarts.apache.org/handbook/en/how-to/data/dynamic-data/)。
+
+## 数据怎样保存
+
+沿用已经落地的确认快照协议，不新增一份容易失配的“最新指标库”：
+
+```text
+data/observations.jsonl                     日期化观测导出，含更正版本
+state/confirmed-revisions/13-<id>.json       不可变 workspace/证据快照
+state/current.json                         原子指向一份完整快照
+```
+
+Skill 返回候选数据；Go 宿主验证来源、指标、日期、单位、有限数值和当前 revision，
+写事实导出与不可变快照后，最后原子替换 current.json。前端由指针取整个一致版本，
+不会读到写一半的 JSONL。不要直接修改 JSONL 或让脚本覆盖 current.json。
+
+当前真实 `GET /api/projects/:pid/okr` 返回这份确认工作区；自定义 HTML 的数据投影
+接口待新增，建议 `GET /api/projects/:pid/okr/dashboard-data?range=14d`。后者只返回
+manifest 中获准的 dataset、有限日期范围与显示需要的列；大明细必须分页，不把
+完整观测历史/所有账号数据塞进 HTML。ETag 覆盖 dataVersion 与采集状态版本。
+
+运行时数据库保存 schedules/jobs/runs、租约、下一次时间、重试和幂等键，不作为
+文件化项目指标的第二主库。大明细可留在来源数据库，Connector Skill 输出统计结果
+与证据。后续超过快照规模上限时，用明确版本化迁移引入事实库，不能静默双写。
+
+## 用户自定义 HTML 如何读
+
+HTML 不直接读服务器路径、JSONL 或 SQLite，也不拿项目鉴权凭证。主应用绑定当前
+project，读取上述只读投影，通过专用 MessageChannel 给看板 iframe 注入 `okr` SDK。
+以下是**拟定 SDK 契约**，产品后端尚未提供：
+
+```html
+<h2>GitHub star</h2>
+<strong id="stars">未知</strong>
+<script>
+(async () => {
+  const draw = data => {
+    document.getElementById('stars').textContent = data.latest.value ?? '未知';
+    // 用户也可以在这里调用 chart.setOption(...)。
+  };
+  draw(await okr.data.read('github-stars'));
+  const unsubscribe = okr.data.subscribe('github-stars', draw);
+})();
+</script>
+```
+
+`read(datasetId, {range?,cursor?})` 返回获准数据；`subscribe(datasetId, callback)` 返回
+取消订阅函数。返回值含 snapshotId/revision、latest、points、source、asOf、capturedAt、
+quality/lastError；`null` 表示未知。宿主把绑定主题与 locale 一起提供，用户可以完全
+自己设计 HTML 和组件，不必写 React，也不必选固定的 UI 图表。
+
+```text
+Python/MCP Connector Skill
+    → 候选观测 + 证据
+    → Go 校验 / 确认快照 / current.json
+    → 项目只读数据 API
+    → 当前看板专用消息通道 / okr.data SDK
+    → 用户 HTML / ECharts / 表格
+```
+
+宿主复用页面级更新/事件与缓存；同页多个卡片共享一次取数，不各自轮询。发布新
+revision 后宿主重新获取投影并推给订阅者；隐藏/离开看板暂停，恢复时对账最新版本。
+采集失败只改变健康状态，数据版本和上次有效值不变；状态更新也能通知 HTML。
+SDK 不能提交采集结果、派工、切换 project 或调用任意 Roami API。
+
+自定义 HTML 不在主应用同源 DOM 执行。iframe 开脚本但不开 allow-same-origin；
+打包确认的 HTML/CSS/JS、SDK 和本地 ECharts 资源，CSP 限制资源与网络。父端只接受
+本 iframe 的握手和通道，绑定 project、看板版本与允许 dataset；页面刷新/切换即销毁
+旧通道。不把鉴权 cookie、文件路径或能力令牌传进 iframe。不沿用通用文件预览的
+同源访问方式承载可执行看板。隔离语义依据
+[HTML sandbox 标准](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox)。
+
+[本目录的 HTML/SDK 演示](dashboard-example.html)仅使用静态 fixture，不代表真实 API、沙箱加载器或生产
+Skill Runner 已实现；正式实现需要覆盖越权 dataset、跨项目、旧 iframe 消息、畸形
+数据、更新去重、退出清理和页面/脚本资源限制。
+
+## 生成 OKR 的 Skill 交付清单
+
+`okr-development` 既创建也编辑。输入：用户对话、已注册项目根、现有确认 revision、
+期望目标/周期、模板可选、数据源/口径、职责和调度决定。输出不是一段建议，而是：
+
+1. 完整草稿包：okr.json、dashboard.json、用户 dashboard HTML/CSS/JS、Connector
+   Skill（SKILL.md + Python 或 MCP 资源）、team 期望职责、AGENTS/记忆位置与调度草稿。
+2. 基于同一投影的运行预览、可核对的变更和校验结果。预览没有注册、派工或定时副作用。
+3. 用户确认后的 revision CAS 发布与真实回读。保留原 Main、成员、provider 对话和历史。
+4. 只有用户要求且宿主能力已接通时，依据真实登记/派工/调度回执继续；不能把定义或
+   HTML 已加载说成取数成功或日更已启用。
+
+模板包随 Skill 的 `assets/templates/` 版本化分发，至少含 `template.json`、dashboard
+布局种子、Connector Skill 种子、目标/职责种子与必要资料。模板内容不包含凭证、实例
+ID、模拟事实；调度默认关闭。开发 Skill 按用户已有答案填充并校验，缺口留为未知；
+人数、KR 和图表数量可以增减。预置内容增长、产品交付、运营指标，支持将用户自己
+的 HTML 作为看板起点。编辑场景保留不相关的定义，只把新职责写入期望计划。
+
+
+可执行脚本的 CSP 限制 fetch/子资源并不等于完全网络沙箱，尤其不能据此承诺任意
+用户 JS 绝无出站请求。生产加载器须明确脚本信任与授权范围；若要求严格禁止所有
+外联，还需宿主网络策略/代理控制，而不是只加 iframe 属性。样例用于证明只读数据
+通道与源隔离，不把它当作完整生产安全实现。

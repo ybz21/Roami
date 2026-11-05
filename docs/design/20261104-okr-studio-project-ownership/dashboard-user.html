@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>用户自己的 HTML 看板</title><style>
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui}main{height:100%;overflow:auto;padding:var(--sp-5)}header{display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-5)}h1{font-size:var(--fs-lg);font-weight:500;margin:0}small{font-size:var(--fs-meta);color:var(--text-dim)}header small{margin-left:auto}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*13)),1fr));gap:var(--sp-4)}article{padding:var(--sp-5);background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:var(--r-card)}h2{font-size:var(--fs-body);font-weight:500;margin:0}strong{font-size:var(--fs-title);font-weight:500;display:block;margin:var(--sp-4) 0}.bars{height:calc(var(--sp-5)*5);display:flex;align-items:end;gap:var(--sp-3);border-bottom:1px solid var(--border-subtle)}.bars i{flex:1;background:var(--accent-soft);border-top:2px solid var(--accent);border-radius:var(--r-xs) var(--r-xs) 0 0}p{font-size:var(--fs-sm);color:var(--text-dim)}.status{color:var(--warn)}code{font-size:var(--fs-sm)}
+</style></head><body><main><header><h1>我的数据看板</h1><small id="version">读取中</small></header><div class="cards"><article><h2>GitHub star</h2><strong id="stars">未知</strong><div id="stars-trend" class="bars" aria-label="Star 趋势"></div><p id="stars-status"></p></article><article><h2>GitHub fork</h2><strong id="forks">未知</strong><div id="forks-trend" class="bars" aria-label="Fork 趋势"></div><p id="forks-status"></p></article><article><h2>X 曝光</h2><strong id="views">未知</strong><p>来源未连接，保持未知。</p></article></div><p id="notice"></p><p>这一页是用户写的 HTML/CSS/JS，只通过 <code>okr.data</code> 读取数据。趋势为原型绘制，正式模板可使用已有 ECharts。</p></main><script>
+(async () => {
+  const render = (prefix, data) => {
+    document.getElementById(prefix).textContent = data.latest.value ?? '未知';
+    document.getElementById('version').textContent = `快照 ${data.revision} · ${data.asOf}`;
+    const host=document.getElementById(prefix+'-trend');host.replaceChildren();
+    const max=Math.max(1,...data.points.map(row=>row.value??0));
+    for(const point of data.points){const bar=document.createElement('i');bar.style.height=Math.max(4,(point.value??0)/max*100)+'%';host.append(bar);}
+    document.getElementById(prefix+'-status').textContent = data.quality==='stale'?'本次采集失败，保留上次有效值。':'已确认的公开仓库观测';
+    document.getElementById(prefix+'-status').className=data.quality==='stale'?'status':'';
+  };
+  for(const [dataset,prefix] of [['github-stars','stars'],['github-forks','forks']]){
+    render(prefix,await okr.data.read(dataset));
+    okr.data.subscribe(dataset,data=>render(prefix,data));
+  }
+  const unknown=await okr.data.read('x-views');document.getElementById('views').textContent=unknown.latest.value??'未知';
+})();
+</script></body></html>

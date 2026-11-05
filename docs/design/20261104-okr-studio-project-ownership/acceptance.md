@@ -20,3 +20,9 @@
 
 本轮保留前一版 index 的 revision 快照，设计继续在这两个目录演进。真实触控与上线
 验收仍需在后续实现批次按授权执行，不能把本文件记作完成 #656/#658/#679。
+
+## 自定义 HTML / 数据 / 生成 Skill 补充
+
+目录改为 connectors/<name>/SKILL.md，包内 Python/MCP；只读核对真实七个旧 Connector，未改写。技术方案补齐 dashboard.json HTML 入口、组件选型、数据文件权威/API投影/SDK、模板与生成编辑 Skill 交付清单。
+
+HTML 样例实测 MessageChannel 的 read/subscribe：11→12 更新；失败后保持12和数据版本13，未知仍为null；未绑定dataset被拒绝，子页不能读父DOM/cookie，SDK无写接口。390宽度模拟无文档溢出。样例仅是静态数据与机制验证，不等于生产API、权限、网络沙箱或Skill Runner已接通。证据 html-proof.json、html-{initial,updated,failed,phone}.json 与截图在同一临时验收目录。

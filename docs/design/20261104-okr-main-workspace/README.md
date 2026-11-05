@@ -137,3 +137,5 @@
 本轮以用户最新要求为准：对话与协作同页，移除场景下重复职责列表；运行态保持简单，开发编辑从次要入口进入 Studio。原 index 说明保存在 revisions/20261105-before.html，历史实现/验收记录继续保留。原型数据、消息、模板应用与调度是本地模拟，不代表真实执行或已部署能力。完整产品设计、用户故事、模块/API、模板、Skill 日更和分批验收见技术方案 Markdown。
 
 [本轮原型验收](../20261104-okr-studio-project-ownership/acceptance.md)。
+
+补充：Connector 位于 connectors/ 的 Skill 包；[用户 HTML 读取数据的可运行样例](../20261104-okr-studio-project-ownership/dashboard-example.html)，以及[生成/编辑 Skill 扩展示例](../20261104-okr-studio-project-ownership/templates/okr-development/SKILL.md)。数据保存、读取 API、组件与模板规范均见技术方案。
