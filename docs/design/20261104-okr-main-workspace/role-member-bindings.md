@@ -28,3 +28,14 @@ SaveValidated 与 SyncValidated 在项目修订 CAS 事务中先合并旧客户�
 专项覆盖跨项目/团队/执行器、归档、旧协议、未知/重复成员、重复职责绑定、无团队、旧客户端省略字段、显式解除、CAS 冲突、失败 sync 保留确认版本，以及不改历史状态的任务路由。首轮正常 full 已通过（Go全量，按范围跳过未改 Python）；最终补强前端跨项目拒绝。最终源码前端全量199文件/1461项，typecheck/i18n5190/hover/build及正常full另存门禁日志；87项初轮前端专项、Go API/文件专项已通过。
 
 隔离浏览器：1280/1920/2560/3440及390粗指针，默认3职责/9历史、原Codex会话、原任务群聊、草稿保留、历史任务包含开关、场景开关均验证；记录 `/tmp/okr-role-member-bindings-ui-20261106/acceptance.json`。未触手机，未宣称真机通过。真实项目应用与部署回执在交付时补充。
+
+
+### 真实项目应用与后续 Skill 约束
+
+#706 已合入 `1b5aecde`，Web/CLI 部署为 `okr-team-3d9bb5c2`。原项目 Main 实际保存三项 memberId，确认版本19到20；25条观测、2次复盘、所有其他配置、12个成员及全部工作项的task/revision/run/状态保持。旧记忆前缀与可恢复版本保留，追加后7305B。23份旧Connector参考按原字节归档，正常发布只更新5份生成的manual store.go；自定义GitHub Skill与旧快照未改。
+
+线上 `roami chrome` 验证默认3职责、9历史，Main仍为原项目实例；X入口打开原Codex会话且原terminal WebSocket已连接。项目新回复没有进入首页未读（首页仍0）。所有证据位于 `/tmp/okr-role-member-bindings-project-20261106/`，没有触手机。
+
+第一轮Main曾猜CLI命令，并发出一次不完整save（宿主拒绝）；随后完整参数save已经成功，即使该轮回复后来中断，写入也不会回滚。后续同Main先读取当前版本，未重复保存，只追加记忆。不能把此过程描述为一次自然语言无故障完成，或将停止回复等同于没有写入。
+
+后续增加派生能力字段 `projectFiles.teamRoleBindings`，供新建项目在写入前判断明确职责绑定是否支持；不改变实例、任务或数据。`skills/okr-development/references/team-bindings.md` 提炼完整save参数、原身份匹配、停止后复核和简短回报规则。该能力与新增Skill资源以其独立提交/部署为准，不追溯宣称#706已经提供新字段。

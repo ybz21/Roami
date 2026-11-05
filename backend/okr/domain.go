@@ -96,6 +96,7 @@ type TeamDefinition struct {
 }
 
 type ProjectFiles struct {
+	TeamRoleBindings     bool           `json:"teamRoleBindings,omitempty"`
 	Root                 string         `json:"root"`
 	SchemaVersion        int            `json:"schemaVersion"`
 	Revision             int64          `json:"revision"`

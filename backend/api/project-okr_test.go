@@ -122,7 +122,7 @@ func TestProjectOKRAPISavesDesiredTeamWithoutLaunchingSwarm(t *testing.T) {
 	}
 	path := "/projects/" + projectID + "/okr"
 	w := decodeProjectOKR(t, projectOKRRequest(t, router, "PUT", path, string(body), 200))
-	if w.Team == nil || len(w.Team.Roles) != 1 || w.Team.Roles[0].ID != "editor" || w.Swarm != "" {
+	if w.Team == nil || len(w.Team.Roles) != 1 || w.Team.Roles[0].ID != "editor" || w.Swarm != "" || w.ProjectFiles == nil || !w.ProjectFiles.TeamRoleBindings {
 		t.Fatal("desired team was not preserved independently of a live Swarm", w)
 	}
 	entry, _ := a.Projects.Entry(projectID)
