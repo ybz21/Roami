@@ -12,8 +12,12 @@ export function publishTaskEvent(event: AgentEvent) {
   if (!event.kind.startsWith('task.') || event.payload.toolName || event.payload.activity?.kind === 'tool') return
   const ids = new Set([event.payload.taskId, event.payload.activity?.taskId, event.payload.activity?.parentTaskId].filter(Boolean))
   for (const id of ids) {
-    const path = '/agent/tasks/' + encodeURIComponent(id), key = agentDataKey(path)
-    for (const entry of [path, path + '/resources', '/agent/artifacts?taskId=' + encodeURIComponent(id)]) invalidateAgentData(agentDataKey(entry))
-    for (const listener of listeners.get(key) || []) listener()
+    refreshTask(id)
   }
+}
+
+export function refreshTask(id: string) {
+  const path = '/agent/tasks/' + encodeURIComponent(id), key = agentDataKey(path)
+  for (const entry of [path, path + '/resources', '/agent/artifacts?taskId=' + encodeURIComponent(id)]) invalidateAgentData(agentDataKey(entry))
+  for (const listener of listeners.get(key) || []) listener()
 }

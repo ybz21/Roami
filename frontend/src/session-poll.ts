@@ -5,7 +5,7 @@ import { pollWhileVisible } from './visible-poll'
 
 /** Consumers on the same machine share a request and an unchanged snapshot. */
 export function createSessionPoll<T>(path: string, interval: number, initial: T, read: (response: any) => T) {
-  const empty = { value: initial, failed: false }
+  const empty = { value: initial, failed: false, loaded: false }
   let current: { node: string | null; store: ReturnType<typeof createStore> } | undefined
   const idleSubscribe = () => () => {}
   const emptySnapshot = () => empty
@@ -21,10 +21,10 @@ export function createSessionPoll<T>(path: string, interval: number, initial: T,
         const next = read(await api('GET', path, undefined, { signal }))
         if (signal.aborted || currentNodeId() !== node) return
         const nextSignature = JSON.stringify(next)
-        if (nextSignature !== signature || snapshot.failed) {
+        if (nextSignature !== signature || snapshot.failed || !snapshot.loaded) {
           const value = nextSignature === signature ? snapshot.value : next
           signature = nextSignature
-          snapshot = { value, failed: false }; emit()
+          snapshot = { value, failed: false, loaded: true }; emit()
         }
       } catch (error) {
         if (!signal.aborted && currentNodeId() === node && !snapshot.failed) {
@@ -33,14 +33,19 @@ export function createSessionPoll<T>(path: string, interval: number, initial: T,
         throw error
       }
     }
+    const refresh = () => { void poll?.refresh() }
     return {
       getSnapshot: () => snapshot,
       subscribe: (listener: () => void) => {
         listeners.add(listener)
-        if (listeners.size === 1) poll = pollWhileVisible(load, interval)
+        if (listeners.size === 1) {
+          if (snapshot.loaded) snapshot = { ...snapshot, loaded: false }
+          poll = pollWhileVisible(load, interval)
+          window.addEventListener('roami:sessions-changed', refresh)
+        }
         return () => {
           listeners.delete(listener)
-          if (!listeners.size) { poll?.stop(); poll = undefined }
+          if (!listeners.size) { poll?.stop(); poll = undefined; window.removeEventListener('roami:sessions-changed', refresh) }
         }
       },
     }

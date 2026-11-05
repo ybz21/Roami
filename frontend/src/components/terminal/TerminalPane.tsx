@@ -3,6 +3,10 @@ import { atPath, atPaths } from '../../agent-paths'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
+import NativeSession from '../agent/NativeSession'
+import { nativeSessionId } from '../sessions/session-record'
+import { refreshSessionLists } from '../sessions/native-session-list'
+import { stopSession, sendSessionPrompt, sessionActionError } from '../sessions/session-actions'
 import ClaudeChat from '../chat/ClaudeChat'
 import CodexChat from '../chat/CodexChat'
 import OpenCodeChat from '../chat/OpenCodeChat'
@@ -192,7 +196,7 @@ export default function TerminalPane(props: {
   const dotOf = (name: string) => {
     if (activityMap?.[name]?.waiting || termNeedsInput[name]) return 'var(--warn)'
     if (activityMap?.[name]?.running) return 'var(--ok)'
-    if (statusMap[name] === 'connected' || agentKinds[name] || claudeMap[name]?.running || codexMap[name]?.running) return 'var(--text-dimmer)'
+    if (nativeSessionId(name) || statusMap[name] === 'connected' || agentKinds[name] || claudeMap[name]?.running || codexMap[name]?.running) return 'var(--text-dimmer)'
     return statusMap[name] === 'connecting' ? 'var(--warn)' : 'var(--danger)'
   }
   const dot = active ? dotOf(active) : 'var(--danger)'
@@ -204,7 +208,7 @@ export default function TerminalPane(props: {
     (codexMap[name]?.running || (isPhone && !codexMap[name] && agentKinds[name] === 'codex'))
   const showOpenCodeChat = (name: string) => (openCodeView[name] === true || (isPhone && openCodeView[name] !== false)) &&
     (openCodeMap[name]?.running || (isPhone && !openCodeMap[name] && agentKinds[name] === 'opencode'))
-  const inChat = !!active && !!(showClaudeChat(active) || showCodexChat(active) || showOpenCodeChat(active))
+  const inChat = !!active && !!(nativeSessionId(active) || showClaudeChat(active) || showCodexChat(active) || showOpenCodeChat(active))
   const sendRaw = (s: string) => { if (active) termRefs.current[active]?.send(s, true) } // keepFocus：不抢 xterm 焦点 → 软键盘不收起
   // 滚上去看历史会让 tmux 进 copy-mode，此时输入被它截走（要先按「底」才生效）。
   // 发送前先回到底部退出 copy-mode，省去手动按「底」。
@@ -421,7 +425,7 @@ export default function TerminalPane(props: {
     const src = readDrag(e.dataTransfer)
     const v = canDrop(src, {
       id: target, node: currentNodeId() || '',
-      hasAgent: !!(agentKinds[target] || claudeMap[target]?.running || codexMap[target]?.running),
+      hasAgent: !!(nativeSessionId(target) || agentKinds[target] || claudeMap[target]?.running || codexMap[target]?.running),
     })
     if (!src) return
     if (!v.ok) {
@@ -433,7 +437,7 @@ export default function TerminalPane(props: {
       return
     }
     try {
-      await api('POST', '/tasks/_/send', { sess: target, msg: buildIntro(src, target, t) })
+      await sendSessionPrompt(target, buildIntro(src, target, t, location.origin))
       message.success(t('pair.sent', { name: sessionDisplay(target), peer: src.label || src.id }))
     } catch (err: any) { message.error(err.message) }
   }
@@ -525,7 +529,7 @@ export default function TerminalPane(props: {
     const known = claudeMap[active]?.dir || codexMap[active]?.dir
     if (known) { setCwd(known); return }
     let stop = false
-    api('GET', `/sessions/${encodeURIComponent(active)}/cwd`).then((r) => { if (!stop) setCwd(r.data?.dir || '') }).catch(() => {})
+    api('GET', nativeSessionId(active) ? `/agent/native-sessions/${encodeURIComponent(nativeSessionId(active)!)}` : `/sessions/${encodeURIComponent(active)}/cwd`).then((r) => { if (!stop) setCwd(r.data?.directory || r.data?.dir || '') }).catch(() => {})
     return () => { stop = true }
   }, [active, claudeMap, codexMap])
 
@@ -538,7 +542,7 @@ export default function TerminalPane(props: {
     }
     let stop = false
     const checkPrompts = async () => {
-      const entries = await Promise.all(terms.map(async (name) => {
+      const entries = await Promise.all(terms.filter(name => !nativeSessionId(name)).map(async (name) => {
         try {
           const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=50`)
           return [name, !!detectPrompt(r.data || ''), codexReconnectFailed(r.data || '')] as const
@@ -739,7 +743,7 @@ export default function TerminalPane(props: {
   )
   // 标签内的会话标记：官方品牌标，跟状态点同一行且同一光学尺寸（颜色由标自己带，见 AgentLogo）
   const agentMarks = (name: string) => {
-    const kind = agentKinds[name] || (claudeMap[name]?.running ? 'claude' : codexMap[name]?.running ? 'codex' : undefined)
+    const kind = nativeSessionId(name) ? 'native' : agentKinds[name] || (claudeMap[name]?.running ? 'claude' : codexMap[name]?.running ? 'codex' : undefined)
     return kind && <span title={agentName(kind)} style={{ display: 'inline-flex' }}><AgentLogo kind={kind} /></span>
   }
   const sessionTab = (
@@ -912,7 +916,7 @@ export default function TerminalPane(props: {
             ...(tabs.length ? [{ type: 'group' as const, key: 'g-term', label: t('tabs.allSessions'),
               children: tabs.map((n) => ({
                 key: 'term:' + n,
-                icon: agentKinds[n] ? <AgentLogo kind={agentKinds[n]} size={13} /> : claudeMap[n]?.running ? <AgentLogo kind="claude" size={13} /> : codexMap[n]?.running ? <AgentLogo kind="codex" size={13} /> : <TerminalIcon size={13} />,
+                icon: nativeSessionId(n) ? <AgentLogo kind="native" size={13} /> : agentKinds[n] ? <AgentLogo kind={agentKinds[n]} size={13} /> : claudeMap[n]?.running ? <AgentLogo kind="claude" size={13} /> : codexMap[n]?.running ? <AgentLogo kind="codex" size={13} /> : <TerminalIcon size={13} />,
                 label: <span className="tt-tabmenu-row"><span className="nm">{sessionDisplay(n) || n}</span>
                   <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')} onClick={(e) => { e.stopPropagation(); closeTerm(n) }}>{TI.close}</button></span>,
                 onClick: () => setActive(n),
@@ -1014,16 +1018,16 @@ export default function TerminalPane(props: {
         {/* 「中断」得在这儿常驻：带 ^C 的快捷键条只在打字时才升起来，而 agent 跑飞了要停它的
             那一刻，手根本不在输入框上。danger 是给这一下的分量做的记号。 */}
         <SheetRow icon={<StopIcon size={20} />} danger title={t('terminal.interrupt')} desc={t('terminal.interruptDesc')}
-          onClick={() => { setMoreSheet(false); void interruptActive() }} />
+          onClick={() => { setMoreSheet(false); void (active && nativeSessionId(active) ? stopSession(active).catch((error: Error) => message.error(sessionActionError(error, t))) : interruptActive()) }} />
         <SheetSection>{t('mobile.groupPanels')}</SheetSection>
         <SheetRow icon={TI.folder} title={t('chat.files')} onClick={() => { setMoreSheet(false); toggleFiles() }} />
         <SheetRow icon={TI.git} title={t('git.title')} onClick={() => { setMoreSheet(false); toggleGit() }} />
         <SheetRow icon={TI.mic} title={t('voice.input')} onClick={() => { setMoreSheet(false); setShowVoice((v) => !v) }} />
-        <SheetRow icon={promptOff ? TI.bellOff : TI.bellOn} title={t('prompt.popup')}
-          desc={promptOff ? t('prompt.popupOff') : t('prompt.popupOn')} onClick={togglePromptOff} />
-        <SheetRow icon={TI.dpad} title={t('mobile.dpadOn')} desc={ws.dpadOn ? t('common.on') : t('common.off')}
-          onClick={() => saveWorkspace({ dpadOn: !ws.dpadOn })} />
-        {ws.dpadOn && (
+        {!inChat && <SheetRow icon={promptOff ? TI.bellOff : TI.bellOn} title={t('prompt.popup')}
+          desc={promptOff ? t('prompt.popupOff') : t('prompt.popupOn')} onClick={togglePromptOff} />}
+        {!inChat && <SheetRow icon={TI.dpad} title={t('mobile.dpadOn')} desc={ws.dpadOn ? t('common.on') : t('common.off')}
+          onClick={() => saveWorkspace({ dpadOn: !ws.dpadOn })} />}
+        {!inChat && ws.dpadOn && (
           <SheetRow icon={TI.dpad} title={t('mobile.dpadSide')} desc={ws.dpadSide === 'left' ? t('common.on') : t('common.off')}
             onClick={() => saveWorkspace({ dpadSide: ws.dpadSide === 'left' ? 'right' : 'left' })} />
         )}
@@ -1081,7 +1085,7 @@ export default function TerminalPane(props: {
       )}
     </>
   )
-  const sessionToolbar = (
+  const sessionToolbar = active && nativeSessionId(active) ? null : (
     <div className="tt-tbar tt-session-toolbar">
       {sessionLead}<span className="tt-sep" />
       <Dropdown trigger={['click']} menu={{ items: tmuxMenu(t) as any, onClick: ({ key }) => { if (key === PFX + 'x') openPaneCloseConfirm(); else sendKey(key) } }} placement="bottomLeft">
@@ -1182,16 +1186,16 @@ export default function TerminalPane(props: {
           // 下一张 WebGL 画布要经过“重新量尺寸 → 清画布 → 重画”，中间会露出 1~2 帧黑屏。
           // visibility:hidden 保留真实尺寸并让后台画布保持就绪；pointerEvents/zIndex 隔离交互与层叠。
           <div key={termName} style={{
-            position: 'absolute', inset: 0, padding: 6,
+            position: 'absolute', inset: 0, padding: nativeSessionId(termName) ? 0 : 6,
             visibility: termName === active && !curFile ? 'visible' : 'hidden',
             pointerEvents: termName === active && !curFile ? 'auto' : 'none',
             zIndex: termName === active && !curFile ? 1 : 0,
           }}>
-            <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
+            {nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
               onContextMenu={({ x, y, selection }) => { setActive(termName); setCtx({ x, y, session: termName, selection }) }}
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}
-              onImagePaste={(files) => { setActive(termName); pasteImage(termName, files) }} />
+              onImagePaste={(files) => { setActive(termName); pasteImage(termName, files) }} />}
             {showClaudeChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
                 <ClaudeChat name={termName} file={claudeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
@@ -1208,7 +1212,7 @@ export default function TerminalPane(props: {
               </div>
             )}
             {/* 悬浮话筒只留给手机：桌面的在工具条上（重命名旁边） */}
-            {showVoice && isPhone && !claudeView[termName] && !codexView[termName] && !openCodeView[termName] && (
+            {!nativeSessionId(termName) && showVoice && isPhone && !claudeView[termName] && !codexView[termName] && !openCodeView[termName] && (
               <VoiceInput accent="var(--accent)" onResult={(text) => { api('POST', `/sessions/${encodeURIComponent(termName)}/type`, { text }).catch((e: any) => message.error(e.message)) }} />
             )}
           </div>

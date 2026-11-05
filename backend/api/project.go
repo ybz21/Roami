@@ -77,6 +77,7 @@ type projectSummary struct {
 type sessListItem struct {
 	Name         string          `json:"name"`
 	Label        string          `json:"label"`
+	Parent       string          `json:"parent,omitempty"`
 	Attached     json.RawMessage `json:"attached"`
 	LastActivity json.RawMessage `json:"last_activity"`
 	// State: live | dormant。dormant = 机器重启带走了，点开即恢复（懒恢复，见 R2 设计稿）。

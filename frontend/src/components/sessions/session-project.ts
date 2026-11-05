@@ -6,6 +6,7 @@
 //
 // 和 session-label 一样是模块级小表 + useSyncExternalStore：要用它的地方（终端标签、
 // 会话胶囊、标签右键菜单）散在各处，数据源却只有 App 那一份轮询。
+import { nativeSessionName, type NativeSessionRecord } from './session-record'
 import { useSyncExternalStore } from 'react'
 
 export type SessionProject = { key: string; name: string; dir: string; branch?: string; worktree?: string }
@@ -68,6 +69,7 @@ export function useSessionProjects(): Record<string, SessionProject> {
 export function buildSessionProjects(
   projects: { key: string; name: string; dir: string; git: boolean; top?: { name: string }[] | null }[],
   annotations: Record<string, any>,
+  native: NativeSessionRecord[] = [],
 ): Record<string, SessionProject> {
   const byDir = new Map<string, { key: string; name: string; dir: string }>()
   for (const p of projects) if (p.git) byDir.set(p.dir, { key: p.key, name: p.name, dir: p.dir })
@@ -88,6 +90,10 @@ export function buildSessionProjects(
   for (const p of projects) {
     if (p.git) continue
     for (const s of p.top || []) if (!out[s.name]) out[s.name] = { key: p.key, name: p.name, dir: p.dir }
+  }
+  for (const session of native) {
+    const project = projects.find(project => project.key === session.projectId)
+    if (project) out[nativeSessionName(session.nativeSessionId)] = { key: project.key, name: project.name, dir: project.dir, branch: session.branch, worktree: session.directory }
   }
   return out
 }

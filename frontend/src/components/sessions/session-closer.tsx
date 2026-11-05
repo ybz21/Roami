@@ -6,6 +6,8 @@
 import { useState } from 'react'
 import { App as AntApp, Checkbox } from 'antd'
 import { api } from '../../api'
+import { closeSession, sessionActionError } from './session-actions'
+import { nativeSessionId } from './session-record'
 import { useI18n } from '../../i18n'
 import { sessionDisplay } from './session-label'
 import { CloseWorktreeModal } from './CloseWorktreeModal'
@@ -16,7 +18,7 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
   const [closing, setClosing] = useState<{ name: string; st: any } | null>(null)
   const done = (n: string) => { message.success(t('session.closed')); closeTerm(n); afterClose?.() }
   const kill = async (n: string) => {
-    try { await api('DELETE', '/sessions/' + encodeURIComponent(n)); done(n) } catch (e: any) { message.error(e.message) }
+    try { await closeSession(n); done(n) } catch (e: any) { message.error(sessionActionError(e, t)) }
   }
   const closeWith = async (n: string, mode: 'keep' | 'merge' | 'discard', path?: string) => {
     try {
@@ -30,7 +32,7 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
   }
   const beginClose = async (n: string) => {
     let st: any = null
-    try { st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data } catch {}
+    try { if (!nativeSessionId(n)) st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data } catch {}
     const unfinished = (st?.dirty || 0) > 0 || (st?.untracked || 0) > 0 || (st?.committedAhead || 0) > 0
     // worktree 里还有别的会话：只关这一个，worktree 和分支一根毛都不碰（收尾整个任务走 finishTask）
     if (st?.inWorktree && (st.others || 0) > 0) {

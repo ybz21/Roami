@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import AgentTasks from './AgentTasks'
 import NativeSession from './NativeSession'
 import NativeSessionArtifacts from './NativeSessionArtifacts'
-import NativeProjectSessions from './NativeProjectSessions'
-import { clearAgentDataCache } from './agent-data-cache'
+import { agentDataKey, clearAgentDataCache } from './agent-data-cache'
 import { api } from '../../api'
 
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
@@ -510,11 +509,11 @@ it('keeps the completed professional session reachable and closes it only after 
   fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.closeSession' }))
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.completeAndClose' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'agent.task.closeSession' }))
   await screen.findByText('agent.task.sessionClosed')
   expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/close-session', { revision: 1, runId: 'attempt-one' })
   expect(screen.queryByRole('button', { name: 'agent.openSession' })).toBeNull()
-  expect(screen.getByRole('button', { name: 'agent.task.continue' }).hasAttribute('disabled')).toBe(true)
+  expect(screen.queryByRole('button', { name: 'agent.task.continue' })).toBeNull()
   expect(screen.getByText('Result one')).toBeTruthy()
 })
 
@@ -533,8 +532,7 @@ it('keeps filters across remounts and exposes original session and project as se
   render(<AgentTasks cid="conversation" onSession={openSession} onChanged={vi.fn()} />)
   expect(screen.getByRole('button', { name: 'agent.task.filter.open' }).getAttribute('aria-pressed')).toBe('true')
   fireEvent.click((await screen.findAllByRole('button', { name: 'agent.task.enterSession' }))[1])
-  expect(location.hash).toContain('/session/')
-  expect(decodeURIComponent(location.hash)).toContain('native-identity')
+  expect(openSession).toHaveBeenLastCalledWith('roami:native-identity')
 })
 
 
@@ -547,7 +545,7 @@ it('hides empty native tool replies while retaining real content and the active 
     { id: 'active', role: 'assistant', status: 'streaming', seq: 17, content: { text: '' } },
   ]
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original', title: 'Goal original' } }
     if (path.endsWith('/conversation')) return { data: { messages, before: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
@@ -566,7 +564,7 @@ it('refreshes a fast native continuation without Main events and stops reading a
   const nativeTask = { ...task('original'), nativeSession: { id: 'native-id', conversationId: 'native-conversation' } }
   vi.mocked(api).mockImplementation(async (method, path) => {
     if (method === 'POST') { phase = 1; return { data: { state: 'stopping' } } }
-    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original', title: 'Goal original' } }
     if (path.endsWith('/conversation')) return { data: { messages: [{ id: 'reply-' + phase, role: 'assistant', status: 'completed', seq: phase + 1, content: { text: phase === 2 ? 'Updated answer' : 'Original answer' } }], before: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [] }
@@ -576,7 +574,7 @@ it('refreshes a fast native continuation without Main events and stops reading a
   await screen.findByText('Original answer')
   vi.useFakeTimers()
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Add the owner' } })
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' })); await Promise.resolve() })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'agent.send' })); await Promise.resolve() })
   phase = 2
   await act(async () => { await vi.advanceTimersByTimeAsync(3100) })
   expect(screen.getByText('Updated answer')).toBeTruthy()
@@ -602,7 +600,7 @@ it('loads native execution steps on demand and retains the draft across tabs and
   const posts: any[] = []
   vi.mocked(api).mockImplementation(async (method, path, body) => {
     if (method === 'POST') { posts.push(body); if (reject) throw { apiError: { code: 'TASK_REVISION_CHANGED' } }; return { data: {} } }
-    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original', title: 'Goal original' } }
     if (path.endsWith('/conversation')) return { data: { messages: [], before: null } }
     if (path.endsWith('/activities')) return { data: [{ id: 'step', kind: 'tool', name: 'shell', state: 'succeeded', startedMs: 1000, updatedMs: 2000 }] }
     if (path.endsWith('/activities/step')) return { data: { input: { text: 'node build.mjs', truncated: false }, output: { text: 'Build passed', truncated: false } } }
@@ -621,13 +619,13 @@ it('loads native execution steps on demand and retains the draft across tabs and
   fireEvent.click(screen.getByRole('tab', { name: 'agent.task.sessionTab.artifacts' }))
   await screen.findByText('agent.task.noArtifacts')
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep the draft')
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.send' }))
   await screen.findByRole('alert')
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep the draft')
   reject = false
   fireEvent.click(screen.getByRole('tab', { name: 'agent.task.sessionTab.conversation' }))
-  await waitFor(() => expect((screen.getByRole('button', { name: 'agent.task.continue' }) as HTMLButtonElement).disabled).toBe(false))
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.continue' }))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'agent.send' }) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.send' }))
   await waitFor(() => expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(''))
   expect(posts).toHaveLength(2)
   expect(posts[1]).toMatchObject({ text: 'Keep the draft', revision: 1 })
@@ -637,7 +635,7 @@ it('separates native deliverables by execution and keeps task failure visible du
   const current = { ...artifact('current'), metadata: { runId: 'attempt-original' } }
   const previous = { ...artifact('previous'), metadata: { runId: 'older' } }
   vi.mocked(api).mockImplementation(async (_method, path) => {
-    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original' } }
+    if (path === '/agent/native-sessions/native-id') return { data: { nativeSessionId: 'native-id', taskId: 'original', title: 'Goal original' } }
     if (path.endsWith('/conversation')) return { data: { messages: [], before: null } }
     if (path.endsWith('/resources')) return { data: controls() }
     if (path.startsWith('/agent/artifacts')) return { data: [current, previous, { ...artifact('archive'), mimeType: 'application/zip' }] }
@@ -663,13 +661,54 @@ it('separates native deliverables by execution and keeps task failure visible du
 })
 
 
-it('opens a native project row directly without per-row detail requests', () => {
-  render(<NativeProjectSessions projectId="project-a" entries={[{ nativeSessionId: 'native-list-entry', title: 'Review the delivery', taskState: 'waiting_user', createdAt: new Date().toISOString() }]} />)
-  expect(screen.getByText('agent.state.waiting_user')).toBeTruthy()
-  expect(screen.queryByText('agent.task.enterSession')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: /Review the delivery/ }))
-  expect(decodeURIComponent(location.hash)).toContain('/native-list-entry')
-  expect(api).not.toHaveBeenCalled()
+it.each([false, true])('accepts a retained task independently of session closure (%s)', async closed => {
+  const waiting = { ...task('one'), state: 'waiting_user', nativeSession: { id: 'native-one' }, sessionClosure: closed ? { state: 'closed' } : null }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') return { data: {} }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: waiting, sessionClosure: waiting.sessionClosure } }
+  })
+  render(<AgentTasks selectedTask="one" cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'agent.task.accept' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/one/verify', { accepted: true, revision: 1, runId: 'attempt-one' }))
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/close-session'))).toBe(false)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  if (closed) expect(screen.getByRole('button', { name: 'agent.task.sessionRecord' })).toBeTruthy()
+})
+
+it('keeps a removed native session and its unsent draft readable without a composer or periodic requests', async () => {
+  localStorage.setItem('roami.native.draft.' + agentDataKey('/agent/native-sessions/native-one/conversation'), 'Keep my unsent draft')
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/native-sessions/native-one') return { data: { nativeSessionId: 'native-one', taskId: 'one' } }
+    if (path.endsWith('/conversation')) return { data: { messages: [{ id: 'm', role: 'assistant', seq: 1, content: { text: 'Preserved result' } }], before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: { ...task('one'), state: 'waiting_user' }, sessionClosure: { state: 'closed' } } }
+  })
+  render(<NativeSession id="native-one" node={null} projects={[]} onChanged={vi.fn()} />)
+  await screen.findByText('Preserved result')
+  expect(screen.getByText('Keep my unsent draft')).toBeTruthy()
+  expect(screen.getByText('mobile.st.idle')).toBeTruthy()
+  expect(screen.queryByRole('textbox')).toBeNull()
+  const calls = vi.mocked(api).mock.calls.length
+  await act(async () => { await vi.advanceTimersByTimeAsync(15000) })
+  expect(api).toHaveBeenCalledTimes(calls)
+})
+
+it('shows a model authentication failure in chat while keeping the session available for another message', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/native-sessions/auth') return { data: { nativeSessionId: 'auth', taskId: 'one', title: 'Chat' } }
+    if (path.endsWith('/conversation')) return { data: { messages: [], before: null } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('one'), task: { ...task('one'), state: 'failed' }, attempts: [{ id: 'run', revision: 1, state: 'failed', result: { summary: 'MODEL_HTTP_401' } }] } }
+  })
+  render(<NativeSession id="auth" node="selected" projects={[]} onChanged={vi.fn()} />)
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'agent.task.failure.authentication')
+  expect(screen.getByRole('textbox').hasAttribute('disabled')).toBe(false)
+  expect(screen.queryByText('MODEL_HTTP_401')).toBeNull()
 })
 
 
@@ -724,7 +763,7 @@ it('accepts closing a running session and shows asynchronous cleanup failures wi
   const view = render(<AgentTasks cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
   fireEvent.click(await screen.findByRole('button', { name: 'agent.task.closeSession' }))
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.completeAndClose' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'agent.task.closeSession' }))
   await screen.findByText('agent.task.sessionClosing')
   expect(screen.getByRole('button', { name: 'agent.task.closeSession' }).hasAttribute('disabled')).toBe(true)
   view.unmount(); clearAgentDataCache(); phase = 'failed'

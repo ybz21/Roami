@@ -13,6 +13,14 @@ class CreateConversation(Payload):
     projectId: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class RenameNativeSession(Payload):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class CancelTask(Payload):
+    revision: int | None = Field(default=None, ge=1)
+
+
 class SendMessage(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     text: str = Field(default="", max_length=100_000)

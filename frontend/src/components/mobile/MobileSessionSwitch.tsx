@@ -1,4 +1,6 @@
 // 手机会话切换先显示后台工作区中的会话，再显示待处理与最近会话。
+import { useNativeSessionList } from '../sessions/native-session-list'
+import { nativeSessionRecord } from '../sessions/session-record'
 import { useSessionOverview, type OverviewItem } from '../../session-overview'
 import { sessionLabel } from '../sessions/session-label'
 import { useI18n } from '../../i18n'
@@ -16,7 +18,8 @@ export function MobileSessionSwitch({ open, active, terms, onPick, onAll, onClos
   onClose: () => void
 }) {
   const { t } = useI18n()
-  const { value: items } = useSessionOverview(open)
+  const overview = useSessionOverview(open), native = useNativeSessionList(open)
+  const items = [...overview.value, ...native.value.map(nativeSessionRecord)].sort((a, b) => b.lastActivity - a.lastActivity)
 
   const afterSheetGone = (fn: () => void) => {
     let done = false

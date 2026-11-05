@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { agentCommand } from '../agent-command'
 import { useAgentKinds, type AgentKind } from '../agent-kind'
 import { api } from '../api'
+import { nativeSessionId } from '../components/sessions/session-record'
 import { NewProjectModal } from '../components/projects/Projects'
 import RenameSessionModal from '../components/sessions/RenameSessionModal'
 import { TaskComposer } from '../components/sessions/TaskComposer'
@@ -45,6 +46,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   const [prefs] = usePreferences()
   const { t } = useI18n()
   const openTerm = (name: string, task?: TaskKey) => {
+    if (nativeSessionId(name)) { workspace.openTerm(name, task); return }
     if (!sessList.some(s => s.name === name.replace(/[.:]/g, '_'))) directory.refresh()
     workspace.openTerm(name, task)
   }
@@ -123,7 +125,8 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
     const taken = new Set(sessList.map((s) => s.label || s.name))
     for (let i = 2; taken.has(name); i++) name = `${base}-${suffix}${i}`
     try {
-      const parent = parentArg || tree.projects.flatMap(project => project.tasks).find(task => task.path === dir)?.sessions.find(session => !session.dormant)?.name
+      const candidate = parentArg || tree.projects.flatMap(project => project.tasks).find(task => task.path === dir)?.sessions.find(session => !session.dormant)?.name
+      const parent = candidate && !nativeSessionId(candidate) ? candidate : undefined
       const res = parent
         ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork`, { child: name, ...(dir ? { dir } : {}) })
         : await api('POST', '/sessions', dir ? { name, dir } : { name })

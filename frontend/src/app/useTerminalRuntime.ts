@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNativeSessionList } from '../components/sessions/native-session-list'
+import { nativeSessionRecord, nativeSessionId } from '../components/sessions/session-record'
 import { api } from '../api'
 import type { ClaudeInfo } from '../components/terminal/claude-info'
 import { TermHandle, TermStatus } from '../components/terminal/Terminal'
@@ -16,8 +18,9 @@ export function useTerminalRuntime(terms: string[], isMobile: boolean) {
   const [fontSize, setFontSize] = useState(13)
   const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
   const sessionOverview = useSessionOverview(terms.length > 0)
-  const activityMap = useMemo(() => Object.fromEntries(sessionOverview.value.map(item =>
-    [item.name, { running: item.running, waiting: item.waiting }])), [sessionOverview.value])
+  const native = useNativeSessionList(terms.length > 0)
+  const activityMap = useMemo(() => Object.fromEntries([...sessionOverview.value, ...native.value.map(nativeSessionRecord)].map(item =>
+    [item.name, { running: item.running, waiting: item.waiting }])), [sessionOverview.value, native.value])
   const termRefs = useRef<Record<string, TermHandle | null>>({})
   const [claudeMap, setClaudeMap] = useState<Record<string, ClaudeInfo>>({})
   const [claudeView, setClaudeView] = useState<Record<string, boolean>>({})
@@ -32,7 +35,7 @@ export function useTerminalRuntime(terms: string[], isMobile: boolean) {
     let stop = false
     const check = () => {
       if (document.hidden) return
-      terms.forEach(async (n) => {
+      terms.filter(name => !nativeSessionId(name)).forEach(async (n) => {
         try {
           const r = await api('GET', `/sessions/${encodeURIComponent(n)}/claude`)
           if (stop) return

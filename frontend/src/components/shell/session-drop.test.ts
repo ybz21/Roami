@@ -9,6 +9,13 @@ const src: SessionDrag = {
   agent: 'codex',
 }
 
+it('uses an openable chat link for a Roami peer instead of a tmux send command', () => {
+  const text = buildIntro({ ...src, id: 'roami:native', agent: 'native', node: 'node-one' }, 'codex', key => key, 'https://roami.test')
+  expect(text).toContain('https://roami.test/#/term/roami%3Anative?node=node-one')
+  expect(text).not.toContain('roami session send roami:')
+  expect(text).toContain('roami session send codex')
+})
+
 // 真 t()：把 {x} 换掉就行，这里只关心拼出来的形状
 const t = (k: string, v?: Record<string, unknown>) => {
   const table: Record<string, string> = {

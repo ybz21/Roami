@@ -1,7 +1,7 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 21
+SCHEMA_VERSION = 22
 UPGRADES = {
     2: "0002_artifact_metadata.sql",
     3: "0003_resource_controls.sql",
@@ -23,6 +23,7 @@ UPGRADES = {
     19: "0019_project_okr_mains.sql",
     20: "0020_swarm_members.sql",
     21: "0021_member_instances.sql",
+    22: "0022_native_session_labels.sql",
 }
 
 

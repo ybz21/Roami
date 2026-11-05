@@ -29,9 +29,8 @@ def assert_session_open(db, task_id):
 
 
 class TaskSessions:
-    def __init__(self, database, executor, confirm, *, cleanup=None):
-        self.db, self.executor, self.confirm = database, executor, confirm
-        self.cleanup = cleanup
+    def __init__(self, database, executor):
+        self.db, self.executor = database, executor
 
     async def request(self, owner, task_id, revision, run_id):
         def reserve(db):
@@ -215,7 +214,7 @@ class TaskSessions:
             if row(
                 db,
                 tree
-                + "SELECT 1 FROM tasks WHERE id IN (SELECT id FROM tree) AND id!=? AND state NOT IN ('succeeded','failed','cancelled','interrupted') LIMIT 1",
+                + "SELECT 1 FROM tasks t WHERE id IN (SELECT id FROM tree) AND id!=? AND state NOT IN ('succeeded','failed','cancelled','interrupted') AND NOT (state='waiting_user' AND EXISTS(SELECT 1 FROM task_session_closures c WHERE c.task_id=t.id AND c.state='closed')) LIMIT 1",
                 (task_id, task_id),
             ):
                 raise DomainError("TASK_SESSION_BUSY", 409)
@@ -261,23 +260,19 @@ class TaskSessions:
                 "ON CONFLICT(task_id) DO UPDATE SET task_revision=excluded.task_revision,run_id=excluded.run_id,launch_id=excluded.launch_id,session_id=excluded.session_id,state='closing',error_code=NULL,updated_ms=excluded.updated_ms",
                 (task_id, revision, run_id, run["launch_id"], run["session_id"], now_ms()),
             )
-            if run["executor_kind"] == "native" and not self.cleanup:
+            if run["executor_kind"] == "native":
                 finish(db, task, run)
                 return task, run, True
             return task, run, False
 
         task, run, closed = await self.db.call(reserve, write=True)
         if closed:
-            if task["state"] == "waiting_user":
-                await self.confirm(owner, task_id, True, revision=revision, run_id=run_id)
             return {"taskId": task_id, "state": "closed"}
         try:
             if run["executor_kind"] == "cli":
                 result = await self.executor.command("close", "--key", run["launch_id"])
                 if result.get("state") != "closed" or result.get("session") != run["session_id"]:
                     raise DomainError("TASK_SESSION_CLOSE_UNKNOWN", 409)
-            if self.cleanup:
-                await self.cleanup(task, run)
         except (DomainError, OSError, TimeoutError) as exc:
             code = exc.code if isinstance(exc, DomainError) else "TASK_SESSION_CLOSE_UNKNOWN"
             known = code in {
@@ -305,6 +300,4 @@ class TaskSessions:
             raise DomainError(code, 409) from exc
 
         await self.db.call(lambda db: finish(db, task, run), write=True)
-        if task["state"] == "waiting_user":
-            await self.confirm(owner, task_id, True, revision=revision, run_id=run_id)
         return {"taskId": task_id, "state": "closed"}

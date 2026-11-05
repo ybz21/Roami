@@ -3,6 +3,7 @@
 // 仅提交路由不同（fork / fork-worktree，meta 记父子关系）。两处不再各维护一份表单。
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
+import { nativeSessionId } from './session-record'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
@@ -83,8 +84,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
     if (parent) {
       let cancelled = false
-      api('GET', `/sessions/${encodeURIComponent(parent)}/cwd`)
-        .then((r) => { if (!cancelled) setDir(r?.data?.dir || '') }).catch(() => {})
+      api('GET', nativeSessionId(parent) ? `/agent/native-sessions/${encodeURIComponent(nativeSessionId(parent)!)}` : `/sessions/${encodeURIComponent(parent)}/cwd`)
+        .then((r) => { if (!cancelled) setDir(r?.data?.directory || r?.data?.dir || '') }).catch(() => {})
       return () => { cancelled = true }
     }
   }, [open, parent])
@@ -160,7 +161,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
           baseReq = { base: rest.slice(sep + 1), remote: rest.slice(0, sep) }
         }
         const wtReq = adopt ? { branch: adopt, existing: true } : baseReq
-        const res = parent
+        const res = parent && !nativeSessionId(parent)
           ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork-worktree`, {
             child: finalName, dir: sessionDir, ...wtReq,
           })
@@ -175,7 +176,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
         // 主仓库直接用所选目录；「已有 worktree」= 会话 cwd 指进该 worktree；
         // 派生模式走 fork（dir 留空则继承父 cwd）
         if (wtMode === 'existing' && pickedWtPath(existing)) sessionDir = pickedWtPath(existing)
-        const res = parent
+        const res = parent && !nativeSessionId(parent)
           ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork`, {
             child: finalName, ...(sessionDir ? { dir: sessionDir } : {}),
           })

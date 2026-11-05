@@ -11,7 +11,7 @@ const task = (path: string, name: string, sessions: TreeTask['sessions']): TreeT
 
 it('shows recorded descendants under their parent and opens a child in its actual workspace', () => {
   const root = task('/rsi', 'RSI主任务', [{ name: 'parent', label: 'RSI修复', agent: 'codex' }, { name: 'child', label: '答案回归', parent: 'parent' }, { name: 'grandchild', label: '数值验证', parent: 'child' }])
-  const separate = task('/verify', '独立验证', [{ name: 'cross', label: '跨区验证', parent: 'parent', agent: 'codex' }])
+  const separate = task('/verify', '独立验证', [{ name: 'cross', label: '跨区验证', parent: 'parent', agent: 'codex', at: Math.floor(Date.now() / 1000) - 180 }])
   const open = vi.fn()
   render(<I18nProvider><ProjectTree tree={{ projects: [{ key: 'p', name: 'Roami', dir: '/repo', needs: 0, tasks: [root, separate] }], loose: [] }} activeTask={separate.key} activeSession="cross" onProject={vi.fn()} onSession={open} /></I18nProvider>)
   const parent = screen.getByText('RSI修复').closest('.tt-tree-session-branch')!
@@ -21,6 +21,8 @@ it('shows recorded descendants under their parent and opens a child in its actua
   expect(child.querySelector('.tt-tree-children')?.contains(grandchild)).toBe(true)
   const cross = screen.getByText('跨区验证').closest('button')!
   expect(parent.contains(cross)).toBe(true)
+  expect(cross.querySelector('.tm')?.textContent).toBe('3m')
+  expect(cross.querySelector('.directory')?.getAttribute('title')).toBe('/verify')
   expect(screen.queryByText('RSI主任务')).toBeNull()
   expect(screen.queryByText('独立验证')).toBeNull()
   expect(screen.queryByText(/工作区|Workspace|worktree/)).toBeNull()

@@ -73,6 +73,8 @@ func (l *liveTable) prune(alive map[string]string) {
 type overviewItem struct {
 	Name         string `json:"name"`
 	Label        string `json:"label"`
+	Parent       string `json:"parent,omitempty"`
+	Cwd          string `json:"cwd,omitempty"`
 	LastActivity int64  `json:"lastActivity"`
 	Dormant      bool   `json:"dormant"`
 	ProjectKey   string `json:"projectKey,omitempty"`
@@ -112,17 +114,16 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		if strings.HasPrefix(s.Name, "_ttmux-") {
 			continue
 		}
-		it := overviewItem{Name: s.Name, Label: s.Label, LastActivity: rawInt(s.LastActivity), Dormant: s.State == "dormant"}
+		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: rawInt(s.LastActivity), Dormant: s.State == "dormant"}
 		if it.Label == "" {
 			it.Label = s.Name
 		}
 		if an := ann[s.Name]; an != nil {
+			it.Cwd = an.Home
 			dir := an.Home
 			if an.Primary != nil {
 				it.Branch = an.Primary.Branch
-				if an.Primary.Linked {
-					it.Worktree = an.Primary.Worktree
-				}
+				it.Worktree = an.Primary.Worktree
 				dir = an.Primary.Repo
 			}
 			// 主仓库根命中项目；没命中就按 home 目录最长前缀找非 git 项目

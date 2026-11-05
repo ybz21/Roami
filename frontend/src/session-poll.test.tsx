@@ -26,6 +26,23 @@ const visibility = async (value: boolean) => {
   await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
 }
 
+it('waits for a fresh inventory after remount and shares mutation refreshes', async () => {
+  vi.mocked(api).mockResolvedValue({ data: {} })
+  const useInventory = poll(), first = renderHook(() => useInventory())
+  await advance(0)
+  expect(first.result.current.loaded).toBe(true)
+  first.unmount()
+  let finish!: (value: unknown) => void
+  vi.mocked(api).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const next = renderHook(() => useInventory()), second = renderHook(() => useInventory())
+  expect(next.result.current.loaded).toBe(false)
+  await act(async () => { finish({ data: { native: 'native' } }) })
+  expect(next.result.current.loaded).toBe(true)
+  expect(second.result.current.value).toBe(next.result.current.value)
+  await act(async () => { window.dispatchEvent(new Event('roami:sessions-changed')) })
+  expect(api).toHaveBeenCalledTimes(3)
+})
+
 it('shares one polling loop across consumers and keeps unchanged snapshots stable', async () => {
   vi.mocked(api).mockResolvedValue({ data: { one: 'codex' } })
   const useKinds = poll()

@@ -7,6 +7,8 @@
 // 这里全是纯函数：接不接得住、那段话长什么样。文案是纯函数，喂固定输入断言就够，
 // 不必开浏览器看。
 
+import { nativeSessionId } from '../sessions/session-record'
+
 /** 拖拽载荷。自定义 MIME，别用 text/plain——那条会被文件拖放接走（见 isPathDrag） */
 export const SESSION_MIME = 'application/x-tt-session'
 
@@ -97,7 +99,10 @@ type T = (key: string, vars?: Record<string, unknown>) => string
  * - **对面是不是 Agent**：没有 Agent 在跑的会话，收到的每一行都会被 shell 当命令执行。
  *   这条是真用起来才发现的：Roam 告诉我「可以跟它说话」，而那头跑的是 bash
  */
-export function buildIntro(src: SessionDrag, selfId: string, t: T): string {
+export function buildIntro(src: SessionDrag, selfId: string, t: T, origin = ''): string {
+  const sendHint = (id: string) => nativeSessionId(id)
+    ? `${origin}/#/term/${encodeURIComponent(id)}${src.node ? '?node=' + encodeURIComponent(src.node) : ''}`
+    : `roami session send ${id} "…"`
   const who = [src.project, src.label || src.id].filter(Boolean).join(' · ')
   const kind = src.agent ? `（${src.agent}）` : ''
   // 对面没有 Agent 在跑 = 那是个普通 shell，发过去的**是一条命令**，会被直接执行。
@@ -113,11 +118,11 @@ export function buildIntro(src: SessionDrag, selfId: string, t: T): string {
   lines.push(
     '  ' + t('pair.intro.id', { id: src.id }),
     '',
-    '  ' + t('pair.intro.sendHead'),
-    `    roami session send ${src.id} "…"`,
+    '  ' + t(nativeSessionId(src.id) ? 'pair.intro.openChat' : 'pair.intro.sendHead'),
+    '    ' + sendHint(src.id),
     '',
     '  ' + t('pair.intro.replyHead'),
-    `    roami session send ${selfId} "…"`,
+    '    ' + sendHint(selfId),
     '',
     '  ' + t(peerNote),
   )

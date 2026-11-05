@@ -11,7 +11,6 @@ import Markdown from '../markdown/Markdown'
 import AgentMemory from './AgentMemory'
 import { openAgentPage } from './agent-page-route'
 import AgentTasks from './AgentTasks'
-import NativeSession from './NativeSession'
 import { taskFailureKey } from './task-failure'
 import AgentWorkspaceRail from './AgentWorkspaceRail'
 import { useAgentWorkspace } from './useAgentWorkspace'
@@ -47,8 +46,7 @@ export function agentFailure(error: any, t: (key: string) => string) {
 }
 const newKey = () => crypto.randomUUID()
 
-export default function AgentChat({ cid, branch, focusMessage = '', inactive = false, nativeSession, onCloseNative, node, inbox, inboxOpen, select, notifications, projects, onSession, mobileActionsHost }: {
-  nativeSession?: string; onCloseNative?: () => void
+export default function AgentChat({ cid, branch, focusMessage = '', inactive = false, node, inbox, inboxOpen, select, notifications, projects, onSession, mobileActionsHost }: {
   cid: string; branch: string; focusMessage?: string; inactive?: boolean; node: string | null; inbox: AgentInboxState; inboxOpen: boolean
   select: (cid: string, branch?: string, message?: string) => void; notifications: () => void
   projects: { id: string; name: string }[]; onSession: (session: string) => void; onOverview: () => void
@@ -267,7 +265,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
     onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true) } }}
     onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); setDragging(false); void addFiles(Array.from(event.dataTransfer.files)) } }}>
-    {!phone && !(wide && (workspace.open || nativeSession)) && <div className="agent-chat-actions">
+    {!phone && !(wide && workspace.open) && <div className="agent-chat-actions">
       {conversationActions}
       {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
     </div>}
@@ -328,6 +326,6 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>
     </Modal>
   </section>
-  {wide && nativeSession ? <aside className="agent-workspace-rail agent-native-workspace" aria-label={t('agent.session')}><div className="agent-native-workspace-nav"><button type="button" className="tt-act" onClick={onCloseNative}>{t('common.back')}</button><span>{t('agent.session')}</span></div><NativeSession id={nativeSession} node={node} projects={projects} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} /></aside> : !inactive && wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
+  {!inactive && wide && workspace.open && <AgentWorkspaceRail key={`${node || 'local'}:${cid}:${thread.view?.branchId || ''}`} cid={cid} connected={thread.connected} actions={secondaryActions} inbox={inbox} tab={workspace.tab} task={workspaceTask} change={tab => { workspace.change({ tab }); setWorkspaceTask('') }} close={() => workspace.change({ open: false })} onTask={openWorkspaceTask} onSession={onSession} onChanged={() => { thread.refresh(); inbox.refresh() }} projects={projects} select={select} />}
   </div>
 }

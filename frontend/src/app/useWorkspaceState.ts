@@ -1,5 +1,6 @@
 import { message } from 'antd'
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { nativeSessionId } from '../components/sessions/session-record'
 import { api } from '../api'
 import { currentNodeId } from '../components/cluster/node-url'
 import { loadTabs, forgetTabs } from '../components/terminal/term-tabs-store'
@@ -22,7 +23,7 @@ export function useWorkspaceState(nodeId: string | null, directory: SessionDirec
     const legacy = loadTabs(nodeId)
     const url = readTermTokens()
     const ids = directoryRef.current.sessIds
-    const terms = (url.terms.length ? url.terms : legacy.terms).map(id => ids?.byName[id] || id).filter(id => !!ids?.byId[id])
+    const terms = (url.terms.length ? url.terms : legacy.terms).map(id => ids?.byName[id] || id).filter(id => !!ids?.byId[id] || (nativeSessionId(id) && !directoryRef.current.nativeSessionsLoaded))
     const selected = url.active || legacy.active
     return { ...legacy, terms, active: ids?.byName[selected] || selected }
   }, () => {

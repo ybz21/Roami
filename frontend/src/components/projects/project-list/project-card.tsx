@@ -85,8 +85,8 @@ export function ProjectCard({ p, swarms, index, openTerm, refresh }: {
       </div>
 
       <div className="prj-cstat">
-        <span><b>{p.sessions}</b> {t('project.tasks')}</span>
-        {p.git && <>·<span><b>{p.worktrees}</b> worktree</span></>}
+        {p.sessions > 0 && <span><b>{p.sessions}</b> {t('nav.sessions')}</span>}
+        {p.git && <>{p.sessions > 0 && '·'}<span><b>{p.worktrees}</b> worktree</span></>}
         {p.races > 0 && <Tag style={{ margin: 0 }}>{t('project.race', { count: p.races })}</Tag>}
         {/* 「可清理」是零损失的一键动作，不进「需要你」，留在这里当状态标就够 */}
         {p.cleanable > 0 && <Tag style={{ margin: 0 }}>{t('project.cleanableCount', { count: p.cleanable })}</Tag>}

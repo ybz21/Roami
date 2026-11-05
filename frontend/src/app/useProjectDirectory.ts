@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNativeSessionList } from '../components/sessions/native-session-list'
 import { api } from '../api'
 import { loadSwarmDirectory } from '../components/swarm/swarm-directory'
 import { buildSessionProjects, setSessionProjects } from '../components/sessions/session-project'
 import { loadTreeSrc, saveTreeSrc, type TreeSrc } from '../components/shell/task-tree-snapshot'
 
 export function useProjectDirectory(hasSider: boolean, gitDir: string) {
+  const native = useNativeSessionList()
+  const nativeRef = useRef(native.value), annotations = useRef<Record<string, any>>({})
+  nativeRef.current = native.value
   const [treeSrc, setTreeSrc] = useState<TreeSrc>(() => {
     const s = loadTreeSrc()
     if (s.placement && Object.keys(s.placement).length) setSessionProjects(s.placement)
     return s
   })
+  useEffect(() => { setSessionProjects(buildSessionProjects(treeSrc.projects, annotations.current, native.value)) }, [treeSrc.projects, native.value])
   const treeSrcRef = useRef(treeSrc)
   const [projectsLoaded, setProjectsLoaded] = useState(treeSrc.projects.length > 0)
   const [projectsError, setProjectsError] = useState(false)
@@ -45,7 +50,8 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
         void anP.then((an) => {
           if (stop || !an?.data) return
           const known = treeSrcRef.current.projects
-          if (known.length) setSessionProjects(buildSessionProjects(known, an.data))
+          annotations.current = an.data
+          if (known.length) setSessionProjects(buildSessionProjects(known, an.data, nativeRef.current))
         })
         const [pr, an, sw] = await Promise.all([prP, anP, swP])
         if (stop) return
@@ -53,7 +59,8 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
         setProjectsLoaded(true)
         setProjectsError(false)
         setUnfinished(projects.reduce((n: number, p: any) => n + (p.unfinished || 0), 0))
-        const placement = buildSessionProjects(projects, an?.data || {})
+        annotations.current = an?.data || {}
+        const placement = buildSessionProjects(projects, annotations.current, nativeRef.current)
         setSessionProjects(placement)
         if (sw) setSwarmCount(sw.filter(group => !group.archived).length)
         void loadGit()

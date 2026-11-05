@@ -7,7 +7,7 @@ import { applyWorkspaceChange, type WorkspaceState } from './workspace-state'
 
 vi.mock('../components/shell/useWorkspaceLayout', () => ({ useWorkspaceLayout: () => ({ setDockOpen: vi.fn(), setFocus: vi.fn() }) }))
 vi.mock('../components/sessions/session-project', () => ({ useSessionProjects: () => ({}) }))
-vi.mock('../components/cluster/node-url', async importOriginal => ({ ...await importOriginal<typeof import('../components/cluster/node-url')>(), currentNodeId: () => 'node-a' }))
+vi.mock('../components/cluster/node-url', async importOriginal => ({ ...await importOriginal<typeof import('../components/cluster/node-url')>(), currentNodeId: () => 'node-a', useCurrentNodeId: () => 'node-a' }))
 const mock = vi.hoisted(() => ({ api: vi.fn() }))
 vi.mock('../api', () => ({ api: mock.api }))
 
@@ -22,6 +22,7 @@ beforeEach(() => {
   localStorage.clear(); go.mockClear(); history.replaceState(null, '', '#/w')
   server = { revision: 1, terms: ['$1'], active: '$1', files: [], activeFile: '' }
   mock.api.mockReset().mockImplementation(async (method, path, body) => {
+    if (path === '/agent/native-sessions') return { data: [] }
     if (path === '/sessions') return Object.entries(ids.byId).map(([id, name]) => ({ id, name }))
     if (path !== '/workspace') throw new Error(path)
     if (method === 'PATCH') {
@@ -101,4 +102,46 @@ describe('server workspace lifecycle', () => {
     expect(result.current.workspace.activeFile).toBe('')
     await waitFor(() => expect(server.files.map(file => file.path)).toEqual(['/repo/one.md']))
   })
+})
+
+
+it('opens Roami beside Codex in the shared workspace and restores its stable identity', async () => {
+  const base = mock.api.getMockImplementation()!
+  mock.api.mockImplementation(async (method, path, body) => path === '/agent/native-sessions' ? { data: [{ nativeSessionId: 'native', taskId: 'task', title: 'Roami chat', taskState: 'waiting_user' }] } : base(method, path, body))
+  const first = renderHook(() => useWorkspace(true))
+  await waitFor(() => expect(first.result.current.directory.sessListLoaded).toBe(true))
+  act(() => first.result.current.workspace.openTerm('roami:native'))
+  await waitFor(() => expect(server.active).toBe('roami:native'))
+  expect(first.result.current.workspace.terms).toEqual(['alpha', 'roami:native'])
+  expect(first.result.current.workspace.overlay).toBe(true)
+  first.unmount()
+  const next = renderHook(() => useWorkspace())
+  await waitFor(() => expect(next.result.current.workspace.active).toBe('roami:native'))
+  expect(next.result.current.workspace.terms).toEqual(['alpha', 'roami:native'])
+})
+
+it('loads the workspace while the Roami inventory is pending and prunes only after a fresh response', async () => {
+  server.terms = ['$1', 'roami:pending']; server.active = 'roami:pending'
+  let finish!: (value: unknown) => void
+  const base = mock.api.getMockImplementation()!
+  mock.api.mockImplementation((method, path, body) => path === '/agent/native-sessions' ? new Promise(resolve => { finish = resolve }) : base(method, path, body))
+  const { result } = renderHook(() => useWorkspace())
+  await waitFor(() => expect(result.current.workspace.active).toBe('roami:pending'))
+  expect(result.current.workspace.terms).toEqual(['alpha', 'roami:pending'])
+  await act(async () => { finish({ data: [] }) })
+  await waitFor(() => expect(server.terms).toEqual(['$1']))
+})
+
+it('keeps session identities and open tabs stable when only Roami activity changes', async () => {
+  let state = 'running'
+  const base = mock.api.getMockImplementation()!
+  mock.api.mockImplementation((method, path, body) => path === '/agent/native-sessions' ? Promise.resolve({ data: [{ nativeSessionId: 'native', taskId: 'task', title: 'Chat', taskState: state }] }) : base(method, path, body))
+  const { result } = renderHook(() => useWorkspace())
+  await waitFor(() => expect(result.current.directory.sessList.some(session => session.name === 'roami:native')).toBe(true))
+  const identities = result.current.directory.sessIds, terms = result.current.workspace.terms
+  state = 'succeeded'
+  await act(async () => { window.dispatchEvent(new Event('roami:sessions-changed')) })
+  await waitFor(() => expect(result.current.directory.sessList.find(session => session.name === 'roami:native')).toMatchObject({ running: false }))
+  expect(result.current.directory.sessIds).toBe(identities)
+  expect(result.current.workspace.terms).toBe(terms)
 })
