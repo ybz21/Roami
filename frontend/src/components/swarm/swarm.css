@@ -6,7 +6,6 @@
 .swarm-note { color:var(--text-dim); }
 p.swarm-note { padding:var(--sp-3) var(--sp-4); margin:0; }
 .swarm-state { white-space:nowrap; }
-.swarm-managed-grid { flex:1; min-height:0; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(calc(var(--sp-5) * 16),calc(var(--sp-5) * 24)); overflow:hidden; }
 .swarm-main-area { height:100%; min-height:0; min-width:0; overflow:auto; }
 .swarm-panel-head { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); padding:var(--sp-3) var(--sp-4); font-size:var(--fs-sm); }
 .swarm-panel-head strong { font-weight:500; }
@@ -42,6 +41,10 @@ p.swarm-note { padding:var(--sp-3) var(--sp-4); margin:0; }
 .swarm-chat-composer .ant-input { background:transparent; }
 .swarm-work-detail { padding:var(--sp-4); border-top:1px solid var(--border-subtle); overflow:auto; }
 .swarm-work-detail section { margin-top:var(--sp-4); }
+.swarm-member-detail { height:100%; min-height:0; overflow:auto; padding:var(--sp-4); background:var(--bg-base); }
+.swarm-member-detail[data-compact="true"] { height:auto; overflow:visible; }
+.swarm-member-detail > details { padding:var(--sp-3) 0; border-bottom:1px solid var(--border-subtle); }
+.swarm-board[hidden] { display:none; }
 .swarm-work-detail h3,.swarm-work-detail h4 { font-size:var(--fs-body); margin:0; }
 .swarm-description { margin-block:var(--sp-4); }
 .swarm-description summary { cursor:pointer; min-height:var(--tap); display:flex; align-items:center; }
@@ -64,7 +67,6 @@ html[data-pointer="coarse"] .swarm-studio-label { min-height:var(--tap); display
 html[data-pointer="coarse"] .swarm-studio-label::after { position:absolute; content:''; inset:calc(-1 * var(--sp-1)); }
 html[data-pointer="coarse"] .swarm-studio-label[aria-pressed="false"] { display:none; }
 html[data-pointer="coarse"] .swarm-member { min-height:var(--tap); }
-html:is([data-size="compact"],[data-size="medium"]) .swarm-managed-grid { display:flex; flex-direction:column; overflow:hidden; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-main-area { height:100%; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-chat { flex:1; height:auto; border:0; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-stage { height:calc(var(--sp-5) * 12); }
@@ -86,7 +88,6 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-studio { height:auto;
 html:is([data-size="compact"],[data-size="medium"]) .swarm-stage { flex:none; height:calc(var(--sp-5) * 12); }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-studio-area .swarm-member-list { border:0; flex:1; min-height:0; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-page-identity h2 { font-size:var(--fs-lg); max-width:calc(var(--sp-5) * 8); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm-managed[data-tab="studio"] .swarm-managed-grid { padding-bottom:max(var(--kb),env(keyboard-inset-height,0px)); }
 html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm-managed[data-tab="studio"] > :is(.tt-pagehead,.swarm-tabs,.swarm-stream-error) { display:none; }
 .swarm-directory { height:100%; overflow:auto; }
 .swarm-directory .tt-pagehead { padding:var(--sp-3) var(--sp-4); margin:0; border-bottom:1px solid var(--border-subtle); }
@@ -103,7 +104,6 @@ html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm
 .swarm-project-card p { color:var(--text-dim); font-size:var(--fs-sm); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .swarm-project-card small { font-size:var(--fs-meta); color:var(--text-dim); }
 
-.swarm-managed-grid[hidden] { display:none; }
 .swarm-memory { flex:1; min-height:0; overflow:auto; padding:var(--sp-4); }
 .swarm-memory textarea { font-size:var(--fs-body); }
 .swarm-memory > details { margin-top:var(--sp-4); }
@@ -160,14 +160,8 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { g
 
 .swarm-relation-actions { display:flex; flex-wrap:wrap; gap:var(--sp-3); margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--border-subtle); }
 
-.swarm-chat-conversation { display:flex; flex-shrink:0; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
-.swarm-chat-conversation label { color:var(--text-dim); font-size:var(--fs-sm); }
-.swarm-chat-conversation .ant-select { flex:1; min-width:0; }
 .swarm-chat-context { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); min-height:var(--tap); padding:var(--sp-1) var(--sp-4); flex-shrink:0; color:var(--text-dim); font-size:var(--fs-meta); }
-html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="false"] .swarm-main-area { display:none; }
-html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="studio"][data-team-open="true"] .swarm-main-area { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-managed[data-tab="board"] .swarm-chat { display:none; }
-html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm-managed[data-tab="studio"] .swarm-main-area { display:none; }
 
 /* The scene and chat share the canvas; assignment details no longer sit above it. */
 .swarm-managed > .tt-pagehead { display:flex; align-items:center; gap:var(--sp-3); padding-block:var(--sp-2); }
@@ -175,7 +169,6 @@ html:is([data-size="compact"],[data-size="medium"])[data-keyboard="open"] .swarm
 .swarm-managed > .tt-pagehead .acts { margin-left:auto; display:flex; align-items:center; gap:var(--sp-3); }
 .swarm-managed > .tt-pagehead .swarm-tabs { padding:0; border:0; }
 .swarm-tabs button { flex:none; padding-inline:var(--sp-3); }
-.swarm-managed-grid { grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr); }
 .swarm-managed[data-tab="studio"] .swarm-main-area { overflow:hidden; }
 .swarm-studio-area { height:100%; min-height:0; }
 .swarm-studio-area > .swarm-studio { flex:1; height:auto; min-height:0; }
@@ -205,6 +198,30 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-stage { flex:1; heigh
 html:is([data-size="compact"],[data-size="medium"]) .swarm-studio-area .swarm-relations { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { grid-auto-flow:row; grid-auto-columns:auto; overflow:visible; }
 
-.swarm-team-page { display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg-base); }
-.swarm-team-page > .swarm-studio-area { flex:1; min-height:0; }
-html:is([data-size="compact"],[data-size="medium"]) .swarm-team-page .swarm-relations { display:block; max-height:35%; }
+
+.swarm-conversation-workspace { display:grid; grid-template-columns:calc(var(--sp-5) * 10) minmax(0,1fr); flex:1; min-height:0; min-width:0; overflow:hidden; }
+.swarm-conversations { min-width:0; min-height:0; overflow:auto; padding:var(--sp-2); border-right:1px solid var(--border-subtle); background:var(--bg-base); }
+.swarm-conversations > button { position:relative; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; width:100%; min-height:var(--tap); padding:var(--sp-2) var(--sp-3); gap:var(--sp-1); border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-bright); font:inherit; cursor:pointer; text-align:start; }
+.swarm-conversations > button strong { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-body); font-weight:500; }
+.swarm-conversations > button small { color:var(--text-dim); font-size:var(--fs-meta); }
+.swarm-conversations > button[aria-pressed="true"] { background:var(--sel-bg); }
+.swarm-conversations > button[aria-pressed="true"]::before { content:''; position:absolute; inset-block:var(--sp-2); inset-inline-start:0; border-left:2px solid var(--accent); }
+.swarm-conversations > h3 { margin:var(--sp-4) var(--sp-3) var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; }
+.swarm-conversations > button:focus-visible { outline:2px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
+:where(html[data-pointer="fine"]) .swarm-conversations > button:hover { background:var(--list-hover); }
+.swarm-conversation-pane { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+.swarm-conversation-head { display:flex; align-items:center; flex-shrink:0; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); min-height:var(--tap); border-bottom:1px solid var(--border-subtle); }
+.swarm-conversation-head > div:first-of-type { min-width:0; flex:1; }
+.swarm-conversation-head strong { display:block; font-size:var(--fs-body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.swarm-conversation-head small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.swarm-conversation-pane > :is(.swarm-chat,.okr-main-chat) { flex:1; width:100%; height:auto; min-height:0; border:0; padding:0; }
+.swarm-conversation-pane .okr-chat-messages { padding:var(--sp-4); }
+.swarm-conversation-pane :is(.okr-chat-transcript,.swarm-conversation-messages) { width:100%; max-width:calc(var(--sp-5) * 32); margin-inline:auto; }
+.swarm-conversation-pane :is(.conversation-composer,.swarm-chat-composer) { flex-shrink:0; width:calc(100% - var(--sp-4) * 2); max-width:calc(var(--sp-5) * 34); margin:var(--sp-3) auto; }
+.swarm-conversation-pane .swarm-member-detail { flex:1; height:auto; }
+.swarm-managed > .swarm-main-area { flex:1; height:auto; }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspace { display:flex; flex-direction:column; }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-pane { flex:1; }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-conversations { border:0; }
+html[data-pointer="coarse"] .swarm-conversation-head .tt-act { position:relative; }
+html[data-pointer="coarse"] .swarm-conversation-head .tt-act::after { content:''; position:absolute; min-height:var(--tap); min-width:var(--tap); top:50%; left:50%; transform:translate(-50%,-50%); }
