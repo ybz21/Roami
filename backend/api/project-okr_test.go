@@ -316,3 +316,25 @@ func TestProjectOKRSyncAndSharedMemory(t *testing.T) {
 	}
 	projectOKRRequest(t, router, "POST", endpoint+"/sync", `{"revision":1}`, 409)
 }
+
+func TestProjectOKRMemoryAppendPreservesPriorAndRejectsUnknownMode(t *testing.T) {
+	_, router, id := projectOKRFixture(t)
+	endpoint := "/projects/" + id + "/okr"
+	w := decodeProjectOKR(t, projectOKRRequest(t, router, "PUT", endpoint, projectOKRConfigJSON(), 200))
+	memory := func(mode, content, hash string, status int) *httptest.ResponseRecorder {
+		payload, _ := json.Marshal(map[string]string{"mode": mode, "content": content, "expectedSha256": hash})
+		return projectOKRRequest(t, router, "PUT", endpoint+"/memory", string(payload), status)
+	}
+	w = decodeProjectOKR(t, memory("append", "Existing receipt", w.ProjectFiles.TeamMemorySha256, 200))
+	previous := w.ProjectFiles.TeamMemorySha256
+	w = decodeProjectOKR(t, memory("append", "New dated fact", previous, 200))
+	if w.ProjectFiles.TeamMemory != "Existing receipt\n\nNew dated fact" {
+		t.Fatal(w.ProjectFiles.TeamMemory)
+	}
+	memory("append", "Stale", previous, 409)
+	memory("probe", "Wrong", w.ProjectFiles.TeamMemorySha256, 400)
+	current := decodeProjectOKR(t, projectOKRRequest(t, router, "GET", endpoint, "", 200))
+	if current.ProjectFiles.TeamMemory != w.ProjectFiles.TeamMemory {
+		t.Fatal("failed write changed memory")
+	}
+}

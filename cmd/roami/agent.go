@@ -79,6 +79,9 @@ func runAgent(args []string) int {
 	revision := fs.Int("revision", 1, "task revision")
 	source := fs.String("source", "local-cli", "proactive source")
 	title := fs.String("title", "New conversation", "conversation title")
+	limit := fs.Int("limit", 20, "history page size (1-100)")
+	before := fs.String("before", "", "history olderCursor from the previous page")
+	branch := fs.String("branch", "", "history branch ID")
 	_ = fs.Bool("json", true, "JSON output")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
@@ -146,7 +149,10 @@ func runAgent(args []string) int {
 		if *conversation == "" {
 			return fail(fmt.Errorf("--conversation is required"))
 		}
-		path = "/v1/conversations/" + url.PathEscape(*conversation) + "/messages"
+		path, err = agentHistoryPath(*conversation, *limit, *before, *branch)
+		if err != nil {
+			return fail(err)
+		}
 	case "send", "notify":
 		if *conversation == "" {
 			return fail(fmt.Errorf("--conversation is required"))
@@ -394,9 +400,13 @@ func agentRequest(socket, method, path string, body any) ([]byte, error) {
 		return nil, fmt.Errorf("AGENT_RUNTIME_UNAVAILABLE: %w", err)
 	}
 	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	const responseLimit = 4 << 20
+	raw, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(raw) > responseLimit {
+		return nil, fmt.Errorf("AGENT_RESPONSE_TOO_LARGE: response exceeds 4 MiB; for history, use --limit with page.olderCursor as --before")
 	}
 	if response.StatusCode >= 400 {
 		return raw, fmt.Errorf("agent HTTP %d", response.StatusCode)

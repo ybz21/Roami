@@ -324,6 +324,7 @@ func (a *API) ProjectOKRMemory(c *gin.Context) {
 		Content        *string `json:"content"`
 		ExpectedSha256 string  `json:"expectedSha256"`
 		Revision       *int64  `json:"revision,omitempty"`
+		Mode           string  `json:"mode,omitempty"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20))
 	decoder.DisallowUnknownFields()
@@ -331,7 +332,16 @@ func (a *API) ProjectOKRMemory(c *gin.Context) {
 		okrError(c, okr.ErrInvalid)
 		return
 	}
-	w, err := a.ProjectOKR.WriteMemory(projectID, *body.Content, body.ExpectedSha256)
+	var w *okr.Workspace
+	var err error
+	switch body.Mode {
+	case "", "replace":
+		w, err = a.ProjectOKR.WriteMemory(projectID, *body.Content, body.ExpectedSha256)
+	case "append":
+		w, err = a.ProjectOKR.AppendMemory(projectID, *body.Content, body.ExpectedSha256)
+	default:
+		err = okr.ErrInvalid
+	}
 	if err != nil {
 		okrError(c, err)
 		return

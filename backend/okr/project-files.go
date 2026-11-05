@@ -868,6 +868,14 @@ func (s *Store) SyncValidated(projectID string, revision int64, validateConfig f
 }
 
 func (s *Store) WriteMemory(projectID, content, expectedSha256 string) (*Workspace, error) {
+	return s.updateMemory(projectID, content, expectedSha256, false)
+}
+
+func (s *Store) AppendMemory(projectID, content, expectedSha256 string) (*Workspace, error) {
+	return s.updateMemory(projectID, content, expectedSha256, true)
+}
+
+func (s *Store) updateMemory(projectID, content, expectedSha256 string, appendContent bool) (*Workspace, error) {
 	if s.projects == nil || len(content) > maxMemory || len(expectedSha256) != 64 {
 		return nil, ErrInvalid
 	}
@@ -892,7 +900,26 @@ func (s *Store) WriteMemory(projectID, content, expectedSha256 string) (*Workspa
 		err = ErrConflict
 	}
 	if err == nil {
-		err = atomicFile(root, "memory/team.md", []byte(content))
+		if appendContent && len(b) > 0 && content != "" {
+			separator := "\n\n"
+			if bytes.HasSuffix(b, []byte("\n\n")) {
+				separator = ""
+			} else if bytes.HasSuffix(b, []byte("\n")) {
+				separator = "\n"
+			}
+			content = string(b) + separator + content
+		} else if appendContent && content == "" {
+			content = string(b)
+		}
+		if len(content) > maxMemory {
+			err = ErrInvalid
+		} else if !bytes.Equal(b, []byte(content)) {
+			// Retain the exact prior bytes before replacing the current memory.
+			err = atomicFile(root, "memory/history/"+hashText(b)+".md", b)
+			if err == nil {
+				err = atomicFile(root, "memory/team.md", []byte(content))
+			}
+		}
 	}
 	unlock()
 	if err != nil {
