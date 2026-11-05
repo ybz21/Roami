@@ -70,10 +70,10 @@ flowchart TD
 
 隔离专项已验证：同一成员三轮保持同 task/native conversation/branch，各轮 run 和真实测试文件分别保留；未验收前为 waiting_user，显式验收后才 succeeded；投递接受时 roundCount 不增加；未知结果续派被拒绝；隐式追加 research-r2 被拒绝；跨 owner/团队/Worker 越权与遗忘来源被隔离。87项相关 Python 专项及 Go CLI/存储/路由专项通过，真实 Go CLI → 私有 Python API 联验通过。CLI 联验使用注入测试模型和私有数据库，不是线上宣传执行。
 
-证据 `/tmp/okr-member-rounds/{combined-tests.log,go-tests.log,cli-proof.log,cli-proof.json}`。完整门禁与 PR 记录另补。
+证据 `/tmp/okr-member-rounds/{combined-tests.log,go-tests.log,cli-proof.log,cli-proof.json}`。最终门禁见下；PR 与后续进展继续记录在 #656。
 
 仍待下一阶段：无任务职责的真实常驻原生实例、成员视图接入、Codex/Claude 终端消失后的可信原 provider 会话恢复，以及现有重复职责的显式 CAS 映射。以上不能因成员行或轮次账本已存在就视为完成；不对线上 unknown 任务做恢复、重试或清理。
 
-发布前兼容复核补充：旧团队（memberProtocol=0）的 `members --json` 保持原工作项格式，即使新服务已提供成员元数据；显式登记后的协议1才返回成员格式。HTTP 计划中未提供 `memberId` 时仅省略该新增字段，不改变旧字段默认值，确保升级前的幂等回执可原样重放。兼容专项58项及 Go CLI 回归通过。第一阶段提交门禁已通过，Python3443 passed/48 skipped；兼容修正后的最终门禁仍需完成。
+发布前兼容复核补充：旧团队（memberProtocol=0）的 `members --json` 保持原工作项格式，即使新服务已提供成员元数据；显式登记后的协议1才返回成员格式。HTTP 计划中未提供 `memberId` 时仅省略该新增字段，不改变旧字段默认值，确保升级前的幂等回执可原样重放。兼容专项58项及 Go CLI 回归通过。最终兼容与并发修正已完成 quick/full，结果见下。
 
-提交前独立并发复核又复现两项边界，并已修正：旧团队仅编辑依赖不启用成员协议1；任务创建、成员归属和首轮请求通过同一数据库事务提交，消除创建后立即续派导致第二轮漏记的窗口。两个回归修复前均失败，修复后成员/协作/续派69项专项通过；兼容提交 quick 为 Python3444 passed/48 skipped。最终源码仍须完成 quick/full，不能沿用前一提交的门禁结果。
+提交前独立并发复核又复现两项边界，并已修正：旧团队仅编辑依赖不启用成员协议1；任务创建、成员归属和首轮请求通过同一数据库事务提交，消除创建后立即续派导致第二轮漏记的窗口。两个回归修复前均失败，修复后成员/协作/续派69项专项通过；兼容提交 quick 为 Python3444 passed/48 skipped。最终运行时代码为 `56c132d8`：quick 和 full 均通过，Python 各3446 passed/48 skipped，Go全量、前端typecheck/i18n/hover与生产构建、CLI入口/敏感信息/文件策略审计通过。真实 CLI 联验在 `/tmp/okr-member-rounds/cli-5` 使用最终源码再次通过，三轮继续同一个成员、task、native conversation/branch，每轮各自验收与文件；无任务重复或执行重放。门禁日志 `/tmp/okr-member-rounds/{atomic-commit.log,full.log}`，图文证据 `/tmp/okr-member-rounds/acceptance.html`。本轮没有修改 Web UI，无手机操作或线上部署。
