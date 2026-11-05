@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,6 +13,9 @@ jobs:
   quality:
     name: Build, Test, And Compliance
     runs-on: ubuntu-latest
+    env:
+      QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      QUALITY_HEAD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,49 +32,38 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Select Python checks
+        id: python
+        run: node scripts/dev/quality/python-check-plan.mjs "${{ github.event_name == 'workflow_dispatch' && 'release' || 'full' }}" --github-output
+
       - uses: actions/setup-python@v5
+        if: steps.python.outputs.python == 'true'
         with:
           python-version: '3.12'
 
       - name: Install Python package runner
+        if: steps.python.outputs.python == 'true'
         run: python -m pip install uv==0.11.2
+
+      - name: Install report dependencies
+        if: steps.python.outputs.market == 'true'
+        run: |
+          if ! command -v soffice >/dev/null || ! command -v pdftoppm >/dev/null || ! command -v pdffonts >/dev/null || ! command -v fc-match >/dev/null || ! dpkg -s fonts-liberation 2>/dev/null | grep -q '^Status: install ok installed$'; then
+            sudo apt-get update
+            sudo apt-get install -y libreoffice-impress poppler-utils fontconfig fonts-liberation
+          fi
+
+      - name: Install video dependencies
+        if: steps.python.outputs.video == 'true'
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
 
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
       - name: Run quality gate
-        env:
-          QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          QUALITY_HEAD_SHA: ${{ github.sha }}
-        run: scripts/dev/quality/check.sh full
-
-      - name: Check external presentation Skill
-        run: |
-          uv run --project agent-runtime --frozen ruff check skills/presentation-edit
-          uv run --project agent-runtime --frozen ruff format --check skills/presentation-edit
-          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/presentation-edit/tests
-
-      - name: Check external tabular Skill
-        run: |
-          uv run --project agent-runtime --frozen ruff check skills/tabular-analysis
-          uv run --project agent-runtime --frozen ruff format --check skills/tabular-analysis
-          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/tabular-analysis/tests
-
-      - name: Check external market report Skill
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libreoffice-impress poppler-utils fontconfig fonts-liberation
-          uv run --project agent-runtime --frozen ruff check skills/market-series-report cases/case-99-mech-mp01/scripts
-          uv run --project agent-runtime --frozen ruff format --check skills/market-series-report cases/case-99-mech-mp01/scripts
-          uv run --isolated --with 'pandas>=2.2,<4' --with 'matplotlib>=3.8,<4' --with 'python-pptx>=1,<2' --with pytest pytest -q -p no:cacheprovider skills/market-series-report/tests
-
-      - name: Check external video assembly Skill
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-          fi
-          uv run --project agent-runtime --frozen ruff check skills/video-assembly
-          uv run --project agent-runtime --frozen ruff format --check skills/video-assembly
-          uv run --project agent-runtime --frozen pytest -q -p no:cacheprovider skills/video-assembly/tests
+        run: scripts/dev/quality/check.sh "${{ github.event_name == 'workflow_dispatch' && 'release' || 'full' }}"
