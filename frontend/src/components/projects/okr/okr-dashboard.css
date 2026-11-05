@@ -18,7 +18,6 @@
 .okr-result[data-met="true"] .okr-progress>i{background:var(--ok-solid)}
 .okr-delta{font-size:var(--fs-meta);color:var(--text-dim)}
 .okr-trend,.okr-focus{min-width:0;padding:var(--sp-4);border:1px solid var(--border-subtle);border-radius:var(--r-card);background:var(--bg-container)}
-.okr-trend .ant-select{min-width:0;width:calc(var(--sp-5)*8);max-width:100%}
 .okr-trend .okr-section-head{flex-wrap:wrap}
 .okr-trend-canvas{height:calc(var(--sp-5)*9);width:100%;min-width:0}
 .okr-trend-value{display:flex;gap:var(--sp-3);align-items:baseline;flex-wrap:wrap;margin-block:var(--sp-3)}
@@ -80,8 +79,9 @@ html:is([data-size="compact"],[data-size="medium"]) .okr-objective-head h2{font-
 .okr-board-toolbar{flex-shrink:0;padding-top:var(--sp-3)}
 .okr-inner-tabs{flex:1;min-height:0}
 .okr-inner-tabs>.ant-tabs-content-holder{min-height:0;overflow:auto;overscroll-behavior:contain;padding-bottom:var(--sp-5)}
-.okr-dashboard-widgets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-4);padding-block:var(--sp-4)}
+.okr-dashboard-widgets{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-4);padding-block:var(--sp-4)}
 .okr-dashboard-widgets>.okr-board{grid-column:1/-1}
+.okr-trend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*20)),1fr));gap:var(--sp-4);min-width:0}
 .okr-initiative-grid,.okr-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-4)}
 .okr-initiative,.okr-status-task{min-width:0;padding-block:var(--sp-3);border-top:1px solid var(--border-subtle);overflow-wrap:anywhere}
 .okr-status-task>section{margin-block:var(--sp-4)}
@@ -94,7 +94,7 @@ a.okr-deliverable:focus-visible{outline:2px solid var(--accent);outline-offset:v
 .okr-dashboard-config{width:100%}
 .okr-team-memory .okr-actions{margin:0}
 .okr-team-memory form{max-width:var(--content-form)}
-.okr-detail-layout:has(>.okr-main-chat) :is(.okr-dashboard-widgets,.okr-initiative-grid,.okr-status-grid){grid-template-columns:minmax(0,1fr)}
+.okr-detail-layout:has(>.okr-main-chat) :is(.okr-initiative-grid,.okr-status-grid){grid-template-columns:minmax(0,1fr)}
 html:is([data-size="compact"],[data-size="medium"]) :is(.okr-dashboard-widgets,.okr-initiative-grid,.okr-status-grid){grid-template-columns:minmax(0,1fr)}
 html[data-size="compact"] .okr-board-toolbar>.ant-segmented{width:100%}
 html[data-size="compact"] .okr-board-toolbar .ant-segmented-group{display:flex}

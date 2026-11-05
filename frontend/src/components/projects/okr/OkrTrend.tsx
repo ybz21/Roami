@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Select } from 'antd'
 import { useI18n } from '../../../i18n'
 import { useLayout } from '../../../layout'
 import { useThemeMode } from '../../../theme'
@@ -10,9 +9,8 @@ export default function OkrTrend({ workspace, title }: { workspace: Workspace; t
   const { t, locale } = useI18n()
   const { coarse } = useLayout()
   const { mode } = useThemeMode()
-  const [chosen, setChosen] = useState(workspace.metrics[0]?.id || '')
   const [failed, setFailed] = useState(false)
-  const metric = workspace.metrics.find(m => m.id === chosen) || workspace.metrics[0]
+  const metric = workspace.metrics[0]
   const rows = useMemo(() => metric ? dailyHistory(sourceObservations(workspace, metric)).filter(row => row.date >= workspace.startDate && row.date <= workspace.endDate) : [], [workspace, metric])
   const latest = rows[0]
   const number = (v: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(v)
@@ -40,7 +38,7 @@ export default function OkrTrend({ workspace, title }: { workspace: Workspace; t
     return () => { disposed = true; observer.disconnect(); chart.current?.dispose(); chart.current = null }
   }, [rows, dates, metric, locale, coarse, mode]) // eslint-disable-line react-hooks/exhaustive-deps
   return <section className="okr-trend">
-    <div className="okr-section-head"><div><h3>{title || t('okr.trend')}</h3><p className="okr-muted">{t('okr.recentDays')}</p></div><Select aria-label={t('okr.trendMetric')} value={metric?.id} onChange={setChosen} options={workspace.metrics.map(m => ({ value: m.id, label: m.name }))} /></div>
+    <div className="okr-section-head"><div><h3>{title || metric?.name || t('okr.trend')}</h3><p className="okr-muted">{t('okr.recentDays')}</p></div></div>
     {latest ? <>
       <div className="okr-trend-value"><strong>{number(latest.latest.value)} <small>{metric?.unit}</small></strong><span>{day(latest.date)} · {latest.delta === null ? t('okr.noDailyComparison') : t('okr.latestDelta', { value: new Intl.NumberFormat(locale, { signDisplay: 'always', maximumFractionDigits: 2 }).format(latest.delta), unit: metric?.unit || '' })}</span></div>
       {rows.length === 1 && <p className="okr-muted">{t('okr.firstDay')}</p>}
