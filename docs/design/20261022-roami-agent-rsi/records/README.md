@@ -1,5 +1,7 @@
 # Roami Agent RSI：设计修订与验收记录
 
+- [Go 模型准入耗时回执](2026-11-05/gateway-admission-timing.md)：可信耗时、代理传递与缺失观测边界。
+
 [返回主题入口](../README.md)
 
 | 日期 | 记录 |

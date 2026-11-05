@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Handler struct {
@@ -225,7 +226,9 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		reject(w, 400, "INVALID_MODEL_CONFIG")
 		return
 	}
+	admissionStarted := time.Now()
 	call, err := h.admit(r.Context(), role, payload.Model, session, requestID, validate)
+	w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(time.Since(admissionStarted).Milliseconds(), 10))
 	if err != nil {
 		if r.Context().Err() != nil {
 			return

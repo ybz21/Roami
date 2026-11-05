@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ybz21/Roami/internal/agentproviders"
 )
@@ -271,6 +272,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	for _, s := range catalog.Sources {
 		sources[s.ID] = s
 	}
+	var admissionDuration time.Duration
 	for index, candidate := range model.Candidates {
 		source, exists := sources[candidate.SourceID]
 		if !exists {
@@ -325,7 +327,10 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				return nil
 			}
 		}
+		admissionStarted := time.Now()
 		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID})
+		admissionDuration += time.Since(admissionStarted)
+		w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(admissionDuration.Milliseconds(), 10))
 		if e != nil {
 			status := 503
 			if e.Error() == "MODEL_GATEWAY_UNAUTHORIZED" {
