@@ -37,7 +37,6 @@ import { savePreferences, saveWorkspace, usePreferences } from '../../preference
 import { PromptDialog, PromptSignal, advancePromptSignal, detectPrompt } from '../prompt'
 import { SessionTitle, TabName, sessionDisplay, useSessionLabel } from '../sessions/session-label'
 import { sessionProject, useSessionProject } from '../sessions/session-project'
-import SessionContext from '../sessions/SessionContext'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useEdgeSwipe } from '../shell/edge-swipe'
 import { DPad } from '../shell/DPad'
@@ -937,7 +936,6 @@ export default function TerminalPane(props: {
           </button>
         </Dropdown>
       )}
-      {active && !activePage && !curFile && <SessionContext key={active} branch={activeProject?.branch} worktree={activeProject?.worktree} cwd={taskDir || activeProject?.dir} />}
       {onNew && (
         <div className="tt-tabs-end">
           <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: [{

@@ -2280,7 +2280,6 @@ const enUS = {
   'file.workingDir': 'Working directory',
   'file.recentDir': 'Recent',
   'file.directory': 'Folder',
-  'session.context': 'View branch and directory',
   'file.closePanel': 'Close file panel',
   'file.back': 'Back',
   'file.forward': 'Forward',
