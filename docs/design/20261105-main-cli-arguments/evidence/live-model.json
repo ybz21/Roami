@@ -1,0 +1,59 @@
+{
+  "model": "deepseek-4.1-flash",
+  "savedRoutesUnchanged": true,
+  "error": null,
+  "passed": true,
+  "calls": [
+    {
+      "tool": "tool_list",
+      "state": "succeeded",
+      "arguments": {
+        "query": "reminder"
+      },
+      "error": null
+    },
+    {
+      "tool": "command_help",
+      "state": "succeeded",
+      "arguments": {},
+      "error": null
+    },
+    {
+      "tool": "reminder_create",
+      "state": "succeeded",
+      "arguments": {
+        "afterSeconds": 3600,
+        "text": "检查命令兼容性"
+      },
+      "error": null
+    },
+    {
+      "tool": "reminder_list",
+      "state": "succeeded",
+      "arguments": {},
+      "error": null
+    },
+    {
+      "tool": "reminder_cancel",
+      "state": "succeeded",
+      "arguments": {
+        "id": "be6a5c96d7af4705b8045c339a9748fc"
+      },
+      "error": null
+    },
+    {
+      "tool": "reminder_list",
+      "state": "succeeded",
+      "arguments": {},
+      "error": null
+    }
+  ],
+  "remindersDisabled": true,
+  "commands": [
+    "roami help",
+    "roami agent reminder add --text \"检查命令兼容性\" --after-seconds 3600",
+    "roami agent reminder ls",
+    "roami agent reminder cancel --id be6a5c96d7af4705b8045c339a9748fc",
+    "roami agent reminder ls"
+  ]
+}

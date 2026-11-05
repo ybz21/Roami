@@ -80,7 +80,7 @@ async def test_diagnostics_are_discoverable_read_only_and_need_no_workspace(stor
         for query in ["host_processes", "machine process system status node"]:
             items = runtime.tools.directory.list(query, "cli", 20, "main")["items"]
             assert any(
-                command["argv"] == ["roami", "agent", "host", "processes", "--input", "JSON"]
+                command["argv"] == ["roami", "agent", "host", "processes"]
                 for item in items
                 for command in item.get("commands", [item])
             )

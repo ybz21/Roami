@@ -357,8 +357,24 @@ class ToolGateway:
                     "This call was rejected before execution. "
                     "Use tool_list to find a registered operation available in this role. "
                     "Use the command string returned by tool_list or command-family help. Correct the intended "
-                    "call instead of repeating the rejected command."
+                    "call instead of repeating the rejected command. Submit each managed command alone, "
+                    "without shell pipes, redirections, chaining or a cd prefix. Read its structured result directly."
                 )
+            if (
+                self.tools.directory
+                and call["function"]["name"] == "bash"
+                and value["error"] in {"INVALID_CLI_ARGUMENTS", "INVALID_TOOL_ARGUMENTS"}
+            ):
+                value.update(self.tools.directory.command_hint(args, role))
+                if value.get("expectedCommand"):
+                    value["recovery"] = (
+                        "This registered command was rejected before execution because its arguments "
+                        "do not match its usage. Use expectedCommand and its options/inputSchema. "
+                        "Ordinary scalar flags and --input JSON are supported; no arguments means an "
+                        "empty input object. The host supplies conversation and request identity. "
+                        "Submit this command alone, without shell pipes, redirections or chaining. "
+                        "Correct the original call; do not probe writes with test content."
+                    )
             if value["error"] == "TASK_ALREADY_HANDED_OFF":
                 value.update(
                     executionStarted=False,

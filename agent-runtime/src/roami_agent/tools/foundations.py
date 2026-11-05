@@ -12,7 +12,14 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
 from roami_agent.protocol.tools import Tool, object_schema
-from roami_agent.tools.command_families import COMMANDS, INTERNAL, operation_kind, public_operation
+from roami_agent.tools.command_families import (
+    COMMANDS,
+    INTERNAL,
+    command_argv,
+    operation_kind,
+    option_name,
+    public_operation,
+)
 from roami_agent.tools.process import execute
 
 FOUNDATIONS = (
@@ -234,8 +241,14 @@ class ToolDirectory:
                 "kind": "cli",
                 "name": name,
                 "description": available[name].description,
-                "argv": ["roami", *path, "--input", "JSON"],
+                "argv": command_argv(path, available[name].model_schema or available[name].schema),
                 "inputSchema": deepcopy(available[name].model_schema or available[name].schema),
+                "options": {
+                    option_name(field): deepcopy(spec)
+                    for field, spec in (available[name].model_schema or available[name].schema)
+                    .get("properties", {})
+                    .items()
+                },
                 "effect": available[name].effect,
                 "source": "builtin",
                 "mutable": False,
@@ -251,8 +264,14 @@ class ToolDirectory:
         entries = []
         commands = [
             {
-                "argv": ["roami", *path, "--input", "JSON"],
+                "argv": command_argv(path, available[name].model_schema or available[name].schema),
                 "inputSchema": deepcopy(available[name].model_schema or available[name].schema),
+                "options": {
+                    option_name(field): deepcopy(spec)
+                    for field, spec in (available[name].model_schema or available[name].schema)
+                    .get("properties", {})
+                    .items()
+                },
                 "effect": available[name].effect,
             }
             for name, path in COMMANDS.items()
@@ -265,7 +284,7 @@ class ToolDirectory:
                     "kind": "cli",
                     "name": "roami",
                     "skill": "roami",
-                    "description": "Roami projects, sessions, tasks, executors, reminders, memory, local host process CPU/memory/load diagnostics and capability marketplace search/install.",
+                    "description": "Roami projects, sessions, tasks, executors, reminders, memory, local host process CPU/memory/load diagnostics and capability marketplace search/install. Use ordinary --kebab-case options for scalar arguments; --input JSON remains available for structured arguments. Omit options for parameterless commands.",
                     "argv": ["roami", "help"],
                     "commands": commands,
                     "searchTerms": list(COMMANDS),
@@ -384,8 +403,30 @@ class ToolDirectory:
             except ValueError:
                 raise DomainError("INVALID_CLI_ARGUMENTS") from None
         if argv and argv[0] in {"roami", self.settings.cli_bin}:
-            return public_operation(argv[1:])
+            return public_operation(
+                argv[1:],
+                {
+                    name: tool.model_schema or tool.schema
+                    for name, tool in self.registry.registry.items()
+                },
+            )
         return None
+
+    def command_hint(self, args, role):
+        try:
+            argv = self.argv(args)
+        except (DomainError, KeyError):
+            return {}
+        if not argv or argv[0] not in {"roami", self.settings.cli_bin}:
+            return {}
+        path = next((path for path in COMMANDS.values() if argv[1 : len(path) + 1] == path), None)
+        if path is None:
+            return {}
+        for entry in self.command_entries(role):
+            for command in entry["commands"]:
+                if command["argv"][1 : len(path) + 1] == path:
+                    return {"expectedCommand": command_strings(command)}
+        return {}
 
     def resolve(self, tool, args, role):
         if tool.name == "read":
