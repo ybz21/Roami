@@ -53,7 +53,8 @@ function select(path) {
     all(); return
   }
   if (path.startsWith('agent-runtime/')) {
-    if (!/^agent-runtime\/(?:docs\/|README)/.test(path)) { plan.runtime = true; plan.go = true }
+    const prose = !/\.pyi?$/.test(path) && /^agent-runtime\/(?:docs\/|README(?:\.(?:md|rst|txt))?$)/.test(path)
+    if (!prose) { plan.runtime = true; plan.go = true }
     return
   }
   if (/^(?:backend|internal|cmd|pkg|plugins)\//.test(path) || /(^|\/)go\.(?:mod|sum)$/.test(path)) { plan.go = true; return }

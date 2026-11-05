@@ -35,6 +35,7 @@ function expect(plan, enabled, go = enabled.includes('runtime')) {
 for (const [name, selected] of [
   ['frontend/page.tsx', []], ['README.md', []],
   ['agent-runtime/src/agent.py', ['runtime']], ['agent-runtime/src/commands.json', ['runtime']], ['agent-runtime/migrations/0001.sql', ['runtime']],
+  ['agent-runtime/README.md', []], ['agent-runtime/README.py', ['runtime']], ['agent-runtime/docs/example.py', ['runtime']],
   ['skills/presentation-edit/SKILL.md', ['presentation']], ['skills/tabular-analysis/input/schema.json', ['tabular']],
   ['skills/market-series-report/scripts/main.py', ['market']], ['skills/video-assembly/pyproject.toml', ['video']],
   ['agent-runtime/uv.lock', suites], ['requirements-dev.txt', suites], ['pytest.ini', suites], ['cases/case-99/input.csv', suites],
