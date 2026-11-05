@@ -5,8 +5,9 @@ import { useAgentData } from './useAgentData'
 
 export function useAgentInbox(enabled: boolean, node: string | null, preloadMain = false): AgentInboxState {
   const main = useAgentData<AgentConversation>(enabled ? '/agent/main-conversation' : null, 60_000, 60_000, 'POST')
-  const notices = useAgentData<{ unread: number; cursor: number }>(enabled ? '/agent/notifications/summary' : null, 5000, 10_000)
   const cid = main.value?.id
+  const notices = useAgentData<{ unread: number; cursor: number; conversationId: string }>(enabled && cid ? '/agent/notifications/summary?conversationId=' + encodeURIComponent(cid) : null, 5000, 10_000)
+  const summary = notices.value?.conversationId === cid ? notices.value : undefined
   const mainKey = enabled ? agentDataKey('/agent/main-conversation', 'POST') : ''
   useEffect(() => { if (!enabled) clearAgentDataCache() }, [enabled])
   useEffect(() => {
@@ -17,8 +18,8 @@ export function useAgentInbox(enabled: boolean, node: string | null, preloadMain
   const refresh = useCallback(() => { notices.refresh(); if (!main.value || main.failed) main.refresh() }, [notices.refresh, main.refresh, main.value, main.failed])
   return {
     conversations: enabled && mainKey && main.value ? [main.value] : [],
-    notices: [], cursor: enabled ? notices.value?.cursor : undefined, unread: enabled ? notices.value?.unread || 0 : 0,
-    unavailable: enabled && main.failed, notificationsLoading: notices.loading, notificationsFailed: notices.failed, refresh,
+    notices: [], cursor: enabled ? summary?.cursor : undefined, unread: enabled ? summary?.unread || 0 : 0,
+    unavailable: enabled && main.failed, notificationsLoading: main.loading || notices.loading, notificationsFailed: main.failed || notices.failed, refresh,
   }
 }
 export type AgentInboxState = {

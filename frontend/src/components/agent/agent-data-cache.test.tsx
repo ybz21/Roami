@@ -123,7 +123,7 @@ it('publishes the main conversation and preloads messages/tasks before slow noti
   await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/conversations/main/messages?limit=50', undefined, expect.anything()))
   expect(vi.mocked(api).mock.calls.some(call => call[1].startsWith('/agent/tasks?'))).toBe(false)
   expect(hook.result.current.notices).toEqual([])
-  await act(async () => { notices.resolve({ data: { items: [{ id: 1 }], unread: 1 } }); await notices.promise })
+  await act(async () => { notices.resolve({ data: { conversationId: 'main', unread: 1, cursor: 1 } }); await notices.promise })
   await waitFor(() => expect(hook.result.current.unread).toBe(1))
   act(() => hook.result.current.refresh())
   await waitFor(() => expect(vi.mocked(api).mock.calls.filter(call => call[1].includes('/notifications'))).toHaveLength(2))
@@ -133,13 +133,13 @@ it('publishes the main conversation and preloads messages/tasks before slow noti
 it('keeps badges available without loading history/tasks until main chat is opened', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path === '/agent/main-conversation') return { data: { id: 'main', active_branch_id: 'branch' } }
-    if (path.includes('/notifications')) return { data: { items: [{ id: 1 }], unread: 1 } }
+    if (path.includes('/notifications')) return { data: { conversationId: 'main', unread: 1, cursor: 1 } }
     return { data: [] }
   })
   const hook = renderHook(({ preload }) => useAgentInbox(true, 'one', preload), { initialProps: { preload: false } })
   await waitFor(() => expect(hook.result.current.unread).toBe(1))
   expect(hook.result.current.conversations[0]?.id).toBe('main')
-  expect(vi.mocked(api).mock.calls.map(call => call[1])).toEqual(['/agent/main-conversation', '/agent/notifications/summary'])
+  expect(vi.mocked(api).mock.calls.map(call => call[1])).toEqual(['/agent/main-conversation', '/agent/notifications/summary?conversationId=main'])
   hook.rerender({ preload: true })
   await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/conversations/main/messages?limit=50', undefined, expect.anything()))
   expect(vi.mocked(api).mock.calls.some(call => call[1].startsWith('/agent/tasks?'))).toBe(false)
@@ -166,4 +166,27 @@ it('backs off failed visible record reads and retries immediately on an explicit
   expect(hook.result.current.failed).toBe(false)
   await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
   expect(api).toHaveBeenCalledTimes(4)
+})
+
+it('waits for Home identity and rejects an unread summary from another instance', async () => {
+  const main = deferred()
+  vi.mocked(api).mockImplementation(async (_method, path) => path === '/agent/main-conversation' ? main.promise : { data: { conversationId: 'okr-main', unread: 99, cursor: 900 } })
+  const hook = renderHook(() => useAgentInbox(true, 'one'))
+  expect(vi.mocked(api).mock.calls.map(([, path]) => path)).toEqual(['/agent/main-conversation'])
+  await act(async () => { main.resolve({ data: { id: 'main', active_branch_id: 'branch' } }); await main.promise })
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/notifications/summary?conversationId=main', undefined, expect.anything()))
+  expect(hook.result.current.unread).toBe(0)
+  expect(hook.result.current.cursor).toBeUndefined()
+  expect(hook.result.current.conversations[0]?.id).toBe('main')
+})
+
+it('clears Home badges immediately when changing nodes while the next identity is pending', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => node === 'two' ? new Promise(() => {}) : { data: path === '/agent/main-conversation' ? { id: 'main', active_branch_id: 'branch' } : { conversationId: 'main', unread: 3, cursor: 4 } })
+  const hook = renderHook(() => useAgentInbox(true, node))
+  await waitFor(() => expect(hook.result.current.unread).toBe(3))
+  node = 'two'; hook.rerender()
+  expect(hook.result.current.unread).toBe(0)
+  expect(hook.result.current.cursor).toBeUndefined()
+  expect(hook.result.current.conversations).toEqual([])
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path === '/agent/notifications/summary')).toBe(false)
 })
