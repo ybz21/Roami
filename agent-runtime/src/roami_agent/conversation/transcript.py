@@ -6,6 +6,7 @@ import json
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.project_main import project_main
+from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
 from roami_agent.memory.intake import remember_request
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -221,7 +222,9 @@ class Conversations:
 
         return await self.db.call(read)
 
-    async def accept(self, owner, cid, request_key, text, attachment_ids=None):
+    async def accept(
+        self, owner, cid, request_key, text, attachment_ids=None, *, wake_project=None
+    ):
         attachment_ids = attachment_ids or []
         if (
             not request_key
@@ -231,13 +234,21 @@ class Conversations:
             or len(set(attachment_ids)) != len(attachment_ids)
         ):
             raise DomainError("INVALID_MESSAGE")
+        if wake_project is not None and (
+            not isinstance(wake_project, str) or not wake_project.strip() or attachment_ids
+        ):
+            raise DomainError("INVALID_MESSAGE")
         payload = {"conversation": cid, "text": text}
+        if wake_project is not None:
+            payload["wakeProject"] = wake_project
         if attachment_ids:
             payload["attachmentIds"] = attachment_ids
         digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
 
         def write(db):
             c = owned(db, owner, cid)
+            if wake_project is not None:
+                assert_project_main(db, owner, cid, wake_project)
             old = row(
                 db,
                 "SELECT * FROM requests WHERE owner_id=? AND request_key=?",
@@ -259,6 +270,8 @@ class Conversations:
                     "cursor": receipt["id"] if receipt else None,
                     "reused": True,
                 }
+            if wake_project is not None:
+                assert_main_idle(db, c)
             rid, tid = identity(), identity()
             db.execute(
                 "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,"
@@ -271,14 +284,18 @@ class Conversations:
                 (tid, rid, cid, c["active_branch_id"], "user", now_ms()),
             )
             db.execute("UPDATE requests SET turn_id=? WHERE id=?", (tid, rid))
-            mid = message(db, cid, c["active_branch_id"], "user", {"text": text}, turn_id=tid)
+            content = {"text": text}
+            if wake_project is not None:
+                content["scheduled"] = {"projectId": wake_project}
+            mid = message(db, cid, c["active_branch_id"], "user", content, turn_id=tid)
             if attachment_ids:
                 references = Attachments.bind(db, owner, mid, attachment_ids)
                 db.execute(
                     "UPDATE messages SET content_json=? WHERE id=?",
                     (encoded({"text": text, "attachments": references}), mid),
                 )
-            remember_request(db, owner, cid, mid, text)
+            if wake_project is None:
+                remember_request(db, owner, cid, mid, text)
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms)"
                 " VALUES(?,'turn.run',?,?,?,'queued',?)",

@@ -62,12 +62,13 @@ func runAgent(args []string) int {
 		return runAgentTrace(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|mcp|trace|gateway [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  gateway settings|usage|configure|reconcile: local Go model billing and daily quota\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|identity|wake|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|mcp|trace|gateway [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  gateway settings|usage|configure|reconcile: local Go model billing and daily quota\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
 		return 0
 	}
 	sub := args[0]
 	fs := flag.NewFlagSet("agent "+sub, flag.ContinueOnError)
 	runtimeDir := fs.String("runtime-dir", "", "Python runtime project")
+	project := fs.String("project", "", "bound project for an external Main wakeup")
 	conversation := fs.String("conversation", "", "conversation ID")
 	text := fs.String("text", "", "message text")
 	file := fs.String("file", "", "message/result file, or - for stdin")
@@ -126,7 +127,7 @@ func runAgent(args []string) int {
 		}
 		return 0
 	}
-	if sub != "status" && sub != "conversations" && sub != "new" && sub != "send" && sub != "history" && sub != "report" && sub != "reply" && sub != "notify" && sub != "steer" && sub != "steering" {
+	if sub != "status" && sub != "conversations" && sub != "new" && sub != "send" && sub != "history" && sub != "identity" && sub != "wake" && sub != "report" && sub != "reply" && sub != "notify" && sub != "steer" && sub != "steering" {
 		fmt.Fprintf(os.Stderr, "unknown agent command %q\n", sub)
 		return 2
 	}
@@ -145,6 +146,11 @@ func runAgent(args []string) int {
 			request["requestKey"] = *key
 		}
 		method, path, body = "POST", "/v1/conversations", request
+	case "identity":
+		if *conversation == "" {
+			return fail(fmt.Errorf("--conversation is required"))
+		}
+		path = "/v1/conversations/" + url.PathEscape(*conversation) + "/identity"
 	case "history":
 		if *conversation == "" {
 			return fail(fmt.Errorf("--conversation is required"))
@@ -153,6 +159,19 @@ func runAgent(args []string) int {
 		if err != nil {
 			return fail(err)
 		}
+	case "wake":
+		if os.Getenv("ROAMI_AGENT_CALLER_ROLE") != "" || os.Getenv("ROAMI_AGENT_TURN_ID") != "" {
+			return fail(fmt.Errorf("EXTERNAL_TRIGGER_REQUIRED"))
+		}
+		if *conversation == "" || *project == "" || *key == "" {
+			return fail(fmt.Errorf("wake requires --conversation, --project and --key"))
+		}
+		content, inputErr := agentInput(*file, *text)
+		if inputErr != nil {
+			return fail(inputErr)
+		}
+		method, path = "POST", "/v1/conversations/"+url.PathEscape(*conversation)+"/wake"
+		body = map[string]string{"projectId": *project, "requestKey": *key, "text": string(content)}
 	case "send", "notify":
 		if *conversation == "" {
 			return fail(fmt.Errorf("--conversation is required"))

@@ -36,6 +36,7 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | agents/team.json | schema1、稳定角色 id、名称、executor、职责；空 roles 也合法 | 不把期望职责当真实成员/实例 |
 | agents/swarm.json | 受管团队登记后取得的真实绑定；未建团队先为空 | 不复制其他项目团队 ID |
 | skills/ | 项目规划、采集协调、执行等工作流；Connector 包单独在 connectors/ | 不把一轮任务写成新职责/新实例 |
+| skills/daily-operations/ | 外部日程唤醒脚本与开工/复盘提示；填真实项目/Main、IANA时区和语义时段，先dry-run | 不让Main自己运行，不把accepted当执行，不从旧运行时回退send |
 | memory/team.md | 有来源的团队事实、约定与工作知识 | 不当执行日志或成功证明 |
 | memory/decisions.md | 日期、来源、决定、负责人、当前状态/未决事项 | 不静默覆盖旧决定 |
 | memory/members/ | 取得真实 stable-member-id 后写个人笔记 | 不按 r2/r3 另建记忆 |

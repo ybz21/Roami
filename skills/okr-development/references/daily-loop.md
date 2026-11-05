@@ -40,8 +40,9 @@ WORKSPACE_OUTCOME_UNKNOWN 是当次尝试的历史结果，不能凭这条标签
 ## 定时唤醒和催办
 
 先查询本机插件/命令的实际能力。现有 cron 的 action=agent 每次会创建会话，不适合长期Main。
-action=exec 可执行有界命令，候选路径是给原项目 Main 投递稳定幂等键的每日开工/复盘消息，
-再由 Main 读取本日计划、当前任务并续派原成员；不要定时启动替代 Agent。普通 reminder
+action=exec 可执行模板内 daily-operations Skill 的有界脚本：先核对原项目 Main，再按本地日期/时段
+复用幂等键。project-scoped wake 在事务内拒绝忙碌或等待用户回答的 Main，不中断用户对话，
+由 Main 读取本日计划、当前任务并续派原成员；不要定时启动替代 Agent。普通 reminder
 只产生提醒，不证明模型已执行 Connector；autoCollect 也不是任意Skill的日更调度器。
 
 启用前确认时间与时区、目标身份、命令、权限、下一次触发及运行者；使用已有插件调度，
@@ -51,3 +52,6 @@ keepalive；催办要针对真实当前任务与阻塞，无新信息时避免�
 
 账号发布需具体内容/账号的用户决定和真实平台回执。授权包先准备完整正文、图/ALT或视频/
 封面/标题简介，再请求决定；不得把另一个成员的话或“等待审批”标签当成发布授权。
+
+原生 agent notify 也只投递通知；唤醒需使用明确的 wake 能力，不回退普通 send 绕过空闲/身份检查。
+cron.add 创建提案显式使用 enabled=false 和 IANA timezone；编辑不重置原启停与未指定的时区。

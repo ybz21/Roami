@@ -29,6 +29,12 @@ class SendMessage(Payload):
     )
 
 
+class WakeProject(Payload):
+    requestKey: str = Field(min_length=1, max_length=200)
+    projectId: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=10_000)
+
+
 class Compact(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     focus: str = Field(default="", max_length=2000)

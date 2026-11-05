@@ -18,7 +18,8 @@ only the resources needed for the requested change.
 The complete initialization template is `assets/`, mirroring the project root.
 It contains both AGENTS.md files, O/KR/method definitions, dashboard JSON and
 HTML/CSS/JS, a Connector Skill, Main/team definitions, project workflows, memory,
-empty data/evidence/state directories and a disabled schedule proposal. Copy the
+empty data/evidence/state directories and a disabled schedule proposal. The daily-operations Skill provides a scoped external Main wakeup script
+and kickoff/review prompts; its schedule remains disabled. Copy the
 whole directory first, including hidden files:
 
 ```bash

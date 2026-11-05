@@ -73,6 +73,15 @@ class ConversationService:
         self.wakeup.set()
         return {"kind": "message", **result}
 
+    async def wake_project(self, owner, cid, project_id, request_key, text):
+        if not self.model.model:
+            raise DomainError("MODEL_NOT_CONFIGURED", 503)
+        result = await self.conversations.accept(
+            owner, cid, request_key, text, wake_project=project_id
+        )
+        self.wakeup.set()
+        return {"kind": "message", **result}
+
     async def status(self, owner, cid):
         plan = await self.context.project(owner, cid)
         return {

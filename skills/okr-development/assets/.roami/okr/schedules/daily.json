@@ -1,7 +1,10 @@
 {
   "schemaVersion": 1,
   "enabled": false,
-  "skill": null,
+  "skill": "skills/daily-operations/SKILL.md",
   "dailyAt": null,
-  "timezone": null
+  "timezone": null,
+  "projectId": null,
+  "mainConversationId": null,
+  "slots": []
 }
