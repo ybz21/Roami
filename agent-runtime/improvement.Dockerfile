@@ -3,7 +3,7 @@ LABEL org.roami.rsi.shared-daily-policy="6"
 LABEL org.roami.rsi.workspace-image-input="1"
 LABEL org.roami.rsi.model-image-input="1"
 LABEL org.roami.rsi.role-instructions="1"
-LABEL org.roami.rsi.final-reply-tool="1"
+LABEL org.roami.rsi.final-reply-tool="2"
 LABEL org.roami.rsi.source-reply-review="6"
 LABEL org.roami.rsi.login-runtime-path="1"
 RUN apt-get update && apt-get install -y --no-install-recommends chromium ffmpeg libreoffice-impress fonts-noto-cjk fonts-liberation fonts-crosextra-carlito git && rm -rf /var/lib/apt/lists/*

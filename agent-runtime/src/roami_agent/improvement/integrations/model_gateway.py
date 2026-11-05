@@ -6,6 +6,7 @@ import re
 from contextlib import aclosing
 
 from roami_agent.protocol.errors import DomainError, public_error_code
+from roami_agent.protocol.model_tool_selection import final_reply_choice, select_final_reply
 from roami_agent.providers.request_receipts import forwarded_receipt, usage_receipt
 from roami_agent.providers.transport_failures import transport_receipt
 
@@ -71,14 +72,31 @@ class ModelGateway:
                 or not isinstance(body.get("tools", []), list)
             ):
                 raise DomainError("RSI_GATEWAY_INPUT")
+            choice = body.get("tool_choice")
+            required_reply = choice not in (None, "auto")
+            if required_reply and (
+                match[1] != "main"
+                or choice != final_reply_choice()
+                or not any(
+                    isinstance(tool, dict)
+                    and tool.get("type") == "function"
+                    and isinstance(tool.get("function"), dict)
+                    and tool["function"].get("name") == "reply"
+                    for tool in body.get("tools", [])
+                )
+            ):
+                raise DomainError("RSI_GATEWAY_INPUT")
             writer.write(
                 b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
             )
             sent = True
             index = 0
-            async with aclosing(
-                self.models[match[1]].stream(body["messages"], body.get("tools", []))
-            ) as events:
+            async with (
+                select_final_reply(required_reply),
+                aclosing(
+                    self.models[match[1]].stream(body["messages"], body.get("tools", []))
+                ) as events,
+            ):
                 async for event in events:
                     if event.kind == "telemetry":
                         receipt = forwarded_receipt(event.value)

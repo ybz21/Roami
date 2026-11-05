@@ -372,7 +372,7 @@ async def test_container_requires_actual_review_support_before_model_execution(m
         labels = {
             "org.roami.rsi.shared-daily-policy": "6",
             "org.roami.rsi.role-instructions": "1",
-            "org.roami.rsi.final-reply-tool": "1",
+            "org.roami.rsi.final-reply-tool": "2",
         }
         if label is not None:
             labels["org.roami.rsi.source-reply-review"] = label
