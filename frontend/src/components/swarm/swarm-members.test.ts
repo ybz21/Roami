@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { swarmMember, swarmMembers } from './swarm-members'
+import { swarmMember, swarmMembers, swarmRoleMembers } from './swarm-members'
 import type { SwarmMember, SwarmSnapshot, SwarmWork } from './swarm-protocol'
 
 const work: SwarmWork = { id: 'work', memberId: 'role', member_name: 'Writer', executor: 'codex', title: 'Current request', goal: 'Goal', acceptance: 'Verify', integration: 0, task_id: 'task', revision: 3, state: 'waiting_user', dispatch_error: null, dependencies: [], attempt: { runId: 'run-3', state: 'verifying' } }
@@ -43,4 +43,35 @@ describe('stable role selection', () => {
     data.members![0].instance = { id: 'instance', conversationId: 'cid', branchId: 'branch', taskId: 'task', nativeSessionId: 'native', state: 'closed' }
     expect(swarmMembers(data)[0].state).toBe('closed')
   })
+})
+
+it('binds desired roles only by exact member identity and preserves all historical records', () => {
+  const data = snapshot(); data.target.projectId = 'project'
+  data.members!.push({ ...member, id: 'old-role', name: 'Writer-r1', workId: null, taskId: null, taskRevision: null, state: 'unknown' })
+  const before = JSON.stringify(data)
+  const result = swarmRoleMembers(data, [{ id: 'writer', name: 'Content', duty: 'Daily content', executor: 'codex', memberId: 'role' }], 'project')
+  expect(result.current.map(member => [member.id, member.name])).toEqual([['role', 'Content']])
+  expect(result.current[0].work?.task_id).toBe('task')
+  expect(result.historical.map(member => [member.id, member.state])).toEqual([['old-role', 'unknown']])
+  expect(JSON.stringify(data)).toBe(before)
+})
+
+it('never guesses bindings from matching names, labels or task IDs', () => {
+  const data = snapshot(); data.target.projectId = 'project'
+  const roles = [{ id: 'role', name: 'Writer', duty: 'Write', executor: 'codex', memberId: 'task' }]
+  const result = swarmRoleMembers(data, roles, 'project')
+  expect(result.current).toEqual([])
+  expect(result.historical).toHaveLength(1)
+  expect(result.unbound).toEqual(roles)
+  expect(swarmRoleMembers(data, [{ ...roles[0], memberId: 'role' }], 'other-project').current).toEqual([])
+  expect(swarmRoleMembers(data, [{ ...roles[0], memberId: 'role', executor: 'native' }], 'project').current).toEqual([])
+})
+
+it('preserves unassigned member identities and rejects duplicate role bindings', () => {
+  const data = snapshot(); data.target.projectId = 'project'; data.members![0] = { ...member, workId: null, taskId: null, taskRevision: null, state: 'unassigned' }; data.work = []
+  const role = { id: 'writer', name: 'Content', duty: 'Write', executor: 'codex', memberId: 'role' }
+  expect(swarmRoleMembers(data, [role], 'project').current[0]).toMatchObject({ id: 'role', state: 'unassigned', work: undefined })
+  const duplicate = swarmRoleMembers(data, [role, { ...role, id: 'editor' }], 'project')
+  expect(duplicate.current).toEqual([])
+  expect(duplicate.unbound).toHaveLength(2)
 })

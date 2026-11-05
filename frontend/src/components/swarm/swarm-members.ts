@@ -23,3 +23,21 @@ export function swarmMember(members: SwarmTeamMember[], selection: string) {
   // Old drafts may use the current work ID; only an exact binding can migrate them.
   return members.find(member => member.id === selection) || members.find(member => member.work?.id === selection)
 }
+
+export type SwarmRoleBinding = { id: string; name: string; executor: string; duty: string; memberId?: string }
+
+export function swarmRoleMembers(data: SwarmSnapshot, roles?: SwarmRoleBinding[], projectId?: string) {
+  const members = swarmMembers(data)
+  const configured = Boolean(roles?.some(role => role.memberId))
+  if (!configured) return { members, current: members, historical: [], unbound: [], configured }
+  const validProject = projectId && data.target.projectId === projectId && data.memberProtocol === 1
+  const bound = new Map<string, SwarmRoleBinding>()
+  const unbound: SwarmRoleBinding[] = []
+  for (const role of roles || []) {
+    const member = members.find(member => member.id === role.memberId && member.registered)
+    if (!validProject || !member || member.executor !== role.executor || roles!.filter(other => other.memberId === role.memberId).length !== 1) unbound.push(role)
+    else bound.set(member.id, role)
+  }
+  const named = members.map(member => { const role = bound.get(member.id); return role ? { ...member, name: role.name, duty: role.duty } : member })
+  return { members: named, current: named.filter(member => bound.has(member.id)), historical: named.filter(member => !bound.has(member.id)), unbound, configured }
+}

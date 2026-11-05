@@ -595,3 +595,39 @@ it.each(['project', 'Main'])('rejects a %s binding changed during the session lo
   await waitFor(() => expect(test.openTask).toHaveBeenCalledWith('tasks', 'task'))
   expect(terminal).not.toHaveBeenCalled()
 })
+
+it('focuses bound roles while retaining unknown history and exact task routing', async () => {
+  const current = snapshot().work[0]
+  test.data = { ...snapshot(), target: { projectId: 'project' }, memberProtocol: 1, members: [
+    { id: 'member', swarm_id: 'sw-one', name: 'frontend', executor: 'codex', dutyPreview: 'Build', workId: 'work', taskId: 'task', taskRevision: 1, state: 'waiting_user', memoryPath: '', roundCount: 1 },
+    { id: 'old', swarm_id: 'sw-one', name: 'old-run', executor: 'codex', dutyPreview: 'Old', workId: 'old-work', taskId: 'old-task', taskRevision: 1, state: 'unknown', memoryPath: '', roundCount: 1 },
+  ], work: [current, { ...current, id: 'old-work', task_id: 'old-task', title: 'Old unknown work', state: 'unknown' }] }
+  const roles = [{ id: 'writer', name: 'Content', executor: 'codex', duty: 'Daily content', memberId: 'member' }]
+  render(<ManagedSwarm id="sw-one" projectId="project" roles={roles} onBack={vi.fn()} openTerm={vi.fn()} />)
+  const directory = screen.getByRole('navigation', { name: 'swarm.conversation.list' })
+  expect(within(directory).getByRole('button', { name: 'Content' })).toBeTruthy()
+  const history = directory.querySelector('details')!
+  expect(history.open).toBe(false)
+  expect(history.textContent).toContain('old-run')
+  expect(history.textContent).toContain('swarm.managed.state.unknown')
+  fireEvent.click(within(directory).getByRole('button', { name: 'Content' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Continue this role' } })
+  fireEvent.click(screen.getByRole('button', { name: 'common.send' }))
+  await waitFor(() => expect(test.api).toHaveBeenCalledWith('POST', '/agent/swarms/sw-one/messages', expect.objectContaining({ text: 'Continue this role', workId: 'work', taskRevision: 1 })))
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.board' }))
+  expect(screen.queryByRole('button', { name: /Old unknown work/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.member.includeHistory' }))
+  expect(screen.getByRole('button', { name: /Old unknown work/ })).toBeTruthy()
+  expect(test.data.members).toHaveLength(2)
+  expect(test.data.work[1].state).toBe('unknown')
+})
+
+it('does not expose a different project group behind configured role bindings', () => {
+  test.data = { ...snapshot(), target: { projectId: 'foreign-project' }, memberProtocol: 1 }
+  render(<ManagedSwarm id="sw-one" projectId="project" roles={[{ id: 'writer', memberId: 'member', name: 'Content', executor: 'codex', duty: 'Write' }]} onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect(screen.getByRole('alert').textContent).toContain('swarm.member.registryUnavailable')
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(screen.queryByRole('navigation', { name: 'swarm.conversation.list' })).toBeNull()
+  expect(screen.queryByText('Task update')).toBeNull()
+  expect(test.api).not.toHaveBeenCalled()
+})

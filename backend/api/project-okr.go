@@ -190,7 +190,9 @@ func (a *API) ProjectOKRSave(c *gin.Context) {
 		return
 	}
 	config.Swarm = swarmName
-	w, err := a.ProjectOKR.Save(projectID, config)
+	w, err := a.ProjectOKR.SaveValidated(projectID, config, func(effective *okr.Config) error {
+		return a.validateOKRRoleBindings(c.Request.Context(), projectID, effective)
+	})
 	if err != nil {
 		okrError(c, err)
 		return
@@ -306,7 +308,7 @@ func (a *API) ProjectOKRSync(c *gin.Context) {
 			return err
 		}
 		config.Swarm = swarm
-		return nil
+		return a.validateOKRRoleBindings(c.Request.Context(), projectID, config)
 	})
 	if err != nil {
 		okrError(c, err)

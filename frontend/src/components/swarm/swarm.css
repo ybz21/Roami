@@ -202,14 +202,14 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-relations-members { g
 
 .swarm-conversation-workspace { display:grid; grid-template-columns:calc(var(--sp-5) * 10) minmax(0,1fr); flex:1; min-height:0; min-width:0; overflow:hidden; }
 .swarm-conversations { min-width:0; min-height:0; overflow:auto; padding:var(--sp-2); border-right:1px solid var(--border-subtle); background:var(--bg-base); }
-.swarm-conversations > button { position:relative; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; width:100%; min-height:var(--tap); padding:var(--sp-2) var(--sp-3); gap:var(--sp-1); border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-bright); font:inherit; cursor:pointer; text-align:start; }
-.swarm-conversations > button strong { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-body); font-weight:500; }
-.swarm-conversations > button small { color:var(--text-dim); font-size:var(--fs-meta); }
-.swarm-conversations > button[aria-pressed="true"] { background:var(--sel-bg); }
-.swarm-conversations > button[aria-pressed="true"]::before { content:''; position:absolute; inset-block:var(--sp-2); inset-inline-start:0; border-left:2px solid var(--accent); }
+.swarm-conversations button { position:relative; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; width:100%; min-height:var(--tap); padding:var(--sp-2) var(--sp-3); gap:var(--sp-1); border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-bright); font:inherit; cursor:pointer; text-align:start; }
+.swarm-conversations button strong { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-body); font-weight:500; }
+.swarm-conversations button small { color:var(--text-dim); font-size:var(--fs-meta); }
+.swarm-conversations button[aria-pressed="true"] { background:var(--sel-bg); }
+.swarm-conversations button[aria-pressed="true"]::before { content:''; position:absolute; inset-block:var(--sp-2); inset-inline-start:0; border-left:2px solid var(--accent); }
 .swarm-conversations > h3 { margin:var(--sp-4) var(--sp-3) var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; }
-.swarm-conversations > button:focus-visible { outline:2px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
-:where(html[data-pointer="fine"]) .swarm-conversations > button:hover { background:var(--list-hover); }
+.swarm-conversations button:focus-visible { outline:2px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
+:where(html[data-pointer="fine"]) .swarm-conversations button:hover { background:var(--list-hover); }
 .swarm-conversation-pane { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .swarm-conversation-head { display:flex; align-items:center; flex-shrink:0; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); min-height:var(--tap); border-bottom:1px solid var(--border-subtle); }
 .swarm-conversation-head > div:first-of-type { min-width:0; flex:1; }
@@ -232,3 +232,6 @@ html[data-pointer="coarse"] .swarm-conversation-head .tt-act::after { content:''
 .swarm-collaboration-pane > .swarm-studio { flex:1; height:auto; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-collaboration-pane { order:-1; flex:1; border-left:0; border-bottom:1px solid var(--border-subtle); }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspace[data-scene="true"] .swarm-conversation-pane { flex:2; }
+
+.swarm-conversation-history { margin-top:var(--sp-3); }
+.swarm-conversation-history > summary { cursor:pointer; min-height:var(--tap); padding:var(--sp-3); color:var(--text-dim); font-size:var(--fs-meta); box-sizing:border-box; }
