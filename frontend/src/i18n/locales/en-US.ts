@@ -5243,6 +5243,7 @@ const enUS = {
   'swarm.managed.state.closed': 'Closed',
   'swarm.member.registryUnavailable': 'Team records are unavailable',
   'swarm.conversation.main': 'Main',
+  'swarm.conversation.workspace': 'Chat & collaboration',
   'swarm.conversation.chat': 'Chat',
   'swarm.conversation.list': 'Conversations',
   'swarm.conversation.members': 'Members',

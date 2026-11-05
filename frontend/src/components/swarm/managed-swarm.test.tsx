@@ -17,7 +17,7 @@ vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => path, current
 vi.mock('../agent/agent-page-route', () => ({ openAgentPage: (...args: unknown[]) => test.openTask(...args) }))
 vi.mock('../markdown/Markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
 vi.mock('../MobileSubPage', () => ({ default: ({ children }: { children: ReactNode }) => <div role="dialog">{children}</div> }))
-vi.mock('./SwarmStudio', () => ({ default: ({ selected, active = true, nodes }: { selected: string; active?: boolean; nodes: { id: string; state: string }[] }) => <div data-testid="studio-selection" data-active={active} data-nodes={nodes.map(node => node.id).join(',')} data-main-state={nodes[0]?.state}>{selected}</div> }))
+vi.mock('./SwarmStudio', () => ({ default: ({ selected, active = true, nodes, onSelect }: { selected: string; active?: boolean; nodes: { id: string; state: string }[]; onSelect: (id: string) => void }) => <div data-testid="studio-selection" data-active={active} data-nodes={nodes.map(node => node.id).join(',')} data-main-state={nodes[0]?.state}>{selected}{nodes.map(node => <button key={node.id} aria-label={'scene ' + node.id} onClick={() => onSelect(node.id)}>{node.id}</button>)}</div> }))
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: { error: test.error }, modal: { confirm: vi.fn() } }) },
   Spin: () => <span>loading</span>,
@@ -27,11 +27,15 @@ vi.mock('antd', () => ({
 }))
 function chooseConversation(id: string) {
   if (!screen.queryByRole('navigation', { name: 'swarm.conversation.list' })) {
-    fireEvent.click(screen.getByRole('button', { name: 'swarm.conversation.chat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'swarm.conversation.workspace' }))
     if (test.phone) fireEvent.click(screen.getByRole('button', { name: 'swarm.conversation.list' }))
   }
   const name = id === 'main' ? 'Main' : id === 'group' ? 'swarm.managed.tab.chat' : test.data?.members?.find(member => member.id === id)?.name || test.data?.work.find(work => work.id === id)?.member_name || id
   fireEvent.click(within(screen.getByRole('navigation', { name: 'swarm.conversation.list' })).getByRole('button', { name }))
+}
+function showScene() {
+  const button = screen.getByRole('button', { name: 'swarm.managed.tab.studio' })
+  if (button.getAttribute('aria-pressed') !== 'true') fireEvent.click(button)
 }
 function snapshot(): SwarmSnapshot {
   return { id: 'sw-one', name: 'Team', goal: 'Goal', mainConversationId: 'main', revision: 2, sequence: 10, paused: false, archived: false, state: 'review', target: {}, posts: [{ id: 1, author: 'frontend', text: 'Task update', taskId: 'task', createdMs: 1 }], mainMessages: [{ id: 'reply', role: 'assistant', text: 'Main response', createdMs: 10 }], work: [{ id: 'work', member_name: 'frontend', executor: 'codex', title: 'Build page', goal: 'Full instructions', acceptance: 'Verify results', integration: 0, task_id: 'task', revision: 1, state: 'waiting_user', dispatch_error: null, dependencies: [], attempt: { runId: 'run', state: 'verifying', summary: 'Reported outcome' } }] }
@@ -173,17 +177,40 @@ it('hydrates memory after its source recovers without seeding an empty draft', a
   view.rerender(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   expect((screen.getByRole('textbox', { name: 'swarm.managed.memory' }) as HTMLTextAreaElement).value).toBe('Recovered source')
 })
-it('opens directly in Main chat and keeps the scene behind an explicit tab', () => {
+it('shows Main chat and collaboration together without the duplicate duty list', () => {
   render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
   expect(screen.queryByRole('region', { name: 'swarm.relations.title' })).toBeNull()
   expect(document.querySelector('.conversation-composer')).toBeTruthy()
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
-  expect(screen.getByText('Build page', { selector: '.swarm-relation-duty' })).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: /Roami Main.*swarm.relations.coordinates/ }))
+  expect(screen.getByTestId('studio-selection')).toBeTruthy()
+  expect(document.querySelector('.swarm-relation-duty')).toBeNull()
+  expect(within(screen.getByRole('navigation', { name: 'swarm.managed.workspace' })).getAllByRole('button')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: 'scene main' }))
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
   expect(screen.getByRole('textbox')).toBeTruthy()
   expect(test.api).not.toHaveBeenCalled()
+})
+
+it('collapses collaboration without unmounting chat or focusing its input', () => {
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  const input = screen.getByRole('textbox')
+  fireEvent.change(input, { target: { value: 'Keep this Main draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
+  expect(screen.queryByTestId('studio-selection')).toBeNull()
+  expect(screen.getByRole('textbox')).toBe(input)
+  expect((input as HTMLTextAreaElement).value).toBe('Keep this Main draft')
+  expect(document.activeElement).not.toBe(input)
+  expect(document.querySelector('.swarm-conversation-workspace')?.getAttribute('data-scene')).toBe('false')
+  showScene()
+  expect(screen.getByTestId('studio-selection')).toBeTruthy()
+  expect(test.api).not.toHaveBeenCalled()
+})
+
+it('maps the old collaboration tab to the unified Main workspace on reopen', () => {
+  localStorage.setItem('roami.swarm.panel.v2:/agent/swarms/sw-one', 'studio')
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
+  expect(screen.getByTestId('studio-selection')).toBeTruthy()
 })
 
 it('keeps the real five kanban states rather than rendering a synthetic member list', () => {
@@ -202,11 +229,12 @@ it('opens an assigned member through its existing task page without sending or l
   expect(test.api).not.toHaveBeenCalled()
 })
 it.each(['scene', 'directory', 'reply'])('selects a member via %s while keeping the Main draft private', async source => {
+  test.data!.work[0].attempt!.sessionId = 'real-session'
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   fireEvent.change(screen.getByRole('textbox'), { target: { value: '@leader Keep this Main draft' } })
   if (source === 'scene') {
-    fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
-    fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.chat' }))
+    showScene()
+    fireEvent.click(screen.getByRole('button', { name: 'scene work' }))
   } else if (source === 'directory') chooseConversation('work')
   else { chooseConversation('group'); fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.replyMember' })) }
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('work')
@@ -237,8 +265,8 @@ it.each([false, true])('keeps undispatched plans local and routes adjustments to
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={term} />)
   expect(screen.queryByRole('button', { name: 'swarm.relations.openWork' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'swarm.relations.chat' })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.viewPlan' }))
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.board' }))
+  fireEvent.click(screen.getByRole('button', { name: /Build page/ }))
   const detail = phone ? within(screen.getByRole('dialog')) : within(document.querySelector('.swarm-work-detail') as HTMLElement)
   expect(detail.getByText('Full instructions').closest('details')?.open).toBe(false)
   chooseConversation('main')
@@ -277,15 +305,20 @@ it('keeps the team and shared chat in one workspace and scopes real task posts b
  expect(screen.getByText('Archived task post')).toBeTruthy()
  expect(test.api).not.toHaveBeenCalled()
 })
-it('opens the phone scene in its tab and releases it when returning to chat', () => {
+it('opens phone collaboration inline and keeps the same chat when it closes', () => {
   test.phone = true
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   expect(screen.queryByTestId('studio-selection')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
+  const input = screen.getByRole('textbox')
+  fireEvent.change(input, { target: { value: 'Main phone draft' } })
+  showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-active')).toBe('true')
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.relations.chat' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByRole('textbox')).toBe(input)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
   expect(screen.queryByTestId('studio-selection')).toBeNull()
-  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('work')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Main phone draft')
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
 })
 
 it('opens a concrete current conversation only after reading its real task identity', async () => {
@@ -368,7 +401,7 @@ it('shows only confirmed live instances in the scene and keeps historical and pl
   test.data!.work[0].attempt!.sessionId = 'real-session'
   test.data!.work.push({ ...test.data!.work[0], id: 'gone', member_name: 'old-role', attempt: { ...test.data!.work[0].attempt!, sessionId: 'gone-session' } }, { ...test.data!.work[0], id: 'planned', member_name: 'future-role', task_id: null, attempt: null })
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
+  showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main,work')
   expect(screen.getByRole('button', { name: 'old-role', pressed: false })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'future-role', pressed: false })).toBeTruthy()
@@ -385,7 +418,7 @@ it.each([
   test.data!.work[0].executor = 'native'
   test.nativeSessions = [{ taskId: 'task', revision, lifecycle }]
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
+  showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe(nodes)
 })
 
@@ -471,9 +504,9 @@ it('uses the actual private Main turn for the scene and releases it outside the 
   test.mainTurns = [{ state: 'running' }]
   test.data!.mainState = 'idle'
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
+  showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-main-state')).toBe('running')
-  chooseConversation('main')
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
   expect(screen.queryByTestId('studio-selection')).toBeNull()
 })
 
@@ -493,7 +526,7 @@ it('does not animate a CLI session whose live executor differs from the member',
   test.data!.work[0].attempt!.sessionId = 'real-session'
   test.data!.work[0].executor = 'claude'
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.studio' }))
+  showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main')
   expect(screen.getByRole('button', { name: 'frontend', pressed: false })).toBeTruthy()
 })
