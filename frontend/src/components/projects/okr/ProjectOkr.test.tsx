@@ -295,7 +295,7 @@ it('keeps data as a read-only dashboard and leaves reflection in project files',
   render(<ProjectOkr projectId="stable-project" projectDir="/project" />)
   await screen.findByText('Launch')
   panel('data')
-  expect(await screen.findByTestId('trend')).toBeTruthy()
+  expect(await screen.findAllByTestId('trend')).toHaveLength(2)
   for (const label of ['okr.reviewSummary', 'okr.value', 'okr.note']) expect(screen.queryByLabelText(label)).toBeNull()
   expect(screen.queryByRole('button', { name: 'okr.collect' })).toBeNull()
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)

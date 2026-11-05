@@ -34,6 +34,27 @@ it('renders only configured known widgets and restricts metric trends to their d
   expect(screen.queryByText('okr.nextAction')).toBeNull()
 })
 
+it('gives each configured metric its own trend card with no other metric data', () => {
+  render(<OkrDashboard workspace={{ ...workspace, dashboard: { schemaVersion: 1, widgets: [{ id: 'trends', type: 'metricTrend', title: 'All metrics', metricIds: ['clicks', 'watch'] }] } }} />)
+  const cards = screen.getByLabelText('okr.tab.dashboard').querySelectorAll('.okr-trend-grid > section')
+  expect(cards).toHaveLength(2)
+  expect(cards[0].textContent).toBe('X clicksX clicks')
+  expect(cards[1].textContent).toBe('Video watch timeVideo watch time')
+  expect(screen.queryByText('All metrics')).toBeNull()
+})
+
+it('does not reserve a blank key-results section above the trend cards', () => {
+  render(<OkrDashboard workspace={{ ...workspace, keyResults: [] }} />)
+  expect(screen.queryByText('okr.keyResults')).toBeNull()
+  expect(screen.getByLabelText('okr.tab.dashboard').querySelectorAll('.okr-trend-grid > section')).toHaveLength(2)
+})
+
+it('does not invent a trend card when the configured metric is missing', () => {
+  render(<OkrDashboard workspace={{ ...workspace, dashboard: { schemaVersion: 1, widgets: [{ id: 'missing', type: 'metricTrend', metricIds: ['removed-metric'] }] } }} />)
+  expect(screen.getByText('okr.noWidgets')).toBeTruthy()
+  expect(screen.queryByText('X clicks')).toBeNull()
+})
+
 it('keeps task state authoritative and separates stored media, acceptance, external receipts and executor claims', () => {
   state.snapshot = {
     id: 'team', name: 'Promotion team', state: 'failed', mainState: 'idle', work: [{
