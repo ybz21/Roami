@@ -100,7 +100,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   }, [prefs.p2pEnabled])
 
   const projectActions = useProjectActions({ data, directory, workspace, runtime, isMobile, agentKinds, go })
-  const { tree, openTerm, closeTerm, renameOpenTerm, onTreeTask, onTreeProject, newTerminalInTask, newTerminalAt, activeTaskLabel, finishTask } = projectActions
+  const { tree, openTerm, closeTerm, renameOpenTerm, onTreeProject, newTerminalInTask, newTerminalAt, activeTaskLabel } = projectActions
   const keys = useWorkspaceShortcuts({ hasSider, workspace, inspector, tree, activeProject, newTerminalInTask, closeTerm, setNewTaskDir: projectActions.setNewTaskDir })
   const termPane = <WorkspaceTerminals workspace={workspace} runtime={runtime} inspector={inspector} pages={pageTabsState}
     routing={routing} hasSider={hasSider} agentKinds={agentKinds} activeTaskLabel={activeTaskLabel}
@@ -202,11 +202,10 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
               onSearch={openPalette}
               searchHint={keys.search.label}
               tree={<ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
-                onProject={onTreeProject} onTask={onTreeTask} onSession={(key, name) => (terms.includes(name) ? returnToTask(key, name) : openTerm(name, key))}
+                onProject={onTreeProject} onSession={(key, name) => (terms.includes(name) ? returnToTask(key, name) : openTerm(name, key))}
                 onAddProject={projectActions.addProject}
                 onRename={projectActions.renameSession}
-                onRenameTask={projectActions.renameTask}
-                onNewTask={projectActions.newTask} onKill={projectActions.kill} onFinishTask={finishTask}
+                onNewTask={projectActions.newTask} onKill={projectActions.kill}
                 onNewInTask={(key, kind, parent) => { void newTerminalInTask(kind, key, parent) }}
                 onRemoveProject={projectActions.removeProject} />}
               hubAlarm={hubHealth.level === 'ok' ? undefined : hubReasonText(hubHealth, t)}
