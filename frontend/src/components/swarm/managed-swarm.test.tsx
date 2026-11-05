@@ -5,8 +5,8 @@ import type { ReactNode } from 'react'
 import ManagedSwarm from './ManagedSwarm'
 import type { SwarmSnapshot } from './swarm-protocol'
 
-const test = vi.hoisted(() => ({ mainTurns: null as { state: string }[] | null, nativeSessions: [] as { taskId: string; revision: number; lifecycle: string }[], phone: false, api: vi.fn(), refresh: vi.fn(), openTask: vi.fn(), error: vi.fn(), data: null as SwarmSnapshot | null }))
-vi.mock('../../session-overview', () => ({ useSessionOverview: () => ({ value: [{ name: 'real-session', agent: 'codex', dormant: false }], failed: false }) }))
+const test = vi.hoisted(() => ({ sessions: [{ name: "real-session", agent: "codex", dormant: false }] as { name: string; agent: string; dormant: boolean; projectKey?: string }[], mainTurns: null as { state: string }[] | null, nativeSessions: [] as { taskId: string; revision: number; lifecycle: string }[], phone: false, api: vi.fn(), refresh: vi.fn(), openTask: vi.fn(), error: vi.fn(), data: null as SwarmSnapshot | null }))
+vi.mock('../../session-overview', () => ({ useSessionOverview: () => ({ value: test.sessions, failed: false }) }))
 vi.mock('../agent/useAgentThread', () => ({ useAgentThread: (cid: string) => ({ view: cid && test.mainTurns ? { turns: test.mainTurns, messages: [] } : null, refresh: test.refresh }) }))
 vi.mock('../agent/useAgentData', () => ({ useAgentData: () => ({ value: test.nativeSessions, failed: false }) }))
 vi.mock('../../api', () => ({ api: (...args: unknown[]) => test.api(...args) }))
@@ -40,7 +40,7 @@ function showScene() {
 function snapshot(): SwarmSnapshot {
   return { id: 'sw-one', name: 'Team', goal: 'Goal', mainConversationId: 'main', revision: 2, sequence: 10, paused: false, archived: false, state: 'review', target: {}, posts: [{ id: 1, author: 'frontend', text: 'Task update', taskId: 'task', createdMs: 1 }], mainMessages: [{ id: 'reply', role: 'assistant', text: 'Main response', createdMs: 10 }], work: [{ id: 'work', member_name: 'frontend', executor: 'codex', title: 'Build page', goal: 'Full instructions', acceptance: 'Verify results', integration: 0, task_id: 'task', revision: 1, state: 'waiting_user', dispatch_error: null, dependencies: [], attempt: { runId: 'run', state: 'verifying', summary: 'Reported outcome' } }] }
 }
-beforeEach(() => { test.mainTurns = null; test.nativeSessions = []; localStorage.clear(); test.phone = false; test.data = snapshot(); test.api.mockReset().mockResolvedValue({ data: {} }); test.refresh.mockReset().mockResolvedValue(undefined); test.error.mockReset(); test.openTask.mockReset() })
+beforeEach(() => { test.sessions = [{ name: "real-session", agent: "codex", dormant: false }]; test.mainTurns = null; test.nativeSessions = []; localStorage.clear(); test.phone = false; test.data = snapshot(); test.api.mockReset().mockResolvedValue({ data: {} }); test.refresh.mockReset().mockResolvedValue(undefined); test.error.mockReset(); test.openTask.mockReset() })
 afterEach(cleanup)
 it('embeds the same managed workspace without an extra page return action', () => {
   render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
@@ -529,4 +529,48 @@ it('does not animate a CLI session whose live executor differs from the member',
   showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main')
   expect(screen.getByRole('button', { name: 'frontend', pressed: false })).toBeTruthy()
+})
+
+
+it.each([false, true])('opens the original legacy member using host project identity (phone=%s)', async phone => {
+  test.phone = phone
+  test.data!.target = { projectId: 'bound-project' }
+  test.sessions[0].projectKey = 'bound-project'
+  test.api.mockResolvedValueOnce({ data: { task: { id: 'task', revision: 1, executor: 'codex', projectId: null, origin_conversation_id: 'main' }, attempts: [{ id: 'run', revision: 1, sessionId: 'real-session' }] } })
+  const terminal = vi.fn()
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
+  chooseConversation('work')
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.openSession' }))
+  await waitFor(() => expect(terminal).toHaveBeenCalledWith('real-session'))
+  expect(test.openTask).not.toHaveBeenCalled()
+})
+
+it.each(['missing project', 'other project', 'other Main', 'explicit conflict', 'host conflict', 'native alias', 'dormant', 'ambiguous session'])('rejects legacy session entry with %s', async mismatch => {
+  test.data!.target = { projectId: 'bound-project' }
+  test.sessions[0].projectKey = ['other project', 'host conflict'].includes(mismatch) ? 'another-project' : mismatch === 'missing project' ? undefined : 'bound-project'
+  if (mismatch === 'dormant') test.sessions[0].dormant = true
+  if (mismatch === 'ambiguous session') test.sessions.push({ ...test.sessions[0] })
+  test.api.mockResolvedValueOnce({ data: { task: { id: 'task', revision: 1, executor: 'codex', nativeSession: mismatch === 'native alias' ? { id: 'native', conversationId: 'worker' } : null, projectId: mismatch === 'explicit conflict' ? 'another-project' : mismatch === 'host conflict' ? 'bound-project' : null, origin_conversation_id: mismatch === 'other Main' ? 'another-main' : 'main' }, attempts: [{ id: 'run', revision: 1, sessionId: 'real-session' }] } })
+  const terminal = vi.fn()
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
+  chooseConversation('work')
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.openSession' }))
+  await waitFor(() => expect(test.openTask).toHaveBeenCalledWith('tasks', 'task'))
+  expect(terminal).not.toHaveBeenCalled()
+})
+
+
+it.each(['project', 'Main'])('rejects a %s binding changed during the session lookup', async changed => {
+  test.data!.target = { projectId: 'bound-project' }
+  test.sessions[0].projectKey = 'bound-project'
+  let resolve!: (value: unknown) => void
+  test.api.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  const terminal = vi.fn(), view = render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
+  chooseConversation('work')
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.openSession' }))
+  test.data = { ...test.data!, ...(changed === 'project' ? { target: { projectId: 'another-project' } } : { mainConversationId: 'another-main' }) }
+  view.rerender(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
+  resolve({ data: { task: { id: 'task', revision: 1, executor: 'codex', projectId: null, origin_conversation_id: 'main' }, attempts: [{ id: 'run', revision: 1, sessionId: 'real-session' }] } })
+  await waitFor(() => expect(test.openTask).toHaveBeenCalledWith('tasks', 'task'))
+  expect(terminal).not.toHaveBeenCalled()
 })
