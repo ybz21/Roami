@@ -45,16 +45,20 @@ describe('OKR evidence', () => {
     const configured: Workspace = { ...workspace,
       initiatives: [{ id: 'video', title: 'Daily videos', channel: 'bilibili', keyResultIds: ['kr'], description: 'Narrated tips', acceptance: 'Playable media and publication receipts' }],
       dashboard: { schemaVersion: 1, widgets: [{ id: 'interest', type: 'keyResults', keyResultIds: ['kr'] }] },
+      team: { schemaVersion: 1, roles: [{ id: 'editor', name: 'Editor', executor: 'codex', duty: 'Prepare reviewed drafts' }] },
       projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 8, teamMemory: 'Context' },
     }
     const draft = configurationOf(configured)
     expect(draft.initiatives).toEqual(configured.initiatives)
     expect(draft.dashboard).toEqual(configured.dashboard)
+    expect(draft.team).toEqual(configured.team)
     expect(draft).not.toHaveProperty('projectFiles')
     draft.initiatives![0].keyResultIds.length = 0
     draft.dashboard!.widgets[0].keyResultIds!.length = 0
+    draft.team!.roles[0].duty = 'Changed draft'
     expect(configured.initiatives![0].keyResultIds).toEqual(['kr'])
     expect(configured.dashboard!.widgets[0].keyResultIds).toEqual(['kr'])
+    expect(configured.team!.roles[0].duty).toBe('Prepare reviewed drafts')
   })
 })
 

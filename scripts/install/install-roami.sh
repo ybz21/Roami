@@ -19,7 +19,7 @@ roami_skills() {
     mkdir -p "$SKILL_DIR"
     if [[ -f "${SCRIPT_DIR}/skills/sync-skills.sh" ]]; then
         # 本地安装：复用 skills/sync-skills.sh（与开发模式 start.sh --dev 同一套合并逻辑）
-        bash "${SCRIPT_DIR}/skills/sync-skills.sh" "$SKILL_DIR" >/dev/null && info "skills 已安装 (roami-session, cc-swarm, dev-roles, babysit-pr)"
+        bash "${SCRIPT_DIR}/skills/sync-skills.sh" "$SKILL_DIR" >/dev/null && info "skills 已安装 (roami-session, cc-swarm, dev-roles, babysit-pr, okr-development)"
         return 0
     fi
     # curl|bash 无本地文件：从 GitHub 下载合并。
@@ -39,6 +39,10 @@ roami_skills() {
         -o "${local_tmp}/babysit-pr.md" 2>/dev/null || all_ok=false
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/skills/babysit-pr/wait-codex-review.sh" \
         -o "${local_tmp}/wait-codex-review.sh" 2>/dev/null || all_ok=false
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/agent-runtime/src/roami_agent/skills/okr-development/SKILL.md" \
+        -o "${local_tmp}/okr-development.md" 2>/dev/null || all_ok=false
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/${BRANCH}/agent-runtime/src/roami_agent/skills/okr-development/references/bundle.md" \
+        -o "${local_tmp}/okr-bundle.md" 2>/dev/null || all_ok=false
     local d
     # dev-roles 各角色子文档（顺序与 skills/sync-skills.sh 的 DEV_ROLES_DOCS 保持一致）
     for d in plaza board chrome pm architect frontend backend fullstack qa designer reviewer devops docs; do
@@ -60,8 +64,11 @@ roami_skills() {
             cp "${local_tmp}/babysit-pr.md" "${sd}/babysit-pr/SKILL.md"
             cp "${local_tmp}/wait-codex-review.sh" "${sd}/babysit-pr/wait-codex-review.sh"
             chmod +x "${sd}/babysit-pr/wait-codex-review.sh"
+            mkdir -p "${sd}/okr-development/references"
+            cp "${local_tmp}/okr-development.md" "${sd}/okr-development/SKILL.md"
+            cp "${local_tmp}/okr-bundle.md" "${sd}/okr-development/references/bundle.md"
         done
-        info "skills 已安装 (roami-session, cc-swarm, dev-roles, babysit-pr)"
+        info "skills 已安装 (roami-session, cc-swarm, dev-roles, babysit-pr, okr-development)"
     fi
     rm -rf "$local_tmp"
 }

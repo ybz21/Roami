@@ -34,7 +34,6 @@
 
 真实目录已整理：327 个历史原件归档、21 个根目录散文件移入历史；367 个配置与日期产物文件字节/mtime未变。原件字节、权限、mtime逐个复核，artifacts旧链接仍解析。审计位于 /tmp/okr-main-workspace/archive-result.json，迁移索引在项目 archive/legacy-20261104/manifest.json。
 
-
 ### 实现与本机验收
 
 - 持久 Main 索引、并发复用、复用既有专用团队、项目隔离和工具权限专项通过。集成用例走真实运行时/SQLite/tool handler：同一 Main 建团队、关联目标、计划任务、生成受管任务、写共享群聊、重新打开，保持同一身份；不调用真实模型或执行外部动作。
@@ -49,7 +48,6 @@
 本轮没有部署、重启生产 Go Agent/Python、修改 env/模型路由/费用/账目或强制解除 busy。持久 Main 的 schema19 仅用于开发验收；正式升级须在已有旧任务可信恢复后走受管安装流程。旧服务只复用已经核验的专用团队 Main，不把不支持的新目标绑定回退到首页。
 
 用户此前要求不操作手机，真机仍未验收；桌面模拟不能代替真机触控。PR655 仍是前序草稿，不能把旧截图或旧门禁当作本轮手机通过。尚未增加同项目多 OKR 或自动日更调度器。
-
 
 ## 迭代：页面减法、群聊转交与消息隔离
 
@@ -79,7 +77,6 @@
 
 前一轮前端全量188文件/1343测试通过；此后追加了会话级通知隔离与回归，最终结果待补。CLI→Leader续派→同一成员/native branch→群聊记录的真实运行时/SQLite/注册CLI集成专项通过；当前Python专题61项通过。真实Android仍未操作，不能把窄屏模拟记作通过。
 
-
 ### 最终第一轮记录
 
 第一轮提交 `9d410ee8`，提交门禁通过：Go 全量、Python **3427 passed / 48 skipped**（931.14秒）、ruff、typecheck、i18n、hover 与秘密扫描。前端全量 **188文件/1344测试**通过，构建通过。没有运行 full 命令或开新 PR，不能把该记录标为 PR 完整发布门禁。
@@ -88,7 +85,6 @@
 
 [长期成员与执行轮次设计](long-lived-members.md)明确区分职责、实例和任务。当前 task/native branch 延续已有回归证明；独立职责实例、关闭终端后可信恢复以及历史重复职责迁移仍未完成，不把提示词约束当作宿主强制保证。
 
-
 ### 手机预览与摘要后续
 
 前端全量最终 **188文件/1346测试**通过，typecheck、i18n（5150 keys）、hover 与构建通过。独立团队预览在392×766紧凑/粗指针模拟中占705px页面，动画高381.25px；聊天、预览、项目文件与Main均无文档溢出，没有自动聚焦输入。Main和团队两个页面均可返回原上下文，真实手机仍未验收。
@@ -96,7 +92,6 @@
 证据 `/tmp/okr-leader-workspace/final-qa/phone-qa.json` 与 `phone-{chat,team,files,main}-emulated.png`；通知列表将Markdown链接显示为文件名并限制三行，点击仍回原消息。
 
 后续边界：随后补充只读统一身份API，按owner/持久Main索引区分首页Main、项目Main和成员；未绑定Swarm也可导航到原项目Main。新运行时通过conversationIdentity能力标记启用，旧运行时保留团队绑定复验路径。该新增接口只有专项验证，不把旧生产环境的浏览器复验扩展宣称为新接口已部署。长期职责实体、未派发成员实例与原生会话可信恢复按独立设计继续实现。
-
 
 ### 统一实例身份补充
 
@@ -132,3 +127,5 @@
 原生执行器恢复的后续设计与隔离验收见 [provider-recovery.md](provider-recovery.md)：保持原 provider 对话，按宿主与停止证明恢复物理终端。
 
 未派发的 Roami 成员会话、首次派工复用及 Main 身份隔离见 [native-member-instances.md](native-member-instances.md)。
+
+[从聊天开发文件化 OKR](file-dashboard-development.md)（2026-11-05）

@@ -465,6 +465,21 @@ func workingConfig(root *os.Root) (Config, error) {
 		return c, err
 	}
 	c.Dashboard = &dashboard
+	if c.Team != nil {
+		return c, ErrInvalid
+	}
+	var team TeamDefinition
+	if err := decodeFile(root, "agents/team.json", &team); err == nil {
+		c.Team = &team
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return c, err
+	} else if snapshot, err := loadSnapshot(root); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return c, err
+		}
+	} else if snapshot.Workspace.Team != nil {
+		return c, ErrInvalid
+	}
 	if err := validate(&c); err != nil {
 		return c, err
 	}
@@ -599,11 +614,17 @@ type connectorDefinition struct {
 func definitions(root *os.Root, w *Workspace, referenceSources map[string]string) error {
 	config := w.Config
 	config.Dashboard = nil
+	config.Team = nil
 	if err := writeJSON(root, "okr.json", config); err != nil {
 		return err
 	}
 	if err := writeJSON(root, "dashboard.json", w.Dashboard); err != nil {
 		return err
+	}
+	if w.Team != nil {
+		if err := writeJSON(root, "agents/team.json", w.Team); err != nil {
+			return err
+		}
 	}
 	for _, metric := range w.Metrics {
 		file := "connectors/" + metric.ID + "/"
@@ -641,7 +662,7 @@ func definitions(root *os.Root, w *Workspace, referenceSources map[string]string
 	if err := seedProjectCapabilities(root); err != nil {
 		return err
 	}
-	for _, name := range []string{"memory/team.md", "memory/decisions.jsonl"} {
+	for _, name := range []string{"memory/team.md", "memory/decisions.md", "memory/decisions.jsonl"} {
 		if _, err := root.Lstat(name); errors.Is(err, fs.ErrNotExist) {
 			if err := atomicFile(root, name, nil); err != nil {
 				return err

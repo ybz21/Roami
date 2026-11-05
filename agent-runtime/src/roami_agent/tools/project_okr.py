@@ -35,7 +35,7 @@ def register_project_okr_tools(registry, database, settings):
     registry.add(
         Tool(
             "project_okr_update",
-            "Apply a user-confirmed OKR change only to this goal conversation's bound project. First read project_okr_context; use its revision and the existing validated project operation JSON. Save definitions, collect registered sources, record real observations, review, sync staged definitions or update memory with expectedSha256. Conflicts require rereading. No shell, paths, credentials, model settings or public posting.",
+            "Apply a user-confirmed OKR change only to this goal conversation's bound project. First read project_okr_context; use its revision and the existing validated project operation JSON. Save objective, dashboard, Connector bindings and desired team roles (team.schemaVersion=1, roles with id/name/executor/duty); saving roles does not register or dispatch members. Collect registered sources, record real observations, review, sync staged definitions or update memory with expectedSha256. For whole-project creation discover okr-development. Conflicts require rereading. No shell, paths, credentials, model settings or public posting.",
             object_schema(
                 {
                     "operation": {
