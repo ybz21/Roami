@@ -15,6 +15,7 @@ async def execute(
     timeout=None,
     input_data=None,
     env: dict | None = None,
+    env_overrides: dict | None = None,
     max_bytes=None,
     raw_output=False,
     excluded_env=(),
@@ -35,6 +36,8 @@ async def execute(
             "GIT_GRAFT_FILE",
         }
         env = {name: value for name, value in os.environ.items() if name not in bindings}
+    if env_overrides:
+        env = {**(os.environ if env is None else env), **env_overrides}
     if excluded_env:
         env = {
             name: value

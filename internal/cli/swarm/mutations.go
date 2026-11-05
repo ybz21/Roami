@@ -112,6 +112,10 @@ func dependencyFlags(o commandOptions) ([]dependency, error) {
 	return values, nil
 }
 func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, o commandOptions, w io.Writer, input io.Reader, jsonOutput bool) error {
+	// This marker only restricts shell callers; it never grants an Agent identity.
+	if command == "say" && os.Getenv("ROAMI_AGENT_CALLER_ROLE") != "" {
+		return fmt.Errorf("AGENT_MESSAGE_IDENTITY_REQUIRED: use the registered roami swarm post --input JSON operation directly, without cd or shell wrappers; public swarm say is for human messages")
+	}
 	var body map[string]any
 	var err error
 	suffix := map[string]string{"member-register": "members", "member-add": "plan", "plan": "plan", "dependencies": "dependencies", "control": "control", "say": "messages", "post": "member-posts", "pause": "control", "resume": "control", "stop": "control", "archive": "control"}[command]

@@ -45,10 +45,15 @@ def register_shell(registry, settings, artifacts=None):
         return cwd
 
     async def run(args, binding, cwd):
+        role = binding.get("role")
+        environment = (
+            {"ROAMI_AGENT_CALLER_ROLE": role} if role in {"main", "worker", "research"} else None
+        )
         if not artifacts:
             return await execute(
                 args["argv"],
                 cwd=cwd,
+                env_overrides=environment,
                 timeout=args.get("timeout") or None,
                 excluded_env=settings.provider_key_environments(),
             )
@@ -56,6 +61,7 @@ def register_shell(registry, settings, artifacts=None):
             result = await execute(
                 args["argv"],
                 cwd=cwd,
+                env_overrides=environment,
                 timeout=args.get("timeout") or None,
                 excluded_env=settings.provider_key_environments(),
                 output_directory=directory,
