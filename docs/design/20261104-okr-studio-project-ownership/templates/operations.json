@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "templateId": "operations",
+  "version": 1,
+  "name": "运营指标",
+  "prototypeOnly": true,
+  "objectiveSeed": "建立可信的日常经营数据视图",
+  "roles": [
+    {
+      "id": "operations-role-1",
+      "name": "数据采集",
+      "executor": "native",
+      "duty": "数据采集职责，创建时与用户明确范围"
+    },
+    {
+      "id": "operations-role-2",
+      "name": "分析跟进",
+      "executor": "native",
+      "duty": "分析跟进职责，创建时与用户明确范围"
+    }
+  ],
+  "skillSeeds": [
+    "collect-operations"
+  ],
+  "scheduleSeed": {
+    "enabled": false,
+    "dailyAt": null,
+    "timezone": null
+  },
+  "preserveOnEdit": [
+    "projectIdentity",
+    "mainConversation",
+    "members",
+    "providerConversations",
+    "observations",
+    "history"
+  ],
+  "requiresProjectDecisions": [
+    "objectivePeriod",
+    "keyResults",
+    "metricsAndUnits",
+    "sourceAccount",
+    "evidence",
+    "roleDuties",
+    "scheduleTimeAndTimezone"
+  ],
+  "exclude": [
+    "credentials",
+    "liveInstanceIds",
+    "observations",
+    "completedState"
+  ]
+}

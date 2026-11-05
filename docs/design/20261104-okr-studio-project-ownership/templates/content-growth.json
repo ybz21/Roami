@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "templateId": "content-growth",
+  "version": 1,
+  "name": "内容增长",
+  "prototypeOnly": true,
+  "objectiveSeed": "让更多开发者认识并使用 Roami",
+  "roles": [
+    {
+      "id": "content-growth-role-1",
+      "name": "内容编辑",
+      "executor": "native",
+      "duty": "内容编辑职责，创建时与用户明确范围"
+    },
+    {
+      "id": "content-growth-role-2",
+      "name": "视频制作",
+      "executor": "native",
+      "duty": "视频制作职责，创建时与用户明确范围"
+    },
+    {
+      "id": "content-growth-role-3",
+      "name": "数据分析",
+      "executor": "native",
+      "duty": "数据分析职责，创建时与用户明确范围"
+    },
+    {
+      "id": "content-growth-role-4",
+      "name": "独立验收",
+      "executor": "native",
+      "duty": "独立验收职责，创建时与用户明确范围"
+    }
+  ],
+  "skillSeeds": [
+    "collect-github",
+    "review-deliveries"
+  ],
+  "scheduleSeed": {
+    "enabled": false,
+    "dailyAt": null,
+    "timezone": null
+  },
+  "preserveOnEdit": [
+    "projectIdentity",
+    "mainConversation",
+    "members",
+    "providerConversations",
+    "observations",
+    "history"
+  ],
+  "requiresProjectDecisions": [
+    "objectivePeriod",
+    "keyResults",
+    "metricsAndUnits",
+    "sourceAccount",
+    "evidence",
+    "roleDuties",
+    "scheduleTimeAndTimezone"
+  ],
+  "exclude": [
+    "credentials",
+    "liveInstanceIds",
+    "observations",
+    "completedState"
+  ]
+}
