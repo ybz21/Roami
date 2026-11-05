@@ -3,7 +3,8 @@
 #
 # Usage:
 #   scripts/dev/quality/check.sh quick   # pre-commit friendly
-#   scripts/dev/quality/check.sh full    # CI / release gate
+#   scripts/dev/quality/check.sh full    # complete affected checks
+#   scripts/dev/quality/check.sh release # all checks, regardless of changed paths
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -38,6 +39,7 @@ bash scripts/dev/selftest/install-storage-preflight.sh
 bash scripts/dev/selftest/install-release-discovery.sh
 bash scripts/dev/selftest/retired-session-entries.sh
 bash scripts/dev/selftest/python-check-scope.sh
+node --test scripts/dev/selftest/python-check-plan.test.mjs
 
 section "Shell syntax"
 shell_files="$(git ls-files '*.sh' 'scripts/*.sh')"
@@ -58,20 +60,40 @@ if [ -n "$go_files" ]; then
   fi
 fi
 
-section "Go tests"
-go test ./...
-
-python_checks="$(bash scripts/dev/quality/python-check-scope.sh "$MODE")"
-if [ "$python_checks" = true ]; then
-  section "Python Agent runtime"
-  if ! command -v uv >/dev/null 2>&1; then
-    echo "uv is missing. Install uv, then run: cd agent-runtime && uv sync --frozen" >&2
-    exit 1
+python_plan="$(node scripts/dev/quality/python-check-plan.mjs "$MODE" --lines)"
+python_enabled() {
+  [[ $'\n'"$python_plan"$'\n' == *$'\n'"$1=true"$'\n'* ]]
+}
+section "Python check plan"
+printf '%s\n' "$python_plan"
+if python_enabled python && ! command -v uv >/dev/null 2>&1; then
+  echo "uv is missing. Install uv, then run: cd agent-runtime && uv sync --frozen" >&2
+  exit 1
+fi
+for profile in presentation tabular market video; do
+  if python_enabled "$profile"; then
+    bash scripts/dev/quality/python-skill-dependencies.sh "$profile"
   fi
+done
+if python_enabled go; then
+  section "Go tests"
+  go test ./...
+else
+  section "Go tests skipped (no related changes)"
+fi
+if python_enabled runtime; then
+  section "Python Agent runtime"
   (cd agent-runtime && uv sync --frozen --quiet && uv run --frozen ruff check src tests && uv run --frozen ruff format --check src tests && uv run --frozen pytest -q)
 else
   section "Python Agent runtime skipped (no related changes)"
 fi
+
+for profile in presentation tabular market video; do
+  if python_enabled "$profile"; then
+    section "Python Skill: $profile"
+    bash scripts/dev/quality/python-skill-check.sh "$profile"
+  fi
+done
 
 section "Frontend checks"
 if [ ! -d frontend/node_modules ]; then
@@ -82,7 +104,7 @@ fi
 (cd frontend && npm run hover:check)
 (cd frontend && npm run typecheck)
 
-if [ "$MODE" = "full" ]; then
+if [ "$MODE" != quick ]; then
   section "Frontend build"
   (cd frontend && npm run build)
 fi
