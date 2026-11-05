@@ -15,14 +15,19 @@ from roami_agent.protocol.models import ModelEvent
 from roami_agent.providers.chat_completions import ChatCompletions
 from roami_agent.providers.local_gateway import LocalGatewayTransport
 from roami_agent.providers.model_bridge_transport import PrivateModelBridgeTransport
-from roami_agent.providers.request_receipts import forwarded_receipt
+from roami_agent.providers.request_receipts import (
+    GATEWAY_EXTENSION,
+    forwarded_receipt,
+    relayed_receipt,
+    response_receipt,
+)
 
 INPUT = json.loads((Path(__file__).parent / "fixtures/model-request-receipts.json").read_text())
 CALL = INPUT["retry_scenario"][0]["call_id"]
 
 
 @asynccontextmanager
-async def go_response(tmp_path, responses):
+async def go_response(tmp_path, responses, *, admission_ms=None):
     import asyncio
 
     socket = tmp_path / "go.sock"
@@ -49,7 +54,10 @@ async def go_response(tmp_path, responses):
                 if status != 200
                 else b"data: " + json.dumps(success).encode() + b"\n\ndata: [DONE]\n\n"
             )
-            prefix = f"HTTP/1.1 {status} Fixture\r\nContent-Type: text/event-stream\r\nContent-Length: {len(payload)}\r\nRetry-After: 0\r\nX-Roami-Model-Call: {call_id}\r\nX-Request-Id: upstream-{len(calls)}\r\nConnection: close\r\n\r\n"
+            timing = (
+                "" if admission_ms is None else f"X-Roami-Model-Admission-Ms: {admission_ms}\r\n"
+            )
+            prefix = f"HTTP/1.1 {status} Fixture\r\nContent-Type: text/event-stream\r\nContent-Length: {len(payload)}\r\nRetry-After: 0\r\nX-Roami-Model-Call: {call_id}\r\nX-Request-Id: upstream-{len(calls)}\r\n{timing}Connection: close\r\n\r\n"
             writer.write(prefix.encode() + payload)
             await writer.drain()
         finally:
@@ -384,3 +392,81 @@ async def test_actual_agent_failure_trace_keeps_go_call_receipt(store, tmp_path)
             assert trace["summary"]["hasFailures"] and len(calls) == 1
         finally:
             await runtime.close()
+
+
+@pytest.mark.parametrize("trusted", [False, True])
+@pytest.mark.parametrize(
+    "header,expected",
+    [
+        (None, None),
+        ("0", 0),
+        ("137", 137),
+        (str(2**63 - 1), 2**63 - 1),
+        ("-1", None),
+        ("1.5", None),
+        ("nan", None),
+        ("inf", None),
+        (str(2**63), None),
+        ("007", None),
+        ("", None),
+    ],
+)
+def test_admission_duration_requires_trusted_gateway_and_finite_integer(header, expected, trusted):
+    headers = {} if header is None else {"X-Roami-Model-Admission-Ms": header}
+    response = httpx.Response(200, headers=headers, extensions={GATEWAY_EXTENSION: trusted})
+    receipt = response_receipt(response, 1)
+    if not trusted or expected is None:
+        assert "gatewayAdmissionMs" not in receipt
+    else:
+        assert receipt["gatewayAdmissionMs"] == expected
+        assert type(receipt["gatewayAdmissionMs"]) is int
+
+
+@pytest.mark.parametrize("duration", [0, 137, 2**63 - 1, None, True, False, -1, 1.5, "137", 2**63])
+def test_admission_duration_relay_preserves_only_nonnegative_wire_integers(duration):
+    value = {
+        "phase": "headers",
+        "attempt": 1,
+        "gatewayCallId": CALL,
+        "gatewayAdmissionMs": duration,
+    }
+    receipt = forwarded_receipt(value)
+    forwarded = relayed_receipt(value, 2)
+    assert receipt["gatewayCallId"] == forwarded["gatewayCallId"] == CALL
+    if type(duration) is int and 0 <= duration <= 2**63 - 1:
+        assert receipt["gatewayAdmissionMs"] == forwarded["gatewayAdmissionMs"] == duration
+    else:
+        assert "gatewayAdmissionMs" not in receipt and "gatewayAdmissionMs" not in forwarded
+
+
+@pytest.mark.parametrize("status", [200, 401])
+async def test_real_private_bridge_keeps_gateway_admission_duration(tmp_path, status):
+    async with (
+        go_response(tmp_path, [(status, CALL)], admission_ms=137) as (socket, calls),
+        httpx.AsyncClient(transport=LocalGatewayTransport(str(socket), "worker")) as host_client,
+    ):
+        host = ChatCompletions(
+            "http://localhost/v1", "saved-fixture", client=host_client, max_retries=0
+        )
+        async with (
+            ModelGateway(tmp_path / "relay.sock", {"worker": host}),
+            httpx.AsyncClient(
+                transport=PrivateModelBridgeTransport(str(tmp_path / "relay.sock"))
+            ) as client,
+        ):
+            actor = ChatCompletions(
+                "http://localhost/v1/worker", "worker", client=client, max_retries=0
+            )
+            events = []
+            if status == 200:
+                events = [event async for event in actor.stream([], [])]
+            else:
+                with pytest.raises(DomainError, match="MODEL_HTTP_401"):
+                    async for event in actor.stream([], []):
+                        events.append(event)
+    assert len(calls) == 1
+    receipts = [event.value for event in events if event.kind == "telemetry"]
+    remote = next(value for value in receipts if value["phase"] == "upstream_headers")
+    local = next(value for value in receipts if value["phase"] == "headers")
+    assert remote["gatewayAdmissionMs"] == 137 and remote["gatewayCallId"] == CALL
+    assert "gatewayAdmissionMs" not in local

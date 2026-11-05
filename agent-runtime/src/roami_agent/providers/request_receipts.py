@@ -8,6 +8,7 @@ GATEWAY_EXTENSION = "roami_go_gateway"
 BRIDGE_EXTENSION = "roami_receipt_bridge"
 REQUEST_ID = re.compile(r"[A-Za-z0-9_.:-]{1,200}")
 CALL_ID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
+MILLISECONDS = re.compile(r"(?:0|[1-9][0-9]{0,18})")
 
 
 def response_receipt(response, attempt):
@@ -22,6 +23,14 @@ def response_receipt(response, attempt):
         and CALL_ID.fullmatch(call_id)
     ):
         receipt["gatewayCallId"] = call_id
+    admission = response.headers.get("x-roami-model-admission-ms")
+    if (
+        response.extensions.get(GATEWAY_EXTENSION) is True
+        and admission
+        and MILLISECONDS.fullmatch(admission)
+        and int(admission) <= 2**63 - 1
+    ):
+        receipt["gatewayAdmissionMs"] = int(admission)
     return receipt
 
 
@@ -41,6 +50,9 @@ def forwarded_receipt(value):
     status = value.get("httpStatus")
     if type(status) is int and 100 <= status <= 599:
         receipt["httpStatus"] = status
+    admission = value.get("gatewayAdmissionMs")
+    if type(admission) is int and 0 <= admission <= 2**63 - 1:
+        receipt["gatewayAdmissionMs"] = admission
     return receipt
 
 

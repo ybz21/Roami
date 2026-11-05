@@ -1,0 +1,45 @@
+{
+  "scope": "trusted optional Go admission timing receipt; no latency reduction or semantic quality claim",
+  "before_final": {
+    "go_valid_scenarios_failed": 3,
+    "python_failed": 8,
+    "python_boundary_passed": 26
+  },
+  "after": {
+    "go_timing_scenarios": 3,
+    "race_repeats": 5,
+    "race_passed": 15,
+    "related_python_passed": 131,
+    "go_package_race_passed": true
+  },
+  "runtime_source_sha256": {
+    "internal/modelgateway/handler.go": "d091b15712b171dfe7086abbc401d4a65de55a30f9960635bfc9e604cf705f29",
+    "internal/modelgateway/catalog_http.go": "47dddaa7b4abb47d6f145929bbc9c4da8dd0ca67132ea7085e3e282e4f59a42d",
+    "agent-runtime/src/roami_agent/providers/request_receipts.py": "629c03d410b7985b53f1b25d53b4e58938b8d6501472f99e8824050e0c6032af"
+  },
+  "inference": {
+    "scope": "read-only timeline inference; no direct queue trace or attribution to a named caller",
+    "scenario_timeout_retained": true,
+    "other_calls_role_counts": {
+      "main": 19,
+      "worker": 9
+    },
+    "sample": {
+      "request": 18,
+      "wrapper_ms": 37856.099,
+      "gateway_ms": 2532,
+      "between_previous_and_this": {
+        "request": 18,
+        "inter_request_ms": 35346,
+        "other_calls_between": 2,
+        "other_ledger_ms": 35332
+      }
+    },
+    "interpretation": "Observed intervals match other admitted requests and Go admission occurs before a gateway ledger row is created; consistent with shared FIFO admission wait, not equivalent to upstream model duration. No saved settings, deadlines, scores or other tasks changed.",
+    "retry_started": false
+  },
+  "external_model_calls_for_mechanism_tests": 0,
+  "node_settings_modified": false,
+  "production_deployed": false,
+  "historical_suite_updated": false
+}
