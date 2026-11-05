@@ -134,6 +134,15 @@ They are not yet automatically scheduled by this product. Keep unsupported
 execution pending instead of installing an ad hoc cron job or pretending a file
 is an active timer. Preserve the original Main and long-lived team identities.
 
+## Operate and learn
+
+For an existing team's daily execution, browser validation, recovery, memory and
+scheduling, read [the daily loop](references/daily-loop.md). Use `roami chrome`
+for the actual Main/group/member and dashboard interactions. Preserve the original
+Main and member identities; distinguish human `swarm say` from Main `swarm_post`.
+Never probe live write endpoints with placeholder content. Extract only verified
+lessons, keeping project IDs/accounts and private transcripts out of this package.
+
 ## Verify the result
 
 Reread the saved workspace and actual files. Check widget/metric bindings, source
