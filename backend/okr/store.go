@@ -131,6 +131,11 @@ func (s *Store) mutate(projectID string, revision int64, create bool, change fun
 }
 
 func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
+	return s.SaveValidated(projectID, c, nil)
+}
+
+// Validate the effective configuration after preserving fields omitted by older clients.
+func (s *Store) SaveValidated(projectID string, c Config, validateConfig func(*Config) error) (*Workspace, error) {
 	if err := validate(&c); err != nil {
 		return nil, err
 	}
@@ -150,7 +155,13 @@ func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
 			}
 		}
 		applyConfig(w, c)
-		return validate(&w.Config)
+		if err := validate(&w.Config); err != nil {
+			return err
+		}
+		if validateConfig != nil {
+			return validateConfig(&w.Config)
+		}
+		return nil
 	})
 }
 
@@ -160,6 +171,20 @@ func applyConfig(w *Workspace, c Config) {
 	}
 	if c.Team == nil {
 		c.Team = &TeamDefinition{SchemaVersion: 1, Roles: []TeamRole{}}
+	}
+	if w.Team != nil {
+		for i := range c.Team.Roles {
+			role := &c.Team.Roles[i]
+			if role.MemberID != nil {
+				continue
+			}
+			for _, previous := range w.Team.Roles {
+				if previous.ID == role.ID {
+					role.MemberID = previous.MemberID
+					break
+				}
+			}
+		}
 	}
 	for i := range c.Metrics {
 		m := &c.Metrics[i]

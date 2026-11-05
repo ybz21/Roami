@@ -90,3 +90,10 @@ it('accepts live project memory and pending file changes at the same revision wi
   expect(workspaceUpdated(current, { ...current, revision: 7, projectFiles: { ...current.projectFiles, teamMemorySha256: 'new' } })).toBe(false)
   expect(workspaceUpdated(current, { ...current, observations: [] })).toBe(false)
 })
+
+it('round-trips explicit member bindings including clears without inventing bindings', () => {
+  for (const memberId of [undefined, '', '0123456789abcdef0123456789abcdef']) {
+    const team = { schemaVersion: 1 as const, roles: [{ id: 'editor', name: 'Editor', executor: 'codex' as const, duty: 'Write', ...(memberId !== undefined ? { memberId } : {}) }] }
+    expect(configurationOf({ ...workspace, team }).team).toEqual(team)
+  }
+})

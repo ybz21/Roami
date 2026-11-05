@@ -857,12 +857,12 @@ func (s *Store) SyncValidated(projectID string, revision int64, validateConfig f
 			return err
 		}
 		config.Revision = revision
+		applyConfig(w, config)
 		if validateConfig != nil {
-			if err := validateConfig(&config); err != nil {
+			if err := validateConfig(&w.Config); err != nil {
 				return err
 			}
 		}
-		applyConfig(w, config)
 		return validate(&w.Config)
 	}, true)
 }

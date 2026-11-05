@@ -19,6 +19,7 @@ var (
 	ErrSource   = errors.New("GitHub collection failed")
 )
 
+var memberIdentity = regexp.MustCompile(`^[a-f0-9]{32}$`)
 var identifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]{0,63}$`)
 var repository = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$`)
 
@@ -82,10 +83,11 @@ type Dashboard struct {
 }
 
 type TeamRole struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Executor string `json:"executor"`
-	Duty     string `json:"duty"`
+	MemberID *string `json:"memberId,omitempty"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Executor string  `json:"executor"`
+	Duty     string  `json:"duty"`
 }
 
 type TeamDefinition struct {
@@ -172,8 +174,14 @@ func validate(c *Config) error {
 		if c.Team.SchemaVersion != 1 || c.Team.Roles == nil || len(c.Team.Roles) > 64 {
 			return ErrInvalid
 		}
-		ids, names := map[string]bool{}, map[string]bool{}
+		ids, names, members := map[string]bool{}, map[string]bool{}, map[string]bool{}
 		for _, role := range c.Team.Roles {
+			if role.MemberID != nil && *role.MemberID != "" {
+				if !memberIdentity.MatchString(*role.MemberID) || c.Swarm == "" || members[*role.MemberID] {
+					return ErrInvalid
+				}
+				members[*role.MemberID] = true
+			}
 			name := strings.TrimSpace(role.Name)
 			if !identifier.MatchString(role.ID) || ids[role.ID] || name == "" || name != role.Name || names[name] || utf8.RuneCountInString(name) > 80 || strings.EqualFold(name, "main") || strings.EqualFold(name, "leader") || strings.TrimSpace(role.Duty) == "" || utf8.RuneCountInString(role.Duty) > 8000 {
 				return ErrInvalid
