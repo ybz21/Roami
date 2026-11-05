@@ -9,6 +9,7 @@
 | 会话同等展示 | [20261105-task-session-separation](20261105-task-session-separation/README.md) | 统一会话列表与聊天入口，关闭会话后任务独立留存 |
 | OKR 固定主智能体与目录 | [20261104-okr-main-workspace](20261104-okr-main-workspace/README.md) | 持久负责人、目录归档与会话收拢 |
 | 侧栏会话派生层级 | [20261104-sidebar-session-identity](20261104-sidebar-session-identity/README.md) | 项目下的父、子、孙会话导航 |
+| Main 普通 CLI 参数与调用拒绝 | [20261105-main-cli-arguments](20261105-main-cli-arguments/README.md) | 普通参数、真实模型提醒闭环与桌面/真机验收 |
 | OKR 活动场景与项目归属 | [20261104-okr-studio-project-ownership](20261104-okr-studio-project-ownership/README.md) | 历史场景、归属修复与分工验收 |
 | 工作区围栏启动诊断 | [20261103-workspace-launch-diagnostics](20261103-workspace-launch-diagnostics/README.md) | 启动前拒绝、阻塞执行证据、历史频次与回归 |
 | 蜂群 Main 编排与 Three.js | [20261103-swarm-main-three](20261103-swarm-main-three/README.md) | Roami Main、多执行器、三页签与受管验收 |

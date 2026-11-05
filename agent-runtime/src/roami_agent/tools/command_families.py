@@ -1,6 +1,7 @@
 """Public command families over role-bound internal operations."""
 
 import json
+import re
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
@@ -57,18 +58,69 @@ def chrome_operation(argv):
     return "browser_act", args
 
 
-def public_operation(argv):
-    for name, path in COMMANDS.items():
-        if argv[: len(path)] == path and argv[len(path) : len(path) + 1] == ["--input"]:
-            if len(argv) != len(path) + 2:
+def option_name(field):
+    return "--" + re.sub(r"[A-Z]", lambda match: "-" + match[0].lower(), field)
+
+
+def command_argv(path, schema):
+    prefix = ["roami", *path]
+    argv = list(prefix)
+    for field in schema.get("required", []):
+        spec = schema.get("properties", {}).get(field, {})
+        if spec.get("type") not in {"string", "integer", "number", "boolean"}:
+            return [*prefix, "--input", "JSON"]
+        argv.extend([option_name(field), field])
+    return argv
+
+
+def command_arguments(rest, schema):
+    if rest and (rest[0] == "--input" or rest[0].startswith("--input=")):
+        if rest[0] == "--input" and len(rest) == 2:
+            raw = rest[1]
+        elif len(rest) == 1 and rest[0].startswith("--input="):
+            raw = rest[0].partition("=")[2]
+        else:
+            raise DomainError("INVALID_CLI_ARGUMENTS")
+        try:
+            args = json.loads(raw)
+        except (ValueError, TypeError):
+            raise DomainError("INVALID_CLI_ARGUMENTS") from None
+        if not isinstance(args, dict):
+            raise DomainError("INVALID_CLI_ARGUMENTS")
+        return args
+    options = {
+        option_name(field): (field, spec.get("type"))
+        for field, spec in schema.get("properties", {}).items()
+    }
+    args, rest = {}, list(rest)
+    while rest:
+        flag, equals, value = rest.pop(0).partition("=")
+        if flag not in options:
+            raise DomainError("INVALID_CLI_ARGUMENTS")
+        field, kind = options[flag]
+        if field in args or kind not in {"string", "integer", "number", "boolean"}:
+            raise DomainError("INVALID_CLI_ARGUMENTS")
+        if not equals:
+            if kind == "boolean" and (not rest or rest[0].startswith("--")):
+                args[field] = True
+                continue
+            if not rest:
                 raise DomainError("INVALID_CLI_ARGUMENTS")
+            value = rest.pop(0)
+        if kind == "string":
+            args[field] = value
+        else:
             try:
-                args = json.loads(argv[-1])
-            except (ValueError, TypeError):
+                args[field] = json.loads(value)
+            except ValueError:
                 raise DomainError("INVALID_CLI_ARGUMENTS") from None
-            if not isinstance(args, dict):
-                raise DomainError("INVALID_CLI_ARGUMENTS")
-            return name, args
+    return args
+
+
+def public_operation(argv, schemas):
+    for name, path in COMMANDS.items():
+        if argv[: len(path)] == path:
+            return name, command_arguments(argv[len(path) :], schemas.get(name, {}))
     if argv[:1] == ["chrome"]:
         return chrome_operation(argv[1:])
     return None

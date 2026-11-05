@@ -86,10 +86,10 @@ async def test_named_builtin_discovery_returns_its_executable_command_and_schema
         entry = result["items"][0]
         assert entry["name"] == "task_status" and "commands" not in entry
         argv = shlex.split(entry["command"])
-        assert argv == ["roami", "agent", "task", "status", "--input", "JSON"]
+        assert argv == ["roami", "agent", "task", "status"]
         assert "taskId" in entry["inputSchema"]["properties"]
+        assert entry["options"]["--task-id"]["type"] == "string"
         conversation = await runtime.conversations.create("alice")
-        argv[-1] = "{}"
         assert (
             await runtime.tools.invoke(
                 call("bash", {"command": shlex.join(argv)}),

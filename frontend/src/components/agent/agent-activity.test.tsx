@@ -114,3 +114,21 @@ it('shows a declined assignment as not accepted rather than queued or an unknown
   expect(screen.queryByText('agent.activity.accepted')).toBeNull()
   expect(screen.queryByText('agent.activity.outcomeUnknown')).toBeNull()
 })
+
+it.each(['USE_REGISTERED_CLI_CAPABILITY', 'INVALID_CLI_ARGUMENTS'])('explains historical command rejection %s without claiming execution', errorCode => {
+  render(<AgentActivity record items={[{ ...task('failed'), id: 'tool:rejected', kind: 'tool', name: 'bash', errorCode }]} onSession={vi.fn()} />)
+  expect(screen.getByText('agent.activity.notExecuted')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toContain(errorCode === 'INVALID_CLI_ARGUMENTS' ? 'agent.activity.commandArguments' : 'agent.activity.commandUnavailable')
+  expect(screen.queryByText('agent.activity.failedReason')).toBeNull()
+  fireEvent.click(screen.getByRole('button'))
+  expect(screen.getByText(errorCode)).toBeTruthy()
+})
+
+it('uses explicit execution evidence while keeping real command failures distinct', () => {
+  const item: AgentActivityItem = { ...task('failed'), kind: 'tool', name: 'bash', executionStarted: false, errorCode: 'INVALID_TOOL_ARGUMENTS' }
+  const view = render(<AgentActivity record items={[item]} onSession={vi.fn()} />)
+  expect(screen.getByText('agent.activity.notExecuted')).toBeTruthy()
+  view.rerender(<AgentActivity record items={[{ ...item, executionStarted: true, errorCode: 'COMMAND_EXIT_NONZERO' }]} onSession={vi.fn()} />)
+  expect(screen.queryByText('agent.activity.notExecuted')).toBeNull()
+  expect(screen.getByRole('status').textContent).toContain('agent.activity.commandFailed')
+})

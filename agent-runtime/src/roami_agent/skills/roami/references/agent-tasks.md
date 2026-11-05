@@ -1,6 +1,6 @@
 # Agent 任务、进度、消息与提醒
 
-下文命令后的对象表示 `--input JSON` 的输入；原生任务执行完整 argv，身份由宿主绑定。
+下文命令后的对象表示可选的 `--input JSON` 输入；标量参数也支持普通 flags，例如 `roami agent reminder add --text "稍后检查" --after-seconds 60`。无参查询直接执行 `roami agent reminder ls`；身份由宿主绑定。受管命令单独执行，不加管道、重定向或命令拼接，直接读取返回的结构化结果。
 
 ## 受管任务状态
 

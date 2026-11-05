@@ -9,7 +9,7 @@ import './agent-activity.css'
 const active = new Set(['planned', 'running', 'queued', 'preparing', 'starting', 'verifying', 'cancelling'])
 const attention = new Set(['failed', 'unknown', 'interrupted', 'blocked'])
 const toolNames: Record<string, string> = { session_send: 'send', target_search: 'find', target_resolve: 'resolve', workspace_overview: 'overview', delegate: 'delegate', task_status: 'status', shell: 'shell', memory_search: 'memory', memory_get: 'memory', skill_read: 'skill', file_read: 'read', tool_list: 'discover', browser_open: 'browserOpen', browser_act: 'browserAct', browser_observe: 'browserObserve' }
-const reasons: Record<string, string> = { MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired', TASK_CONTINUATION_REQUIRED: 'continueTask', TASK_TARGET_REVIEW_REQUIRED: 'directoryReview', EXECUTION_DIRECTORY_UNAVAILABLE: 'directoryUnavailable', INVALID_EXECUTION_DIRECTORY: 'directoryInvalid' }
+const reasons: Record<string, string> = { USE_REGISTERED_CLI_CAPABILITY: 'commandUnavailable', INVALID_CLI_ARGUMENTS: 'commandArguments', INVALID_TOOL_ARGUMENTS: 'invalidArguments', MODEL_DEADLINE: 'modelTimeout', AGENT_TURN_DEADLINE: 'turnTimeout', COMMAND_EXIT_NONZERO: 'commandFailed', CODING_SESSION_TARGET_CONFLICT: 'targetConflict', SESSION_LIFECYCLE_UNAVAILABLE: 'callbacksMissing', SESSION_NOT_IDLE: 'sessionBusy', SESSION_TARGET_NOT_FOUND: 'sessionMissing', TOOL_OUTCOME_UNKNOWN: 'unknownReason', SESSION_TARGET_AMBIGUOUS: 'ambiguous', REMOTE_REQUIRED: 'remoteRequired', CONTEXT_TOO_LARGE: 'contextFull', ROAMI_CLI_AUTH_REQUIRED: 'authRequired', TASK_CONTINUATION_REQUIRED: 'continueTask', TASK_TARGET_REVIEW_REQUIRED: 'directoryReview', EXECUTION_DIRECTORY_UNAVAILABLE: 'directoryUnavailable', INVALID_EXECUTION_DIRECTORY: 'directoryInvalid' }
 
 export function activityReason(code: string | null | undefined, t: (key: string) => string, fallback = 'agent.activity.failedReason') {
   if (modelProxyFailureKey(code)) return t(modelProxyFailureKey(code)!)
@@ -42,7 +42,8 @@ function ActivityStep({ item, onSession, conversationId, branchId, taskScope }: 
   const { t, locale } = useI18n(), [expanded, setExpanded] = useState(false)
   const status = activityState(item.state)
   const name = item.kind === 'turn' ? t('agent.activity.reply') : item.kind === 'task' ? t('agent.activity.task', { name: item.name }) : t('agent.activity.' + (toolNames[item.name] || 'tool'), { name: item.name })
-  const state = item.kind === 'task' && status === 'failed' && item.external && !item.delivered ? t('agent.activity.notDelivered') : item.name === 'delegate' && status === 'succeeded' ? t('agent.activity.accepted') : t('agent.activity.state.' + status)
+  const rejected = item.kind === 'tool' && status === 'failed' && (item.executionStarted === false || item.errorCode === 'USE_REGISTERED_CLI_CAPABILITY' || item.errorCode === 'INVALID_CLI_ARGUMENTS')
+  const state = rejected ? t('agent.activity.notExecuted') : item.kind === 'task' && status === 'failed' && item.external && !item.delivered ? t('agent.activity.notDelivered') : item.name === 'delegate' && status === 'succeeded' ? t('agent.activity.accepted') : t('agent.activity.state.' + status)
   const formatTime = (ms: number) => new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(ms)
   const failed = attention.has(status)
   return <section className={`agent-activity is-${active.has(status) ? 'running' : failed ? 'failed' : status}`} aria-label={t('agent.activity.title')} data-activity-id={item.id} data-state={status}>
@@ -50,7 +51,7 @@ function ActivityStep({ item, onSession, conversationId, branchId, taskScope }: 
       {item.kind === 'task' ? item.name === 'native' ? <RoamiLogo size={16} /> : <BotIcon size={16} /> : item.name === 'shell' ? <TerminalIcon size={16} /> : <ClockIcon size={16} />}
       <span className="agent-activity-name">{name}</span><time dateTime={new Date(item.startedMs).toISOString()}>{formatTime(item.startedMs)}</time><span className="agent-activity-summary">{state}</span>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
     </button>
-    {failed && <p className="agent-activity-failure" role="status">{state}{t('agent.activity.separator')}{status === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t)}</p>}
+    {failed && <p className="agent-activity-failure" role="status">{!rejected && <>{state}{t('agent.activity.separator')}</>}{status === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t)}</p>}
     {item.routingDecision && <p className="agent-routing-reason">{t('agent.routing.reason')}{t('agent.activity.separator')}{item.routingDecision.routingExplanation}</p>}
     {expanded && <div className="agent-activity-details">
       <p className="agent-activity-reference">{t('agent.activity.startedAt', { time: formatTime(item.startedMs) })}{t('agent.activity.updatedAt', { time: formatTime(item.updatedMs) })}</p>

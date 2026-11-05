@@ -173,6 +173,11 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                     else {}
                 ),
                 "name": call["tool_name"],
+                **(
+                    {"executionStarted": value["executionStarted"]}
+                    if isinstance(value, dict) and isinstance(value.get("executionStarted"), bool)
+                    else {}
+                ),
                 "preview": {
                     "input": preview(json.loads(call["arguments_json"]), limit=2000),
                     "output": preview(value, limit=4000) if call.get("result_json") else None,
