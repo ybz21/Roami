@@ -27,13 +27,20 @@ def member_for_plan(db, group, name, executor, duty, member_id=None):
     if member:
         if member["executor"] != executor:
             raise DomainError("SWARM_MEMBER_EXECUTOR_CONFLICT", 409)
+        from roami_agent.storage.member_instances import ensure_native_instance
+
+        ensure_native_instance(db, member)
         return member
     ident = identity()
     db.execute(
         "INSERT INTO swarm_members(id,swarm_id,name,executor,duty,created_ms) VALUES(?,?,?,?,?,?)",
         (ident, group["id"], name, executor, duty.strip(), now_ms()),
     )
-    return row(db, "SELECT * FROM swarm_members WHERE id=?", (ident,))
+    member = row(db, "SELECT * FROM swarm_members WHERE id=?", (ident,))
+    from roami_agent.storage.member_instances import ensure_native_instance
+
+    ensure_native_instance(db, member)
+    return member
 
 
 def record_round(db, task_id, revision, source_message_id, text):
@@ -51,6 +58,9 @@ def record_round(db, task_id, revision, source_message_id, text):
 
 
 def member_list(db, sid, work):
+    from roami_agent.storage.member_instances import instance_summaries
+
+    instances = instance_summaries(db, sid)
     by_id = {item["id"]: item for item in work}
     members = rows(
         db,
@@ -65,6 +75,7 @@ def member_list(db, sid, work):
             taskRevision=item["revision"] if item else None,
             state=item["state"] if item else "unassigned",
             memoryPath="members/" + member["id"] + "/memory.md",
+            instance=instances.get(member["id"]),
         )
         if item:
             item["memberId"] = member["id"]

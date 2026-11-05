@@ -59,7 +59,11 @@ class SwarmPlans:
         def write(db):
             def new():
                 conversation = owned(db, owner, cid)
-                if row(db, "SELECT id FROM native_sessions WHERE conversation_id=?", (cid,)):
+                if row(
+                    db,
+                    "SELECT id FROM native_sessions WHERE conversation_id=? UNION ALL SELECT id FROM swarm_member_instances WHERE conversation_id=?",
+                    (cid, cid),
+                ):
                     raise DomainError("SWARM_MAIN_REQUIRED", 409)
                 project = row(
                     db,
@@ -649,6 +653,14 @@ class SwarmPlans:
                             target=target,
                             title=item["title"],
                             origin_message_id=info["origin_message_id"],
+                            member_instance_id=(
+                                await self.db.call(
+                                    lambda db, item=item: self.native_instance_for_work(db, item),
+                                    write=True,
+                                )
+                                if item["executor"] == "native"
+                                else None
+                            ),
                             bind_task=bind,
                         )
                     except DomainError as exc:
@@ -668,6 +680,20 @@ class SwarmPlans:
             write=True,
         )
         self.wakeup.set()
+
+    @staticmethod
+    def native_instance_for_work(db, item):
+        from roami_agent.storage.member_instances import ensure_native_instance
+
+        member = row(
+            db,
+            "SELECT m.* FROM swarm_members m JOIN swarm_member_work b ON b.member_id=m.id WHERE b.work_id=?",
+            (item["id"],),
+        )
+        if not member:
+            raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
+        instance = ensure_native_instance(db, member)
+        return instance["id"] if instance else None
 
     async def dependencies(self, owner, sid, spec):
         def write(db):

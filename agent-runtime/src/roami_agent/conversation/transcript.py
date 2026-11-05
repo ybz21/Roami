@@ -53,6 +53,7 @@ class Conversations:
                 "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) "
                 "AND NOT EXISTS (SELECT 1 FROM project_okr_conversations p WHERE p.conversation_id=c.id) "
+                "AND NOT EXISTS (SELECT 1 FROM swarm_member_instances i WHERE i.conversation_id=c.id) "
                 "AND NOT EXISTS (SELECT 1 FROM swarm_groups g WHERE g.conversation_id=c.id) ORDER BY c.created_ms,c.id LIMIT 1",
                 (owner,),
             )
@@ -119,6 +120,7 @@ class Conversations:
                 db,
                 "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) "
+                "AND NOT EXISTS (SELECT 1 FROM swarm_member_instances i WHERE i.conversation_id=c.id) "
                 "ORDER BY c.updated_ms DESC LIMIT 200",
                 (owner,),
             )

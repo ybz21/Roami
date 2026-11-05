@@ -114,6 +114,30 @@ class PromptBuilder:
             )
 
     async def build(self, turn, instructions, catalog, completion):
+        instance = await self.db.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM swarm_member_instances WHERE conversation_id=? AND owner_id=?",
+                (turn["conversation_id"], turn["owner_id"]),
+            )
+        )
+        if instance:
+            if not turn.get("executionRunId"):
+                raise DomainError("NATIVE_SESSION_USE_TASK_CHANNEL", 409)
+            bound = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT a.id FROM task_attempts a JOIN tasks t ON t.id=a.task_id WHERE a.id=? AND a.task_id=? AND a.native_branch_id=? AND a.task_revision=t.revision AND t.owner_id=?",
+                    (
+                        turn["executionRunId"],
+                        instance["task_id"],
+                        instance["branch_id"],
+                        turn["owner_id"],
+                    ),
+                )
+            )
+            if not bound or turn["branch_id"] != instance["branch_id"]:
+                raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
         completion_source = None
         completion_request = None
         request_created_ms = turn["created_ms"]

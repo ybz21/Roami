@@ -101,3 +101,32 @@ func TestMembersPreservesLegacyJSONOnModernRuntime(t *testing.T) {
 		t.Fatalf("legacy contract changed: %s", output)
 	}
 }
+
+func TestMembersRetainsIdleNativeConversationFromAPI(t *testing.T) {
+	rt := fixtureRuntime(t, func(w http.ResponseWriter, r *http.Request) {
+		role := map[string]any{"id": stableMemberFixtureID, "name": "research", "executor": "native", "state": "unassigned", "roundCount": 0, "instance": map[string]any{"id": "native-instance", "conversationId": "reserved-conversation", "branchId": "reserved-branch", "state": "idle", "taskId": nil}}
+		if strings.Contains(r.URL.Path, "/members/") {
+			apiReply(w, map[string]any{"member": role, "rounds": map[string]any{"items": []any{}}})
+			return
+		}
+		apiReply(w, map[string]any{"id": fixtureID, "memberProtocol": 1, "members": []any{role}, "work": []any{}})
+	})
+	output := commandResult(t, rt, "members", fixtureID, "--json")
+	var result struct {
+		Data []struct {
+			TaskID     string          `json:"taskId"`
+			RoundCount int             `json:"roundCount"`
+			Instance   *memberInstance `json:"instance"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Data) != 1 || result.Data[0].TaskID != "" || result.Data[0].RoundCount != 0 || result.Data[0].Instance == nil || result.Data[0].Instance.ConversationID != "reserved-conversation" {
+		t.Fatalf("lost idle native instance: %s", output)
+	}
+	detail := commandResult(t, rt, "member", "inspect", fixtureID, stableMemberFixtureID)
+	if !strings.Contains(detail, "对话: reserved-conversation") || strings.Contains(detail, "已完成") {
+		t.Fatalf("misleading idle preview: %s", detail)
+	}
+}

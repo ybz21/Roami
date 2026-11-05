@@ -126,3 +126,5 @@
 #661 已实际合入，全部CI通过。后续实现与隔离证据继续写在[长期成员与执行轮次](long-lived-members.md#第一阶段实现持久成员与轮次账本)。本阶段仅后端、CLI、协议与迁移，不改页面；手机、部署、生产运行时与原项目状态保持不动，不能以尚未授权手机为由阻断这些独立交付。
 
 原生执行器恢复的后续设计与隔离验收见 [provider-recovery.md](provider-recovery.md)：保持原 provider 对话，按宿主与停止证明恢复物理终端。
+
+未派发的 Roami 成员会话、首次派工复用及 Main 身份隔离见 [native-member-instances.md](native-member-instances.md)。
