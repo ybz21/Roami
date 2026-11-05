@@ -57,6 +57,9 @@ func inspectMember(ctx context.Context, client *runtimeClient, path string, opti
 		return err
 	}
 	fmt.Fprintf(w, "%s  %s\nID: %s\n%s\n", line(value.Member.Name), stateLabel(value.Member.State), value.Member.ID, line(value.Member.Duty))
+	if value.Member.Instance != nil {
+		fmt.Fprintf(w, "对话: %s\n", line(value.Member.Instance.ConversationID))
+	}
 	for _, round := range value.Rounds.Items {
 		request := line(round.Request)
 		if round.SourceUnavailable {

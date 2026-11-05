@@ -74,6 +74,7 @@ class Tasks:
         title=None,
         independent_project_outcome=False,
         bind_task=None,
+        member_instance_id=None,
     ):
         if (
             not key
@@ -137,6 +138,14 @@ class Tasks:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if any(target.get(k) for k in ["directory", "workspaceId", "base", "remote"]):
                 raise DomainError("CODING_SESSION_TARGET_CONFLICT")
+        if member_instance_id is not None and (
+            executor != "native"
+            or not isinstance(member_instance_id, str)
+            or not member_instance_id
+            or parent_task_id
+            or from_message_id
+        ):
+            raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
         spec = {
             "goal": goal,
             "target": target,
@@ -147,6 +156,8 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if member_instance_id is not None:
+            spec["memberInstanceId"] = member_instance_id
         if model is not None:
             spec["model"] = model
         if title is not None:
@@ -409,24 +420,32 @@ class Tasks:
             )
             branch_id = None
             if executor == "native":
-                child, branch_id = identity(), identity()
-                db.execute(
-                    "INSERT INTO conversations(id,owner_id,title,created_ms,updated_ms) VALUES(?,?,?,?,?)",
-                    (child, owner, "Task: " + goal[:100], now_ms(), now_ms()),
-                )
-                db.execute(
-                    "INSERT INTO branches(id,conversation_id,parent_branch_id,fork_message_id,created_ms) VALUES(?,?,?,?,?)",
-                    (
-                        branch_id,
-                        child,
-                        fork_point["branch_id"] if fork_point else None,
-                        from_message_id,
-                        now_ms(),
-                    ),
-                )
-                db.execute(
-                    "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
-                )
+                if member_instance_id:
+                    from roami_agent.storage.member_instances import native_task_instance
+
+                    instance = native_task_instance(db, owner, cid, member_instance_id, key)
+                    if instance["task_id"] is not None:
+                        raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
+                    child, branch_id = instance["conversation_id"], instance["branch_id"]
+                else:
+                    child, branch_id = identity(), identity()
+                    db.execute(
+                        "INSERT INTO conversations(id,owner_id,title,created_ms,updated_ms) VALUES(?,?,?,?,?)",
+                        (child, owner, "Task: " + goal[:100], now_ms(), now_ms()),
+                    )
+                    db.execute(
+                        "INSERT INTO branches(id,conversation_id,parent_branch_id,fork_message_id,created_ms) VALUES(?,?,?,?,?)",
+                        (
+                            branch_id,
+                            child,
+                            fork_point["branch_id"] if fork_point else None,
+                            from_message_id,
+                            now_ms(),
+                        ),
+                    )
+                    db.execute(
+                        "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
+                    )
                 register_native_session(db, tid, child, branch_id)
                 source_content = json.loads(origin["content_json"])
                 resource_only = (spec.get("target") or {}).get("resourceOnly")
@@ -457,6 +476,13 @@ class Tasks:
                 "state,native_branch_id,lease_epoch) VALUES(?,?,1,1,?,?,'accepted',?,1)",
                 (rid, tid, "native" if executor == "native" else "cli", launch_id, branch_id),
             )
+            if member_instance_id:
+                changed = db.execute(
+                    "UPDATE swarm_member_instances SET task_id=? WHERE id=? AND task_id IS NULL",
+                    (tid, member_instance_id),
+                )
+                if changed.rowcount != 1:
+                    raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
                 "VALUES(?,'task.run',?,?,?,'queued',?)",

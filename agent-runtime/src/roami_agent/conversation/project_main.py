@@ -47,8 +47,9 @@ def project_main(db, owner, project_id, title, create, *, swarm_id=None):
             db,
             "SELECT 1 FROM main_conversations WHERE conversation_id=? UNION ALL "
             "SELECT 1 FROM native_sessions WHERE conversation_id=? UNION ALL "
+            "SELECT 1 FROM swarm_member_instances WHERE conversation_id=? UNION ALL "
             "SELECT 1 FROM project_okr_conversations WHERE conversation_id=? AND (owner_id!=? OR project_id!=?)",
-            (candidate, candidate, candidate, owner, project_id),
+            (candidate, candidate, candidate, candidate, owner, project_id),
         ):
             raise DomainError("PROJECT_OKR_MAIN_CONFLICT", 409)
         for swarm in rows(

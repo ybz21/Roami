@@ -52,18 +52,27 @@ type mainMessage struct {
 	Text      string `json:"text"`
 	CreatedMS int64  `json:"createdMs"`
 }
+type memberInstance struct {
+	ID              string `json:"id"`
+	ConversationID  string `json:"conversationId"`
+	BranchID        string `json:"branchId"`
+	TaskID          string `json:"taskId,omitempty"`
+	NativeSessionID string `json:"nativeSessionId,omitempty"`
+	State           string `json:"state"`
+}
 type member struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Executor     string `json:"executor"`
-	Duty         string `json:"duty,omitempty"`
-	DutyPreview  string `json:"dutyPreview,omitempty"`
-	State        string `json:"state"`
-	WorkID       string `json:"workId"`
-	TaskID       string `json:"taskId"`
-	TaskRevision int    `json:"taskRevision"`
-	RoundCount   int    `json:"roundCount"`
-	MemoryPath   string `json:"memoryPath"`
+	Instance     *memberInstance `json:"instance,omitempty"`
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Executor     string          `json:"executor"`
+	Duty         string          `json:"duty,omitempty"`
+	DutyPreview  string          `json:"dutyPreview,omitempty"`
+	State        string          `json:"state"`
+	WorkID       string          `json:"workId"`
+	TaskID       string          `json:"taskId"`
+	TaskRevision int             `json:"taskRevision"`
+	RoundCount   int             `json:"roundCount"`
+	MemoryPath   string          `json:"memoryPath"`
 }
 type snapshot struct {
 	MemberProtocol     int             `json:"memberProtocol,omitempty"`
