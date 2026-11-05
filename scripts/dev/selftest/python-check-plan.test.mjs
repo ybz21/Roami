@@ -49,7 +49,7 @@ for (const [name, selected] of [
 for (const name of ['.github/workflows/quality.yml', 'scripts/dev/quality/check.sh', 'scripts/dev/selftest/python-check-plan.test.mjs']) {
   test('quick validates dispatch fixtures; full exercises pipeline changes: ' + name, t => {
     const f = fixture(t); f.write(name); f.git('add', '--', name)
-    expect(f.plan('quick'), [], true); expect(f.plan('full'), suites)
+    expect(f.plan('quick'), []); expect(f.plan('full'), suites)
   })
 }
 for (const [skill, selected] of [['presentation-edit', 'presentation'], ['tabular-analysis', 'tabular'], ['market-series-report', 'market'], ['video-assembly', 'video']]) {

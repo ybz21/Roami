@@ -14,16 +14,7 @@ case "$1" in
   *) echo 'Expected presentation|tabular|market|video' >&2; exit 2 ;;
 esac
 
-if [ "$1" = market ]; then
-  for program in soffice pdftoppm pdffonts fc-match; do
-    command -v "$program" >/dev/null || { echo "Missing market report dependency: $program" >&2; exit 1; }
-  done
-fi
-if [ "$1" = video ]; then
-  for program in ffmpeg ffprobe; do
-    command -v "$program" >/dev/null || { echo "Missing video assembly dependency: $program" >&2; exit 1; }
-  done
-fi
+bash scripts/dev/quality/python-skill-dependencies.sh "$1"
 
 lint_paths=("$directory")
 if [ "$1" = market ]; then lint_paths+=(cases/case-99-mech-mp01/scripts); fi

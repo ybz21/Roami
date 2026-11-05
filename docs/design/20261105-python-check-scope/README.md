@@ -24,12 +24,14 @@
 | Agent runtime 程序、资源、迁移 | runtime 与 Go 集成 |
 | Go 代码、模块与领域资源 | Go；保留其真实 Python 桥接环境，不额外跑 runtime pytest |
 | 共享依赖、canonical cases、未识别 Skill、未知路径 | 全部 |
-| 质量脚本和质量/发布工作流 | quick：调度回归和 Go；full：完整重演检查链路 |
+| 质量脚本和质量/发布工作流 | quick：调度回归与静态检查；full：完整重演检查链路 |
 | 比较历史缺失或 Git 不可用 | 全部 |
 
 quick 优先暂存区，避免把不在本次提交中的改动混入；full 检查整个分支与工作区。CI 明确传入完整 PR base/head，不能只看最后一次推送。使用 NUL 分隔和 `--no-renames`，删除和移动前后的路径均参与判断。新增资源和文件与源码同等处理。release 无条件扩大到全部检查，没有跳过检查的环境开关。
 
 Go 测试会调用真实 Python harness，因此 Go 的计划同时要求 uv 可用，避免因依赖缺失静默跳过桥接回归。纯前端不调用 Go 测试。前端 i18n 工作流保留 PR、merge group 和 main push，取消功能分支 push 的重复运行及 pr-shots 图片分支构建。
+
+已选套件的系统依赖在 Go、runtime pytest 之前统一预检，单独运行 Skill 也复用同一预检。缺少 ffprobe 等工具会先失败，不必等长套件跑完才发现环境问题。
 
 ## Acceptance
 

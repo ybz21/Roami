@@ -70,6 +70,11 @@ if python_enabled python && ! command -v uv >/dev/null 2>&1; then
   echo "uv is missing. Install uv, then run: cd agent-runtime && uv sync --frozen" >&2
   exit 1
 fi
+for profile in presentation tabular market video; do
+  if python_enabled "$profile"; then
+    bash scripts/dev/quality/python-skill-dependencies.sh "$profile"
+  fi
+done
 if python_enabled go; then
   section "Go tests"
   go test ./...

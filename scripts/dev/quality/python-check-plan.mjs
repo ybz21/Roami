@@ -44,7 +44,6 @@ function select(path) {
     || /^\.github\/workflows\/(?:quality|release[^/]*)\.ya?ml$/.test(path)) {
     // Quick exercises dispatch fixtures; full reenacts the entire changed pipeline.
     if (mode !== 'quick') all()
-    else plan.go = true
     return
   }
   // All four skill suites use the runtime environment and canonical case fixtures.
