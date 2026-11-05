@@ -21,4 +21,4 @@
 - 修复前真实群聊 post 已 accepted，但对应 Main turn failed 且没有最终回复；群聊缺少失败提示，证据保留在 `/tmp/okr-main-context-release-20261106/group-failure-feedback-proof.json`，不将私有对话截图上传公开仓库。
 - 新回归在旧实现上分别复现快照缺少关联状态、页面缺少失败反馈；修复后 Python 协作/署名专项 48 项通过，前端全量 199 文件 / 1450 项通过，typecheck、i18n、hover、build 通过。
 - 独立页面 fixture 只使用演示身份和内存 API，不访问真实任务或发送消息。四档桌面、协作栏开关、草稿保留和原 Main 跳转记录在 `/tmp/okr-group-failure-ui-20261106/{acceptance,pane-acceptance}.json`；独立触摸上下文的 390px 粗指针模拟在 `phone-acceptance.json`，44px 命中区四向检查通过。所有记录仍为隔离演示，不代表真机触控。
-- quick/full 发布门禁另行记录。当前不宣称已部署，真实 Android 未操作、未计为通过。
+- 前置实现 `5fb60f96` 的正常 quick/full 均通过：Go全量、Python3702 passed/48 skipped、4组Skill与前端构建/静态审计；full为963.16秒。PR701已合入，当前不宣称Python运行时已激活，真实 Android 未操作、未计为通过。
