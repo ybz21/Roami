@@ -1,0 +1,271 @@
+{
+  "scope": "same saved routes; objective conversation checks; synthetic task checkpoints; no full60 or independent artifact score",
+  "runs": [
+    {
+      "run": "integrated-full",
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 16,
+        "observed_scenarios": 16,
+        "passed_scenarios": 16,
+        "observed_user_turns": 62,
+        "verified_user_turns": 62,
+        "expected_user_turns": 62,
+        "tool_process_coverage": "complete",
+        "tool_calls": 180,
+        "tool_errors": 54,
+        "tool_error_rate": 0.3,
+        "tool_first_attempt_success_rate": 0.7419354838709677,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 62,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "044976e9857b1e735e7bf373f61aabb5ea459bf1aaff214e2d108f0d9c9eb7ee",
+        "contracts_sha256": "3ad9ecc4f0f3dc01a99db5b816c8e29704ec0b12d77d9db25d609839eecda64a",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 253,
+        "external_model_calls": 253,
+        "observed_tokens": 1059017,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "audit": {
+        "model_wrappers": 253,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 253,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 253
+        },
+        "gateway_http_statuses": {
+          "200": 253
+        },
+        "known_tokens": 1059017,
+        "known_cost_by_currency": {
+          "CNY": 0.3759141
+        },
+        "scenarios_observed": 16,
+        "scenarios_passed": 16,
+        "checkpoints_observed": 62,
+        "checkpoints_passed": 62,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    {
+      "run": "integrated-chat-a",
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 4,
+        "passed_scenarios": 4,
+        "observed_user_turns": 18,
+        "verified_user_turns": 18,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "complete",
+        "tool_calls": 31,
+        "tool_errors": 13,
+        "tool_error_rate": 0.41935483870967744,
+        "tool_first_attempt_success_rate": 0.2777777777777778,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 18,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "044976e9857b1e735e7bf373f61aabb5ea459bf1aaff214e2d108f0d9c9eb7ee",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 68,
+        "external_model_calls": 68,
+        "observed_tokens": 194439,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "audit": {
+        "model_wrappers": 68,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 68,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 68
+        },
+        "gateway_http_statuses": {
+          "200": 68
+        },
+        "known_tokens": 194439,
+        "known_cost_by_currency": {
+          "CNY": 0.0697469
+        },
+        "scenarios_observed": 4,
+        "scenarios_passed": 4,
+        "checkpoints_observed": 18,
+        "checkpoints_passed": 18,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    {
+      "run": "integrated-chat-b",
+      "receipt": {
+        "mode": "saved-model",
+        "passed": true,
+        "selected_passed": true,
+        "complete_cases": true,
+        "expected_scenarios": 4,
+        "observed_scenarios": 4,
+        "passed_scenarios": 4,
+        "observed_user_turns": 18,
+        "verified_user_turns": 18,
+        "expected_user_turns": 18,
+        "tool_process_coverage": "complete",
+        "tool_calls": 33,
+        "tool_errors": 15,
+        "tool_error_rate": 0.45454545454545453,
+        "tool_first_attempt_success_rate": 0.2777777777777778,
+        "failure": null,
+        "blocked_scenarios": 0,
+        "failed_scenarios": 0,
+        "semantic_checked_user_turns": 18,
+        "live_model_semantics_tested": true,
+        "child_exit_code": 0,
+        "cleanup_exit_code": 0,
+        "source_unchanged": true,
+        "frozen_sha256": "044976e9857b1e735e7bf373f61aabb5ea459bf1aaff214e2d108f0d9c9eb7ee",
+        "contracts_sha256": "dbd47b8db57ec02cec9da23e38126b1e089621451fc59ed2c4a3174d14019167",
+        "saved_main_route_hash": "9f70c28403cf6bac4b1017cc65aa7b6eafa4ed83c3ea55a1d8c674b3ac8b3b29",
+        "model_calls": 71,
+        "external_model_calls": 71,
+        "observed_tokens": 197620,
+        "usage_known": true,
+        "historical_suite_updated": false,
+        "eligible_for_promotion": false,
+        "background_execution": "synthetic_checkpoint"
+      },
+      "audit": {
+        "model_wrappers": 71,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 71,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 71
+        },
+        "gateway_http_statuses": {
+          "200": 71
+        },
+        "known_tokens": 197620,
+        "known_cost_by_currency": {
+          "CNY": 0.0642823
+        },
+        "scenarios_observed": 4,
+        "scenarios_passed": 4,
+        "checkpoints_observed": 18,
+        "checkpoints_passed": 18,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    {
+      "run": "unique-project",
+      "audit": {
+        "model_wrappers": 21,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 21,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 21
+        },
+        "gateway_http_statuses": {
+          "200": 21
+        },
+        "known_tokens": 111553,
+        "known_cost_by_currency": {
+          "CNY": 0.0302281
+        },
+        "scenarios_observed": 3,
+        "scenarios_passed": 3,
+        "checkpoints_observed": 3,
+        "checkpoints_passed": 3,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    },
+    {
+      "run": "duplicate-project",
+      "audit": {
+        "model_wrappers": 25,
+        "wrappers_without_gateway_id": 0,
+        "gateway_calls": 25,
+        "missing_gateway_calls": 0,
+        "gateway_states": {
+          "known": 25
+        },
+        "gateway_http_statuses": {
+          "200": 25
+        },
+        "known_tokens": 123038,
+        "known_cost_by_currency": {
+          "CNY": 0.055251
+        },
+        "scenarios_observed": 3,
+        "scenarios_passed": 3,
+        "checkpoints_observed": 3,
+        "checkpoints_passed": 3,
+        "local_unknown_usage_retained": false,
+        "scope": "local diagnostic, real saved Main; background synthetic; no production/full60/independent-rater or stability claim"
+      }
+    }
+  ],
+  "containerAudit": {
+    "model_wrappers": 37,
+    "wrappers_without_gateway_id": 0,
+    "gateway_calls": 37,
+    "missing_gateway_calls": 0,
+    "gateway_states": {
+      "known": 37
+    },
+    "gateway_http_statuses": {
+      "200": 37
+    },
+    "known_tokens": 171381,
+    "known_cost_by_currency": {
+      "CNY": 0.0695424
+    },
+    "scenarios_observed": 0,
+    "scenarios_passed": 0,
+    "checkpoints_observed": 0,
+    "checkpoints_passed": 0,
+    "local_unknown_usage_retained": false,
+    "scope": "local candidate-container diagnostic, saved Main/Worker, frozen units-v3 contract; no production, old-suite score improvement or full60 claim",
+    "cases_observed": 3,
+    "cases_passed": 3
+  },
+  "targetedPassed": 270,
+  "offlineImagePassed": 99,
+  "imageId": "sha256:2bd8749c5318ada1fba48f7a43965bb137a159f5e2e5678c7629418ab88ae081",
+  "runtimeFiles": 359,
+  "fullGateRuntime": {
+    "passed": 3651,
+    "skipped": 48
+  },
+  "fullGateCompletion": "segmented after real toolchain correction; original failures preserved",
+  "quickHookExitCode": 0,
+  "priorFailuresRetained": true,
+  "issue635StillOpen": true
+}
