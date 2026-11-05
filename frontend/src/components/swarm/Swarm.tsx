@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Select, Spin } from 'antd'
 import { loadSwarmDirectory } from './swarm-directory'
 import { useI18n } from '../../i18n'
@@ -13,7 +13,7 @@ import { swarmStateToken, type SwarmSnapshot } from './swarm-protocol'
 import './swarm.css'
 export { NewSwarmModal } from './NewSwarmModal'
 
-export default function Swarm({ openTerm, initialSwarm, onNav, embedded = false, projectId, onManage }: { openTerm: (id: string) => void; initialSwarm?: string; onNav?: (id: string | null) => void; embedded?: boolean; projectId?: string; onManage?: () => void }) {
+export default function Swarm({ openTerm, initialSwarm, onNav, embedded = false, projectId, onManage, renderMain, mainRequest }: { openTerm: (id: string) => void; initialSwarm?: string; onNav?: (id: string | null) => void; embedded?: boolean; projectId?: string; onManage?: () => void; renderMain?: (id: string) => ReactNode; mainRequest?: number }) {
   const { t } = useI18n(), { phone } = useLayout()
   const [list, setList] = useState<SwarmSnapshot[] | null>(null), [error, setError] = useState(false), [creating, setCreating] = useState(false), [archived, setArchived] = useState(false)
   const scope = nodeApi('/agent/swarms')
@@ -28,7 +28,7 @@ export default function Swarm({ openTerm, initialSwarm, onNav, embedded = false,
     }, 10000).stop
   }, [initialSwarm, scope])
   if (initialSwarm && projectId && !/^sw-[a-f0-9]{32}$/.test(initialSwarm)) return <LegacySwarmHistory projectId={projectId} onManage={onManage || (() => onNav?.(null))} />
-  if (initialSwarm) return <ManagedSwarm key={scope + initialSwarm} id={initialSwarm} onBack={() => onNav?.(null)} openTerm={openTerm} embedded={embedded} projectId={projectId} onManage={onManage} />
+  if (initialSwarm) return <ManagedSwarm key={scope + initialSwarm} id={initialSwarm} onBack={() => onNav?.(null)} openTerm={openTerm} embedded={embedded} projectId={projectId} onManage={onManage} renderMain={renderMain} mainRequest={mainRequest} />
   const shown = list?.filter(item => item.archived === archived)
   return <div className="swarm-directory">
     <header className="tt-pagehead">{!phone && <h2>{t('nav.swarm')}</h2>}<div className="acts"><Select aria-label={t('swarm.managed.filter')} value={archived ? 'archived' : 'active'} onChange={value => setArchived(value === 'archived')} options={[{ value: 'active', label: t('swarm.active') }, { value: 'archived', label: t('swarm.status.archived') }]} /><Button type="primary" icon={<PlusIcon />} onClick={() => setCreating(true)}>{t('swarm.new')}</Button></div></header>

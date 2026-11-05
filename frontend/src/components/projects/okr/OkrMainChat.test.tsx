@@ -3,15 +3,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OkrMainChat from './OkrMainChat'
 import { emptyConfiguration } from './okr-workspace'
-const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn(), thread: vi.fn() }))
+const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn(), thread: vi.fn(), globalNode: null as string | null }))
 vi.mock('../../../api', () => ({ api: state.api }))
 vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: false, size: 'large' }) }))
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
+vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, currentNodeId: () => state.globalNode }))
 vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (...args: unknown[]) => { state.thread(...args); return { refresh: state.refresh, view: null } } }))
 vi.mock('../../shell/AdaptivePanel', () => ({ default: ({ children }: any) => children }))
 vi.mock('../../markdown/Markdown', () => ({ default: ({ children }: any) => children }))
-beforeEach(() => { localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
+beforeEach(() => { state.globalNode = null; localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
 afterEach(cleanup)
 it('restores the same persistent Main when reopened and closing the view never stops it', async () => {
   const close = vi.fn()
@@ -108,13 +108,13 @@ it('restores the unsent project draft after closing and reopening', async () => 
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep my next instruction')
   await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
 })
-it('records coordinator instructions in the existing shared team conversation', async () => {
+it('keeps a private Main instruction out of the shared group even when a team exists', async () => {
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
   await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
   fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: '@writer needs a new plan' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
-  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/swarms/sw-existing/messages', expect.objectContaining({ text: '@leader @writer needs a new plan', commandKey: expect.any(String) })))
-  expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations/independent/messages')).toBe(false)
+  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: expect.stringContaining('@writer needs a new plan'), requestKey: expect.any(String) })))
+  expect(state.api.mock.calls.some(call => call[1] === '/agent/swarms/sw-existing/messages')).toBe(false)
 })
 
 
@@ -140,4 +140,17 @@ it('restores a referenced fixed Main before a team exists using read-only identi
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} reference={{ conversationId: 'fixed-main', branchId: 'branch', messageId: 'message' }} onClose={vi.fn()} />)
   await waitFor(() => expect(state.thread).toHaveBeenCalledWith('fixed-main', 'branch', null, 'message'))
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+})
+
+it('does not create or send on a newly selected node before React re-renders', async () => {
+  let resolve!: (value: unknown) => void
+  state.api.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Keep this project request' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  state.globalNode = 'another-node'
+  resolve({ data: { projectOkrMain: true } })
+  await screen.findByRole('alert')
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+  expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep this project request')
 })

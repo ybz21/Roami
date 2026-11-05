@@ -6,11 +6,18 @@ export type SwarmWork = {
   deliverables?: { kind: 'artifact' | 'external_action'; description: string; mimeType?: string }[]
   evidence?: { artifacts: { id: string; name: string; mimeType: string; sizeBytes: number; sha256: string; downloadUrl: string }[]; verification: { kind?: string; state?: string; externalAction?: string | null; receipt?: { artifactId: string; target: string; state: string }; [key: string]: unknown } | null }
   attempt: { runId: string; state: string; sessionId?: string; finishedMs?: number; summary?: string } | null
+  memberId?: string
+}
+export type SwarmMember = {
+  id: string; swarm_id: string; name: string; executor: string; dutyPreview: string; workId: string | null
+  taskId: string | null; taskRevision: number | null; state: string; memoryPath: string; roundCount: number
+  instance?: { id: string; conversationId: string; branchId: string; taskId: string | null; nativeSessionId: string | null; state: 'idle' | 'assigned' | 'closing' | 'closed' | 'unknown' } | null
 }
 export type SwarmSnapshot = {
   id: string; name: string; goal: string; mainConversationId: string; revision: number; sequence: number
   mainState?: string; paused: boolean; archived: boolean; state: SwarmState; target: { projectId?: string; directory?: string }
   teamMemory?: { available: boolean; content?: string; sha256?: string; source: string; updatedMs?: number | null; author?: string | null; errorCode?: string }
+  memberProtocol?: number; members?: SwarmMember[]
   work: SwarmWork[]; posts: { id: number; author: string; text: string; taskId?: string | null; createdMs: number; deliveryState?: 'accepted' | 'pending' }[]
   mainMessages: { id: string; role: string; text: string; createdMs: number }[]
 }

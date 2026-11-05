@@ -6,7 +6,7 @@ export function useAgentMessageFocus(root: RefObject<HTMLDivElement>, conversati
     const key = [conversation, branch, message].join(':')
     if (applied.current.key !== key) applied.current = { key, done: false }
     if (!message || applied.current.done || !root.current) return
-    const element = [...root.current.querySelectorAll<HTMLElement>('[data-message-id]')].find((item) => item.dataset.messageId === message)
+    const element = [...root.current.querySelectorAll<HTMLElement>('[data-message-id], [data-msg-id]')].find((item) => (item.dataset.messageId || item.dataset.msgId) === message)
     if (!element) return
     const pane = root.current
     const align = () => {
