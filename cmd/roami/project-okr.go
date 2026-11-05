@@ -13,6 +13,14 @@ import (
 )
 
 func runProjectOKR(args []string) int {
+	if len(args) == 2 && args[0] == "memory" && (args[1] == "help" || args[1] == "--help") {
+		fmt.Println(`roami project okr memory PROJECT --file JSON|- --json
+Read 'roami project okr show PROJECT --json' first. Append real new knowledge with:
+{"mode":"append","content":"New verified knowledge","expectedSha256":"CURRENT_MEMORY_SHA256"}
+Full replacement uses mode=replace. Prior bytes are retained in memory/history/<sha256>.md.
+Never probe a live write endpoint to discover its schema. A conflict requires rereading.`)
+		return 0
+	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
 		fmt.Println("roami project okr show|save|sync|memory|record|collect|review PROJECT [--file JSON|-] [--server URL] [--json]\nWrites require the current revision in the JSON object; collect also requires --file. A conflict never retries a write.")
 		return 0

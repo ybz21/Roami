@@ -335,3 +335,36 @@ async def test_persistent_main_plans_tasks_and_keeps_instructions_in_shared_chat
     assert updated["posts"][-1]["text"] == "@leader Summarize the current task before dispatch"
     assert state["workspace"]["swarm"] == sid
     assert (await create_goal(runtime, key="reopen-after-plan")).json()["data"]["id"] == cid
+
+
+async def test_memory_append_has_concrete_contract_and_preserves_project_scope(
+    project_runtime, monkeypatch
+):
+    runtime, _, _ = project_runtime
+    cid = (await create_goal(runtime)).json()["data"]["id"]
+    calls = []
+
+    async def operation(settings, pid, action, payload):
+        calls.append((pid, action, payload))
+        return {"projectId": pid}
+
+    monkeypatch.setattr("roami_agent.tools.project_okr.operation", operation)
+    tool = runtime.tools.registry["project_okr_memory_append"]
+    args = {"content": "Verified dated knowledge", "expectedSha256": "a" * 64}
+    tool.validate(args)
+    await tool.handler(args, {"owner": "alice", "conversation": cid, "role": "main"})
+    assert calls == [("registered", "memory", {"mode": "append", **args})]
+    with pytest.raises(ToolArgumentsError):
+        tool.validate({**args, "projectId": "foreign"})
+    with pytest.raises(ToolArgumentsError):
+        tool.validate({**args, "expectedSha256": "missing"})
+    for binding in [
+        {"owner": "alice", "conversation": cid, "role": "worker"},
+        {"owner": "bob", "conversation": cid},
+        {"owner": "alice", "conversation": await runtime.conversations.main("alice")},
+    ]:
+        if isinstance(binding["conversation"], dict):
+            binding["conversation"] = binding["conversation"]["id"]
+        with pytest.raises(DomainError):
+            await tool.handler(args, binding)
+    assert len(calls) == 1

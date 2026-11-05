@@ -22,6 +22,36 @@ def register_project_okr_tools(registry, database, settings):
                 raise DomainError("PROJECT_OKR_TEAM_CONFLICT", 409)
         return await operation(settings, pid, args["operation"], args["payload"])
 
+    async def append_memory(args, binding):
+        pid = await bound_project(database, binding)
+        return await operation(
+            settings,
+            pid,
+            "memory",
+            {
+                "mode": "append",
+                "content": args["content"],
+                "expectedSha256": args["expectedSha256"],
+            },
+        )
+
+    registry.add(
+        Tool(
+            "project_okr_memory_append",
+            "Append verified lasting knowledge to this project's team memory, preserving existing text. Read project_okr_context first and use projectFiles.teamMemorySha256 as expectedSha256. Supply only the new knowledge as content. Conflicts require rereading; never probe live writes with placeholder/test content. The host retains prior bytes in memory/history for recovery.",
+            object_schema(
+                {
+                    "content": {"type": "string", "minLength": 1, "maxLength": 65536},
+                    "expectedSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                },
+                ["content", "expectedSha256"],
+            ),
+            append_memory,
+            effect="write",
+            main=True,
+        )
+    )
+
     registry.add(
         Tool(
             "project_okr_context",
@@ -35,7 +65,7 @@ def register_project_okr_tools(registry, database, settings):
     registry.add(
         Tool(
             "project_okr_update",
-            "Apply a user-confirmed OKR change only to this goal conversation's bound project. First read project_okr_context; use its revision and the existing validated project operation JSON. Save objective, dashboard, Connector bindings and desired team roles (team.schemaVersion=1, roles with id/name/executor/duty); saving roles does not register or dispatch members. Collect registered sources, record real observations, review, sync staged definitions or update memory with expectedSha256. For whole-project creation discover okr-development. Conflicts require rereading. No shell, paths, credentials, model settings or public posting.",
+            "Apply a user-confirmed OKR change only to this goal conversation's bound project. First read project_okr_context; use its revision and the existing validated project operation JSON. Save objective, dashboard, Connector bindings and desired team roles (team.schemaVersion=1, roles with id/name/executor/duty); saving roles does not register or dispatch members. Collect registered sources, record real observations, review or sync staged definitions. For new team knowledge use project_okr_memory_append; memory replacement requires the full intended document and its current expectedSha256. Never discover schemas by probing live writes. For whole-project creation discover okr-development. Conflicts require rereading. No shell, paths, credentials, model settings or public posting.",
             object_schema(
                 {
                     "operation": {
