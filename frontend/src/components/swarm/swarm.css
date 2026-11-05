@@ -225,3 +225,9 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-pane { f
 html:is([data-size="compact"],[data-size="medium"]) .swarm-conversations { border:0; }
 html[data-pointer="coarse"] .swarm-conversation-head .tt-act { position:relative; }
 html[data-pointer="coarse"] .swarm-conversation-head .tt-act::after { content:''; position:absolute; min-height:var(--tap); min-width:var(--tap); top:50%; left:50%; transform:translate(-50%,-50%); }
+
+.swarm-conversation-workspace[data-scene="true"] { grid-template-columns:calc(var(--sp-5) * 10) minmax(0,2fr) minmax(0,1fr); }
+.swarm-collaboration-pane { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; border-left:1px solid var(--border-subtle); }
+.swarm-collaboration-pane > .swarm-studio { flex:1; height:auto; }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-collaboration-pane { order:-1; flex:1; border-left:0; border-bottom:1px solid var(--border-subtle); }
+html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspace[data-scene="true"] .swarm-conversation-pane { flex:2; }

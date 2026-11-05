@@ -5252,6 +5252,7 @@ const zhCN = {
   'swarm.managed.state.closed': '已关闭',
   'swarm.member.registryUnavailable': '团队记录暂不可用',
   'swarm.conversation.main': 'Main',
+  'swarm.conversation.workspace': '对话与协作',
   'swarm.conversation.chat': '对话',
   'swarm.conversation.list': '切换对话',
   'swarm.conversation.members': '成员',
