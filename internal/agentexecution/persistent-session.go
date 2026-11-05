@@ -28,9 +28,30 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	}
 	ac := spawn.DefaultAgentConfig(receipt.Workspace.Directory)
 	ac.Kind, ac.Interactive, ac.Model, ac.Permission = spec.Executor, true, spec.Model, spec.Permission
+	if spec.ResumeFrom != "" {
+		source, problem := s.recheckProviderRecovery(ctx, dir, spec)
+		if problem != nil {
+			return s.failPersistent(dir, problem)
+		}
+		ac.Model, ac.Permission = source.Lifecycle.Model, source.Lifecycle.Permission
+		ac.SessionUUID = spec.ResumeProvider
+		binding.ProviderID = spec.ResumeProvider
+		binding.ProviderHome, binding.ProviderHomeProof = source.Receipt.Binding.ProviderHome, source.Receipt.Binding.ProviderHomeProof
+		key := "CODEX_HOME"
+		if spec.Executor == "claude" {
+			key = "CLAUDE_CONFIG_DIR"
+		}
+		// Run is a dedicated process that becomes this provider; retain its original profile.
+		if err := os.Setenv(key, binding.ProviderHome); err != nil {
+			return s.failPersistent(dir, err)
+		}
+	}
 	ac, err = ac.PrepareInteractive(s.Runtime)
 	if err != nil {
 		return s.failPersistent(dir, err)
+	}
+	if spec.ResumeFrom != "" && !ac.HasLifecycleHooks() {
+		return s.failPersistent(dir, fmt.Errorf("SESSION_RECOVERY_HOOKS_UNAVAILABLE"))
 	}
 	lease, err := s.claimWorkspace(ctx, binding.Directory, spec.Key)
 	if err != nil {
@@ -41,14 +62,15 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	if err != nil {
 		return err
 	}
-	if spec.Executor == "codex" {
+	if spec.Executor == "codex" || spec.ResumeFrom != "" {
 		_, scope, processes, observeErr := paneProcessSnapshot(binding.PID)
 		if observeErr != nil {
 			return observeErr
 		}
 		binding.Scope, binding.Processes = scope, processes
 	}
-	state := sessionLifecycle{Binding: binding, Executor: spec.Executor, State: "submitting", LaunchKey: spec.Key, InitialLaunch: true, Tools: map[string]bool{}, UpdatedMS: time.Now().UnixMilli()}
+	state := sessionLifecycle{Binding: binding, Executor: spec.Executor, Model: ac.Model, Permission: ac.Permission, Workspace: receipt.Workspace, State: "submitting", LaunchKey: spec.Key, InitialLaunch: true, Tools: map[string]bool{}, UpdatedMS: time.Now().UnixMilli()}
+	state.Resuming = spec.ResumeFrom != ""
 	if err = writeJSON(path, state); err != nil {
 		return err
 	}
@@ -59,25 +81,38 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	spawn.RecordAgentSession(s.Runtime, receipt.Session, ac)
 	lease()
 	// The TUI owns the pane and remains alive after each completion callback.
-	if err = syscall.Exec("/bin/sh", []string{"sh", "-c", ac.InteractiveFromPromptFile(promptFile)}, gitcontext.ForDirectory(os.Environ())); err != nil {
+	command := ac.InteractiveFromPromptFile(promptFile)
+	if state.Resuming {
+		command = ac.ResumeInteractiveFromPromptFile(spec.ResumeProvider, promptFile)
+	}
+	if err = syscall.Exec("/bin/sh", []string{"sh", "-c", command}, gitcontext.ForDirectory(os.Environ())); err != nil {
 		return s.failPersistent(dir, err)
 	}
 	return nil
 }
 
 func (s Service) failPersistent(dir string, err error) error {
-	if problem := writeJSON(filepath.Join(dir, "result.json"), Result{State: "failed", Summary: err.Error(), ExitCode: -1, FinishedMS: time.Now().UnixMilli()}); problem != nil {
+	started, stopped := false, true
+	if problem := writeJSON(filepath.Join(dir, "result.json"), Result{State: "failed", Summary: err.Error(), ExitCode: -1, ExecutionStarted: &started, ExitCodeSource: "not_started", InputStopped: &stopped, OutcomeKnown: &stopped, FinishedMS: time.Now().UnixMilli()}); problem != nil {
 		return problem
 	}
 	return err
 }
 
 func (s Service) bindInitialSession(dir string, state *sessionLifecycle, binding SessionBinding, provider string) error {
+	if state.Resuming && (state.Binding.ProviderID == "" || provider != state.Binding.ProviderID) {
+		return fmt.Errorf("SESSION_BINDING_CONFLICT")
+	}
+	binding.ProviderHome = providerHome(state.Executor)
+	binding.ProviderHomeProof = sessionDirectoryProof(binding.ProviderHome)
+	if state.Resuming && (binding.ProviderHome == "" || binding.ProviderHome != state.Binding.ProviderHome || binding.ProviderHomeProof != state.Binding.ProviderHomeProof) {
+		return fmt.Errorf("SESSION_BINDING_CONFLICT")
+	}
 	snapshot, scope, scoped, err := paneProcessSnapshot(binding.PID)
 	if err != nil {
 		return err
 	}
-	if state.Executor == "codex" && (state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || state.Binding.Scope != "" && state.Binding.Scope != scope || state.Binding.Processes[binding.PID] != "" && state.Binding.Processes[binding.PID] != snapshot[binding.PID].Token) {
+	if (state.Executor == "codex" || state.Resuming) && (state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || state.Binding.Scope != "" && state.Binding.Scope != scope || state.Binding.Processes[binding.PID] != "" && state.Binding.Processes[binding.PID] != snapshot[binding.PID].Token) {
 		return fmt.Errorf("SESSION_BINDING_CONFLICT")
 	}
 	binding.Scope, binding.Processes, binding.ProviderID = scope, scoped, provider

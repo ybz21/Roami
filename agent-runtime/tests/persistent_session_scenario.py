@@ -24,6 +24,9 @@ async def main():
         script = bins / kind
         script.write_text(f"#!{python}\n" + fixture.read_text())
         script.chmod(0o700)
+    transcripts = root / "provider-transcripts"
+    os.environ["CODEX_HOME"] = str(transcripts / "codex")
+    os.environ["CLAUDE_CONFIG_DIR"] = str(transcripts / "claude")
     os.environ["PATH"] = str(bins) + os.pathsep + os.environ["PATH"]
     database = Database(root / "python/runtime.db", root / "python", managed=False)
     await database.open()

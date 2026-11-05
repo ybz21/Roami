@@ -246,7 +246,13 @@ async def test_missing_session_never_falls_back_to_new_provider(store):
 
         coding.command = missing
         result = await coding.run(current, run)
-        assert result == {"state": "failed", "summary": "SESSION_TARGET_NOT_FOUND"}
+        assert result == {
+            "state": "failed",
+            "summary": "SESSION_TARGET_NOT_FOUND",
+            "executionStarted": False,
+            "inputStopped": True,
+            "outcomeKnown": True,
+        }
         assert (
             len(calls) == 1
             and calls[0]["sessionId"] == "original-session"

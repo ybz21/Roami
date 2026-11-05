@@ -386,6 +386,14 @@ class TaskRevisions:
                 intent = json.loads(task["intent_json"])
                 intent.setdefault("initialIntent", dict(intent))
                 previous = intent.get("continuation", {})
+                from roami_agent.storage.task_provider import provider_binding
+
+                provider = provider_binding(
+                    db,
+                    task,
+                    run["id"] if run["agent_conversation_id"] else previous.get("providerRunId"),
+                    run["attempt_no"],
+                )
                 verified_through = (
                     task["revision"]
                     if task["state"] == "succeeded"
@@ -413,6 +421,7 @@ class TaskRevisions:
                         if run["result_json"]
                         else ""
                     ),
+                    **({"providerRunId": provider["id"]} if provider else {}),
                 }
                 intent.update(
                     goal=payload["goal"],
@@ -425,11 +434,12 @@ class TaskRevisions:
                 if intent["target"]["kind"] == "new_project":
                     intent.setdefault("provisionLaunchId", run["launch_id"])
                 target = json.loads(task["target_json"]) if task["target_json"] else {}
-                if run["executor_kind"] == "cli" and run["session_id"]:
+                if provider or run["executor_kind"] == "cli" and run["session_id"]:
+                    session = provider or run
                     intent["target"] = {
                         "kind": "session",
-                        "sessionId": run["session_id"],
-                        "nodeId": run["node_id"] or "local",
+                        "sessionId": session["session_id"],
+                        "nodeId": session["node_id"] or "local",
                     }
                 elif (
                     intent["target"]["kind"] != "session"
