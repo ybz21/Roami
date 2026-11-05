@@ -73,3 +73,5 @@ flowchart TD
 证据 `/tmp/okr-member-rounds/{combined-tests.log,go-tests.log,cli-proof.log,cli-proof.json}`。完整门禁与 PR 记录另补。
 
 仍待下一阶段：无任务职责的真实常驻原生实例、成员视图接入、Codex/Claude 终端消失后的可信原 provider 会话恢复，以及现有重复职责的显式 CAS 映射。以上不能因成员行或轮次账本已存在就视为完成；不对线上 unknown 任务做恢复、重试或清理。
+
+发布前兼容复核补充：旧团队（memberProtocol=0）的 `members --json` 保持原工作项格式，即使新服务已提供成员元数据；显式登记后的协议1才返回成员格式。HTTP 计划中未提供 `memberId` 时仅省略该新增字段，不改变旧字段默认值，确保升级前的幂等回执可原样重放。兼容专项58项及 Go CLI 回归通过。第一阶段提交门禁已通过，Python3443 passed/48 skipped；兼容修正后的最终门禁仍需完成。

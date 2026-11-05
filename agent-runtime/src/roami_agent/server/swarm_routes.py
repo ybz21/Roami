@@ -39,7 +39,9 @@ class MemorySwarm(Payload):
 
 
 class WorkSpec(Payload):
-    memberId: str | None = Field(default=None, min_length=1, max_length=200)
+    memberId: str | None = Field(
+        default=None, min_length=1, max_length=200, exclude_if=lambda value: value is None
+    )
     member: str = Field(min_length=1, max_length=80)
     executor: Literal["native", "codex", "claude", "opencode", "pi"]
     title: str = Field(min_length=1, max_length=80)

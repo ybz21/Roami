@@ -573,3 +573,36 @@ async def test_registered_team_rejects_implicit_new_roles_in_later_plans(team):
         )
     assert len((await runtime.swarms.snapshot("alice", group["id"]))["members"]) == 1
     assert not (await runtime.swarms.snapshot("alice", group["id"]))["work"]
+
+
+async def test_legacy_http_plan_receipt_replays_without_a_new_null_field(team):
+    from roami_agent.server.swarm_routes import PlanSwarm
+
+    runtime, group = team
+    body = {
+        "commandKey": "pre-upgrade-plan",
+        "expectedRevision": 1,
+        "items": [
+            {
+                "member": "legacy-role",
+                "executor": "native",
+                "title": "Read",
+                "goal": "Read references",
+                "acceptance": "Check references",
+            }
+        ],
+    }
+    previous_payload = PlanSwarm(**body).model_dump()
+    for item in previous_payload["items"]:
+        item.pop("memberId", None)
+    original = await runtime.swarms.plan("alice", group["id"], previous_payload)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(create_app(runtime, manage_lifecycle=False)),
+        base_url="http://agent",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        replay = await client.post(f"/v1/swarms/{group['id']}/plan", json=body)
+        assert replay.status_code == 200 and replay.json()["data"] == original
+    snapshot = await runtime.swarms.snapshot("alice", group["id"])
+    assert len(snapshot["members"]) == len(snapshot["work"]) == 1
+    assert snapshot["revision"] == original["revision"]

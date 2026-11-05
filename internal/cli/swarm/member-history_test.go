@@ -39,6 +39,7 @@ func TestMemberRegistrationDoesNotCreateAnExecutionPlan(t *testing.T) {
 func TestMembersIncludesUnassignedRolesWithoutSyntheticTasks(t *testing.T) {
 	rt := fixtureRuntime(t, func(w http.ResponseWriter, r *http.Request) {
 		value := collaborationFixture()
+		value.MemberProtocol = 1
 		value.Members = []member{{ID: stableMemberFixtureID, Name: "research", Executor: "native", Duty: "Read references", State: "unassigned", MemoryPath: "members/" + stableMemberFixtureID + "/memory.md"}}
 		value.Work = nil
 		apiReply(w, value)
@@ -79,5 +80,24 @@ func TestMemberInspectRejectsPathSelectorsAndInvalidCursorsBeforeRequest(t *test
 	}
 	if calls != 0 {
 		t.Fatalf("invalid selectors sent %d requests", calls)
+	}
+}
+
+func TestMembersPreservesLegacyJSONOnModernRuntime(t *testing.T) {
+	rt := fixtureRuntime(t, func(w http.ResponseWriter, r *http.Request) {
+		value := collaborationFixture()
+		value.MemberProtocol = 0
+		value.Members = []member{{ID: stableMemberFixtureID, Name: "api", State: "succeeded", TaskID: "task-api"}}
+		apiReply(w, value)
+	})
+	output := commandResult(t, rt, "members", fixtureID, "--json")
+	var result struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Data) != 3 || result.Data[0]["id"] != "work-api" || result.Data[0]["member_name"] != "api" || result.Data[0]["task_id"] != "task-api" {
+		t.Fatalf("legacy contract changed: %s", output)
 	}
 }

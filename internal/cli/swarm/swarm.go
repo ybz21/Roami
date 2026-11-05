@@ -192,7 +192,7 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		return followView(ctx, client, path, value, command, w, jsonOutput)
 	}
 	if jsonOutput && command == "members" {
-		if value.Members != nil {
+		if value.MemberProtocol == 1 && value.Members != nil {
 			return writeJSON(w, map[string]any{"data": value.Members})
 		}
 		return writeJSON(w, map[string]any{"data": value.Work})

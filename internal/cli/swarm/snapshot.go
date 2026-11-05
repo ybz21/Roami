@@ -66,6 +66,7 @@ type member struct {
 	MemoryPath   string `json:"memoryPath"`
 }
 type snapshot struct {
+	MemberProtocol     int             `json:"memberProtocol,omitempty"`
 	ID                 string          `json:"id"`
 	Name               string          `json:"name"`
 	Goal               string          `json:"goal"`
