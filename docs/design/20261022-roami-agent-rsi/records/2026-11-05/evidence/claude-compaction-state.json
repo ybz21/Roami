@@ -1,0 +1,20 @@
+{
+  "scope": "preserve authenticated Claude lifecycle across compact SessionStart; no historical reconciliation",
+  "baseline": {
+    "same_final_tests": true,
+    "failed_valid_scenarios": 5
+  },
+  "final_race": {
+    "scenarios": 21,
+    "repeats": 3,
+    "passed": 63,
+    "log": "roami-claude-compaction-final-20261105.log"
+  },
+  "runtime_files": {
+    "internal/agentexecution/session-lifecycle.go": "ad0063f6507a82c8c0999c4b9a3b82f12b8814a9c3674fdb9a7fcb0b5416996b"
+  },
+  "production_modified": false,
+  "external_inference_calls": 0,
+  "unknown_results_rewritten": false,
+  "official_reference": "https://code.claude.com/docs/en/hooks#sessionstart"
+}

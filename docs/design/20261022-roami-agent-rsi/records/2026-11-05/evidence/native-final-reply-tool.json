@@ -529,5 +529,15 @@
   "production_deployed": false,
   "default_image_activated": false,
   "historical_suite_updated": false,
-  "eligible_for_promotion": false
+  "eligible_for_promotion": false,
+  "prior_full_timing_failure": {
+    "passed": 3531,
+    "failed": 1,
+    "skipped": 48,
+    "location": "test_repeated_unresolved_request.py::repeat_turn",
+    "cause": "manual claim before an existing callback finishes",
+    "production_serialization_changed": false,
+    "focused_repeats_before_fixture_fix": 20,
+    "post_fix_file_passed": 10
+  }
 }
