@@ -606,3 +606,83 @@ async def test_legacy_http_plan_receipt_replays_without_a_new_null_field(team):
     snapshot = await runtime.swarms.snapshot("alice", group["id"])
     assert len(snapshot["members"]) == len(snapshot["work"]) == 1
     assert snapshot["revision"] == original["revision"]
+
+
+async def test_dependency_edit_keeps_legacy_protocol(team):
+    runtime, group = team
+
+    def item(name):
+        return {
+            "member": name,
+            "executor": "native",
+            "title": name,
+            "goal": "Read " + name,
+            "acceptance": "Verify files",
+        }
+
+    await runtime.swarms.plan(
+        "alice", group["id"], {"commandKey": "one", "expectedRevision": 1, "items": [item("first")]}
+    )
+    snapshot = await runtime.swarms.snapshot("alice", group["id"])
+    assert snapshot["memberProtocol"] == 0
+    await runtime.swarms.dependencies(
+        "alice",
+        group["id"],
+        {
+            "commandKey": "deps",
+            "expectedRevision": 2,
+            "workId": snapshot["work"][0]["id"],
+            "dependencies": [],
+        },
+    )
+    assert (await runtime.swarms.snapshot("alice", group["id"]))["memberProtocol"] == 0
+    await runtime.swarms.plan(
+        "alice",
+        group["id"],
+        {"commandKey": "two", "expectedRevision": 3, "items": [item("second")]},
+    )
+
+
+async def test_revision_between_create_and_binding_keeps_history(team, monkeypatch):
+    runtime, group = team
+    registered = await register(runtime, group)
+    member = registered["members"][0]
+    await runtime.swarms.plan(
+        "alice",
+        group["id"],
+        {
+            "commandKey": "work",
+            "expectedRevision": 2,
+            "items": [
+                {
+                    "member": "research",
+                    "memberId": member["id"],
+                    "executor": "native",
+                    "title": "Read",
+                    "goal": "Read reference one",
+                    "acceptance": "Verify",
+                }
+            ],
+        },
+    )
+    create = runtime.tasks.create
+
+    async def interleave(*args, **kwargs):
+        task = await create(*args, **kwargs)
+        snapshot = await runtime.swarms.snapshot("alice", group["id"])
+        assert snapshot["work"][0]["task_id"] == task["id"]
+        assert snapshot["members"][0]["roundCount"] == 1
+        await finish_round(runtime, {"task_id": task["id"]}, 1)
+        operation = await runtime.tasks.revisions.request(
+            "alice", task["id"], "Read reference two", 1, "race-round-two"
+        )
+        await runtime.tasks.revisions.advance()
+        assert (await runtime.tasks.revisions.get("alice", task["id"], operation["operationId"]))[
+            "revision"
+        ] == 2
+        return task
+
+    monkeypatch.setattr(runtime.tasks, "create", interleave)
+    await runtime.swarms.advance({"id": "advance", "aggregate_id": group["id"]})
+    detail = await runtime.swarms.member("alice", group["id"], member["id"])
+    assert [entry["revision"] for entry in detail["rounds"]["items"]] == [2, 1]

@@ -622,30 +622,8 @@ class SwarmPlans:
                             ]
                         )
                         goal += "\nVerified upstream results:\n" + encoded(evidence)
-                    try:
-                        task = await self.tasks.create(
-                            info["owner_id"],
-                            info["conversation_id"],
-                            goal,
-                            key="swarm.work:" + item["id"],
-                            executor=item["executor"],
-                            target=target,
-                            title=item["title"],
-                            origin_message_id=info["origin_message_id"],
-                        )
-                    except DomainError as exc:
 
-                        def failed(db, item=item, code=exc.code):
-                            db.execute(
-                                "UPDATE swarm_work_items SET dispatch_error=? WHERE id=?",
-                                (code, item["id"]),
-                            )
-                            changed(db, info)
-
-                        await self.db.call(failed, write=True)
-                        continue
-
-                    def bind(db, item=item, task=task):
+                    def bind(db, task, item=item):
                         db.execute(
                             "UPDATE swarm_work_items SET task_id=? WHERE id=?",
                             (task["id"], item["id"]),
@@ -661,7 +639,30 @@ class SwarmPlans:
                         )
                         changed(db, info, "swarm.assigned")
 
-                    await self.db.call(bind, write=True)
+                    try:
+                        await self.tasks.create(
+                            info["owner_id"],
+                            info["conversation_id"],
+                            goal,
+                            key="swarm.work:" + item["id"],
+                            executor=item["executor"],
+                            target=target,
+                            title=item["title"],
+                            origin_message_id=info["origin_message_id"],
+                            bind_task=bind,
+                        )
+                    except DomainError as exc:
+
+                        def failed(db, item=item, code=exc.code):
+                            db.execute(
+                                "UPDATE swarm_work_items SET dispatch_error=? WHERE id=?",
+                                (code, item["id"]),
+                            )
+                            changed(db, info)
+
+                        await self.db.call(failed, write=True)
+                        continue
+
         await self.db.call(
             lambda db: db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],)),
             write=True,
@@ -733,10 +734,7 @@ class SwarmPlans:
                 db.execute(
                     "UPDATE swarm_work_items SET dispatch_error=NULL WHERE id=?", (work["id"],)
                 )
-                db.execute(
-                    "UPDATE swarm_groups SET revision=revision+1,member_protocol=1 WHERE id=?",
-                    (sid,),
-                )
+                db.execute("UPDATE swarm_groups SET revision=revision+1 WHERE id=?", (sid,))
                 value["revision"] += 1
                 changed(db, value, "swarm.dependencies_changed")
                 enqueue(db, sid, identity())

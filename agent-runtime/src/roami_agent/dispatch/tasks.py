@@ -73,6 +73,7 @@ class Tasks:
         routing_decision=None,
         title=None,
         independent_project_outcome=False,
+        bind_task=None,
     ):
         if (
             not key
@@ -158,6 +159,12 @@ class Tasks:
                 sourceAssistantMessageId=source_assistant_message_id,
             )
 
+        def admitted(db, task):
+            # Commit Swarm identity before the queued task can run or be steered.
+            if bind_task:
+                bind_task(db, task)
+            return task
+
         def write(db):
             c = owned(db, owner, cid)
             if source_turn_id or source_assistant_message_id:
@@ -184,7 +191,7 @@ class Tasks:
                 stored_spec.pop("parentTaskRevision", None)
                 if stored_spec != spec or task["origin_conversation_id"] != cid:
                     raise DomainError("TASK_KEY_CONFLICT", 409)
-                return task
+                return admitted(db, task)
             if (
                 source_turn_id
                 and not parent_task_id
@@ -326,7 +333,7 @@ class Tasks:
                         and intent.get("target") == target
                     ):
                         # A new tool-call ID must not duplicate an already admitted assignment.
-                        return existing
+                        return admitted(db, existing)
                 unknown = any(
                     row(
                         db,
@@ -463,7 +470,7 @@ class Tasks:
                 key="accepted:" + tid,
                 task_id=tid,
             )
-            return row(db, "SELECT * FROM tasks WHERE id=?", (tid,))
+            return admitted(db, row(db, "SELECT * FROM tasks WHERE id=?", (tid,)))
 
         return await self.db.call(write, write=True)
 
