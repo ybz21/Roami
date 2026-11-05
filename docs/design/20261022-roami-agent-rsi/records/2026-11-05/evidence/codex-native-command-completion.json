@@ -1,0 +1,53 @@
+{
+  "recordedAt": "2026-11-05T07:50:52.420967+00:00",
+  "baseCommit": "83d47ff9",
+  "sourceSha256": "69f726c571800d6be029ffc7f11331527ec68dfbcbf38b013489956ac59d57b2",
+  "testsSha256": "101fcbf7f2a9b1266231409f2231ccc6500c753f0fe8c225e6ca1839cf9ccd24",
+  "offline": {
+    "beforeValidProofsFailed": 4,
+    "nativeCases": 19,
+    "raceIterations": 5,
+    "externalInferenceCalls": 0,
+    "steps": [
+      {
+        "name": "before",
+        "exitCode": 1,
+        "logSha256": "c15428873fc60bd70beea883dc2e280e5f7eefaa82525d0e959e524e05e42e13"
+      },
+      {
+        "name": "repeat",
+        "exitCode": 0,
+        "logSha256": "807520a3e09c4464046995b1ca50801f2c97f4ccc3bf386a78749c2a795082a6"
+      },
+      {
+        "name": "package",
+        "exitCode": 0,
+        "logSha256": "399d7378282e28419a8fcdb6748216b0440b5b07e21ed5f8e0ca033812d08d8c"
+      }
+    ],
+    "full": {
+      "exitCode": 0,
+      "logSha256": "a8a9caf59f6fb7f6c9d9339522edf32a77b4f3fb998eb7988dd019255442a4c5"
+    }
+  },
+  "online": {
+    "boundNativeCommands": 3,
+    "beforeExecutionState": "unknown",
+    "afterExecutionState": "succeeded",
+    "inputStopped": true,
+    "outcomeKnown": true,
+    "providerTranscriptHashSaved": true,
+    "observedTaskState": "waiting_user",
+    "businessAcceptance": "not_asserted",
+    "logicalUnresolvedBefore": 3,
+    "logicalUnresolvedAfter": 2,
+    "sentInput": false,
+    "stoppedSessions": false,
+    "manualDatabaseEdits": false
+  },
+  "remaining": {
+    "missingRootProcess": "unknown",
+    "claudeUntrackedStart": "unknown",
+    "fullRsiAccepted": false
+  }
+}

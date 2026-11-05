@@ -17,6 +17,7 @@ import (
 )
 
 var codexThreadID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+var codexCommandID = regexp.MustCompile(`^exec-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 type codexRecord struct {
 	Type      string          `json:"type"`
@@ -24,17 +25,29 @@ type codexRecord struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
+type codexCommandItem struct {
+	Type      string `json:"type"`
+	ID        string `json:"id"`
+	ProcessID string `json:"process_id"`
+	Status    string `json:"status"`
+	ExitCode  *int   `json:"exit_code"`
+}
+
 type codexPayload struct {
-	Type          string `json:"type"`
-	ID            string `json:"id"`
-	Cwd           string `json:"cwd"`
-	TurnID        string `json:"turn_id"`
-	RootTurnID    string `json:"root_turn_id"`
-	LastAssistant string `json:"last_agent_message"`
-	CallID        string `json:"call_id"`
-	Role          string `json:"role"`
-	Phase         string `json:"phase"`
-	Status        string `json:"status"`
+	ThreadID      string            `json:"thread_id"`
+	StartedMS     int64             `json:"started_at_ms"`
+	CompletedMS   int64             `json:"completed_at_ms"`
+	Item          *codexCommandItem `json:"item"`
+	Type          string            `json:"type"`
+	ID            string            `json:"id"`
+	Cwd           string            `json:"cwd"`
+	TurnID        string            `json:"turn_id"`
+	RootTurnID    string            `json:"root_turn_id"`
+	LastAssistant string            `json:"last_agent_message"`
+	CallID        string            `json:"call_id"`
+	Role          string            `json:"role"`
+	Phase         string            `json:"phase"`
+	Status        string            `json:"status"`
 	Content       []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -51,8 +64,13 @@ func codexOutcome(binding SessionBinding, turn, promptHash string, cancelled boo
 }
 
 func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, cancelled, initial bool) (*Result, string) {
+	result, evidence, _ := codexObservedOutcome(binding, turn, promptHash, cancelled, initial)
+	return result, evidence
+}
+
+func codexObservedOutcome(binding SessionBinding, turn, promptHash string, cancelled, initial bool) (*Result, string, map[string]int64) {
 	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
-		return nil, ""
+		return nil, "", nil
 	}
 	home := binding.ProviderHome
 	if home == "" {
@@ -61,54 +79,54 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 	if home == "" {
 		userHome, err := os.UserHomeDir()
 		if err != nil {
-			return nil, ""
+			return nil, "", nil
 		}
 		home = filepath.Join(userHome, ".codex")
 	}
 	root, err := filepath.EvalSymlinks(filepath.Join(home, "sessions"))
 	if err != nil {
-		return nil, ""
+		return nil, "", nil
 	}
 	paths, err := filepath.Glob(filepath.Join(root, "*", "*", "*", "rollout-*-"+binding.ProviderID+".jsonl"))
 	if err != nil || len(paths) != 1 {
-		return nil, ""
+		return nil, "", nil
 	}
 	path := paths[0]
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil || resolved != path {
-		return nil, ""
+		return nil, "", nil
 	}
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > 64<<20 {
-		return nil, ""
+		return nil, "", nil
 	}
 	owner, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || owner.Uid != uint32(os.Geteuid()) {
-		return nil, ""
+		return nil, "", nil
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, ""
+		return nil, "", nil
 	}
 	defer file.Close()
 	opened, err := file.Stat()
 	if err != nil || !os.SameFile(info, opened) {
-		return nil, ""
+		return nil, "", nil
 	}
 	// Active histories normally end in tool or token records; avoid scanning them repeatedly.
 	tail := make([]byte, min(info.Size(), 256<<10))
 	if _, err = file.ReadAt(tail, info.Size()-int64(len(tail))); err != nil {
-		return nil, ""
+		return nil, "", nil
 	}
 	tail = bytes.TrimSpace(tail)
 	line := tail[bytes.LastIndexByte(tail, '\n')+1:]
 	var last codexRecord
 	var end codexPayload
 	if json.Unmarshal(line, &last) != nil || last.Type != "event_msg" || json.Unmarshal(last.Payload, &end) != nil || (end.Type != "task_complete" && !(cancelled && end.Type == "turn_aborted")) || end.TurnID != turn {
-		return nil, ""
+		return nil, "", nil
 	}
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
-		return nil, ""
+		return nil, "", nil
 	}
 	hash := sha256.New()
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), hash))
@@ -116,40 +134,49 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 	metadata, matched, finalAnswer, aborted := false, false, false, false
 	startedTurns := 0
 	calls := map[string]bool{}
+	commands := map[string]int64{}
 	var result *Result
 	for {
 		var record codexRecord
 		if err = decoder.Decode(&record); errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
-			return nil, ""
+			return nil, "", nil
 		}
 		var value codexPayload
 		if json.Unmarshal(record.Payload, &value) != nil {
-			return nil, ""
+			return nil, "", nil
 		}
 		switch record.Type {
 		case "session_meta":
 			directory, e := canonicalWorkspace(value.Cwd)
 			if e != nil || directory != binding.Directory || value.ID != binding.ProviderID {
-				return nil, ""
+				return nil, "", nil
 			}
 			metadata = true
 		case "event_msg":
 			if value.Type == "task_started" {
 				startedTurns++
 				if initial && (startedTurns != 1 || value.TurnID != turn || value.RootTurnID != turn) {
-					return nil, ""
+					return nil, "", nil
 				}
 				active, assistant, matched, result = value.TurnID, "", false, nil
 				finalAnswer, aborted = false, false
 				calls = map[string]bool{}
+				commands = map[string]int64{}
+			} else if active == turn && value.Type == "item_completed" && value.Item != nil && value.Item.Type == "CommandExecution" && codexCommandID.MatchString(value.Item.ID) {
+				item := value.Item
+				_, duplicate := commands[item.ID]
+				commands[item.ID] = 0
+				if !duplicate && value.ThreadID == binding.ProviderID && value.TurnID == turn && value.StartedMS > 0 && value.CompletedMS >= value.StartedMS && item.ProcessID != "" && item.ExitCode != nil && (item.Status == "completed" || item.Status == "failed") {
+					commands[item.ID] = value.CompletedMS
+				}
 			} else if active == turn && (value.Type == "turn_aborted" || value.Type == "task_failed") {
 				aborted = true
 				if cancelled && value.Type == "turn_aborted" && value.TurnID == turn && (value.RootTurnID == "" || value.RootTurnID == turn) && matched && len(calls) == 0 {
 					stamp, e := time.Parse(time.RFC3339Nano, record.Timestamp)
 					if e != nil {
-						return nil, ""
+						return nil, "", nil
 					}
 					result = &Result{State: "cancelled", Summary: "Session task stopped after cancellation request", FinishedMS: stamp.UnixMilli()}
 				}
@@ -159,7 +186,7 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 				}
 				stamp, e := time.Parse(time.RFC3339Nano, record.Timestamp)
 				if e != nil || active != turn || value.TurnID != turn || (value.RootTurnID != "" && value.RootTurnID != turn) || !matched || len(calls) != 0 || !finalAnswer || aborted || assistant == "" || assistant != value.LastAssistant {
-					return nil, ""
+					return nil, "", nil
 				}
 				result = &Result{State: "succeeded", Summary: truncate(assistant, 32000), FinishedMS: stamp.UnixMilli()}
 			}
@@ -177,7 +204,7 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 				}
 				if value.Role == "user" {
 					if matched {
-						return nil, ""
+						return nil, "", nil
 					}
 					matched = workspaceHash(text) == promptHash
 				} else if value.Role == "assistant" {
@@ -186,30 +213,30 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 				}
 			case "function_call", "custom_tool_call":
 				if value.CallID == "" || calls[value.CallID] {
-					return nil, ""
+					return nil, "", nil
 				}
 				calls[value.CallID] = true
 			case "function_call_output", "custom_tool_call_output":
 				if !calls[value.CallID] {
-					return nil, ""
+					return nil, "", nil
 				}
 				delete(calls, value.CallID)
 			default:
 				if strings.HasSuffix(value.Type, "_call") && value.Status != "completed" {
-					return nil, ""
+					return nil, "", nil
 				}
 			}
 		}
 	}
 	after, err := file.Stat()
 	if err != nil || !metadata || result == nil || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
-		return nil, ""
+		return nil, "", nil
 	}
 	current, err := os.Lstat(path)
 	if err != nil || !os.SameFile(info, current) || current.Mode().Perm()&0002 != 0 {
-		return nil, ""
+		return nil, "", nil
 	}
-	return result, hex.EncodeToString(hash.Sum(nil))
+	return result, hex.EncodeToString(hash.Sum(nil)), commands
 }
 
 func (s Service) reconcileCodexCompletion(key string, status Status, state *sessionLifecycle, path string) (Status, bool, error) {
@@ -229,7 +256,7 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 			return status, false, nil
 		}
 	}
-	result, evidence := codexOutcome(*status.Binding, state.TurnID, state.PromptHash, cancelErr == nil)
+	result, evidence, commands := codexObservedOutcome(*status.Binding, state.TurnID, state.PromptHash, cancelErr == nil, false)
 	if result == nil || !sessionProcessesStopped(*status.Binding) {
 		return status, false, nil
 	}
@@ -239,9 +266,15 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 				return status, false, nil
 			}
 		}
-		var interrupt sessionInterrupt
-		if result.State != "cancelled" || readJSON(filepath.Join(dir, "interrupt-request.json"), &interrupt) != nil || !interrupt.Delivered || interrupt.ResourceID != status.Binding.resourceID() || interrupt.ProviderID != state.Binding.ProviderID || interrupt.TurnID != state.TurnID || interrupt.PromptHash != state.PromptHash {
-			return status, false, nil
+		completed := true
+		for tool := range state.Tools {
+			completed = completed && commands[tool] > 0 && commands[tool] <= result.FinishedMS
+		}
+		if !completed {
+			var interrupt sessionInterrupt
+			if result.State != "cancelled" || readJSON(filepath.Join(dir, "interrupt-request.json"), &interrupt) != nil || !interrupt.Delivered || interrupt.ResourceID != status.Binding.resourceID() || interrupt.ProviderID != state.Binding.ProviderID || interrupt.TurnID != state.TurnID || interrupt.PromptHash != state.PromptHash {
+				return status, false, nil
+			}
 		}
 	}
 	stopped := true
