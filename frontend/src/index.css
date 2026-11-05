@@ -3415,10 +3415,14 @@ button.mc-tab-x { padding: 0; border: 0; background: transparent; cursor: pointe
 .tt-session-lineage { min-width: 0; }
 .tt-session-lineage.child { border-inline-start: 1px solid var(--border-subtle); padding-inline-start: var(--sp-1); }
 .tt-session-parent { display: block; padding: var(--sp-1) var(--sp-3); color: var(--text-dim); font-size: var(--fs-meta); }
-.tt-tree-sessions .tt-tree-row .nm { display: flex; flex-direction: column; min-width: 0; }
-.tt-tree-sessions .tt-tree-row .nm > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tt-tree-sessions .tt-session-location { flex-wrap: wrap; }
-.tt-tree-sessions .tt-session-location .branch { flex-shrink: 1; }
-.tt-tree-sessions .tt-session-location .directory { flex-shrink: 2; }
+.tt-session-context { flex: 0 1 auto; min-width: 0; max-width: calc(var(--sp-5) * 10); margin-inline: var(--sp-2); }
+.tt-session-context > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-session-context > svg { flex: 0 0 auto; }
+html[data-pointer="coarse"] .tt-session-context { position: relative; }
+html[data-pointer="coarse"] .tt-session-context::after { content: ''; position: absolute; inset: calc((100% - var(--tap)) / 2) calc(-1 * var(--sp-1)); }
+.tt-session-context-detail { display: flex; flex-direction: column; gap: var(--sp-3); max-width: min(calc(var(--sp-5) * 24), 80vw); margin: 0; }
+.tt-session-context-detail > div { display: flex; flex-direction: column; gap: var(--sp-1); }
+.tt-session-context-detail dt { color: var(--text-dim); font-size: var(--fs-meta); }
+.tt-session-context-detail dd { margin: 0; overflow-wrap: anywhere; font-size: var(--fs-sm); font-family: var(--mono); }
 .tt-tree-children .tt-tree-children .tt-tree-children .tt-tree-children { margin-left: 0; }
 .tt-msess-row em { font-size: var(--fs-meta); }
