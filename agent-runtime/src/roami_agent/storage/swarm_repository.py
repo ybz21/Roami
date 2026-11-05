@@ -245,9 +245,25 @@ def snapshot(db, owner, swarm_id):
     ).fetchone()[0]
     posts = rows(
         db,
-        "SELECT id,author,text,task_id AS taskId,created_ms AS createdMs,CASE WHEN author!='human' OR turn_id IS NOT NULL OR delivery_json IS NOT NULL THEN 'accepted' ELSE 'pending' END AS deliveryState FROM swarm_posts WHERE swarm_id=? ORDER BY id DESC LIMIT 100",
-        (swarm_id,),
+        "SELECT p.id,p.author,p.text,p.task_id AS taskId,p.created_ms AS createdMs,"
+        "CASE WHEN p.author!='human' OR p.turn_id IS NOT NULL OR p.delivery_json IS NOT NULL "
+        "THEN 'accepted' ELSE 'pending' END AS deliveryState,"
+        "t.id AS mainTurnId,t.state AS mainTurnState "
+        "FROM swarm_posts p LEFT JOIN turns t ON t.id=p.turn_id AND t.conversation_id=? "
+        "AND p.author='human' AND p.task_id IS NULL "
+        "AND json_extract(CASE WHEN json_valid(p.delivery_json) THEN p.delivery_json ELSE '{}' END,'$.kind')='message' "
+        "WHERE p.swarm_id=? ORDER BY p.id DESC LIMIT 100",
+        (value["conversation_id"], swarm_id),
     )[::-1]
+    for post in posts:
+        turn_id = post.pop("mainTurnId")
+        turn_state = post.pop("mainTurnState")
+        if turn_id:
+            post["mainTurn"] = {
+                "id": turn_id,
+                "conversationId": value["conversation_id"],
+                "state": turn_state,
+            }
     main_messages = rows(
         db,
         "SELECT id,role,substr(json_extract(native_content(content_json),'$.text'),1,16000) AS text,created_ms AS createdMs FROM messages WHERE turn_id IN (SELECT turn_id FROM swarm_posts WHERE swarm_id=? AND turn_id IS NOT NULL UNION SELECT j.aggregate_id FROM jobs j WHERE j.kind='turn.run' AND json_extract(j.payload_json,'$.completion.taskId') IN (SELECT task_id FROM swarm_work_items WHERE swarm_id=?)) AND role='assistant' AND deleted_ms IS NULL ORDER BY created_ms DESC LIMIT 50",

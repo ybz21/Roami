@@ -22,7 +22,7 @@ async def collaboration(store):
 
     class Intake:
         async def submit(self, owner, cid, key, text):
-            return await conversations.accept(owner, cid, key, text)
+            return {"kind": "message", **await conversations.accept(owner, cid, key, text)}
 
     swarms.chat = Intake()
     created = await swarms.create(
@@ -284,6 +284,45 @@ async def test_group_chat_dedup_and_main_reply(collaboration, store):
     assert len(view["posts"]) == 2 and view["mainMessages"][0]["text"] == "Included phone checks"
     with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
         await swarms.send("alice", created["id"], {**payload, "text": "Changed"})
+
+
+async def test_group_post_exposes_only_its_bound_main_turn(collaboration, store):
+    swarms, created = collaboration
+    sent = await swarms.send(
+        "alice", created["id"], {"commandKey": "shared", "text": "Check the result"}
+    )
+    await store.call(
+        lambda db: db.execute("UPDATE turns SET state='failed' WHERE id=?", (sent["turnId"],)),
+        write=True,
+    )
+    private = await swarms.conversations.accept(
+        "alice", created["mainConversationId"], "private", "Private discussion"
+    )
+    view = await swarms.snapshot("alice", created["id"])
+    post = next(p for p in view["posts"] if p["text"] == "Check the result")
+    assert post["deliveryState"] == "accepted"
+    assert post["mainTurn"] == {
+        "id": sent["turnId"],
+        "conversationId": created["mainConversationId"],
+        "state": "failed",
+    }
+    assert private["turnId"] not in json.dumps(view["posts"])
+
+    foreign = await swarms.conversations.main("bob")
+    foreign_turn = await swarms.conversations.accept(
+        "bob", foreign["id"], "foreign", "Other project"
+    )
+    await store.call(
+        lambda db: db.execute(
+            "UPDATE swarm_posts SET turn_id=? WHERE id=?", (foreign_turn["turnId"], post["id"])
+        ),
+        write=True,
+    )
+    view = await swarms.snapshot("alice", created["id"])
+    assert all("mainTurn" not in p for p in view["posts"])
+    assert foreign_turn["turnId"] not in json.dumps(view["posts"])
+    with pytest.raises(DomainError, match="SWARM_NOT_FOUND"):
+        await swarms.snapshot("bob", created["id"])
 
 
 async def test_worker_posts_require_current_bound_run(collaboration, store):

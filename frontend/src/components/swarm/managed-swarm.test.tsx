@@ -56,6 +56,27 @@ it('keeps Main discussion separate from undispatched members with no task identi
   expect(screen.getByText('Discuss with Main')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'swarm.managed.replyMember' })).toBeNull()
 })
+it('shows a failed group delivery and opens the same Main without retrying', () => {
+  test.data = { ...test.data!, posts: [{ id: 2, author: 'human', text: 'Check this result', createdMs: 5, deliveryState: 'accepted', mainTurn: { id: 'shared-turn', conversationId: 'main', state: 'failed' } }] }
+  const renderMain = vi.fn((cid: string) => <div>{'original ' + cid}</div>)
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} renderMain={renderMain} />)
+  chooseConversation('group')
+  expect(screen.getByRole('alert').textContent).toContain('swarm.chat.mainReplyFailed')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep my draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.chat.viewMain' }))
+  expect(renderMain).toHaveBeenLastCalledWith('main')
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
+  chooseConversation('group')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep my draft')
+  expect(test.api).not.toHaveBeenCalled()
+})
+it('does not broadcast private or foreign Main failures to the group', () => {
+  test.data = { ...test.data!, mainState: 'failed', posts: [{ id: 2, author: 'human', text: 'A different Main', createdMs: 5, mainTurn: { id: 'foreign-turn', conversationId: 'foreign-main', state: 'failed' } }] }
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  chooseConversation('group')
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'swarm.chat.viewMain' })).toBeNull()
+})
 it('keeps a reported task in review and opens the original task outputs', () => {
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.board' }))

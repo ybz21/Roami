@@ -5189,6 +5189,8 @@ const zhCN = {
   'swarm.managed.state.cancelling': '停止中',
   'swarm.managed.state.idle': '空闲',
   'swarm.managed.deliveryPending': '等待投递确认',
+  'swarm.chat.mainReplyFailed': 'Main 未能完成这条消息的处理。',
+  'swarm.chat.viewMain': '查看 Main',
   'swarm.managed.filter': '筛选蜂群',
   'swarm.relations.openWork': '进入工作',
   'swarm.relations.chat': '对话',
