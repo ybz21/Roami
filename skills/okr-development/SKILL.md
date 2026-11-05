@@ -9,6 +9,45 @@ Turn the user's goal into a working project bundle, not a report about a possibl
 OKR. Use this workflow for creation and changes to an existing OKR. Ordinary team
 chat or a progress question does not require rebuilding the bundle.
 
+## Author from templates
+
+The repository's `skills/okr-development/` is the canonical package. Runtime
+wheels and native installers ship this same package, including templates. Read
+only the resources needed for the requested change.
+
+The complete initialization template is `assets/`, mirroring the project root.
+It contains both AGENTS.md files, O/KR/method definitions, dashboard JSON and
+HTML/CSS/JS, a Connector Skill, Main/team definitions, project workflows, memory,
+empty data/evidence/state directories and a disabled schedule proposal. Copy the
+whole directory first, including hidden files:
+
+```bash
+okr_skill_dir=/path/to/skills/okr-development
+okr_draft_dir="$(mktemp -d)"
+cp -R "$okr_skill_dir/assets/." "$okr_draft_dir/"
+```
+
+Then combine `parts/` for Python/MCP sources, HTML fragments and executor roles.
+Content-growth, product-delivery and operations under `examples/` are optional
+reference overlays, not a substitute for the complete generic directory. Fill
+intentional `{{...}}` template parameters from the user/project; targets, dates,
+repo, role duties and widget count remain editable. Keep this work in the
+isolated draft. Never put the package's fixtures or example counts into live
+observations. Do not manufacture Main/member/provider IDs or current.json.
+
+Produce the objective/KRs/methods, dashboard definition, user HTML/CSS/JS,
+Connector Skill packages, desired team, instructions/memory locations and a
+schedule proposal. Show the resulting runtime preview and meaningful diff.
+Apply only supported definitions with the current project revision, then reread
+the actual result. Keep unsupported HTML/Skill-scheduler definitions as drafts;
+current JSON widgets and builtin/manual sources remain the compatibility path.
+
+A template choice does not replace long-lived members in an existing project.
+Saving the desired team, registering it, dispatching work and activating a daily
+schedule have separate receipts. Preserve the user's input on conflicts. Never
+claim a template, script, HTML page or scheduled proposal has executed merely
+because its files exist.
+
 Read [the bundle contract](references/bundle.md) when preparing configuration.
 For creation or a new layout, read [templates](references/templates.md) and choose
 the complete `assets/` first, then combine the needed parts.
@@ -103,32 +142,3 @@ managed team's current roster and receipts with the plan. Report what was
 created, what data was actually obtained, and any missing access or unsupported
 view. Return the project entry and usable files. Do not say the team ran, a post
 was published, or a dashboard is live merely because its definition was saved.
-
-
-## Author from templates
-
-The repository's `skills/okr-development/` is the canonical package. Runtime
-wheels and native installers ship this same package, including templates. Read
-only the resources needed for the requested change.
-
-First copy `assets/.` to an empty draft with `cp -R`, including
-the project AGENTS.md and hidden .roami/okr/AGENTS.md. Then combine `parts/` for sources, HTML and roles.
-Content-growth, product-delivery and operations under `examples/` are optional
-reference overlays, not a substitute for the complete generic directory. Fill
-intentional `{{...}}` template parameters from the user/project; targets, dates,
-repo, role duties and widget count remain editable. Copy only useful assets into
-an isolated draft. Never put the package's fixtures or example counts into live
-observations. Do not manufacture Main/member/provider IDs or current.json.
-
-Produce the objective/KRs/methods, dashboard definition, user HTML/CSS/JS,
-Connector Skill packages, desired team, instructions/memory locations and a
-schedule proposal. Show the resulting runtime preview and meaningful diff.
-Apply only supported definitions with the current project revision, then reread
-the actual result. Keep unsupported HTML/Skill-scheduler definitions as drafts;
-current JSON widgets and builtin/manual sources remain the compatibility path.
-
-A template choice does not replace long-lived members in an existing project.
-Saving the desired team, registering it, dispatching work and activating a daily
-schedule have separate receipts. Preserve the user's input on conflicts. Never
-claim a template, script, HTML page or scheduled proposal has executed merely
-because its files exist.
