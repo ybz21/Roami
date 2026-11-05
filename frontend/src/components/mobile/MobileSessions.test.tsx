@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import MobileSessions from './MobileSessions'
 import { api } from '../../api'
@@ -9,7 +9,7 @@ const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn(
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../sessions/session-actions', () => ({ closeSession: vi.fn(), renameSession: vi.fn(), stopSession: vi.fn() }))
-vi.mock('../sessions/native-session-list', () => ({ useNativeSessionList: () => ({ failed: false, value: [{ nativeSessionId: 'native', taskId: 'task', title: 'Roami chat', taskState: 'running', lastActivity: 200, projectId: 'project' }] }) }))
+vi.mock('../sessions/native-session-list', () => ({ refreshSessionLists: vi.fn(), useNativeSessionList: () => ({ failed: false, value: [{ nativeSessionId: 'native', taskId: 'task', title: 'Roami chat', taskState: 'running', lastActivity: 200, projectId: 'project' }] }) }))
 vi.mock('../swarm/swarm-directory', () => ({ loadSwarmDirectory: async () => [] }))
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: ui, modal: { confirm: ui.confirm } }) },
@@ -17,7 +17,7 @@ vi.mock('antd', () => ({
   Spin: () => null,
   Modal: ({ open, title, children, onOk, okText }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button></div> : null,
 }))
-afterEach(() => { cleanup(); localStorage.clear(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); localStorage.clear(); vi.resetAllMocks(); vi.useRealTimers() })
 
 const mount = () => {
   vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/projects' ? { projects: [{ key: 'project', name: 'Project', dir: '/work', unfinished: 0 }] } : { items: [{ name: 'codex', label: 'Codex chat', agent: 'codex', lastActivity: 100, running: true, waiting: false, dormant: false, projectKey: 'project', project: 'Project', projectDir: '/work' }] } }))
@@ -56,4 +56,15 @@ it('renames and stops Roami through the same menu actions', async () => {
   vi.mocked(renameSession).mockResolvedValue({ data: { label: 'Follow-up' } })
   fireEvent.click(screen.getByRole('button', { name: 'common.confirm' }))
   await waitFor(() => expect(renameSession).toHaveBeenCalledWith('roami:native', 'Follow-up'))
+})
+
+it('advances relative activity time while an unchanged shared overview keeps its snapshot', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(149000)
+  await act(async () => { mount() })
+  const time = () => screen.getByRole('button', { name: /Codex chat/ }).querySelector('em')?.textContent
+  expect(time()).toBe('time.justNow')
+  await act(async () => { await vi.advanceTimersByTimeAsync(61000) })
+  expect(time()).toBe('time.minutesAgo')
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path === '/sessions/overview').length).toBeLessThan(15)
 })

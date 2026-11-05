@@ -24,6 +24,7 @@ import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mo
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
 import { projectPath } from '../projects/okr/okr-workspace'
 import { getHashParams, setHashParams } from '../../route-hash'
+import { useSessionOverview } from '../../session-overview'
 export type { OverviewItem } from './mobile-overview-cache'
 
 export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject, searchNonce = 0, initialProjectKey }: {
@@ -36,14 +37,21 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   searchNonce?: number
 }) {
   const { t } = useI18n()
+  const overview = useSessionOverview()
   const [items, setItems] = useState<OverviewItem[] | null>(() => readMobileOverview())
+  const [, setActivityTick] = useState(0)
+  useEffect(() => {
+    if (overview.loaded) setItems(writeMobileOverview(overview.value))
+    else if (overview.failed) setItems(current => current || [])
+  }, [overview.loaded, overview.value, overview.failed])
+  useEffect(() => pollWhileVisible(async () => { setActivityTick(tick => tick + 1) }, 30000).stop, [])
   const [projects, setProjects] = useState<MobileProject[] | null>(() => readMobileProjects())
   const native = useNativeSessionList()
   const allItems = useMemo(() => [...(items || []), ...native.value.map(session => {
     const record = nativeSessionRecord(session), project = projects?.find(project => project.key === session.projectId)
     return { ...record, project: project?.name, projectDir: project?.dir }
   })].sort((a, b) => b.lastActivity - a.lastActivity || a.name.localeCompare(b.name)), [items, native.value, projects])
-  const [loadError, setLoadError] = useState(false)
+  const loadError = overview.failed
   const [q, setQ] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const searchInput = useRef<HTMLInputElement>(null)
@@ -92,7 +100,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const lpCancel = () => clearTimeout(lp.current.timer)
   const [renaming, setRenaming] = useState<OverviewItem | null>(null)
   const [renameVal, setRenameVal] = useState('')
-  const reload = () => api('GET', '/sessions/overview').then((r) => { setItems(writeMobileOverview(r.data.items || [])); setLoadError(false) }).catch(() => { setLoadError(true); setItems((cur) => cur || []) })
+  const reload = refreshSessionLists
   const interrupt = async (s: OverviewItem) => {
     try { await stopSession(s.name); message.success(t('mobile.interrupted')) }
     catch (e: any) { message.error(sessionActionError(e, t)) }
@@ -106,13 +114,6 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     if (!s || !name || name === s.label) return
     try { await renameSession(s.name, name); setRenaming(null); void reload() } catch (e: any) { message.error(sessionActionError(e, t)) }
   }
-  useEffect(() => {
-    let stop = false
-    const load = () => api('GET', '/sessions/overview').then((r) => { if (!stop) { setItems(writeMobileOverview(r.data.items || [])); setLoadError(false) } }).catch(() => { if (!stop) { setLoadError(true); setItems((c) => c || []) } })
-    load()
-    const i = setInterval(load, 5000)
-    return () => { stop = true; clearInterval(i) }
-  }, [])
   useEffect(() => {
     let stop = false
     const load = () => api('GET', '/projects').then((r) => { if (!stop) setProjects(writeMobileProjects(r.data.projects || [])) }).catch(() => {})
@@ -205,7 +206,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   return (
     <div className="tt-msess">
       <style>{SESSION_ACTIVITY_CSS}</style>
-      {(loadError || native.failed) && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => { refreshSessionLists(); void reload() }}>{t('inbox.retry')}</button></div>}
+      {(loadError || native.failed) && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={reload}>{t('inbox.retry')}</button></div>}
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">
           <div className="kicker">{t('mobile.sessions.kicker')}</div>
