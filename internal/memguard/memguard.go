@@ -234,6 +234,33 @@ func ScopeProcesses(pid int) (string, []int, error) {
 	if directory == "" || !strings.HasPrefix(filepath.Base(directory), "tmux-spawn-") || !strings.HasSuffix(directory, ".scope") {
 		return "", nil, fmt.Errorf("pane process scope unavailable")
 	}
+	pids, err := scopeProcesses(directory)
+	return directory, pids, err
+}
+
+// RecordedScopeProcesses observes a saved pane scope even after its root PID disappeared.
+func RecordedScopeProcesses(directory string) ([]int, error) {
+	const root = "/sys/fs/cgroup"
+	relative, err := filepath.Rel(root, directory)
+	base := filepath.Base(directory)
+	if err != nil || !filepath.IsAbs(directory) || filepath.Clean(directory) != directory || relative == "." || relative == ".." || strings.HasPrefix(relative, "../") || !strings.HasPrefix(base, "tmux-spawn-") || !strings.HasSuffix(base, ".scope") {
+		return nil, fmt.Errorf("invalid recorded pane scope")
+	}
+	var filesystem syscall.Statfs_t
+	if err := syscall.Statfs(root, &filesystem); err != nil || filesystem.Type != 0x63677270 {
+		return nil, fmt.Errorf("pane cgroup filesystem unavailable")
+	}
+	if info, err := os.Stat(directory); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	} else if !info.IsDir() {
+		return nil, fmt.Errorf("invalid recorded pane scope")
+	}
+	return scopeProcesses(directory)
+}
+
+func scopeProcesses(directory string) ([]int, error) {
 	var pids []int
 	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, problem error) error {
 		if problem != nil {
@@ -258,7 +285,7 @@ func ScopeProcesses(pid int) (string, []int, error) {
 		}
 		return nil
 	})
-	return directory, pids, err
+	return pids, err
 }
 
 // 设上限要重试，而且**只能以回读的结果为准**。
