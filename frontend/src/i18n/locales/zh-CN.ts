@@ -2282,6 +2282,7 @@ const zhCN = {
   'file.workingDir': '工作目录',
   'file.recentDir': '最近打开',
   'file.directory': '目录',
+  'session.context': '查看分支与目录',
   'file.closePanel': '关闭文件栏',
   'file.back': '后退',
   'file.forward': '前进',

@@ -8,7 +8,6 @@ import { AgentLogo, ChevronDown, CloseIcon, HomeIcon, MoreIcon, OpenInIcon, Penc
 import { isLooseTask, taskKeyOf, type TaskKey } from '../sessions/task-key'
 import { sessionBranches, type SessionBranch } from './session-lineage'
 import type { TaskTree, TreeSession } from './task-tree'
-import SessionLocation, { type SessionPlace } from '../sessions/SessionLocation'
 import { absTime } from '../../time-format'
 
 const CLOSED_KEY = 'roam.tree.closed'
@@ -88,14 +87,14 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
   // 它自己的会话名是一串 id（<被审id>-review），照原样印出来没人认得出这是什么。
   const rowLabel = (s: TreeSession) => (s.reviewOf ? t('tree.reviewOf', { name: s.reviewOf }) : s.label)
 
-  const sessionRow = (task: TaskKey, s: TreeSession, place: SessionPlace) => (
+  const sessionRow = (task: TaskKey, s: TreeSession) => (
     <Dropdown key={s.name} trigger={['contextMenu']} menu={sessionMenu(task, s)}>
       <button type="button"
         className={`tt-nav-item tt-tree-row${activeTask === task && activeSession === s.name ? ' on' : ''}${s.dormant ? ' dormant' : ''}`}
         onClick={() => onSession(task, s.name)} title={s.dormant ? t('session.dormant.hint') : s.name} onDoubleClick={onRename ? () => onRename(s.name) : undefined}
         aria-current={activeTask === task && activeSession === s.name ? 'true' : undefined}>
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
-        <span className="nm"><span>{rowLabel(s)}</span><SessionLocation {...place} compact /></span>
+        <span className="nm">{rowLabel(s)}</span>
         {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, t(s.waiting ? 'mobile.st.waiting' : 'mobile.st.running'))}
         {s.at ? <span className="tm" title={absTime(s.at)}>{ago(s.at, t)}</span> : null}
       </button>
@@ -104,7 +103,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
 
   const branchRows = (branch: SessionBranch, depth = 0): ReactNode => (
     <div key={branch.session.name} className="tt-tree-session-branch">
-      {sessionRow(branch.task?.key || taskKeyOf(branch.session.name), branch.session, { cwd: branch.session.cwd, branch: branch.session.branch ?? (branch.session.cwd === '' ? undefined : branch.task?.branch), worktree: branch.session.worktree ?? branch.session.cwd ?? branch.task?.path })}
+      {sessionRow(branch.task?.key || taskKeyOf(branch.session.name), branch.session)}
       {branch.children.length > 0 && <div className="tt-tree-children" role="group" aria-label={t('session.fork.childOf', { parent: branch.session.label })}>{branch.children.map(child => branchRows(child, depth + 1))}</div>}
     </div>
   )

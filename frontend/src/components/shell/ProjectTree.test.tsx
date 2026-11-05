@@ -22,7 +22,8 @@ it('shows recorded descendants under their parent and opens a child in its actua
   const cross = screen.getByText('跨区验证').closest('button')!
   expect(parent.contains(cross)).toBe(true)
   expect(cross.querySelector('.tm')?.textContent).toBe('3m')
-  expect(cross.querySelector('.directory')?.getAttribute('title')).toBe('/verify')
+  expect(document.querySelector('.tt-tree .tt-session-location')).toBeNull()
+  expect(screen.queryByText('fix/rsi')).toBeNull()
   expect(screen.queryByText('RSI主任务')).toBeNull()
   expect(screen.queryByText('独立验证')).toBeNull()
   expect(screen.queryByText(/工作区|Workspace|worktree/)).toBeNull()
