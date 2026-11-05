@@ -150,5 +150,9 @@ func nextRun(j Job, from time.Time) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return s.next(from)
+	location, err := scheduleLocation(j.Timezone)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return s.next(from.In(location))
 }

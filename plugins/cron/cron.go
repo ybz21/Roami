@@ -29,10 +29,11 @@ const tickInterval = 15 * time.Second
 
 // Job 是一条定时任务。排期由 Cron(5 段 cron 表达式)描述(见 schedule.go)。
 type Job struct {
-	Name    string `json:"name"`
-	Cron    string `json:"cron"`   // 标准 5 段 cron 表达式(见 schedule.go)
-	Action  string `json:"action"` // agent | exec
-	Enabled bool   `json:"enabled"`
+	Name     string `json:"name"`
+	Timezone string `json:"timezone,omitempty"`
+	Cron     string `json:"cron"`   // 标准 5 段 cron 表达式(见 schedule.go)
+	Action   string `json:"action"` // agent | exec
+	Enabled  bool   `json:"enabled"`
 
 	// action=agent(定时启动已注册 Agent 干活)
 	Provider    string `json:"provider,omitempty"`
@@ -107,60 +108,31 @@ func saveJobs(ctx *sdk.Ctx, jobs []Job) error {
 func add(ctx *sdk.Ctx, args map[string]string) (any, error) {
 	name := strings.TrimSpace(args["name"])
 	if name == "" {
-		return nil, fmt.Errorf("usage: cron.add --name <名> --cron '<分 时 日 月 周>' [--action agent|exec] ...")
+		return nil, fmt.Errorf("usage: cron.add --name <名> --cron '<分 时 日 月 周>' [--action agent|exec] [--enabled false] [--timezone IANA] ...")
 	}
-	cronExpr := strings.TrimSpace(args["cron"])
-	if err := validateCron(cronExpr); err != nil {
-		return nil, err
-	}
-	action := args["action"]
-	if action == "" {
-		action = "agent"
-	}
-	job := Job{
-		Name:     name,
-		Cron:     cronExpr,
-		Action:   action,
-		Enabled:  true,
-		Provider: args["provider"],
-		Prompt:   args["prompt"],
-		Workdir:  args["workdir"],
-		Command:  args["command"],
-		Artifact: strings.TrimSpace(args["artifact"]),
-	}
-	// --interactive true/1 → 拉 Agent 时保持交互会话(仅 action=agent 有意义)
-	if v := strings.TrimSpace(args["interactive"]); v == "true" || v == "1" {
-		job.Interactive = true
-	}
-	// --notify true/1 → 跑完发通知(拉 Agent 等会话退出,跑命令等命令返回)
-	if v := strings.TrimSpace(args["notify"]); v == "true" || v == "1" {
-		job.Notify = true
-	}
-	if err := validateAction(job); err != nil {
-		return nil, err
-	}
-	next, err := nextRun(job, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	job.NextRun = next.Unix()
-
 	jobs, err := loadJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	replaced := false
+	index := -1
 	for i := range jobs {
 		if jobs[i].Name == name {
-			// 更新时保留累计计数与启停状态(启停由 enable/disable 专管,
-			// 编辑配置不该顺手把禁用的任务重新点亮),其余字段整体替换。
-			job.Runs, job.LastRun, job.Enabled = jobs[i].Runs, jobs[i].LastRun, jobs[i].Enabled
-			jobs[i] = job
-			replaced = true
+			index = i
 			break
 		}
 	}
-	if !replaced {
+	var previous *Job
+	if index >= 0 {
+		previous = &jobs[index]
+	}
+	job, err := configuredJob(args, previous, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	replaced := index >= 0
+	if replaced {
+		jobs[index] = job
+	} else {
 		jobs = append(jobs, job)
 	}
 	if err := saveJobs(ctx, jobs); err != nil {
@@ -186,7 +158,11 @@ func preview(ctx *sdk.Ctx, args map[string]string) (any, error) {
 		count = n
 	}
 	times := make([]string, 0, count)
-	t := time.Now()
+	location, err := scheduleLocation(strings.TrimSpace(args["timezone"]))
+	if err != nil {
+		return nil, err
+	}
+	t := time.Now().In(location)
 	for i := 0; i < count; i++ {
 		next, nerr := s.next(t)
 		if nerr != nil {
@@ -195,7 +171,7 @@ func preview(ctx *sdk.Ctx, args map[string]string) (any, error) {
 		times = append(times, next.Format("2006-01-02 15:04:05"))
 		t = next
 	}
-	return map[string]any{"cron": strings.TrimSpace(args["cron"]), "next": times}, nil
+	return map[string]any{"cron": strings.TrimSpace(args["cron"]), "next": times, "timezone": strings.TrimSpace(args["timezone"])}, nil
 }
 
 // list 列出全部任务及下次触发时间(按下次触发时间升序)。
@@ -523,6 +499,7 @@ func jobView(j Job) map[string]any {
 		"action":   j.Action,
 		"enabled":  j.Enabled,
 		"runs":     j.Runs,
+		"timezone": j.Timezone,
 		// 原始可编辑字段(供设置页回填;空值也带上,前端按 action 取用)
 		"provider":    j.Provider,
 		"prompt":      j.Prompt,
@@ -532,11 +509,16 @@ func jobView(j Job) map[string]any {
 		"artifact":    j.Artifact,
 		"command":     j.Command,
 	}
+	location, err := scheduleLocation(j.Timezone)
+	if err != nil {
+		v["scheduleError"] = "INVALID_TIMEZONE"
+		return v
+	}
 	if j.NextRun > 0 {
-		v["nextRunAt"] = time.Unix(j.NextRun, 0).Format("2006-01-02 15:04:05")
+		v["nextRunAt"] = time.Unix(j.NextRun, 0).In(location).Format("2006-01-02 15:04:05")
 	}
 	if j.LastRun > 0 {
-		v["lastRunAt"] = time.Unix(j.LastRun, 0).Format("2006-01-02 15:04:05")
+		v["lastRunAt"] = time.Unix(j.LastRun, 0).In(location).Format("2006-01-02 15:04:05")
 	}
 	return v
 }

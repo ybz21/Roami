@@ -33,6 +33,7 @@ from roami_agent.protocol.http import (
     SendMessage,
     SessionReport,
     SteerTask,
+    WakeProject,
 )
 from roami_agent.server.installation import Installation
 from roami_agent.server.model_settings import ModelSettings
@@ -672,6 +673,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "projectOkr": True,
                 "projectOkrMain": True,
                 "conversationIdentity": True,
+                "projectMainWake": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
@@ -799,6 +801,14 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {
             "data": await runtime.chat.submit(
                 owner, cid, body.requestKey, body.text, body.attachmentIds
+            )
+        }
+
+    @app.post("/v1/conversations/{cid}/wake", status_code=202)
+    async def wake_project(cid: str, body: WakeProject, owner: Owner):
+        return {
+            "data": await runtime.chat.wake_project(
+                owner, cid, body.projectId, body.requestKey, body.text
             )
         }
 
