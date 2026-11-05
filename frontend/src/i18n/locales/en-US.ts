@@ -1775,6 +1775,7 @@ const enUS = {
   'pair.intro.dir': 'Working directory: {dir}',
   'pair.intro.id': 'Session name: {id}',
   'pair.intro.sendHead': 'Send it a message (replace … with what you want to say):',
+  'pair.intro.openChat': 'Open the session to send a message:',
   'pair.intro.replyHead': 'To get a reply, include your own session name in the message:',
   'pair.intro.note': 'What it receives is one line of text, submitted for it — no different from a human typing it. Say who you are and what you want first; and do not keep trading pleasantries.',
   'pair.intro.noteShell': 'Careful: no agent is running over there — it is a plain shell, so every line you send is executed as a command. Either send real commands, or check who is on the other end first.',

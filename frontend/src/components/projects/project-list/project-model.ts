@@ -1,4 +1,4 @@
-import type { AgentKind } from '../../../agent-kind'
+import type { SessionAgent as AgentKind } from '../../sessions/session-record'
 // 项目列表页的读模型 —— 全部来自 GET /projects 一条接口（18 设计 §9）。
 // 会话的 running/waiting/agent/tail 由后端一趟进程树扫描算好，前端不再逐会话探测。
 

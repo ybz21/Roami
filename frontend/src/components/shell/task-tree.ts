@@ -1,4 +1,4 @@
-import type { AgentKind } from '../../agent-kind'
+import type { SessionAgent as AgentKind } from '../sessions/session-record'
 // 左栏项目树的读模型：项目 → 任务（worktree）→ 会话（22 设计 §3.2）。
 //
 // 三条现成接口合成，没有新接口：
@@ -55,7 +55,7 @@ type ProjIn = {
   needs?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; state?: string }[] | null
 }
 type WtIn = { path: string; branch: string; isMain: boolean; committedAhead?: number; dirty?: number; untracked?: number; behind?: number; mergedInto?: string; pushed?: boolean; sessions?: { session: string; dormant?: boolean }[] | null }
-type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string }
+type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string; projectKey?: string }
 
 export function buildTaskTree(o: {
   projects: ProjIn[]
@@ -164,7 +164,7 @@ export function buildTaskTree(o: {
     // 左树却把它们扔进「散会话」，同一件事两处不一致。以项目页为准。
     const owned = new Set([...(p.top || []), ...(p.needs || [])].map((x) => x.name))
     for (const s of o.sessions) {
-      const assigned = o.placement?.[s.name]?.key
+      const assigned = o.placement?.[s.name]?.key || s.projectKey
       if (placed.has(s.name) || (assigned ? assigned !== p.key : !owned.has(s.name)) || isInfraSession(s.name)) continue
       placed.add(s.name)
       const hit = tasks.find((x) => x.path.replace(/\/+$/, '') === root)

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Roam logo">
+  <title>Roam</title>
+  <!-- 背景透明：不带底板、不带描边、不带投影，落到哪儿由那一处自己给底。
+       丝带取自 assets/logo-mobius.svg，等比放进 64 见方（132x188 → 40.7x58）。 -->
+  <g transform="translate(11.65 3) scale(.3085)">
+    <g fill="#1F6FEB">
+      <path d="M66 0 66 56 42 72 0 44Z"/>
+      <path d="M90 72 132 100 108 116 66 88Z"/>
+      <path d="M21 114 63 142 0 184 0 128Z"/>
+    </g>
+    <g fill="#58A6FF">
+      <path d="M66 0 132 44 132 100 90 72 66 56Z"/>
+      <path d="M0 44 132 132 132 188 0 100Z"/>
+    </g>
+  </g>
+</svg>

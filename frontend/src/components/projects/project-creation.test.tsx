@@ -14,11 +14,11 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); location.hash = '' })
 
-it('waits for the project identity before reading native sessions on a deep link', async () => {
+it('shares an unscoped session list while project identity is loading on a deep link', async () => {
   vi.mocked(api).mockImplementation(() => new Promise(() => {}))
   render(<App><Projects initialKey="project" openTerm={vi.fn()} closeTerm={vi.fn()} /></App>)
   await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/projects'))
-  expect(vi.mocked(api).mock.calls.some(([, path]) => path.startsWith('/agent/native-sessions'))).toBe(false)
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.startsWith('/agent/native-sessions')).map(([, path]) => path)).toEqual(['/agent/native-sessions'])
 })
 
 it.each([false, true])('keeps local-directory and clone workflows available with inline=%s', async inline => {

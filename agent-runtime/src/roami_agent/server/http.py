@@ -14,6 +14,7 @@ from roami_agent.conversation.attachments import MAX_UPLOAD_BYTES
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import (
+    CancelTask,
     CloseTaskSession,
     Compact,
     ConfirmMemory,
@@ -26,6 +27,7 @@ from roami_agent.protocol.http import (
     NotificationPreferences,
     Proactive,
     ReadCursor,
+    RenameNativeSession,
     Report,
     SaveMemory,
     SendMessage,
@@ -948,6 +950,10 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def native_session(session_id: str, owner: Owner):
         return {"data": await runtime.native_sessions.get(owner, session_id)}
 
+    @app.patch("/v1/native-sessions/{session_id}")
+    async def rename_native_session(session_id: str, body: RenameNativeSession, owner: Owner):
+        return {"data": await runtime.native_sessions.rename(owner, session_id, body.name)}
+
     @app.get("/v1/native-sessions/{session_id}/conversation")
     async def native_conversation(
         session_id: str,
@@ -1022,8 +1028,10 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": result}
 
     @app.post("/v1/tasks/{task_id}/cancel")
-    async def cancel_task(task_id: str, owner: Owner):
-        result = await runtime.tasks.cancel(owner, task_id)
+    async def cancel_task(task_id: str, owner: Owner, body: CancelTask | None = None):
+        result = await runtime.tasks.cancel(
+            owner, task_id, expected_revision=body.revision if body else None
+        )
         runtime.wakeup.set()
         return {"data": result}
 

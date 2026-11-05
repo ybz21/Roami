@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../api'
+import { renameSession, sessionActionError } from './session-actions'
 import { useI18n } from '../../i18n'
 import { sessionLabel, updateSessionLabel } from './session-label'
 import { Input, Modal, Space, App as AntApp } from 'antd'
@@ -14,14 +14,14 @@ export default function RenameSessionModal({ session, onClose, onDone }: { sessi
     const next = name.trim()
     if (!next) return message.error(t('session.nameRequired'))
     try {
-      const res = await api('PATCH', `/sessions/${encodeURIComponent(session)}`, { name: next })
+      const res = await renameSession(session, next)
       const label = res.data?.label || next
       updateSessionLabel(session, label)
       message.success(t('session.renamed'))
       onClose()
       onDone(session, session)
     } catch (e: any) {
-      message.error(e.message)
+      message.error(sessionActionError(e, t))
     }
   }
   return (

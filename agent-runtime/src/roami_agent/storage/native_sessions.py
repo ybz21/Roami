@@ -32,7 +32,7 @@ class NativeSessions:
     def _get(db, owner, ident):
         value = row(
             db,
-            "SELECT n.*,t.parent_task_id,t.target_json,t.intent_json,t.state AS task_state,t.revision,t.origin_message_id,(SELECT state FROM task_session_closures WHERE task_id=t.id) AS session_closure,(SELECT error_code FROM task_session_closures WHERE task_id=t.id) AS session_close_error FROM native_sessions n JOIN tasks t ON t.id=n.task_id JOIN messages m ON m.id=t.origin_message_id JOIN conversations c ON c.id=t.origin_conversation_id WHERE n.id=? AND n.owner_id=? AND m.deleted_ms IS NULL AND c.deleted_ms IS NULL AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=n.owner_id AND o.message_id=t.origin_message_id)",
+            "SELECT n.*,t.parent_task_id,t.target_json,t.intent_json,t.state AS task_state,t.revision,t.origin_message_id,(SELECT updated_ms FROM conversations WHERE id=n.conversation_id) AS session_updated_ms,(SELECT state FROM task_session_closures WHERE task_id=t.id) AS session_closure,(SELECT error_code FROM task_session_closures WHERE task_id=t.id) AS session_close_error FROM native_sessions n JOIN tasks t ON t.id=n.task_id JOIN messages m ON m.id=t.origin_message_id JOIN conversations c ON c.id=t.origin_conversation_id WHERE n.id=? AND n.owner_id=? AND m.deleted_ms IS NULL AND c.deleted_ms IS NULL AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=n.owner_id AND o.message_id=t.origin_message_id)",
             (ident, owner),
         )
         if not value:
@@ -53,10 +53,6 @@ class NativeSessions:
                 except DomainError:
                     continue
                 metadata = self.metadata(value)
-                metadata["title"] = (
-                    json.loads(value["intent_json"]).get("title")
-                    or json.loads(value["intent_json"]).get("goal", "")[:100]
-                )
                 result.append(metadata)
             return result
 
@@ -145,7 +141,16 @@ class NativeSessions:
         target = json.loads(session.get("target_json") or "null") or json.loads(
             session["intent_json"]
         ).get("target", {})
+        intent = json.loads(session["intent_json"])
+        initial = intent.get("initialIntent") or intent
         return {
+            "title": session.get("label")
+            or initial.get("title")
+            or intent.get("title")
+            or initial.get("goal", "")[:100],
+            "lastActivity": max(session["created_ms"], session.get("session_updated_ms") or 0)
+            / 1000,
+            "branch": target.get("branch") or (target.get("workspace") or {}).get("branch"),
             "schemaVersion": 1,
             "nativeSessionId": session["id"],
             "taskId": session["task_id"],
@@ -158,7 +163,9 @@ class NativeSessions:
             "nodeId": target.get("nodeId", "local"),
             "projectId": target.get("projectId"),
             "workspaceId": target.get("workspaceId"),
-            "directory": target.get("workdir") or target.get("directory"),
+            "directory": target.get("workdir")
+            or target.get("directory")
+            or (target.get("workspace") or {}).get("directory"),
             "taskState": session["task_state"],
             "lifecycle": "closed"
             if session.get("session_closure") == "closed"
@@ -174,6 +181,20 @@ class NativeSessions:
             "archivedSeq": session["archived_seq"],
             "archiveError": session["archive_error"],
         }
+
+    async def rename(self, owner, ident, name):
+        label = name.strip()
+        if not label:
+            raise DomainError("SESSION_NAME_REQUIRED", 422)
+
+        def write(db):
+            session = self._get(db, owner, ident)
+            if session.get("session_closure") in {"closed", "closing", "unknown"}:
+                raise DomainError("TASK_SESSION_CLOSED", 409)
+            db.execute("UPDATE native_sessions SET label=? WHERE id=?", (label, ident))
+            return {"id": ident, "label": label}
+
+        return await self.db.call(write, write=True)
 
     async def get(self, owner, ident):
         return self.metadata(await self.db.call(lambda db: self._get(db, owner, ident)))

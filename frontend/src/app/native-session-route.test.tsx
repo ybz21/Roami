@@ -22,10 +22,6 @@ it.each(['large', 'expanded', 'compact'])('keeps a native session visible at %s 
     agent: { node: null, inbox: { conversations: [{ id: 'main' }], refresh: vi.fn() }, notifications: vi.fn() },
   }
   render(<AppRoutes {...props} />)
-  if (size === 'large') {
-    const main = await screen.findByTestId('main-chat')
-    expect(main.hidden).toBe(false)
-    expect(main.getAttribute('data-native-session')).toBe('native-id')
-    expect(screen.queryByTestId('session-page')).toBeNull()
-  } else expect(await screen.findByTestId('session-page')).toBeTruthy()
+  expect(await screen.findByTestId('session-page')).toBeTruthy()
+  expect(screen.queryByTestId('main-chat')).toBeNull()
 })

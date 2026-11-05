@@ -62,6 +62,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		{"POST", "/api/agent/capability-markets/install"},
 		{"POST", "/api/agent/notifications/read"},
 		{"POST", "/api/agent/tasks/probe/close-session"},
+		{"PATCH", "/api/agent/native-sessions/probe"},
 		{"POST", "/api/agent/capability-imports/skills"},
 		{"PUT", "/api/agent/capability-imports/cli/fixture"},
 		{"DELETE", "/api/agent/capability-imports/mcp/fixture"},

@@ -46,7 +46,15 @@ def register(db, task_id, conversation_id, branch_id):
         ident,
         {"taskId": task_id, "conversationId": conversation_id, "branchId": branch_id},
     )
-    return row(db, "SELECT * FROM native_sessions WHERE id=?", (ident,))
+    session = row(db, "SELECT * FROM native_sessions WHERE id=?", (ident,))
+    if "label" in session:
+        intent = json.loads(task["intent_json"])
+        initial = intent.get("initialIntent") or intent
+        session["label"] = (
+            initial.get("title") or intent.get("title") or initial.get("goal", "")[:100]
+        )
+        db.execute("UPDATE native_sessions SET label=? WHERE id=?", (session["label"], ident))
+    return session
 
 
 def append(db, session_id, kind, entity_id, payload):

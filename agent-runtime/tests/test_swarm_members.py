@@ -424,14 +424,15 @@ async def test_schema19_upgrade_preserves_separate_legacy_roles_and_unknown_atte
             )
             == original
         )
-        assert (
-            await database.call(
-                lambda db: [
-                    dict(item) for item in db.execute("SELECT * FROM native_sessions ORDER BY id")
-                ]
-            )
-            == native
+        migrated = await database.call(
+            lambda db: [
+                dict(item) for item in db.execute("SELECT * FROM native_sessions ORDER BY id")
+            ]
         )
+        assert [
+            {key: value for key, value in item.items() if key != "label"} for item in migrated
+        ] == native
+        assert {item["label"] for item in migrated} == {"Read research", "Read research-r2"}
         roles = await database.call(
             lambda db: [
                 dict(item) for item in db.execute("SELECT * FROM swarm_members ORDER BY name")

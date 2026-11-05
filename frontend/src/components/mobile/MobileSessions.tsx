@@ -12,8 +12,9 @@ import { AgentLogo, ChevronRight, CloseIcon, PencilIcon, StopIcon, SwarmIcon, Te
 import { MobileSheet, SheetRow } from '../shell/MobileSheet'
 import { BranchIcon } from '../git/parts'
 import MobileProjectDetail from './MobileProjectDetail'
-import NativeProjectSessions, { type NativeProjectSession } from '../agent/NativeProjectSessions'
-import { useAgentData } from '../agent/useAgentData'
+import { useNativeSessionList, refreshSessionLists } from '../sessions/native-session-list'
+import { nativeSessionRecord } from '../sessions/session-record'
+import { renameSession, closeSession, stopSession, sessionActionError } from '../sessions/session-actions'
 import MobilePageSearch from './MobilePageSearch'
 import MobileSubPage from '../MobileSubPage'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
@@ -44,7 +45,11 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const { t } = useI18n()
   const [items, setItems] = useState<OverviewItem[] | null>(() => readMobileOverview())
   const [projects, setProjects] = useState<MobileProject[] | null>(() => readMobileProjects())
-  const native = useAgentData<NativeProjectSession[]>(!initialProjectKey ? '/agent/native-sessions' : null, 5000, 5000)
+  const native = useNativeSessionList()
+  const allItems = useMemo(() => [...(items || []), ...native.value.map(session => {
+    const record = nativeSessionRecord(session), project = projects?.find(project => project.key === session.projectId)
+    return { ...record, project: project?.name, projectDir: project?.dir }
+  })].sort((a, b) => b.lastActivity - a.lastActivity || a.name.localeCompare(b.name)), [items, native.value, projects])
   const [loadError, setLoadError] = useState(false)
   const [q, setQ] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -96,18 +101,17 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const [renameVal, setRenameVal] = useState('')
   const reload = () => api('GET', '/sessions/overview').then((r) => { setItems(writeMobileOverview(r.data.items || [])); setLoadError(false) }).catch(() => { setLoadError(true); setItems((cur) => cur || []) })
   const interrupt = async (s: OverviewItem) => {
-    try { await api('POST', `/sessions/${encodeURIComponent(s.name)}/keys`, { keys: ['Escape'] }); message.success(t('mobile.interrupted')) }
-    catch (e: any) { message.error(e.message) }
+    try { await stopSession(s.name); message.success(t('mobile.interrupted')) }
+    catch (e: any) { message.error(sessionActionError(e, t)) }
   }
   const close = (s: OverviewItem) => modal.confirm({
     title: t('session.closeConfirm', { name: s.label }), okText: t('session.close'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
-    onOk: async () => { try { await api('DELETE', `/sessions/${encodeURIComponent(s.name)}`); void reload() } catch (e: any) { message.error(e.message) } },
+    onOk: async () => { try { await closeSession(s.name); void reload() } catch (e: any) { message.error(sessionActionError(e, t)) } },
   })
   const rename = async () => {
     const s = renaming, name = renameVal.trim()
-    setRenaming(null)
     if (!s || !name || name === s.label) return
-    try { await api('PATCH', `/sessions/${encodeURIComponent(s.name)}`, { name }); void reload() } catch (e: any) { message.error(e.message) }
+    try { await renameSession(s.name, name); setRenaming(null); void reload() } catch (e: any) { message.error(sessionActionError(e, t)) }
   }
   useEffect(() => {
     let stop = false
@@ -139,7 +143,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const hit = (s: OverviewItem) => inFilter(s) && (!needle || s.label.toLowerCase().includes(needle) || s.name.toLowerCase().includes(needle) || (s.branch || '').toLowerCase().includes(needle))
   const groups = useMemo(() => {
     const by = new Map<string, { name: string; dir: string; list: OverviewItem[] }>()
-    for (const s of items || []) {
+    for (const s of allItems) {
       if (!hit(s)) continue
       const k = s.projectKey || ''
       if (!by.has(k)) by.set(k, { name: s.project || t('tree.loose'), dir: s.projectDir || '', list: [] })
@@ -147,15 +151,12 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     }
     // 散会话垫底
     return Array.from(by.entries()).sort((a, b) => (a[0] === '' ? 1 : 0) - (b[0] === '' ? 1 : 0)).map(([, g]) => g)
-  }, [items, needle, filter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allItems, needle, filter]) // eslint-disable-line react-hooks/exhaustive-deps
   const unfinishedByDir = new Map((projects || []).map((p) => [p.dir, p.unfinished]))
   const unfinishedProjects = (projects || []).filter((p) => p.unfinished > 0 && (!needle || p.name.toLowerCase().includes(needle)))
-  const nativeRunning = (session: NativeProjectSession) => ['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(session.taskState)
-  const nativeVisible = (native.value || []).filter(session => session.lifecycle !== 'closed' && (filter === 'all' || filter === 'running' && nativeRunning(session) || filter === 'idle' && !nativeRunning(session)) && (!needle || session.title.toLowerCase().includes(needle) || projects?.find(project => project.key === session.projectId)?.name.toLowerCase().includes(needle)))
-  const nativeProjects = (projects || []).filter(project => nativeVisible.some(session => session.projectId === project.key))
-  const visibleGroups = ['all', 'idle', 'running'].includes(filter) ? [
+  const visibleGroups = filter === 'all' ? [
     ...groups,
-    ...[...(filter === 'all' ? unfinishedProjects : []), ...nativeProjects.filter(project => filter !== 'all' || !unfinishedProjects.some(item => item.key === project.key))].filter((p) => !groups.some((g) => g.dir === p.dir)).map((p) => ({ name: p.name, dir: p.dir, list: [] as OverviewItem[] })),
+    ...unfinishedProjects.filter(project => !groups.some(group => group.dir === project.dir)).map(project => ({ name: project.name, dir: project.dir, list: [] as OverviewItem[] })),
   ] : groups
 
   const status = (s: OverviewItem) => s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
@@ -213,7 +214,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   return (
     <div className="tt-msess">
       <style>{SESSION_ACTIVITY_CSS}</style>
-      {loadError && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => void reload()}>{t('inbox.retry')}</button></div>}
+      {(loadError || native.failed) && <div className="tt-data-error" role="alert">{t('mobile.overviewLoadFailed')} <button type="button" className="tt-act" onClick={() => { refreshSessionLists(); void reload() }}>{t('inbox.retry')}</button></div>}
       <header className="tt-pagehead tt-mobile-pagehead">
         <div className="ttl">
           <div className="kicker">{t('mobile.sessions.kicker')}</div>
@@ -230,7 +231,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       </div>}
       <div className="tt-msess-pills">
         {(['all', 'waiting', 'running', 'idle', 'unfinished', 'activity'] as const).map((k) => {
-          const n = k === 'activity' ? null : k === 'unfinished' ? projects?.reduce((sum, p) => sum + p.unfinished, 0) ?? null : k === 'all' ? items.length + (native.value?.length || 0) : items.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length + (native.value || []).filter(session => k === 'running' ? nativeRunning(session) : k === 'idle' && !nativeRunning(session)).length
+          const n = k === 'activity' ? null : k === 'unfinished' ? projects?.reduce((sum, p) => sum + p.unfinished, 0) ?? null : k === 'all' ? allItems.length : allItems.filter((x) => (k === 'waiting' ? x.waiting : k === 'running' ? x.running : !x.waiting && !x.running && !x.dormant)).length
           return <button key={k} type="button" className={`tt-pill${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => { setFilter(k); if (k === 'activity') { setQ(''); setSearchOpen(false) } }}>{t(k === 'all' ? 'mobile.filter.all' : k === 'unfinished' ? 'mobile.home.unfinished' : k === 'activity' ? 'project.sessionActivity' : 'mobile.st.' + k)}{n !== null && n > 0 && <span>{n}</span>}</button>
         })}
       </div>
@@ -245,10 +246,9 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       ) : visibleGroups.map((g, i) => (
         <section key={i} className="tt-msess-sec">
           {g.dir
-            ? <button type="button" className="tt-msess-proj" onClick={() => enterProject(g)}><h3>{g.name} {g.list.length + nativeVisible.filter(session => session.projectId === projects?.find(project => project.dir === g.dir)?.key).length > 0 && <span>{g.list.length + nativeVisible.filter(session => session.projectId === projects?.find(project => project.dir === g.dir)?.key).length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
+            ? <button type="button" className="tt-msess-proj" onClick={() => enterProject(g)}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
             : <h3>{g.name} <span>{g.list.length}</span></h3>}
           {swarmCards(needle || filter !== 'all' || expanded.has(g.name) ? g.list : g.list.slice(0, 5))}
-          {['all', 'idle', 'running'].includes(filter) && projects?.find(project => project.dir === g.dir) && <NativeProjectSessions projectId={projects.find(project => project.dir === g.dir)!.key} entries={nativeVisible.filter(session => session.projectId === projects.find(project => project.dir === g.dir)!.key)} onChanged={native.refresh} />}
           {!needle && filter === 'all' && g.list.length > 5 && (
             <button type="button" className="tt-mproj-more" onClick={() => setExpanded((cur) => { const n = new Set(cur); if (n.has(g.name)) n.delete(g.name); else n.add(g.name); return n })}>
               {expanded.has(g.name) ? t('mobile.proj.hideQuiet') : t('mobile.moreN', { n: g.list.length - 5 })}

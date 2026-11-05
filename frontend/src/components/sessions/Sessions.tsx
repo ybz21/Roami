@@ -1,3 +1,5 @@
+import { useNativeSessionList } from './native-session-list'
+import { nativeSessionRecord } from './session-record'
 import { agentName, useAgentKinds } from '../../agent-kind'
 // ── 会话（可新建/指定目录 / 进终端 / 关闭） ──
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -30,7 +32,9 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   embedded?: boolean
 }) {
   const { phone: isPhone } = useLayout()
-  const [list, setList] = useState<any[]>([])
+  const [cliList, setList] = useState<any[]>([])
+  const native = useNativeSessionList()
+  const list = useMemo(() => [...cliList, ...native.value.map(record => ({ ...nativeSessionRecord(record), last_activity: record.lastActivity, created: Date.parse(record.createdAt || '') / 1000 }))], [cliList, native.value])
   const agentKinds = useAgentKinds()
   const overview = useSessionOverview()
   const needsInput = useMemo(() => Object.fromEntries(overview.value.map(item => [item.name, item.waiting])), [overview.value])
@@ -57,8 +61,8 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     const walk = (nodes: any[]) => { for (const n of nodes || []) { flat.push(n); walk(n.children) } }
     walk(Array.isArray(roots) ? roots : [])
     setList(flat)
-    setSessionLabels(Object.fromEntries(flat.filter((s) => s?.name && s?.label).map((s) => [s.name, s.label])))
   }).catch(error => { if (signal) throw error })
+  useEffect(() => { setSessionLabels(Object.fromEntries(list.filter(s => s.label).map(s => [s.name, s.label]))) }, [list])
   useEffect(() => pollWhileVisible(load, 3000).stop, [])
   useEffect(() => {
     return pollWhileVisible(signal => api('GET', '/sessions/annotations', undefined, { signal })
@@ -78,7 +82,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const goSwarm = (sw: string) => { location.hash = '#/swarm/' + encodeURIComponent(sw) }
   // ── 筛选 / 搜索 ──
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<'all' | 'waiting' | 'claude' | 'codex' | 'opencode' | 'pi' | 'swarm' | 'idle'>('all')
+  const [filter, setFilter] = useState<'all' | 'waiting' | 'claude' | 'codex' | 'opencode' | 'pi' | 'native' | 'swarm' | 'idle'>('all')
   const ql = q.trim().toLowerCase()
   const isSwarm = (s: any) => !!swarmMap[s.name]
   // 默认不展示蜂群会话（它们有专门的蜂群页）；仅「蜂群」筛选时才列出
@@ -87,11 +91,12 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     if (f === 'waiting') return !!needsInput[s.name]
     if (isSwarm(s)) return false
     switch (f) {
+      case 'native': return s.agent === 'native'
       case 'claude': return agentKinds[s.name] === 'claude'
       case 'codex': return agentKinds[s.name] === 'codex'
       case 'opencode': return agentKinds[s.name] === 'opencode'
       case 'pi': return agentKinds[s.name] === 'pi'
-      case 'idle': return !agentKinds[s.name]
+      case 'idle': return s.agent === 'native' ? !s.running : !agentKinds[s.name]
       default: return true
     }
   }
@@ -271,6 +276,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
             { label: `${t('session.waiting')} ${cnt('waiting')}`, value: 'waiting' },
             { label: `Claude ${cnt('claude')}`, value: 'claude' },
             { label: `Codex ${cnt('codex')}`, value: 'codex' },
+            { label: `Roami ${cnt('native')}`, value: 'native' },
             { label: `OpenCode ${cnt('opencode')}`, value: 'opencode' },
             { label: `Pi ${cnt('pi')}`, value: 'pi' },
             { label: `${t('nav.swarm')} ${cnt('swarm')}`, value: 'swarm' },
@@ -332,7 +338,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
               const indent = !!en.indent
               const sw = swarmMap[s.name]
               const connected = s.attached == 1
-              const agent = agentKinds[s.name] || null
+              const agent = s.agent || agentKinds[s.name] || null
               const waiting = !!needsInput[s.name]
               // 休眠：机器重启带走了 tmux 那一半，台账还认得它，点开即恢复。
               // 它没有进程，所以 attached/agent/待输入这些运行时判断都不适用。

@@ -24,6 +24,7 @@ import { artifactPreviewHref } from './artifact-preview-route'
 import { TaskArtifactLink, TaskArtifactMobilePreview } from './TaskArtifactLink'
 import { taskFailureKey } from './task-failure'
 import { taskSessionError as failure } from './task-session-error'
+import { nativeSessionName } from '../sessions/session-record'
 import { openAgentPage } from './agent-page-route'
 import './agent-tasks.css'
 
@@ -115,7 +116,7 @@ function TaskRow({ task, compact, select, projects, onSession }: { projects: { i
   </button>
     {task.projectId && <a className="tt-act agent-task-project" href={'#/projects/' + encodeURIComponent(task.projectId)}><FolderIcon size={14} /><span>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</span></a>}
     <div className="agent-task-entry-actions">
-      {task.nativeSession && task.sessionClosure?.state !== 'closed' ? <button type="button" className="tt-act agent-task-session" aria-label={t('agent.task.enterSession')} onClick={() => openAgentPage('session', task.nativeSession!.id)}><TerminalIcon size={18} /></button> : task.latestAttempt?.sessionId && task.sessionClosure?.state !== 'closed' && <button type="button" className="tt-act agent-task-session" aria-label={t('agent.task.enterSession')} onClick={() => onSession(task.latestAttempt!.sessionId!)}><TerminalIcon size={18} /></button>}
+      {task.nativeSession && task.sessionClosure?.state !== 'closed' ? <button type="button" className="tt-act agent-task-session" aria-label={t('agent.task.enterSession')} onClick={() => onSession(nativeSessionName(task.nativeSession!.id))}><TerminalIcon size={18} /></button> : task.latestAttempt?.sessionId && task.sessionClosure?.state !== 'closed' && <button type="button" className="tt-act agent-task-session" aria-label={t('agent.task.enterSession')} onClick={() => onSession(task.latestAttempt!.sessionId!)}><TerminalIcon size={18} /></button>}
     </div></div>
 }
 
@@ -194,7 +195,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
       {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={taskReportSummary(reported)} title={false} /></section>}
       {!!reportLinks.length && <section className="agent-task-section"><h4>{t(task.state === 'succeeded' ? 'agent.task.deliveryLinks' : 'agent.task.reportedLinks')}</h4>{reportLinks.map(href => <a className="tt-act agent-task-delivery-link" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</section>}
       <div className="agent-task-actions">
-        {task?.nativeSession && <Button onClick={() => openAgentPage('session', task.nativeSession!.id)}>{t(sessionClosed ? 'agent.task.sessionRecord' : 'agent.task.enterSession')}</Button>}
+        {task?.nativeSession && <Button onClick={() => sessionClosed ? openAgentPage('session', task.nativeSession!.id) : onSession(nativeSessionName(task.nativeSession!.id))}>{t(sessionClosed ? 'agent.task.sessionRecord' : 'agent.task.enterSession')}</Button>}
         {task?.projectId && <a className="tt-act" href={'#/projects/' + encodeURIComponent(task.projectId)}>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</a>}
         {sessionId && (!ended || retainedSession) && !sessionClosed && <Button onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
         {retainedSession && (sessionId || task.nativeSession) && !sessionClosed && <Button disabled={!detailSafe || !!busy || sessionClosing} onClick={() => setCloseConfirm(true)}>{t('agent.task.closeSession')}</Button>}

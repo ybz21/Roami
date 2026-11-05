@@ -15,7 +15,10 @@ import NativeConversation from './NativeConversation'
 import { agentDataKey } from './agent-data-cache'
 import { openAgentPage } from './agent-page-route'
 import type { AgentMessage, AgentSnapshot } from './agent-protocol'
-import { taskTopic } from './task-topic'
+import RenameSessionModal from '../sessions/RenameSessionModal'
+import { nativeSessionName } from '../sessions/session-record'
+import { updateSessionLabel, useSessionLabel } from '../sessions/session-label'
+import { taskFailureKey } from './task-failure'
 import { taskSessionError } from './task-session-error'
 import { useBoundaryLoad } from './useBoundaryLoad'
 import { useAgentData } from './useAgentData'
@@ -23,17 +26,20 @@ import { useAgentDraft } from './useAgentDraft'
 import { useAgentTask } from './useAgentTask'
 import './native-session.css'
 
-type Metadata = { nativeSessionId: string; taskId: string; projectId?: string }
+type Metadata = { nativeSessionId: string; taskId: string; projectId?: string; title?: string }
 type Page = AgentSnapshot & { before: number | null }
 
-export default function NativeSession({ id, node, projects, onChanged, onSession }: { id: string; node: string | null; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
+export default function NativeSession({ id, node, projects, onChanged, onSession, embedded = false }: { id: string; node: string | null; embedded?: boolean; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
   const { t } = useI18n()
   const session = useAgentData<Metadata>('/agent/native-sessions/' + encodeURIComponent(id), 0)
-  return <>{session.loading && <Spin />}{session.failed && <p role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={session.refresh}>{t('agent.retry')}</button></p>}{session.value && <SessionConversation key={agentDataKey('/agent/native-sessions/' + id)} metadata={session.value} node={node} projects={projects} onChanged={onChanged} onSession={onSession} />}</>
+  useEffect(() => { if (session.value?.title) updateSessionLabel(nativeSessionName(id), session.value.title) }, [id, session.value?.title])
+  return <>{session.loading && <Spin />}{session.failed && <p role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={session.refresh}>{t('agent.retry')}</button></p>}{session.value && <SessionConversation key={agentDataKey('/agent/native-sessions/' + id)} embedded={embedded} metadata={session.value} refreshMetadata={session.refresh} node={node} projects={projects} onChanged={onChanged} onSession={onSession} />}</>
 }
 
-function SessionConversation({ metadata, node, projects, onChanged, onSession }: { metadata: Metadata; node: string | null; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
+function SessionConversation({ embedded, metadata, refreshMetadata, node, projects, onChanged, onSession }: { embedded?: boolean; metadata: Metadata; refreshMetadata: () => void; node: string | null; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
   const { t } = useI18n(), snapshot = useAgentTask(metadata.taskId), models = useAgentModels(node, 'worker')
+  const sessionName = nativeSessionName(metadata.nativeSessionId), savedLabel = useSessionLabel(sessionName)
+  const title = savedLabel !== sessionName ? savedLabel : metadata.title || 'Roami'
   const detail = snapshot.detail.value, task = detail?.task
   const closed = detail?.sessionClosure?.state === 'closed'
   const closing = detail?.sessionClosure?.state === 'closing'
@@ -41,7 +47,7 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
   const active = !!task && ['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(task.state)
   const path = '/agent/native-sessions/' + encodeURIComponent(metadata.nativeSessionId) + '/conversation'
   const conversation = useAgentData<Page>(path, 0, active ? 3000 : 0)
-  const [tab, setTab] = useState('conversation')
+  const [tab, setTab] = useState('conversation'), [renaming, setRenaming] = useState(false)
   const positions = useRef<Record<string, number>>({})
   const [older, setOlder] = useState<AgentMessage[]>([]), [before, setBefore] = useState<number | null | undefined>()
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirm, setConfirm] = useState(false)
@@ -118,12 +124,14 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
   }, [messages.length, messages[messages.length - 1]?.content.text])
   useLayoutEffect(() => { if (scroll.current) scroll.current.scrollTop = positions.current[tab] ?? (tab === 'conversation' ? scroll.current.scrollHeight : 0) }, [tab])
   const projectId = task?.projectId || metadata.projectId
+  const current = detail?.attempts[0]
+  const failure = task?.state === 'failed' && current?.revision === task.revision ? taskFailureKey(detail?.outcome?.errorCode || current.result?.summary) || 'agent.requestFailed' : ''
   const stopping = detail?.steering?.state === 'stopping'
   const disabled = busy || !task || snapshot.detail.failed || closed || closing || stopping
   const artifacts = snapshot.artifacts.value || []
   const switchTab = (value: string) => { if (scroll.current) positions.current[tab] = scroll.current.scrollTop; setTab(value) }
   return <div className="native-session">
-    <header className="tt-pagehead native-session-head"><span className="native-session-mark"><RoamiLogo size={20} /></span><div className="native-session-identity"><h2>{task ? taskTopic(task) || t('agent.task.untitled') : t('agent.session')}</h2><div className="native-session-meta">{task && <span className="agent-task-state" data-state={task.state} role="status">{t('agent.state.' + task.state)}</span>}{projectId && <a href={'#/projects/' + encodeURIComponent(projectId)}>{projects.find(project => project.id === projectId)?.name || t('agent.task.project')}</a>}</div></div><button type="button" className="tt-act native-session-details" onClick={() => openAgentPage('tasks', metadata.taskId)}>{t('agent.task.details')}<ChevronRight size={14} /></button></header>
+    {!embedded && <header className="tt-pagehead native-session-head"><span className="native-session-mark"><RoamiLogo size={20} /></span><div className="native-session-identity"><h2>{title}</h2><div className="native-session-meta">{task && <span className="agent-task-state" data-state={task.state} role="status">{t(active ? 'mobile.st.running' : 'mobile.st.idle')}</span>}{projectId && <a href={'#/projects/' + encodeURIComponent(projectId)}>{projects.find(project => project.id === projectId)?.name || t('agent.task.project')}</a>}</div></div></header>}
     <div className="native-session-tabs" role="tablist" aria-label={t('agent.task.sessionViews')}>{['conversation', 'process', 'artifacts'].map(value => <button key={value} type="button" role="tab" id={'native-tab-' + value} aria-controls="native-session-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} onClick={() => switchTab(value)} onKeyDown={event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
       event.preventDefault()
@@ -145,14 +153,15 @@ function SessionConversation({ metadata, node, projects, onChanged, onSession }:
       {tab === 'process' && detail && <div className="native-session-process"><TaskProcess id={metadata.taskId} active={active} onSession={sessionId => onSession?.(sessionId)} /><details className="agent-task-requirements"><summary><ChevronRight />{t('agent.task.reports')}</summary>{detail.attempts.map(attempt => <section className="agent-task-attempt" key={attempt.id}><b>{t('agent.task.revision', { n: attempt.revision })}</b><span>{t('agent.state.' + attempt.state)}</span><div className="agent-task-attempt-record"><TaskResult attempt={attempt} artifacts={artifacts} /></div></section>)}{detail.attemptsTruncated && <small>{t('agent.task.moreHistory')}</small>}</details></div>}
       {tab === 'artifacts' && detail && <NativeSessionArtifacts detail={detail} artifacts={artifacts} failed={snapshot.artifacts.failed} retry={snapshot.refresh} />}
     </div>
-    <div className="native-session-composer conversation-composer-dock">{steering?.state === 'blocked' && <p role="alert">{taskSessionError(steering.errorCode,t)}</p>}{(error || closeError) && <p role="alert">{error || closeError}</p>}{stopping && <p role="status">{t('agent.task.steering.stopping')}</p>}{closed && <p role="status">{t('agent.task.sessionClosed')}</p>}{closing && <p role="status">{t('agent.task.sessionClosing')}</p>}
-      {!closed && <ConversationComposer id="native-message" value={draft} onChange={setDraft} label={t('agent.task.additionalRequirements')} placeholder={t('agent.task.continuePlaceholder')} disabled={disabled} maxLength={10000}
-        send={{ label: t('agent.task.continue'), pending: busy, onClick: () => { void send() } }}
-        stop={active ? { label: t('agent.cancelTask'), disabled, onClick: () => { void mutation('cancel', {}) } } : undefined}
-        leading={<Dropdown trigger={['click']} menu={{ items: [{ key: 'details', label: t('agent.task.details') }, { key: 'artifacts', label: t('agent.task.sessionTab.artifacts') }, ...(!closed ? [{ key: 'close', label: t('agent.task.closeSession'), disabled: busy || !task || snapshot.detail.failed || closing || !detail?.attempts[0] }] : [])], onClick: ({ key }) => { if (key === 'details') openAgentPage('tasks', metadata.taskId); else if (key === 'artifacts') switchTab('artifacts'); else setConfirm(true) } }}><button type="button" className="tt-pill ico" aria-label={t('chat.more')}><PlusIcon size={16} /></button></Dropdown>}
+    <div className="native-session-composer conversation-composer-dock">{!closed && failure && <p role="alert">{t(failure)}</p>}{steering?.state === 'blocked' && <p role="alert">{taskSessionError(steering.errorCode,t)}</p>}{(error || closeError) && <p role="alert">{error || closeError}</p>}{stopping && <p role="status">{t('agent.task.steering.stopping')}</p>}{closed && <p role="status">{t('agent.task.sessionClosed')}</p>}{closing && <p role="status">{t('agent.task.sessionClosing')}</p>}
+      {!closed && <ConversationComposer id="native-message" value={draft} onChange={setDraft} label={t('chat.sendTo', { name: title })} placeholder={t('chat.sendTo', { name: title })} disabled={disabled} maxLength={10000}
+        send={{ label: t('agent.send'), pending: busy, onClick: () => { void send() } }}
+        stop={active ? { label: t('chat.stop'), disabled, onClick: () => { void mutation('cancel', {}) } } : undefined}
+        leading={<Dropdown trigger={['click']} menu={{ items: [{ key: 'rename', label: t('session.rename'), disabled: closed || closing }, { key: 'details', label: t('agent.task.details') }, { key: 'artifacts', label: t('agent.task.sessionTab.artifacts') }, ...(!closed ? [{ key: 'close', label: t('session.close'), disabled: busy || !task || snapshot.detail.failed || closing || !detail?.attempts[0] }] : [])], onClick: ({ key }) => { if (key === 'rename') setRenaming(true); else if (key === 'details') openAgentPage('tasks', metadata.taskId); else if (key === 'artifacts') switchTab('artifacts'); else setConfirm(true) } }}><button type="button" className="tt-pill ico" aria-label={t('chat.more')}><PlusIcon size={16} /></button></Dropdown>}
         settings={<AgentModelPicker models={models} disabled={disabled || active} node={node} />}
         voice={<VoiceInput inline scope={metadata.nativeSessionId + ':' + node} hotkey disabled={disabled} accent="var(--accent)" onResult={text => setDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />}
     </div>
-    <Modal className="native-session-confirm" open={confirm} title={t('agent.task.closeSessionConfirm')} okText={t('agent.task.closeSession')} cancelText={t('common.cancel')} confirmLoading={busy} onCancel={() => { if (!busy) setConfirm(false) }} onOk={() => { void mutation('close-session', { revision: task?.revision, runId: detail?.attempts[0]?.id }).then(ok => { if (ok && alive.current) setConfirm(false) }) }}><p>{t('agent.task.closeSessionHint')}</p>{error && <p role="alert">{error}</p>}</Modal>
+    {renaming && <RenameSessionModal session={renaming ? nativeSessionName(metadata.nativeSessionId) : null} onClose={() => setRenaming(false)} onDone={() => { refreshMetadata(); onChanged() }} />}
+    <Modal className="native-session-confirm" open={confirm} title={t('session.closeConfirm', { name: title })} okText={t('session.close')} cancelText={t('common.cancel')} confirmLoading={busy} onCancel={() => { if (!busy) setConfirm(false) }} onOk={() => { void mutation('close-session', { revision: task?.revision, runId: detail?.attempts[0]?.id }).then(ok => { if (ok && alive.current) setConfirm(false) }) }}>{error && <p role="alert">{error}</p>}</Modal>
   </div>
 }

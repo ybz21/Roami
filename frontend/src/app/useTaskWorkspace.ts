@@ -8,6 +8,7 @@ import { lastTabOf, rememberLastTab } from '../components/shell/task-last-tab'
 import { useBackDismiss } from '../components/shell/useBackDismiss'
 import { useWorkspaceLayout } from '../components/shell/useWorkspaceLayout'
 import { dropDeadTokens, type FileTab } from '../components/terminal/term-tabs-store'
+import { nativeSessionId } from '../components/sessions/session-record'
 import { TASK_ROUTE } from '../route-hash'
 import { useWorkspaceState } from './useWorkspaceState'
 
@@ -27,11 +28,11 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   useEffect(() => {
     if (!sessIds || !data.sessListLoaded || !saved.loaded) return
     saved.update(state => {
-      const terms = [...new Set(dropDeadTokens(state.terms, sessIds.byId).map(id => sessIds.byName[id] || id))]
+      const terms = [...new Set(dropDeadTokens(state.terms, sessIds.byId).filter(id => !nativeSessionId(id) || !data.nativeSessionsLoaded || !!sessIds.byId[id]).map(id => sessIds.byName[id] || id))]
       const selected = sessIds.byName[state.active] || state.active
       return { ...state, terms, active: terms.includes(selected) ? selected : terms[terms.length - 1] || '' }
     })
-  }, [sessIds, data.sessListLoaded, saved.loaded, saved.update])
+  }, [sessIds, data.sessListLoaded, data.nativeSessionsLoaded, saved.loaded, saved.update])
   const toName = (id: string) => sessIds?.byId[id] || id
   const toId = (name: string) => sessIds?.byName[name] || name
   const terms = useMemo(() => saved.state.terms.map(id => sessIds?.byId[id] || id), [saved.state.terms, sessIds])
@@ -92,7 +93,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   }, [saved.state.terms, fileTabs])
 
   const openTerm = (rawName: string, task?: TaskKey) => {
-    const name = rawName.replace(/[.:]/g, '_')
+    const name = nativeSessionId(rawName) ? rawName : rawName.replace(/[.:]/g, '_')
     if (!sessList.some((s) => s.name === name)) { data.refresh() }
     setTerms((ts) => ts.includes(name) ? ts : [...ts, name])
     if (task) taskHint.current[name] = task

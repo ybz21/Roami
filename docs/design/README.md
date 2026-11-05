@@ -4,7 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
-| 任务与会话分离 | [20261105-task-session-separation](20261105-task-session-separation/README.md) | 独立关闭、任务核验与历史记录保留 |
+| 会话同等展示 | [20261105-task-session-separation](20261105-task-session-separation/README.md) | 统一会话列表与聊天入口，关闭会话后任务独立留存 |
 | OKR 固定主智能体与目录 | [20261104-okr-main-workspace](20261104-okr-main-workspace/README.md) | 持久负责人、目录归档与会话收拢 |
 | 侧栏会话派生层级 | [20261104-sidebar-session-identity](20261104-sidebar-session-identity/README.md) | 项目下的父、子、孙会话导航 |
 | OKR 活动场景与项目归属 | [20261104-okr-studio-project-ownership](20261104-okr-studio-project-ownership/README.md) | 历史场景、归属修复与分工验收 |

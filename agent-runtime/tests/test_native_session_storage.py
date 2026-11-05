@@ -290,6 +290,7 @@ async def test_completed_native_continues_same_branch_then_user_closes(store):
         detail = await runtime.tasks.get("alice", task["id"])
         native_id = detail["task"]["nativeSession"]["id"]
         first = await runtime.native_sessions.get("alice", native_id)
+        assert first["title"] == "整理访谈行动项"
         with pytest.raises(DomainError, match="NATIVE_SESSION_USE_TASK_CHANNEL"):
             await runtime.chat.submit("alice", first["conversationId"], "wrong", "继续")
         await runtime.tasks.revisions.request("alice", task["id"], "加上负责人", 1, "continue")
@@ -303,6 +304,7 @@ async def test_completed_native_continues_same_branch_then_user_closes(store):
             ),
         )
         current = await runtime.tasks.get("alice", task["id"])
+        assert (await runtime.native_sessions.get("alice", native_id))["title"] == first["title"]
         assert current["task"]["nativeSession"]["id"] == native_id
         assert (await runtime.native_sessions.get("alice", native_id))["branchId"] == first[
             "branchId"
@@ -374,6 +376,20 @@ async def test_native_http_history_is_owned_and_paged_without_creating_work(stor
                 headers={"X-Roami-Owner": "alice"},
             )
             assert response.status_code == 200
+            renamed = await client.patch(
+                "/v1/native-sessions/" + session["id"],
+                json={"name": "Follow-up"},
+                headers={"X-Roami-Owner": "alice"},
+            )
+            assert renamed.status_code == 200
+            assert renamed.json()["data"]["label"] == "Follow-up"
+            assert (
+                await client.patch(
+                    "/v1/native-sessions/" + session["id"],
+                    json={"name": "Forbidden"},
+                    headers={"X-Roami-Owner": "bob"},
+                )
+            ).status_code == 404
             page = response.json()["data"]
             assert [m["content"]["text"] for m in page["messages"]] == ["3", "4"]
             older = await client.get(
@@ -610,3 +626,34 @@ async def test_native_conversation_interleaves_tool_results_and_redacts_payloads
     assert (await service.conversation("alice", session["id"]))["messages"] == messages
     with pytest.raises(DomainError, match="NATIVE_SESSION_NOT_FOUND"):
         await service.conversation("bob", session["id"])
+
+
+async def test_session_rename_keeps_task_and_conversation_identity(store):
+    service, session, _, task = await native(store)
+    original = await service.conversation("alice", session["id"])
+    before = await Tasks(store, Conversations(store)).get("alice", task["id"])
+    with pytest.raises(DomainError, match="NATIVE_SESSION_NOT_FOUND"):
+        await service.rename("bob", session["id"], "Other name")
+    with pytest.raises(DomainError, match="SESSION_NAME_REQUIRED"):
+        await service.rename("alice", session["id"], "   ")
+    result = await service.rename("alice", session["id"], "  Follow-up chat  ")
+    assert result == {"id": session["id"], "label": "Follow-up chat"}
+    assert (await NativeSessions(store).get("alice", session["id"]))["title"] == "Follow-up chat"
+    assert (await service.list("alice"))[0]["title"] == "Follow-up chat"
+    assert await service.conversation("alice", session["id"]) == original
+    assert await Tasks(store, Conversations(store)).get("alice", task["id"]) == before
+
+
+@pytest.mark.parametrize("state", ["closed", "closing", "unknown"])
+async def test_removed_or_closing_session_cannot_be_renamed(store, state):
+    service, session, _, task = await native(store)
+    await store.call(
+        lambda db: db.execute(
+            "INSERT INTO task_session_closures(task_id,state,task_revision,run_id,launch_id,session_id,updated_ms) "
+            "SELECT task_id,?,task_revision,id,'',?,1 FROM task_attempts WHERE task_id=?",
+            (state, session["id"], task["id"]),
+        ),
+        write=True,
+    )
+    with pytest.raises(DomainError, match="TASK_SESSION_CLOSED"):
+        await service.rename("alice", session["id"], "Changed")

@@ -4,8 +4,11 @@ import { loadSwarmDirectory } from '../swarm/swarm-directory'
 import { swarmStateToken, type SwarmSnapshot } from '../swarm/swarm-protocol'
 import { pollWhileVisible } from '../../visible-poll'
 import { useSettingsDraft } from '../settings/settings-draft'
-import NativeProjectSessions, { type NativeProjectSession } from '../agent/NativeProjectSessions'
-import { useAgentData } from '../agent/useAgentData'
+import { useNativeSessionList } from '../sessions/native-session-list'
+import { closeSession, sendSessionPrompt, sessionActionError } from '../sessions/session-actions'
+import { refreshSessionLists } from '../sessions/native-session-list'
+import { mergeProjectSessions, mergeWorktreeSessions } from './project-list/project-sessions'
+import { nativeSessionId, nativeSessionRecord } from '../sessions/session-record'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
 // 项目页（08 设计）——「项目 = 目录（git 可选），任务驱动」：
@@ -304,6 +307,14 @@ export function Lifec({ done, cur }: { done: number; cur?: number }) {
 export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }: { openTerm: (n: string) => void; closeTerm: (n: string) => void; initialKey?: string; activeTerm?: string | null }) {
   const [data, setData] = useState<{ projects: Proj[]; loose: ProjSession[]; overview: OverviewItem[] | null }>({ projects: [], loose: [], overview: null })
   const [loaded, setLoaded] = useState(false)
+  const native = useNativeSessionList()
+  const displayed = useMemo(() => ({ ...data, projects: mergeProjectSessions(data.projects, native.value),
+    loose: [...data.loose, ...native.value.filter(session => !data.projects.some(project => project.key === session.projectId)).map(session => ({ ...nativeSessionRecord(session), attached: false }))],
+    overview: data.overview && [...data.overview, ...native.value.map(session => {
+      const project = data.projects.find(project => project.key === session.projectId)
+      return { ...nativeSessionRecord(session), project: project?.name, projectDir: project?.dir }
+    })],
+  }), [data, native.value])
   const load = async () => {
     const [projects, overview] = await Promise.allSettled([api('GET', '/projects'), api('GET', '/sessions/overview')])
     if (projects.status !== 'fulfilled') return
@@ -320,8 +331,8 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
     <>
       <style>{PRJ_CSS + NEEDS_CSS + CARD_CSS + RAIL_CSS + SESSION_ACTIVITY_CSS}</style>
       {initialKey
-        ? <ProjectHome proj={data.projects.find((x) => x.key === initialKey)} allProjects={data.projects} loaded={loaded} openTerm={openTerm} closeTerm={closeTerm} refresh={load} activeTerm={activeTerm} />
-        : <ProjectList data={data} loaded={loaded} openTerm={openTerm} refresh={load} />}
+        ? <ProjectHome proj={displayed.projects.find((x) => x.key === initialKey)} allProjects={displayed.projects} loaded={loaded} openTerm={openTerm} closeTerm={closeTerm} refresh={load} activeTerm={activeTerm} />
+        : <ProjectList data={displayed} loaded={loaded} openTerm={openTerm} refresh={load} />}
     </>
   )
 }
@@ -813,8 +824,9 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const { message } = AntApp.useApp()
   const [prefs] = usePreferences()
   const [tab, setTab] = useState<'tasks' | 'wt' | 'race' | 'act' | 'files'>('tasks')
-  const native = useAgentData<NativeProjectSession[]>(proj ? '/agent/native-sessions?projectId=' + encodeURIComponent(proj.key) : null, 5000, 5000)
-  const [wtsAll, setWtsAll] = useState<any[]>([])
+  const native = useNativeSessionList()
+  const [rawWorktrees, setWtsAll] = useState<any[]>([])
+  const wtsAll = useMemo(() => mergeWorktreeSessions(rawWorktrees, native.value), [rawWorktrees, native.value])
   const [defBranch, setDefBranch] = useState('')
   const [sessions, setSessions] = useState<any[]>([])
   const [ann, setAnn] = useState<Record<string, any>>({})
@@ -923,7 +935,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [tab, proj?.key])
 
-  const mine = useMemo(() => {
+  const cliMine = useMemo(() => {
     if (!dir) return []
     if (isGit) return sessions.filter((s) => ann[s.name]?.primary?.repo === dir)
     // 非 git 项目：按 pane cwd 目录前缀认领（对齐后端 project.go 的两阶段归属），
@@ -940,6 +952,10 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const claimedByDeeper = (c: string) => deeper.some((d) => c === d || c.startsWith(d + '/'))
     return sessions.filter((s) => !ann[s.name]?.primary?.repo && under(homeOf(s)) && !claimedByDeeper(homeOf(s)))
   }, [sessions, ann, dir, isGit, allProjects])
+  const mine = useMemo(() => [...cliMine, ...native.value.filter(session => session.projectId === proj?.key).map(session => {
+    const record = nativeSessionRecord(session)
+    return { ...record, last_activity: record.lastActivity }
+  })].sort((a, b) => (b.last_activity || 0) - (a.last_activity || 0) || a.name.localeCompare(b.name)), [cliMine, native.value, proj?.key])
   useEffect(() => {
     if (!isGit) return
     return pollWhileVisible(async signal => {
@@ -951,15 +967,15 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   // Agent 运行标注 + 待输入检测（仅本项目会话，量小）
   useEffect(() => {
     let stop = false
-    const check = () => mine.forEach(async (s: any) => {
+    const check = () => cliMine.forEach(async (s: any) => {
       try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/claude`); if (!stop) setCc((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
       try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/codex`); if (!stop) setCx((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
       try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/capture?lines=50`); if (!stop) setNeedsInput((m) => ({ ...m, [s.name]: !!detectPrompt(r.data || '') })) } catch {}
     })
-    if (mine.length) check()
-    const i = setInterval(() => { if (mine.length) check() }, 6000)
+    if (cliMine.length) check()
+    const i = setInterval(() => { if (cliMine.length) check() }, 6000)
     return () => { stop = true; clearInterval(i) }
-  }, [mine])
+  }, [cliMine])
   // 展开的 worktree 的命令行尾行预览（懒加载，5s）
   useEffect(() => {
     const names = wts.filter((w: any) => expanded[w.path]).flatMap((w: any) => (w.sessions || []).map((x: any) => x.session))
@@ -1045,11 +1061,11 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   // 收尾（W7 三选一）：会话在 worktree 内走 CloseWorktreeModal；否则普通关闭
   const beginClose = async (n: string) => {
     let st: any = null
-    try { st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data } catch {}
+    try { if (!nativeSessionId(n)) st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data } catch {}
     if (!st?.inWorktree || st.external) {
       Modal.confirm({
-        title: t('project.killConfirm', { name: n }),
-        onOk: async () => { try { await api('DELETE', '/sessions/' + encodeURIComponent(n)); message.success(t('session.closed')); closeTerm(n); refresh() } catch (e: any) { message.error(e.message) } },
+        title: t('session.closeConfirm', { name: sessionLabel(n) }),
+        onOk: async () => { try { await closeSession(n); refreshSessionLists(); message.success(t('session.closed')); closeTerm(n); refresh() } catch (e: any) { message.error(sessionActionError(e, t)) } },
       })
       return
     }
@@ -1162,7 +1178,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   // 任务行：生命周期导轨 = 建(必亮)→干(agent 跑)→审(待输入/有未合并)→并(merged)
   // 状态点语义（设计 W2）：绿 = agent 正在干活，黄 = 待输入，其余一律灰。
   const row = (s: any, i: number) => {
-    const a = ann[s.name] || {}
+    const a = ann[s.name] || { home: s.cwd, primary: { branch: s.branch, worktree: s.cwd } }
     const hit = a.primary || {}
     const isChild = !!s.parent && mine.some((x) => x.name === s.parent)
     const w = wtOf(s)
@@ -1170,8 +1186,8 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const changes = (w?.dirty || 0) + (w?.untracked || 0)
     const gs = wtStage(w)
     const merged = gs === 'merged'
-    const running = !!agentKinds[s.name] || cc[s.name] || cx[s.name]
-    const waiting = needsInput[s.name]
+    const running = s.running ?? (!!agentKinds[s.name] || cc[s.name] || cx[s.name])
+    const waiting = s.waiting ?? needsInput[s.name]
     // 休眠：机器重启带走了 tmux 那一半，点开即恢复。它没有进程，
     // 所以生命周期导轨/未提交改动那些运行时判断对它都不适用。
     const dormant = s.state === 'dormant' 
@@ -1189,12 +1205,12 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       const drag = {
         id: s.name, label: s.label || sessionLabel(s.name),
         project: proj.name, dir: hit.worktree || proj.dir,
-        agent: agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
+        agent: s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
       }
       const v = canDrop(drag, { id: activeTerm })
       if (!v.ok) { message.warning(t('pair.cannotSelf')); return }
       try {
-        await api('POST', '/tasks/_/send', { sess: activeTerm, msg: buildIntro(drag, activeTerm, t) })
+        await sendSessionPrompt(activeTerm, buildIntro(drag, activeTerm, t, location.origin))
         message.success(t('pair.sent', { name: sessionDisplay(activeTerm), peer: drag.label }))
       } catch (e: any) { message.error(e.message) }
     }
@@ -1210,7 +1226,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           e.dataTransfer.setData(SESSION_MIME, JSON.stringify({
             id: s.name, label: s.label || sessionLabel(s.name),
             project: proj.name, dir: hit.worktree || proj.dir,
-            agent: agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
+            agent: s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
             node: currentNodeId() || '',
           }))
           e.dataTransfer.effectAllowed = 'copy'
@@ -1228,7 +1244,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
             )}
             {hit.linked && hit.branch && <span className="tt-branch" title={hit.branch}><BranchIcon size={10} />{hit.branch}</span>}
             {hit.external && hit.linked && <Tag style={{ margin: 0 }}><WindowsIcon size={11} /></Tag>}
-            {(agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : undefined)) && <span className="tt-agentmark" title={agentName(agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex'))}><AgentLogo kind={agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex')} size={13} /></span>}
+            {(s.agent || agentKinds[s.name] || cc[s.name] || cx[s.name]) && <span className="tt-agentmark" title={agentName(s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex'))}><AgentLogo kind={s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex')} size={13} /></span>}
             {waiting && <Tag color="warning" style={{ margin: 0 }}>{t('session.waiting')}</Tag>}
             <MemBar mem={s.mem} />
             {a.ambiguous && (
@@ -1342,7 +1358,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
 
         {/* Tabs：任务 | Worktree | 编队 | 活动（非 git 只有任务）。同样 sticky，贴在项目头下面 */}
         <div className="prj-tabs prj-in" style={{ animationDelay: '110ms' }}>
-          {tabBtn('tasks', t('nav.sessions'), mine.length + (native.value?.length || 0))}
+          {tabBtn('tasks', t('nav.sessions'), mine.length)}
           {isGit && tabBtn('wt', 'Worktree', wts.length)}
           {isGit && tabBtn('race', t('project.tab.race'), races.length + swarms.length)}
           {isGit && tabBtn('act', t('project.tab.activity'))}
@@ -1351,7 +1367,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
 
         {/* ── 任务流 ── */}
         {tab === 'tasks' && (<>
-          <NativeProjectSessions projectId={proj.key} entries={native.value || []} onChanged={native.refresh} failed={native.failed} />
           {mine.length > 0 && sect(t('project.section.active'), mine.length)}
           {/* 分组优先级 蜂群 ⬡ > parent 树 > 平铺（08 §2.2）：成员按编队组头聚合，组头 → 蜂群台 */}
           {(() => {
@@ -1385,7 +1400,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
               {rest.map(row)}
             </>)
           })()}
-          {mine.length === 0 && !native.value?.length && !native.failed && <div className="prj-empty">{t('session.empty')}</div>}
+          {mine.length === 0 && !native.failed && <div className="prj-empty">{t('session.empty')}</div>}
 
           {cleanable.length > 0 && (<>
             {sect(t('project.section.cleanable'), cleanable.length, 'ok')}
@@ -1582,7 +1597,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                           <div key={ref.session} className="prj-subrow" onClick={() => openTerm(ref.session)}>
                             {dot(false, agentKinds[ref.session] || cc[ref.session] || cx[ref.session] ? 'var(--ok)' : undefined)}
                             <span style={{ fontWeight: 600, fontSize: 13 }} title={ref.session}>{sessionLabel(ref.session)}</span>
-                            {agentKinds[ref.session] && <span className="tt-agentmark" title={agentName(agentKinds[ref.session])}><AgentLogo kind={agentKinds[ref.session]} size={12} /></span>}
+                            {(nativeSessionId(ref.session) || agentKinds[ref.session]) && <span className="tt-agentmark" title={agentName(nativeSessionId(ref.session) ? 'native' : agentKinds[ref.session])}><AgentLogo kind={nativeSessionId(ref.session) ? 'native' : agentKinds[ref.session]} size={12} /></span>}
                             <span className="prj-peek">{peeks[ref.session] || '…'}</span>
                             <a style={{ fontSize: 'var(--fs-meta)' }} onClick={(e) => { e.stopPropagation(); openTerm(ref.session) }}>{t('project.enter')}</a>
                           </div>

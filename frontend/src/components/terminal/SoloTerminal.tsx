@@ -1,4 +1,5 @@
 // ── 独立单终端页：新浏览器标签全屏打开单个会话（hash 路由 #/term/name）──
+import { nativeSessionId } from '../sessions/session-record'
 import { useEffect, useRef, useState } from 'react'
 import { TermHandle, TermStatus } from './Terminal'
 import { api } from '../../api'
@@ -27,12 +28,14 @@ export default function SoloTerminal({ name }: { name: string }) {
 
   // 独立页没有会话列表轮询，自己拉一次拿展示名（标题要显示「名字（id）」）
   useEffect(() => {
+    if (nativeSessionId(name)) return
     api('GET', '/sessions').then((list) => {
       setSessionLabels(Object.fromEntries((Array.isArray(list) ? list : []).filter((s: any) => s?.name && s?.label).map((s: any) => [s.name, s.label])))
     }).catch(() => {})
-  }, [])
+  }, [name])
   useEffect(() => { document.title = `Roami · ${sessionDisplay(name) || name}` }, [name, label])
   useEffect(() => {
+    if (nativeSessionId(name)) return
     let stop = false
     const check = async () => {
       try {

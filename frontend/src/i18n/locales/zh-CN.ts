@@ -1775,6 +1775,7 @@ const zhCN = {
   'pair.intro.dir': '工作目录：{dir}',
   'pair.intro.id': '会话名：{id}',
   'pair.intro.sendHead': '给它发消息（把 … 换成你要说的话）：',
+  'pair.intro.openChat': '打开会话后发送消息：',
   'pair.intro.replyHead': '想让它回你，就在消息里带上你自己的会话名：',
   'pair.intro.note': '它收到的是一行文字并自动回车，和人敲进去的没区别。先说清你是谁、想让它干什么；也别一直客套着来回。',
   'pair.intro.noteShell': '注意：那边现在跑的不是 Agent，是个普通 shell —— 你发过去的每一行都会被当成命令直接执行。要么发真正的命令，要么先确认那头有人。',
