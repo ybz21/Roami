@@ -159,6 +159,8 @@ function SwarmChat({ data, recipient, selected, onSelect, onWork, onSession, onS
   const currentMember = swarmMember(members, scope)
   const currentWork = currentMember?.work?.task_id ? currentMember.work : undefined
   const latestMember = useRef(currentMember); latestMember.current = currentMember
+  const latestProject = useRef(data.target?.projectId); latestProject.current = data.target?.projectId
+  const latestMain = useRef(data.mainConversationId); latestMain.current = data.mainConversationId
   const missingRecipient = scope !== 'group' && scope !== 'main' && !currentMember
   const unavailableRecipient = missingRecipient || Boolean(currentMember?.registered?.workId && !currentMember.work)
   const unavailableSession = Boolean(currentMember?.registered?.instance && ['closed', 'closing', 'unknown'].includes(currentMember.registered.instance.state))
@@ -174,7 +176,7 @@ function SwarmChat({ data, recipient, selected, onSelect, onWork, onSession, onS
   const enterConversation = async () => {
     if (!currentWork?.task_id || openingRef.current) return
     openingRef.current = true; setOpening(true)
-    const taskId = currentWork.task_id, requestedScope = scope, requestedRevision = currentWork.revision, requestedRun = currentWork.attempt?.runId, requestedMember = currentMember!.id, requestedInstance = currentMember?.registered?.instance ? { ...currentMember.registered.instance } : undefined, requestedExecutor = currentMember?.executor, requestedNode = nodeApi('/agent/swarms/' + data.id)
+    const taskId = currentWork.task_id, requestedScope = scope, requestedRevision = currentWork.revision, requestedRun = currentWork.attempt?.runId, requestedMember = currentMember!.id, requestedInstance = currentMember?.registered?.instance ? { ...currentMember.registered.instance } : undefined, requestedExecutor = currentMember?.executor, requestedNode = nodeApi('/agent/swarms/' + data.id), requestedProject = data.target?.projectId, requestedMain = data.mainConversationId
     const fallback = () => {
       if (!alive.current || latestScope.current !== requestedScope || nodeApi('/agent/swarms/' + data.id) !== requestedNode || latestMember.current?.id !== requestedMember) return
       if (latestWork.current?.task_id) openAgentPage('tasks', latestWork.current.task_id)
@@ -188,13 +190,18 @@ function SwarmChat({ data, recipient, selected, onSelect, onWork, onSession, onS
       const instance = latestMember.current.registered?.instance
       if (instance?.id !== requestedInstance?.id || instance?.conversationId !== requestedInstance?.conversationId || instance?.branchId !== requestedInstance?.branchId || instance?.nativeSessionId !== requestedInstance?.nativeSessionId || instance && instance.state !== 'assigned') { fallback(); return }
       if (observed.task_id !== taskId || observed.revision !== requestedRevision || observed.attempt?.runId !== requestedRun) { if (observed.task_id) openAgentPage('tasks', observed.task_id); return }
+      if (latestProject.current !== requestedProject || latestMain.current !== requestedMain) { fallback(); return }
       const attempt = detail.attempts[0]
-      if (detail.task.id !== taskId || detail.task.revision !== currentWork.revision || !attempt || attempt.revision !== detail.task.revision || attempt.id !== currentWork.attempt?.runId || ['closing', 'closed', 'unknown'].includes(detail.sessionClosure?.state || '') || taskExecutor(detail.task) !== currentMember?.executor || data.target?.projectId && detail.task.projectId !== data.target.projectId) { fallback(); return }
+      const sessions = latestSessions.current.failed ? [] : latestSessions.current.value.filter(session => session.name === attempt?.sessionId)
+      const session = sessions.length === 1 && !sessions[0].dormant && sessions[0].agent === requestedExecutor ? sessions[0] : undefined
+      // Legacy session targets can omit projectId; use the host's persistent home identity.
+      const projectMatches = !requestedProject || (detail.task.projectId === requestedProject || detail.task.projectId == null && !detail.task.nativeSession && detail.task.origin_conversation_id === requestedMain && session?.projectKey === requestedProject) && (!session?.projectKey || session.projectKey === requestedProject)
+      if (detail.task.id !== taskId || detail.task.revision !== currentWork.revision || !attempt || attempt.revision !== detail.task.revision || attempt.id !== currentWork.attempt?.runId || ['closing', 'closed', 'unknown'].includes(detail.sessionClosure?.state || '') || taskExecutor(detail.task) !== currentMember?.executor || !projectMatches) { fallback(); return }
       if (detail.task.nativeSession) {
         if (instance && (instance.conversationId !== detail.task.nativeSession.conversationId || instance.nativeSessionId !== detail.task.nativeSession.id)) { fallback(); return }
         openAgentPage('session', detail.task.nativeSession.id)
       }
-      else if (attempt.sessionId && !latestSessions.current.failed && latestSessions.current.value.some(session => session.name === attempt.sessionId && !session.dormant && session.agent === currentMember?.executor)) onSession(attempt.sessionId)
+      else if (session) onSession(session.name)
       else fallback()
     } catch { if (alive.current && latestScope.current === requestedScope) fallback() }
     finally { openingRef.current = false; if (alive.current) setOpening(false) }
