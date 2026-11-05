@@ -111,6 +111,7 @@ func (s Service) reconcileInitialCodex(key string, status Status) (Status, bool,
 	status.Binding = &observed
 	status.Receipt.State = "running"
 	state.Binding, state.InitialLaunch, state.State, state.LaunchKey = observed, false, "idle", ""
+	state.CompletedKey, state.EndedIdle = key, false
 	state.TurnID, state.PromptHash, state.UnknownReason = completion.TurnID, workspaceHash(prompt), ""
 	state.UpdatedMS = time.Now().UnixMilli()
 	if err := writeJSON(path, state); err != nil {

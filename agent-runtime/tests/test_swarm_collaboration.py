@@ -1294,20 +1294,28 @@ async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, 
         try:
             conversations = Conversations(database)
             tasks = Tasks(database, conversations)
-            swarms = SwarmPlans(database, tasks, conversations, asyncio.Event())
-            main = await conversations.main("alice")
+
+            def legacy_main(db):
+                value = Conversations._new(db, "alice", "Legacy Main")
+                db.execute("INSERT INTO main_conversations VALUES(?,?,1)", ("alice", value["id"]))
+                return value
+
+            main = await database.call(legacy_main, write=True)
             origin = await conversations.accept(
                 "alice", main["id"], "origin", "Build original output"
             )
-            created = await swarms.create(
-                "alice",
-                {
-                    "name": "Legacy",
-                    "goal": "Build original output",
-                    "mainConversationId": main["id"],
-                    "commandKey": "create",
-                },
-                binding={"turnId": origin["turnId"]},
+            created = {"id": "sw-legacy-upgrade"}
+            await database.call(
+                lambda db: db.execute(
+                    "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms,origin_message_id) VALUES(?,'alice','Legacy',?,'Build original output',?,1,1,?)",
+                    (
+                        created["id"],
+                        main["id"],
+                        json.dumps({"kind": "new_session"}),
+                        origin["messageId"],
+                    ),
+                ),
+                write=True,
             )
             task = await tasks.create(
                 "alice",

@@ -367,7 +367,13 @@ async def test_schema19_upgrade_preserves_separate_legacy_roles_and_unknown_atte
         try:
             conversations = Conversations(database)
             tasks = Tasks(database, conversations)
-            main = await conversations.main("alice")
+
+            def legacy_main(db):
+                value = Conversations._new(db, "alice", "Legacy Main")
+                db.execute("INSERT INTO main_conversations VALUES(?,?,1)", ("alice", value["id"]))
+                return value
+
+            main = await database.call(legacy_main, write=True)
             origin = await conversations.accept(
                 "alice", main["id"], "original", "Read original references"
             )

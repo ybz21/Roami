@@ -22,12 +22,13 @@ Android Redmi Note 8（`216d6a43`）实测项目列表、长按菜单、改名�
 
 ## 回归与边界
 
-- `scripts/dev/quality/check.sh quick`、`full` 均通过。Go 全套、Python lint/format 与 3457 项测试通过，48 项跳过。
+- `scripts/dev/quality/check.sh quick`、`full` 均通过。Go 全套、Python lint/format 与 3474 项测试通过，48 项跳过。
 - 前端 typecheck、i18n、hover 审计、195 个测试文件 / 1396 项测试、生产构建均通过。
+- 同步 main 后保留其成员会话的 21 号升级，会话名称升级顺延至 22；版本 1–22 的备份恢复以及两项迁移一并检查。合并后的完整 quick/full 再次通过。
 - 初次检查发现旧迁移测试比较整个行字典，需要适配新增的独立名称字段；补充初始名称及旧字段保持不变的断言后，全套重跑通过。
 - 真机实际提交续聊消息成功，同一会话进入新任务版本；保存的模型路由返回 `MODEL_HTTP_401`。因此没有把本机验证计为真实 AI 回复成功。运行时回归覆盖成功续聊并复用原会话与分支；聊天界面对模型认证失败给出可理解提示，保留继续输入能力。未覆盖或替换节点保存的模型配置。
 - 原始改前截图来自首轮 main 基线，包含尚未关闭的测试会话；本版改后截图是在改名及关闭操作后拍摄。交互稿中的回复为示意，不作为模型执行证据。
 
 截图通过 `pr-shots` 提供，不提交到主分支。提交复用此次已通过的 quick/full 结果，单独校验提交信息，保留仓库 hooks 配置。
 
-原始证据：`revision2-desktop-layout.json`、`revision2-request-profile.json`、`revision2-removal.json`、`revision2-quick-final.log`、`revision2-full-final.log`、`revision2-vitest.log`（均在本机验证目录）。
+原始证据：`revision2-desktop-layout.json`、`revision2-request-profile.json`、`revision2-removal.json`、`revision2-integrated-quick.log`、`revision2-integrated-full.log`、`revision2-integrated-storage.log`、`revision2-integrated-vitest.log`（均在本机验证目录）。

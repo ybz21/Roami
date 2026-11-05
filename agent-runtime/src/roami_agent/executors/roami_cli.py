@@ -25,6 +25,18 @@ SESSION_REJECTIONS = {
     "SESSION_PANE_AMBIGUOUS",
     "SESSION_PROCESS_OBSERVATION_UNAVAILABLE",
     "INVALID_SESSION_EXECUTION_SPEC",
+    "SESSION_RECOVERY_BINDING_CONFLICT",
+    "SESSION_RECOVERY_SOURCE_CHANGED",
+    "SESSION_RECOVERY_EXPLICITLY_CLOSED",
+    "SESSION_RECOVERY_OUTCOME_UNRESOLVED",
+    "SESSION_RECOVERY_STOP_UNCONFIRMED",
+    "SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE",
+    "SESSION_RECOVERY_WORKSPACE_CHANGED",
+    "SESSION_RECOVERY_ALREADY_CLAIMED",
+    "SESSION_RECOVERY_TARGET_OBSERVATION_FAILED",
+    "SESSION_RECOVERY_HOOKS_UNAVAILABLE",
+    "TASK_SESSION_CLOSED",
+    "TASK_SESSION_CLOSING",
 }
 
 
@@ -186,18 +198,19 @@ class CodingExecutor:
                 raise DomainError("CODING_DIRECTORY_REQUIRED")
             launch["directory"] = str(Path(directory).resolve())
         try:
-            receipt = await self.command(
-                "launch",
-                "--file",
-                "-",
-                spec=launch,
-            )
+            receipt = await self.launch(task, run, launch)
         except DomainError as exc:
             if exc.code == "SESSION_NOT_IDLE":
                 # Go rejects this before journaling or sending the new prompt.
                 raise
             if exc.code in SESSION_REJECTIONS:
-                return {"state": "failed", "summary": exc.code}
+                return {
+                    "state": "failed",
+                    "summary": exc.code,
+                    "executionStarted": False,
+                    "inputStopped": True,
+                    "outcomeKnown": True,
+                }
             await self.record(task, run, {"state": "unknown"})
             return None
         except (OSError, TimeoutError):
@@ -205,6 +218,55 @@ class CodingExecutor:
             return None
         await self.record(task, run, receipt)
         return self.result(receipt)
+
+    async def launch(self, task, run, launch):
+        try:
+            return await self.command("launch", "--file", "-", spec=launch)
+        except DomainError as exc:
+            if exc.code != "SESSION_TARGET_NOT_FOUND" or not launch.get("sessionId"):
+                raise
+            source = await self.recovery_source(task, run, launch["sessionId"])
+            if not source:
+                raise
+        return await self.command(
+            "launch",
+            "--file",
+            "-",
+            spec={
+                **launch,
+                "resumeFrom": source["launch_id"],
+                "resumeProviderId": source["agent_conversation_id"],
+            },
+        )
+
+    async def recovery_source(self, task, run, session_id):
+        from roami_agent.dispatch.task_sessions import assert_session_open
+        from roami_agent.storage.task_provider import provider_binding
+
+        intent = json.loads(task["intent_json"])
+        continuation = intent.get("continuation", {})
+        source_id = continuation.get("providerRunId") or continuation.get("runId")
+
+        def read(db):
+            assert_session_open(db, task["id"])
+            source = provider_binding(db, task, source_id, run["attempt_no"] - 1)
+            latest = row(
+                db,
+                "SELECT a.id,t.revision FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
+                "WHERE a.task_id=? ORDER BY a.attempt_no DESC LIMIT 1",
+                (task["id"],),
+            )
+            if (
+                not source
+                or not latest
+                or latest["id"] != run["id"]
+                or latest["revision"] != run["task_revision"]
+                or source["session_id"] != session_id
+            ):
+                return None
+            return source
+
+        return await self.db.call(read)
 
     async def record(self, task, run, receipt):
         state = {"running": "running", "cancelling": "stopping"}.get(receipt.get("state"))

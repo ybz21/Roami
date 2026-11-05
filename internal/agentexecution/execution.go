@@ -34,6 +34,8 @@ type Spec struct {
 	ProjectID      string `json:"projectId,omitempty"`
 	WorkspaceID    string `json:"workspaceId,omitempty"`
 	SessionID      string `json:"sessionId,omitempty"`
+	ResumeFrom     string `json:"resumeFrom,omitempty"`
+	ResumeProvider string `json:"resumeProviderId,omitempty"`
 	Base           string `json:"base,omitempty"`
 	Remote         string `json:"remote,omitempty"`
 	Prompt         string `json:"prompt"`
@@ -146,6 +148,9 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if spec.SessionID != "" {
 		return s.continueSession(ctx, spec)
 	}
+	if spec.ResumeFrom != "" || spec.ResumeProvider != "" {
+		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
+	}
 	dir, err := s.directory(spec.Key)
 	if err != nil {
 		return Status{}, err
@@ -206,6 +211,12 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return Status{}, err
 	}
+	return s.startExecutionSession(ctx, dir, spec, receipt)
+}
+
+func (s Service) startExecutionSession(ctx context.Context, dir string, spec Spec, receipt Receipt) (Status, error) {
+	workspace := *receipt.Workspace
+	hash := filepath.Base(dir)
 	command := "exec " + quote(s.Executable) + " agent execution run --key " + quote(spec.Key)
 	opt := runtime.CreateOpts{Label: executionTitle(spec), Dir: workspace.Directory, Extra: []string{
 		"-e", "ROAMI_HOME=" + s.Runtime.HomeDir, "-e", "ROAMI_DATA=" + s.Runtime.DataDir,
@@ -220,6 +231,9 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 		return Status{}, fmt.Errorf("EXECUTION_LAUNCH_UNCERTAIN: %w", err)
 	}
 	_ = meta.SetAgentKind(created.Session, spec.Executor)
+	if spec.ResumeFrom != "" {
+		_ = meta.SetRestoredFrom(created.Session, spec.SessionID)
+	}
 	if workspace.ProjectID != "" {
 		s.bindWorkspace(ctx, created.Session, workspace)
 	}
@@ -358,7 +372,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if err = readJSON(filepath.Join(dir, "spec.json"), &spec); err != nil {
 		return err
 	}
-	if spec.SessionID != "" {
+	if spec.SessionID != "" && spec.ResumeFrom == "" {
 		return fmt.Errorf("SESSION_RUNNER_UNSUPPORTED")
 	}
 	if spec.Persistent {

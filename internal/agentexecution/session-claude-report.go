@@ -83,7 +83,10 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
 		return nil
 	}
-	home := os.Getenv("CLAUDE_CONFIG_DIR")
+	home := binding.ProviderHome
+	if home == "" {
+		home = os.Getenv("CLAUDE_CONFIG_DIR")
+	}
 	if home == "" {
 		user, err := os.UserHomeDir()
 		if err != nil {
