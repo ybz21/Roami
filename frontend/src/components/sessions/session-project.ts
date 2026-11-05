@@ -93,7 +93,7 @@ export function buildSessionProjects(
   }
   for (const session of native) {
     const project = projects.find(project => project.key === session.projectId)
-    if (project) out[nativeSessionName(session.nativeSessionId)] = { key: project.key, name: project.name, dir: project.dir, branch: session.branch, worktree: session.directory || project.dir }
+    if (project) out[nativeSessionName(session.nativeSessionId)] = { key: project.key, name: project.name, dir: project.dir, branch: session.branch, worktree: session.directory }
   }
   return out
 }

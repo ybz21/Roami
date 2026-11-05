@@ -5,10 +5,12 @@ import { isAgentKind, type AgentKind } from '../agent-kind'
 import { api } from '../api'
 import { isInfraSession } from '../components/sessions/infra-session'
 import { setSessionLabels } from '../components/sessions/session-label'
+import { useSessionOverview } from '../session-overview'
 
 export function useSessionDirectory() {
   const [cliIds, setSessIds] = useState<{ byId: Record<string, string>; byName: Record<string, string> } | null>(null)
   const native = useNativeSessionList()
+  const overview = useSessionOverview()
   const [cliSessions, setSessList] = useState<{ name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string }[]>([])
   const [sessListLoaded, setSessListLoaded] = useState(false)
   const sessReload = useRef<(() => void) | null>(null)
@@ -45,7 +47,13 @@ export function useSessionDirectory() {
     for (const name of nativeNames.split('\n').filter(Boolean)) { byId[name] = name; byName[name] = name }
     return { byId, byName }
   }, [cliIds, nativeNames])
-  const sessList = useMemo(() => [...cliSessions, ...native.value.map(nativeSessionRecord)], [cliSessions, native.value])
+  const sessList = useMemo(() => {
+    const locations = new Map(overview.value.map(session => [session.name, session]))
+    return [...cliSessions.map(session => {
+      const location = locations.get(session.name)
+      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch }
+    }), ...native.value.map(nativeSessionRecord)]
+  }, [cliSessions, native.value, overview.value])
   useEffect(() => { setSessionLabels(Object.fromEntries(sessList.map(session => [session.name, session.label || session.name]))) }, [sessList])
   const rename = (oldName: string, newName: string) => setSessIds((m) => {
     const id = m?.byName[oldName]

@@ -1,7 +1,7 @@
 // 手机「项目」页：按项目分组的会话列表。
 // 数据只吃一条 GET /sessions/overview（会话 + 归属 + 探测循环的活状态），5s 一轮——
 // 桌面树那三条原料手机上不齐（worktree 那趟被省了），拿来画只会全成散会话。
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input, Modal, Spin, App as AntApp } from 'antd'
 import { api } from '../../api'
 import { pollWhileVisible } from '../../visible-poll'
@@ -10,7 +10,9 @@ import { swarmSessionMembership, type SwarmSessionMember } from '../swarm/swarm-
 import { useI18n } from '../../i18n'
 import { AgentLogo, ChevronRight, CloseIcon, PencilIcon, StopIcon, SwarmIcon, TerminalIcon, PlusIcon } from '../../icons'
 import { MobileSheet, SheetRow } from '../shell/MobileSheet'
-import { BranchIcon } from '../git/parts'
+import SessionLocation from '../sessions/SessionLocation'
+import SessionHierarchy from '../sessions/SessionHierarchy'
+import { absTime, relTime } from '../../time-format'
 import MobileProjectDetail from './MobileProjectDetail'
 import { useNativeSessionList, refreshSessionLists } from '../sessions/native-session-list'
 import { nativeSessionRecord } from '../sessions/session-record'
@@ -23,15 +25,6 @@ import { readMobileProjects, writeMobileProjects, type MobileProject } from './m
 import { projectPath } from '../projects/okr/okr-workspace'
 import { getHashParams, setHashParams } from '../../route-hash'
 export type { OverviewItem } from './mobile-overview-cache'
-
-function ago(sec: number | undefined, t: (k: string) => string): string {
-  if (!sec) return ''
-  const d = Math.max(0, Math.floor(Date.now() / 1000 - sec))
-  if (d < 60) return t('time.justNow')
-  if (d < 3600) return `${Math.floor(d / 60)}m`
-  if (d < 86400) return `${Math.floor(d / 3600)}h`
-  return `${Math.floor(d / 86400)}d`
-}
 
 export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject, searchNonce = 0, initialProjectKey }: {
   initialProjectKey?: string
@@ -140,7 +133,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 
   const needle = q.trim().toLowerCase()
   const inFilter = (s: OverviewItem) => filter === 'all' || (filter === 'waiting' ? s.waiting : filter === 'running' ? s.running : filter === 'activity' || filter === 'unfinished' ? false : !s.waiting && !s.running && !s.dormant)
-  const hit = (s: OverviewItem) => inFilter(s) && (!needle || s.label.toLowerCase().includes(needle) || s.name.toLowerCase().includes(needle) || (s.branch || '').toLowerCase().includes(needle))
+  const hit = (s: OverviewItem) => inFilter(s) && (!needle || [s.label, s.name, s.branch, s.worktree, s.cwd].some(value => value?.toLowerCase().includes(needle)))
   const groups = useMemo(() => {
     const by = new Map<string, { name: string; dir: string; list: OverviewItem[] }>()
     for (const s of allItems) {
@@ -169,35 +162,33 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       <span className="t">
         <b>{s.label}</b>
         <span className="st"><i>{status(s)}</i>{(s.waiting || s.running) && s.tail ? <span className="tail"> · {s.tail}</span> : null}</span>
-        {s.branch && <span className="br"><BranchIcon size={11} />{s.branch}</span>}
+        <SessionLocation {...s} />
       </span>
-      <em>{ago(s.lastActivity, t)}</em>
+      <em title={absTime(s.lastActivity)}>{relTime(s.lastActivity, t)}</em>
     </button>
   )
 
   // 一个分组里：蜂群成员按蜂群折成卡（首次出现的位置），其余照常一行一个
-  const swarmCards = (list: OverviewItem[]) => {
-    const out: ReactNode[] = []
+  const swarmCards = (list: OverviewItem[], limit?: number) => {
     const seen = new Set<string>()
-    for (const s of list) {
+    return <SessionHierarchy sessions={list} allSessions={allItems} limit={limit} renderRow={s => {
       const sw = swarmOf[s.name]
-      if (!sw) { out.push(row(s)); continue }
-      if (seen.has(sw.swarm)) continue
+      if (!sw) return row(s)
+      if (seen.has(sw.swarm)) return null
       seen.add(sw.swarm)
       const members = list.filter((x) => swarmOf[x.name]?.swarm === sw.swarm)
       const pending = swarmPending[sw.swarm] || 0
-      out.push(
+      return (
         <div key={'sw:' + sw.swarm} className="tt-msess-task swarm">
           <button type="button" className="tn" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(sw.swarm) }}>
             <SwarmIcon size={14} /><b>{sw.label}</b><span>{members.length}</span>
             {pending > 0 && <i className="pend">{t('swarm.pendingSummary', { count: pending })}</i>}
             <ChevronRight size={14} />
           </button>
-          {members.map((x) => row(x, true))}
-        </div>,
+          <SessionHierarchy sessions={members} allSessions={allItems} renderRow={x => row(x, true)} />
+        </div>
       )
-    }
-    return out
+    }} />
   }
 
   if (initialProjectKey) {
@@ -248,7 +239,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           {g.dir
             ? <button type="button" className="tt-msess-proj" onClick={() => enterProject(g)}><h3>{g.name} {g.list.length > 0 && <span>{g.list.length}</span>}</h3>{(unfinishedByDir.get(g.dir) || 0) > 0 && <span className="unfinished">{t('mobile.proj.unfinished', { n: unfinishedByDir.get(g.dir) || 0 })}</span>}<ChevronRight size={14} /></button>
             : <h3>{g.name} <span>{g.list.length}</span></h3>}
-          {swarmCards(needle || filter !== 'all' || expanded.has(g.name) ? g.list : g.list.slice(0, 5))}
+          {swarmCards(g.list, needle || filter !== 'all' || expanded.has(g.name) ? undefined : 5)}
           {!needle && filter === 'all' && g.list.length > 5 && (
             <button type="button" className="tt-mproj-more" onClick={() => setExpanded((cur) => { const n = new Set(cur); if (n.has(g.name)) n.delete(g.name); else n.add(g.name); return n })}>
               {expanded.has(g.name) ? t('mobile.proj.hideQuiet') : t('mobile.moreN', { n: g.list.length - 5 })}

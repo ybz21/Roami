@@ -21,6 +21,9 @@ export type TreeSession = {
   waiting?: boolean
   /** 记录的父会话；工作区归属独立于派生关系。 */
   parent?: string
+  cwd?: string
+  worktree?: string
+  branch?: string
   /** 互审陪跑会话：树上显示被审会话的名称。 */
   reviewOf?: string
 }
@@ -55,7 +58,7 @@ type ProjIn = {
   needs?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; state?: string }[] | null
 }
 type WtIn = { path: string; branch: string; isMain: boolean; committedAhead?: number; dirty?: number; untracked?: number; behind?: number; mergedInto?: string; pushed?: boolean; sessions?: { session: string; dormant?: boolean }[] | null }
-type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string; projectKey?: string }
+type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string; projectKey?: string; cwd?: string; worktree?: string; branch?: string }
 
 export function buildTaskTree(o: {
   projects: ProjIn[]
@@ -75,13 +78,16 @@ export function buildTaskTree(o: {
 }): TaskTree {
   // 会话的展示信息：先从 /projects 的 top / needs 里捞（带 agent / running / waiting），再补 /sessions 的 label
   const info = new Map<string, TreeSession>()
-  const put = (s: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; lastActivity?: number; state?: string; dormant?: boolean; parent?: string }) => {
+  const put = (s: SessIn & { running?: boolean; waiting?: boolean; state?: string; dormant?: boolean }) => {
     const cur = info.get(s.name) || { name: s.name, label: s.label || s.name }
     info.set(s.name, {
       ...cur,
       label: s.label || cur.label,
       at: s.lastActivity || cur.at,
       parent: s.parent ?? cur.parent,
+      cwd: s.cwd ?? cur.cwd,
+      worktree: s.worktree ?? cur.worktree,
+      branch: s.branch ?? cur.branch,
       dormant: s.dormant || s.state === 'dormant' || cur.dormant,
       agent: s.agent || cur.agent,
       running: s.running ?? cur.running,

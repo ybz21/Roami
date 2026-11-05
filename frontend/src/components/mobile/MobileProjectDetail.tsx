@@ -7,18 +7,21 @@ import { getHashParams } from '../../route-hash'
 import { projectPath } from '../projects/okr/okr-workspace'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, DiffIcon, TargetIcon, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronRight, DiffIcon, FolderIcon, TargetIcon, TerminalIcon } from '../../icons'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useNativeSessionList } from '../sessions/native-session-list'
 import { nativeSessionRecord } from '../sessions/session-record'
 import { useSessionOverview } from '../../session-overview'
 import { pollWhileVisible } from '../../visible-poll'
+import SessionHierarchy from '../sessions/SessionHierarchy'
+import SessionLocation from '../sessions/SessionLocation'
+import { absTime, relTime } from '../../time-format'
 
 const GitPanel = lazy(() => import('../git/GitPanel'))
 import { BranchIcon } from '../git/parts'
 import type { OverviewItem } from './MobileSessions'
 
-type Wt = { path: string; branch: string; isMain: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; pushed?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
+type Wt = { path: string; branch: string; isMain: boolean; directoryOnly?: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; pushed?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
 
 export default function MobileProjectDetail({ projectId, dir, onOpenSession, onNewInWorktree }: {
   projectId?: string
@@ -62,11 +65,12 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   const busy = (w: Wt) => (w.sessions || []).length > 0 || w.dirty + w.untracked > 0 || (w.committedAhead > 0 && !w.mergedInto)
   const all = useMemo(() => {
     const groups = (wts || []).map(worktree => ({ ...worktree, sessions: [...worktree.sessions || []] }))
-    const sessions = [...overview.value.filter(session => projectId ? session.projectKey === projectId : session.projectDir === dir), ...owned]
+    const sessions: OverviewItem[] = [...overview.value.filter(session => projectId ? session.projectKey === projectId : session.projectDir === dir), ...owned]
     for (const session of sessions) {
-      const directory = 'cwd' in session ? session.cwd : session.worktree || session.projectDir
-      let group = groups.find(worktree => worktree.path === directory) || groups.find(worktree => worktree.isMain)
-      if (!group) { group = { path: dir, branch: '', isMain: true, dirty: 0, untracked: 0, committedAhead: 0, behind: 0, sessions: [] }; groups.unshift(group) }
+      if (groups.some(group => group.sessions.some(item => item.session === session.name))) continue
+      const directory = session.worktree || session.cwd || ''
+      let group = groups.find(worktree => worktree.path === directory)
+      if (!group) { group = { path: directory, branch: session.branch || '', isMain: directory === dir, directoryOnly: true, dirty: 0, untracked: 0, committedAhead: 0, behind: 0, sessions: [] }; groups.push(group) }
       if (!group.sessions.some(item => item.session === session.name)) group.sessions.push({ session: session.name })
     }
     return groups
@@ -80,23 +84,24 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
       {wts === null && <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}><Spin /></div>}
       {shown.map((w) => (
         <div key={w.path} className="tt-mproj-wt">
-          <div className="wn"><BranchIcon size={12} /><b>{w.isMain ? t('session.wt.mainRepo') : w.branch || w.path.split('/').pop()}</b><span>{wtStatus(w)}</span></div>
-          {(w.sessions || []).map((s) => {
-            const o = live.get(s.session)
+          <div className="wn">{w.directoryOnly ? <FolderIcon size={12} /> : <BranchIcon size={12} />}<b>{w.isMain ? t('session.wt.mainRepo') : w.branch || w.path.split('/').pop() || t('tree.loose')}</b>{w.isMain && w.branch && <span>{w.branch}</span>}{!w.directoryOnly && <span>{wtStatus(w)}</span>}</div>
+          {w.path && <SessionLocation cwd={w.path} />}
+          <SessionHierarchy sessions={(w.sessions || []).map(s => ({ ...s, name: s.session, label: live.get(s.session)?.label, parent: live.get(s.session)?.parent }))} allSessions={[...live.values()]} renderRow={s => {
+            const o = live.get(s.name)
             return (
               <button key={s.session} type="button" className={`tt-msess-row sub${o?.waiting ? ' wait' : ''}${s.dormant || o?.dormant ? ' dormant' : ''}`} onClick={() => onOpenSession(s.session)}>
                 <span className="ic">{o?.agent ? <AgentLogo kind={o.agent} size={16} /> : <TerminalIcon size={16} />}</span>
                 <span className="t"><b>{o?.label || s.session}</b><span className="st"><i>{status(o, s.dormant)}</i>{o && (o.waiting || o.running) && o.tail ? <span className="tail"> · {o.tail}</span> : null}</span></span>
-                <ChevronRight size={14} />
+                <em title={absTime(o?.lastActivity)}>{relTime(o?.lastActivity, t)}</em><ChevronRight size={14} />
               </button>
             )
-          })}
-          <div className="acts">
+          }} />
+          {w.path && <div className="acts">
             <button type="button" className="tt-act" onClick={() => onNewInWorktree('claude', w.path)}><AgentLogo kind="claude" size={13} />Claude</button>
             <button type="button" className="tt-act" onClick={() => onNewInWorktree('codex', w.path)}><AgentLogo kind="codex" size={13} />Codex</button>
             <button type="button" className="tt-act" onClick={() => onNewInWorktree('shell', w.path)}><TerminalIcon size={13} />{t('tabs.newTerminal')}</button>
             {(w.dirty + w.untracked > 0 || w.committedAhead > 0) && <button type="button" className="tt-act" onClick={() => setGitAt(w.path)}><DiffIcon size={13} />{t('git.changes')}</button>}
-          </div>
+          </div>}
         </div>
       ))}
       {quiet.length > 0 && (

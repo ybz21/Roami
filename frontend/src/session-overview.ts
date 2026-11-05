@@ -2,7 +2,7 @@ import type { SessionAgent } from './components/sessions/session-record'
 import { createSessionPoll } from './session-poll'
 
 export type OverviewItem = {
-  name: string; label: string; lastActivity: number; dormant: boolean
+  name: string; label: string; lastActivity: number; dormant: boolean; parent?: string; cwd?: string
   projectKey?: string; project?: string; projectDir?: string; worktree?: string; branch?: string
   agent?: SessionAgent | ''; running: boolean; waiting: boolean; tail?: string
 }

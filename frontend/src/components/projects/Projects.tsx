@@ -1,3 +1,5 @@
+import SessionLocation from '../sessions/SessionLocation'
+import SessionHierarchy from '../sessions/SessionHierarchy'
 import { nodeApi } from '../cluster/node-url'
 import '../swarm/swarm.css'
 import { loadSwarmDirectory } from '../swarm/swarm-directory'
@@ -1011,7 +1013,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const cleanable = orphans.filter((w: any) => w.mergedInto && !wtDirty(w))
   const unfinished = orphans.filter((w: any) => (w.committedAhead > 0 || wtDirty(w)) && !(w.mergedInto && !wtDirty(w)))
   const clean = orphans.filter((w: any) => !w.mergedInto && !(w.committedAhead > 0 || wtDirty(w)))
-  const wtOf = (s: any) => wts.find((w: any) => w.path === ann[s.name]?.primary?.worktree)
+  const wtOf = (s: any) => wts.find((w: any) => w.path === (ann[s.name]?.primary?.worktree || s.cwd))
 
   // 图片上传到 /tmp 并把绝对路径插进需求框：开干时路径会随命令传给 agent，模型按绝对路径读图（同对话页 Ctrl+V）
   // 新开命令行（P4）：shell = 裸会话；agent = 会话 + 启动命令。孤儿复活/外部收编同款。
@@ -1180,7 +1182,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const row = (s: any, i: number) => {
     const a = ann[s.name] || { home: s.cwd, primary: { branch: s.branch, worktree: s.cwd } }
     const hit = a.primary || {}
-    const isChild = !!s.parent && mine.some((x) => x.name === s.parent)
     const w = wtOf(s)
     const ahead = w?.committedAhead || 0
     const changes = (w?.dirty || 0) + (w?.untracked || 0)
@@ -1218,7 +1219,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const rowNode = (
       <div key={s.name} className={`prj-row prj-in${activeTerm === s.name ? ' on' : ''}`}
         aria-current={activeTerm === s.name ? 'true' : undefined}
-        style={{ marginLeft: isChild ? 22 : 0, animationDelay: `${Math.min(i, 8) * 40}ms` }}
+        style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
         // 拖到终端标签上 = 告诉那个会话怎么跟这个会话说话（21 设计）。
         // 自定义 MIME：用 text/plain 会被文件区/终端当成路径拖拽接走。
         draggable
@@ -1233,7 +1234,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
         }}
         onClick={() => openTerm(s.name)}>
         <span style={{ marginTop: 7, display: 'inline-flex' }}>{dot(false, waiting ? '#d29922' : running ? 'var(--ok)' : undefined, dormant)}</span>
-        {isChild && <span style={{ color: 'var(--swarm)', marginTop: 3, display: 'inline-flex' }}><BranchIcon size={12} /></span>}
         <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, color: dormant ? 'var(--text-dim)' : undefined }} title={s.name}>{s.label || sessionLabel(s.name)}</span>
@@ -1242,7 +1242,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                 {t(s.resumable ? 'session.dormant.resumable' : 'session.dormant.hint')}
               </Tag>
             )}
-            {hit.linked && hit.branch && <span className="tt-branch" title={hit.branch}><BranchIcon size={10} />{hit.branch}</span>}
+            <SessionLocation branch={hit.branch} worktree={hit.worktree} cwd={a.home || s.cwd || s.dir} />
             {hit.external && hit.linked && <Tag style={{ margin: 0 }}><WindowsIcon size={11} /></Tag>}
             {(s.agent || agentKinds[s.name] || cc[s.name] || cx[s.name]) && <span className="tt-agentmark" title={agentName(s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex'))}><AgentLogo kind={s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex')} size={13} /></span>}
             {waiting && <Tag color="warning" style={{ margin: 0 }}>{t('session.waiting')}</Tag>}
@@ -1392,12 +1392,12 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                       <button type="button" className="tt-act" onClick={() => { location.hash = '#/swarm/' + encodeURIComponent(swName) }}>{t('project.swarm.board')}</button>
                     </div>
                     <div style={{ marginLeft: 6, paddingLeft: 10, borderLeft: '2px solid rgba(163,113,247,.3)' }}>
-                      {rows.map(row)}
+                      <SessionHierarchy sessions={rows} allSessions={mine} renderRow={row} />
                     </div>
                   </div>
                 )
               })}
-              {rest.map(row)}
+              <SessionHierarchy sessions={rest} allSessions={mine} renderRow={row} />
             </>)
           })()}
           {mine.length === 0 && !native.failed && <div className="prj-empty">{t('session.empty')}</div>}

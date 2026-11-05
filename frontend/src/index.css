@@ -653,7 +653,7 @@ html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 .tt-pill.sm.danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-soft); }
 .tt-pill.sm.warn { color: var(--warn); border-color: var(--warn-border); background: var(--warn-soft); }
 .tt-pill.sm.dim { color: var(--text-dim); }
-/* 父会话保留活动时间，派生子会话优先展示名称与状态。 */
+/* 父子会话使用相同的信息层级。 */
 .tt-tree-sessions .tt-tree-row { padding-left: var(--sp-3); padding-right: var(--sp-2); min-height: var(--row-compact); border-radius: var(--r-xs); margin: 0; width: 100%; gap: var(--sp-2); }
 .tt-tree-sessions .tt-tree-row .nm { flex: 1 1 auto; }
 .tt-tree-sessions .tt-tree-row .nm { color: var(--text-dim); font-size: var(--fs-sm); font-weight: 400; }
@@ -3408,3 +3408,17 @@ button.mc-tab-x { padding: 0; border: 0; background: transparent; cursor: pointe
 
 .tt-page-swarm { height:100%; min-height:0; padding:0; overflow:auto; }
 .tt-page-swarm > .swarm-managed { flex:1; }
+
+.tt-session-location { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); min-width: 0; color: var(--text-dim); font-size: var(--fs-meta); font-weight: 400; line-height: 1.5; }
+.tt-session-location > span { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-session-location svg { flex: 0 0 auto; }
+.tt-session-lineage { min-width: 0; }
+.tt-session-lineage.child { border-inline-start: 1px solid var(--border-subtle); padding-inline-start: var(--sp-1); }
+.tt-session-parent { display: block; padding: var(--sp-1) var(--sp-3); color: var(--text-dim); font-size: var(--fs-meta); }
+.tt-tree-sessions .tt-tree-row .nm { display: flex; flex-direction: column; min-width: 0; }
+.tt-tree-sessions .tt-tree-row .nm > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-tree-sessions .tt-session-location { flex-wrap: wrap; }
+.tt-tree-sessions .tt-session-location .branch { flex-shrink: 1; }
+.tt-tree-sessions .tt-session-location .directory { flex-shrink: 2; }
+.tt-tree-children .tt-tree-children .tt-tree-children .tt-tree-children { margin-left: 0; }
+.tt-msess-row em { font-size: var(--fs-meta); }

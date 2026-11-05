@@ -1,3 +1,4 @@
+import SessionLocation from './SessionLocation'
 import { useNativeSessionList } from './native-session-list'
 import { nativeSessionRecord } from './session-record'
 import { agentName, useAgentKinds } from '../../agent-kind'
@@ -389,7 +390,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                     <span className="pj">{sessProj[s.name]?.name}</span>
                     {(() => { // 位置列：有 worktree 就是 ⎇ 分支（点开进 worktree 管理），否则是工作目录
                       const ann = wtAnn[s.name]
-                      const loc = sessionLocation(ann, s.cwd, sessProj[s.name]?.dir)
+                      const loc = sessionLocation(ann || { primary: { branch: s.branch, worktree: s.cwd } }, s.cwd, sessProj[s.name]?.dir)
                       if (!loc.branch && !loc.path) return <span className="loc" />
                       const tip = loc.branch
                         ? t('worktree.sessionTagTip', { path: ann?.primary?.worktree || '' })
@@ -399,7 +400,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                         <span className="loc" title={tip}
                           onClick={ann?.primary?.linked ? (e) => { e.stopPropagation(); setWtDir(ann.primary.repo); setWtOpen(true) } : undefined}
                           style={ann?.primary?.linked ? { cursor: 'pointer' } : undefined}>
-                          {loc.branch ? <span className="br"><BranchIcon size={11} />{loc.branch}{ann?.ambiguous ? ' +' : ''}</span> : loc.path}
+                          <SessionLocation branch={loc.branch} worktree={ann?.primary?.worktree} cwd={s.cwd || ann?.home} />
                         </span>
                       )
                     })()}
