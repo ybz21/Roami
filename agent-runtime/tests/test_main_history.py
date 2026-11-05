@@ -174,3 +174,115 @@ class MainPlaceholder:
 
     async def stream(self, messages, tools):
         yield ModelEvent("text", "unused")
+
+
+async def test_task_result_read_does_not_restore_unrelated_main_history(store):
+    from test_task_delivery_benchmark import mark
+
+    task_id = None
+    rounds = 0
+    observed = []
+    report = "CURRENT_TASK_RESULT_WITH_SOURCES " * 200
+
+    class Main:
+        model = "scoped-task-result"
+
+        async def stream(self, messages, tools):
+            nonlocal rounds
+            rounds += 1
+            text = str(messages)
+            observed.append(
+                {
+                    "constraints": "Preserve literal source URLs" in text,
+                    "latestReply": "LATEST_RELEVANT_REPLY" in text,
+                    "forgotten": "FORGOTTEN_SECRET" in text,
+                    "oldTool": "UNRELATED_OLD_TOOL_OUTPUT" in text,
+                    "oldAnswer": "UNRELATED_OLD_ANSWER" in text,
+                    "currentResult": report in text,
+                }
+            )
+            if rounds == 1:
+                yield ModelEvent(
+                    "tool", call("task_status", {"taskId": task_id, "includeResult": True})
+                )
+            elif rounds == 2:
+                observed[-1]["fullResult"] = (
+                    json.loads(messages[-1]["content"])[0]["executorResult"]["summary"] == report
+                )
+                yield ModelEvent("tool", call("conversation_history", {}))
+            else:
+                yield ModelEvent("text", "Result and explicitly requested history are available.")
+
+    runtime = Runtime(store, Main(), settings=Settings(workers=0))
+    try:
+        c = await runtime.conversations.create("alice")
+
+        def seed(db):
+            message(
+                db, c["id"], c["active_branch_id"], "user", {"text": "Preserve literal source URLs"}
+            )
+            message(
+                db,
+                c["id"],
+                c["active_branch_id"],
+                "assistant",
+                {"text": "", "tool_calls": [call("old_read", {}, "old-call")]},
+            )
+            message(
+                db,
+                c["id"],
+                c["active_branch_id"],
+                "tool",
+                {"text": "UNRELATED_OLD_TOOL_OUTPUT " * 1000, "tool_call_id": "old-call"},
+            )
+            message(
+                db,
+                c["id"],
+                c["active_branch_id"],
+                "assistant",
+                {"text": "UNRELATED_OLD_ANSWER " * 1000},
+            )
+            mid = message(
+                db, c["id"], c["active_branch_id"], "assistant", {"text": "FORGOTTEN_SECRET"}
+            )
+            db.execute(
+                "INSERT INTO context_omissions(owner_id,message_id,reason,created_ms) VALUES('alice',?,'test',0)",
+                (mid,),
+            )
+            message(
+                db, c["id"], c["active_branch_id"], "assistant", {"text": "LATEST_RELEVANT_REPLY"}
+            )
+
+        await store.call(seed, write=True)
+        task = await runtime.tasks.create(
+            "alice", c["id"], "Existing analysis", key="analysis", record_intent=True
+        )
+        task_id = task["id"]
+        await mark(runtime, task, "succeeded", {"state": "succeeded", "summary": report})
+        await runtime.start()
+        receipt = await runtime.chat.submit(
+            "alice",
+            c["id"],
+            "details",
+            "Read this task's full result, then explicitly check earlier history.",
+        )
+        await completed(store, receipt["turnId"])
+        manifests = await store.call(
+            lambda db: rows(
+                db,
+                "SELECT parts_json FROM prompt_manifests WHERE turn_id=? ORDER BY attempt_no",
+                (receipt["turnId"],),
+            )
+        )
+        initial, details, restored = [json.loads(m["parts_json"]) for m in manifests]
+        assert all(o["constraints"] and o["latestReply"] and not o["forgotten"] for o in observed)
+        assert observed[1]["fullResult"]
+        assert not observed[1]["oldTool"] and not observed[1]["oldAnswer"]
+        assert observed[2]["oldTool"] and observed[2]["oldAnswer"] and observed[2]["currentResult"]
+        assert initial["historyView"] == details["historyView"] == "main_briefing"
+        assert details["suppressedHistoryCount"] > 0
+        assert restored["historyView"] == "full"
+        assert details["estimatedTokens"] < restored["estimatedTokens"]
+        assert rounds == 3
+    finally:
+        await runtime.close()
