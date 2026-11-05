@@ -15,10 +15,11 @@ allowed-tools:
 
 ## 会话与派活
 
+同一任务的回归、验证、审查或辅助工作先复用已有会话，确需新增时优先从当前会话 `fork`，保留父子关系。每个子任务复用一个子会话，不为每条命令独立新建；结果未知先 capture 原会话并检查产物，不另开会话补跑。只有没有可用父会话或用户明确要求独立任务时才用 `new`。代码需要隔离时先建 worktree，再让 `fork --dir` 指向该目录。
+
 ```bash
 roami session ls --json
 roami session ls --tree --json
-roami session new build-check --dir /path/to/project --detach --json
 roami session fork <父会话ID> review --dir /path/to/worktree --detach --json
 roami session children <父会话ID> --json
 roami session capture <会话ID> --lines 100

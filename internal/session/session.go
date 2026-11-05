@@ -43,7 +43,7 @@ type sessionInfo struct {
 	Repo string `json:"repo,omitempty"`
 	// Mem 这个会话此刻吃了多少（字节）。休眠会话没有进程，恒为 nil。
 	Mem *memInfo `json:"mem,omitempty"`
-	// 下面两列供 ls --tree 建父子投影，平铺输出时省略。
+	// 平铺与树形列表共用父子关系，供客户端按真实来历组织会话。
 	Parent    string `json:"parent,omitempty"`
 	CreatedBy string `json:"created_by,omitempty"`
 }

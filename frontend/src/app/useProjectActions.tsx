@@ -109,20 +109,24 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
     ? (isLooseTask(activeTask) ? sessionLabel(looseSessionOf(activeTask)) : tree.projects.flatMap((p) => p.tasks).find((x) => x.key === activeTask)?.name || activeTask.split('/').pop() || '')
     : ''
   const onTreeProject = (key: string) => go('projects/' + encodeURIComponent(key))
-  async function newTerminalInTask(kind: 'shell' | AgentKind = 'shell', keyArg?: TaskKey) {
+  async function newTerminalInTask(kind: 'shell' | AgentKind = 'shell', keyArg?: TaskKey, parentArg?: string) {
     const key = keyArg ?? activeTaskRef.current
     const dir = key ? (taskPathOf(tree, key) || sessionProject(looseSessionOf(key))?.dir || '') : ''
-    const first = key ? firstSessionOf(tree, key) : null
-    await newTerminalAt(kind, dir, (first && sessionLabel(first)) || 'shell', key || undefined)
+    const available = tree.projects.flatMap(project => project.tasks).find(task => task.key === key)?.sessions.find(session => !session.dormant)?.name
+    const parent = parentArg || (active && keyOf(active) === key ? active : available || (key && isLooseTask(key) ? looseSessionOf(key) : null))
+    await newTerminalAt(kind, dir, (parent && sessionLabel(parent)) || 'shell', key || undefined, parent || undefined)
   }
-  const newTerminalAt = async (kind: 'shell' | AgentKind, dir: string, baseArg?: string, key?: TaskKey) => {
+  const newTerminalAt = async (kind: 'shell' | AgentKind, dir: string, baseArg?: string, key?: TaskKey, parentArg?: string) => {
     const base = baseArg || (dir ? dir.split('/').pop() : '') || 'shell'
     const suffix = ({ shell: 'sh', claude: 'cc', codex: 'cx', pi: 'pi', opencode: 'oc' } as const)[kind]
     let name = `${base}-${suffix}`
     const taken = new Set(sessList.map((s) => s.label || s.name))
     for (let i = 2; taken.has(name); i++) name = `${base}-${suffix}${i}`
     try {
-      const res = await api('POST', '/sessions', dir ? { name, dir } : { name })
+      const parent = parentArg || tree.projects.flatMap(project => project.tasks).find(task => task.path === dir)?.sessions.find(session => !session.dormant)?.name
+      const res = parent
+        ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork`, { child: name, ...(dir ? { dir } : {}) })
+        : await api('POST', '/sessions', dir ? { name, dir } : { name })
       const actual = res?.name || name
       if (kind !== 'shell') {
         const cmd = agentCommand(kind, prefs)

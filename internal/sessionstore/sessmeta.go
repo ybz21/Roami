@@ -377,12 +377,8 @@ func (s *Store) Children(parent string) []string {
 	return out
 }
 
-// All 返回活会话（key = 会话名，供 ls --tree 投影）。父会话已死的行按孤儿投影：
-// 只在投影里断链，表里的来历不动——「谁 fork 出了我」是历史，不该被父亲的死改写。
-//
-// 判父亲死活看 **tmux 实况**而不是「表里有没有活行」：父会话常常是 `roami session new`
-// 直建的、压根没有自己的行（只有 fork 出来的孩子才写行），按行判会把整棵树拍平。
-func (s *Store) All() map[string]Row {
+// Lineage reads recorded live relationships without another tmux observation.
+func (s *Store) Lineage() map[string]Row {
 	db, err := s.db()
 	if err != nil {
 		return nil
@@ -400,6 +396,12 @@ func (s *Store) All() map[string]Row {
 		}
 	}
 	rows.Close()
+	return out
+}
+
+// All projects live parent links against the current tmux session names.
+func (s *Store) All() map[string]Row {
+	out := s.Lineage()
 	alive := s.nameToID()
 	if alive == nil { // 盲态：照记录返回，不猜谁死了
 		return out
