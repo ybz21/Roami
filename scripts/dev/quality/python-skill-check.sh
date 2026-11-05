@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PYTHONDONTWRITEBYTECODE=1
 cd "$(dirname "$0")/../../.."
 
 if [ "$#" -ne 1 ]; then

@@ -37,4 +37,20 @@ Go 测试会调用真实 Python harness，因此 Go 的计划同时要求 uv 可
 
 调度测试用真实临时 Git 仓库覆盖路径、资源、删除、重命名、完整 PR、多次提交、换行文件名、暂存区、历史缺失、Git 缺失与发布模式。工作流另经 actionlint 校验。
 
-实际执行与耗时记录将在本次完整门禁及同机调度对比后补充。比较区分工具安装与测试耗时；不把 CI 等待减少推断为产品 CPU 或内存减少。本次没有产品界面改动，不操作手机或线上服务。
+实际执行（2026-11-05，同一主机、相同产品源码、工具已准备，秒为墙钟）：
+
+| 场景 | 计划与实际执行 | 耗时 |
+| --- | --- | --- |
+| 纯前端真实历史范围 `b063a68c^..b063a68c`，旧调度 | Go、前端完整检查/构建，外加四个无条件 Skill | 236.215 秒 |
+| 相同范围，新调度 | 仓库静态检查和前端完整检查/构建；没有 Go、Python 或 Skill | 101.227 秒 |
+| 单视频 Skill 资源变更 Git fixture | 只选择 video；真实视频套件 Ruff/format/35 项 pytest 全过 | 2.896 秒 |
+| 共享 Python 依赖 Git fixture | runtime、四个 Skill、Go 全部选中；相同全量计划用于本 PR 的真实共享工作流改动 | 见下文分项 |
+| 缺少 ffprobe 的负例 | 在 Go/runtime 测试前报错；没有进入长测试 | 4.773 秒 |
+
+纯前端同机样本减少 134.988 秒，约 57.1%；四组有效 Skill 测试共 248 项保持原样。此前 #671 CI 的主门禁 11 分 34 秒后，还花 8 分 51 秒运行办公依赖/报告、6 分 40 秒运行视频依赖/检查；不同主机和安装条件不可直接与上表混算。
+
+全量计划已实际执行 Go 全套，runtime **3518 passed / 48 skipped（891.05 秒）**，presentation **79 passed**，tabular **118 passed**，market **16 passed**。第一次本地 full 在末尾因 ffprobe 缺失退出，没有记作整条 full 通过；私有目录补齐与 CI 一致的 ffmpeg/ffprobe 6.1 后，视频 **35 passed**，前端检查/构建完成。最终 PR CI 仍须完整执行并通过全部选中检查，不能用分流的前端基准冒充本 PR 门禁。
+
+对比复用了旧 6f1825a2 的核心质量脚本与原四个 Skill 命令，固定当前产品源码；旧布尔适配器在该真实前端范围仍返回 false。不是回滚产品，也不包含系统安装时间。办公和视频依赖仅在 `/tmp/okr-ci-scope` 私有前缀准备，未修改系统包、线上服务或模型配置。单 Skill 与共享依赖的选择来自独立 Git fixture，实际测试执行仓库原套件，不把 fixture 当产品实现证据。
+
+证据：本机 `/tmp/okr-ci-scope` 中的 `candidate-full.log/json`、`frontend-before.log/json`、`frontend-after-final.log/json`、`video-selected.log/json`、`dispatch-fixture-plans.json`、`dependencies-early-fail.log/json`；PR 提供公开截图。没有产品界面改动，不操作手机。以上只说明检查等待变化，不声称产品 CPU 或内存减少。
