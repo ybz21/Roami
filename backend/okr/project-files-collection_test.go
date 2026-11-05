@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -130,6 +131,9 @@ func TestProjectTeamDefinitionValidationAndLegacySaves(t *testing.T) {
 		{SchemaVersion: 1, Roles: []TeamRole{{ID: "../escape", Name: "Editor", Executor: "codex", Duty: "Draft"}}},
 		{SchemaVersion: 1, Roles: []TeamRole{{ID: "editor", Name: "Editor", Executor: "shell", Duty: "Draft"}}},
 		{SchemaVersion: 1, Roles: []TeamRole{{ID: "editor", Name: "Editor", Executor: "codex", Duty: ""}}},
+		{SchemaVersion: 1, Roles: []TeamRole{{ID: "coordinator", Name: "MAIN", Executor: "native", Duty: "Coordinate"}}},
+		{SchemaVersion: 1, Roles: []TeamRole{{ID: "coordinator", Name: "Leader", Executor: "native", Duty: "Coordinate"}}},
+		{SchemaVersion: 1, Roles: []TeamRole{{ID: "editor", Name: strings.Repeat("编", 81), Executor: "codex", Duty: "Draft"}}},
 		{SchemaVersion: 1, Roles: []TeamRole{c.Team.Roles[0], c.Team.Roles[0]}},
 		{SchemaVersion: 1, Roles: []TeamRole{c.Team.Roles[0], {ID: "other", Name: "Editor", Executor: "native", Duty: "Verify"}}},
 	} {
@@ -149,6 +153,16 @@ func TestProjectTeamDefinitionValidationAndLegacySaves(t *testing.T) {
 	got, err := s.Get("project")
 	if err != nil || got.Team == nil || !reflect.DeepEqual(got.Team, w.Team) || !got.ProjectFiles.PendingChanges {
 		t.Fatal("missing draft team file replaced confirmed roles", got, err)
+	}
+}
+
+func TestProjectTeamAcceptsRegistryUnicodeNameLimit(t *testing.T) {
+	s, _ := fileStore(t)
+	c := testConfig()
+	c.Team = &TeamDefinition{SchemaVersion: 1, Roles: []TeamRole{{ID: "editor", Name: strings.Repeat("编", 80), Executor: "codex", Duty: "Draft"}}}
+	w, err := s.Save("project", c)
+	if err != nil || w.Team.Roles[0].Name != c.Team.Roles[0].Name {
+		t.Fatal("valid managed-member name was rejected or changed", w, err)
 	}
 }
 

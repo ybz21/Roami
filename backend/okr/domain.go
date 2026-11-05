@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var (
@@ -174,7 +175,7 @@ func validate(c *Config) error {
 		ids, names := map[string]bool{}, map[string]bool{}
 		for _, role := range c.Team.Roles {
 			name := strings.TrimSpace(role.Name)
-			if !identifier.MatchString(role.ID) || ids[role.ID] || name == "" || name != role.Name || names[name] || len(name) > 128 || strings.TrimSpace(role.Duty) == "" || len(role.Duty) > 8000 {
+			if !identifier.MatchString(role.ID) || ids[role.ID] || name == "" || name != role.Name || names[name] || utf8.RuneCountInString(name) > 80 || strings.EqualFold(name, "main") || strings.EqualFold(name, "leader") || strings.TrimSpace(role.Duty) == "" || utf8.RuneCountInString(role.Duty) > 8000 {
 				return ErrInvalid
 			}
 			switch role.Executor {
