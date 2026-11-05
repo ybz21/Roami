@@ -1,0 +1,90 @@
+{
+  "scope": "isolated Go gateway mechanics; no external inference or production claim",
+  "baseCommit": "b063a68cae2260fc64cb08672896e1072cc24fa2",
+  "candidateFiles": {
+    "internal/modelgateway/admission.go": "fd7d952fbcfd199f21b615f2bec8e3f84275f6ee8f1805050aed76c66617c246",
+    "internal/modelgateway/handler.go": "cf049085e86f9151d73d4c472ca88861f4acfc50f65c82891dc8adb0740b967d",
+    "internal/modelgateway/agent_keys_test.go": "c7ac2cd0011e3452eac1e26b21a6de95546f9cb29f0cbeecd94213d0b6c95955",
+    "internal/modelgateway/admission_order_test.go": "c80da9bab42a5c2a8566ff1455eee9b2b01cf16695d5ce256879d28d93fe104f"
+  },
+  "beforeFairOrder": {
+    "exit": 1,
+    "logSha256": "cf677e97a01bb57aca54954f4a153aa9fd0b12777d29b54e54b0776b6e274a8a",
+    "lastLines": [
+      "--- FAIL: TestAdmissionServesOlderWaiterBeforeLaterArrival (0.05s)",
+      "    admission_order_test.go:74: admitted \"later\" before waiting \"older\"",
+      "    admission_order_test.go:74: admitted \"older\" before waiting \"later\"",
+      "--- FAIL: TestAdmissionServesOlderWaiterBeforeLaterArrival (0.05s)",
+      "    admission_order_test.go:74: admitted \"later\" before waiting \"older\"",
+      "    admission_order_test.go:74: admitted \"older\" before waiting \"later\"",
+      "--- FAIL: TestAdmissionServesOlderWaiterBeforeLaterArrival (0.05s)",
+      "    admission_order_test.go:74: admitted \"later\" before waiting \"older\"",
+      "    admission_order_test.go:74: admitted \"older\" before waiting \"later\"",
+      "FAIL",
+      "FAIL\tgithub.com/ybz21/Roami/internal/modelgateway\t0.160s",
+      "FAIL"
+    ]
+  },
+  "racePackage": {
+    "exit": 0,
+    "logSha256": "ff620bb0db3d07cd8d2b78067a05dc846b4a1b3f596d1e9513a3a7aa10794b66",
+    "lastLines": [
+      "ok  \tgithub.com/ybz21/Roami/internal/modelgateway\t22.191s"
+    ]
+  },
+  "repeatedScenarios": {
+    "topLevelFamilies": 4,
+    "iterationsEach": 20,
+    "cancellationPositions": [
+      "head",
+      "middle"
+    ],
+    "result": {
+      "exit": 0,
+      "logSha256": "0b32586e5e42ee7cd7fece103ac6a6edf4b869d1b60fc07ccd46e84ad3ca1bf6",
+      "lastLines": [
+        "ok  \tgithub.com/ybz21/Roami/internal/modelgateway\t17.252s"
+      ]
+    }
+  },
+  "prototypeNonHeadRevalidation": {
+    "exit": 1,
+    "logSha256": "9bf17b4b12f7af55a722820c03dda1b137d06c485e9b6587ae4d274cdeef0b2e",
+    "lastLines": [
+      "--- FAIL: TestAdmissionRevalidatesNonHeadWhileUsageIsPending (0.27s)",
+      "    admission_order_test.go:145: invalidated non-head request remained blocked behind pending usage",
+      "FAIL",
+      "FAIL\tgithub.com/ybz21/Roami/internal/modelgateway\t0.274s",
+      "FAIL"
+    ]
+  },
+  "fullGate": {
+    "exit": 0,
+    "logSha256": "01ff32e140073b2f92405ba6096337b7f3c492991644dff2f9c42829df6f04db",
+    "lastLines": [
+      "(!) Some chunks are larger than 900 kB after minification. Consider:",
+      "- Using dynamic import() to code-split the application",
+      "- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks",
+      "- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.",
+      "✓ built in 42.78s",
+      "compress-dist: 92 个文件生成 .br/.gz，较原文件省 19.9/18.3 MB 传输量",
+      "",
+      "==> Secret scan",
+      "",
+      "==> Staged file policy",
+      "",
+      "==> Quality gate passed"
+    ]
+  },
+  "pythonChecksSkippedAsUnrelated": true,
+  "externalModelCalls": 0,
+  "savedRoutesModified": false,
+  "productionLedgerModified": false,
+  "historicalUnknownRewritten": false,
+  "deployed": false,
+  "sourceReviewDraft": {
+    "pr": 666,
+    "ciPassed": true,
+    "semanticQualityStillFails": true
+  }
+}

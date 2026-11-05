@@ -15,14 +15,14 @@ import (
 )
 
 type Handler struct {
-	Catalog          *CatalogStore
-	Ledger           *Ledger
-	Client           *http.Client
-	wait             sync.WaitGroup
-	mu               sync.Mutex
-	closing          bool
-	activeForwards   int
-	admissionChanged chan struct{}
+	Catalog        *CatalogStore
+	Ledger         *Ledger
+	Client         *http.Client
+	wait           sync.WaitGroup
+	mu             sync.Mutex
+	closing        bool
+	activeForwards int
+	admissionQueue []*admissionWaiter
 }
 
 func NewHandler(ledger *Ledger) *Handler {

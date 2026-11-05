@@ -4,7 +4,9 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-05 | [Go 网关准入顺序与取消恢复](2026-11-05/gateway-admission-order.md) |
 | 2026-11-05 | [当前套件的默认诊断与财务单位合同](2026-11-05/suite-diagnostics-and-finance-units.md) |
+| 2026-11-05 | [用户目的地与逐轮最终交付](2026-11-05/source-bound-delivery.md) |
 | 2026-11-04 | [线上 RSI 环境恢复与命令发现](2026-11-04/online-recovery.md) |
 | 2026-11-04 | [对话契约、任务身份与过程错误](2026-11-04/conversation-contract-parity.md) |
 | 2026-11-03 | [重复取消时完整保存停止收尾](2026-11-03/cancellation-settlement.md) |
