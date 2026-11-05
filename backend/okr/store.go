@@ -155,6 +155,12 @@ func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
 }
 
 func applyConfig(w *Workspace, c Config) {
+	if c.Team == nil {
+		c.Team = w.Team
+	}
+	if c.Team == nil {
+		c.Team = &TeamDefinition{SchemaVersion: 1, Roles: []TeamRole{}}
+	}
 	for i := range c.Metrics {
 		m := &c.Metrics[i]
 		m.SourceKey = ""

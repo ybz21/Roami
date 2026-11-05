@@ -80,6 +80,18 @@ type Dashboard struct {
 	Widgets       []DashboardWidget `json:"widgets"`
 }
 
+type TeamRole struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Executor string `json:"executor"`
+	Duty     string `json:"duty"`
+}
+
+type TeamDefinition struct {
+	SchemaVersion int        `json:"schemaVersion"`
+	Roles         []TeamRole `json:"roles"`
+}
+
 type ProjectFiles struct {
 	Root                 string         `json:"root"`
 	SchemaVersion        int            `json:"schemaVersion"`
@@ -103,16 +115,17 @@ type ProjectSkill struct {
 }
 
 type Config struct {
-	Initiatives []Initiative `json:"initiatives,omitempty"`
-	Dashboard   *Dashboard   `json:"dashboard,omitempty"`
-	Revision    int64        `json:"revision"`
-	Objective   string       `json:"objective"`
-	StartDate   string       `json:"startDate"`
-	EndDate     string       `json:"endDate"`
-	KeyResults  []KeyResult  `json:"keyResults"`
-	Metrics     []Metric     `json:"metrics"`
-	Swarm       string       `json:"swarm"`
-	AutoCollect bool         `json:"autoCollect"`
+	Team        *TeamDefinition `json:"team,omitempty"`
+	Initiatives []Initiative    `json:"initiatives,omitempty"`
+	Dashboard   *Dashboard      `json:"dashboard,omitempty"`
+	Revision    int64           `json:"revision"`
+	Objective   string          `json:"objective"`
+	StartDate   string          `json:"startDate"`
+	EndDate     string          `json:"endDate"`
+	KeyResults  []KeyResult     `json:"keyResults"`
+	Metrics     []Metric        `json:"metrics"`
+	Swarm       string          `json:"swarm"`
+	AutoCollect bool            `json:"autoCollect"`
 }
 
 type Observation struct {
@@ -153,6 +166,24 @@ func finite(n float64) bool { return !math.IsNaN(n) && !math.IsInf(n, 0) }
 func validate(c *Config) error {
 	if c.Revision < 0 || strings.TrimSpace(c.Objective) == "" || !validDate(c.StartDate) || !validDate(c.EndDate) || c.StartDate > c.EndDate || len(c.Metrics) == 0 || len(c.KeyResults) == 0 {
 		return ErrInvalid
+	}
+	if c.Team != nil {
+		if c.Team.SchemaVersion != 1 || c.Team.Roles == nil || len(c.Team.Roles) > 64 {
+			return ErrInvalid
+		}
+		ids, names := map[string]bool{}, map[string]bool{}
+		for _, role := range c.Team.Roles {
+			name := strings.TrimSpace(role.Name)
+			if !identifier.MatchString(role.ID) || ids[role.ID] || name == "" || name != role.Name || names[name] || len(name) > 128 || strings.TrimSpace(role.Duty) == "" || len(role.Duty) > 8000 {
+				return ErrInvalid
+			}
+			switch role.Executor {
+			case "native", "codex", "claude", "opencode", "pi":
+			default:
+				return ErrInvalid
+			}
+			ids[role.ID], names[name] = true, true
+		}
 	}
 	metrics := map[string]bool{}
 	for i := range c.Metrics {

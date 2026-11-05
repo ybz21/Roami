@@ -114,6 +114,7 @@ This directory belongs to this project. It is created only for a saved OKR.
 - data/reviews.jsonl and evidence/: reviews and their original evidence snapshots.
 - connectors/<metric-id>/: source definition and reviewable implementation references.
 - agents/main.json and main.md: on-demand coordinator configuration and instructions.
+- agents/team.json: desired persistent role definitions; live identities remain with the managed team.
 - agents/swarm.json: the existing managed team's binding; its board/chat remain authoritative.
 - skills/: project capabilities used by goal discussions and managed team context.
 - memory/team.md and decisions.jsonl: durable knowledge, separate from proof of execution.
@@ -124,7 +125,7 @@ Discuss the objective, KRs, methods, metrics and sources before saving changes. 
 
 const projectMainInstructions = `# Project coordinator
 
-Use this project's confirmed OKR, dashboard, dated evidence, skills and team memory. Discover the current project_okr_context/project_okr_update capabilities; do not guess paths, credentials or project identity. Project context fixes the authorized project.
+Use this project's confirmed OKR, dashboard, dated evidence, skills and team memory. Discover the current project_okr_context/project_okr_update capabilities; do not guess paths, credentials or project identity. Project context fixes the authorized project. For complete project creation or development, discover the okr-development skill. The team definition in agents/team.json is a plan, not evidence that members were registered or ran.
 
 For a new goal, reason with the user about outcome KRs, shorter experiments, methods, metrics, units, dates and sources. The number and meaning of KRs/widgets follow the goal. Get confirmation before saving configuration or connecting an account. Missing observations remain unknown. Read the current revision before every change.
 

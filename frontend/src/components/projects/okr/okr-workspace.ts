@@ -3,7 +3,8 @@ export type KeyResult = { id: string; title: string; horizon: 'long' | 'short'; 
 export type Initiative = { id: string; title: string; channel: string; keyResultIds: string[]; description: string; acceptance: string }
 export type DashboardWidget = { id: string; type: 'keyResults' | 'metricTrend' | 'nextAction'; keyResultIds?: string[]; metricIds?: string[]; title?: string }
 export type Dashboard = { schemaVersion: 1; widgets: DashboardWidget[] }
-export type Configuration = { objective: string; startDate: string; endDate: string; keyResults: KeyResult[]; metrics: Metric[]; swarm: string; autoCollect: boolean; initiatives?: Initiative[]; dashboard?: Dashboard }
+export type TeamDefinition = { schemaVersion: 1; roles: { id: string; name: string; executor: 'native' | 'codex' | 'claude' | 'opencode' | 'pi'; duty: string }[] }
+export type Configuration = { objective: string; startDate: string; endDate: string; keyResults: KeyResult[]; metrics: Metric[]; swarm: string; autoCollect: boolean; initiatives?: Initiative[]; dashboard?: Dashboard; team?: TeamDefinition }
 export type Observation = { id: string; metricId: string; date: string; value: number; source: 'manual' | 'github'; sourceKey: string; capturedAt: string; note: string }
 export type Review = { id: string; summary: string; actions: string; date: string; evidenceRevision: number }
 export type Workspace = Configuration & { revision: number; projectId: string; observations: Observation[]; reviews: Review[]; updatedAt: string; projectFiles?: { root: string; schemaVersion: 1; revision: number; mainInstructionsFile?: string; teamMemoryFile?: string; mainInstructions?: string; teamMemory?: string; teamMemorySha256?: string; pendingChanges?: boolean; skills?: { id: string; path: string; content: string; sha256: string }[] } }
@@ -48,6 +49,7 @@ export function configurationOf(value: Configuration): Configuration {
     objective: value.objective, startDate: value.startDate, endDate: value.endDate,
     metrics: value.metrics.map(({ id, name, unit, source, repo, field }) => ({ id, name, unit, source, ...(source === 'github' ? { repo, field } : {}) })),
     keyResults: value.keyResults.map(kr => ({ ...kr })), swarm: value.swarm, autoCollect: value.autoCollect,
+    ...(value.team ? { team: { schemaVersion: 1 as const, roles: value.team.roles.map(({ id, name, executor, duty }) => ({ id, name, executor, duty })) } } : {}),
     ...(value.initiatives ? { initiatives: value.initiatives.map(({ id, title, channel, keyResultIds, description, acceptance }) => ({ id, title, channel, keyResultIds: [...keyResultIds], description, acceptance })) } : {}),
     ...(value.dashboard ? { dashboard: { schemaVersion: 1 as const, widgets: value.dashboard.widgets.map(({ id, type, title, keyResultIds, metricIds }) => ({ id, type, ...(title !== undefined ? { title } : {}), ...(keyResultIds ? { keyResultIds: [...keyResultIds] } : {}), ...(metricIds ? { metricIds: [...metricIds] } : {}) })) } } : {}),
   }

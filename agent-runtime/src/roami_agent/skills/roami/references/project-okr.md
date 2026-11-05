@@ -1,5 +1,9 @@
 # Project OKR workspaces
 
+For conversational creation of the whole directory, dashboard, Connector
+bindings and team duties, read `skill://okr-development` first. Its bundle
+reference describes the current configuration, including `dashboard` and `team`.
+
 The real workspace is `#/projects/PROJECT_ID/okr` inside Roami. Discover the project's stable ID with the existing project tools. Discover this node's installed support with `roami project okr help`; old nodes may not have it. Use the normal authenticated CLI only where the active execution context permits bash and project writes. Do not read, copy or print saved credentials.
 
 ## From an objective to a proposal

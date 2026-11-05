@@ -18,6 +18,10 @@ bash "$REPO_DIR/skills/sync-skills.sh" > /dev/null
 [[ ! -e "$HOME/.local/bin/ttmux.bash-backup" && ! -e "$HOME/.local/bin/ttmux-poke" ]]
 [[ ! -e "$HOME/.bash_completion.d/ttmux" && ! -e "$HOME/.claude/skills/ttmux" ]]
 [[ -s "$HOME/.claude/skills/roami-session/SKILL.md" && -s "$HOME/.codex/skills/roami-session/SKILL.md" ]]
+for target in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
+    cmp "$REPO_DIR/agent-runtime/src/roami_agent/skills/okr-development/SKILL.md" "$target/okr-development/SKILL.md"
+    cmp "$REPO_DIR/agent-runtime/src/roami_agent/skills/okr-development/references/bundle.md" "$target/okr-development/references/bundle.md"
+done
 [[ "$(find "$FIXTURE/archive" -type f | wc -l)" -ge 4 ]]
 retire_roami_session_entries "$HOME/.local/bin"
 bash "$REPO_DIR/skills/sync-skills.sh" > /dev/null

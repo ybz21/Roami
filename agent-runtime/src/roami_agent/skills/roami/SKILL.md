@@ -12,7 +12,8 @@ Read only the relevant reference through `read`:
 | Task | Reference |
 | --- | --- |
 | Projects, sessions and dispatch | `skill://roami/references/projects-sessions.md` |
-| Objectives, KRs, dated metrics and Swarm learning loops | `skill://roami/references/project-okr.md` |
+| Create or develop a complete OKR project, dashboard, Connectors and team | `skill://okr-development` |
+| Existing OKR operations, dated metrics and Swarm learning loops | `skill://roami/references/project-okr.md` |
 | Task progress, reports, reminders and takeover | `skill://roami/references/agent-tasks.md` |
 | Memory, files and external capabilities | `skill://roami/references/capabilities.md` |
 | Login, node diagnostics, plugins and database | `skill://roami/references/node-operations.md` |
@@ -23,4 +24,4 @@ Use exact target identities and complete pagination. The user's request to send 
 
 New work uses `delegate` with `goal`; optionally choose `executor`, `directory`, `projectId` or `sessionId`. The host supplies routing, provenance and execution bookkeeping. Continue tracked work with `task_steer` using `taskId` and `text`; the host reads its current revision and preserves its executor/workspace. Handle every independent part of the user's request, then finish without polling accepted work. Completion arrives automatically. Use `task_status` for an explicit progress or results request. Do not confuse task IDs with tmux session IDs.
 
-The user has one Main; background results return there. Keep required stage confirmations. Native bounded work and professional complex work follow the current host routing policy; no extra approval is implied by this Skill. Built-in capabilities stay read-only; external entries keep their configured enable/disable policy.
+Each conversation keeps its bound Main; an OKR project Main is separate from Home Main. Background results return to the originating Main. Keep required stage confirmations. Native bounded work and professional complex work follow the current host routing policy; no extra approval is implied by this Skill. Built-in capabilities stay read-only; external entries keep their configured enable/disable policy.

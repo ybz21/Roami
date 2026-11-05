@@ -64,7 +64,7 @@ async def test_document_mode_is_not_a_foundation_file_operation(store, tmp_path,
 async def test_document_workflows_are_optional_not_reserved_builtins(store):
     runtime = Runtime(store, ConversationModel())
     try:
-        assert set(runtime.tools.skills) == {"roami", "browser_use"}
+        assert set(runtime.tools.skills) == {"roami", "browser_use", "okr-development"}
         assert not runtime.tools.directory.list("幻灯片", "skill")["items"]
         with pytest.raises(DomainError, match="INVALID_TOOL_ARGUMENTS"):
             await runtime.tools.invoke(

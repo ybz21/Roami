@@ -109,6 +109,34 @@ func decodeProjectOKR(t *testing.T, response *httptest.ResponseRecorder) *okr.Wo
 	return body.Data
 }
 
+func TestProjectOKRAPISavesDesiredTeamWithoutLaunchingSwarm(t *testing.T) {
+	a, router, projectID := projectOKRFixture(t)
+	var config okr.Config
+	if err := json.Unmarshal([]byte(projectOKRConfigJSON()), &config); err != nil {
+		t.Fatal(err)
+	}
+	config.Team = &okr.TeamDefinition{SchemaVersion: 1, Roles: []okr.TeamRole{{ID: "editor", Name: "Editor", Executor: "codex", Duty: "Prepare verified drafts"}}}
+	body, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/projects/" + projectID + "/okr"
+	w := decodeProjectOKR(t, projectOKRRequest(t, router, "PUT", path, string(body), 200))
+	if w.Team == nil || len(w.Team.Roles) != 1 || w.Team.Roles[0].ID != "editor" || w.Swarm != "" {
+		t.Fatal("desired team was not preserved independently of a live Swarm", w)
+	}
+	entry, _ := a.Projects.Entry(projectID)
+	file, err := os.ReadFile(filepath.Join(entry.Dir, ".roami/okr/agents/team.json"))
+	var team okr.TeamDefinition
+	if err != nil || json.Unmarshal(file, &team) != nil || len(team.Roles) != 1 || team.Roles[0].Duty != config.Team.Roles[0].Duty {
+		t.Fatal("team definition was not published in the project directory", string(file), err)
+	}
+	w = decodeProjectOKR(t, projectOKRRequest(t, router, "GET", path, "", 200))
+	if w.Team == nil || w.Team.Roles[0].Executor != "codex" {
+		t.Fatal("project API did not load the confirmed file definition", w)
+	}
+}
+
 func TestProjectOKRAPIHistoryRevisionsAndProjectAliases(t *testing.T) {
 	a, router, projectID := projectOKRFixture(t)
 	path := "/projects/" + projectID + "/okr"
