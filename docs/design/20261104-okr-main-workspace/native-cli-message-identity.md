@@ -28,3 +28,5 @@ Go 专项验证 Main/worker/research 的原始 say 在创建客户端前被拒�
 Main post 署名、同工具重放幂等且 turn 数不增加；原命令目录和 host执行专项也通过。
 初次用例忘记计入建群时已有的人类目标消息，已按真实初始状态修正并重验。证据
 `/tmp/okr-main-cli-20261106-targeted.log`，完整质量门禁与发布记录另行补录。当前未部署此保护。
+
+完整 quick/full 均通过，Python 各 3669 passed / 48 skipped；full 的 Python 阶段为 995.57 秒，Go全量、前端静态/构建及审计通过。最终后续提交只补本页和入口文档，运行时代码保持 c145bf65 原样；CI按完整PR差异再次核验。
