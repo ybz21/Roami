@@ -124,7 +124,7 @@ class ContainerExecutor:
         self.model_hash = digest(
             [
                 NativeFilesExecutor(settings, review_replies=True).model_hash,
-                "container-uds-v41-unanchored-questions",
+                "container-uds-v42-final-tool-recovery",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -229,7 +229,7 @@ class ContainerExecutor:
                 {
                     "org.roami.rsi.role-instructions": "1",
                     "org.roami.rsi.shared-daily-policy": "6",
-                    "org.roami.rsi.final-reply-tool": "1",
+                    "org.roami.rsi.final-reply-tool": "2",
                     "org.roami.rsi.source-reply-review": "6",
                 }
             )

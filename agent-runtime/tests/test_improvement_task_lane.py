@@ -489,7 +489,7 @@ async def test_shared_daily_preflight_rejects_legacy_images_before_execution(
             {
                 "org.roami.rsi.shared-daily-policy": version,
                 "org.roami.rsi.role-instructions": "1",
-                "org.roami.rsi.final-reply-tool": "1",
+                "org.roami.rsi.final-reply-tool": "2",
                 "org.roami.rsi.source-reply-review": "6",
             }
             if version

@@ -162,7 +162,7 @@ class NativeFilesExecutor:
         )
         if self.shared_daily_limit:
             self.model_hash = digest(
-                [self.model_hash, "shared_model_daily_limit-v4-final-reply-tool"]
+                [self.model_hash, "shared_model_daily_limit-v5-final-tool-recovery"]
             )
 
     def reservation_tokens(self, case):

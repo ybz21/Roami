@@ -12,6 +12,7 @@ import httpx
 
 from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected
 from roami_agent.protocol.model_observation import model_observation
+from roami_agent.protocol.model_tool_selection import selected_reply_tool
 from roami_agent.protocol.models import ModelEvent, model_endpoint
 from roami_agent.protocol.serialization import encoded
 from roami_agent.providers.generation_parameters import generation_parameters
@@ -210,6 +211,9 @@ class ChatCompletions:
             body["stream_options"] = {"include_usage": True}
         if tools:
             body["tools"] = tools
+        choice = selected_reply_tool(tools)
+        if choice is not None:
+            body["tool_choice"] = choice
         if "namespace" in self.cache:
             prefix = [
                 self.provider_key,
@@ -218,6 +222,8 @@ class ChatCompletions:
                 messages[:1],
                 tools,
             ]
+            if choice is not None:
+                prefix.append(choice)
             body["prompt_cache_key"] = hashlib.sha256(encoded(prefix).encode()).hexdigest()
         if set(self.cache) & {"mode", "ttl"}:
             body["prompt_cache_options"] = {

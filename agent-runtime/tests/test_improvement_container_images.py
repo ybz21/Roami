@@ -85,7 +85,7 @@ async def test_visual_worker_requires_a_capable_container_image(labels, monkeypa
                             **(labels or {}),
                             "org.roami.rsi.shared-daily-policy": "6",
                             "org.roami.rsi.role-instructions": "1",
-                            "org.roami.rsi.final-reply-tool": "1",
+                            "org.roami.rsi.final-reply-tool": "2",
                             "org.roami.rsi.source-reply-review": "6",
                         }
                     },
@@ -174,7 +174,7 @@ async def test_visual_main_requires_a_capable_container_image(labels, monkeypatc
                             **(labels or {}),
                             "org.roami.rsi.shared-daily-policy": "6",
                             "org.roami.rsi.role-instructions": "1",
-                            "org.roami.rsi.final-reply-tool": "1",
+                            "org.roami.rsi.final-reply-tool": "2",
                             "org.roami.rsi.source-reply-review": "6",
                         }
                     },
@@ -218,7 +218,7 @@ async def test_model_free_renderer_keeps_its_pinned_image_without_actor_input_la
                             "org.roami.rsi.model-image-input": "1",
                             "org.roami.rsi.shared-daily-policy": "6",
                             "org.roami.rsi.role-instructions": "1",
-                            "org.roami.rsi.final-reply-tool": "1",
+                            "org.roami.rsi.final-reply-tool": "2",
                             "org.roami.rsi.source-reply-review": "6",
                         }
                         if actor

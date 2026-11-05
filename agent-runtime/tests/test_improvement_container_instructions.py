@@ -54,7 +54,7 @@ async def test_model_actor_requires_role_instruction_support_before_start(monkey
         calls.append(args)
         labels = {
             "org.roami.rsi.shared-daily-policy": "6",
-            "org.roami.rsi.final-reply-tool": "1",
+            "org.roami.rsi.final-reply-tool": "2",
             "org.roami.rsi.source-reply-review": "6",
         }
         if label is not None:
