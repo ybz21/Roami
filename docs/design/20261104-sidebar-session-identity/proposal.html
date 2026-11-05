@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>侧栏会话派生层级</title>
+<style>
+:root{color-scheme:dark;--bg-base:#0d1117;--text-bright:#e6edf3;--text-dim:#8b949e;--border-subtle:#21262d;--sel-bg:rgba(255,255,255,.065);--accent:#58a6ff;--ok:#3fb950;--fs-meta:12px;--fs-sm:13px;--fs-body:14px;--fs-title:22px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--r-xs:6px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 system-ui;padding:var(--sp-5)}h1{font-size:var(--fs-title)}main{display:flex;gap:var(--sp-5);flex-wrap:wrap}section{width:280px}h2{font-size:var(--fs-body);color:var(--text-dim)}.row{padding:var(--sp-2) var(--sp-3);font-size:var(--fs-sm)}.meta{color:var(--text-dim);font-size:var(--fs-meta)}.children{margin-left:var(--sp-5);padding-left:var(--sp-2);border-left:1px solid var(--border-subtle)}.selected{background:var(--sel-bg);border-radius:var(--r-xs);box-shadow:inset 2px 0 var(--accent)}.run{display:inline-block;width:var(--sp-2);height:var(--sp-2);background:var(--ok);border-radius:50%;margin-left:var(--sp-2)}p{max-width:56ch;color:var(--text-dim)}</style>
+<h1>项目下的会话派生层级</h1><p>会话只出现一次；父、子、孙按派生关系逐级缩进。目录相同不产生上下级，跨目录也不打断派生关系。</p><main><section><h2>Roami</h2><div class="row selected">RSI线上修复 <i class="run"></i></div><div class="children"><div class="row">RSI答案回归</div><div class="children"><div class="row">RSI数值验收</div></div><div class="row">RSI提交门禁</div><div class="row">跨目录回归</div></div><div class="row">独立检查</div><div class="row">OKR会话续接</div></section></main><h2>入口提示词顺序</h2><pre># 任务：
+
+任务原文
+
+# 开工准备
+
+工作区初始化与命名
+
+# Roami 本机能力
+
+先复用已有会话，确需新开时优先派生。</pre><p>这是层级示意；真实组件使用 Agent 和终端 SVG 图标，目录信息在详情与相关操作中查看。</p></html>

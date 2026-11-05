@@ -1,0 +1,84 @@
+{
+  "issue": 398,
+  "original_request": "帮我查一下有哪些 MCP 有免费的搜索额度的。",
+  "live_chrome": {
+    "natural_repeat_preserved_task": false,
+    "replacement_created": true,
+    "detail_page_continuation": {
+      "same_task": true,
+      "revision": 2,
+      "latest_attempt_state": "succeeded",
+      "historical_attempt_state": "unknown",
+      "historical_result_unchanged": true,
+      "result_has_source_links": true,
+      "lookup_delivery": "four pricing pages retrieved; unavailable sources identified; not claimed as complete natural-request acceptance"
+    },
+    "source_check": {
+      "method": "independent retrieval of official pricing and MCP documentation",
+      "checked": [
+        "https://www.tavily.com/pricing",
+        "https://docs.tavily.com/documentation/mcp",
+        "https://exa.ai/pricing",
+        "https://exa.ai/mcp",
+        "https://www.firecrawl.dev/pricing",
+        "https://www.linkup.so/pricing"
+      ],
+      "four_free_tier_claims_supported": true
+    },
+    "production_main_source_updated": false
+  },
+  "candidate": {
+    "delivered": true,
+    "old_context_positive_controls_failed": 2,
+    "old_admission_positive_controls_failed": 2,
+    "new_regression_tests": {
+      "passed": 10,
+      "failed": 0
+    },
+    "saved_main": {
+      "passed": 3,
+      "total": 3,
+      "saved_routes_changed": false,
+      "scope": "Main admission/steering with isolated navigation and paused background execution fixtures; not real lookup delivery",
+      "rounds": [
+        {
+          "round": 0,
+          "passed": true,
+          "revision": 2,
+          "taskCountBefore": 5,
+          "taskCountAfter": 5,
+          "oldAttemptState": "unknown"
+        },
+        {
+          "round": 1,
+          "passed": true,
+          "revision": 2,
+          "taskCountBefore": 5,
+          "taskCountAfter": 5,
+          "oldAttemptState": "unknown"
+        },
+        {
+          "round": 2,
+          "passed": true,
+          "revision": 2,
+          "taskCountBefore": 5,
+          "taskCountAfter": 5,
+          "oldAttemptState": "unknown"
+        }
+      ]
+    },
+    "full_quality_gate": {
+      "exit": 0,
+      "python_passed": 3432,
+      "python_skipped": 48,
+      "source_manifest_sha256": "55f205c3ac0a5e9aa12fd580a38cc100ab1730fcd1f6f130e004a08cbc4df1c1"
+    },
+    "pre_commit_quick_gate": {
+      "exit": 0,
+      "python_passed": 3432,
+      "python_skipped": 48,
+      "commit": "9df2b700"
+    }
+  },
+  "full_issue_acceptance": false
+}

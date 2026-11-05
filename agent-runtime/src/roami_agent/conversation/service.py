@@ -28,8 +28,8 @@ class ConversationService:
         native = await self.db.call(
             lambda db: row(
                 db,
-                "SELECT task_id FROM native_sessions WHERE conversation_id=? AND owner_id=?",
-                (cid, owner),
+                "SELECT task_id FROM native_sessions WHERE conversation_id=? AND owner_id=? UNION ALL SELECT task_id FROM swarm_member_instances WHERE conversation_id=? AND owner_id=?",
+                (cid, owner, cid, owner),
             )
         )
         if native:

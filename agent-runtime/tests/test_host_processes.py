@@ -82,7 +82,7 @@ async def test_diagnostics_are_discoverable_read_only_and_need_no_workspace(stor
             assert any(
                 command["argv"] == ["roami", "agent", "host", "processes", "--input", "JSON"]
                 for item in items
-                for command in item.get("commands", [])
+                for command in item.get("commands", [item])
             )
         for role in ["main", "worker"]:
             tool, _ = runtime.tools.validate(host_call(), role)

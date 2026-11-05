@@ -12,7 +12,7 @@ import (
 )
 
 func stateLabel(state string) string {
-	labels := map[string]string{"planning": "规划中", "queued": "待派发", "preparing": "准备中", "running": "执行中", "verifying": "待验收", "waiting_user": "需要输入", "review": "待审", "blocked": "受阻", "failed": "失败", "succeeded": "已验收", "done": "已完成", "unknown": "结果未知", "cancelled": "已取消", "interrupted": "已中断", "cancelling": "停止中", "idle": "空闲", "completed": "已结束"}
+	labels := map[string]string{"unassigned": "待分配", "planning": "规划中", "queued": "待派发", "preparing": "准备中", "running": "执行中", "verifying": "待验收", "waiting_user": "需要输入", "review": "待审", "blocked": "受阻", "failed": "失败", "succeeded": "已验收", "done": "已完成", "unknown": "结果未知", "cancelled": "已取消", "interrupted": "已中断", "cancelling": "停止中", "idle": "空闲", "completed": "已结束"}
 	if label, ok := labels[state]; ok {
 		return label
 	}
@@ -39,7 +39,11 @@ func renderDirectory(w io.Writer, values []snapshot, archived bool) error {
 		if value.Archived {
 			state += " / 已归档"
 		}
-		fmt.Fprintf(table, "%s\t%s\t%s\t%d\t%d\n", value.ID, line(value.Name), state, len(value.Work), value.Revision)
+		count := len(value.Work)
+		if value.Members != nil {
+			count = len(value.Members)
+		}
+		fmt.Fprintf(table, "%s\t%s\t%s\t%d\t%d\n", value.ID, line(value.Name), state, count, value.Revision)
 	}
 	return table.Flush()
 }
@@ -64,6 +68,14 @@ func renderStatus(w io.Writer, value snapshot) error {
 	return err
 }
 func renderMembers(w io.Writer, value snapshot) error {
+	if value.Members != nil {
+		table := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+		fmt.Fprintln(table, "成员ID\t职责\t执行器\t状态\t轮次\t任务")
+		for _, member := range value.Members {
+			fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%d\t%s\n", member.ID, line(member.Name), executorLabel(member.Executor), stateLabel(member.State), member.RoundCount, member.TaskID)
+		}
+		return table.Flush()
+	}
 	table := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(table, "工作项\t成员\t执行器\t状态\t任务修订\t任务\t会话")
 	for _, work := range value.Work {

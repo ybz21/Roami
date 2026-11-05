@@ -17,9 +17,14 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.native_session_registry import register as register_native_session
+from roami_agent.storage.request_quotes import source_quote
 from roami_agent.storage.task_context import model_task_projection
-from roami_agent.storage.task_continuation import continuation_candidates
+from roami_agent.storage.task_continuation import (
+    continuation_candidates,
+    unresolved_repeated_requests,
+)
 from roami_agent.storage.task_reports import reported_progress
+from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -73,6 +78,8 @@ class Tasks:
         routing_decision=None,
         title=None,
         independent_project_outcome=False,
+        bind_task=None,
+        member_instance_id=None,
     ):
         if (
             not key
@@ -136,6 +143,14 @@ class Tasks:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if any(target.get(k) for k in ["directory", "workspaceId", "base", "remote"]):
                 raise DomainError("CODING_SESSION_TARGET_CONFLICT")
+        if member_instance_id is not None and (
+            executor != "native"
+            or not isinstance(member_instance_id, str)
+            or not member_instance_id
+            or parent_task_id
+            or from_message_id
+        ):
+            raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
         spec = {
             "goal": goal,
             "target": target,
@@ -146,6 +161,8 @@ class Tasks:
             "recordIntent": record_intent,
         }
 
+        if member_instance_id is not None:
+            spec["memberInstanceId"] = member_instance_id
         if model is not None:
             spec["model"] = model
         if title is not None:
@@ -157,6 +174,12 @@ class Tasks:
                 sourceTurnId=source_turn_id,
                 sourceAssistantMessageId=source_assistant_message_id,
             )
+
+        def admitted(db, task):
+            # Commit Swarm identity before the queued task can run or be steered.
+            if bind_task:
+                bind_task(db, task)
+            return task
 
         def write(db):
             c = owned(db, owner, cid)
@@ -184,7 +207,7 @@ class Tasks:
                 stored_spec.pop("parentTaskRevision", None)
                 if stored_spec != spec or task["origin_conversation_id"] != cid:
                     raise DomainError("TASK_KEY_CONFLICT", 409)
-                return task
+                return admitted(db, task)
             if (
                 source_turn_id
                 and not parent_task_id
@@ -214,24 +237,41 @@ class Tasks:
                         ) or rejected_args.get("executor")
                         if requested and executor != requested:
                             raise DomainError("ROUTING_EXECUTOR_CONFLICT", 409)
-                rejected = row(
+                rejected = rows(
                     db,
                     "SELECT COALESCE(json_extract(e.payload_json,'$.decision.executor'),"
-                    "json_extract(x.arguments_json,'$.executor'),'native') AS executor "
+                    "json_extract(x.arguments_json,'$.executor'),'native') AS executor,"
+                    "COALESCE(json_extract(native_content(x.arguments_json),'$.directory'),"
+                    "json_extract(native_content(x.arguments_json),'$.target.directory')) AS directory "
                     "FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
                     "LEFT JOIN events e ON e.event_key='routing:'||x.idempotency_key "
                     "WHERE x.turn_id=? AND x.tool_name='delegate' AND x.state='failed' AND "
                     "CASE WHEN json_valid(json_extract(native_content(m.content_json),'$.text')) THEN "
                     "json_extract(json_extract(native_content(m.content_json),'$.text'),'$.error') END "
-                    "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') LIMIT 1",
+                    "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE',"
+                    "'TASK_TARGET_REVIEW_REQUIRED')",
                     (source_turn_id,),
                 )
-                if rejected and not (
-                    executor == "native"
-                    and automatic_task_directory(target)
-                    and rejected["executor"] == "native"
-                ):
-                    raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
+                if rejected:
+                    source = row(
+                        db,
+                        "SELECT * FROM messages WHERE turn_id=? AND conversation_id=? "
+                        "AND role='user' AND deleted_ms IS NULL ORDER BY rowid LIMIT 1",
+                        (source_turn_id, cid),
+                    )
+                    source = task_user_request(db, source) if source else None
+                    text = json.loads(source["content_json"]).get("text", "") if source else ""
+                    if not (
+                        executor == "native"
+                        and automatic_task_directory(target)
+                        and source is not None
+                        and all(
+                            item["executor"] == "native"
+                            and not source_quote(text, item["directory"])
+                            for item in rejected
+                        )
+                    ):
+                        raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
                 for steering in rows(
                     db,
                     "SELECT arguments_json FROM tool_calls WHERE turn_id=? "
@@ -313,6 +353,9 @@ class Tasks:
             if not origin:
                 raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
             if source_turn_id and not parent_task_id:
+                source_turn = row(db, "SELECT * FROM turns WHERE id=?", (source_turn_id,))
+                if unresolved_repeated_requests(db, dict(source_turn, owner_id=owner), origin):
+                    raise DomainError("TASK_FAILURE_REVIEW_REQUIRED", 409)
                 previous = rows(
                     db,
                     "SELECT * FROM tasks WHERE owner_id=? AND origin_conversation_id=? "
@@ -326,7 +369,7 @@ class Tasks:
                         and intent.get("target") == target
                     ):
                         # A new tool-call ID must not duplicate an already admitted assignment.
-                        return existing
+                        return admitted(db, existing)
                 unknown = any(
                     row(
                         db,
@@ -402,24 +445,32 @@ class Tasks:
             )
             branch_id = None
             if executor == "native":
-                child, branch_id = identity(), identity()
-                db.execute(
-                    "INSERT INTO conversations(id,owner_id,title,created_ms,updated_ms) VALUES(?,?,?,?,?)",
-                    (child, owner, "Task: " + goal[:100], now_ms(), now_ms()),
-                )
-                db.execute(
-                    "INSERT INTO branches(id,conversation_id,parent_branch_id,fork_message_id,created_ms) VALUES(?,?,?,?,?)",
-                    (
-                        branch_id,
-                        child,
-                        fork_point["branch_id"] if fork_point else None,
-                        from_message_id,
-                        now_ms(),
-                    ),
-                )
-                db.execute(
-                    "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
-                )
+                if member_instance_id:
+                    from roami_agent.storage.member_instances import native_task_instance
+
+                    instance = native_task_instance(db, owner, cid, member_instance_id, key)
+                    if instance["task_id"] is not None:
+                        raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
+                    child, branch_id = instance["conversation_id"], instance["branch_id"]
+                else:
+                    child, branch_id = identity(), identity()
+                    db.execute(
+                        "INSERT INTO conversations(id,owner_id,title,created_ms,updated_ms) VALUES(?,?,?,?,?)",
+                        (child, owner, "Task: " + goal[:100], now_ms(), now_ms()),
+                    )
+                    db.execute(
+                        "INSERT INTO branches(id,conversation_id,parent_branch_id,fork_message_id,created_ms) VALUES(?,?,?,?,?)",
+                        (
+                            branch_id,
+                            child,
+                            fork_point["branch_id"] if fork_point else None,
+                            from_message_id,
+                            now_ms(),
+                        ),
+                    )
+                    db.execute(
+                        "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
+                    )
                 register_native_session(db, tid, child, branch_id)
                 source_content = json.loads(origin["content_json"])
                 resource_only = (spec.get("target") or {}).get("resourceOnly")
@@ -450,6 +501,13 @@ class Tasks:
                 "state,native_branch_id,lease_epoch) VALUES(?,?,1,1,?,?,'accepted',?,1)",
                 (rid, tid, "native" if executor == "native" else "cli", launch_id, branch_id),
             )
+            if member_instance_id:
+                changed = db.execute(
+                    "UPDATE swarm_member_instances SET task_id=? WHERE id=? AND task_id IS NULL",
+                    (tid, member_instance_id),
+                )
+                if changed.rowcount != 1:
+                    raise DomainError("MEMBER_INSTANCE_BINDING_CONFLICT", 409)
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
                 "VALUES(?,'task.run',?,?,?,'queued',?)",
@@ -463,7 +521,7 @@ class Tasks:
                 key="accepted:" + tid,
                 task_id=tid,
             )
-            return row(db, "SELECT * FROM tasks WHERE id=?", (tid,))
+            return admitted(db, row(db, "SELECT * FROM tasks WHERE id=?", (tid,)))
 
         return await self.db.call(write, write=True)
 

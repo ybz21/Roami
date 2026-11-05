@@ -7,6 +7,8 @@ from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import require
 from roami_agent.protocol.errors import DomainError
+from roami_agent.storage.database import rows
+from roami_agent.storage.task_handoff import accepted_handoffs
 
 NATIVE_TASK_REQUEST = "本次任务明确使用内置Native Worker执行。"
 NATIVE_TASK_PROFILE_VERSION = "native-worker-v2-continuations"
@@ -27,7 +29,45 @@ NATIVE_EXECUTION_FAILURES = NATIVE_BUDGET_FAILURES | {
     "RSI_NATIVE_TASK_REQUIRED",
     "RSI_NATIVE_EXECUTOR_REQUIRED",
     "RSI_NATIVE_TASK_INCOMPLETE",
+    "RSI_NATIVE_DELIVERY_REQUIRED",
 }
+
+
+async def delivered_evaluation_answer(database, turn_id):
+    def read(db):
+        handoffs = accepted_handoffs(db, turn_id)
+        if not handoffs:
+            return None
+        results = rows(
+            db,
+            "SELECT t.id AS task_id,m.content_json FROM turns source JOIN conversations c ON c.id=source.conversation_id "
+            "JOIN tasks t ON t.owner_id=c.owner_id AND t.origin_conversation_id=c.id "
+            "AND t.origin_branch_id=source.branch_id "
+            "JOIN task_attempts a ON a.task_id=t.id AND a.task_revision=t.revision "
+            "AND a.attempt_no=(SELECT MAX(last.attempt_no) FROM task_attempts last "
+            "WHERE last.task_id=t.id AND last.task_revision=t.revision) "
+            "JOIN jobs j ON j.kind='turn.run' "
+            "AND json_extract(j.payload_json,'$.completion.taskId')=t.id "
+            "AND json_extract(j.payload_json,'$.completion.taskRevision')=t.revision "
+            "AND json_extract(j.payload_json,'$.completion.runId')=a.id "
+            "JOIN turns u ON u.id=j.aggregate_id AND u.conversation_id=c.id "
+            "AND u.branch_id=source.branch_id AND u.trigger_kind='completion' AND u.state='completed' "
+            "JOIN messages m ON m.turn_id=u.id AND m.role='assistant' AND m.status='completed' "
+            "AND m.deleted_ms IS NULL WHERE source.id=? AND t.id IN (SELECT value FROM json_each(?)) "
+            "AND t.state IN ('succeeded','waiting_user') AND a.state='succeeded' AND a.executor_kind='native' "
+            "AND json_extract(native_content(a.result_json),'$.outcomeKnown') IS NOT 0 "
+            "AND json_extract(native_content(a.result_json),'$.inputStopped') IS NOT 0 "
+            "AND json_extract(native_content(m.content_json),'$.source')='task' "
+            "AND json_type(native_content(m.content_json),'$.answerText')='text' "
+            "AND json_extract(native_content(m.content_json),'$.tool_calls') IS NULL "
+            "ORDER BY m.rowid DESC",
+            (turn_id, json.dumps(sorted(handoffs))),
+        )
+        if {result["task_id"] for result in results} != set(handoffs):
+            return None
+        return json.loads(results[0]["content_json"])["answerText"]
+
+    return await database.call(read)
 
 
 async def evaluation_turn_failure(database, turn):

@@ -30,6 +30,27 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
             {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
         )
 
+    async def register_members(args, binding):
+        await main(binding, args["swarmId"])
+        return await swarms.register_members(
+            binding["owner"],
+            args["swarmId"],
+            {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
+        )
+
+    async def member(args, binding):
+        await status(args, binding)
+        value = await swarms.member(
+            binding["owner"],
+            args["swarmId"],
+            args["memberId"],
+            before=args.get("before"),
+            limit=args.get("limit", 20),
+        )
+        if binding.get("taskId") and value["member"]["taskId"] != binding["taskId"]:
+            raise DomainError("SWARM_MEMBER_REQUIRED", 403)
+        return value
+
     async def status(args, binding):
         info = await swarms.snapshot(binding["owner"], args["swarmId"])
         if binding.get("taskId"):
@@ -119,6 +140,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
     item = object_schema(
         {
             "member": string,
+            "memberId": string,
             "executor": {"type": "string", "enum": ["native", "codex", "claude", "opencode", "pi"]},
             "title": string,
             "goal": string,
@@ -141,6 +163,52 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ["member", "executor", "title", "goal", "acceptance"],
     )
     for name, description, schema, call, is_main, effect in [
+        (
+            "swarm_members_register",
+            "Register persistent roles without dispatching tasks or pretending an instance is running. This opts the team into stable-member planning: subsequent swarm_plan items must specify memberId from this receipt. Reuse existing stable member IDs for later work. Existing roles keep their executor and duty; command retries are idempotent.",
+            object_schema(
+                {
+                    "swarmId": string,
+                    "expectedRevision": {"type": "integer", "minimum": 1},
+                    "members": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "items": object_schema(
+                            {
+                                "name": string,
+                                "executor": {
+                                    "type": "string",
+                                    "enum": ["native", "codex", "claude", "opencode", "pi"],
+                                },
+                                "duty": string,
+                            },
+                            ["name", "executor", "duty"],
+                        ),
+                    },
+                },
+                ["swarmId", "expectedRevision", "members"],
+            ),
+            register_members,
+            True,
+            "write",
+        ),
+        (
+            "swarm_member",
+            "Read a persistent member and its paginated execution rounds. Round requests, attempts and acceptance stay distinct; delivery is not completion. Main reads its team, workers only their own member history. Use task_steer with the existing task ID for subsequent rounds.",
+            object_schema(
+                {
+                    "swarmId": string,
+                    "memberId": string,
+                    "before": {"type": "integer", "minimum": 1},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+                ["swarmId", "memberId"],
+            ),
+            member,
+            True,
+            "read",
+        ),
         (
             "swarm_verify",
             "Main independently verifies a waiting task in its own Swarm at the exact revision/runId. First inspect task state and fully read each selected current-run text artifact with read artifact://ID in this turn, before this assistant message. Metadata, partial pages, execution summaries and checks text alone are not proof. Complete text pages may be read across calls; binary and external-action acceptance stays with UI/host. All external_action tasks are rejected here, even with user-consent claims. accepted=false records rejection with checks. This never executes or retries the task.",
@@ -242,7 +310,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_plan",
-            "Append named members/work items to the current swarm plan at expectedRevision. Select appropriate executors (native means Roami Worker), explicit goals and acceptance. Declare deliverables for requested files (kind=artifact, mimeType such as video/mp4) and real external actions (kind=external_action). Text plans and URLs do not satisfy them; external actions need a concrete receipt and explicit user acceptance. Read-only research may omit deliverables; integration=true is a final integration task that depends on all other items. Hard dependencies dispatch only after verified matching revisions. Do not redelegate existing work: use task_steer for changes, preserve its executor and workspace. Unknown launches never retry as new tasks.",
+            "Assign work at expectedRevision. When memberProtocol=1, every item must use the exact memberId of a registered role; unregistered replacement names are rejected. Register genuine new roles separately with swarm_members_register. Legacy teams retain named-plan compatibility. Select appropriate executors (native means Roami Worker), explicit goals and acceptance. Declare deliverables for requested files (kind=artifact, mimeType such as video/mp4) and real external actions (kind=external_action). Text plans and URLs do not satisfy them; external actions need a concrete receipt and explicit user acceptance. Read-only research may omit deliverables; integration=true is a final integration task that depends on all other items. Hard dependencies dispatch only after verified matching revisions. Members are long-lived roles, not execution rounds. Reuse the original member/task with task_steer for later work and keep its conversation, executor and workspace; never append r2/r3 replacements. Unknown launches never retry as new tasks.",
             object_schema(
                 {
                     "swarmId": string,

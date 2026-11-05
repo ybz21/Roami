@@ -5,6 +5,7 @@ import { useI18n } from '../../i18n'
 import AgentTasks from './AgentTasks'
 import AgentMemory from './AgentMemory'
 import AgentInbox from './AgentInbox'
+import { useAgentData } from './useAgentData'
 import type { AgentInboxState } from './useAgentInbox'
 import type { WorkspaceTab } from './useAgentWorkspace'
 import './agent-workspace.css'
@@ -16,6 +17,8 @@ export default function AgentWorkspaceRail({ cid, connected, actions, inbox, tab
   projects: { id: string; name: string }[]; select: (cid: string, branch?: string, message?: string) => void
 }) {
   const { t } = useI18n()
+  const messageSummary = useAgentData<{ unread: number; conversationId?: string }>(cid ? '/agent/notifications/summary?conversationId=' + encodeURIComponent(cid) : null, 10000)
+  const unread = messageSummary.value?.conversationId === cid ? messageSummary.value.unread : 0
   const label = (key: WorkspaceTab, icon: ReactNode) => <span className="agent-workspace-tab">{icon}{t('agent.workspace.' + key)}</span>
   return <aside className="agent-workspace-rail" data-tab={tab} aria-label={t('agent.workspace.title')}>
     <Tabs activeKey={tab} onChange={key => change(key as WorkspaceTab)} tabBarExtraContent={{ right: <div className="agent-workspace-toolbar">
@@ -24,7 +27,7 @@ export default function AgentWorkspaceRail({ cid, connected, actions, inbox, tab
       <button type="button" className="tt-act" aria-label={t('agent.workspace.close')} title={t('agent.workspace.close')} onClick={close}><PanelRightIcon size={18} /></button>
     </div> }} destroyInactiveTabPane items={[
       { key: 'tasks', label: label('tasks', <ChecklistIcon size={15} />), children: <AgentTasks projects={projects} compact cid={cid} selectedTask={task} onSelectTask={onTask} onSession={onSession} onChanged={onChanged} /> },
-      { key: 'messages', label: <>{label('messages', <BellIcon size={15} />)}{!!inbox.unread && <span className="agent-workspace-unread">{inbox.unread > 99 ? '99+' : inbox.unread}</span>}</>, children: <AgentInbox inbox={inbox} select={select} /> },
+      { key: 'messages', label: <>{label('messages', <BellIcon size={15} />)}{!!unread && <span className="agent-workspace-unread">{unread > 99 ? '99+' : unread}</span>}</>, children: <AgentInbox key={cid} conversationId={cid} inbox={inbox} select={select} /> },
       { key: 'memory', label: label('memory', <NotebookIcon size={15} />), children: <AgentMemory compact cid={cid} defaultGroup="all" projects={projects} select={select} /> },
     ]} />
   </aside>

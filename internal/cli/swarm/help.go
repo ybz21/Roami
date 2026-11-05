@@ -34,7 +34,10 @@ func showHelp(w io.Writer, topics []string) error {
   say <群ID> "消息" --key KEY [--to 成员 --task-revision N] [--json]
   member add <群ID> <成员名> --executor codex|claude|roami|opencode|pi
     --goal TEXT --acceptance TEXT --key KEY --revision N
-    [--title TEXT] [--depends-on 成员@修订#产物ID]... [--integration]
+    [--member-id ID] [--title TEXT] [--depends-on 成员@修订#产物ID]... [--integration]
+  member register <群ID> <职责名> --executor codex|claude|roami|opencode|pi
+    --duty TEXT --key KEY --revision N（仅登记，不派发）
+  member inspect <群ID> <成员ID> [--before N] [--limit 20] [--json]
   member ls <群ID> [--json]
   member show <群ID> <成员名或工作项ID> [--json]
   dependencies <群ID> <成员名或工作项ID> --key KEY --revision N
@@ -49,6 +52,8 @@ func showHelp(w io.Writer, topics []string) error {
 
 群ID、工作项、task、run 是不同身份；status 显示计划修订，members 显示任务修订。
 new 默认复用节点 Main；成员由受管任务执行。结果经独立验收，不能手动移到完成。
+member inspect 按成员ID查看轮次；登记不会创建运行中的实例。
+登记后计划必须传 memberId（member add 用 --member-id），不再按新名字创建替代成员。
 指定成员的 say 会继续原任务；重试保持原 --key、文本、接收人和任务修订。
 暂停只停新派发，停止调用任务取消，归档不关闭会话。修复依赖前先确认停止。
 --json 为结构化输出；--follow 持续读取 SSE，断线退避重连，Ctrl-C 退出。

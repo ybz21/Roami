@@ -10,7 +10,7 @@ function briefState(generation: BriefGeneration) {
   return generation.generationUnknown ? 'unknown' : generation.skipped ? 'skipped' : generation.state
 }
 
-export default function AgentReminders({ select }: { select: (cid: string, branch?: string, message?: string) => void }) {
+export default function AgentReminders({ select, conversationId }: { conversationId?: string; select: (cid: string, branch?: string, message?: string) => void }) {
   const { t, locale } = useI18n()
   const [items, setItems] = useState<Reminder[] | null>(null), [failed, setFailed] = useState(false), [version, setVersion] = useState(0), [busy, setBusy] = useState('')
   const alive = useRef(true), pending = useRef(false)
@@ -19,11 +19,11 @@ export default function AgentReminders({ select }: { select: (cid: string, branc
   useEffect(() => {
     let cancelled = false
     const abort = new AbortController(), timer = setTimeout(() => abort.abort(), 10000)
-    void api('GET', '/agent/reminders', undefined, { signal: abort.signal })
-      .then((result) => { if (!cancelled) { setItems(result.data); setFailed(false) } })
+    void api('GET', '/agent/reminders' + (conversationId ? '?conversationId=' + encodeURIComponent(conversationId) : ''), undefined, { signal: abort.signal })
+      .then((result) => { if (!cancelled) { setItems(conversationId ? result.data.filter((item: Reminder) => item.conversationId === conversationId) : result.data); setFailed(false) } })
       .catch(() => { if (!cancelled) setFailed(true) }).finally(() => clearTimeout(timer))
     return () => { cancelled = true; clearTimeout(timer); abort.abort() }
-  }, [version])
+  }, [version, conversationId])
   const cancel = async (id: string) => {
     if (pending.current) return
     pending.current = true; setBusy(id)

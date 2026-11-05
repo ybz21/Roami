@@ -164,6 +164,13 @@ const projectAgentEntry = `# Project agent instructions
 Before OKR work, read .roami/okr/AGENTS.md, the confirmed .roami/okr/okr.json,
 the bound team's current board/chat and .roami/okr/memory/team.md.
 Follow the daily artifact and multi-agent collaboration contract there.
+
+Store team facts and working rules in .roami/okr/memory/team.md.
+Store important decisions and unresolved matters in .roami/okr/memory/decisions.md,
+including date, source and current status. Each long-lived member keeps its own
+notes in .roami/okr/memory/members/<stable-member-id>/memory.md. Reuse the same
+member, task and native conversation for later rounds; do not create r2/r3 members.
+Keep deliverables and reviews in YYYY/YYYYMM/YYYYMMDD/, separate from memory.
 Keep this file's existing project rules when extending it.
 `
 
@@ -223,6 +230,11 @@ uncertainty and proposes the next change; Main/user decide and dispatch it.
 One member owns a file, account or device action at a time. Serialize browser and
 phone operations; unknown outcomes are reconciled on the same resource before
 retry. Do not bypass a busy task, old pending tool or login/approval boundary.
+
+Keep members alive between rounds. Reuse the original member/task and native
+conversation through revision-checked steering; do not create r2/r3 replacements.
+A closed terminal requires identity-verified restoration of the original
+conversation, never a silent new conversation.
 
 Use the same group chat for handoffs, blockers, candidate artifacts and decisions.
 Report task/revision/run and paths rather than only saying done. @leader addresses

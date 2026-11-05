@@ -333,3 +333,46 @@ async def test_pipeline_preflight_failure_has_private_stage_artifact(tmp_path, d
         in service.runs.read_artifact("local", run["id"], artifact["id"])["text"]
     )
     assert "private image failure sentinel" not in public_issue_body(value, {})
+
+
+async def test_incompatible_image_keeps_missing_capabilities_in_private_stage_artifact(
+    tmp_path, docker
+):
+    processes, calls = docker
+    processes.append(
+        Process(
+            json.dumps(
+                [{"Id": "stale-image", "Config": {"Labels": {"unrelated": "PRIVATE_LABEL"}}}]
+            ).encode()
+        )
+    )
+    service = ImprovementStatus(tmp_path)
+    service.control.register_machine(
+        "local", {"id": "a", "label": "A", "mode": "container"}, local_only=True
+    )
+    service.control.register_suite("local", suite_file(tmp_path))
+    service.control.save(
+        "local", {**service.control.preferences("local"), "suite_id": "data", "machine_ids": ["a"]}
+    )
+    run = enqueue_diagnostic(service, "local", {"request_key": "stale-image", "case_ids": ["a"]})
+    with pytest.raises(DomainError, match="RSI_CONTAINER_IMAGE_REQUIRED"):
+        await execute_diagnostic(
+            SimpleNamespace(settings=SimpleNamespace(current=Settings())),
+            service,
+            service.control.claim(),
+        )
+    value = service.runs.get("local", run["id"])
+    assert value["cases"] == []
+    artifact = next(a for a in value["artifacts"] if a["name"] == "environment-failure.json")
+    evidence = json.loads(service.runs.read_artifact("local", run["id"], artifact["id"])["text"])[
+        "execution_diagnostics"
+    ]
+    assert evidence["source"] == "host_container_image"
+    assert evidence["image_id"] == "stale-image" and evidence["execution_started"] is False
+    assert evidence["requirements"] == [
+        {"label": "org.roami.rsi.role-instructions", "required": "1", "observed": None},
+        {"label": "org.roami.rsi.shared-daily-policy", "required": "6", "observed": None},
+    ]
+    assert "PRIVATE_LABEL" not in json.dumps(value)
+    assert "stale-image" not in public_issue_body(value, {})
+    assert len(calls) == 1 and calls[0][1:3] == ("image", "inspect")

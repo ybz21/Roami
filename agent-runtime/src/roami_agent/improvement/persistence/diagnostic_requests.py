@@ -5,6 +5,7 @@ from pathlib import Path
 
 from roami_agent.improvement.domain.contracts import digest, require
 from roami_agent.improvement.evaluation.contracts import load_suite
+from roami_agent.improvement.evaluation.diagnostic_selection import default_diagnostic_cases
 from roami_agent.improvement.persistence.run_repository import RunRepository
 from roami_agent.protocol.identity import now_ms
 
@@ -33,6 +34,8 @@ def enqueue_diagnostic_request(
             return {"id": prior[0]}
         suite = load_suite(Path(source["path"]))
         require(suite["content_hash"] == source["content_hash"], "RSI_SUITE_HASH_MISMATCH")
+        if case_ids is None:
+            case_ids = default_diagnostic_cases(suite)
         require(set(case_ids) <= {c["id"] for c in suite["cases"]}, "RSI_CASE_NOT_FOUND")
         request = {
             "period_key": key,

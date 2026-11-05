@@ -163,6 +163,12 @@ func (c AgentConfig) ResumeInteractive(conversation string) string {
 	return c.prefix(true) + " resume " + shellQuote(conversation)
 }
 
+func (c AgentConfig) ResumeInteractiveFromPromptFile(conversation, path string) string {
+	return c.ResumeInteractive(conversation) + ` "$(cat ` + shellQuote(path) + `)"`
+}
+
+func (c AgentConfig) HasLifecycleHooks() bool { return len(c.lifecycleArgs) > 0 }
+
 // Command builds the shell command line that launches the agent, mirroring
 // _agent_cmd → _agent_claude_cmd / _agent_codex_cmd.
 func (c AgentConfig) Command(task string) string {

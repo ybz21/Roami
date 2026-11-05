@@ -64,7 +64,8 @@ func readAgentCapabilities() (string, error) {
 func isShippedAgentCapabilities(data []byte) bool {
 	content := strings.TrimSpace(strings.ReplaceAll(string(data), "\r\n", "\n"))
 	switch fmt.Sprintf("%x", sha256.Sum256([]byte(content))) {
-	case "0d50a9e28f927ed484a75c9fe898ec72d47823574f2f71b1f4f8d92f9ee66786", // #317
+	case "7f9f63b412b44843ec3240351815ca8cd56c273786a8e6060f57a89ea6425251", // Fork-first session policy
+		"0d50a9e28f927ed484a75c9fe898ec72d47823574f2f71b1f4f8d92f9ee66786", // #317
 		"8774efb02f7ffef268c3cfa6cdd51a5b2eb8af9be5969ee529302e6095894dda", // #328
 		"a7b402f283e8182fedbd330dd5ca775ad9d210985a148f364cdbbc3e19af6aec", // #399
 		"731ca3553ff6cfedc7f5560ae54351c362a388a7d4913adfeda1478b03dea849", // #403

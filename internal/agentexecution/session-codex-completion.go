@@ -54,7 +54,10 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
 		return nil, ""
 	}
-	home := os.Getenv("CODEX_HOME")
+	home := binding.ProviderHome
+	if home == "" {
+		home = os.Getenv("CODEX_HOME")
+	}
 	if home == "" {
 		userHome, err := os.UserHomeDir()
 		if err != nil {
@@ -262,6 +265,7 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 		return status, false, err
 	}
 	state.State, state.LaunchKey, state.Tools = "idle", "", map[string]bool{}
+	state.CompletedKey, state.EndedIdle = key, false
 	state.UpdatedMS = time.Now().UnixMilli()
 	if err := writeJSON(path, state); err != nil {
 		return status, false, err

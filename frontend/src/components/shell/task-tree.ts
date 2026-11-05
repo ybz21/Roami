@@ -19,7 +19,9 @@ export type TreeSession = {
   agent?: AgentKind
   running?: boolean
   waiting?: boolean
-  /** 互审陪跑会话（<被审会话>-review）：审谁写在这儿，树上挂到被审那条下面 */
+  /** 记录的父会话；工作区归属独立于派生关系。 */
+  parent?: string
+  /** 互审陪跑会话：树上显示被审会话的名称。 */
   reviewOf?: string
 }
 
@@ -53,7 +55,7 @@ type ProjIn = {
   needs?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; state?: string }[] | null
 }
 type WtIn = { path: string; branch: string; isMain: boolean; committedAhead?: number; dirty?: number; untracked?: number; behind?: number; mergedInto?: string; pushed?: boolean; sessions?: { session: string; dormant?: boolean }[] | null }
-type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind }
+type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string }
 
 export function buildTaskTree(o: {
   projects: ProjIn[]
@@ -73,12 +75,13 @@ export function buildTaskTree(o: {
 }): TaskTree {
   // 会话的展示信息：先从 /projects 的 top / needs 里捞（带 agent / running / waiting），再补 /sessions 的 label
   const info = new Map<string, TreeSession>()
-  const put = (s: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; lastActivity?: number; state?: string; dormant?: boolean }) => {
+  const put = (s: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; lastActivity?: number; state?: string; dormant?: boolean; parent?: string }) => {
     const cur = info.get(s.name) || { name: s.name, label: s.label || s.name }
     info.set(s.name, {
       ...cur,
       label: s.label || cur.label,
       at: s.lastActivity || cur.at,
+      parent: s.parent ?? cur.parent,
       dormant: s.dormant || s.state === 'dormant' || cur.dormant,
       agent: s.agent || cur.agent,
       running: s.running ?? cur.running,
@@ -203,6 +206,7 @@ export function buildTaskTree(o: {
   const relocate = (s: TreeSession, from: TreeTask | null) => {
     const author = authorOf(s.name)
     if (!author) return false
+    s.parent ||= author
     const home = homeOf.get(author)
     // reviewOf 存的是**给人看的那个名字**：树上要写「互审 · 谁」，写会话名等于又印一串 id
     s.reviewOf = home?.sessions.find((x) => x.name === author)?.label || author

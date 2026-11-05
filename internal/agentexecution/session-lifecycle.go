@@ -19,18 +19,22 @@ import (
 )
 
 type SessionBinding struct {
-	Name             string         `json:"name"`
-	ID               string         `json:"id"`
-	TmuxID           string         `json:"tmuxId"`
-	Created          string         `json:"created"`
-	Server           string         `json:"server"`
-	Pane             string         `json:"pane"`
-	PID              int            `json:"pid"`
-	Directory        string         `json:"directory"`
-	ProviderID       string         `json:"providerConversationId"`
-	Processes        map[int]string `json:"processes,omitempty"`
-	Scope            string         `json:"scope,omitempty"`
-	ForeignProcesses map[int]string `json:"foreignProcesses,omitempty"`
+	Name              string         `json:"name"`
+	ID                string         `json:"id"`
+	TmuxID            string         `json:"tmuxId"`
+	Created           string         `json:"created"`
+	Server            string         `json:"server"`
+	Pane              string         `json:"pane"`
+	PID               int            `json:"pid"`
+	Directory         string         `json:"directory"`
+	ProviderID        string         `json:"providerConversationId"`
+	HostProof         string         `json:"hostProof,omitempty"`
+	DirectoryProof    string         `json:"directoryProof,omitempty"`
+	ProviderHome      string         `json:"providerHome,omitempty"`
+	ProviderHomeProof string         `json:"providerHomeProof,omitempty"`
+	Processes         map[int]string `json:"processes,omitempty"`
+	Scope             string         `json:"scope,omitempty"`
+	ForeignProcesses  map[int]string `json:"foreignProcesses,omitempty"`
 }
 
 type sessionLifecycle struct {
@@ -49,6 +53,10 @@ type sessionLifecycle struct {
 	Tools            map[string]bool          `json:"tools"`
 	ClaudeStop       *claudeStop              `json:"claudeStop,omitempty"`
 	UpdatedMS        int64                    `json:"updatedMs"`
+	CompletedKey     string                   `json:"completedLaunchKey,omitempty"`
+	EndedIdle        bool                     `json:"endedIdle,omitempty"`
+	Workspace        *Workspace               `json:"workspace,omitempty"`
+	Resuming         bool                     `json:"resuming,omitempty"`
 }
 
 // Record identities only; hook input and tool output can contain private content.
@@ -120,7 +128,7 @@ func (s Service) paneBinding(target string, pane bool) (SessionBinding, error) {
 		return SessionBinding{}, fmt.Errorf("SESSION_OBSERVATION_FAILED")
 	}
 	row := runtime.SessionRow{Name: fields[0], TmuxID: fields[1], Created: created}
-	return SessionBinding{Name: fields[0], ID: row.ID(), TmuxID: fields[1], Created: fields[2], Server: fields[3], Pane: fields[4], PID: pid, Directory: directory}, nil
+	return SessionBinding{Name: fields[0], ID: row.ID(), TmuxID: fields[1], Created: fields[2], Server: fields[3], Pane: fields[4], PID: pid, Directory: directory, HostProof: sessionHostProof(), DirectoryProof: sessionDirectoryProof(directory)}, nil
 }
 
 func (binding SessionBinding) resourceID() string {
@@ -155,6 +163,7 @@ func (s Service) ObserveSessionEvent(ctx context.Context, executor, pane string,
 }
 
 func markSessionUnknown(state *sessionLifecycle, reason string) {
+	state.EndedIdle = false
 	if state.State != "unknown" || state.UnknownReason == "" {
 		state.UnknownReason = reason
 	}
@@ -202,10 +211,19 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		dir, _ := s.directory(state.LaunchKey)
 		var spec Spec
 		var receipt Receipt
-		if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" || !spec.Persistent || spec.SessionID != "" || spec.Key != state.LaunchKey || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding != nil || workspaceHash(event.Prompt) != workspaceHash(sessionPrompt(dir, spec)) || event.TurnID == "" {
+		if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" || !spec.Persistent || (spec.SessionID != "" && spec.ResumeFrom == "") || spec.Key != state.LaunchKey || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding != nil || workspaceHash(event.Prompt) != workspaceHash(sessionPrompt(dir, spec)) || event.TurnID == "" {
 			return nil
 		}
-		state.Binding.ProviderID, state.State = "", "submitting"
+		if state.Resuming {
+			if spec.ResumeFrom == "" || state.Binding.ProviderID != spec.ResumeProvider || state.State != "submitting" {
+				return nil
+			}
+		} else {
+			state.Binding.ProviderID, state.State = "", "submitting"
+		}
+	}
+	if event.Hook == "UserPromptSubmit" {
+		state.CompletedKey, state.EndedIdle = "", false
 	}
 	if state.Binding.ProviderID != "" && (state.Binding.ProviderID != event.ProviderID || state.Executor != executor) {
 		if state.ProviderConflict == nil {
@@ -260,6 +278,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 				}
 			}
 		}
+		state.CompletedKey, state.EndedIdle = "", false
 		state.TurnID, state.PromptHash, state.State = event.TurnID, promptHash, "busy"
 	case event.Hook == "PreToolUse" || event.Hook == "PostToolUse":
 		if event.Hook == "PreToolUse" && state.LaunchKey != "" && state.TurnID == event.TurnID {
@@ -282,7 +301,9 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			state.Tools["subagent:"+event.AgentID] = true
 		}
 	case event.Hook == "Interrupt" || event.Hook == "SessionEnd":
+		endedIdle := event.Hook == "SessionEnd" && (state.State == "idle" || state.State == "unknown" && state.EndedIdle && state.UnknownReason == "SESSION_INTERRUPTED") && state.CompletedKey != "" && len(state.Tools) == 0
 		markSessionUnknown(&state, "SESSION_INTERRUPTED")
+		state.EndedIdle = endedIdle
 	case completed:
 		inputMatches := claudeCompleted
 		for _, input := range event.Inputs {
@@ -299,13 +320,15 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 			if readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding == nil || !sessionProcessesStopped(*receipt.Binding) {
 				markSessionUnknown(&state, "SESSION_STOP_UNCONFIRMED")
 			} else {
-				result := Result{State: "succeeded", Summary: truncate(event.LastAssistant, 32000), FinishedMS: time.Now().UnixMilli()}
+				stopped := true
+				result := Result{State: "succeeded", Summary: truncate(event.LastAssistant, 32000), FinishedMS: time.Now().UnixMilli(), InputStopped: &stopped, OutcomeKnown: &stopped}
 				if _, cancelErr := os.Stat(filepath.Join(dir, "cancel.json")); cancelErr == nil {
 					result.State, result.Summary = "cancelled", "Session task stopped after cancellation request"
 				}
 				if err = writeJSON(filepath.Join(dir, "result.json"), result); err != nil {
 					return err
 				}
+				state.CompletedKey = state.LaunchKey
 				state.LaunchKey, state.State = "", "idle"
 			}
 		} else {
@@ -353,6 +376,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Status{}, err
 	}
+	if spec.ResumeFrom != "" || spec.ResumeProvider != "" {
+		return s.restoreProviderSession(ctx, dir, spec)
+	}
 	binding, err := s.paneBinding(spec.SessionID, false)
 	if err != nil {
 		return Status{}, err
@@ -395,7 +421,13 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 		return Status{}, fmt.Errorf("SESSION_PROCESS_OBSERVATION_UNAVAILABLE")
 	}
 	binding.ProviderID = state.Binding.ProviderID
-	workspace, err := s.rememberWorkspace(Workspace{Directory: binding.Directory})
+	binding.ProviderHome, binding.ProviderHomeProof = state.Binding.ProviderHome, state.Binding.ProviderHomeProof
+	var workspace Workspace
+	if state.Workspace != nil {
+		workspace, err = s.recoveryWorkspace(ctx, *state.Workspace)
+	} else {
+		workspace, err = s.rememberWorkspace(Workspace{Directory: binding.Directory})
+	}
 	if err != nil {
 		return Status{}, err
 	}
@@ -417,7 +449,7 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 		return s.Status(spec.Key)
 	}
 	defer lease()
-	state.Binding, state.LaunchKey, state.State = binding, spec.Key, "submitting"
+	state.Binding, state.LaunchKey, state.State, state.Workspace = binding, spec.Key, "submitting", &workspace
 	if err = writeJSON(path, state); err != nil {
 		return Status{}, err
 	}

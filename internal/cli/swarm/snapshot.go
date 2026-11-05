@@ -24,6 +24,7 @@ type attempt struct {
 	Summary    string `json:"summary"`
 }
 type workItem struct {
+	MemberID      string       `json:"memberId,omitempty"`
 	ID            string       `json:"id"`
 	Member        string       `json:"member_name"`
 	Executor      string       `json:"executor"`
@@ -51,7 +52,30 @@ type mainMessage struct {
 	Text      string `json:"text"`
 	CreatedMS int64  `json:"createdMs"`
 }
+type memberInstance struct {
+	ID              string `json:"id"`
+	ConversationID  string `json:"conversationId"`
+	BranchID        string `json:"branchId"`
+	TaskID          string `json:"taskId,omitempty"`
+	NativeSessionID string `json:"nativeSessionId,omitempty"`
+	State           string `json:"state"`
+}
+type member struct {
+	Instance     *memberInstance `json:"instance,omitempty"`
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Executor     string          `json:"executor"`
+	Duty         string          `json:"duty,omitempty"`
+	DutyPreview  string          `json:"dutyPreview,omitempty"`
+	State        string          `json:"state"`
+	WorkID       string          `json:"workId"`
+	TaskID       string          `json:"taskId"`
+	TaskRevision int             `json:"taskRevision"`
+	RoundCount   int             `json:"roundCount"`
+	MemoryPath   string          `json:"memoryPath"`
+}
 type snapshot struct {
+	MemberProtocol     int             `json:"memberProtocol,omitempty"`
 	ID                 string          `json:"id"`
 	Name               string          `json:"name"`
 	Goal               string          `json:"goal"`
@@ -63,6 +87,7 @@ type snapshot struct {
 	Archived           bool            `json:"archived"`
 	State              string          `json:"state"`
 	Target             json.RawMessage `json:"target"`
+	Members            []member        `json:"members"`
 	Work               []workItem      `json:"work"`
 	Posts              []post          `json:"posts"`
 	MainMessages       []mainMessage   `json:"mainMessages"`
@@ -89,7 +114,7 @@ func readSnapshot(ctx context.Context, client *runtimeClient, path string) (snap
 func findWork(value snapshot, selector string) (workItem, error) {
 	var found []workItem
 	for _, work := range value.Work {
-		if work.ID == selector || work.Member == selector {
+		if work.ID == selector || work.MemberID == selector || work.Member == selector {
 			found = append(found, work)
 		}
 	}

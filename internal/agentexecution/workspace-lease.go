@@ -101,29 +101,7 @@ func (s Service) claimWorkspace(ctx context.Context, directory, launchKey string
 		return nil, err
 	}
 
-	var previous struct {
-		Key string `json:"key"`
-	}
-	if err = readJSON(filepath.Join(root, "writer.json"), &previous); err == nil {
-		priorDir, e := s.directory(previous.Key)
-		var result Result
-		if e != nil {
-			release()
-			return nil, s.blockedWorkspaceWriter(previous.Key, "WORKSPACE_PRIOR_LAUNCH_INVALID")
-		}
-		if e = readJSON(filepath.Join(priorDir, "result.json"), &result); e != nil {
-			reason := "WORKSPACE_PRIOR_RESULT_UNREADABLE"
-			if errors.Is(e, os.ErrNotExist) {
-				reason = "WORKSPACE_PRIOR_RESULT_MISSING"
-			}
-			release()
-			return nil, s.blockedWorkspaceWriter(previous.Key, reason)
-		}
-		if result.State != "succeeded" && result.State != "failed" && result.State != "cancelled" {
-			release()
-			return nil, s.blockedWorkspaceWriter(previous.Key, "WORKSPACE_PRIOR_RESULT_NOT_TERMINAL")
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
+	if err := s.workspaceWriterReady(root); err != nil {
 		release()
 		return nil, err
 	}
@@ -134,6 +112,32 @@ func (s Service) claimWorkspace(ctx context.Context, directory, launchKey string
 		return nil, err
 	}
 	return release, nil
+}
+
+func (s Service) workspaceWriterReady(root string) error {
+	var previous struct {
+		Key string `json:"key"`
+	}
+	if err := readJSON(filepath.Join(root, "writer.json"), &previous); err == nil {
+		priorDir, e := s.directory(previous.Key)
+		var result Result
+		if e != nil {
+			return s.blockedWorkspaceWriter(previous.Key, "WORKSPACE_PRIOR_LAUNCH_INVALID")
+		}
+		if e = readJSON(filepath.Join(priorDir, "result.json"), &result); e != nil {
+			reason := "WORKSPACE_PRIOR_RESULT_UNREADABLE"
+			if errors.Is(e, os.ErrNotExist) {
+				reason = "WORKSPACE_PRIOR_RESULT_MISSING"
+			}
+			return s.blockedWorkspaceWriter(previous.Key, reason)
+		}
+		if result.State != "succeeded" && result.State != "failed" && result.State != "cancelled" {
+			return s.blockedWorkspaceWriter(previous.Key, "WORKSPACE_PRIOR_RESULT_NOT_TERMINAL")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func workspaceLeaseCode(err error) string {

@@ -89,6 +89,17 @@ class ProtocolFixtureModel:
 
 
 class NativeFilesExecutor:
+    async def answer(self, database, messages, turn_id):
+        if self.allow_tasks:
+            from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
+                delivered_evaluation_answer,
+            )
+
+            delivered = await delivered_evaluation_answer(database, turn_id)
+            require(delivered is not None, "RSI_NATIVE_DELIVERY_REQUIRED")
+            return delivered
+        return committed_answer(messages, turn_id=turn_id)
+
     def __init__(
         self,
         settings,
@@ -301,18 +312,19 @@ class NativeFilesExecutor:
                     view = await runtime.conversations.messages(
                         "rsi-evaluation", conversation["id"]
                     )
+                    turn_output = await self.answer(database, view["messages"], receipt["turnId"])
                     if "turn_judges" in case:
                         turn_grades.append(
                             judge_case(
                                 {**case, "judge": case["turn_judges"][index]},
-                                committed_answer(view["messages"], turn_id=receipt["turnId"]),
+                                turn_output,
                                 workspace,
                             )
                         )
                 messages = await runtime.conversations.messages(
                     "rsi-evaluation", conversation["id"]
                 )
-                output = committed_answer(messages["messages"], turn_id=receipt["turnId"])
+                output = await self.answer(database, messages["messages"], receipt["turnId"])
                 if self.allow_tasks:
                     from roami_agent.improvement.evaluation.execution.evaluation_tasks import (
                         verify_native_execution,

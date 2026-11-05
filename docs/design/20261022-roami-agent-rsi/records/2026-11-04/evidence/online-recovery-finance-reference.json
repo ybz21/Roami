@@ -1,0 +1,167 @@
+{
+  "old_suite": "roami-formal-60-v18-online-recovery-20261104",
+  "old_hash": "90b2932b4d5da1c2269f5c52b7d5b3bfd3fd3effc1f4f08d563ce0ecb9f7b35a",
+  "new_suite": "roami-formal-60-v19-reference-validated-online-20261105",
+  "new_hash": "7f06fdd277b92c0dcd740886b7fcba4412c505ce7f7d3f437d8470aba7900b13",
+  "coverage": {
+    "contract": "roami-daily-60-v1",
+    "complete": true,
+    "checks": {
+      "count": true,
+      "unique_ids": true,
+      "public_quotas": true,
+      "unique_public_tasks": true,
+      "pinned_public_revisions": true,
+      "authored_selection": true,
+      "mechanism_selection": true,
+      "formal_splits": true,
+      "no_smoke": true,
+      "mechanism_grader": true
+    },
+    "public": {
+      "swe_verified": {
+        "expected": 2,
+        "actual": 2
+      },
+      "terminal_bench": {
+        "expected": 2,
+        "actual": 2
+      },
+      "the_agent_company": {
+        "expected": 2,
+        "actual": 2
+      },
+      "osworld": {
+        "expected": 2,
+        "actual": 2
+      },
+      "agentic_vbench": {
+        "expected": 2,
+        "actual": 2
+      },
+      "dsbench": {
+        "expected": 2,
+        "actual": 2
+      },
+      "spreadsheetbench": {
+        "expected": 1,
+        "actual": 1
+      },
+      "gaia": {
+        "expected": 1,
+        "actual": 1
+      },
+      "longmemeval_v2": {
+        "expected": 1,
+        "actual": 1
+      },
+      "finqa": {
+        "expected": 3,
+        "actual": 3
+      },
+      "convfinqa": {
+        "expected": 1,
+        "actual": 1
+      },
+      "mlagentbench": {
+        "expected": 1,
+        "actual": 1
+      }
+    },
+    "missing_authored": [],
+    "missing_mechanisms": [],
+    "scope": "composition_only; environment and graders require separate acceptance"
+  },
+  "retained_cases_unchanged": 57,
+  "changed_scope": "only three FinQA records replaced using existing v2 importer and original pinned seed; not comparable same-contract improvement",
+  "source_sha256": "a847fb7e0d61a3125a1e2909852df6b89f1ee64d2c5ff1bf689e332214deee51",
+  "source_revision": "0f16e2867befa6840783e58be38c9efb9229d742",
+  "seed": 20261023,
+  "reproduces_previous_finance_sample_byte_for_byte": true,
+  "excluded_inconsistent_rent_case": true,
+  "old_case_ids": [
+    "finqa:4f978c08853a6db6",
+    "finqa:ab5bf9f64e475b1a",
+    "finqa:d587661d9420b7e1"
+  ],
+  "new_case_ids": [
+    "finqa:88dabae584587913",
+    "finqa:4a00d7dc1848a85e",
+    "finqa:6db35f5f25b0d831"
+  ],
+  "sampling_excluded_count": 148,
+  "historical_grades_changed": false,
+  "model_calls": 0,
+  "production_preferences_changed": true,
+  "activation": {
+    "before_suite": "roami-formal-60-v18-online-recovery-20261104",
+    "after_suite": "roami-formal-60-v19-reference-validated-online-20261105",
+    "before_revision": 5,
+    "after_revision": 6,
+    "schedule_enabled": false,
+    "historical_results_preserved": true,
+    "all_other_preferences_unchanged": true
+  },
+  "reference_audit": {
+    "source_url": "https://github.com/czyssrs/FinQA/blob/0f16e2867befa6840783e58be38c9efb9229d742/dataset/dev.json",
+    "old_rent": {
+      "source_id": "IP/2012/page_93.pdf-4",
+      "displayed_answer": 215.33,
+      "execution_answer": 324.5,
+      "public_arithmetic": "(231+205+210)/3=215.33333333333334",
+      "old_grade_retained": true
+    },
+    "old_pmi": {
+      "source_id": "PM/2018/page_24.pdf-2",
+      "displayed_answer": "53.8%",
+      "execution_answer": 0.538,
+      "model_source_bound_answer": -0.538,
+      "failure_reason": "sign differs, not rounding",
+      "old_grade_retained": true
+    }
+  },
+  "fresh_v2_sample_execution": {
+    "scope": "fresh isolated validated v2 FinQA sample, original pinned seed; saved node model routes unchanged; different suite, not an improvement to old full60",
+    "passed": 2,
+    "total": 3,
+    "model_calls": 27,
+    "known_tokens": 100468,
+    "saved_routes_parameters_and_capabilities_unchanged": true,
+    "immutable_image": "sha256:2dded6ed343a889735d7e1989d38214d8a3e1af516138bf4ddfb2e59b64320d3",
+    "source_selection": "strict current-turn all-handoff delivery binding in PR #664",
+    "results": [
+      {
+        "case": "finqa:88dabae584587913",
+        "passed": true,
+        "reason": "assertions_passed",
+        "metrics": {
+          "tokens": 33252,
+          "token_coverage": "complete",
+          "model_calls": 8
+        }
+      },
+      {
+        "case": "finqa:4a00d7dc1848a85e",
+        "passed": true,
+        "reason": "assertions_passed",
+        "metrics": {
+          "tokens": 37726,
+          "token_coverage": "complete",
+          "model_calls": 11
+        }
+      },
+      {
+        "case": "finqa:6db35f5f25b0d831",
+        "passed": false,
+        "reason": "assertion_failed",
+        "metrics": {
+          "tokens": 29490,
+          "token_coverage": "complete",
+          "model_calls": 8
+        }
+      }
+    ],
+    "old_grades_replaced": false,
+    "full60_rerun": false
+  }
+}

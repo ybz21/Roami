@@ -1,0 +1,515 @@
+{
+  "recorded_at": "2026-11-04T17:55:34.793203+00:00",
+  "cycle_id": "039f7fac44d558bd812e0b32528a0e900c8e067e1694b0899f138fe12ecc2657",
+  "suite_hash": "90b2932b4d5da1c2269f5c52b7d5b3bfd3fd3effc1f4f08d563ce0ecb9f7b35a",
+  "result_sha256": "2efecd4e694357ce16b480624674787c79f2cf596d8f141df775930ac8b4e17d",
+  "scope": "fresh complete baseline execution; original grades unchanged; not an independent semantic review or promotion",
+  "full_suite_complete": true,
+  "evaluation_complete": false,
+  "daily_complete": false,
+  "report_phase": "evaluated_waiting_semantic_review",
+  "usage_blocker": null,
+  "counts": {
+    "pending": 6,
+    "passed": 43,
+    "failed": 11
+  },
+  "verified_deliveries": 23,
+  "model_calls": 834,
+  "known_tokens": 14389923,
+  "comparison": {
+    "pairs": 0,
+    "eligible_for_promotion": false,
+    "reasons": [
+      "quality_noninferiority_unproven"
+    ],
+    "release_blockers": [
+      "baseline_observation_only"
+    ]
+  },
+  "policy_applied_to_live_agent": false,
+  "previous_formal_scores_overwritten": false,
+  "real_observation_days_added": 0,
+  "trials": [
+    {
+      "case_id": "DOC-03",
+      "status": "pending",
+      "reason": "independent_rubric_required",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "caa9c6484776e619e7d1c379565bf0776c20e810cd848eaacce09f186595f4d7"
+    },
+    {
+      "case_id": "MECH-TL02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "bb6b5d1d05d038332df27f25bc461bcd95976615a49e307b89280ee62e2a81a6"
+    },
+    {
+      "case_id": "MECH-MB02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "5614b93b3e4faeeb79e4ee318015cf3b611c7d63e1db715d62cae9f83b43f3c1"
+    },
+    {
+      "case_id": "spreadsheetbench:38703",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "adapted_workbook_values",
+      "trial_sha256": "9f2898fa600d97c927b52cf95859a2859c4cc851d00e808d6c4385a98f2b99a8"
+    },
+    {
+      "case_id": "MECH-CT02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "1dc0f72165baaa87ac1420783f9f926a54c71647d85db667672b610c9a05cd15"
+    },
+    {
+      "case_id": "CODE-01",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "f7a982ef6d3d014b2f3257a98f8251770f13a0b846e7af5515ebb10d0b8e8607"
+    },
+    {
+      "case_id": "MECH-TR01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "94af206e2a288b1b4dfd3776ed7896d402d784056693591fe58d071b33c6838c"
+    },
+    {
+      "case_id": "DEMO-02",
+      "status": "pending",
+      "reason": "independent_rubric_required",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "761bc40a8a36ab29b21204a3d6410ea1715343f419a4e4e29a3524a6f638cd84"
+    },
+    {
+      "case_id": "STOCK-04",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "d4560a7d866277cb0e7ef10ec89f8f3814bce9b1843e2b5f244ff75cb84bbfc4"
+    },
+    {
+      "case_id": "MECH-SK02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "2780891cd0d27f82f3d2be698c8c9f91ad16b8677f23930a73640d6710923c8a"
+    },
+    {
+      "case_id": "MECH-CT01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "fb0fec44f4a619dc3de21a8d9c9e11f0d542f2cb8c0c0ebc9f93768da1cce454"
+    },
+    {
+      "case_id": "MECH-TR02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "2f9738cadc8729f3bbf1e9fc1856e78e3f7d43102b8c35bfa76e513abaca7379"
+    },
+    {
+      "case_id": "agentic_vbench:agentic-vbench-assembly-task1",
+      "status": "failed",
+      "reason": "native_metric_below_threshold",
+      "native_metric": 0.0,
+      "grade_scope": "original_media_verifier_plus_frozen_delivery_checks",
+      "trial_sha256": "7748bf71ef88aa3b5076cb92adddd2b85fb058ad1fd0e5b317b982871afe8cb9"
+    },
+    {
+      "case_id": "gaia-course:6f37996b-2ac7-44b0-8e68-6d28256631b4",
+      "status": "passed",
+      "reason": "assertions_passed",
+      "native_metric": 1.0,
+      "grade_scope": "official_course_task_complete_table_reasoning_with_added_proof",
+      "trial_sha256": "6895b88e145aaa244d24edbfc368ea085a69dcb84b5c0e67b82eaeea068bccfd"
+    },
+    {
+      "case_id": "MECH-PL02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "77b24177affeef4d93c05d8513cc96b43005fa2cca4ef8e7169093dc2c3e3713"
+    },
+    {
+      "case_id": "mlagentbench:vectorization",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "adapted_numpy_forward_correctness_and_host_time",
+      "trial_sha256": "bf44d9cec138d22ee08c5fa074ca404ba83b496221604d615f1567e62062d94b"
+    },
+    {
+      "case_id": "QUANT-03",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "de34659edb640f6542887551d5b31e10469e3b65aadeab380892f1136e2bce54"
+    },
+    {
+      "case_id": "MECH-PL01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "511dff00c4650a1ffc5f48fe7370941f40606ec0a2b51dea138ba64b10f65ce9"
+    },
+    {
+      "case_id": "MECH-MR02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "f7d0d929b8662e26b334d5c5a712682374c9259601f33256b780fe5a9d8db608"
+    },
+    {
+      "case_id": "finqa:ab5bf9f64e475b1a",
+      "status": "failed",
+      "reason": "assertion_failed",
+      "native_metric": 0.0,
+      "grade_scope": "objective_contract",
+      "trial_sha256": "5d0767c80540b9c29aa1cefe6835a1d62ba1f62ff969f32bdf1cea5688223c75"
+    },
+    {
+      "case_id": "terminal_bench:cancel-async-tasks",
+      "status": "passed",
+      "reason": null,
+      "native_metric": 1.0,
+      "grade_scope": "adapted_upstream_result_assertions",
+      "trial_sha256": "c2f40b605680854de1a00feb4c20b906876793156e764a0bd497b8a06cb21303"
+    },
+    {
+      "case_id": "MECH-SK01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "6ab7b165b658fc2908796ce5d8d3daeb0e29ded7a08d15844165e2e851788e2f"
+    },
+    {
+      "case_id": "MECH-TL01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "e095c83ca05d0765f32b93ee22d7d5f52bc52848c7918fe9e60d820872e3bb26"
+    },
+    {
+      "case_id": "MECH-VD02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "0a102965fca43d0aad8e3c92886475e51432527457a7c392e8b2c4e3cdb08ec6"
+    },
+    {
+      "case_id": "NEWS-04",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "b5da5a39d48c7ac48c9c2f9a52a6a2d8dd6ccce02b33aa127e7bf8ae0821ea2b"
+    },
+    {
+      "case_id": "MECH-TE02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "b608c7da295b159d9b12554275e72123a50d42a7a4850f493eed832ea4266ecb"
+    },
+    {
+      "case_id": "dsbench:00000018:question24",
+      "status": "passed",
+      "reason": "assertions_passed",
+      "native_metric": 1.0,
+      "grade_scope": "objective_contract",
+      "trial_sha256": "dd14b7f1ce4de535796b0d17e190cf388924701c77fc0bba5c4a90b761cbf5a0"
+    },
+    {
+      "case_id": "finqa:d587661d9420b7e1",
+      "status": "failed",
+      "reason": "assertion_failed",
+      "native_metric": 0.0,
+      "grade_scope": "objective_contract",
+      "trial_sha256": "4ac5477f926534505a77f0281b250fd32fe9b35485da4fefd59516b8835c0b93"
+    },
+    {
+      "case_id": "LAB-05",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "07f5e1b6bafd75e51fc3d9516b32054a17a5da750496df59a8e7e489eae4d9e0"
+    },
+    {
+      "case_id": "NEWS-01",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "34a1ff30958d689b4dc3fe387388c499e9fb8b81db02a9c1ecb20679cf895ff5"
+    },
+    {
+      "case_id": "NEWS-02",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "cfeb4df2b46b276e80aaf29a0d8ae350d05d1e9db65a373f7d17cf4d74d51193"
+    },
+    {
+      "case_id": "MECH-MG01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "5cba383aca8fc8b365921ee25b4a41bb8640f60568abb210ef4da498da744a8c"
+    },
+    {
+      "case_id": "agentic_vbench:exp-codec-restore-task01",
+      "status": "failed",
+      "reason": "native_metric_below_threshold",
+      "native_metric": 0.0892506617752059,
+      "grade_scope": "original_media_verifier_plus_frozen_delivery_checks",
+      "trial_sha256": "fe1c0399f414821ffc7e78fe2a2a410fce5188e2ef408788e19228517b468d41"
+    },
+    {
+      "case_id": "swe_verified:scikit-learn__scikit-learn-13496",
+      "status": "passed",
+      "reason": null,
+      "native_metric": 1.0,
+      "grade_scope": "native_upstream_required_tests_with_frozen_test_patch",
+      "trial_sha256": "a12afa8517a9e9404626c62b007498c49902a4908f15e55637f245cf675c88a6"
+    },
+    {
+      "case_id": "STOCK-05",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "5d58ee7af12fefd5c4a67d8d6ecd627447c82bd175bb5871221c7cdaa399a52d"
+    },
+    {
+      "case_id": "MECH-VD01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "c23c08d9d06bb562eb43dca8e8ef4b4b9339e485ecc4bf1cab13463d69ace311"
+    },
+    {
+      "case_id": "STOCK-01",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "e94d4c1fb4e847505226b7dd53923b492a50f627b698752e93075f0472e06d57"
+    },
+    {
+      "case_id": "DEMO-05",
+      "status": "pending",
+      "reason": "independent_rubric_required",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "16b24c92f17481330c1677d23289e9c8d9ed9964963f1bb19d733e8bb423208b"
+    },
+    {
+      "case_id": "QUANT-01",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "d63b1ad73c6a4c4acca2d448291322222a78393bed3bcf9083d04ca167d10a65"
+    },
+    {
+      "case_id": "swe_verified:pylint-dev__pylint-6903",
+      "status": "passed",
+      "reason": null,
+      "native_metric": 1.0,
+      "grade_scope": "native_upstream_required_tests_with_frozen_test_patch",
+      "trial_sha256": "95cd762a4ebca4550a96ffab60dfda38bb71ac70f4d502e3b2a36f75c411d320"
+    },
+    {
+      "case_id": "DEMO-01",
+      "status": "pending",
+      "reason": "independent_rubric_required",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "d85b145777d3f0a96e116d3cfb096ff393d904db729a797283fa2d670ef0e51d"
+    },
+    {
+      "case_id": "osworld:05dd4c1d-c489-4c85-8389-a7836c4f0567",
+      "status": "failed",
+      "reason": "native_reference_mismatch",
+      "native_metric": 0.0,
+      "grade_scope": "original_pptx_state_comparison_not_gui_or_visual_quality",
+      "trial_sha256": "e96d1475696cbac41979e669d43f416d89d5792d1e75804ff7dede690b7b609e"
+    },
+    {
+      "case_id": "MECH-TE01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "4097286a91ffac56d99cc355981944897c13504c9d22352138f88d736744efc1"
+    },
+    {
+      "case_id": "finqa:4f978c08853a6db6",
+      "status": "failed",
+      "reason": "assertion_failed",
+      "native_metric": 0.0,
+      "grade_scope": "objective_contract",
+      "trial_sha256": "15ce82bdcd59ddb359320bc1140992c5741ff4f886dc5e54fbc9538d8575e32a"
+    },
+    {
+      "case_id": "QUANT-05",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "f530bc9c75514012c1a16a684153342d6694d0a765d68ab7295727e0372364c9"
+    },
+    {
+      "case_id": "STOCK-03",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "87608a7ff6515d34e01e5e5993ff9e38d4067db906f54fc1402d29db0f726515"
+    },
+    {
+      "case_id": "dsbench:00000013:question19",
+      "status": "passed",
+      "reason": "assertions_passed",
+      "native_metric": 1.0,
+      "grade_scope": "objective_contract",
+      "trial_sha256": "97d0479183a17f4b4e31af30c8f34ae87ea81e1fcd237b1ecaa73bb97a2bdd23"
+    },
+    {
+      "case_id": "DOC-05",
+      "status": "pending",
+      "reason": "independent_rubric_required",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "2749284b4198e7969472082ae01707293467e5b1cbf388ab06a5253d17412e95"
+    },
+    {
+      "case_id": "osworld:04578141-1d42-4146-b9cf-6fab4ce5fd74",
+      "status": "failed",
+      "reason": "native_reference_mismatch",
+      "native_metric": 0.0,
+      "grade_scope": "original_pptx_state_comparison_not_gui_or_visual_quality",
+      "trial_sha256": "cdd2e5beeb81a93879b86fdc140c80a5bf1db0ef8b011f22cfbd8b683ac1f6e5"
+    },
+    {
+      "case_id": "convfinqa:85d9a548c6a57df1",
+      "status": "failed",
+      "reason": "assertion_failed",
+      "native_metric": 0.0,
+      "grade_scope": "objective_contract",
+      "trial_sha256": "2dd6c846f93981867e41af7ac99cfc917a181e4c3cb49eb198cf507ca9985f2d"
+    },
+    {
+      "case_id": "terminal_bench:db-wal-recovery",
+      "status": "passed",
+      "reason": null,
+      "native_metric": 1.0,
+      "grade_scope": "adapted_upstream_result_assertions",
+      "trial_sha256": "e0542f3bfab1c8d1a730a4c7427cfc9d0e66cfba846d78cafb8c2d6653433f9a"
+    },
+    {
+      "case_id": "longmemeval-v2:4ed01379",
+      "status": "failed",
+      "reason": "assertion_failed",
+      "native_metric": 1.0,
+      "grade_scope": "complete_textual_haystack_retrieval_not_persisted_memory",
+      "trial_sha256": "cfc10a3793d7e95e52ffb7d00662237bc2c72b97ef998cda97c15388a3a9d729"
+    },
+    {
+      "case_id": "QUANT-04",
+      "status": "failed",
+      "reason": "hard_assertion_failed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "46e95a56354fe7c1ef85952872dcd8823b66a9502cfc72e61c439d9da9974cea"
+    },
+    {
+      "case_id": "MECH-MG02",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "14bdba589ea20e672a9b0d083eb9d03252705112db5103155c73cd0a8093ffa3"
+    },
+    {
+      "case_id": "the-agent-company:hr-make-slides-introduce-leadership",
+      "status": "pending",
+      "reason": "independent_rubric_required",
+      "native_metric": 1.0,
+      "grade_scope": "native_company_checkpoints_biography_and_visual_quality_pending",
+      "trial_sha256": "9179f89cca63aa1ba942fa4012cdf2a5fcbbd3d436aafc574c1eeb6e4b873eae"
+    },
+    {
+      "case_id": "MECH-MB01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "b97a2c41ffcf9716f24b305cbe2e5f48d8c3d0b86847fcff3db49b14e6e007ee"
+    },
+    {
+      "case_id": "MECH-MR01",
+      "status": "passed",
+      "reason": null,
+      "native_metric": null,
+      "grade_scope": "deterministic_mechanism_regression",
+      "trial_sha256": "b329258a7ac3ef203300f63b9c4e6dca445134264dd58f98c3c16f9ed01083d8"
+    },
+    {
+      "case_id": "the-agent-company:ds-stock-analysis-slides",
+      "status": "failed",
+      "reason": "hard_assertion_failed",
+      "native_metric": null,
+      "grade_scope": "native_uploaded_stock_artifacts_csv_checkpoint_only_quality_pending",
+      "trial_sha256": "0aae7c1b8be5c3a165a268f0d75b53035c58a1ba3e7616b0f8054fba25400762"
+    },
+    {
+      "case_id": "OPS-04",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "e13902c63ab0b1731ede2b4a0d5ffa002974590bcfd945d6dd3c20e120901eaa"
+    },
+    {
+      "case_id": "QUANT-02",
+      "status": "passed",
+      "reason": "objective_checks_passed",
+      "native_metric": null,
+      "grade_scope": "authored_contract",
+      "trial_sha256": "b9fb2e8e8b5fd7379df1a2c1117828e6e0063d6909bc33e433dd9037b6df8355"
+    }
+  ]
+}

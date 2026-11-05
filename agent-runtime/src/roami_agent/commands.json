@@ -99,6 +99,8 @@
     "swarm",
     "new"
   ],
+  "swarm_members_register": ["swarm", "member", "register"],
+  "swarm_member": ["swarm", "member", "inspect"],
   "swarm_plan": [
     "swarm",
     "plan"

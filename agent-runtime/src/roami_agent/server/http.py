@@ -608,8 +608,12 @@ def create_app(runtime, *, manage_lifecycle=True):
         }
 
     @app.get("/v1/reminders")
-    async def reminders(owner: Owner):
-        items = await runtime.reminders.list(owner) + await runtime.briefs.reminders(owner)
+    async def reminders(owner: Owner, conversationId: str | None = None):
+        if conversationId:
+            await runtime.conversations.get(owner, conversationId)
+        items = await runtime.reminders.list(
+            owner, conversationId
+        ) + await runtime.briefs.reminders(owner, conversationId)
         items.sort(key=lambda item: (not item["enabled"], -item["createdMs"]))
         return {"data": items}
 
@@ -664,6 +668,8 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
                 "projectOkr": True,
+                "projectOkrMain": True,
+                "conversationIdentity": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
@@ -739,20 +745,31 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):
         project_id = None
+        swarm_id = None
         if body.projectId is not None:
-            from roami_agent.conversation.project_okr import registered_project
+            from roami_agent.conversation.project_okr import operation, registered_project
 
             project_id = await registered_project(runtime.settings, body.projectId)
+            workspace = await operation(runtime.settings, project_id, "show")
+            swarm_id = workspace.get("swarm") if workspace else None
             await runtime.conversations.main(owner)
         return {
             "data": await runtime.conversations.create(
-                owner, body.title, request_key=body.requestKey, project_id=project_id
+                owner,
+                body.title,
+                request_key=body.requestKey,
+                project_id=project_id,
+                swarm_id=swarm_id,
             )
         }
 
     @app.get("/v1/conversations/{cid}/activities/{aid}")
     async def activity_detail(cid: str, aid: str, owner: Owner, branchId: str | None = None):
         return {"data": await runtime.conversations.activity_detail(owner, cid, aid, branchId)}
+
+    @app.get("/v1/conversations/{cid}/identity")
+    async def conversation_identity(cid: str, owner: Owner):
+        return {"data": await runtime.conversations.identity(owner, cid)}
 
     @app.get("/v1/conversations/{cid}/messages")
     async def messages(
@@ -871,8 +888,8 @@ def create_app(runtime, *, manage_lifecycle=True):
         return {"data": await runtime.notifications.mark_read(owner, cid, body.eventId)}
 
     @app.get("/v1/notifications/summary")
-    async def notice_summary(owner: Owner):
-        return {"data": await runtime.notifications.summary(owner)}
+    async def notice_summary(owner: Owner, conversationId: str | None = None):
+        return {"data": await runtime.notifications.summary(owner, conversationId)}
 
     @app.post("/v1/notifications/read")
     async def read_notices(owner: Owner, body: ReadCursor):
@@ -884,10 +901,15 @@ def create_app(runtime, *, manage_lifecycle=True):
         limit: int = Query(20, ge=1, le=50),
         before: int | None = Query(None, ge=1),
         unreadOnly: bool = False,
+        conversationId: str | None = None,
     ):
         return {
             "data": await runtime.notifications.page(
-                owner, before=before, limit=limit, unread_only=unreadOnly
+                owner,
+                before=before,
+                limit=limit,
+                unread_only=unreadOnly,
+                conversation_id=conversationId,
             )
         }
 

@@ -96,17 +96,22 @@ class Notifications:
             )
         return {"eventId": cursor, "messageId": mid, "reused": False}
 
-    async def summary(self, owner):
+    async def summary(self, owner, conversation_id=None):
         from roami_agent.replies.notification_pages import notification_summary
 
-        return await self.db.call(lambda db: notification_summary(db, owner))
+        return await self.db.call(lambda db: notification_summary(db, owner, conversation_id))
 
-    async def page(self, owner, *, before=None, limit=20, unread_only=False):
+    async def page(self, owner, *, before=None, limit=20, unread_only=False, conversation_id=None):
         from roami_agent.replies.notification_pages import notification_page
 
         return await self.db.call(
             lambda db: notification_page(
-                db, owner, before=before, limit=limit, unread_only=unread_only
+                db,
+                owner,
+                before=before,
+                limit=limit,
+                unread_only=unread_only,
+                conversation_id=conversation_id,
             )
         )
 

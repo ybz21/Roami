@@ -52,6 +52,10 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 			command = "work"
 		case "add":
 			command = "member-add"
+		case "register":
+			command = "member-register"
+		case "inspect":
+			command = "member-inspect"
 		default:
 			return fmt.Errorf("unknown member command: %s", action)
 		}
@@ -70,8 +74,12 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		switchFlags = "follow"
 	case "plan", "control":
 		valueFlags = "file"
+	case "member-register":
+		valueFlags = "file key revision executor duty"
+	case "member-inspect":
+		valueFlags = "before limit"
 	case "member-add":
-		valueFlags = "file key revision executor title goal acceptance depends-on"
+		valueFlags = "file key revision executor title goal acceptance depends-on member-id"
 		switchFlags = "integration"
 	case "dependencies":
 		valueFlags = "file key revision depends-on"
@@ -117,7 +125,7 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 	}
 	min, max := 1, 1
 	switch command {
-	case "member-add":
+	case "member-add", "member-register":
 		if options.value("file") == "" {
 			min, max = 2, 2
 		}
@@ -129,7 +137,7 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		if options.value("file") == "" {
 			min, max = 2, 2
 		}
-	case "work":
+	case "work", "member-inspect":
 		min, max = 2, 2
 	}
 	if err = options.arguments(min, max); err != nil {
@@ -147,6 +155,9 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		return err
 	}
 	defer client.close()
+	if command == "member-inspect" {
+		return inspectMember(ctx, client, path, options, w, jsonOutput)
+	}
 	value, raw, err := readSnapshot(ctx, client, path)
 	if err != nil {
 		return err
@@ -181,6 +192,9 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		return followView(ctx, client, path, value, command, w, jsonOutput)
 	}
 	if jsonOutput && command == "members" {
+		if value.MemberProtocol == 1 && value.Members != nil {
+			return writeJSON(w, map[string]any{"data": value.Members})
+		}
 		return writeJSON(w, map[string]any{"data": value.Work})
 	}
 	if jsonOutput && command == "board" {

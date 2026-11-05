@@ -14,6 +14,8 @@ Roami 已有的能力优先用 `roami` CLI 完成；用 `roami help` 查看命�
 
 ## 会话、派活与蜂群
 
+同一任务的回归、验证、审查与辅助命令先复用已有会话；确需新增时，优先从当前工作会话派生子会话。先解析当前父会话的唯一 ID，再执行 `roami session fork <父会话ID> <短名称> --dir <工作目录> --detach --json`，保留返回的父子关系，不用独立 `new` 会话替代派生。一个子任务复用一个会话，不为每条验证命令新开会话；执行结果未知时先 capture 原会话、检查产物，不另建会话补跑。只有没有可用父会话，或用户明确要求独立任务时才独立新建。并行改代码需要隔离时，先创建独立 worktree，再用 fork 的 `--dir` 指向它，父子关系仍然保留。
+
 - 找会话：`roami session ls --json`、`roami session ls --tree --json`；操作前用 `roami session resolve <目标> --strict --json` 确认唯一 ID，后续保存并使用该 ID，展示名可能重名。
 - 派生工作会话：`roami session fork <父会话ID> <短名称> --dir <工作目录> --detach --json`，返回的 `session` 是子会话 ID。派生只创建工作会话，不复制 Agent 对话、不自动启动 Agent，也不创建 Git worktree；需要隔离代码时先准备独立 worktree。
 - 向会话发话：先 `roami session capture <会话ID> --lines 100` 确认里面是 shell 还是 Agent，再用 `roami session send <会话ID> "启动命令或后续任务"` 提交。shell 接收命令，运行中的 Agent 接收任务；`send` 会提交输入，不只是打字。跟进时再次读取屏幕、核对实际产物和测试，不能把发送成功当作任务完成。

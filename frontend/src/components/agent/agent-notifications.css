@@ -26,3 +26,5 @@ html[data-pointer="coarse"] .agent-notification-settings .ant-btn::after { conte
 .agent-inbox .agent-notice[data-unread="true"] { border-inline-start:2px solid var(--accent); }
 .agent-inbox .agent-notice { width:100%; text-align:left; overflow-wrap:anywhere; }
 .agent-inbox .agent-notifications-body { max-height:none; overflow:visible; }
+
+.agent-inbox .agent-notice > span { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }

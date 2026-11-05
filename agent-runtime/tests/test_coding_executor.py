@@ -363,7 +363,13 @@ async def test_session_preflight_rejection_is_distinct_from_submission_uncertain
         raise DomainError(code)
 
     executor.command = command
-    assert await executor.run(task, run) == {"state": "failed", "summary": code}
+    assert await executor.run(task, run) == {
+        "state": "failed",
+        "summary": code,
+        "executionStarted": False,
+        "inputStopped": True,
+        "outcomeKnown": True,
+    }
     code = "SESSION_SUBMISSION_UNKNOWN"
     assert await executor.run(task, run) is None
     assert (await tasks.list("alice"))[0]["latestAttempt"]["state"] == "unknown"

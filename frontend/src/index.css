@@ -605,23 +605,18 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-tree-proj + .tt-tree-proj { margin-top: 4px; }
 .tt-tree-proj.loose { margin-top: 10px; }
 .tt-tree-proj .gl { padding: 0 10px; margin-bottom: var(--sp-1); color: var(--text-dimmer); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .1em; }
-/* 散会话没有卡，行自己缩一级，和卡里的头行对齐 */
-.tt-tree-proj.loose .tt-tree-row { padding-left: 32px; }
 /* 箭头钉右端：没有计数徽标时也不能跟在名字后面 */
 .tt-tree-row .chev { flex: 0 0 auto; margin-left: auto; display: grid; place-items: center; color: var(--text-dimmer); transition: transform .15s; }
 .tt-tree-row .bd + .chev { margin-left: 0; }
 .tt-tree-row.closed .chev { transform: rotate(-90deg); }
-/* 状态点住在图标槽正中：运行 / 等你 / 待收尾 才上色，空闲很淡 */
+/* 会话行尾显示各自状态。 */
 .tt-tree .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dimmer); }
-.tt-tree .dot.idle { opacity: .4; }
 .tt-tree .dot.run { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
 .tt-tree .dot.wait { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .tt-tree .dot.sleep { background: var(--text-dim); box-shadow: 0 0 0 3px var(--sel-bg); }
-.tt-tree .dot.fin { background: var(--swarm); }
-/* 会话沿用侧栏底色，避免每个任务再套一张卡片。 */
-.tt-tree-task { margin: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3); padding: 0; border: 0; border-radius: 0; background: transparent; }
-.tt-tree-task.idle { opacity: .72; }
-.tt-tree .tt-tree-row.on { background: transparent; color: var(--text-bright); }
+/* 项目下只画会话；层级只来自派生关系。 */
+.tt-tree-roots { margin: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3); }
+.tt-tree .tt-tree-row.on { background: var(--sel-bg); color: var(--text-bright); }
 /* 项目行右端的 […] [+]：一直看得见（淡），悬停亮 */
 .tt-tree-row.proj .act { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
 .tt-tree-row.proj .nm + .act, .tt-tree-row.proj .bd + .act { margin-left: auto; }
@@ -633,8 +628,8 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-nav-tree::-webkit-scrollbar-thumb { background: transparent; border: 0; }
 :where(html[data-pointer="fine"]) .tt-nav-tree:hover { scrollbar-color: var(--scroll-thumb) transparent; }
 :where(html[data-pointer="fine"]) .tt-nav-tree:hover::-webkit-scrollbar-thumb { background: var(--scroll-thumb); }
-.tt-tree-task > .tt-tree-row.head { padding-left: var(--sp-3); border-radius: var(--r-xs); }
-.tt-tree-task > .tt-tree-row.head .nm { font-weight: 500; font-size: var(--fs-sm); }
+.tt-tree-children { margin-left: var(--sp-3); padding-left: var(--sp-2); border-left: 1px solid var(--border-subtle); }
+html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 /* 头行右端的分支状态图标（Orca 卡片右上角那枚）：颜色说状态，悬停看分支和数字 */
 .wtst { flex: 0 0 auto; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: var(--r-xs); color: var(--text-dimmer); }
 .tt-tree-row .wtst { margin-left: auto; width: 20px; height: 20px; }
@@ -658,19 +653,16 @@ html[data-pointer="coarse"] .tt-csearch-line, html[data-pointer="coarse"] .tt-cs
 .tt-pill.sm.danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-soft); }
 .tt-pill.sm.warn { color: var(--warn); border-color: var(--warn-border); background: var(--warn-soft); }
 .tt-pill.sm.dim { color: var(--text-dim); }
-/* 会话与任务头行对齐，不再为会话数量多缩一级。 */
-.tt-tree-sessions .tt-tree-row { padding-left: var(--sp-3); padding-right: var(--sp-2); min-height: 30px; border-radius: var(--r-xs); margin: 0; width: 100%; gap: var(--sp-2); }
+/* 父会话保留活动时间，派生子会话优先展示名称与状态。 */
+.tt-tree-sessions .tt-tree-row { padding-left: var(--sp-3); padding-right: var(--sp-2); min-height: var(--row-compact); border-radius: var(--r-xs); margin: 0; width: 100%; gap: var(--sp-2); }
 .tt-tree-sessions .tt-tree-row .nm { flex: 1 1 auto; }
 .tt-tree-sessions .tt-tree-row .nm { color: var(--text-dim); font-size: var(--fs-sm); font-weight: 400; }
 /* 休眠会话（重启带走、点开即在原目录重开）：整行淡一档 */
 .tt-tree-row.dormant .ic, .tt-tree-row.dormant .nm { opacity: .55; }
-/* 互审陪跑：缩进半格挂在被审那条下面，字弱一档——它是附属，不是并列的另一个会话 */
-.tt-tree-sessions .tt-tree-row.review { padding-left: calc(var(--sp-3) * 2); }
-.tt-tree-sessions .tt-tree-row.review .nm { color: var(--text-dimmer); }
 .tt-tree-sessions .tt-tree-row.on .nm { color: var(--text-bright); }
 :where(html[data-pointer="fine"]) .tt-tree-sessions .tt-tree-row:hover .nm { color: var(--text-bright); }
 /* 行尾时间在会话行和单会话任务卡头行都出现：不许收缩、不许折行——名字一长「刚刚」会被挤成竖排两个字 */
-.tt-tree-row .tm { flex: 0 0 auto; white-space: nowrap; margin-left: 0; color: var(--text-dimmer); font: 400 var(--fs-micro)/1 var(--mono); }
+.tt-tree-row .tm { flex: 0 0 auto; white-space: nowrap; margin-left: 0; color: var(--text-dimmer); font: 400 var(--fs-meta)/1 var(--mono); }
 .tt-tree-sessions .tt-tree-row .nm + .dot { margin-left: 0; }
 /* 会话行末尾的状态点（只在运行 / 等你时有） */
 .tt-tree-row .nm + .dot { flex: 0 0 auto; margin-left: auto; }

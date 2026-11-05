@@ -159,3 +159,100 @@ async def test_discovered_swarm_commands_preserve_binding_and_revision_without_h
         assert len((await invoke(["swarm", "status"], {"swarmId": sid}))["work"]) == 1
     finally:
         await runtime.close()
+
+
+async def test_cli_leader_steering_records_the_same_member_thread_and_preserves_identity(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        conversation = await runtime.conversations.create("alice")
+        created = await runtime.swarms.create(
+            "alice",
+            {
+                "name": "Persistent team",
+                "goal": "Keep source evidence",
+                "mainConversationId": conversation["id"],
+                "commandKey": "create-team",
+            },
+        )
+        await runtime.swarms.plan(
+            "alice",
+            created["id"],
+            {
+                "commandKey": "plan",
+                "expectedRevision": 1,
+                "items": [
+                    {
+                        "member": "researcher",
+                        "executor": "native",
+                        "title": "Research",
+                        "goal": "Find facts",
+                        "acceptance": "Actual sources",
+                    }
+                ],
+            },
+        )
+        await runtime.swarms.advance({"aggregate_id": created["id"], "id": "advance"})
+        work = (await runtime.swarms.snapshot("alice", created["id"]))["work"][0]
+        original = await runtime.tasks.get("alice", work["task_id"])
+        old_run = await store.call(
+            lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (work["task_id"],))
+        )
+        await runtime.dispatch.complete(
+            original["task"],
+            old_run,
+            {"state": "succeeded", "summary": "Original evidence"},
+            "succeeded",
+        )
+        accepted = await runtime.conversations.accept(
+            "alice",
+            conversation["id"],
+            "follow-up",
+            "Check the second source, without publishing anything.",
+        )
+        job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?",
+                (accepted["turnId"],),
+            )
+        )
+        await runtime.mailbox.claim(job)
+        binding = {
+            "owner": "alice",
+            "conversation": conversation["id"],
+            "turnId": accepted["turnId"],
+            "toolCallId": "forward",
+        }
+        payload = {
+            "taskId": work["task_id"],
+            "revision": 1,
+            "text": "Check second source and publish",
+            "sourceQuote": "Check the second source, without publishing anything.",
+            "requestComplete": True,
+        }
+        operation = await runtime.tools.invoke(
+            command(["roami", "agent", "task", "steer", "--input", json.dumps(payload)]),
+            "main",
+            binding,
+        )
+        assert operation["acceptedOnly"] and operation["taskId"] == work["task_id"]
+        posts = (await runtime.swarms.snapshot("alice", created["id"]))["posts"]
+        forwarded = [post for post in posts if post["author"] == "main"]
+        assert len(forwarded) == 1 and forwarded[0]["taskId"] == work["task_id"]
+        assert forwarded[0]["text"] == payload["sourceQuote"]
+        assert forwarded[0]["deliveryState"] == "accepted"
+        await runtime.tasks.revisions.advance()
+        current = await runtime.tasks.get("alice", work["task_id"])
+        assert current["task"]["revision"] == 2
+        new_run = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
+                (work["task_id"],),
+            )
+        )
+        assert new_run["native_branch_id"] == old_run["native_branch_id"]
+        assert len(await runtime.tasks.list("alice")) == 1
+        assert len((await runtime.swarms.snapshot("alice", created["id"]))["work"]) == 1
+    finally:
+        await runtime.close()

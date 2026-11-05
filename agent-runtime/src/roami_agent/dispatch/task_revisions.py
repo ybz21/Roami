@@ -208,6 +208,30 @@ class TaskRevisions:
                 "VALUES(?,'task.steer',?,?,?,'queued',?)",
                 (operation, task_id, dedupe, encoded(payload), now_ms()),
             )
+            if source_turn_id:
+                team = row(
+                    db,
+                    "SELECT g.* FROM swarm_groups g JOIN swarm_work_items w ON w.swarm_id=g.id "
+                    "WHERE w.task_id=? AND g.owner_id=? AND g.conversation_id=?",
+                    (task_id, owner, source_conversation_id),
+                )
+                if team:
+                    from roami_agent.storage.swarm_repository import changed
+
+                    db.execute(
+                        "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_json) "
+                        "VALUES(?,'main',?,?,?,?)",
+                        (
+                            team["id"],
+                            text_for_execution,
+                            task_id,
+                            now_ms(),
+                            encoded(
+                                {"operationId": operation, "taskId": task_id, "acceptedOnly": True}
+                            ),
+                        ),
+                    )
+                    changed(db, team, "swarm.message_forwarded")
             event(
                 db,
                 task["origin_conversation_id"],
@@ -362,6 +386,14 @@ class TaskRevisions:
                 intent = json.loads(task["intent_json"])
                 intent.setdefault("initialIntent", dict(intent))
                 previous = intent.get("continuation", {})
+                from roami_agent.storage.task_provider import provider_binding
+
+                provider = provider_binding(
+                    db,
+                    task,
+                    run["id"] if run["agent_conversation_id"] else previous.get("providerRunId"),
+                    run["attempt_no"],
+                )
                 verified_through = (
                     task["revision"]
                     if task["state"] == "succeeded"
@@ -389,6 +421,7 @@ class TaskRevisions:
                         if run["result_json"]
                         else ""
                     ),
+                    **({"providerRunId": provider["id"]} if provider else {}),
                 }
                 intent.update(
                     goal=payload["goal"],
@@ -401,11 +434,12 @@ class TaskRevisions:
                 if intent["target"]["kind"] == "new_project":
                     intent.setdefault("provisionLaunchId", run["launch_id"])
                 target = json.loads(task["target_json"]) if task["target_json"] else {}
-                if run["executor_kind"] == "cli" and run["session_id"]:
+                if provider or run["executor_kind"] == "cli" and run["session_id"]:
+                    session = provider or run
                     intent["target"] = {
                         "kind": "session",
-                        "sessionId": run["session_id"],
-                        "nodeId": run["node_id"] or "local",
+                        "sessionId": session["session_id"],
+                        "nodeId": session["node_id"] or "local",
                     }
                 elif (
                     intent["target"]["kind"] != "session"
@@ -476,6 +510,15 @@ class TaskRevisions:
                 db.execute(
                     "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) VALUES(?,'task.run',?,?,?,'queued',?)",
                     (identity(), task["id"], "run:" + rid, encoded({"runId": rid}), now_ms()),
+                )
+                from roami_agent.storage.swarm_members import record_round
+
+                record_round(
+                    db,
+                    task["id"],
+                    revision,
+                    payload["messageId"],
+                    payload.get("executionText", payload["text"]),
                 )
                 payload.update(status="applied", appliedRevision=revision, runId=rid)
                 db.execute(

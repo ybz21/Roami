@@ -1294,23 +1294,53 @@ async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, 
         try:
             conversations = Conversations(database)
             tasks = Tasks(database, conversations)
-            swarms = SwarmPlans(database, tasks, conversations, asyncio.Event())
-            main = await conversations.main("alice")
+
+            def legacy_main(db):
+                value = Conversations._new(db, "alice", "Legacy Main")
+                db.execute("INSERT INTO main_conversations VALUES(?,?,1)", ("alice", value["id"]))
+                return value
+
+            main = await database.call(legacy_main, write=True)
             origin = await conversations.accept(
                 "alice", main["id"], "origin", "Build original output"
             )
-            created = await swarms.create(
-                "alice",
-                {
-                    "name": "Legacy",
-                    "goal": "Build original output",
-                    "mainConversationId": main["id"],
-                    "commandKey": "create",
-                },
-                binding={"turnId": origin["turnId"]},
+            created = {"id": "sw-legacy-upgrade"}
+            await database.call(
+                lambda db: db.execute(
+                    "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms,origin_message_id) VALUES(?,'alice','Legacy',?,'Build original output',?,1,1,?)",
+                    (
+                        created["id"],
+                        main["id"],
+                        json.dumps({"kind": "new_session"}),
+                        origin["messageId"],
+                    ),
+                ),
+                write=True,
             )
-            await plan(swarms, created, [item("original")])
-            await advance(swarms, created)
+            task = await tasks.create(
+                "alice",
+                main["id"],
+                "Implement original",
+                key="legacy-task",
+                executor="codex",
+                origin_message_id=origin["messageId"],
+            )
+            await database.call(
+                lambda db: db.execute(
+                    "INSERT INTO swarm_work_items(id,swarm_id,member_name,executor,title,goal,acceptance,task_id) VALUES(?,?,?,?,?,?,?,?)",
+                    (
+                        "legacy-work",
+                        created["id"],
+                        "original",
+                        "codex",
+                        "Original",
+                        "Implement original",
+                        "Check outputs",
+                        task["id"],
+                    ),
+                ),
+                write=True,
+            )
             work = await database.call(
                 lambda db: row(
                     db, "SELECT * FROM swarm_work_items WHERE swarm_id=?", (created["id"],)
@@ -1350,7 +1380,33 @@ async def test_schema_seventeen_upgrade_keeps_original_swarm_evidence(tmp_path, 
             await database.call(
                 lambda db: db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
             )
-            == 18
+            == migrations.SCHEMA_VERSION
         )
     finally:
         await database.close()
+
+
+async def test_directed_chat_belongs_to_member_task_and_rejects_nonexistent_recipient(
+    collaboration,
+):
+    swarms, created = collaboration
+    await plan(swarms, created, [item("writer", executor="native")])
+    await advance(swarms, created)
+    work = (await swarms.snapshot("alice", created["id"]))["work"][0]
+    payload = {
+        "commandKey": "direct",
+        "text": "Continue the draft",
+        "workId": work["id"],
+        "taskRevision": 1,
+    }
+    await swarms.send("alice", created["id"], payload)
+    posts = (await swarms.snapshot("alice", created["id"]))["posts"]
+    assert posts[-1]["taskId"] == work["task_id"]
+    before = len(posts)
+    with pytest.raises(DomainError, match="SWARM_MEMBER_TASK_REQUIRED"):
+        await swarms.send(
+            "alice",
+            created["id"],
+            {**payload, "commandKey": "invalid", "workId": "another-team-work"},
+        )
+    assert len((await swarms.snapshot("alice", created["id"]))["posts"]) == before

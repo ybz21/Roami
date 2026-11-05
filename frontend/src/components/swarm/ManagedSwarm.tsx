@@ -2,11 +2,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { nodeApi } from '../cluster/node-url'
 import { App, Button, Input, Select, Spin } from 'antd'
 import { api } from '../../api'
+import { useSessionOverview } from '../../session-overview'
+import { useAgentData } from '../agent/useAgentData'
 import { useLayout } from '../../layout'
 import { useI18n } from '../../i18n'
 import { ChevronLeft, CloseIcon, ArrowUp } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
 import Markdown from '../markdown/Markdown'
+import type { TaskDetail } from '../agent/agent-task-protocol'
 import { openAgentPage } from '../agent/agent-page-route'
 import { useSwarmSnapshot } from './useSwarmSnapshot'
 import SwarmStudio from './SwarmStudio'
@@ -25,14 +28,12 @@ function State({ state }: { state: string }) {
 export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, projectId, onManage }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean; projectId?: string; onManage?: () => void }) {
   const { data, error, missing, refresh } = useSwarmSnapshot(id), { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const panelKey = 'roami.swarm.panel:' + nodeApi('/agent/swarms/' + id)
-  const [selected, setSelected] = useState('main'), [tab, setTab] = useState(() => localStorage.getItem(panelKey) || 'studio'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
+  const [selected, setSelected] = useState('main'), [tab, setTab] = useState(() => localStorage.getItem(panelKey) === 'board' ? 'board' : 'studio'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
   const [chatRecipientRequest, setChatRecipientRequest] = useState<{ id: string; nonce: number }>()
   const recipientNonce = useRef(0)
-  const [memoryOpen, setMemoryOpen] = useState(false)
+  const [memoryOpen, setMemoryOpen] = useState(false), [teamOpen, setTeamOpen] = useState(false)
   const controlKey = useRef<{ action: string; revision: number; key: string } | null>(null)
-  const [readCount, setReadCount] = useState(() => Number(localStorage.getItem(panelKey + ':read') || 0))
-  const chatCount = (data?.posts.length || 0) + (data?.mainMessages.filter(item => item.text).length || 0) + (data?.work.filter(item => item.attempt?.summary).length || 0)
-  useEffect(() => { localStorage.setItem(panelKey, tab); if (tab === 'chat') { setReadCount(chatCount); localStorage.setItem(panelKey + ':read', String(chatCount)) } }, [phone, tab, chatCount, panelKey])
+  useEffect(() => { localStorage.setItem(panelKey, tab) }, [tab, panelKey])
   const positions = useRef<Record<string, number>>({})
   const switchTab = (next: string) => {
     const panel = document.querySelector<HTMLElement>(tab === 'chat' ? '.swarm-chat-log' : '.swarm-main-area')
@@ -42,9 +43,13 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
     const panel = document.querySelector<HTMLElement>(tab === 'chat' ? '.swarm-chat-log' : '.swarm-main-area')
     if (panel) panel.scrollTop = positions.current[tab] || 0
   }, [tab])
-  const unread = Math.max(0, chatCount - readCount)
   const blockedCount = data?.work.filter(item => swarmColumn(item.state) === 'blocked').length || 0
-  const nodes = useMemo(() => data ? [{ id: 'main', name: 'Roami Main', executor: 'roami', main: true, state: data.mainState === 'failed' ? 'failed' : data.paused ? 'idle' : data.mainState === 'queued' ? 'preparing' : data.mainState === 'running' ? 'running' : 'idle' }, ...data.work.map(w => ({ id: w.id, name: w.member_name, executor: w.executor, state: w.state }))] : [], [data?.work, data?.paused, data?.mainState])
+  const sceneActive = !data?.archived && tab === 'studio' && !memoryOpen && (!phone || teamOpen)
+  const sceneSessions = useSessionOverview(sceneActive)
+  const nativeSessions = useAgentData<{ taskId: string; revision: number; lifecycle: string }[]>(data?.work.some(item => item.executor === 'native' && item.task_id) ? '/agent/native-sessions' : null, 5000, 10000, 'GET', sceneActive)
+  const nodes = useMemo(() => data ? [{ id: 'main', name: 'Roami Main', executor: 'roami', main: true, state: data.mainState === 'failed' ? 'failed' : data.paused ? 'idle' : data.mainState === 'queued' ? 'preparing' : data.mainState === 'running' ? 'running' : 'idle' }, ...data.work.filter(w => w.task_id && (w.executor === 'native'
+    ? !nativeSessions.failed && nativeSessions.value?.some(session => session.taskId === w.task_id && session.revision === w.revision && session.lifecycle === 'open')
+    : !sceneSessions.failed && sceneSessions.value.some(session => session.name === w.attempt?.sessionId && !session.dormant))).map(w => ({ id: w.id, name: w.member_name, executor: w.executor, state: w.state }))] : [], [data?.work, data?.paused, data?.mainState, nativeSessions.value, nativeSessions.failed, sceneSessions.value, sceneSessions.failed])
   const control = async (action: string) => {
     if (!data) return
     if (!controlKey.current || controlKey.current.action !== action || controlKey.current.revision !== data.revision) controlKey.current = { action, revision: data.revision, key: crypto.randomUUID() }
@@ -59,7 +64,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   if (!data) return <div className="swarm-loading">{missing ? <><p role="alert">{t('swarm.managed.relinkTeam')}</p><button type="button" className="tt-act" onClick={onBack}>{t('swarm.managed.selectTeam')}</button></> : error ? <><p role="alert">{t('swarm.managed.unavailable')}</p><button type="button" className="tt-act" onClick={() => void refresh()}>{t('agent.retry')}</button></> : <Spin />}</div>
   const work = data.work.find(item => item.id === detail)
   const openWork = (item: SwarmWork) => { setSelected(item.id); setDetail(item.id); if (!phone) switchTab('board') }
-  const openChat = (recipient: string) => { setSelected(recipient); setDetail(null); setChatRecipientRequest({ id: recipient, nonce: ++recipientNonce.current }); switchTab('chat') }
+  const openChat = (recipient: string) => { setSelected(recipient); setDetail(null); setChatRecipientRequest({ id: recipient, nonce: ++recipientNonce.current }); switchTab('studio'); if (phone) setTeamOpen(false) }
   const view = <div className="swarm-work-detail">
     {work && <>{!phone && <div className="swarm-panel-head"><h3>{work.title}</h3><button type="button" className="tt-act" aria-label={t('common.close')} onClick={() => setDetail(null)}><CloseIcon /></button></div>}<State state={work.state} />
       {work.evidence?.verification?.state === 'missing' && <p role="status">{t('swarm.managed.evidenceMissing')}</p>}
@@ -69,61 +74,103 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
       <details className="swarm-description"><summary>{t('swarm.managed.instructions')}</summary><Markdown>{work.goal}</Markdown><h4>{t('swarm.managed.acceptance')}</h4><Markdown>{work.acceptance}</Markdown></details>
       {work.dispatch_error && <p role="alert">{t(work.dispatch_error === 'SWARM_DEPENDENCY_NOT_VERIFIED' ? 'swarm.managed.dependencyBlocked' : 'swarm.managed.dispatchFailed')}</p>}
       {work.dependencies.length > 0 && <section><h4>{t('swarm.managed.dependencies')}</h4>{work.dependencies.map(dep => <p key={dep.upstreamId}>{data.work.find(item => item.id === dep.upstreamId)?.title}</p>)}</section>}
-      <div className="swarm-detail-actions">{work.task_id && <button type="button" className="tt-act" onClick={() => openAgentPage('tasks', work.task_id!)}>{t('swarm.managed.openTask')}</button>}{work.attempt?.sessionId && <button type="button" className="tt-act" onClick={() => openTerm(work.attempt!.sessionId!)}>{t('swarm.managed.openSession')}</button>}</div>
+      <div className="swarm-detail-actions">{work.task_id && <button type="button" className="tt-act" onClick={() => openAgentPage('tasks', work.task_id!)}>{t('swarm.managed.openTask')}</button>}</div>
     </>}
   </div>
-  return <div className="swarm-managed" data-tab={tab}>
-    <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && !embedded && <button type="button" className="tt-act" onClick={onBack} aria-label={t('common.back')}><ChevronLeft /></button>}<h2>{data.name}</h2><State state={data.state} />{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts"><Button size="small" loading={busy} disabled={data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</Button><details className="swarm-controls"><summary>{t('common.more')}</summary><button type="button" className="tt-act" onClick={() => { void refresh().then(() => setMemoryOpen(true)) }}>{t('swarm.managed.memory')}</button><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></details></div></header>
+  const studio = <div className="swarm-studio-area"><SwarmStudio active={tab === 'studio' && !memoryOpen && (!phone || teamOpen && !detail)} nodes={nodes} selected={selected} onSelect={id => { const item = data.work.find(w => w.id === id); item?.task_id ? openChat(id) : item ? openWork(item) : openChat('main') }} /><SwarmRelations data={data} selected={selected} onSelect={id => { const item = data.work.find(w => w.id === id); item?.task_id ? openChat(id) : item ? openWork(item) : openChat('main') }} onMain={() => openChat('main')} onWork={item => item.task_id ? openAgentPage('tasks', item.task_id) : openWork(item)} onChat={item => openChat(item.task_id ? item.id : 'main')} /></div>
+  return <div className="swarm-managed" data-embedded={embedded} data-tab={tab} data-team-open={teamOpen}>
+    <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && !embedded && <button type="button" className="tt-act" onClick={onBack} aria-label={t('common.back')}><ChevronLeft /></button>}<h2>{data.name}</h2><State state={data.state} />{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div>{!memoryOpen && <nav className="swarm-tabs" aria-label={t('swarm.managed.workspace')}>{['studio', 'board'].map(key => <button type="button" key={key} aria-pressed={tab === key} onClick={() => switchTab(key)}>{t(`swarm.managed.tab.${key}`)}{(key === 'board' ? blockedCount : 0) > 0 && <span className="swarm-tab-count">{new Intl.NumberFormat(locale).format(blockedCount)}</span>}</button>)}{phone && tab === 'studio' && <button type="button" aria-expanded={teamOpen} onClick={() => setTeamOpen(value => !value)}>{t('swarm.chat.team')}</button>}</nav>}<div className="acts"><Button size="small" loading={busy} disabled={data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</Button><details className="swarm-controls"><summary>{t('common.more')}</summary><button type="button" className="tt-act" onClick={() => { void refresh().then(() => setMemoryOpen(true)) }}>{t('swarm.managed.memory')}</button><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></details></div></header>
     {error && <div className="swarm-stream-error" role="status">{t('swarm.managed.reconnecting')}</div>}
     {data.mainState === 'failed' && <p role="alert" className="swarm-stream-error">{t('swarm.managed.mainFailed')}</p>}
     {data.archived && <p className="swarm-note">{t('swarm.managed.archived')}</p>}
-    {!memoryOpen && <nav className="swarm-tabs" aria-label={t('swarm.managed.workspace')}>{['studio', 'chat', 'board'].map(key => <button type="button" key={key} aria-pressed={tab === key} onClick={() => switchTab(key)}>{t(`swarm.managed.tab.${key}`)}{(key === 'chat' ? unread : key === 'board' ? blockedCount : 0) > 0 && <span className="swarm-tab-count">{new Intl.NumberFormat(locale).format(key === 'chat' ? unread : blockedCount)}</span>}</button>)}</nav>}
+
     <div className="swarm-managed-grid" hidden={memoryOpen && !phone}>
       <div className="swarm-main-area">
-        <div className="swarm-studio-area"><SwarmRelations data={data} selected={selected} onSelect={setSelected} onMain={() => openChat('main')} onWork={item => item.task_id ? openAgentPage('tasks', item.task_id) : openWork(item)} onChat={item => openChat(item.task_id ? item.id : 'main')} /><SwarmStudio active={tab === 'studio' && !memoryOpen} nodes={nodes} selected={selected} onSelect={setSelected} /></div>
+        {(!phone || !teamOpen) && studio}
         <section className="swarm-board" aria-label={t('swarm.board')}>{!data.work.length ? <p className="swarm-note">{t('swarm.managed.planning')}</p> : <div className="swarm-board-columns">{['backlog', 'doing', 'blocked', 'review', 'done'].map(column => <section key={column}><h3>{t(`swarm.board.col.${column}`)}</h3>{data.work.filter(item => swarmColumn(item.state) === column).map(item => <button type="button" className="swarm-work-card" key={item.id} aria-pressed={selected === item.id} onClick={() => openWork(item)}><strong>{item.title}</strong><small>{item.member_name} · {item.executor === 'native' ? 'Roami' : item.executor}</small><State state={item.state} /></button>)}</section>)}</div>}</section>
         {!phone && work && view}
       </div>
-      <SwarmChat key={data.id} data={data} recipientRequest={chatRecipientRequest} selected={selected} onSelect={setSelected} onWork={openWork} onSent={refresh} />
+      <SwarmChat key={data.id} data={data} recipientRequest={chatRecipientRequest} selected={selected} onSelect={setSelected} onWork={openWork} onSession={openTerm} onSent={refresh} />
     </div>
     {memoryOpen && (phone ? <MobileSubPage title={t('swarm.managed.memory')} onBack={() => setMemoryOpen(false)}><TeamMemory data={data} onReload={refresh} onSaved={async () => { await refresh(); setMemoryOpen(false) }} /></MobileSubPage> : <><div className="swarm-panel-head"><strong>{t('swarm.managed.memory')}</strong><button type="button" className="tt-act" aria-label={t('common.close')} onClick={() => setMemoryOpen(false)}><CloseIcon /></button></div><TeamMemory data={data} onReload={refresh} onSaved={async () => { await refresh(); setMemoryOpen(false) }} /></>)}
+    {phone && teamOpen && <MobileSubPage title={data.name} onBack={() => setTeamOpen(false)}><div className="swarm-team-page">{studio}</div></MobileSubPage>}
     {phone && work && <MobileSubPage title={work.title} onBack={() => setDetail(null)}>{view}</MobileSubPage>}
   </div>
 }
 
-function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSent }: { data: SwarmSnapshot; recipientRequest?: { id: string; nonce: number }; selected: string; onSelect: (id: string) => void; onWork: (item: SwarmWork) => void; onSent: () => Promise<void> }) {
-  const { t, locale } = useI18n(), { message } = App.useApp()
+function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSession, onSent }: { data: SwarmSnapshot; recipientRequest?: { id: string; nonce: number }; selected: string; onSelect: (id: string) => void; onWork: (item: SwarmWork) => void; onSession: (id: string) => void; onSent: () => Promise<void> }) {
+  const { t, locale } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
+  const sessions = useSessionOverview(!data.archived)
+  const latestSessions = useRef(sessions); latestSessions.current = sessions
   const storageKey = 'roami.swarm.draft:' + nodeApi('/agent/swarms/' + data.id)
   const [saved] = useState(() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}') } catch { return {} } })
-  const [draft, setDraft] = useState<string>(saved.draft || ''), [recipient, setRecipient] = useState<string>(saved.recipient || 'main'), [sending, setSending] = useState(false)
+  const [scope, setScope] = useState<string>(saved.scope || saved.recipient || 'group'), [opening, setOpening] = useState(false)
+  const alive = useRef(true), openingRef = useRef(false), latestScope = useRef(scope); latestScope.current = scope
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const [draft, setDraft] = useState<string>(saved.draft || ''), [sending, setSending] = useState(false)
   const sendKey = useRef<{ key: string; payload: string; body?: { text: string; workId?: string; taskRevision?: number | null } }>(saved.pending || { key: crypto.randomUUID(), payload: '' })
-  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify({ draft, recipient, pending: sendKey.current })) }, [draft, recipient, sending, storageKey])
+  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify({ draft, scope, pending: sendKey.current })) }, [draft, scope, sending, storageKey])
   const editDraft = (text: string) => {
     setDraft(text)
     const mention = /^\s*@([^\s]+)(?:\s+|$)/.exec(text)?.[1]
     const id = ['leader', 'main'].includes(mention?.toLowerCase() || '') ? 'main' : data.work.find(item => item.task_id && item.member_name === mention)?.id
-    if (id) setRecipient(id)
+    if (id) { setScope(id); onSelect(id) }
   }
   const chooseRecipient = (id: string) => {
     const member = data.work.find(item => item.id === id && item.task_id)
     if (id !== 'main' && !member) return
-    setRecipient(id)
+    setScope(id); onSelect(id)
     setDraft(text => text.replace(/^(\s*)@[^\s]+(?=\s|$)/, (_match, space: string) => space + '@' + (id === 'main' ? 'leader' : member!.member_name)))
   }
   useEffect(() => {
     if (!recipientRequest) return
     chooseRecipient(recipientRequest.id)
-    document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus()
+    if (!phone) document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipientRequest?.id, recipientRequest?.nonce])
   const messages = useMemo(() => [
-    ...data.posts.map(post => ({ id: 'post:' + post.id, author: post.author === 'human' ? t('swarm.chat.you') : post.author === 'main' ? 'Roami Main' : post.author, text: post.text, time: post.createdMs, pending: post.deliveryState === 'pending', work: post.taskId ? data.work.find(item => item.task_id === post.taskId) : undefined })),
-    ...data.mainMessages.filter(item => item.text).map(item => ({ id: item.id, author: 'Roami Main', text: item.text, time: item.createdMs, pending: false, work: undefined as SwarmWork | undefined })),
-    ...data.work.filter(item => item.attempt?.summary).map(item => ({ id: 'result:' + item.id, author: item.member_name, text: item.attempt!.summary!, time: item.attempt?.finishedMs || 0, pending: false, work: item })),
+    ...data.posts.map(post => {
+      const work = post.taskId ? data.work.find(item => item.task_id === post.taskId) : undefined
+      const author = work && ['human', 'main'].includes(post.author) ? t(post.author === 'main' ? 'swarm.chat.forwardedTo' : 'swarm.chat.sentTo', { name: work.member_name }) : post.author === 'human' ? t('swarm.chat.you') : post.author === 'main' ? 'Roami Main' : post.author
+      return { id: 'post:' + post.id, taskId: post.taskId, author, text: post.text, time: post.createdMs, pending: post.deliveryState === 'pending', work }
+    }),
+    ...data.mainMessages.filter(item => item.text).map(item => ({ id: item.id, taskId: undefined as string | null | undefined, author: 'Roami Main', text: item.text, time: item.createdMs, pending: false, work: undefined as SwarmWork | undefined })),
+    ...data.work.filter(item => item.attempt?.summary).map(item => ({ id: 'result:' + item.id, taskId: item.task_id, author: item.member_name, text: item.attempt!.summary!, time: item.attempt?.finishedMs || 0, pending: false, work: item })),
   ].sort((a, b) => a.time - b.time), [data.posts, data.mainMessages, data.work, t])
+  const currentWork = data.work.find(item => item.id === scope && item.task_id)
+  const latestWork = useRef(currentWork); latestWork.current = currentWork
+  const thread = scope === 'main' || currentWork ? scope : 'group'
+  const visibleMessages = messages.filter(item => thread === 'group' || thread === 'main' && !item.taskId || item.work?.id === thread)
+  const chatLog = useRef<HTMLDivElement>(null), followLatest = useRef(true), lastThread = useRef(thread)
+  const latestMessage = visibleMessages[visibleMessages.length - 1]?.id
+  useLayoutEffect(() => {
+    if (lastThread.current !== thread) { lastThread.current = thread; followLatest.current = true }
+    if (followLatest.current && chatLog.current) chatLog.current.scrollTop = chatLog.current.scrollHeight
+  }, [thread, latestMessage])
+  const enterConversation = async () => {
+    if (!currentWork?.task_id || openingRef.current) return
+    openingRef.current = true; setOpening(true)
+    const taskId = currentWork.task_id, requestedScope = scope, requestedRevision = currentWork.revision, requestedRun = currentWork.attempt?.runId
+    const fallback = () => openAgentPage('tasks', taskId)
+    try {
+      const response = await api('GET', '/agent/tasks/' + encodeURIComponent(taskId))
+      const detail: TaskDetail = response.data
+      if (!alive.current || latestScope.current !== requestedScope) return
+      const observed = latestWork.current
+      if (!observed) return
+      if (observed.task_id !== taskId || observed.revision !== requestedRevision || observed.attempt?.runId !== requestedRun) { if (observed.task_id) openAgentPage('tasks', observed.task_id); return }
+      const attempt = detail.attempts[0]
+      if (detail.task.id !== taskId || detail.task.revision !== currentWork.revision || !attempt || attempt.revision !== detail.task.revision || attempt.id !== currentWork.attempt?.runId || ['closing', 'closed'].includes(detail.sessionClosure?.state || '')) { fallback(); return }
+      if (detail.task.nativeSession) openAgentPage('session', detail.task.nativeSession.id)
+      else if (attempt.sessionId && !latestSessions.current.failed && latestSessions.current.value.some(session => session.name === attempt.sessionId && !session.dormant)) onSession(attempt.sessionId)
+      else fallback()
+    } catch { if (alive.current && latestScope.current === requestedScope) fallback() }
+    finally { openingRef.current = false; if (alive.current) setOpening(false) }
+  }
   const send = async () => {
     if (!draft.trim() || sending) return
     const mention = /^\s*@([^\s]+)(?:\s+|$)/.exec(draft)?.[1]
+    const recipient = thread === 'group' ? 'main' : thread
     const destination = mention?.toLowerCase() === 'leader' || mention?.toLowerCase() === 'main' ? 'main' : mention ? data.work.find(item => item.member_name === mention)?.id ?? recipient : recipient
     const work = data.work.find(item => item.id === destination)
     if (destination !== 'main' && (!work?.task_id || !work.revision)) { message.error(t('swarm.managed.sendFailed')); return }
@@ -136,8 +183,11 @@ function SwarmChat({ data, recipientRequest, selected, onSelect, onWork, onSent 
     try { await api('POST', `/agent/swarms/${data.id}/messages`, { ...body, commandKey: sendKey.current.key }); setDraft(''); sendKey.current = { key: crypto.randomUUID(), payload: '' }; await onSent() }
     catch { message.error(t('swarm.managed.sendFailed')) } finally { setSending(false) }
   }
-  return <section className="swarm-chat" aria-label={t('swarm.managed.tab.chat')}><div className="swarm-chat-log" role="log" aria-label={t('swarm.managed.messages')}>
-    {!messages.length && <p className="swarm-note">{t('swarm.managed.chatEmpty')}</p>}
-    {messages.map(item => <article className="swarm-chat-message" key={item.id} data-selected={item.work?.id === selected}><header><button type="button" className="tt-act" onClick={() => onSelect(item.work?.id || 'main')}>{item.author}</button>{item.time > 0 && <time>{new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(item.time)}</time>}</header>{item.pending && <span className="swarm-note">{t('swarm.managed.deliveryPending')}</span>}{item.id.startsWith('result:') ? <details><summary>{t('swarm.managed.report')}</summary><Markdown>{item.text}</Markdown></details> : <Markdown>{item.text}</Markdown>}{item.work && <div className="swarm-chat-task-actions"><State state={item.work.state} /><button type="button" className="tt-act" onClick={() => onWork(item.work!)}>{t('swarm.managed.openTask')}</button><button type="button" className="tt-act" onClick={() => { chooseRecipient(item.work!.id); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{t('swarm.managed.replyMember')}</button></div>}</article>)}
-  </div><div className="tt-composer swarm-chat-composer"><Input.TextArea variant="borderless" aria-label={t('swarm.managed.messages')} value={draft} onChange={e => editDraft(e.target.value)} rows={3} disabled={data.archived || sending} placeholder={t('swarm.managed.chatPlaceholder')} />{/^\s*@[^\s]*$/.test(draft) && <div className="swarm-detail-actions">{[{ name: 'leader', id: 'main' }, ...data.work.filter(item => item.task_id).map(item => ({ name: item.member_name, id: item.id }))].filter(item => item.name.toLowerCase().startsWith(draft.trim().slice(1).toLowerCase())).map(item => <button type="button" key={item.id} className="tt-act" onClick={() => { setRecipient(item.id); setDraft('@' + item.name + ' '); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{'@' + item.name}</button>)}</div>}<div className="tt-cbar"><div className="tt-cgrp"><label htmlFor="swarm-chat-recipient">{t('swarm.managed.recipient')}</label><Select id="swarm-chat-recipient" value={recipient} onChange={chooseRecipient} disabled={data.archived || sending} options={[{ value: 'main', label: '@leader · ' + t('swarm.managed.leader') }, ...data.work.filter(item => item.task_id).map(item => ({ value: item.id, label: '@' + item.member_name }))]} /></div><div className="tt-cend"><button type="button" className="tt-send" aria-label={t('common.send')} disabled={sending || data.archived || !draft.trim()} onClick={() => void send()}>{sending ? <Spin size="small" /> : <ArrowUp size={18} />}</button></div></div><p className="swarm-note">{t('swarm.managed.chatHint')}</p></div></section>
+  return <section className="swarm-chat" aria-label={t('swarm.managed.tab.chat')}>
+    <div className="swarm-chat-conversation"><label htmlFor="swarm-chat-conversation">{t('swarm.chat.conversations')}</label><Select id="swarm-chat-conversation" aria-label={t('swarm.chat.conversations')} value={thread} onChange={id => { if (id === 'group') { chooseRecipient('main'); setScope('group') } else chooseRecipient(id) }} disabled={sending} options={[{ value: 'group', label: t('swarm.managed.tab.chat') }, { value: 'main', label: 'Roami Main' }, ...data.work.filter(item => item.task_id).map(item => ({ value: item.id, label: item.member_name }))]} /></div>
+    <div className="swarm-chat-context"><span>{t(currentWork ? 'swarm.chat.directRoute' : 'swarm.chat.leaderRoute')}</span>{currentWork && <div className="swarm-detail-actions"><button type="button" className="tt-act" onClick={() => openAgentPage('tasks', currentWork.task_id!)}>{t('swarm.relations.openWork')}</button><button type="button" className="tt-act" disabled={opening} onClick={() => void enterConversation()}>{t('swarm.managed.openSession')}</button></div>}</div>
+    <div className="swarm-chat-log" ref={chatLog} onScroll={event => { const pane = event.currentTarget; followLatest.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight < pane.clientHeight * .1 }} role="log" aria-label={t('swarm.managed.messages')}>
+    {!visibleMessages.length && <p className="swarm-note">{t('swarm.managed.chatEmpty')}</p>}
+    {visibleMessages.map(item => <article className="swarm-chat-message" key={item.id} data-selected={item.work?.id === selected}><header><button type="button" className="tt-act" onClick={() => chooseRecipient(item.work?.id || 'main')}>{item.author}</button>{item.time > 0 && <time>{new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(item.time)}</time>}</header>{item.pending && <span className="swarm-note">{t('swarm.managed.deliveryPending')}</span>}{item.id.startsWith('result:') && item.text === 'SESSION_TARGET_NOT_FOUND' && <p role="status">{t('swarm.chat.sessionMissing')}</p>}{item.id.startsWith('result:') ? <details><summary>{t('swarm.managed.report')}</summary><Markdown>{item.text}</Markdown></details> : <Markdown>{item.text}</Markdown>}{item.work && <div className="swarm-chat-task-actions"><State state={item.work.state} /><button type="button" className="tt-act" onClick={() => onWork(item.work!)}>{t('swarm.managed.openTask')}</button><button type="button" className="tt-act" onClick={() => { chooseRecipient(item.work!.id); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{t('swarm.managed.replyMember')}</button></div>}</article>)}
+  </div><div className="tt-composer swarm-chat-composer"><Input.TextArea variant="borderless" aria-label={t('swarm.managed.messages')} value={draft} onChange={e => editDraft(e.target.value)} rows={3} disabled={data.archived || sending} placeholder={t('swarm.managed.chatPlaceholder')} />{/^\s*@[^\s]*$/.test(draft) && <div className="swarm-detail-actions">{[{ name: 'leader', id: 'main' }, ...data.work.filter(item => item.task_id).map(item => ({ name: item.member_name, id: item.id }))].filter(item => item.name.toLowerCase().startsWith(draft.trim().slice(1).toLowerCase())).map(item => <button type="button" key={item.id} className="tt-act" onClick={() => { setScope(item.id); onSelect(item.id); setDraft('@' + item.name + ' '); document.querySelector<HTMLTextAreaElement>('.swarm-chat textarea')?.focus() }}>{'@' + item.name}</button>)}</div>}<div className="tt-cbar"><div className="tt-cend"><button type="button" className="tt-send" aria-label={t('common.send')} disabled={sending || data.archived || !draft.trim()} onClick={() => void send()}>{sending ? <Spin size="small" /> : <ArrowUp size={18} />}</button></div></div></div></section>
 }
