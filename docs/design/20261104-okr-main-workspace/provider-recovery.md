@@ -39,7 +39,7 @@ Go 验证原 spec、receipt、生命周期与结果：executor/provider/session 
 
 源码阶段已验证两种假 provider 的真实私有 tmux/Go CLI/Python 联验：物理终端变化、provider UUID 与工作区保持、重放不重复输入。相关 Go 身份、进程、占用、原始请求回归和57项 Python执行/续派专项已通过。
 
-最终扩展隔离场景已通过：四个 task revision 对应三次真实假 provider 输入，中间一轮为明确未启动的临时恢复失败；失败不丢原上下文，随后继续同一恢复后的终端。原物理会话的历史仍为 dead，新会话有准确 restored_from。真实 Tasks 报告、验证和显式夹具用户验收分别执行；同一 launch 重放不重复输入。最终相关 Go 专项通过（含两种真实私有 tmux/CLI/Python 场景及旧常驻实例回归），Python57项专项通过。完整 quick/full 与最终源码回执另补，不把专项通过当成完整发布验收。
+最终扩展隔离场景已通过：四个 task revision 对应三次真实假 provider 输入，中间一轮为明确未启动的临时恢复失败；失败不丢原上下文，随后继续同一恢复后的终端。原物理会话的历史仍为 dead，新会话有准确 restored_from。真实 Tasks 报告、验证和显式夹具用户验收分别执行；同一 launch 重放不重复输入。最终相关 Go 专项通过（含两种真实私有 tmux/CLI/Python 场景及旧常驻实例回归），Python57项专项通过。完整 quick/full 已通过：Python3457 passed/48 skipped、Go全量及前端构建/审计。原代码提交7b79547d，主线同步后01eaeef2；同步仅包含其他已合入的Go/前端侧栏改动，agent-runtime目录逐文件相同。按真实7b..01e新增差异另跑full（Python未变化故跳过）和前端全量1376项，均通过。最终私有CLI场景 `/tmp/okr-provider-recovery/scenario-final.log` 在01e源码重建二进制上通过；数据库独立复核四轮状态、同provider、同task、恢复后同终端，报告 `/tmp/okr-provider-recovery/acceptance.html`。CLI与Agent职责文本属于i18n标准豁免，本轮未修改Web UI。
 
 证据目录 `/tmp/okr-provider-recovery/`。所有 provider 均为本仓测试夹具，未调用真实模型、手机或线上项目，没有部署、重启服务、修改路由、费用、账目和 busy。
 
