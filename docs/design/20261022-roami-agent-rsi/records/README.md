@@ -4,6 +4,7 @@
 
 | 日期 | 记录 |
 | --- | --- |
+| 2026-11-05 | [Codex 原生命令完成与丢失回调恢复](2026-11-05/codex-native-command-completion.md) |
 | 2026-11-05 | [Go 网关准入顺序与取消恢复](2026-11-05/gateway-admission-order.md) |
 | 2026-11-05 | [当前套件的默认诊断与财务单位合同](2026-11-05/suite-diagnostics-and-finance-units.md) |
 | 2026-11-05 | [用户目的地与逐轮最终交付](2026-11-05/source-bound-delivery.md) |
