@@ -143,3 +143,5 @@
 补充：Connector 位于 connectors/ 的 Skill 包；[用户 HTML 读取数据的可运行样例](../20261104-okr-studio-project-ownership/dashboard-example.html)，以及[生成/编辑 Skill 扩展示例](../20261104-okr-studio-project-ownership/templates/okr-development/SKILL.md)。数据保存、读取 API、组件与模板规范均见技术方案。
 
 [团队记忆追加、可恢复版本与长期对话分页](memory-integrity.md)（#687）。
+
+[Main 原生 CLI 群聊署名与自我唤醒保护](native-cli-message-identity.md)。
