@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "content-growth",
+  "version": 1,
+  "config": "config.json",
+  "requiredDecisions": [
+    "objectiveAndPeriod",
+    "targetsAndUnits",
+    "sourceAccount",
+    "roleDuties"
+  ],
+  "optionalAssets": [
+    "assets/dashboard",
+    "assets/connectors"
+  ],
+  "scheduleDefault": {
+    "enabled": false,
+    "dailyAt": null,
+    "timezone": null
+  },
+  "exclude": [
+    "credentials",
+    "instanceIds",
+    "observations",
+    "completedState"
+  ]
+}

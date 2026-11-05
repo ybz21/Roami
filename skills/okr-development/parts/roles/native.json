@@ -1,0 +1,6 @@
+{
+  "id": "{{roleId}}",
+  "name": "{{roleName}}",
+  "executor": "native",
+  "duty": "{{duty}}"
+}

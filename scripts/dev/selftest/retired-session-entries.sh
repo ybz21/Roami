@@ -19,8 +19,7 @@ bash "$REPO_DIR/skills/sync-skills.sh" > /dev/null
 [[ ! -e "$HOME/.bash_completion.d/ttmux" && ! -e "$HOME/.claude/skills/ttmux" ]]
 [[ -s "$HOME/.claude/skills/roami-session/SKILL.md" && -s "$HOME/.codex/skills/roami-session/SKILL.md" ]]
 for target in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
-    cmp "$REPO_DIR/agent-runtime/src/roami_agent/skills/okr-development/SKILL.md" "$target/okr-development/SKILL.md"
-    cmp "$REPO_DIR/agent-runtime/src/roami_agent/skills/okr-development/references/bundle.md" "$target/okr-development/references/bundle.md"
+    diff -r "$REPO_DIR/skills/okr-development" "$target/okr-development"
 done
 [[ "$(find "$FIXTURE/archive" -type f | wc -l)" -ge 4 ]]
 retire_roami_session_entries "$HOME/.local/bin"

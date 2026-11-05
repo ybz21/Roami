@@ -1,0 +1,79 @@
+{
+  "revision": 0,
+  "objective": "交付可验证的产品版本",
+  "startDate": "{{startDate}}",
+  "endDate": "{{endDate}}",
+  "metrics": [
+    {
+      "id": "milestones",
+      "name": "已验收里程碑",
+      "unit": "项",
+      "source": "manual"
+    },
+    {
+      "id": "workflows",
+      "name": "通过的关键流程",
+      "unit": "项",
+      "source": "manual"
+    }
+  ],
+  "keyResults": [
+    {
+      "id": "release",
+      "title": "完成可用版本",
+      "horizon": "short",
+      "metricId": "milestones",
+      "target": 3,
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    },
+    {
+      "id": "quality",
+      "title": "验证关键流程",
+      "horizon": "short",
+      "metricId": "workflows",
+      "target": 5,
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    }
+  ],
+  "initiatives": [],
+  "dashboard": {
+    "schemaVersion": 1,
+    "widgets": [
+      {
+        "id": "metrics",
+        "type": "metricTrend",
+        "metricIds": [
+          "milestones",
+          "workflows"
+        ]
+      }
+    ]
+  },
+  "team": {
+    "schemaVersion": 1,
+    "roles": [
+      {
+        "id": "design",
+        "name": "产品设计",
+        "executor": "native",
+        "duty": "拆解需求、交互和验收标准"
+      },
+      {
+        "id": "implementation",
+        "name": "功能实现",
+        "executor": "native",
+        "duty": "实现功能并完成专项回归"
+      },
+      {
+        "id": "verification",
+        "name": "独立测试",
+        "executor": "native",
+        "duty": "独立核验当前产物与关键流程"
+      }
+    ]
+  },
+  "swarm": "",
+  "autoCollect": false
+}

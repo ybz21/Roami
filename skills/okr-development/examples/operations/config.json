@@ -1,0 +1,73 @@
+{
+  "revision": 0,
+  "objective": "建立可信的日常业务视图",
+  "startDate": "{{startDate}}",
+  "endDate": "{{endDate}}",
+  "metrics": [
+    {
+      "id": "coverage",
+      "name": "可信来源覆盖",
+      "unit": "个",
+      "source": "manual"
+    },
+    {
+      "id": "resolved",
+      "name": "已核对异常",
+      "unit": "项",
+      "source": "manual"
+    }
+  ],
+  "keyResults": [
+    {
+      "id": "coverage",
+      "title": "获得有来源的业务指标",
+      "horizon": "short",
+      "metricId": "coverage",
+      "target": 3,
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    },
+    {
+      "id": "response",
+      "title": "闭环处理数据异常",
+      "horizon": "short",
+      "metricId": "resolved",
+      "target": 5,
+      "mode": "atLeast",
+      "dueDate": "{{endDate}}"
+    }
+  ],
+  "initiatives": [],
+  "dashboard": {
+    "schemaVersion": 1,
+    "widgets": [
+      {
+        "id": "metrics",
+        "type": "metricTrend",
+        "metricIds": [
+          "coverage",
+          "resolved"
+        ]
+      }
+    ]
+  },
+  "team": {
+    "schemaVersion": 1,
+    "roles": [
+      {
+        "id": "collection",
+        "name": "数据采集",
+        "executor": "native",
+        "duty": "按授权来源取数并保留口径与证据"
+      },
+      {
+        "id": "analysis",
+        "name": "分析跟进",
+        "executor": "native",
+        "duty": "复核异常并提出下一轮行动"
+      }
+    ]
+  },
+  "swarm": "",
+  "autoCollect": false
+}

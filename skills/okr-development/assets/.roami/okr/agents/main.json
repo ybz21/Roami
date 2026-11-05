@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "role": "main",
+  "instructionsFile": "main.md",
+  "skills": [
+    "skills/okr-planning/SKILL.md",
+    "skills/metric-collection/SKILL.md",
+    "skills/swarm-execution/SKILL.md"
+  ]
+}

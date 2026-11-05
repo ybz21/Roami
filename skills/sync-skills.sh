@@ -65,10 +65,9 @@ for d in "${TARGETS[@]}"; do
         chmod +x "${d}/babysit-pr/wait-codex-review.sh"
     fi
     # One source serves the runtime and native development agents.
-    okr_skill="${SRC}/../agent-runtime/src/roami_agent/skills/okr-development"
-    mkdir -p "${d}/okr-development/references"
-    cp "${okr_skill}/SKILL.md" "${d}/okr-development/SKILL.md"
-    cp "${okr_skill}/references/bundle.md" "${d}/okr-development/references/bundle.md"
+    okr_skill="${SRC}/okr-development"
+    mkdir -p "${d}/okr-development"
+    cp -R "${okr_skill}/." "${d}/okr-development/"
     echo "✔ skills 已同步到 ${d} (roami-session, cc-swarm, dev-roles, babysit-pr, okr-development)"
 done
 rm -f "$tmp_cc" "$tmp_dr"
