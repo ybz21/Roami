@@ -1,0 +1,65 @@
+{
+  "scope": "online read-only acceptance for issue 398; prior implementation, not new protocol code",
+  "observed_on": "2026-11-05",
+  "original_task_sha256": "9dedba4b5bf803df914036f814d4a69eb0eafe1f794079ee3fdc56ee6e8f6508",
+  "revision": 2,
+  "state": "waiting_user",
+  "attempts": [
+    {
+      "task_revision": 2,
+      "state": "succeeded",
+      "result_state": "succeeded",
+      "outcomeKnown": null,
+      "inputStopped": null,
+      "summary_sha256": "41d1e27bfca589ac954a2c45e650e751e5dc49e28f8882f523801dbbdbf3ab01"
+    },
+    {
+      "task_revision": 1,
+      "state": "unknown",
+      "result_state": "failed",
+      "outcomeKnown": false,
+      "inputStopped": null,
+      "summary_sha256": "b11c22e7ad82507b8dcbef689a5f5c47bf5fd308c99f9f97031f9b9b475f3279"
+    }
+  ],
+  "recovery": [
+    {
+      "inputStopped": true,
+      "outcomeKnown": false,
+      "reason": "stopped_navigation_only",
+      "revision": 1,
+      "kind": "task.navigation_recovery",
+      "action_count": 6,
+      "tool_count": 1
+    },
+    {
+      "revision": 2,
+      "kind": "task.steered",
+      "action_count": 0,
+      "tool_count": 0
+    },
+    {
+      "state": "waiting_user",
+      "taskRevision": 2,
+      "kind": "task.waiting_user",
+      "action_count": 0,
+      "tool_count": 0
+    }
+  ],
+  "delivered_summary_count": 1,
+  "delivery_text_hashes": [
+    "dd2a130ebb566bd415dc0cc4fec433b9667caf16e8b38abc64f53080df9f5eba"
+  ],
+  "checks": {
+    "passed": 45,
+    "files": [
+      "test_navigation_recovery.py",
+      "test_native_reconciliation.py"
+    ]
+  },
+  "screenshot_sha256": "3467c08a2ffee1ad8af22f932a70af8ff2f8eba014e61632e1c46d86d39e0b0a",
+  "new_user_prompt_sent": false,
+  "task_status_changed": false,
+  "old_unknown_rewritten": false,
+  "business_acceptance_claimed": false
+}

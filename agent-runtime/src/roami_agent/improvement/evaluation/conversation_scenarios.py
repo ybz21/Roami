@@ -258,7 +258,7 @@ async def run_conversation(scenario, root, *, settings=None, provider=None):
         computer={},
         proactive_enabled=False,
     )
-    runtime = Runtime(database, model, settings=isolated)
+    runtime = Runtime(database, model, settings=isolated, require_final_tool=provider is not None)
     targets = ScenarioTargets(root, database)
     registry = Tools(runtime.artifacts)
     register_main_tools(

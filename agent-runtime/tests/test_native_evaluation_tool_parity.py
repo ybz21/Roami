@@ -66,10 +66,14 @@ async def test_native_user_followup_reuses_the_task_and_workspace(tmp_path, cont
                 for m in messages
             )
             if completed:
-                yield ModelEvent("text", "The worker returned its file for acceptance.")
+                yield tool(
+                    "reply", {"text": "The worker returned its file for acceptance."}, "reply"
+                )
             elif followup in current:
                 if "bash" not in names:
-                    yield ModelEvent("text", "The continuation operation is unavailable.")
+                    yield tool(
+                        "reply", {"text": "The continuation operation is unavailable."}, "reply"
+                    )
                 else:
                     listed = next(
                         (v for v in reversed(results(messages)) if isinstance(v, list)), None

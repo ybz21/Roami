@@ -26,7 +26,13 @@ class Transport:
         response = next(self.responses)
         if isinstance(response, Exception):
             raise response
-        yield ModelEvent("text", response)
+        yield ModelEvent(
+            "tool",
+            {
+                "id": "control-reply",
+                "function": {"name": "reply", "arguments": json.dumps({"text": response})},
+            },
+        )
         yield ModelEvent(
             "usage",
             {"inputTokens": 1, "outputTokens": 1, "requestAttempts": 1, "retryUsageKnown": True},

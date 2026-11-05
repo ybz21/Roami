@@ -251,7 +251,13 @@ async def test_cli_native_runtime_retains_provider_parameters_past_old_case_budg
     def provider(settings, role):
         route = settings.route(role)
         observed.append((role, route))
-        return ProtocolFixtureModel([{"text": "1" if role == "main" else '{"memories":[]}'}])
+        return ProtocolFixtureModel(
+            [
+                {"tool": {"name": "reply", "args": {"json": 1}}}
+                if role == "main"
+                else {"text": '{"memories":[]}'}
+            ]
+        )
 
     monkeypatch.setattr(
         "roami_agent.improvement.evaluation.execution.executors.configured_provider", provider

@@ -35,12 +35,14 @@ class AgentLoop:
         turn_tasks,
         clock,
         gateway: ToolInvoker,
+        require_final_tool=False,
     ):
         self.model, self.worker_model, self.settings = model, worker_model, settings
         self.context, self.journal, self.tools = context, journal, tools
         self.manifests, self.charge_task, self.turn_tasks = manifests, charge_task, turn_tasks
         self.clock = clock
         self.gateway = gateway
+        self.require_final_tool = require_final_tool
         self.preemptible = set()
 
     def preempt(self, turn_id):
@@ -144,6 +146,12 @@ class AgentLoop:
                     mid = await self.journal.start(turn)
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
                     first_delta = True
+                    tool_final = (
+                        role == "main"
+                        and self.require_final_tool
+                        and not finalizing
+                        and any(tool["function"]["name"] == "reply" for tool in catalog)
+                    )
                     phase = "model"
                     if role == "main":
                         self.preemptible.add(tid)
@@ -177,7 +185,11 @@ class AgentLoop:
                                     or len(buffer.encode()) >= 1024
                                     or self.clock() - flushed >= 0.1
                                 ) and (
-                                    role != "main" or not await self.gateway.reply_error(turn, text)
+                                    not tool_final
+                                    and (
+                                        role != "main"
+                                        or not await self.gateway.reply_error(turn, text)
+                                    )
                                 ):
                                     await self.journal.delta(turn, mid, text, buffer)
                                     buffer, flushed = "", self.clock()
@@ -193,6 +205,9 @@ class AgentLoop:
                         and text.strip()
                         and await self.gateway.reply_error(turn, text)
                     )
+                    missing_final_tool = tool_final and bool(text.strip()) and not calls
+                    if missing_final_tool:
+                        invalid_reply = "MAIN_FINAL_TOOL_REQUIRED"
                     if invalid_reply and not calls:
                         calls = [
                             {
@@ -201,7 +216,7 @@ class AgentLoop:
                                 "function": {"name": "reply", "arguments": encoded({"text": text})},
                             }
                         ]
-                    if invalid_reply:
+                    if invalid_reply or tool_final:
                         text, buffer = "", ""
                     if buffer:
                         await self.journal.delta(turn, mid, text, buffer)
@@ -260,6 +275,10 @@ class AgentLoop:
                                 turn, mid, call, role, binding, "QUESTION_MUST_BE_ONLY_TOOL"
                             )
                             if rejected_batch
+                            else await self.gateway.reject(
+                                turn, mid, call, role, binding, "MAIN_FINAL_TOOL_REQUIRED"
+                            )
+                            if missing_final_tool
                             else await self.gateway.invoke(turn, mid, call, role, binding)
                         )
                         if isinstance(value, dict) and value.get("finalizeFromEvidence") is True:
@@ -305,6 +324,7 @@ class AgentLoop:
                                 "TOOL_UNAVAILABLE",
                                 "TOOL_DISABLED",
                                 "REPLY_BOILERPLATE",
+                                "MAIN_FINAL_TOOL_REQUIRED",
                                 "REPLY_INTERNAL_FIELDS",
                                 "REPLY_LANGUAGE_MISMATCH",
                                 "REPLY_SCOPE_QUOTE_REQUIRED",

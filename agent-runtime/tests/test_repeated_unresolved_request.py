@@ -4,6 +4,7 @@ import json
 
 import pytest
 from test_navigation_recovery import interrupted_navigation
+from test_runtime import until
 from test_swarm_main_verification import wire
 
 from roami_agent.protocol.errors import DomainError
@@ -37,6 +38,17 @@ async def repeat_turn(runtime, task, text="Check pricing"):
     )
     job = await runtime.db.call(
         lambda db: row(db, "SELECT * FROM jobs WHERE aggregate_id=?", (source["turnId"],))
+    )
+    # The stopped scheduler can still have an earlier completion callback in flight.
+    await until(
+        runtime.db,
+        lambda db: (
+            not row(
+                db,
+                "SELECT id FROM turns WHERE conversation_id=? AND state='running'",
+                (task["origin_conversation_id"],),
+            )
+        ),
     )
     turn = await runtime.mailbox.claim(job)
     return turn, {

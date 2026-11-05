@@ -206,3 +206,7 @@
 - [用户目录与最终交付的来源绑定](2026-11-05/source-bound-delivery.md)：目录拒绝恢复、逐轮 Native 交付证明、实模与原分数边界。
 
 - [Claude 压缩后的会话状态](2026-11-05/claude-compaction-state.md)：保留已认证回合与工具，仍要求完整停止证明。
+
+- [Main 最终回复的原生工具提交](2026-11-05/native-final-reply-tool.md)：真实工具边界、容器原数值任务及未验收语义候选。
+
+- [旧未知导航任务的线上恢复核对](2026-11-05/navigation-recovery-online.md)：原任务续作、旧未知保留与当前 Chrome 交付核对。

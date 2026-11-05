@@ -157,7 +157,7 @@ class NativeFilesExecutor:
         )
         if self.shared_daily_limit:
             self.model_hash = digest(
-                [self.model_hash, "shared_model_daily_limit-v3-configured-context"]
+                [self.model_hash, "shared_model_daily_limit-v4-final-reply-tool"]
             )
 
     def reservation_tokens(self, case):
@@ -237,6 +237,7 @@ class NativeFilesExecutor:
             settings=settings,
             worker_model=models[1],
             memory_model=models[2],
+            require_final_tool=not self.fixture,
             execution_deadline=lambda: enclosing_deadline_ms,
         )
         # No shell, delegations, external capabilities, session operations or grader access.

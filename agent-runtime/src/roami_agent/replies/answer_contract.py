@@ -1,9 +1,26 @@
 """Reject ordinary delivery mistakes without rewriting requested content."""
 
+import json
 import re
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.replies.task_progress import request_language
+
+
+def reply_text(arguments):
+    if ("text" in arguments) == ("json" in arguments):
+        raise DomainError("INVALID_TOOL_ARGUMENTS")
+    try:
+        text = (
+            json.dumps(arguments["json"], ensure_ascii=False, allow_nan=False)
+            if "json" in arguments
+            else arguments["text"]
+        )
+    except (TypeError, ValueError) as exc:
+        raise DomainError("INVALID_TOOL_ARGUMENTS") from exc
+    if not isinstance(text, str) or not text:
+        raise DomainError("INVALID_TOOL_ARGUMENTS")
+    return text
 
 
 def validate_answer(args, source, *, check_internal=True):
