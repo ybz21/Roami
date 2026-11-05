@@ -28,7 +28,7 @@
   let model = read('.applied', copy(base));
   let draft = read('.draft', copy(model));
   let section = params.get('tab') || 'team', teamView='chat', recipient='main', fileSelected='', studioPreview='preview', scenario='normal', phonePane='chat';
-  let sceneChoice = {}, motion=true, drawer=null, toastTimer;
+  let sceneChoice = {}, motion=true, drawer=null, toastTimer, resetting=false;
   const drafts = read('.messages', {}), studioMessages = read('.studioMessages', []);
   const histories = {};
   const root = document.getElementById('prototype');
@@ -40,7 +40,7 @@
   const member = () => liveModel().members.find(item => item.id === recipient);
   const activeName = () => recipient === 'main' ? 'Main' : recipient === 'group' ? '群聊' : member()?.name || '成员';
   const roleState = item => scenario === 'unknown' && item.id === 'editor' ? '待恢复' : item.state;
-  const snapshot = () => { write('.draft',draft);write('.messages',drafts);write('.studioMessages',studioMessages); };
+  const snapshot = () => { write('.messages',drafts);if(page==='studio'){write('.draft',draft);write('.studioMessages',studioMessages);} };
   const rememberText = () => {
     const field = document.querySelector('[data-compose]');
     if (field) { if (page === 'studio') write('.studioInput',field.value);else drafts[recipientKey()] = field.value; snapshot(); }
@@ -90,10 +90,10 @@
   function objectives() {
     const m=liveModel();
     if (scenario==='empty') return `<div class="empty-state"><p>还没有定义这个 OKR。</p><a class="primary" href="${studioURL}">和 Main 一起创建</a></div>`;
-    return `<div class="scroll-content"><div class="section-heading"><h2>目标与实施手段</h2><span class="end muted">${esc(m.period)}</span></div><div class="objective-map"><section class="objective-node"><small>O · 目标</small><h2>${esc(m.objective)}</h2></section><div class="kr-column">${m.krs.map((kr,i)=>`<section class="kr-node"><small>KR ${i+1}</small><h3>${esc(kr.title)}</h3><div class="kr-metric"><strong>${kr.value}</strong><small>/ ${kr.target} ${esc(kr.metric)}</small></div><div class="meter"><span style="width:${Math.min(100,kr.value/kr.target*100)}%"></span></div></section>`).join('')}</div><div class="method-column">${m.krs.map(kr=>`<section class="method-node"><small>实施手段</small><h3>${esc(kr.method)}</h3><p class="muted">${esc(kr.description)}</p></section>`).join('')}</div></div></div>`;
+    return `<div class="scroll-content"><div class="section-heading"><h2>目标与实施手段</h2><span class="end muted">${esc(m.period)}</span></div><div class="objective-map"><section class="objective-node"><small>O · 目标</small><h2>${esc(m.objective)}</h2></section><div class="kr-column">${m.krs.map((kr,i)=>`<section class="kr-node"><small>KR ${i+1}</small><h3>${esc(kr.title)}</h3><div class="kr-metric"><strong>${kr.value ?? '未知'}</strong><small>/ ${kr.target} ${esc(kr.metric)}</small></div><div class="meter"><span style="width:${Math.min(100,kr.value/kr.target*100)}%"></span></div></section>`).join('')}</div><div class="method-column">${m.krs.map(kr=>`<section class="method-node"><small>实施手段</small><h3>${esc(kr.method)}</h3><p class="muted">${esc(kr.description)}</p></section>`).join('')}</div></div></div>`;
   }
   function dashboard() {
-    const m=liveModel(), metrics=[{title:'GitHub star',value:m.github,unit:'个',values:[6,8,8,9,10,11,11],source:'GitHub · ybz21/Roami',skill:'collect-github'},{title:'GitHub fork',value:m.forks,unit:'个',values:[2,3,3,4,4,5,5],source:'GitHub · ybz21/Roami',skill:'collect-github'},{title:'有效反馈',value:3,unit:'条',values:[0,0,1,1,2,2,3],source:'已核对的反馈记录',skill:'review-feedback'},{title:'演示视频',value:2,unit:'条',values:[0,0,0,1,1,1,2],source:'已验收的项目文件',skill:'review-deliveries'},{title:'X 曝光',value:null,unit:'',source:'账号未连接',skill:'collect-x'},...(m.bili?[{title:'B 站播放量',value:null,unit:'次',source:'账号待连接',skill:'collect-bilibili'}]:[])];
+    const m=liveModel(), metrics=m.template!=='content-growth'?m.krs.map(kr=>({title:kr.metric,value:null,unit:'',source:'待确认来源与口径',skill:'collect-'+m.template})).concat(m.bili?[{title:'B 站播放量',value:null,unit:'次',source:'账号待连接',skill:'collect-bilibili'}]:[]):[{title:'GitHub star',value:m.github,unit:'个',values:[6,8,8,9,10,11,11],source:'GitHub · ybz21/Roami',skill:'collect-github'},{title:'GitHub fork',value:m.forks,unit:'个',values:[2,3,3,4,4,5,5],source:'GitHub · ybz21/Roami',skill:'collect-github'},{title:'有效反馈',value:3,unit:'条',values:[0,0,1,1,2,2,3],source:'已核对的反馈记录',skill:'review-feedback'},{title:'演示视频',value:2,unit:'条',values:[0,0,0,1,1,1,2],source:'已验收的项目文件',skill:'review-deliveries'},{title:'X 曝光',value:null,unit:'',source:'账号未连接',skill:'collect-x'},...(m.bili?[{title:'B 站播放量',value:null,unit:'次',source:'账号待连接',skill:'collect-bilibili'}]:[])];
     return `<div class="scroll-content">${scenario==='stale'?'<div class="notice">今天的采集未完成，保留上次有效数据。Main 会跟进来源问题。</div>':''}<div class="section-heading"><h2>数据看板</h2><small class="end">11 月 5 日 ${scenario==='stale'?'上次有效值':'09:00 更新'}</small></div><div class="dashboard">${metrics.map(metric=>`<article class="metric-card"><header><h3>${metric.title}</h3><small>${metric.value===null?'未知':scenario==='stale'?'待更新':'最近 7 天'}</small></header><div class="metric-value">${metric.value===null?'<strong class="unknown">暂无数据</strong>':`<strong>${metric.value}</strong><small>${metric.unit}</small>`}</div>${metric.values?`<div class="chart" aria-label="${metric.title} 近七日趋势">${metric.values.map(v=>`<span style="height:${Math.max(4,v/Math.max(...metric.values)*100)}%"></span>`).join('')}</div><div class="chart-labels"><span>10/30</span><span>11/05</span></div>`:'<div class="empty-chart">等待真实观测</div>'}<details><summary>数据来源</summary><p>${esc(metric.source)}</p><p>Skill：${esc(metric.skill)}。失败保留旧值，缺失不记为零。</p></details></article>`).join('')}</div></div>`;
   }
   function tasks() {
@@ -104,9 +104,9 @@
     const m=studio?draft:liveModel();
     const entries={
       'AGENTS.md':`# 项目工作约定\n\n本项目 Main 与首页 Main 相互独立。\n团队记忆：.roami/okr/memory/team.md\n重要事项：.roami/okr/memory/decisions.md\n成员记忆：.roami/okr/memory/members/<stable-member-id>/memory.md\n每个职责复用原实例，追加任务形成新轮次。\n产物按 YYYY/YYYYMM/YYYYMMDD/ 保存。`,
-      '.roami/okr/okr.json':JSON.stringify({revision:m.revision,objective:m.objective,startDate:'2026-11-01',endDate:'2026-11-30',metrics:[{id:'stars',name:'GitHub star',unit:'个',source:'github',repo:'ybz21/Roami',field:'stars'},{id:'forks',name:'GitHub fork',unit:'个',source:'github',repo:'ybz21/Roami',field:'forks'},{id:'videos',name:'演示视频',unit:'条',source:'manual'},{id:'feedback',name:'有效反馈',unit:'条',source:'manual'}],keyResults:m.krs.map((kr,i)=>({id:'kr-'+(i+1),title:kr.title,horizon:'short',metricId:['stars','videos','feedback'][i]||'feedback',mode:'atLeast',target:kr.target,dueDate:'2026-11-30'})),autoCollect:false,swarm:'demo-bound-team'},null,2),
+      '.roami/okr/okr.json':JSON.stringify({revision:m.revision,objective:m.objective,startDate:'2026-11-01',endDate:'2026-11-30',metrics:[{id:'stars',name:'GitHub star',unit:'个',source:'github',repo:'ybz21/Roami',field:'stars'},{id:'forks',name:'GitHub fork',unit:'个',source:'github',repo:'ybz21/Roami',field:'forks'},{id:'videos',name:'演示视频',unit:'条',source:'manual'},{id:'feedback',name:'有效反馈',unit:'条',source:'manual'},...(m.template==='product-delivery'?[{id:'milestones',name:'已验收里程碑',unit:'项',source:'manual'},{id:'workflows',name:'通过的关键流程',unit:'项',source:'manual'}]:m.template==='operations'?[{id:'coverage',name:'来源覆盖',unit:'个',source:'manual'}]:[])],keyResults:m.krs.map((kr,i)=>({id:'kr-'+(i+1),title:kr.title,horizon:'short',metricId:(m.template==='product-delivery'?['milestones','workflows']:m.template==='operations'?['coverage']:['stars','videos','feedback'])[i]||'feedback',mode:'atLeast',target:kr.target,dueDate:'2026-11-30'})),autoCollect:false,swarm:'demo-bound-team'},null,2),
       '.roami/okr/dashboard.json':JSON.stringify({schemaVersion:1,widgets:[{id:'public-counts',type:'metricTrend',metricIds:['stars','forks']},...(m.bili?[{id:'bili-views',type:'metricTrend',metricIds:['bili-views']}]:[])]},null,2),
-      '.roami/okr/agents/team.json':JSON.stringify({schemaVersion:1,roles:m.members.map(item=>({id:item.id,name:item.name,executor:item.executor==='Roami'?'native':item.executor.toLowerCase(),duty:item.duty}))},null,2),
+      '.roami/okr/agents/team.json':JSON.stringify({schemaVersion:1,roles:(m.plannedRoles||m.members).map(item=>({id:item.id,name:item.name,executor:item.executor==='Roami'?'native':item.executor.toLowerCase(),duty:item.duty}))},null,2),
       '.roami/okr/skills/collect-github/SKILL.md':'---\nname: collect-github\ndescription: 采集本项目 GitHub 公开指标并提交有来源的观测。\n---\n\n1. 读取已确认的仓库、指标和采集日期。\n2. '+(m.source==='mcp'?'调用已连接的 MCP 只读取数工具。':'运行 scripts/collect.py，获取公开仓库统计。')+'\n3. 检查仓库身份、口径、日期和数值，保留原始证据。\n4. 通过受管采集回执提交结果，由宿主检查并发布。\n5. 失败保留旧数据；状态未知先核对原执行。',
       '.roami/okr/skills/collect-github/scripts/collect.py':'# 提议中的 Skill 内部脚本接口，非现有产品 Runner。\n# Python 只负责取数、标准化及证据；不直接覆盖已确认数据。\ndef collect(source, as_of):\n    payload = fetch_confirmed_source(source)\n    return normalize_with_evidence(payload, as_of)\n',
       '.roami/okr/connectors/public-counts/connector.json':JSON.stringify({schemaVersion:2,skill:'collect-github',metricIds:['stars','forks'],source:{service:'github',resource:'ybz21/Roami'}},null,2),
@@ -183,8 +183,8 @@
     scope.querySelectorAll('[data-prompt]').forEach(button=>button.onclick=()=>{rememberText();changeDraft(button.dataset.prompt);});
     scope.querySelectorAll('[data-template]').forEach(button=>button.onclick=()=>{
       const selected=templates.find(item=>item.id===button.dataset.template);draft.template=selected.id;draft.objective=selected.objective;
-      draft.members=selected.roles.map((name,i)=>({...copy(base.members[i]||base.members[0]),id:'role-'+selected.id+'-'+i,name}));
-      if(selected.id!=='content-growth') draft.krs=selected.id==='product-delivery'?[{title:'完成可用版本',metric:'已验收里程碑',value:0,target:3,method:'分阶段实现与验收',description:'每个阶段有产物、测试和验收。'},{title:'验证关键流程',metric:'通过的关键流程',value:0,target:5,method:'真实场景回归',description:'根据实际风险调整流程数量。'}]:[{title:'每天有可信指标',metric:'来源覆盖',value:0,target:3,method:'Skill 日更',description:'按确认账号、来源和日期采集。'}];else draft.krs=copy(base.krs);
+      draft.plannedRoles=selected.roles.map((name,i)=>({id:'role-'+selected.id+'-'+i,name,executor:'Roami',duty:({产品设计:'需求拆解、交互与验收标准',功能实现:'功能实现与专项回归',独立测试:'独立核验产物与关键流程',数据采集:'按授权来源取数，保留证据和口径',分析跟进:'复核异常并提出下一轮行动'})[name]||base.members.find(item=>item.name===name)?.duty||name}));
+      if(selected.id!=='content-growth') draft.krs=selected.id==='product-delivery'?[{title:'完成可用版本',metric:'已验收里程碑',value:null,target:3,method:'分阶段实现与验收',description:'每个阶段有产物、测试和验收。'},{title:'验证关键流程',metric:'通过的关键流程',value:null,target:5,method:'真实场景回归',description:'根据实际风险调整流程数量。'}]:[{title:'每天有可信指标',metric:'来源覆盖',value:null,target:3,method:'Skill 日更',description:'按确认账号、来源和日期采集。'}];else draft.krs=copy(base.krs);
       studioMessages.push({by:'Main',at:'刚刚',text:`已以「${selected.name}」作为草稿起点，尚未应用。目标、成员和看板都可以继续聊着改。`});snapshot();closeDrawer();renderStudio();
     });
     scope.querySelectorAll('[data-action]').forEach(button=>{
@@ -205,7 +205,7 @@
         if(action==='templates')templatePicker();
         if(action==='connector')connectorSettings();
         if(action==='save-connector'){draft.source=document.getElementById('source-type').value;draft.daily=document.getElementById('daily-enabled').checked;draft.dailyAt=document.getElementById('daily-time').value||'09:00';draft.timezone=document.getElementById('timezone').value;snapshot();closeDrawer();studioMessages.push({by:'Main',at:'刚刚',text:'Skill 和调度草稿已更新。启用和取数的真实回执会在实现阶段单独核验。'});snapshot();renderStudio();}
-        if(action==='changes')showDrawer('草稿变更',`<div class="drawer-body"><p>基础修订 ${model.revision}，原项目 Main 和成员历史保留。</p><pre>${esc(JSON.stringify({objective:draft.objective,template:draft.template,dashboard:{bilibili:draft.bili},collectorSkill:{implementation:draft.source},schedule:{enabled:draft.daily,at:draft.dailyAt,timezone:draft.timezone},roles:draft.members.map(item=>item.name)},null,2))}</pre><p class="muted">保存定义不等于登记成员、启动执行或启用真实日更。</p></div>`);
+        if(action==='changes')showDrawer('草稿变更',`<div class="drawer-body"><p>基础修订 ${model.revision}，原项目 Main 和成员历史保留。</p><pre>${esc(JSON.stringify({objective:draft.objective,template:draft.template,dashboard:{bilibili:draft.bili},collectorSkill:{implementation:draft.source},schedule:{enabled:draft.daily,at:draft.dailyAt,timezone:draft.timezone},roles:(draft.plannedRoles||draft.members).map(item=>item.name)},null,2))}</pre><p class="muted">保存定义不等于登记成员、启动执行或启用真实日更。</p></div>`);
         if(action==='apply')applyDraft();
         if(action==='merge-demo'){scenario='normal';draft.revision=13;snapshot();closeDrawer();renderStudio();toast('演示合并完成。草稿保留，请再次确认应用。');}
         if(action==='phone-preview'){rememberText();phonePane=phonePane==='chat'?'preview':'chat';renderStudio();}
@@ -225,7 +225,7 @@
   const observer=new ResizeObserver(entries=>{const width=entries[0].contentRect.width,size=width<600?'compact':width<905?'medium':width<1280?'expanded':'large';if(size!==html.dataset.size){rememberText();html.dataset.size=size;render();}});observer.observe(html);
   window.addEventListener('message',event=>{if(!embedded||event.source!==parent||(event.origin!==location.origin&&location.origin!=='null')||event.data?.kind!=='roami-okr-design-draft')return;draft=copy(event.data.draft);renderRuntime();});
   window.addEventListener('keydown',event=>{if(event.key==='Escape')closeDrawer();});
-  window.addEventListener('pagehide',()=>{rememberText();observer.disconnect();});
-  Object.defineProperty(window,'__okrDesign',{value:{state:()=>copy({page,section,recipient,model,draft,scenario,scene:sceneOpen()}),reset:()=>{Object.keys(localStorage).filter(k=>k.startsWith(key)).forEach(k=>localStorage.removeItem(k));location.reload();}},writable:false});
+  window.addEventListener('pagehide',()=>{if(!resetting)rememberText();observer.disconnect();});
+  Object.defineProperty(window,'__okrDesign',{value:{state:()=>copy({page,section,recipient,model,draft,scenario,scene:sceneOpen()}),reset:()=>{resetting=true;Object.keys(localStorage).filter(k=>k.startsWith(key)).forEach(k=>localStorage.removeItem(k));location.reload();}},writable:false});
   render();
 })();

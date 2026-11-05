@@ -135,3 +135,5 @@
 [运行态交互原型](index.html) · [Studio 开发编辑原型](../20261104-okr-studio-project-ownership/index.html) · [技术实现](../20261104-okr-studio-project-ownership/implementation.html)。
 
 本轮以用户最新要求为准：对话与协作同页，移除场景下重复职责列表；运行态保持简单，开发编辑从次要入口进入 Studio。原 index 说明保存在 revisions/20261105-before.html，历史实现/验收记录继续保留。原型数据、消息、模板应用与调度是本地模拟，不代表真实执行或已部署能力。完整产品设计、用户故事、模块/API、模板、Skill 日更和分批验收见技术方案 Markdown。
+
+[本轮原型验收](../20261104-okr-studio-project-ownership/acceptance.md)。
