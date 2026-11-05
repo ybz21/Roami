@@ -221,11 +221,21 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if value["error"] == "MAIN_FINAL_TOOL_REQUIRED":
+                value["recovery"] = (
+                    "Submit the final answer by making a real reply tool call. "
+                    "Use its json argument for requested JSON or text for prose. "
+                    "Do not print tool-call markup or a preamble; preserve the requested content."
+                )
             if tool is None:
                 value["executionStarted"] = False
             if rejection or validation_error:
                 value["executionStarted"] = False
-                value["failurePhase"] = "batch" if rejection else "validation"
+                value["failurePhase"] = (
+                    "batch"
+                    if rejection and rejection != "MAIN_FINAL_TOOL_REQUIRED"
+                    else "validation"
+                )
             if value["error"] == "USE_REGISTERED_CLI_CAPABILITY":
                 value.update(executionStarted=False, failurePhase="command_admission")
             if isinstance(exc, WorkspaceImageReadError):

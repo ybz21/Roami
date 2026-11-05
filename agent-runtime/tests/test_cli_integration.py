@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 import pytest
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 
 
@@ -97,18 +97,30 @@ async def test_python_artifacts_survive_real_go_backup_and_restore(tmp_path, roa
 
 async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
     model_app = FastAPI()
+    requests = []
 
     @model_app.post("/v1/chat/completions")
-    async def model():
+    async def model(request: Request):
+        body = await request.json()
+        requests.append(body)
+        if any(t["function"]["name"] == "reply" for t in body.get("tools", [])):
+            name, arguments = "reply", {"text": "Live transport answer"}
+            delta = {
+                "tool_calls": [
+                    {
+                        "index": 0,
+                        "id": "final",
+                        "type": "function",
+                        "function": {"name": name, "arguments": json.dumps(arguments)},
+                    }
+                ]
+            }
+            finish = "tool_calls"
+        else:
+            delta, finish = {"content": "Live transport answer"}, "stop"
         text = (
             "data: "
-            + json.dumps(
-                {
-                    "choices": [
-                        {"delta": {"content": "Live transport answer"}, "finish_reason": "stop"}
-                    ]
-                }
-            )
+            + json.dumps({"choices": [{"delta": delta, "finish_reason": finish}]})
             + "\n\ndata: [DONE]\n\n"
         )
         return StreamingResponse(
@@ -183,12 +195,31 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                 while True:
                     result = await cli("history", "--conversation", cid)
                     messages = result["data"]["messages"]
-                    if len(messages) == 2 and messages[-1]["status"] == "completed":
+                    if (
+                        messages
+                        and messages[-1]["role"] == "assistant"
+                        and messages[-1]["status"] == "completed"
+                        and messages[-1]["content"].get("text")
+                        and not messages[-1]["content"].get("tool_calls")
+                    ):
                         break
                     await asyncio.sleep(0.05)
             assert messages[-1]["content"]["text"] == "Live transport answer"
-            usage = await cli("gateway", "usage")
-            call = usage["data"]["recent"][0]
+            async with asyncio.timeout(5):
+                while True:
+                    usage = await cli("gateway", "usage")
+                    call = next(
+                        (
+                            item
+                            for item in usage["data"]["recent"]
+                            if item.get("upstreamRequestId") == "fixture-cli-response"
+                            and item["state"] != "pending"
+                        ),
+                        None,
+                    )
+                    if call:
+                        break
+                    await asyncio.sleep(0.01)
             assert call["model"] == "injected-http-model"
             assert call["priceStatus"] == "unpriced" and call["cost"] is None
             assert call["state"] == "unknown"

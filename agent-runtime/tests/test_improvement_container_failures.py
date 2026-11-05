@@ -372,6 +372,7 @@ async def test_incompatible_image_keeps_missing_capabilities_in_private_stage_ar
     assert evidence["requirements"] == [
         {"label": "org.roami.rsi.role-instructions", "required": "1", "observed": None},
         {"label": "org.roami.rsi.shared-daily-policy", "required": "6", "observed": None},
+        {"label": "org.roami.rsi.final-reply-tool", "required": "1", "observed": None},
     ]
     assert "PRIVATE_LABEL" not in json.dumps(value)
     assert "stale-image" not in public_issue_body(value, {})

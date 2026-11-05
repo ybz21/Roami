@@ -114,7 +114,18 @@ async def test_live_actor_does_not_receive_fixture_or_expected_answer(tmp_path):
         async def stream(self, messages, tools):
             assert "FIXTURE-SECRET-NEVER-SEND" not in json.dumps(messages)
             assert "ORACLE-SECRET-NEVER-SEND" not in json.dumps(messages)
-            yield ModelEvent("text", '{"主题":"读书会","人数":30,"预算":3000}')
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "final-reply",
+                    "function": {
+                        "name": "reply",
+                        "arguments": json.dumps(
+                            {"json": {"主题": "读书会", "人数": 30, "预算": 3000}}
+                        ),
+                    },
+                },
+            )
             yield ModelEvent(
                 "usage",
                 {
@@ -140,7 +151,18 @@ async def test_failed_or_unknown_usage_stops_before_next_user_turn(tmp_path):
         async def stream(self, messages, tools):
             nonlocal calls
             calls += 1
-            yield ModelEvent("text", '{"主题":"读书会","人数":30,"预算":3000}')
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "final-reply",
+                    "function": {
+                        "name": "reply",
+                        "arguments": json.dumps(
+                            {"json": {"主题": "读书会", "人数": 30, "预算": 3000}}
+                        ),
+                    },
+                },
+            )
 
     result = await run_conversation(scenario, tmp_path / "unknown", provider=UnknownUsage())
     assert not result["passed"] and result["failure"] == "RSI_USAGE_UNKNOWN"
@@ -265,7 +287,18 @@ async def test_live_profile_cannot_execute_a_host_shell_command(tmp_path):
                 )
             else:
                 assert json.loads(messages[-1]["content"])["error"] == "TOOL_UNAVAILABLE"
-                yield ModelEvent("text", '{"主题":"读书会","人数":30,"预算":3000}')
+                yield ModelEvent(
+                    "tool",
+                    {
+                        "id": "final-reply",
+                        "function": {
+                            "name": "reply",
+                            "arguments": json.dumps(
+                                {"json": {"主题": "读书会", "人数": 30, "预算": 3000}}
+                            ),
+                        },
+                    },
+                )
             yield ModelEvent(
                 "usage",
                 {
@@ -279,9 +312,9 @@ async def test_live_profile_cannot_execute_a_host_shell_command(tmp_path):
     result = await run_conversation(scenario, tmp_path / "contained", provider=Actor())
     assert result["passed"] and not outside.exists()
     metrics = result["metrics"]
-    assert metrics["tool_calls"] == metrics["tool_errors"] == 1
+    assert metrics["tool_calls"] == 2 and metrics["tool_errors"] == 1
     assert metrics["tool_admission_failures"] == 1
-    assert metrics["tool_error_rate"] == 1
+    assert metrics["tool_error_rate"] == 0.5
     assert metrics["tool_first_attempt_success_rate"] == 0
     assert logged_tool_process(tmp_path / "contained")["tool_errors"] == 1
 
@@ -305,7 +338,8 @@ async def test_scenario_uses_current_main_schemas_and_executes_compact_registere
 
         async def stream(self, messages, tools):
             schemas = {t["function"]["name"]: t["function"]["parameters"] for t in tools}
-            assert set(schemas["reply"]["properties"]) == {"text"}
+            assert set(schemas["reply"]["properties"]) == {"text", "json"}
+            assert "allOf" in schemas["reply"]
             assert schemas["delegate"]["required"] == ["goal"]
             assert schemas["ask_user"]["properties"]["options"]["items"]["type"] == "string"
             assert "task_steer" not in schemas

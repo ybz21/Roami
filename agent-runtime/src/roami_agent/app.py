@@ -101,6 +101,7 @@ class Runtime:
         executor=None,
         verifier: Callable[[dict, dict], Awaitable[bool]] | None = None,
         development_rsi=False,
+        require_final_tool=False,
         execution_deadline: Callable[[], int | None] | None = None,
     ):
         self.db, self.model = database, model
@@ -294,6 +295,7 @@ class Runtime:
             self.turn_tasks,
             time.monotonic,
             self.gateway,
+            require_final_tool=require_final_tool,
         )
         self.scheduler = Scheduler(
             database,
@@ -589,6 +591,7 @@ async def serve(args):
         worker_model=worker,
         executor=CodingExecutor(database, settings),
         development_rsi=getattr(args, "development_rsi", False),
+        require_final_tool=True,
     )
     runtime.managed_parent = getattr(args, "parent_fd", None) is not None
     try:

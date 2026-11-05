@@ -52,7 +52,10 @@ async def test_model_actor_requires_role_instruction_support_before_start(monkey
 
     async def docker(*args, **kwargs):
         calls.append(args)
-        labels = {"org.roami.rsi.shared-daily-policy": "6"}
+        labels = {
+            "org.roami.rsi.shared-daily-policy": "6",
+            "org.roami.rsi.final-reply-tool": "1",
+        }
         if label is not None:
             labels["org.roami.rsi.role-instructions"] = label
         return json.dumps([{"Id": "fixture-image", "Config": {"Labels": labels}}]).encode()

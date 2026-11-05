@@ -7,7 +7,7 @@ from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
-from roami_agent.replies.answer_contract import validate_answer
+from roami_agent.replies.answer_contract import reply_text, validate_answer
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
@@ -53,7 +53,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             key in args for key in ("mode", "language", "scopeQuote", "languageQuote")
         )
         result = {
-            "reply": validate_answer(args, await reply_source(binding), check_internal=legacy)
+            "reply": validate_answer(
+                {**args, "text": reply_text(args)},
+                await reply_source(binding),
+                check_internal=legacy,
+            )
         }
         await record(binding, outcomes)
         return result
@@ -69,14 +73,27 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
             object_schema(
                 {
                     "text": {"type": "string", "minLength": 1},
+                    "json": {
+                        "description": "The requested JSON value, preserving field names, values and types."
+                    },
                     "requestCoverage": coverage_schema(),
                     "mode": {"type": "string", "enum": ["brief", "detailed", "debug"]},
                     "language": {"type": "string", "enum": ["zh", "en"]},
                     "scopeQuote": {"type": "string", "minLength": 1},
                     "languageQuote": {"type": "string", "minLength": 1},
                 },
-                ["text"],
-            ),
+                [],
+            )
+            | {
+                "allOf": [
+                    {
+                        "oneOf": [
+                            {"required": ["text"], "not": {"required": ["json"]}},
+                            {"required": ["json"], "not": {"required": ["text"]}},
+                        ]
+                    }
+                ]
+            },
             reply,
             main=True,
         )
