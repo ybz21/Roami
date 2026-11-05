@@ -35,4 +35,8 @@ Schema21 增加 `swarm_member_instances`，将 member、owner、conversation、b
 
 旧库夹具按历史表结构建立记录后再升级，不使用新 Main 查询去操作尚无实例表的旧版本数据库。Go 备份接受1..21，拒绝未来22。
 
-最终完整门禁与隔离 CLI 联验待补。没有 Web UI 修改、手机操作、线上部署、模型路由/环境/费用/账目或 busy 变更。
+组合恢复实现后，完整门禁完成：Python3463 passed/48 skipped，Go全量、Ruff检查与格式、前端typecheck/i18n/hover/生产构建和仓库审计均通过。门禁基于3c50d462；#669合入e0fda2ae后重新基于主线的608d1623与其完整文件树一致（e8991de91b7967c01c8ee27144457ed850a6fa29），沿用相同源码的门禁，不重复跑Python全套。此前正常commit quick为原基线Python3452 passed/48 skipped。
+
+真实 Go CLI → 私有 Python API 联验通过：登记时无业务任务或模型turn，读取准确成员身份；首次派工复用预留conversation/branch；连续三轮保留同member/instance/task/conversation/branch，分别产生文件并经过报告、独立验证、显式夹具用户验收。额外只读SQLite核对一个实例/一个任务及三轮记录，隐式research-r2被HTTP409拒绝。该夹具注入测试模型，不是线上宣传执行。证据 `/tmp/okr-member-instances/{cli-proof.log,cli-proof.json,full.log,merge-integration.json,acceptance.html}`。自建测试实例已按隔离入口回收，数据库和记录保留。
+
+没有 Web UI 修改、手机操作、线上部署、模型路由/环境/费用/账目或 busy 变更。CLI输出、协议字段和Agent职责文本按i18n标准豁免。
