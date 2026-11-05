@@ -96,6 +96,8 @@ async def test_python_artifacts_survive_real_go_backup_and_restore(tmp_path, roa
 
 
 async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
+    from roami_agent.replies.source_review import REVIEW_INSTRUCTIONS
+
     model_app = FastAPI()
     requests = []
 
@@ -103,8 +105,12 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
     async def model(request: Request):
         body = await request.json()
         requests.append(body)
-        if any(t["function"]["name"] == "reply" for t in body.get("tools", [])):
-            name, arguments = "reply", {"text": "Live transport answer"}
+        review = body["messages"][0]["content"] == REVIEW_INSTRUCTIONS
+        if review or any(t["function"]["name"] == "reply" for t in body.get("tools", [])):
+            name = "source_review_verdict" if review else "reply"
+            arguments = (
+                {"accepted": True, "feedback": ""} if review else {"text": "Live transport answer"}
+            )
             delta = {
                 "tool_calls": [
                     {
@@ -205,6 +211,13 @@ async def test_go_cli_managed_runtime_round_trip(tmp_path, roami_binary):
                         break
                     await asyncio.sleep(0.05)
             assert messages[-1]["content"]["text"] == "Live transport answer"
+            reviews = [
+                request
+                for request in requests
+                if request["messages"][0]["content"] == REVIEW_INSTRUCTIONS
+            ]
+            assert len(reviews) == 1
+            assert reviews[0]["model"] == "injected-http-model"
             async with asyncio.timeout(5):
                 while True:
                     usage = await cli("gateway", "usage")

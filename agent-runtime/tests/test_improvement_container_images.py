@@ -86,6 +86,7 @@ async def test_visual_worker_requires_a_capable_container_image(labels, monkeypa
                             "org.roami.rsi.shared-daily-policy": "6",
                             "org.roami.rsi.role-instructions": "1",
                             "org.roami.rsi.final-reply-tool": "1",
+                            "org.roami.rsi.source-reply-review": "6",
                         }
                     },
                 }
@@ -174,6 +175,7 @@ async def test_visual_main_requires_a_capable_container_image(labels, monkeypatc
                             "org.roami.rsi.shared-daily-policy": "6",
                             "org.roami.rsi.role-instructions": "1",
                             "org.roami.rsi.final-reply-tool": "1",
+                            "org.roami.rsi.source-reply-review": "6",
                         }
                     },
                 }
@@ -217,6 +219,7 @@ async def test_model_free_renderer_keeps_its_pinned_image_without_actor_input_la
                             "org.roami.rsi.shared-daily-policy": "6",
                             "org.roami.rsi.role-instructions": "1",
                             "org.roami.rsi.final-reply-tool": "1",
+                            "org.roami.rsi.source-reply-review": "6",
                         }
                         if actor
                         else {}

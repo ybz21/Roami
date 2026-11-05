@@ -102,6 +102,7 @@ async def episodes(args, cases):
                     args.output / scenario["id"],
                     settings=settings,
                     provider=provider,
+                    review_replies=args.mode == "saved-model",
                 )
                 unaccounted_episode = False
                 results.append({"case": case["id"], **result})

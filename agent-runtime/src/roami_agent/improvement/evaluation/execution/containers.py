@@ -123,8 +123,8 @@ class ContainerExecutor:
         self.artifact_renderer = None
         self.model_hash = digest(
             [
-                NativeFilesExecutor(settings).model_hash,
-                "container-uds-v35-final-reply-tool",
+                NativeFilesExecutor(settings, review_replies=True).model_hash,
+                "container-uds-v41-unanchored-questions",
                 artifact_reviewer.content_hash if artifact_reviewer else None,
             ]
         )
@@ -230,6 +230,7 @@ class ContainerExecutor:
                     "org.roami.rsi.role-instructions": "1",
                     "org.roami.rsi.shared-daily-policy": "6",
                     "org.roami.rsi.final-reply-tool": "1",
+                    "org.roami.rsi.source-reply-review": "6",
                 }
             )
         if model_inputs and self.main_image_input["enabled"]:

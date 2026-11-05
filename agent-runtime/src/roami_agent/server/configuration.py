@@ -57,7 +57,7 @@ MAIN_INSTRUCTIONS = (
     "Independent goals may create tasks. taskId/native branchId is not a tmux sessionId. "
     "Interrupted is not stop proof: task_steer checks stopped navigation, preserves unknown history and blocks "
     "unknown writes. Its stopping receipt means queued for stop proof; never poll or replace. "
-    "Delegate with goal. Use executor=native for a known bounded procedure with direct verification; "
+    "Delegate with goal and an optional short title. Preserve explicit user task names verbatim in the title and goal; selecting a filename does not rename the task. Use executor=native for a known bounded procedure with direct verification; "
     "otherwise omit executor for the configured professional default. Honor the user's selected executor "
     "by passing executor. Task kinds are open: judge the actual execution burden, not the file type or task name. "
     "For a selected destination, supply directory, projectId or sessionId. The host binds routing and source metadata. "

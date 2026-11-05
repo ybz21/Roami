@@ -20,7 +20,7 @@ from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
 
-def register_main_tools(registry, tasks, memory, targets, router=None):
+def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_reviewer=None):
     async def coverage(args, binding, *, handoff=False):
         if "requestCoverage" not in args and registry.registry["reply"].model_schema is not None:
             return None
@@ -52,13 +52,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         legacy = registry.registry["reply"].model_schema is None or any(
             key in args for key in ("mode", "language", "scopeQuote", "languageQuote")
         )
-        result = {
-            "reply": validate_answer(
-                {**args, "text": reply_text(args)},
-                await reply_source(binding),
-                check_internal=legacy,
-            )
-        }
+        text = reply_text(args)
+        text = validate_answer(
+            {**args, "text": text}, await reply_source(binding), check_internal=legacy
+        )
+        if reply_reviewer is not None:
+            await reply_reviewer.check_reply(args, binding)
+        result = {"reply": text}
         await record(binding, outcomes)
         return result
 
@@ -74,7 +74,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
                 {
                     "text": {"type": "string", "minLength": 1},
                     "json": {
-                        "description": "The requested JSON value, preserving field names, values and types."
+                        "description": "The requested JSON value. Preserve literal field names, values and types."
                     },
                     "requestCoverage": coverage_schema(),
                     "mode": {"type": "string", "enum": ["brief", "detailed", "debug"]},
@@ -232,6 +232,8 @@ def register_main_tools(registry, tasks, memory, targets, router=None):
         labels = [option["label"].strip() for option in args["options"]]
         if len(set(labels)) != len(labels) or any(not label for label in labels):
             raise DomainError("INVALID_QUESTION_OPTIONS")
+        if reply_reviewer is not None:
+            await reply_reviewer.check_question(args, binding)
         return {"question": args, "state": "waiting_user"}
 
     registry.add(

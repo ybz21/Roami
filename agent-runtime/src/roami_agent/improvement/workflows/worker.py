@@ -135,6 +135,7 @@ class EvaluationWorker:
                 else:
                     executor = NativeFilesExecutor(
                         settings,
+                        review_replies=True,
                         settle_maintenance=True,
                         provider_factory=provider_factory,
                         shared_daily_limit=shared,
