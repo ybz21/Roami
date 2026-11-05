@@ -36,6 +36,7 @@ p.swarm-note { padding:var(--sp-3) var(--sp-4); margin:0; }
 .swarm-chat-message header .tt-act { padding-left:0; font-weight:500; }
 .swarm-chat-message time { color:var(--text-dim); font-size:var(--fs-meta); }
 .swarm-chat-task-actions,.swarm-detail-actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); }
+.swarm-chat-delivery-failed { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); color:var(--danger); font-size:var(--fs-meta); }
 .swarm-chat-composer { max-width:calc(var(--sp-5) * 34); width:calc(100% - var(--sp-4) * 2); margin:var(--sp-3) auto; padding:var(--sp-3); flex-shrink:0; }
 .swarm-chat-composer label { display:block; margin-bottom:var(--sp-1); font-size:var(--fs-meta); color:var(--text-dim); }
 .swarm-chat-composer .ant-input { background:transparent; }

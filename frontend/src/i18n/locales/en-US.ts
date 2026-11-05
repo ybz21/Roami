@@ -5180,6 +5180,8 @@ const enUS = {
   'swarm.managed.state.cancelling': 'Stopping',
   'swarm.managed.state.idle': 'Idle',
   'swarm.managed.deliveryPending': 'Awaiting delivery confirmation',
+  'swarm.chat.mainReplyFailed': 'Main could not finish processing this message.',
+  'swarm.chat.viewMain': 'View Main',
   'swarm.managed.filter': 'Filter swarms',
   'swarm.relations.openWork': 'Open work',
   'swarm.relations.chat': 'Chat',
