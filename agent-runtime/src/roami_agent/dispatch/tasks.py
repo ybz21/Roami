@@ -17,12 +17,14 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.native_session_registry import register as register_native_session
+from roami_agent.storage.request_quotes import source_quote
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.task_continuation import (
     continuation_candidates,
     unresolved_repeated_requests,
 )
 from roami_agent.storage.task_reports import reported_progress
+from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -235,24 +237,41 @@ class Tasks:
                         ) or rejected_args.get("executor")
                         if requested and executor != requested:
                             raise DomainError("ROUTING_EXECUTOR_CONFLICT", 409)
-                rejected = row(
+                rejected = rows(
                     db,
                     "SELECT COALESCE(json_extract(e.payload_json,'$.decision.executor'),"
-                    "json_extract(x.arguments_json,'$.executor'),'native') AS executor "
+                    "json_extract(x.arguments_json,'$.executor'),'native') AS executor,"
+                    "COALESCE(json_extract(native_content(x.arguments_json),'$.directory'),"
+                    "json_extract(native_content(x.arguments_json),'$.target.directory')) AS directory "
                     "FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
                     "LEFT JOIN events e ON e.event_key='routing:'||x.idempotency_key "
                     "WHERE x.turn_id=? AND x.tool_name='delegate' AND x.state='failed' AND "
                     "CASE WHEN json_valid(json_extract(native_content(m.content_json),'$.text')) THEN "
                     "json_extract(json_extract(native_content(m.content_json),'$.text'),'$.error') END "
-                    "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE') LIMIT 1",
+                    "IN ('INVALID_EXECUTION_DIRECTORY','EXECUTION_DIRECTORY_UNAVAILABLE',"
+                    "'TASK_TARGET_REVIEW_REQUIRED')",
                     (source_turn_id,),
                 )
-                if rejected and not (
-                    executor == "native"
-                    and automatic_task_directory(target)
-                    and rejected["executor"] == "native"
-                ):
-                    raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
+                if rejected:
+                    source = row(
+                        db,
+                        "SELECT * FROM messages WHERE turn_id=? AND conversation_id=? "
+                        "AND role='user' AND deleted_ms IS NULL ORDER BY rowid LIMIT 1",
+                        (source_turn_id, cid),
+                    )
+                    source = task_user_request(db, source) if source else None
+                    text = json.loads(source["content_json"]).get("text", "") if source else ""
+                    if not (
+                        executor == "native"
+                        and automatic_task_directory(target)
+                        and source is not None
+                        and all(
+                            item["executor"] == "native"
+                            and not source_quote(text, item["directory"])
+                            for item in rejected
+                        )
+                    ):
+                        raise DomainError("TASK_TARGET_REVIEW_REQUIRED", 409)
                 for steering in rows(
                     db,
                     "SELECT arguments_json FROM tool_calls WHERE turn_id=? "
