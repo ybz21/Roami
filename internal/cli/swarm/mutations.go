@@ -14,7 +14,7 @@ import (
 
 func isMutation(command string) bool {
 	switch command {
-	case "plan", "control", "member-add", "dependencies", "say", "post", "pause", "resume", "stop", "archive":
+	case "plan", "control", "member-add", "member-register", "dependencies", "say", "post", "pause", "resume", "stop", "archive":
 		return true
 	}
 	return false
@@ -114,7 +114,7 @@ func dependencyFlags(o commandOptions) ([]dependency, error) {
 func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, o commandOptions, w io.Writer, input io.Reader, jsonOutput bool) error {
 	var body map[string]any
 	var err error
-	suffix := map[string]string{"member-add": "plan", "plan": "plan", "dependencies": "dependencies", "control": "control", "say": "messages", "post": "member-posts", "pause": "control", "resume": "control", "stop": "control", "archive": "control"}[command]
+	suffix := map[string]string{"member-register": "members", "member-add": "plan", "plan": "plan", "dependencies": "dependencies", "control": "control", "say": "messages", "post": "member-posts", "pause": "control", "resume": "control", "stop": "control", "archive": "control"}[command]
 	if file := o.value("file"); file != "" {
 		if len(o.values) > 1 || o.switches["integration"] || o.switches["clear"] {
 			return fmt.Errorf("--file contains the full request; do not mix it with other request options")
@@ -146,7 +146,7 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 		switch command {
 		case "pause", "resume", "stop", "archive":
 			body["action"] = command
-		case "member-add":
+		case "member-add", "member-register":
 			executor, err := o.required("executor")
 			if err != nil {
 				return err
@@ -158,6 +158,14 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 			case "native", "codex", "claude", "opencode", "pi":
 			default:
 				return fmt.Errorf("unsupported executor: %s", executor)
+			}
+			if command == "member-register" {
+				duty, err := o.required("duty")
+				if err != nil {
+					return err
+				}
+				body["members"] = []any{map[string]any{"name": o.args[1], "executor": executor, "duty": duty}}
+				break
 			}
 			goal, err := o.required("goal")
 			if err != nil {
@@ -175,7 +183,11 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 			if title == "" {
 				title = o.args[1]
 			}
-			body["items"] = []any{map[string]any{"member": o.args[1], "executor": executor, "title": title, "goal": goal, "acceptance": acceptance, "integration": o.switches["integration"], "dependencies": deps}}
+			item := map[string]any{"member": o.args[1], "executor": executor, "title": title, "goal": goal, "acceptance": acceptance, "integration": o.switches["integration"], "dependencies": deps}
+			if id := o.value("member-id"); id != "" {
+				item["memberId"] = id
+			}
+			body["items"] = []any{item}
 		case "dependencies":
 			deps, err := dependencyFlags(o)
 			if err != nil {

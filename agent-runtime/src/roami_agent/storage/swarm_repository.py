@@ -258,6 +258,9 @@ def snapshot(db, owner, swarm_id):
         "SELECT state FROM turns WHERE id IN (SELECT turn_id FROM swarm_posts WHERE swarm_id=? AND turn_id IS NOT NULL UNION SELECT aggregate_id FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId') IN (SELECT task_id FROM swarm_work_items WHERE swarm_id=?)) ORDER BY created_ms DESC LIMIT 1",
         (swarm_id, swarm_id),
     )
+    from roami_agent.storage.swarm_members import member_list
+
+    members = member_list(db, swarm_id, work)
     return {
         "id": swarm_id,
         "name": value["name"],
@@ -271,6 +274,8 @@ def snapshot(db, owner, swarm_id):
         "state": state,
         "sequence": sequence,
         "work": work,
+        "members": members,
+        "memberProtocol": value["member_protocol"],
         "posts": posts,
         "mainMessages": main_messages,
         "mainState": main_turn["state"] if main_turn else "idle",
