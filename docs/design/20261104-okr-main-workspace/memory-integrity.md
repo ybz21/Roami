@@ -33,3 +33,9 @@ olderCursor，不把长历史裁成一个成功返回的损坏 JSON。
 真实Main的CLI新二进制只读验证返回3条消息、合法JSON和可续读cursor；旧CLI恰好4MiB截断已复现。
 隔离Go专项及17项项目运行时测试通过。证据 `/tmp/okr-memory-integrity-20261105/`；
 全量门禁、PR、合入和部署另行补录，当前未部署。
+
+完整 quick / full 已通过：Go 全量，Python **3665 passed / 48 skipped**（full 1343.98秒），
+前端静态/构建、四套范围检查与秘密审计按本次实际变更计划执行。具体full基于修复代码55a4e9c9；
+随后只补本主题入口和验收文档，运行时/Go/CLI字节未变。额外的真实Runtime/ASGI/Foundation链路
+证明工具目录能发现带具体schema的追加命令，经通用CLI入口仍固定原项目并保留mode=append；
+夹具没有调用真实模型或触碰真实项目。见 `/tmp/okr-memory-integrity-20261105/append-cli-proof.json`。
