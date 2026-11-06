@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "widgets": [],
+  "html": {
+    "entry": "dashboard/index.html",
+    "assets": ["dashboard/index.html", "dashboard/style.css", "dashboard/page.js"],
+    "metricIds": ["metric"],
+    "libraries": ["echarts"]
+  }
+}

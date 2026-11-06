@@ -1,4 +1,6 @@
 const zhCN = {
+  'okr.html.editFiles': '看板由项目中的 HTML 文件定义，可让 Main 修改。',
+  'okr.html.loadFailed': '看板未能加载，请检查看板文件后重试。',
   'okr.tab.okr': 'OKR',
   'okr.tab.dashboard': '数据看板',
   'okr.tab.status': '当前状态',

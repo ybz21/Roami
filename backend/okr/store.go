@@ -136,6 +136,9 @@ func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
 
 // Validate the effective configuration after preserving fields omitted by older clients.
 func (s *Store) SaveValidated(projectID string, c Config, validateConfig func(*Config) error) (*Workspace, error) {
+	if c.Dashboard != nil && c.Dashboard.HTML != nil && s.projects == nil {
+		return nil, ErrInvalid
+	}
 	if err := validate(&c); err != nil {
 		return nil, err
 	}

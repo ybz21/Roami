@@ -24,7 +24,7 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | 项目 AGENTS.md | 指向 .roami/okr/AGENTS.md，团队/重要事项/个人记忆位置，产物目录 | 不替换已有项目规则 |
 | .roami/okr/AGENTS.md | 团队协作、当轮产物、独立验收、消息来源与记忆约定 | 不把自述当验收，不绕过 unknown |
 | okr.json | objective、日期、metrics、keyResults、initiatives、当前 revision、实际 swarm、autoCollect | 不塞观测、运行回执或虚构实例 |
-| dashboard.json | 当前 schema1/widgets 的顺序和 metric/KR 绑定；未来 HTML 入口需新协议支持 | 不把任意 HTML 写进现有 widget.type |
+| dashboard.json | schema1/widgets 或支持宿主上的 schema2/html 入口、资产与指标绑定 | 不把任意 HTML 写进现有 widget.type |
 | dashboard/index.html | 用户自己的 HTML 布局；一指标一卡，组件绑定清晰 | 不读绝对路径、数据库、鉴权凭证 |
 | dashboard/style.css | 现有主题/字号/间距令牌、响应式列与内部滚动 | 不改变主应用壳或污染父页面 |
 | dashboard/page.js | 只读 okr.data.read/subscribe、格式化、ECharts/表格渲染、离开清理 | 不派工、不写数据、不自行调用 Roami 管理 API |
@@ -59,8 +59,8 @@ KR 的 metricId 必须存在，horizon 是 long/short，mode 是 increase/atLeas
 
 JSON 兼容路径：从 metricTrend/keyResults/nextAction 中选择注册组件，数据页只展示数据。
 HTML 路径：复制 parts/dashboard 的片段到 index.html，填 metricId/名称，按实际组件
-编写 page.js 的 render；趋势片段没有自动图表能力，必须接现有 ECharts 渲染器。
-宿主 SDK 未实现时保留 HTML 草稿/等待状态，不改为直接获取生产凭证。
+选择 parts/dashboard/html/dashboard.json 覆盖，并按实际组件编写渲染；完整模板 page.js 支持数字与趋势/柱图，图表在 okr.ready() 后使用宿主 ECharts。
+先确认 projectFiles.htmlDashboardSupported；不支持时保留 HTML 草稿，不改为直接获取生产凭证。
 
 ## 组合来源与职责
 

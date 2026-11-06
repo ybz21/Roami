@@ -157,3 +157,5 @@
 [Main 原生 CLI 群聊署名与自我唤醒保护](native-cli-message-identity.md)。
 
 - [首页与 OKR 消息隔离](home-message-isolation.md)
+
+- [项目 HTML 看板运行态与只读数据桥](html-dashboard-runtime.md)

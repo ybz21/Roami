@@ -78,6 +78,7 @@ type DashboardWidget struct {
 }
 
 type Dashboard struct {
+	HTML          *HTMLDashboard    `json:"html,omitempty"`
 	SchemaVersion int               `json:"schemaVersion"`
 	Widgets       []DashboardWidget `json:"widgets"`
 }
@@ -96,19 +97,21 @@ type TeamDefinition struct {
 }
 
 type ProjectFiles struct {
-	TeamRoleBindings     bool           `json:"teamRoleBindings,omitempty"`
-	Root                 string         `json:"root"`
-	SchemaVersion        int            `json:"schemaVersion"`
-	Revision             int64          `json:"revision"`
-	MainInstructionsFile string         `json:"mainInstructionsFile"`
-	TeamMemoryFile       string         `json:"teamMemoryFile"`
-	MainInstructions     string         `json:"mainInstructions,omitempty"`
-	WorkflowFile         string         `json:"workflowFile,omitempty"`
-	Workflow             string         `json:"workflow,omitempty"`
-	TeamMemory           string         `json:"teamMemory,omitempty"`
-	TeamMemorySha256     string         `json:"teamMemorySha256"`
-	PendingChanges       bool           `json:"pendingChanges"`
-	Skills               []ProjectSkill `json:"skills"`
+	TeamRoleBindings       bool           `json:"teamRoleBindings,omitempty"`
+	HTMLDashboardSupported bool           `json:"htmlDashboardSupported,omitempty"`
+	DashboardDigest        string         `json:"dashboardDigest,omitempty"`
+	Root                   string         `json:"root"`
+	SchemaVersion          int            `json:"schemaVersion"`
+	Revision               int64          `json:"revision"`
+	MainInstructionsFile   string         `json:"mainInstructionsFile"`
+	TeamMemoryFile         string         `json:"teamMemoryFile"`
+	MainInstructions       string         `json:"mainInstructions,omitempty"`
+	WorkflowFile           string         `json:"workflowFile,omitempty"`
+	Workflow               string         `json:"workflow,omitempty"`
+	TeamMemory             string         `json:"teamMemory,omitempty"`
+	TeamMemorySha256       string         `json:"teamMemorySha256"`
+	PendingChanges         bool           `json:"pendingChanges"`
+	Skills                 []ProjectSkill `json:"skills"`
 }
 
 type ProjectSkill struct {
@@ -235,7 +238,14 @@ func validate(c *Config) error {
 		}
 	}
 	if c.Dashboard != nil {
-		if c.Dashboard.SchemaVersion != 1 || c.Dashboard.Widgets == nil {
+		if c.Dashboard.HTML != nil {
+			if c.Dashboard.SchemaVersion != 2 || len(c.Dashboard.Widgets) != 0 || validateHTMLDashboard(c.Dashboard.HTML, metrics) != nil {
+				return ErrInvalid
+			}
+			if c.Dashboard.Widgets == nil {
+				c.Dashboard.Widgets = []DashboardWidget{}
+			}
+		} else if c.Dashboard.SchemaVersion != 1 || c.Dashboard.Widgets == nil {
 			return ErrInvalid
 		}
 		seen := map[string]bool{}

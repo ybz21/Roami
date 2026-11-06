@@ -60,7 +60,7 @@ export default function OkrConfiguration({ value, onChange, onSave, onCancel, bu
             <OkrField label={t('okr.githubField')}><Select disabled={busy} aria-label={t('okr.githubField')} value={m.field} onChange={field => metric(m.id, { field })} options={['stars', 'forks'].map(field => ({ value: field, label: t('okr.github.' + field) }))} /></OkrField>
           </>}
         </div>
-        <Button danger icon={<TrashIcon />} disabled={value.keyResults.some(k => k.metricId === m.id)} onClick={() => patch({ metrics: value.metrics.filter(x => x.id !== m.id), ...(value.dashboard ? { dashboard: { ...value.dashboard, widgets: value.dashboard.widgets.map(item => ({ ...item, metricIds: item.metricIds?.filter(id => id !== m.id) })) } } : {}) })}>{t('okr.removeMetric')}</Button>
+        <Button danger icon={<TrashIcon />} disabled={value.keyResults.some(k => k.metricId === m.id) || dashboard.html?.metricIds.includes(m.id)} onClick={() => patch({ metrics: value.metrics.filter(x => x.id !== m.id), ...(value.dashboard ? { dashboard: { ...value.dashboard, widgets: value.dashboard.widgets.map(item => ({ ...item, metricIds: item.metricIds?.filter(id => id !== m.id) })) } } : {}) })}>{t('okr.removeMetric')}</Button>
       </section>)}
       <Button icon={<PlusIcon />} onClick={() => patch({ metrics: [...value.metrics, { id: stableId('m'), name: '', unit: '', source: 'manual' }] })}>{t('okr.addMetric')}</Button>
       <h3>{t('okr.keyResults')}</h3>
@@ -90,7 +90,7 @@ export default function OkrConfiguration({ value, onChange, onSave, onCancel, bu
       </section>)}
       <Button icon={<PlusIcon />} onClick={() => patch({ initiatives: [...(value.initiatives || []), { id: stableId('initiative'), title: '', channel: '', keyResultIds: [], description: '', acceptance: '' }] })}>{t('okr.addInitiative')}</Button>
       <details className="okr-dashboard-config"><summary>{t('okr.dashboardConfiguration')}</summary>
-        {dashboard.widgets.map(item => <section className="okr-editor-row" key={item.id}>
+        {dashboard.html ? <p className="okr-muted">{t('okr.html.editFiles')}</p> : <>{dashboard.widgets.map(item => <section className="okr-editor-row" key={item.id}>
           <div className="okr-grid">
             <OkrField label={t('okr.widgetTitle')}><Input value={item.title || ''} onChange={e => widget(item.id, { title: e.target.value })} /></OkrField>
             <OkrField label={t('okr.widgetType')}><Select disabled={busy} aria-label={t('okr.widgetType')} value={item.type} options={['keyResults', 'metricTrend', 'nextAction'].map(type => ({ value: type, label: t('okr.widget.' + type) }))} onChange={type => widget(item.id, { type })} /></OkrField>
@@ -99,7 +99,7 @@ export default function OkrConfiguration({ value, onChange, onSave, onCancel, bu
           {item.type === 'metricTrend' && <OkrField label={t('okr.widgetMetrics')}><Select mode="multiple" disabled={busy} aria-label={t('okr.widgetMetrics')} value={item.metricIds || []} options={value.metrics.map(metric => ({ value: metric.id, label: metric.name }))} onChange={metricIds => widget(item.id, { metricIds })} /></OkrField>}
           <Button danger icon={<TrashIcon />} onClick={() => patch({ dashboard: { ...dashboard, widgets: dashboard.widgets.filter(row => row.id !== item.id) } })}>{t('okr.removeWidget')}</Button>
         </section>)}
-        <Button icon={<PlusIcon />} onClick={() => patch({ dashboard: { ...dashboard, widgets: [...dashboard.widgets, { id: stableId('widget'), type: 'metricTrend' }] } })}>{t('okr.addWidget')}</Button>
+        <Button icon={<PlusIcon />} onClick={() => patch({ dashboard: { ...dashboard, widgets: [...dashboard.widgets, { id: stableId('widget'), type: 'metricTrend' }] } })}>{t('okr.addWidget')}</Button></>}
       </details>
       <h3>{t('okr.swarm')}</h3>
       <OkrField label={t('okr.swarm')}><Select disabled={busy} allowClear aria-label={t('okr.swarm')} value={value.swarm || undefined} onChange={swarm => patch({ swarm: swarm || '' })} options={swarms.map(s => ({ value: s.id, label: s.name }))} /></OkrField>

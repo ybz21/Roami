@@ -7,8 +7,8 @@ PROJECT/
   AGENTS.md
   .roami/okr/
     okr.json                         objective, KRs, methods and metric definitions
-    dashboard.json                   registered widgets, or proposed HTML entry/bindings
-    dashboard/index.html             user-authored display (host SDK pending)
+    dashboard.json                   registered widgets or confirmed HTML entry/bindings
+    dashboard/index.html             user-authored display (check host HTML capability)
     connectors/NAME/
       SKILL.md                       collection workflow (new package protocol)
       connector.json                 source/metric binding
@@ -58,6 +58,9 @@ Use only these fields, retaining existing optional definitions:
   Supported types are `keyResults`, `metricTrend`, `nextAction`; the data page
   displays result and trend widgets. Each selected metric has its own trend card.
   Widget IDs are stable; referenced KR and metric IDs must exist.
+  On hosts with `projectFiles.htmlDashboardSupported`, schema2 uses
+  `{schemaVersion:2,widgets:[],html:{entry,assets,metricIds,libraries?}}`;
+  see [dashboard data](dashboard-data.md) for file and SDK contracts.
 - `team`: `{schemaVersion:1,roles:[{id,name,executor,duty}]}`. Choose duties from
   the goal; an empty roles list is valid for Main-only work. IDs and names are
   unique. Executors are `native`, `codex`, `claude`, `opencode`, `pi`; actual node

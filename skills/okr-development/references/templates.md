@@ -20,8 +20,8 @@ change against the latest revision rather than applying a whole template blindly
 
 Fill `{{startDate}}`, `{{endDate}}`, `{{githubRepo}}` and agreed numeric targets
 before validation. Do not turn missing baseline/access into zero. Config seeds
-use supported widgets and source protocols; the user HTML and general Connector
-Skill packages are preparation for the documented host extensions.
+use supported widgets and source protocols; general Connector Skill execution still needs its documented host adapter.
+For HTML, check `projectFiles.htmlDashboardSupported` before selecting schema2.
 
 Start by copying `assets/.` into an empty draft, preserving .roami.
 Read [the file-by-file guide](authoring.md), then use the reusable dashboard/ files for custom HTML. Replace metric binding
@@ -37,3 +37,12 @@ real schedule/nextDue receipt and the user has chosen time/timezone. Existing
 
 After supported save/sync, reread the workspace and actual files. A draft tree
 must not include a forged state/current.json or immutable confirmed snapshot.
+
+For custom HTML, copy the complete assets first, then copy
+`parts/dashboard/html/dashboard.json` to the draft's `.roami/okr/dashboard.json`.
+Replace `metric` in both the manifest and HTML with agreed metric IDs. Keep the
+three dashboard assets from the complete template; add trend-card.html inside
+the metrics grid when needed. The optional `echarts` library is host supplied;
+remove it for number/table-only layouts. Fill dashboardWaiting/unknownValue and
+visible labels in the user's language. Bind one card to each intended dataset.
+Do not copy this overlay to a host without the HTML capability.
