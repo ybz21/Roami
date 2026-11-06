@@ -39,14 +39,17 @@ export const TI = {
 // 原来写的是 `${tone}1f` / `${tone}59`，而 tone 传进来的是 `var(--accent)`：
 // 拼出来是无效值，底色被整个丢掉，border-color 反倒落成满强度实线，
 // 于是「开启」在界面上是一枚突兀的蓝色描边圈。
-export function TBtn({ icon, label, on, tone = 'accent', title, onClick, onMouseDown }: {
+export function TBtn({ icon, label, on, tone = 'accent', title, pressed, className = '', onClick, onMouseDown }: {
   icon?: ReactNode; label?: ReactNode; on?: boolean; tone?: 'accent' | 'ok'; title?: ReactNode
   onClick?: () => void; onMouseDown?: (e: React.MouseEvent) => void
+  pressed?: boolean
+  className?: string
 }) {
   const { coarse } = useLayout()
   const btn = (
-    <button type="button" className={`tt-tbtn${on ? ' on' : ''}${tone === 'ok' ? ' ok' : ''}${label ? '' : ' tt-ico'}`}
+    <button type="button" className={`tt-tbtn${on ? ' on' : ''}${tone === 'ok' ? ' ok' : ''}${label ? '' : ' tt-ico'} ${className}`}
       onClick={onClick} onMouseDown={onMouseDown}
+      aria-pressed={pressed}
       aria-label={typeof title === 'string' ? title : undefined}
       title={coarse && typeof title === 'string' ? title : undefined}>
       {icon}{label != null && <span>{label}</span>}

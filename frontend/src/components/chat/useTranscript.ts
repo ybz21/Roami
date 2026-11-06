@@ -43,7 +43,7 @@ export function useTranscript(name: string, file: string | undefined, path: stri
         // boff=1：告诉后端这个 offset 是字节偏移（升级前的页面不会带，后端据此重新锚定）
         const q = new URLSearchParams({ offset: String(offset), boff: '1' })
         // 只有首屏带 tail：增量轮询要的是「新行」，一条都不能丢。
-        if (offset === 0) q.set('tail', String(tail))
+        if (offset === 0 || path === 'pi-transcript') q.set('tail', String(tail))
         if (f) q.set('file', f)
         const r = await api('GET', `/sessions/${encodeURIComponent(name)}/${path}?${q.toString()}`)
         const d = r.data
@@ -67,7 +67,11 @@ export function useTranscript(name: string, file: string | undefined, path: stri
         }
         if (typeof d.truncated === 'boolean') setHasEarlier(d.truncated)
         if (typeof d.pending === 'boolean') setServerPending(d.pending)
-        if (d.messages?.length) {
+        if (path === 'pi-transcript' && d.replace === true) {
+          setMsgs(d.messages || [])
+          offset = d.nextOffset
+        }
+        else if (d.messages?.length) {
           setMsgs((m) => {
             if (path !== 'opencode-transcript') return [...m, ...d.messages]
             const ids = new Map<string, number>()

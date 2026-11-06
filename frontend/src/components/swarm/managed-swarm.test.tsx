@@ -22,7 +22,7 @@ vi.mock('../agent/agent-page-route', () => ({ openAgentPage: (...args: unknown[]
 vi.mock('../markdown/Markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
 vi.mock('../MobileSubPage', () => ({ default: ({ children, onBack }: { children: ReactNode; onBack: () => void }) => <div role="dialog"><button type="button" aria-label="test.back" onClick={onBack}>Back</button>{children}</div> }))
 vi.mock('./SwarmStudio', () => ({ default: ({ selected, active = true, nodes, onSelect }: { selected: string; active?: boolean; nodes: { id: string; state: string }[]; onSelect: (id: string) => void }) => <div data-testid="studio-selection" data-active={active} data-nodes={nodes.map(node => node.id).join(',')} data-main-state={nodes[0]?.state}>{selected}{nodes.map(node => <button key={node.id} aria-label={'scene ' + node.id} onClick={() => onSelect(node.id)}>{node.id}</button>)}</div> }))
-vi.mock('antd', () => ({
+vi.mock('antd', () => ({ Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
   App: { useApp: () => ({ message: { error: test.error }, modal: { confirm: vi.fn() } }) },
   Spin: () => <span>loading</span>,
   Button: ({ children, onClick, disabled, loading }: { children: ReactNode; onClick?: () => void; disabled?: boolean; loading?: boolean }) => <button disabled={disabled || loading} onClick={onClick}>{children}</button>,

@@ -202,6 +202,7 @@ const Term = forwardRef<TermHandle, {
   name: string
   fontSize: number
   active: boolean
+  restore?: boolean
   onStatus?: (s: TermStatus) => void
   // 后端懒恢复了一个被机器重启带走的会话：它换了新 id，标签/URL/后续请求都得跟着换。
   onRevived?: (from: string, to: string) => void
@@ -209,7 +210,7 @@ const Term = forwardRef<TermHandle, {
   onSelectionMenu?: (e: { x: number; y: number; selection: string }) => void
   onPaste?: () => void // Ctrl+Shift+V / Cmd+V：交父组件走应用粘贴（读剪贴板→失败弹手动框）
   onImagePaste?: (files: File[]) => void // 粘贴事件含图片时回调（绕过键盘拦截时的兜底）
-}>(function Term({ name, fontSize, active, onStatus, onRevived, onContextMenu, onSelectionMenu, onPaste, onImagePaste }, ref) {
+}>(function Term({ name, fontSize, active, restore = true, onStatus, onRevived, onContextMenu, onSelectionMenu, onPaste, onImagePaste }, ref) {
   const { coarse } = useLayout()
   const elRef = useRef<HTMLDivElement>(null)
   const handoffCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -508,7 +509,9 @@ const Term = forwardRef<TermHandle, {
     // 带上当前尺寸：后端据此建 pty，tmux attach 首帧就按真实尺寸画，省掉「先按 80x24 画完再跳一次」
     const t0 = termRef.current
     const requested = t0 && t0.cols > 1 && t0.rows > 1 ? { cols: t0.cols, rows: t0.rows } : null
-    const q = requested ? `?cols=${requested.cols}&rows=${requested.rows}` : ''
+    const query = new URLSearchParams(requested ? { cols: String(requested.cols), rows: String(requested.rows) } : {})
+    if (!restore) query.set('restore', '0')
+    const q = query.size ? '?' + query.toString() : ''
     const ws = new WebSocket(nodeWs(`/term/${encodeURIComponent(name)}${q}`))
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws

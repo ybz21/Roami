@@ -500,7 +500,10 @@ func Handler(c *gin.Context) {
 	// 从前这里一律 attach：tmux 打一行 "can't find session" 就退出 → pty EOF → 前端按
 	// 「普通断线」1.2s 后重连 → 再来一遍，永远停在「连接中」。
 	if !sessionExists(name) {
-		revived, ok := reviveDormant(name)
+		revived, ok := "", false
+		if c.Query("restore") != "0" {
+			revived, ok = reviveDormant(name)
+		}
 		if !ok {
 			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\n[会话已不存在: "+name+"]\r\n"))
 			_ = conn.WriteMessage(websocket.CloseMessage,

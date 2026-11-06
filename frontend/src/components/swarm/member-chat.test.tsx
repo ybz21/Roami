@@ -13,6 +13,9 @@ vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => path, useCurr
 vi.mock('../chat/CodexChat', () => ({ default: ({ name, onSend }: any) => <button onClick={() => { void onSend('Continue').catch(() => {}) }}>codex:{name}</button> }))
 vi.mock('../chat/ClaudeChat', () => ({ default: ({ name }: any) => <p>claude:{name}</p> }))
 vi.mock('../chat/OpenCodeChat', () => ({ default: ({ name }: any) => <p>opencode:{name}</p> }))
+vi.mock('../chat/PiChat', () => ({ default: ({ name }: any) => <p>pi:{name}</p> }))
+vi.mock('../terminal/AgentViewToggle', () => ({ default: ({ agent, chat, onToggle }: any) => <button aria-pressed={chat} onClick={onToggle}>{agent}-view</button> }))
+vi.mock('../terminal/Terminal', () => ({ default: ({ name, active, restore }: any) => <p data-testid="terminal" data-active={active} data-restore={String(restore)}>terminal:{name}</p> }))
 vi.mock('../agent/NativeSession', () => ({ default: ({ id, expectedTask }: any) => <p>native:{id}:{expectedTask.id}</p> }))
 function snapshot(executor = 'codex'): SwarmSnapshot {
   return { id: 'swarm', name: 'Team', goal: '', mainConversationId: 'main', revision: 1, sequence: 1, paused: false, archived: false, state: 'running', target: { projectId: 'project' }, memberProtocol: 1, posts: [], mainMessages: [], work: [{ id: 'work', memberId: 'member', member_name: 'Member', executor, title: 'Work', goal: '', acceptance: '', integration: 0, dependencies: [], dispatch_error: null, task_id: 'task', revision: 2, state: 'running', attempt: { runId: 'run', state: 'running', sessionId: 'original' } }], members: [{ id: 'member', swarm_id: 'swarm', name: 'Member', executor, dutyPreview: '', workId: 'work', taskId: 'task', taskRevision: 2, state: 'running', memoryPath: '', roundCount: 2, instance: { id: 'instance', taskId: 'task', conversationId: 'worker', branchId: 'branch', nativeSessionId: executor === 'native' ? 'native-original' : null, state: 'assigned' } }] }
@@ -22,7 +25,7 @@ const props = { onMain: vi.fn(), onSession: vi.fn(), onChanged: vi.fn() }
 function view(data: SwarmSnapshot) { return <SwarmMemberChat data={data} member={swarmMembers(data)[0]} {...props} /> }
 beforeEach(() => { localStorage.clear(); state.failed = false; state.sessions = [{ name: 'original', agent: 'codex', dormant: false, projectKey: 'project' }]; state.api.mockReset().mockResolvedValue({ data: detail() }); vi.clearAllMocks() })
 afterEach(cleanup)
-it.each(['codex', 'claude', 'opencode', 'native'])('embeds the original %s conversation after exact identity verification', async executor => {
+it.each(['codex', 'claude', 'opencode', 'pi', 'native'])('embeds the original %s conversation after exact identity verification', async executor => {
   state.sessions[0].agent = executor; state.api.mockResolvedValue({ data: detail(executor) })
   render(view(snapshot(executor)))
   expect(await screen.findByText(executor === 'native' ? 'native:native-original:task' : executor + ':original')).toBeTruthy()
@@ -94,4 +97,23 @@ it('migrates the original uncertain legacy command once and permits a later inte
   await waitFor(()=>expect(state.api.mock.calls).toHaveLength(2));expect(state.api.mock.calls[1][2]).toMatchObject({commandKey:'original-command-key',taskRevision:1})
   first.unmount();render(view(data));await screen.findByText('codex:original');fireEvent.click(screen.getByText('codex:original'))
   await waitFor(()=>expect(state.api.mock.calls).toHaveLength(4));expect(state.api.mock.calls[3][2].commandKey).not.toBe('original-command-key');expect(state.api.mock.calls[3][2].taskRevision).toBe(2)
+})
+
+it.each(['codex', 'claude', 'opencode', 'pi'])('toggles %s on the same live instance, retains the choice, and drops a stale native target', async executor => {
+  const data = snapshot(executor); state.sessions[0].agent = executor; state.api.mockResolvedValue({ data: detail(executor) })
+  const mounted = render(view(data)); await screen.findByText(executor + ':original')
+  fireEvent.click(screen.getByText(executor + '-view'))
+  expect(screen.queryByText(executor + ':original')).toBeNull()
+  expect(screen.getByTestId('terminal').dataset).toMatchObject({ active: 'true', restore: 'false' })
+  expect(screen.getByTestId('terminal').textContent).toBe('terminal:original')
+  fireEvent.click(screen.getByText(executor + '-view'))
+  expect(screen.getByText(executor + ':original')).toBeTruthy()
+  expect(screen.getByTestId('terminal').dataset.active).toBe('false')
+  fireEvent.click(screen.getByText(executor + '-view')); mounted.unmount()
+  const next = render(view(data)); await screen.findByText('terminal:original')
+  expect(screen.queryByText(executor + ':original')).toBeNull()
+  expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
+  state.sessions = []; next.rerender(view(data))
+  expect(screen.queryByTestId('terminal')).toBeNull()
+  expect(screen.getByText('swarm.member.sessionUnavailable')).toBeTruthy()
 })

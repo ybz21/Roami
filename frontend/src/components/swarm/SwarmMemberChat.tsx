@@ -10,6 +10,10 @@ import NativeSession from '../agent/NativeSession'
 import CodexChat from '../chat/CodexChat'
 import ClaudeChat from '../chat/ClaudeChat'
 import OpenCodeChat from '../chat/OpenCodeChat'
+import PiChat from '../chat/PiChat'
+import Term from '../terminal/Terminal'
+import AgentViewToggle from '../terminal/AgentViewToggle'
+import { isAgentKind } from '../../agent-kind'
 import type { SwarmTeamMember } from './swarm-members'
 import type { SwarmSnapshot } from './swarm-protocol'
 import { memberDraft, transferMemberDraft } from './swarm-member-draft'
@@ -50,15 +54,33 @@ export default function SwarmMemberChat({ data, member, onMain, onSession, onCha
   const loading = loaded.identity !== identity
   return <section className="swarm-member-chat" aria-label={member.name}>
     {loading ? <Spin /> : !target ? <div className="swarm-note" role="status"><p>{t(taskId ? 'swarm.member.sessionUnavailable' : 'swarm.member.unassigned')}</p><div className="swarm-detail-actions">{taskId && <><button type="button" className="tt-act" onClick={() => setRetry(value => value + 1)}>{t('agent.retry')}</button><button type="button" className="tt-act" onClick={() => openAgentPage('tasks', taskId)}>{t('swarm.managed.openTask')}</button></>}<button type="button" className="tt-act" onClick={onMain}>{t('swarm.relations.adjustMain')}</button></div></div> : <>
-      <div className="swarm-member-session-actions"><button type="button" className="tt-act" onClick={() => target.kind === 'native' ? openAgentPage('session', target.id) : onSession(target.id)}>{t('swarm.managed.openSession')}</button></div>
-      {['codex', 'claude', 'opencode'].includes(target.kind) ? <MemberCLIChat key={target.id} swarmId={data.id} member={member} sessionId={target.id} executor={target.kind} onSend={send} /> : target.kind === 'native' ? <NativeSession key={target.id} id={target.id} node={node} projects={[]} embedded expectedTask={{ id: target.taskId, projectId: target.projectId, conversationId: member.registered!.instance!.conversationId, branchId: member.registered!.instance!.branchId, revision: member.work!.revision! }} onChanged={onChanged} onSession={onSession} /> : <p className="swarm-note">{t('swarm.managed.openSession')}</p>}
+      {target.kind === 'native' ? <><div className="swarm-member-session-actions"><button type="button" className="tt-act" onClick={() => openAgentPage('session', target.id)}>{t('swarm.managed.openSession')}</button></div><NativeSession key={target.id} id={target.id} node={node} projects={[]} embedded expectedTask={{ id: target.taskId, projectId: target.projectId, conversationId: member.registered!.instance!.conversationId, branchId: member.registered!.instance!.branchId, revision: member.work!.revision! }} onChanged={onChanged} onSession={onSession} /></> : <MemberCLIChat key={identity} swarmId={data.id} member={member} sessionId={target.id} executor={target.kind} onSend={send} onSession={onSession} />}
     </>}
   </section>
 }
 
-function MemberCLIChat({ swarmId, member, sessionId, executor, onSend }: { swarmId: string; member: SwarmTeamMember; sessionId: string; executor: string; onSend: (text: string) => Promise<void> }) {
+function MemberCLIChat({ swarmId, member, sessionId, executor, onSend, onSession }: { swarmId: string; member: SwarmTeamMember; sessionId: string; executor: string; onSend: (text: string) => Promise<void>; onSession: (id: string) => void }) {
+  const { t } = useI18n()
+  const viewKey = 'roami.swarm.member.view:' + nodeApi('/sessions/' + encodeURIComponent(sessionId))
+  const [chat, setChat] = useState(() => { try { return isAgentKind(executor) && localStorage.getItem(viewKey) !== 'terminal' } catch { return isAgentKind(executor) } })
+  const [terminalOpened, setTerminalOpened] = useState(!chat)
   const [ready, setReady] = useState(false)
   useLayoutEffect(() => { transferMemberDraft(swarmId, member, sessionId); setReady(true) }, [swarmId, member.id, sessionId])
   if (!ready) return <Spin />
-  return executor === 'codex' ? <CodexChat name={sessionId} onSend={onSend} /> : executor === 'claude' ? <ClaudeChat name={sessionId} onSend={onSend} /> : <OpenCodeChat name={sessionId} onSend={onSend} />
+  const toggle = () => {
+    setChat(!chat); setTerminalOpened(true)
+    try { localStorage.setItem(viewKey, chat ? 'terminal' : 'chat') } catch { /* Retain the current view without storage. */ }
+  }
+  return <>
+    <div className="swarm-member-session-actions">
+      {isAgentKind(executor) && <AgentViewToggle agent={executor} chat={chat} onToggle={toggle} />}
+      <button type="button" className="tt-act" onClick={() => onSession(sessionId)}>{t('swarm.managed.openSession')}</button>
+    </div>
+    <div className="swarm-member-session-view">
+      {terminalOpened && <div className="swarm-member-terminal" style={{ visibility: chat ? 'hidden' : 'visible', pointerEvents: chat ? 'none' : 'auto' }} aria-hidden={chat}>
+        <Term name={sessionId} fontSize={Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs-sm'))} active={!chat} restore={false} />
+      </div>}
+      {chat && (executor === 'codex' ? <CodexChat name={sessionId} onSend={onSend} /> : executor === 'claude' ? <ClaudeChat name={sessionId} onSend={onSend} /> : executor === 'pi' ? <PiChat name={sessionId} onSend={onSend} /> : <OpenCodeChat name={sessionId} onSend={onSend} />)}
+    </div>
+  </>
 }
