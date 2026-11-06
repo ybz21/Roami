@@ -6,9 +6,10 @@ import { AgentLogo, BotIcon, RoamiLogo, ChecklistIcon, CheckIcon, CircleIcon, Cl
 import { useI18n } from '../../i18n'
 import { nodeApi } from '../cluster/node-url'
 import type { AgentTask } from './agent-protocol'
-import { taskExecutor, taskGoal, taskInstructions, taskExecutionUnconfirmed, currentTaskArtifacts } from './agent-task-protocol'
+import { taskExecutor, taskGoal, taskExecutionUnconfirmed, currentTaskArtifacts } from './agent-task-protocol'
 import AgentTaskRecord from './AgentTaskRecord'
 import TaskDescription from './TaskDescription'
+import TaskDispatch from './TaskDispatch'
 import { taskTopic } from './task-topic'
 import { taskOutcome, taskReportLinks, taskReportSummary } from './task-outcome'
 import { usePagedAgentData } from './usePagedAgentData'
@@ -147,7 +148,9 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
   const sessionClosed = detail?.sessionClosure?.state === 'closed'
   const sessionClosing = detail?.sessionClosure?.state === 'closing'
   const sessionId = detail?.attempts.find(attempt => attempt.sessionId)?.sessionId || task?.latestAttempt?.sessionId
-  const professional = !!task && isAgentKind(taskExecutor(task))
+  const executor = task ? taskExecutor(task) : null
+  const executorLabel = isAgentKind(executor) ? (executor === 'claude' ? 'Claude Code' : agentName(executor)) : executor === 'native' ? t('agent.workspace.native') : ''
+  const professional = isAgentKind(executor)
   const retainedSession = !!task?.nativeSession || professional && !!(task?.latestAttempt?.agentConversationId || detail?.attempts.some(attempt => attempt.sessionId === sessionId && attempt.agentConversationId))
   const ended = !!latest?.finishedMs || terminal.has(task?.state || '')
   const previewArtifact = useCallback((artifactId: string) => {
@@ -188,16 +191,21 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
     {snapshot.detail.failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {task && <>
       <div className="agent-task-heading"><h3>{taskTopic(task) || t('agent.task.untitled')}</h3><span className="agent-task-state" data-state={uncertain ? 'unknown' : task.state}>{t(uncertain ? 'agent.task.executionUnconfirmed' : 'agent.state.' + task.state)}</span></div>
+      <div className="agent-task-meta">
+        {!!executor && <span className="agent-task-executor">{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : executor === 'native' ? <RoamiLogo size={14} /> : <BotIcon size={14} />}{executorLabel}</span>}
+        <span>{t('agent.task.revision', { n: task.revision })}</span>
+        {task.latestAttempt?.workspace && <code className="agent-task-workspace" title={task.latestAttempt.workspace.directory}>{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}
+      </div>
       <TaskDescription content={goal === task.id ? '' : goal} />
       {uncertain && <p className="agent-task-note" role="status">{t('agent.task.executionUnconfirmedHint')}</p>}
-      <details className="agent-task-section agent-task-requirements"><summary><ChevronRight />{t('agent.task.instructions')}</summary><p>{taskInstructions(task) || t('agent.task.noInstructions')}</p>{steering?.text && steering.state !== 'applied' && <p><b>{t('agent.task.unappliedRequirements')}</b>{steering.text}</p>}<small className="agent-muted">{t('agent.task.revision', { n: task.revision })}</small>{task.latestAttempt?.workspace && <code className="agent-task-workspace">{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}</details>
+      <TaskDispatch task={task} goal={goal === task.id ? '' : goal} steering={steering} />
       {failed ? <p className="agent-task-note error" role="status">{t(reason || 'agent.task.incomplete')}</p> : outcome && <section className="agent-task-section agent-task-outcome"><h4>{t('agent.task.result')}</h4>{task.state !== 'succeeded' && <p className="agent-muted">{t('agent.task.resultPending')}</p>}<p>{outcome}</p></section>}
       {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={taskReportSummary(reported)} title={false} /></section>}
       {!!reportLinks.length && <section className="agent-task-section"><h4>{t(task.state === 'succeeded' ? 'agent.task.deliveryLinks' : 'agent.task.reportedLinks')}</h4>{reportLinks.map(href => <a className="tt-act agent-task-delivery-link" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</section>}
       <div className="agent-task-actions">
         {task?.nativeSession && <Button onClick={() => sessionClosed ? openAgentPage('session', task.nativeSession!.id) : onSession(nativeSessionName(task.nativeSession!.id))}>{t(sessionClosed ? 'agent.task.sessionRecord' : 'agent.task.enterSession')}</Button>}
         {task?.projectId && <a className="tt-act" href={'#/projects/' + encodeURIComponent(task.projectId)}>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</a>}
-        {sessionId && (!ended || retainedSession) && !sessionClosed && <Button onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
+        {sessionId && (!ended || retainedSession) && !sessionClosed && <Button type={ended ? 'default' : 'primary'} onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
         {retainedSession && (sessionId || task.nativeSession) && !sessionClosed && <Button disabled={!detailSafe || !!busy || sessionClosing} onClick={() => setCloseConfirm(true)}>{t('agent.task.closeSession')}</Button>}
         {task.parent_task_id && <Button onClick={() => select(task.parent_task_id!)}>{t('agent.task.parent')}</Button>}
         {(!terminal.has(task.state) || stopping) && !sessionClosed && <Button danger disabled={!detailSafe || !!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
@@ -208,7 +216,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
       {sessionClosing && <p className="agent-task-note" role="status">{t('agent.task.sessionClosing')}</p>}
       {['failed', 'unknown'].includes(detail?.sessionClosure?.state || '') && <p className="agent-task-note error" role="alert">{failure(detail?.sessionClosure?.error_code || undefined, t)}</p>}
       <Modal open={closeConfirm} title={t('agent.task.closeSessionConfirm')} okText={t('agent.task.closeSession')} cancelText={t('common.cancel')} confirmLoading={busy === 'close-session'} onCancel={() => { if (!busy) setCloseConfirm(false) }} onOk={() => { void mutate('close-session', '/agent/tasks/' + encodeURIComponent(id) + '/close-session', { revision: task.revision, runId: latest?.id }).then(ok => { if (ok) setCloseConfirm(false) }) }}><p>{t('agent.task.closeSessionHint')}</p>{error && <p role="alert" className="agent-task-note error">{error}</p>}</Modal>
-      {(artifacts.length > 0 || snapshot.artifacts.failed || !!detail?.delivery?.unavailable.length) && <section className="agent-task-section"><h4>{t('agent.task.artifacts')}</h4>
+      {(artifacts.length > 0 || snapshot.artifacts.failed || !!detail?.delivery?.unavailable.length) && <section className="agent-task-section"><h4>{t('agent.task.artifacts')}{artifacts.length > 0 && <small className="agent-task-count">{artifacts.length}</small>}</h4>
         {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}
         {!snapshot.artifacts.value && !snapshot.artifacts.failed && <Spin size="small" />}
         {!!detail?.delivery?.unavailable.length && <p className="agent-task-note" role="status">{t('agent.task.outputsUnavailable')}<small>{detail.delivery.unavailable.map(item => item.sourcePath).join(' · ')}</small></p>}
