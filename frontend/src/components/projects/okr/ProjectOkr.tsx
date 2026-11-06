@@ -182,7 +182,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     {!loaded && !error && <Spin />}
     {incoming && <div className="okr-update" role="status"><span>{t('okr.discussionUpdated')}</span><Button onClick={() => { void readWorkspace().then(response => { if (response.data) applyDiscussion(response.data) }).catch(() => setError('okr.loadFailed')) }}>{t('okr.adoptUpdate')}</Button></div>}
     {loaded && <>
-      <Tabs className="okr-work-tabs" tabBarExtraContent={{ right: <Button type="primary" icon={<BotIcon />} aria-label={t('okr.chatOpen')} onClick={openMain}>{!phone && t('okr.chatOpen')}</Button> }} activeKey={mainPanel} onChange={selectPanel} items={[
+      <Tabs className="okr-work-tabs" tabBarExtraContent={workspace?.swarm ? undefined : { right: <Button type="primary" icon={<BotIcon />} aria-label={t('okr.chatOpen')} onClick={openMain}>{!phone && t('okr.chatOpen')}</Button> }} activeKey={mainPanel} onChange={selectPanel} items={[
         { key: 'okr', label: t('okr.tab.okr'), forceRender: true, children: editing ? <section className="okr-section"><OkrConfiguration value={draft} onChange={setDraft} onSave={save} onCancel={workspace ? () => setEditing(false) : undefined} busy={busy || conflict} swarms={swarms} swarmError={swarmError} onLoadSwarms={() => void loadSwarms()} /></section> : workspace && <>
           <section className="okr-objective-head"><div><p className="okr-goal-meta">{t('okr.period', { start: day(workspace.startDate), end: day(workspace.endDate) })}</p></div><Button icon={<PencilIcon />} onClick={() => { setDraft(configurationOf(workspace)); setEditing(true) }}>{t('okr.edit')}</Button></section>
           <OkrGoalMap workspace={workspace} />

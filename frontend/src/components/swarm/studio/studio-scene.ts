@@ -119,10 +119,23 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
   const observer = new ResizeObserver(resize); observer.observe(host)
   const themeObserver = new MutationObserver(theme); themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] })
   const visibility = () => { lastFrame = 0; render(); schedule() }; document.addEventListener('visibilitychange', visibility)
-  const raycaster = new T.Raycaster(); let down: { x: number; y: number } | null = null
-  const pointerDown = (event: PointerEvent) => { down = { x: event.clientX, y: event.clientY } }
-  const pointerUp = (event: PointerEvent) => { if (!down || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 8) return; const r = renderer.domElement.getBoundingClientRect(); raycaster.setFromCamera(new T.Vector2((event.clientX - r.left) / r.width * 2 - 1, -(event.clientY - r.top) / r.height * 2 + 1), camera); const hit = raycaster.intersectObjects(rigs.map(rig => rig.hit))[0]; if (hit) select(String(hit.object.userData.id)) }
+  const raycaster = new T.Raycaster(); let down: { x: number; y: number; id: number } | null = null
+  const targetAt = (event: PointerEvent) => {
+    const r = renderer.domElement.getBoundingClientRect()
+    if (!r.width || !r.height) return
+    raycaster.setFromCamera(new T.Vector2((event.clientX - r.left) / r.width * 2 - 1, -(event.clientY - r.top) / r.height * 2 + 1), camera)
+    return raycaster.intersectObjects(rigs.map(rig => rig.hit))[0]?.object.userData.id as string | undefined
+  }
+  const pointerDown = (event: PointerEvent) => { down = event.button === 0 ? { x: event.clientX, y: event.clientY, id: event.pointerId } : null }
+  const pointerCancel = () => { down = null }
+  const pointerMove = (event: PointerEvent) => { renderer.domElement.style.cursor = targetAt(event) ? 'pointer' : '' }
+  const pointerUp = (event: PointerEvent) => {
+    const pressed = down; down = null
+    if (!pressed || event.pointerId !== pressed.id || Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > 8) return
+    const id = targetAt(event); if (id) select(id)
+  }
   renderer.domElement.addEventListener('pointerdown', pointerDown); renderer.domElement.addEventListener('pointerup', pointerUp)
+  renderer.domElement.addEventListener('pointercancel', pointerCancel); renderer.domElement.addEventListener('pointermove', pointerMove)
   const contextLost = (event: Event) => { event.preventDefault(); lost = true; schedule(); onLost() }; renderer.domElement.addEventListener('webglcontextlost', contextLost)
   return {
     update(nodes: StudioNode[]) {
@@ -144,6 +157,6 @@ export function createStudio(host: HTMLDivElement, labels: HTMLDivElement, selec
     },
     select(id: string) { selected = id; render() },
     motion(value: boolean, reduce: boolean, history = false) { motion = value; reduced = reduce; historical = history; render(); schedule() },
-    dispose() { disposed = true; renderer.setAnimationLoop(null); observer.disconnect(); themeObserver.disconnect(); document.removeEventListener('visibilitychange', visibility); renderer.domElement.removeEventListener('pointerdown', pointerDown); renderer.domElement.removeEventListener('pointerup', pointerUp); renderer.domElement.removeEventListener('webglcontextlost', contextLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); renderer.dispose(); renderer.domElement.remove() },
+    dispose() { disposed = true; renderer.setAnimationLoop(null); observer.disconnect(); themeObserver.disconnect(); document.removeEventListener('visibilitychange', visibility); renderer.domElement.removeEventListener('pointerdown', pointerDown); renderer.domElement.removeEventListener('pointerup', pointerUp); renderer.domElement.removeEventListener('pointercancel', pointerCancel); renderer.domElement.removeEventListener('pointermove', pointerMove); renderer.domElement.removeEventListener('webglcontextlost', contextLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); renderer.dispose(); renderer.domElement.remove() },
   }
 }
