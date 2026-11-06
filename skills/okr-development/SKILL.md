@@ -91,6 +91,11 @@ until `sync` validates and confirms them. A conflict requires rereading.
 
 ## Connect the team and data
 
+For explicit desired-role bindings and interrupted saves, read
+[durable team bindings](references/team-bindings.md). Use the host's capability
+signal and exact registered member identities; preserve bindings when saving
+other definitions.
+
 Main is this OKR's persistent project conversation, separate from Home Main.
 Reuse its bound Swarm. When the user requests a team, discover the current Swarm
 and register the agreed roles through `swarm_members_register`; use its returned

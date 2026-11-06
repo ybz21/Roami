@@ -552,7 +552,7 @@ func (s *Store) decorate(root *os.Root, w *Workspace) error {
 	if err := s.seedWorkflow(root, w.ProjectID); err != nil {
 		return err
 	}
-	metadata := &ProjectFiles{Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
+	metadata := &ProjectFiles{TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
 	workflow, err := readFile(root, "AGENTS.md", maxMemory)
 	if err != nil {
 		return err

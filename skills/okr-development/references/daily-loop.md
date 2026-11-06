@@ -82,3 +82,5 @@ keepalive；催办要针对真实当前任务与阻塞，无新信息时避免�
 
 原生 agent notify 也只投递通知；唤醒需使用明确的 wake 能力，不回退普通 send 绕过空闲/身份检查。
 cron.add 创建提案显式使用 enabled=false 和 IANA timezone；编辑不重置原启停与未指定的时区。
+
+Use [durable team bindings](team-bindings.md) when reconciling current roles or an interrupted configuration save. Current/history presentation does not change old host task states.
