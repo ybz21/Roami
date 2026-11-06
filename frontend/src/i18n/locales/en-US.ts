@@ -4818,7 +4818,7 @@ const enUS = {
   'composer.transcribing': 'Transcribing…',
   'composer.transcribingHint': 'The transcript will be added to your draft',
 
-  'composer.mainModelHint': 'Used for Home chat. Choose executor models in their own sessions.',
+  'composer.mainModelHint': 'Used by all Main conversations on this node.',
   'composer.taskPlaceholder': 'Describe the task to delegate…',
   'composer.createTask': 'Create task',
 

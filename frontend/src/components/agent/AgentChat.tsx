@@ -26,6 +26,7 @@ import { useVisibleAgentReads } from './useVisibleAgentReads'
 import type { AgentInboxState } from './useAgentInbox'
 import type { AgentMessage } from './agent-protocol'
 import AgentComposerPlus from './AgentComposerPlus'
+import AgentDraftFiles from './AgentDraftFiles'
 import ConversationComposer from '../chat/ConversationComposer'
 import VoiceInput from '../chat/VoiceInput'
 import AgentMessageView from './AgentMessageView'
@@ -288,10 +289,7 @@ export default function AgentChat({ cid, branch, focusMessage = '', inactive = f
       <ConversationComposer className="agent-compose-card" value={draft} onChange={value => { changeDraft(value); setCommandsDismissed(false); setCommandIndex(0); if (!value) setCommandsOpen(false) }} label={t('agent.message')} placeholder={t(target === 'direct' ? 'agent.placeholder' : 'composer.taskPlaceholder')} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly} hasAttachments={!!attachments.ids.length}
         send={{ label: t(queueDraft ? 'agent.outbox.add' : target !== 'direct' ? 'composer.createTask' : 'agent.send'), disabled: sending || attachments.blocked || (target !== 'direct' && draft.trim().length > 20000), pending: sending, icon: queueDraft ? <ClockIcon size={16} /> : undefined, onClick: sendDraft }}
         stop={running ? { label: t('agent.stop'), onClick: () => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) } } : undefined}
-        attachments={!!attachments.items.length && <div className="agent-draft-files">{attachments.items.map(item => <div className={`agent-file-card is-${item.state}`} key={item.key}>
-          <FileTextIcon size={20} /><span>{item.name}<small>{t(item.state === 'uploading' ? item.processing ? 'agent.composer.imagePreparing' : 'agent.composer.uploading' : item.state === 'failed' ? item.preparationFailed ? 'agent.composer.imagePrepareFailed' : 'agent.composer.uploadFailed' : item.reference?.previewState === 'unsupported' ? 'agent.composer.fileStoredOnly' : item.reference?.previewState === 'image' && !models.settings?.main.images ? 'agent.composer.imageUnavailable' : ['unavailable', 'encrypted', 'no_text'].includes(item.reference?.previewState || '') ? 'agent.composer.fileUnavailable' : item.optimized ? 'agent.composer.imageOptimized' : 'agent.composer.fileReady')}</small></span>
-          {item.state === 'uploading' ? <Spin size="small" /> : <>{item.state === 'failed' && <button type="button" aria-label={t('agent.retry')} disabled={sending} onClick={() => { void attachments.retry(item) }}><RefreshIcon size={15} /></button>}<button type="button" aria-label={t('agent.composer.removeFile', { name: item.name })} disabled={sending} onClick={() => { void attachments.remove(item).catch(() => message.error(t('agent.requestFailed'))) }}><CloseIcon size={15} /></button></>}
-        </div>)}</div>}
+        attachments={<AgentDraftFiles attachments={attachments} disabled={sending} imagesAvailable={!!models.settings?.main.images} onError={() => message.error(t('agent.requestFailed'))} />}
         suggestions={<>{slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
           {(compacting || attachments.items.length > 0) && <div className="agent-compose-status"><span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span></div>}</>}
         onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
