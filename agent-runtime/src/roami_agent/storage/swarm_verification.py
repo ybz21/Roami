@@ -8,10 +8,12 @@ from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.swarm_evidence import evidence, requirements
 from roami_agent.storage.swarm_repository import group
+from roami_agent.storage.swarm_scopes import require_scope
 
 
 def admission(db, args, binding):
     swarm = group(db, binding["owner"], args["swarmId"])
+    require_scope(swarm)
     if (
         binding.get("role") != "main"
         or binding.get("taskId")

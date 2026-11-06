@@ -96,6 +96,10 @@ async def test_identity_fails_closed_on_conflicting_main_bindings(store, corrupt
                     "commandKey": "create",
                 },
             )
+            # Simulate imported corruption past the normal scope write guard.
+            await store.call(
+                lambda db: db.execute("DROP TRIGGER swarm_project_scope_update"), write=True
+            )
             await store.call(
                 lambda db: db.execute(
                     "UPDATE swarm_groups SET target_json=? WHERE id=?",

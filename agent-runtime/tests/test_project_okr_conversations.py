@@ -8,6 +8,7 @@ from test_runtime import ConversationModel
 from roami_agent.app import Runtime
 from roami_agent.conversation.project_okr import registered_project
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.identity import identity
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
@@ -50,6 +51,18 @@ async def create_goal(runtime, project="registered", key="goal"):
             "/v1/conversations",
             json={"projectId": project, "title": "Goal discussion", "requestKey": key},
         )
+
+
+async def legacy_team(runtime, leader, project, name="Existing team"):
+    sid = "sw-" + identity()
+    await runtime.db.call(
+        lambda db: db.execute(
+            "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms) VALUES(?,'alice',?,?,'Original goal',?,1,1)",
+            (sid, name, leader["id"], json.dumps({"kind": "project", "projectId": project})),
+        ),
+        write=True,
+    )
+    return {"id": sid}
 
 
 async def test_goal_discussion_binds_registered_project_independently_and_idempotently(
@@ -155,16 +168,7 @@ async def test_project_coordinator_cannot_save_another_teams_binding(
     runtime, calls, _ = project_runtime
     cid = (await create_goal(runtime)).json()["data"]["id"]
     other = await runtime.conversations.create("alice", "Other leader")
-    team = await runtime.swarms.create(
-        "alice",
-        {
-            "name": "Other team",
-            "goal": "A separate goal",
-            "commandKey": "separate-team",
-            "mainConversationId": other["id"],
-            "target": {"kind": "project", "projectId": "other" if other_project else "registered"},
-        },
-    )
+    team = await legacy_team(runtime, other, "other" if other_project else "registered")
     before = len(calls)
     with pytest.raises(DomainError, match="PROJECT_OKR_TEAM_CONFLICT"):
         await runtime.tools.registry["project_okr_update"].handler(
@@ -180,20 +184,15 @@ async def test_existing_dedicated_swarm_main_is_adopted_without_recreating_team(
     runtime, _, state = project_runtime
     await runtime.conversations.main("alice")
     leader = await runtime.conversations.create("alice", "Existing project leader")
-    swarm = await runtime.swarms.create(
-        "alice",
-        {
-            "name": "Existing team",
-            "goal": "User goal",
-            "commandKey": "existing",
-            "mainConversationId": leader["id"],
-            "target": {"kind": "project", "projectId": "registered"},
-        },
-    )
+    swarm = await legacy_team(runtime, leader, "registered")
     state["workspace"] = {"swarm": swarm["id"]}
     before = await runtime.swarms.snapshot("alice", swarm["id"], include_memory=False)
     assert (await create_goal(runtime)).json()["data"]["id"] == leader["id"]
-    assert await runtime.swarms.snapshot("alice", swarm["id"], include_memory=False) == before
+    after = await runtime.swarms.snapshot("alice", swarm["id"], include_memory=False)
+    assert before.pop("scope") == {"kind": "unbound"}
+    assert after.pop("scope") == {"kind": "project", "projectId": "registered"}
+    assert after.pop("sequence") > before.pop("sequence")
+    assert after == before
     assert (
         await store.call(lambda db: db.execute("SELECT count(*) FROM swarm_groups").fetchone()[0])
         == 1
@@ -207,30 +206,11 @@ async def test_project_main_rejects_unsafe_existing_team_bindings(project_runtim
     leader = (
         home if invalid == "home" else await runtime.conversations.create("alice", "Project leader")
     )
-    swarm = await runtime.swarms.create(
-        "alice",
-        {
-            "name": "Existing",
-            "goal": "User goal",
-            "commandKey": "existing",
-            "mainConversationId": leader["id"],
-            "target": {
-                "kind": "project",
-                "projectId": "other" if invalid == "other-project" else "registered",
-            },
-        },
+    swarm = await legacy_team(
+        runtime, leader, "other" if invalid == "other-project" else "registered"
     )
     if invalid == "shared":
-        await runtime.swarms.create(
-            "alice",
-            {
-                "name": "Another team",
-                "goal": "Other goal",
-                "commandKey": "other-team",
-                "mainConversationId": leader["id"],
-                "target": {"kind": "project", "projectId": "other"},
-            },
-        )
+        await legacy_team(runtime, leader, "other", name="Another team")
     state["workspace"] = {"swarm": swarm["id"]}
     result = await create_goal(runtime)
     assert result.status_code == 409, result.text

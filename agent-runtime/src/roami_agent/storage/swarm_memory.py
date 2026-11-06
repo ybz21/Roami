@@ -9,6 +9,7 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_repository import changed, group
+from roami_agent.storage.swarm_scopes import require_scope
 from roami_agent.tools.process import execute
 
 
@@ -29,6 +30,7 @@ async def project_context(swarms, owner, sid, *, memory=None, operation=None, pa
         or "\0" in project_id
     ):
         raise DomainError("INVALID_SWARM_PROJECT_ID")
+    require_scope(value)
     if (
         not swarms.settings
         or not target.get("projectId")
