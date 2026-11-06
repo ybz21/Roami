@@ -88,12 +88,24 @@ class PostSwarm(Payload):
     text: str = Field(min_length=1, max_length=8000)
     workId: str | None = None
     taskRevision: int | None = Field(default=None, ge=1)
+    kind: Literal["progress", "question", "blocker", "handoff", "reply"] | None = None
+    messageKey: str | None = Field(default=None, min_length=1, max_length=200)
+    replyTo: int | None = Field(default=None, ge=1)
+    recipientMemberId: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class MemberPost(PostSwarm):
     taskId: str = Field(min_length=1, max_length=200)
     runId: str = Field(min_length=1, max_length=200)
     taskRevision: int = Field(ge=1)
+
+
+class MemberInbox(Payload):
+    taskId: str = Field(min_length=1, max_length=200)
+    runId: str = Field(min_length=1, max_length=200)
+    taskRevision: int = Field(ge=1)
+    before: int | None = Field(default=None, ge=1)
+    limit: int = Field(default=20, ge=1, le=100)
 
 
 def mount_swarm_routes(app, runtime):
@@ -113,6 +125,20 @@ def mount_swarm_routes(app, runtime):
     async def members(sid: str, owner: Owner):
         value = await runtime.swarms.snapshot(owner, sid, include_memory=False)
         return {"data": value["members"]}
+
+    @app.get("/v1/swarms/{sid}/inbox")
+    async def swarm_inbox(
+        sid: str,
+        owner: Owner,
+        memberId: str | None = None,
+        before: int | None = Query(None, ge=1),
+        limit: int = Query(20, ge=1, le=100),
+    ):
+        return {
+            "data": await runtime.swarms.inbox(
+                owner, sid, {"memberId": memberId, "before": before, "limit": limit}
+            )
+        }
 
     @app.post("/v1/swarms/{sid}/members")
     async def register_members(sid: str, body: RegisterMembers, owner: Owner):
@@ -155,13 +181,30 @@ def mount_swarm_routes(app, runtime):
         return {"data": await runtime.swarms.send(owner, sid, body.model_dump(exclude_none=True))}
 
     # Private Unix-socket CLI return channel, not mounted by the public Go proxy.
+    @app.post("/v1/swarms/{sid}/member-inbox")
+    async def member_inbox(sid: str, body: MemberInbox, owner: Owner):
+        return {
+            "data": await runtime.swarms.inbox(
+                owner,
+                sid,
+                {"before": body.before, "limit": body.limit},
+                binding={
+                    "taskId": body.taskId,
+                    "runId": body.runId,
+                    "taskRevision": body.taskRevision,
+                },
+            )
+        }
+
     @app.post("/v1/swarms/{sid}/member-posts")
     async def member_post(sid: str, body: MemberPost, owner: Owner):
         return {
             "data": await runtime.swarms.post(
                 owner,
                 sid,
-                {"commandKey": body.commandKey, "text": body.text},
+                body.model_dump(
+                    exclude={"taskId", "runId", "taskRevision", "workId"}, exclude_none=True
+                ),
                 binding={
                     "taskId": body.taskId,
                     "runId": body.runId,

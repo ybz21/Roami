@@ -31,6 +31,8 @@ func showHelp(w io.Writer, topics []string) error {
   work <群ID> <成员名或工作项ID> [--json]
   collect <群ID> [--json]
   chat <群ID> [--limit 50] [--follow] [--json]
+  inbox <群ID> [--member 成员ID] [--before N] [--limit 20] [--json]
+  inbox <群ID> --task TASK --run RUN --task-revision N [--json]
   say <群ID> "消息" --key KEY [--to 成员 --task-revision N] [--json]
   member add <群ID> <成员名> --executor codex|claude|roami|opencode|pi
     --goal TEXT --acceptance TEXT --key KEY --revision N
@@ -45,6 +47,8 @@ func showHelp(w io.Writer, topics []string) error {
   pause|resume|stop|archive <群ID> --key KEY --revision N [--json]
   plan|dependencies|control|say|post <群ID> --file request.json [--json]
   post <群ID> "讨论" --key KEY --task TASK --run RUN --task-revision N
+    [--kind progress|question|blocker|handoff|reply] [--message-key KEY]
+    [--reply-to 消息ID] [--recipient-member 成员ID]
   verify --input JSON（仅绑定本群 Main 的 Agent 工具上下文）
     必填 swarmId/taskId/revision/runId/accepted/checks/artifactIds
     先完整读取本轮文本产物；外部动作由用户界面/宿主核验，不能代填回执。
@@ -58,6 +62,8 @@ member inspect 按成员ID查看轮次；登记不会创建运行中的实例。
 暂停只停新派发，停止调用任务取消，归档不关闭会话。修复依赖前先确认停止。
 --json 为结构化输出；--follow 持续读取 SSE，断线退避重连，Ctrl-C 退出。
 chat 是最近讨论与结果的快照；--follow 不保证补齐超出服务快照窗口的历史。
+inbox 的普通查看不冒充Main已读；绑定成员读取仅记录获取，不表示已解决或任务完成。
+question/blocker/handoff持久等待原Main处理；不会自动唤醒模型或注入终端。
 --file 包含完整请求；--file - 从 stdin 读 JSON。不与业务选项混用。
 roami session swarm 访问同一实现。三维动画在 Web 的「协作」Tab 查看。
 `

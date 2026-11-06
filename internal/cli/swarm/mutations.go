@@ -222,6 +222,18 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 					return err
 				}
 				body["taskRevision"] = revision
+				for _, field := range []struct{ flag, key string }{{"kind", "kind"}, {"message-key", "messageKey"}, {"recipient-member", "recipientMemberId"}} {
+					if value := o.value(field.flag); value != "" {
+						body[field.key] = value
+					}
+				}
+				if o.value("reply-to") != "" {
+					value, err := o.positive("reply-to")
+					if err != nil {
+						return err
+					}
+					body["replyTo"] = value
+				}
 			} else if target := o.value("to"); target != "" && target != "main" {
 				revision, err := o.positive("task-revision")
 				if err != nil {

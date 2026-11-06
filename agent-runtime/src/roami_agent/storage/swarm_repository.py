@@ -276,16 +276,29 @@ def snapshot(db, owner, swarm_id):
     posts = rows(
         db,
         "SELECT p.id,p.author,p.text,p.task_id AS taskId,p.created_ms AS createdMs,"
-        "CASE WHEN p.author!='human' OR p.turn_id IS NOT NULL OR p.delivery_json IS NOT NULL "
+        "CASE WHEN r.author_kind IN ('member','main') OR p.author!='human' OR p.turn_id IS NOT NULL OR p.delivery_json IS NOT NULL "
         "THEN 'accepted' ELSE 'pending' END AS deliveryState,"
-        "t.id AS mainTurnId,t.state AS mainTurnState "
-        "FROM swarm_posts p LEFT JOIN turns t ON t.id=p.turn_id AND t.conversation_id=? "
+        "t.id AS mainTurnId,t.state AS mainTurnState,r.kind,r.author_kind AS authorKind,r.reply_to_post_id AS replyTo,"
+        "r.recipient_member_id AS recipientMemberId,r.source_task_revision AS sourceRevision,r.source_run_id AS sourceRunId "
+        "FROM swarm_posts p LEFT JOIN swarm_post_routes r ON r.post_id=p.id "
+        "LEFT JOIN turns t ON t.id=p.turn_id AND t.conversation_id=? "
         "AND p.author='human' AND p.task_id IS NULL "
         "AND json_extract(CASE WHEN json_valid(p.delivery_json) THEN p.delivery_json ELSE '{}' END,'$.kind')='message' "
         "WHERE p.swarm_id=? ORDER BY p.id DESC LIMIT 100",
         (value["conversation_id"], swarm_id),
     )[::-1]
+    deliveries = {}
+    for item in rows(
+        db,
+        "SELECT i.post_id AS postId,i.main_conversation_id AS mainConversationId,i.member_id AS memberId,"
+        "i.read_ms AS readMs,i.handled_post_id AS replyPostId FROM swarm_inbox i "
+        "WHERE i.post_id IN (SELECT id FROM swarm_posts WHERE swarm_id=? ORDER BY id DESC LIMIT 100)",
+        (swarm_id,),
+    ):
+        deliveries.setdefault(item.pop("postId"), []).append(item)
     for post in posts:
+        post["kind"] = post["kind"] or "progress"
+        post["inbox"] = deliveries.get(post["id"], [])
         turn_id = post.pop("mainTurnId")
         turn_state = post.pop("mainTurnState")
         if turn_id:

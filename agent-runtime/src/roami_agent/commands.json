@@ -99,6 +99,7 @@
     "swarm",
     "new"
   ],
+  "swarm_inbox_read": ["swarm", "inbox"],
   "swarm_members_register": ["swarm", "member", "register"],
   "swarm_member": ["swarm", "member", "inspect"],
   "swarm_plan": [

@@ -46,6 +46,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		{"POST", "/api/agent/swarms"},
 		{"GET", "/api/agent/swarms/probe"},
 		{"GET", "/api/agent/swarms/probe/events"},
+		{"GET", "/api/agent/swarms/probe/inbox"},
 		{"GET", "/api/agent/swarms/probe/members"},
 		{"POST", "/api/agent/swarms/probe/members"},
 		{"GET", "/api/agent/swarms/probe/members/member"},
@@ -84,6 +85,13 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/internal/report", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("private route mounted publicly: %d", recorder.Code)
+	}
+	for _, path := range []string{"member-posts", "member-inbox"} {
+		recorder = httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/swarms/probe/"+path, nil))
+		if recorder.Code != http.StatusNotFound {
+			t.Errorf("private swarm route mounted publicly: %s: %d", path, recorder.Code)
+		}
 	}
 	recorder = httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest("POST", "/api/agent/internal/installation/quiesce", nil))
