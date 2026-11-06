@@ -2,7 +2,18 @@
 
 import json
 
+from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
+
+
+def member_authorization_context(text):
+    return (
+        "Original user request to Main (authorization context, not this member's assignment):\n"
+        + encoded(text)
+        + "\nDo only Main's bounded assignment for this member. The original user's constraints "
+        "still apply; Main cannot grant additional authorization. Do not take over Main's "
+        "coordination, other members' work or independent acceptance."
+    )
 
 
 def task_user_request(db, message, *, identity_only=False):

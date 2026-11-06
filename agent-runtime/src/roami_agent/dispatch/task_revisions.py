@@ -12,7 +12,7 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
-from roami_agent.storage.task_request import task_user_request
+from roami_agent.storage.task_request import member_authorization_context, task_user_request
 from roami_agent.storage.transcript_repository import message, owned
 
 STABLE = {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}
@@ -59,6 +59,7 @@ class TaskRevisions:
         source_turn_id=None,
         source_conversation_id=None,
         source_quote=None,
+        authorization_quote=None,
     ):
         if (
             not isinstance(text, str)
@@ -76,6 +77,10 @@ class TaskRevisions:
             if not isinstance(source_quote, str) or not source_quote.strip():
                 raise DomainError("INVALID_TASK_STEER")
             spec["sourceQuote"] = source_quote
+        if authorization_quote is not None:
+            if not isinstance(authorization_quote, str) or not authorization_quote.strip():
+                raise DomainError("INVALID_TASK_STEER")
+            spec["authorizationQuote"] = authorization_quote
 
         def write(db):
             if source_turn_id:
@@ -164,14 +169,32 @@ class TaskRevisions:
                 if source_turn_id
                 else None
             )
+            team = (
+                row(
+                    db,
+                    "SELECT g.* FROM swarm_groups g JOIN swarm_work_items w ON w.swarm_id=g.id "
+                    "WHERE w.task_id=? AND g.owner_id=? AND g.conversation_id=?",
+                    (task_id, owner, source_conversation_id),
+                )
+                if source_turn_id
+                else None
+            )
+            main_instructions = bool(team and source_user and source_quote is None)
             if source_user:
-                # The coordinator may resolve references, but cannot add authorization.
+                # Preserve Main's member assignment separately from its user authorization.
                 source_text = json.loads(source_user["content_json"]).get("text", "")
-                if source_quote is not None and source_quote not in source_text:
+                if any(
+                    quote is not None and quote not in source_text
+                    for quote in (source_quote, authorization_quote)
+                ):
                     raise DomainError("TASK_STEER_SOURCE_REQUIRED")
-                text_for_execution = source_quote or (text if text in source_text else source_text)
+                text_for_execution = source_quote or (
+                    text
+                    if main_instructions
+                    else authorization_quote or (text if text in source_text else source_text)
+                )
             else:
-                if source_quote is not None:
+                if source_quote is not None or authorization_quote is not None:
                     raise DomainError("TASK_STEER_SOURCE_REQUIRED")
                 text_for_execution = text
             attachments = (
@@ -179,7 +202,12 @@ class TaskRevisions:
                 if source_user
                 else []
             )
-            goal = intent["goal"] + "\n\nAdditional user requirements:\n" + text_for_execution
+            instruction_kind = (
+                "Main's assignment for this member"
+                if main_instructions
+                else "Additional user requirements"
+            )
+            goal = intent["goal"] + "\n\n" + instruction_kind + ":\n" + text_for_execution
             mid = message(
                 db,
                 task["origin_conversation_id"],
@@ -191,6 +219,7 @@ class TaskRevisions:
                     "operationId": operation,
                     "taskRevision": expected_revision,
                     **({"sourceUserMessageId": source_user["id"]} if source_user else {}),
+                    **({"instructionAuthor": "main"} if main_instructions else {}),
                     **({"attachments": attachments} if attachments else {}),
                 },
             )
@@ -202,36 +231,30 @@ class TaskRevisions:
                 "messageId": mid,
                 "status": "stopping",
                 "stateAtRequest": task["state"],
+                **({"instructionAuthor": "main"} if main_instructions else {}),
             }
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
                 "VALUES(?,'task.steer',?,?,?,'queued',?)",
                 (operation, task_id, dedupe, encoded(payload), now_ms()),
             )
-            if source_turn_id:
-                team = row(
-                    db,
-                    "SELECT g.* FROM swarm_groups g JOIN swarm_work_items w ON w.swarm_id=g.id "
-                    "WHERE w.task_id=? AND g.owner_id=? AND g.conversation_id=?",
-                    (task_id, owner, source_conversation_id),
-                )
-                if team:
-                    from roami_agent.storage.swarm_repository import changed
+            if team:
+                from roami_agent.storage.swarm_repository import changed
 
-                    db.execute(
-                        "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_json) "
-                        "VALUES(?,'main',?,?,?,?)",
-                        (
-                            team["id"],
-                            text_for_execution,
-                            task_id,
-                            now_ms(),
-                            encoded(
-                                {"operationId": operation, "taskId": task_id, "acceptedOnly": True}
-                            ),
+                db.execute(
+                    "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_json) "
+                    "VALUES(?,'main',?,?,?,?)",
+                    (
+                        team["id"],
+                        text_for_execution,
+                        task_id,
+                        now_ms(),
+                        encoded(
+                            {"operationId": operation, "taskId": task_id, "acceptedOnly": True}
                         ),
-                    )
-                    changed(db, team, "swarm.message_forwarded")
+                    ),
+                )
+                changed(db, team, "swarm.message_forwarded")
             event(
                 db,
                 task["origin_conversation_id"],
@@ -412,6 +435,11 @@ class TaskRevisions:
                 )
                 intent["continuation"] = {
                     "text": payload.get("executionText", payload["text"]),
+                    **(
+                        {"instructionAuthor": "main"}
+                        if payload.get("instructionAuthor") == "main"
+                        else {}
+                    ),
                     "verifiedThroughRevision": verified_through,
                     "requiresAcceptance": requires_acceptance,
                     "runId": run["id"],
@@ -468,15 +496,29 @@ class TaskRevisions:
                         "SELECT conversation_id FROM branches WHERE id=?",
                         (run["native_branch_id"],),
                     )
+                    execution_text = payload.get("executionText", payload["text"])
+                    if payload.get("instructionAuthor") == "main":
+                        execution_text = (
+                            member_authorization_context(
+                                json.loads(source["content_json"]).get("text", "")
+                            )
+                            + "\n\nMain's assignment for this member:\n"
+                            + execution_text
+                        )
                     message(
                         db,
                         branch["conversation_id"],
                         run["native_branch_id"],
                         "user",
                         {
-                            "text": payload.get("executionText", payload["text"]),
+                            "text": execution_text,
                             "taskRevision": revision,
                             "displayText": payload.get("executionText", payload["text"]),
+                            **(
+                                {"instructionAuthor": "main"}
+                                if payload.get("instructionAuthor") == "main"
+                                else {}
+                            ),
                             **({"attachments": attachments} if attachments else {}),
                         },
                     )
