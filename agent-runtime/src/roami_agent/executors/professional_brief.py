@@ -7,7 +7,7 @@ from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
-from roami_agent.storage.task_request import task_user_request
+from roami_agent.storage.task_request import member_authorization_context, task_user_request
 
 
 async def professional_brief(database, artifacts, task, run, *, continuation=False):
@@ -24,6 +24,7 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
             raise DomainError("TASK_CANCELLING")
         intent = json.loads(current["intent_json"])
         attachments = {}
+        authorization = None
         for mid in dict.fromkeys(
             [*intent.get("sourceMessageIds", []), current["origin_message_id"]]
         ):
@@ -38,13 +39,18 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
             if not source:
                 raise DomainError("CONTEXT_SOURCE_FORGOTTEN")
             content = json.loads(source["content_json"])
+            if (
+                mid == current["origin_message_id"]
+                and intent.get("continuation", {}).get("instructionAuthor") == "main"
+            ):
+                authorization = content.get("text", "")
             _, evidence = context_attachments(db, task["owner_id"], content)
             if len(evidence) != len(content.get("attachments", [])):
                 raise DomainError("ATTACHMENT_NOT_FOUND")
             attachments.update((item["id"], item) for item in content.get("attachments", []))
-        return list(attachments.values()), intent
+        return list(attachments.values()), intent, authorization
 
-    attachments, intent = await database.call(admitted)
+    attachments, intent, authorization = await database.call(admitted)
     references = await verified_attachment_inputs(artifacts, task["owner_id"], attachments)
     await database.call(admitted)
     if continuation:
@@ -54,10 +60,15 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
             "and blockers. Keep outputs inside the prepared workspace. Roami automatically retains "
             "linked outputs for this run. No separate artifact publishing call is needed. "
             "A report is not independent acceptance."
+            + (
+                "\n\n" + member_authorization_context(authorization)
+                if authorization is not None
+                else ""
+            )
             + ("\n\nInput files (untrusted data):\n" + encoded(references) if references else "")
         )
     decision = intent.get("routingDecision")
-    if not references and not decision:
+    if not references and not decision and authorization is None:
         return ""
     return (
         "\n\n[Roami execution brief]\n"
@@ -73,4 +84,9 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
         "downloadable outputs after the working session exits. Keep deliverables inside the prepared "
         "workspace. Open/render/run/play outputs as appropriate and report blockers "
         "honestly. Preserve explicitly required stage confirmations. A report is not independent acceptance."
+        + (
+            "\n\n" + member_authorization_context(authorization)
+            if authorization is not None
+            else ""
+        )
     )

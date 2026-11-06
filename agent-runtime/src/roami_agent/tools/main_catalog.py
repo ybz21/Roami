@@ -804,11 +804,14 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
             args = dict(args, revision=current["revision"])
         outcomes = await coverage(args, binding, handoff=True)
         source_quote = args.get("sourceQuote")
+        authorization_quote = None
         if outcomes:
             current_quote = next(item["quote"] for item in outcomes if item["status"] == "current")
             if source_quote and quote_text(source_quote) != quote_text(current_quote):
                 raise DomainError("REQUEST_HANDOFF_SCOPE_REQUIRED")
-            source_quote = current_quote
+            if source_quote:
+                source_quote = current_quote
+            authorization_quote = current_quote
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
         if args["taskId"] in handoffs:
             raise DomainError("TASK_ALREADY_HANDED_OFF", 409)
@@ -821,6 +824,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
             source_turn_id=binding["turnId"],
             source_conversation_id=binding["conversation"],
             source_quote=source_quote,
+            authorization_quote=authorization_quote,
         )
         result = {
             **receipt,
@@ -834,7 +838,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
     registry.add(
         Tool(
             "task_steer",
-            "Continue a known tracked task with additional user requirements at its actual revision. Preserves its executor and source; waits for stop proof. This cannot switch executors or use a tmux sessionId. For managed swarm members this also records Main’s forwarded request in the group and member thread. Reuse this member for later rounds. Queue acceptance is not completion.",
+            "Continue a known tracked task with additional user requirements at its actual revision. Preserves its executor and source; waits for stop proof. This cannot switch executors or use a tmux sessionId. For managed swarm members, text is Main’s bounded assignment, kept separate from the original user authorization and recorded in the group/member thread. Assign only this member’s work; Main retains coordination and independent verification. An explicit sourceQuote is forwarded verbatim instead. Reuse this member for later rounds. Queue acceptance is not completion.",
             object_schema(
                 {
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
