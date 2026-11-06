@@ -49,3 +49,5 @@
 本轮为设计提案。未评审的 SQLite 实现草稿已移出工作区；真实项目没有建立本提案的数据库、改变存储权威或启用新增通信协议。
 
 [数据与团队设计稿检查](data-team-design-acceptance.md)：仅文档与模拟交互，非新增底层机制验收。
+
+通信重点：[逐跳与多个 OKR 演示](../20261104-okr-main-workspace/communication-engine.html)。实现前补充 [SQLite v1 契约](sqlite-v1-contract.md) 与 [协调回合契约](../20261104-okr-main-workspace/swarm-delivery-contract.md)。

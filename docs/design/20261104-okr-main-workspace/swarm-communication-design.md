@@ -2,6 +2,8 @@
 
 状态：设计提案，尚未实现新增通信协议。2026-11-06。关联 #744；与 [SQLite 和读取层设计](../20261104-okr-studio-project-ownership/sqlite-data-design.md) 一起评审。
 
+先看 [通信逐跳与多 OKR 演示](communication-engine.html)，再看 [统一引擎方案](communication-engine-design.md)。CLI/工具是入口，后端维护同一份事实与目标收件箱；每 OKR 保留独立 Main、团队和范围。
+
 ## 用户看到的协作方式
 
 用户优先与本 OKR 的 Main 聊。群聊汇总所有成员的进展、问题和交接；点击成员可以进入其原有渲染对话或原生 Codex/Claude/OpenCode/Pi 会话。任务放右侧列表，聊天输入复用全局组件。默认入口不展示 task/run/commandKey 等内部标识。
@@ -20,6 +22,8 @@
 依据当前 `dispatch/swarm_plans.py` 的 post/send、`storage/swarm_mentions.py` 和 `tools/swarm_catalog.py`。成员 post 校验本群、最新 task/revision/run 和允许状态，但普通 post 只落记录，缺少“成员问题到 Main 的可靠处理”闭环。仅在正文写 `@Main` 无法补齐该闭环。
 
 本机 session skill 的旧 add/done/--as 示例已过时；执行以当前 `roami swarm help` 与受管接口为准，不把旧命令复制进项目新手册。
+
+实现前的 [投递与协调回合契约](swarm-delivery-contract.md) 补充完成回报去重、原委托继承与故障恢复。现有任务完成已创建 Main completion turn；新收件箱复用该结果身份，不额外再通知一次。普通 completion 仍不可续派，只有通过原目标委托准入的 coordination 回合可继续受限协调。
 
 ## 消息与任务是两种对象
 
@@ -79,7 +83,7 @@ Main 发任务时使用 plan/steer，记录当前源请求和有界指令；不�
 
 1. 在落消息的同一事务建立递送记录与待处理标记，绑定 swarm/project/original Main。进程退出后记录仍在。
 2. 调度器按 Main 合并待处理消息；普通进展不唤醒，多个问题进入同一个待处理批次。不会每条消息启动一个负责人。
-3. Main 空闲时，通过项目绑定的内部 wake 能力提交一次协调轮次。忙碌时等待状态事件；等待用户回答时保留消息，不替用户答复或强行打断。
+3. Main 空闲时，通过宿主协调入口提交原项目的一次 coordination 轮次，完成回报与 handoff 共用结果去重。不能直接复用会生成 user 消息的外部日程 wake。忙碌时等待状态事件；等待用户回答时保留消息，不替用户答复或强行打断。
 4. 唤醒信封明确来源为团队事件，并给出 messageId/来源任务等结构化数据。它不是新的用户授权；可执行范围继承原有效委托，成员文本不能授予发布或跨项目权限。
 5. Main 读取收件箱和具体证据，回复、续派或记录仍待解决。仅“创建了 Main turn”不能标为已处理。
 6. Main turn 失败时保留待处理记录与错误，进入恢复流程；不无限重复相同失败唤醒。新信息或明确恢复后再对账继续。
@@ -115,7 +119,8 @@ stateDiagram-v2
 | 模块 | 责任 |
 | --- | --- |
 | `storage/swarm_repository.py` / 新 inbox 存储模块 | 消息、目标、reply 链、读游标、递送与处理回执 |
-| `dispatch/swarm_plans.py` / 新 inbox 调度模块 | 沿用 post/steer，事件驱动合并与原 Main wake |
+| `dispatch/swarm_plans.py` / 新 inbox 调度模块 | 沿用 post/steer，事件驱动合并与原 Main coordination |
+| `dispatch/runner.py`、conversation/mailbox 与协调授权模块 | 合并任务完成入口、原子领取与创建回合、继承原目标委托 |
 | `tools/swarm_catalog.py` | kind/目标、绑定身份读取与处理确认的工具协议 |
 | `server/swarm_routes.py` / Go CLI | 受管读写入口，旧 post 保持兼容；人的 say 与 Agent post 分开 |
 | 现有 OKR 群聊/成员目录 | 简短递送状态与原实例跳转，复用全局聊天框 |

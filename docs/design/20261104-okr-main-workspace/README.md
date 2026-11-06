@@ -189,3 +189,7 @@
 - [Main 正文流式通道](reply-streaming.md)：真实参数增量、核验与候选生命周期（#748，实现候选）。
 
 - [Swarm 互通与 Main 收件箱设计](swarm-communication-design.md)：先明确消息、唤醒、续派与验收，再实施可靠通信；与 [SQLite 读取层设计](../20261104-okr-studio-project-ownership/sqlite-data-design.md) 配套。
+
+- [群聊通信与多个 OKR（HTML）](communication-engine.html)：CLI/后端逐跳、落库与投影、Main 排队及错投演示；[统一引擎设计](communication-engine-design.md) 与 [投递契约](swarm-delivery-contract.md)。
+
+[通信机制设计核对](communication-design-acceptance.md)：真实代码基线、逐跳与多 OKR 本地演示、布局检查；不是生产功能验收。
