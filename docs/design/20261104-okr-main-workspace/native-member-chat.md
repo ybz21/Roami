@@ -36,3 +36,27 @@
 受管 Codex / Claude 的状态与转录接口优先采用精确 live pane 的持久 lifecycle provider 绑定，检查 server、创建代次、pane、PID/启动标记、目录/主机证明及运行状态，再按该 provider ID 唯一定位原转录。已有绑定但证明缺失、变更、文件缺失或重复时不回落同目录其他记录；传入的旧缓存 file 参数不能覆盖这条绑定。未纳入 lifecycle 的普通会话保留原解析路径。读取不创建或改写 state，不修改 Python runtime、模型路由或会话实例。
 
 主机/目录证明算法保持原字节合同，提到既有 agentlifecycle 包供写入与只读投影共用。回归使用隔离虚拟 pane 与临时文件，覆盖同目录更新更晚的另一会话、缺失/重复 provider 文件、跨主机/目录/PID/执行器及 unknown 拒绝；真实生产验证要进一步检查两条不同转录文件和实际可读消息，未完成前 #713 保持打开。
+
+
+### 合入与生产复验（2026-11-06）
+
+#714、#715、#717、#719 已合入，最终主线 b12994eb，Web/CLI 发布
+`okr-source-chat-2cde3884`（tree 2cde38847b176f3ee1f2abcbfbc0f7578afbc04f）。
+#713 已在真实成员复验通过后关闭。Go 全量及 normal full/quick 通过，最终前端
+206 文件 / 1516 项、typecheck、i18n、hover、build 通过；#719 为 Go 改动，按实际差异
+跳过 Python runtime pytest，所需 Go/Python harness 仍按常规检查运行。
+
+通过自己独立 CDP 页的 roami chrome 实际点击确认：群聊有原共享消息、Main 保留原项目
+历史；两个 Codex 成员读取各自不同的原 provider 转录，分别有真实消息与全局输入框；
+原数据成员仍复用原 Roami 实例。请求携带另一成员旧 file 缓存也不能覆盖当前绑定。
+没有新增 Main、成员、provider 或任务来通过验证。
+
+生产构建在 1280、1920、2560、3440 CSS px 检查右栏开合、可用聊天高度、输入草稿与
+页面无溢出，关闭右栏后宽度确实归还；真实任务列表四种筛选通过。390×844 粗指针模拟
+验证成员消息、输入框和可视边界；手机触控仍未执行，不能视为真机验收。
+
+真实项目信息只保存在受保护验收目录 `/tmp/okr-managed-transcript-20261106/`：
+`live-provider-transcripts.json`、`live-cached-file-override.json`、`live-*-chat.json`、
+`live-desktop-layout.json`、`live-task-filters.json`、`live-acceptance.json` 与截图。
+公开 PR 仅附隔离样例证据。原 Main、12 个成员与旧观测保持；Python runtime、模型路由、
+环境、费用及 busy 未改动。
