@@ -161,3 +161,5 @@
 - [项目 HTML 看板运行态与只读数据桥](html-dashboard-runtime.md)
 
 - [右侧任务列表与协作切换](task-workbench.md)（#711）
+
+- [成员原生对话与工作区筛选](native-member-chat.md)：群聊优先目录、原实例聊天、右侧任务过滤。

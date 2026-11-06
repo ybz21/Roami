@@ -15,6 +15,7 @@ import { LiveTail } from './LiveTail'
 import { useLayout } from '../../layout'
 import { ArrowToBottom, ArrowUp, ChevronDown, FileTextIcon, PaperclipIcon, TerminalIcon } from '../../icons'
 import { SESSION_MIME, buildIntro, canDrop, readDrag, type SessionDrag } from '../shell/session-drop'
+import { useAgentDraft } from '../agent/useAgentDraft'
 import { currentNodeId } from '../cluster/node-url'
 import { sessionDisplay } from '../sessions/session-label'
 import { ChatActionsProvider } from './actions'
@@ -28,8 +29,9 @@ import type { AgentStatus } from './status'
 // 数量很小（几条文本），且已发出的会话消息很快就会被转录对账掉，不会无限增长。
 const outboxStore = new Map<string, { id: number; text: string }[]>()
 
-export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active }: {
+export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend }: {
   /** 这条 composer 发给谁：左端那枚亮着的 agent pill（22 设计 §3.3） */
+  onSend?: (text: string) => Promise<void>
   agent?: 'claude' | 'codex' | 'opencode'
   /** 还没有对话文件（agent 刚起、一句没说）：显示这句而不是「加载中」 */
   emptyHint?: string
@@ -60,7 +62,14 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   active?: boolean
 }) {
   const live = active !== false
-  const [input, setInput] = useState('')
+  const draftKey = 'roami.session.draft:' + (currentNodeId() || '') + ':' + name
+  const [input, editInput] = useAgentDraft(draftKey)
+  const inputRef = useRef(input); inputRef.current = input
+  const setInput = (value: string | ((previous: string) => string)) => {
+    const next = typeof value === 'function' ? value(inputRef.current) : value
+    inputRef.current = next; editInput(next)
+    try { if (next) localStorage.setItem(draftKey, next); else localStorage.removeItem(draftKey) } catch { /* Keep editing without storage. */ }
+  }
   const [sending, setSending] = useState(false)
   const [sendErr, setSendErr] = useState('')
   const [showJump, setShowJump] = useState(false)
@@ -94,7 +103,9 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
       return
     }
     try {
-      await api('POST', '/tasks/_/send', { sess: name, msg: buildIntro(drag, name, t), activity: 'dialogue' })
+      const text = buildIntro(drag, name, t)
+      if (onSend) await onSend(text)
+      else await api('POST', '/tasks/_/send', { sess: name, msg: text, activity: 'dialogue' })
       message.success(t('pair.sent', { name: sessionDisplay(name), peer: drag.label || drag.id }))
     } catch (e: any) { message.error(e.message) }
   }
@@ -260,12 +271,14 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   }, [messages])
 
   const send = async () => {
-    const text = input.trim()
+    const original = input, text = original.trim()
     if (!text || sending) return
     setSending(true); setSendErr('')
     try {
-      await api('POST', '/tasks/_/send', { sess: name, msg: text, activity: 'dialogue' })
-      setInput(''); atBottom.current = true
+      if (onSend) await onSend(text)
+      else await api('POST', '/tasks/_/send', { sess: name, msg: text, activity: 'dialogue' })
+      if (inputRef.current === original) setInput('')
+      atBottom.current = true
       setOutbox((q) => [...q, { id: q.length ? q[q.length - 1].id + 1 : 1, text }])
     }
     catch (e: any) { setSendErr(e.message) }
@@ -339,7 +352,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
 
   return (
     <ChatActionsProvider value={actions}>
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-base)' }}>
+    <div className="session-chat-shell" style={{ display: 'flex', height: '100%', background: 'var(--bg-base)' }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}
         onDragEnter={(e) => { e.preventDefault() }}
         onDragOver={(e) => {

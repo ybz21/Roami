@@ -9,7 +9,7 @@ import { deriveFromMessages } from './status-derive'
 import { useSessionLabel } from '../sessions/session-label'
 import { useI18n } from '../../i18n'
 
-export default memo(function OpenCodeChat({ name, file, onOpenFile, onOpenGit, active }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean }) {
+export default memo(function OpenCodeChat({ name, file, onOpenFile, onOpenGit, active, onSend }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; onSend?: (text: string) => Promise<void> }) {
   const { t } = useI18n()
   const label = useSessionLabel(name)
   const { msgs, err, status: raw, hasEarlier, loadEarlier, resolvedFile, serverPending } = useTranscript(name, file, 'opencode-transcript', active === false ? 6000 : 1500)
@@ -26,6 +26,6 @@ export default memo(function OpenCodeChat({ name, file, onOpenFile, onOpenGit, a
     messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}
     renderMessage={(m, i) => <ChatMessage key={m.id || i} m={m} results={results} side="opencode" />}
     pending={pending ? <Typing color={CODEX_ACCENT} /> : undefined}
-    busy={pending} active={active}
+    busy={pending} active={active} onSend={onSend}
   />
 })

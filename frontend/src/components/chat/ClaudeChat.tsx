@@ -12,7 +12,7 @@ import { useSessionLabel } from '../sessions/session-label'
 import { useI18n } from '../../i18n'
 
 // memo：父层（TerminalPane）任何 setState 都会重渲，N 个常驻对话不该跟着一起重算
-export default memo(function ClaudeChat({ name, file, onOpenFile, onOpenGit, active }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean }) {
+export default memo(function ClaudeChat({ name, file, onOpenFile, onOpenGit, active, onSend }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; onSend?: (text: string) => Promise<void> }) {
   const { t } = useI18n()
   const label = useSessionLabel(name)
   const { msgs, err, status: raw, hasEarlier, loadEarlier, resolvedFile } = useTranscript(name, file, 'transcript', active === false ? 6000 : 1500)
@@ -32,7 +32,7 @@ export default memo(function ClaudeChat({ name, file, onOpenFile, onOpenGit, act
       messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}
       renderMessage={(m, i) => <ChatMessage key={m.id || i} m={m} results={results} side="claude" />}
       pending={pending ? <Typing color="var(--accent)" /> : undefined}
-      busy={pending} active={active}
+      busy={pending} active={active} onSend={onSend}
     />
   )
 })
