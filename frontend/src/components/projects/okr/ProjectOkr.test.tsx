@@ -309,3 +309,14 @@ it('restores the former dashboard choice without restoring removed review naviga
   expect(screen.getByRole('tab', { name: 'okr.tab.dashboard' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByRole('tab', { name: 'okr.tab.review' })).toBeNull()
 })
+
+
+it.each([false, true])('uses the team Main entry without a duplicate top button (phone=%s)', async phone => {
+  state.phone = phone
+  render(<ProjectOkr projectId="stable-project" />)
+  await screen.findByRole('button', { name: 'okr.edit' })
+  expect(screen.queryByRole('button', { name: 'okr.chatOpen' })).toBeNull()
+  panel('activities')
+  expect(await screen.findByTestId('activities')).toHaveProperty('textContent', initial.swarm)
+  expect(screen.queryByRole('button', { name: 'okr.chatOpen' })).toBeNull()
+})

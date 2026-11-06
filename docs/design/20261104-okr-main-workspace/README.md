@@ -165,3 +165,5 @@
 - [Connector Skill 批次确认与来源绑定](connector-skill-batches.md)（#679）
 
 - [成员原生对话与工作区筛选](native-member-chat.md)：群聊优先目录、原实例聊天、右侧任务过滤。
+
+- [右栏工具栏、拖拽与场景点击](workspace-controls.md)（#721）。

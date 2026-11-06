@@ -39,21 +39,21 @@ function chooseConversation(id: string) {
   fireEvent.click(within(screen.getByRole('navigation', { name: 'swarm.conversation.list' })).getByRole('button', { name }))
 }
 function showScene() {
-  const toggle = screen.getByRole('button', { name: 'swarm.workspace.open' })
-  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle)
+  const toggle = screen.queryByRole('button', { name: 'swarm.workspace.open' })
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle)
   const tab = screen.getByRole('button', { name: 'swarm.managed.tab.studio' })
   if (tab.getAttribute('aria-pressed') !== 'true') fireEvent.click(tab)
 }
 function showTasks() {
-  const toggle = screen.getByRole('button', { name: 'swarm.workspace.open' })
-  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle)
+  const toggle = screen.queryByRole('button', { name: 'swarm.workspace.open' })
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle)
   fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.board' }))
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.all' }))
 }
 function snapshot(): SwarmSnapshot {
   return { id: 'sw-one', name: 'Team', goal: 'Goal', mainConversationId: 'main', revision: 2, sequence: 10, paused: false, archived: false, state: 'review', target: {}, posts: [{ id: 1, author: 'frontend', text: 'Task update', taskId: 'task', createdMs: 1 }], mainMessages: [{ id: 'reply', role: 'assistant', text: 'Main response', createdMs: 10 }], work: [{ id: 'work', member_name: 'frontend', executor: 'codex', title: 'Build page', goal: 'Full instructions', acceptance: 'Verify results', integration: 0, task_id: 'task', revision: 1, state: 'waiting_user', dispatch_error: null, dependencies: [], attempt: { runId: 'run', state: 'verifying', summary: 'Reported outcome' } }] }
 }
-beforeEach(() => { test.sessions = [{ name: "real-session", agent: "codex", dormant: false }]; test.mainTurns = null; test.nativeSessions = []; localStorage.clear(); test.phone = false; test.data = snapshot(); test.api.mockReset().mockResolvedValue({ data: {} }); test.refresh.mockReset().mockResolvedValue(undefined); test.error.mockReset(); test.openTask.mockReset() })
+beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }); test.sessions = [{ name: "real-session", agent: "codex", dormant: false }]; test.mainTurns = null; test.nativeSessions = []; localStorage.clear(); test.phone = false; test.data = snapshot(); test.api.mockReset().mockResolvedValue({ data: {} }); test.refresh.mockReset().mockResolvedValue(undefined); test.error.mockReset(); test.openTask.mockReset() })
 afterEach(cleanup)
 it('embeds the same managed workspace without an extra page return action', () => {
   render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
@@ -229,7 +229,7 @@ it('collapses collaboration without unmounting chat or focusing its input', () =
   render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
   const input = screen.getByRole('textbox')
   fireEvent.change(input, { target: { value: 'Keep this Main draft' } })
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.workspace.open' }))
+  fireEvent.click(screen.getByRole('button', { name: test.phone ? 'swarm.workspace.open' : 'workspace.collapsePanel' }))
   expect(screen.queryByTestId('studio-selection')).toBeNull()
   expect(screen.getByRole('textbox')).toBe(input)
   expect((input as HTMLTextAreaElement).value).toBe('Keep this Main draft')
@@ -359,7 +359,7 @@ it('opens phone collaboration as a secondary page and preserves the mounted conv
   expect(screen.getByTestId('studio-selection').getAttribute('data-active')).toBe('true')
   expect(screen.queryByRole('dialog')).toBeTruthy()
   expect(screen.getByRole('textbox')).toBe(input)
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.workspace.open' }))
+  fireEvent.click(screen.getByRole('button', { name: test.phone ? 'swarm.workspace.open' : 'workspace.collapsePanel' }))
   expect(screen.queryByTestId('studio-selection')).toBeNull()
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Main phone draft')
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
@@ -577,7 +577,7 @@ it('uses the actual private Main turn for the scene and releases it outside the 
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   showScene()
   expect(screen.getByTestId('studio-selection').getAttribute('data-main-state')).toBe('running')
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.workspace.open' }))
+  fireEvent.click(screen.getByRole('button', { name: test.phone ? 'swarm.workspace.open' : 'workspace.collapsePanel' }))
   expect(screen.queryByTestId('studio-selection')).toBeNull()
 })
 
@@ -705,4 +705,18 @@ it('defaults to active work, filters by real state, and remembers the selection'
   render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
   expect(screen.getByRole('button', { name: 'agent.task.filter.all' }).getAttribute('aria-pressed')).toBe('true')
   expect(document.querySelectorAll('.swarm-task-row')).toHaveLength(3)
+})
+
+
+it('keeps workspace controls in its header and restores the opening action after collapse', () => {
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  const header = document.querySelector('.swarm-workbench-head') as HTMLElement
+  expect(within(header).getByRole('button', { name: 'swarm.managed.tab.board' })).toBeTruthy()
+  expect(within(header).getByLabelText('common.more')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'swarm.workspace.open' })).toBeNull()
+  fireEvent.click(within(header).getByRole('button', { name: 'workspace.collapsePanel' }))
+  expect(screen.queryByRole('separator')).toBeNull()
+  expect(screen.getByRole('button', { name: 'swarm.workspace.open' })).toBeTruthy()
+  showScene()
+  expect(screen.getByRole('separator', { name: 'workspace.resizeInspector' })).toBeTruthy()
 })

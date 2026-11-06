@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { nodeApi, useCurrentNodeId } from '../cluster/node-url'
 import { App, Button, Spin } from 'antd'
 import { api } from '../../api'
@@ -7,13 +7,14 @@ import { useAgentData } from '../agent/useAgentData'
 import { useAgentThread } from '../agent/useAgentThread'
 import { useLayout } from '../../layout'
 import { useI18n } from '../../i18n'
-import { ChevronLeft, CloseIcon, UserIcon } from '../../icons'
+import { ChevronLeft, CloseIcon, MoreIcon, PanelRightIcon, UserIcon } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
 import Markdown from '../markdown/Markdown'
 import { taskExecutor, type TaskDetail } from '../agent/agent-task-protocol'
 import { openAgentPage } from '../agent/agent-page-route'
 import { useSwarmSnapshot } from './useSwarmSnapshot'
 import SwarmStudio from './SwarmStudio'
+import SwarmWorkspaceDivider, { useSwarmWorkspaceWidth } from './SwarmWorkspaceDivider'
 import SwarmConversations from './SwarmConversations'
 import SwarmMainChat from './SwarmMainChat'
 import SwarmMemberChat from './SwarmMemberChat'
@@ -61,6 +62,8 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   }
   useLayoutEffect(() => { if (taskList.current) taskList.current.scrollTop = taskScroll.current }, [tab, detail, studioOpen])
   const workspaceVisible = studioOpen && !teamOpen && !(phone && detail)
+  const workspaceHost = useRef<HTMLDivElement>(null)
+  const workspaceSize = useSwarmWorkspaceWidth(workspaceHost, panelKey, Boolean(data) && !phone && workspaceVisible)
   const sceneVisible = tab === 'chat' && workspaceVisible
   const sceneActive = !data?.archived && sceneVisible && !memoryOpen
   const sceneSessions = useSessionOverview(sceneActive)
@@ -104,11 +107,14 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const memberView = inspectedMember && <SwarmMemberDetails key={nodeApi('/agent/swarms/' + id) + ':' + inspectedMember.id} swarmId={id} member={inspectedMember} compact={phone} onClose={() => setMemberDetail(null)} />
   const currentMember = swarmMember(members, recipient)
   const directory = <SwarmConversations members={currentMembers} historical={roster?.historical} unbound={roster?.unbound} selected={recipient} onSelect={openChat} />
-  const controls = <details className="swarm-controls"><summary>{t('common.more')}</summary><div className="swarm-control-menu">{phone && currentMember?.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}{tab === 'board' && Boolean(roster?.historical.length) && <button type="button" className="tt-act" aria-pressed={includeHistory} onClick={() => setIncludeHistory(value => !value)}>{t('swarm.member.includeHistory')}</button>}<button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</button><button type="button" className="tt-act" onClick={() => { void refresh().then(() => { setDetail(null); setMemberDetail(null); setTeamOpen(false); setMemoryOpen(true) }) }}>{t('swarm.managed.memory')}</button><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></div></details>
+  const controls = <details className="swarm-controls"><summary aria-label={t('common.more')}><MoreIcon /></summary><div className="swarm-control-menu">{phone && currentMember?.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}{tab === 'board' && Boolean(roster?.historical.length) && <button type="button" className="tt-act" aria-pressed={includeHistory} onClick={() => setIncludeHistory(value => !value)}>{t('swarm.member.includeHistory')}</button>}<button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</button><button type="button" className="tt-act" onClick={() => { void refresh().then(() => { setDetail(null); setMemberDetail(null); setTeamOpen(false); setMemoryOpen(true) }) }}>{t('swarm.managed.memory')}</button><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></div></details>
   const workspace = <div className="swarm-workbench">
-    <nav className="swarm-tabs" aria-label={t('swarm.managed.workspace')}>
-      {['chat', 'board'].map(key => <button type="button" key={key} aria-pressed={tab === key} onClick={() => switchTab(key)}>{t(key === 'chat' ? 'swarm.managed.tab.studio' : 'swarm.managed.tab.board')}</button>)}
-    </nav>
+    <header className="swarm-workbench-head">
+      <nav className="swarm-tabs" aria-label={t('swarm.managed.workspace')}>
+        {['chat', 'board'].map(key => <button type="button" key={key} aria-pressed={tab === key} onClick={() => switchTab(key)}>{t(key === 'chat' ? 'swarm.managed.tab.studio' : 'swarm.managed.tab.board')}</button>)}
+      </nav>
+      <div className="swarm-workbench-actions">{embedded && controls}{!phone && <button type="button" className="tt-act" aria-label={t('workspace.collapsePanel')} onClick={() => showWorkspace(false)}><CloseIcon /></button>}</div>
+    </header>
     {tab === 'board' && !work && <div className="swarm-task-filters" role="group" aria-label={t('agent.task.filter.label')}>{swarmTaskFilters.map(value => <button type="button" key={value} aria-pressed={taskFilter === value} onClick={() => filterTasks(value)}>{t('agent.task.filter.' + value)}</button>)}</div>}
     {tab === 'chat' ? studio : !phone && work ? view : !filteredWork.length ? <p className="swarm-note" role="status">{t(taskFilter === 'all' && !boardWork.length ? 'swarm.managed.planning' : 'agent.task.filter.empty')}</p> : <ul ref={taskList} className="swarm-task-list" aria-label={t('swarm.managed.tab.board')}>
       {filteredWork.map(item => <li key={item.id}><button type="button" className="swarm-task-row" aria-pressed={detail === item.id} onClick={() => openWork(item)}><strong>{item.title}</strong><small>{swarmMember(members, item.id)?.name || item.member_name}</small><State state={item.state} /></button></li>)}
@@ -120,17 +126,18 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
     {data.archived && <p className="swarm-note">{t('swarm.managed.archived')}</p>}
 
     {(!memoryOpen || phone) && <>
-      <div className="swarm-conversation-workspace" data-scene={!phone && workspaceVisible}>
+      <div ref={workspaceHost} className="swarm-conversation-workspace" data-scene={!phone && workspaceVisible} style={workspaceSize.width ? { '--swarm-workspace-width': `${workspaceSize.width}px` } as CSSProperties : undefined}>
         {!phone && directory}
         <section className="swarm-conversation-pane" data-recipient={recipient} aria-label={t('swarm.conversation.chat')}>
           <header className="swarm-conversation-head">
             {phone && <button type="button" className="tt-act" aria-label={t('swarm.conversation.list')} onClick={() => setTeamOpen(true)}><UserIcon />{t('swarm.conversation.chat')}</button>}
             <div><strong>{recipient === 'main' ? t('swarm.conversation.main') : recipient === 'group' ? t('swarm.managed.tab.chat') : currentMember?.name || t('swarm.member.recipientUnavailable')}</strong>{phone && <small>{recipient === 'main' ? t('swarm.conversation.mainRole') : currentMember ? <State state={currentMember.state} /> : null}</small>}</div>
-            <button type="button" className="tt-act" aria-expanded={studioOpen} onClick={() => showWorkspace(!studioOpen)}>{t('swarm.workspace.open')}</button>{embedded && controls}
+            {(phone || !workspaceVisible) && <button type="button" className="tt-act" aria-label={t('swarm.workspace.open')} aria-expanded={studioOpen} onClick={() => showWorkspace(!studioOpen)}><PanelRightIcon />{t('swarm.workspace.open')}</button>}{embedded && !workspaceVisible && controls}
             {currentMember && !phone && <div className="swarm-detail-actions"><State state={currentMember.state} />{currentMember.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}</div>}
           </header>
           {memberView && !phone ? memberView : recipient === 'main' ? data.mainConversationId ? renderMain ? renderMain(data.mainConversationId) : <SwarmMainChat key={nodeApi('/agent/conversations/' + data.mainConversationId)} conversationId={data.mainConversationId} projectId={data.target?.projectId} onSent={refresh} /> : <p role="alert" className="swarm-note">{t('swarm.relations.mainUnavailable')}</p> : currentMember?.registered && (currentMember.registered.instance || currentMember.executor !== 'native') ? <SwarmMemberChat key={nodeApi('/agent/swarms/' + data.id) + ':' + currentMember.id} data={data} member={currentMember} onMain={() => openChat('main')} onSession={openTerm} onChanged={refresh} /> : <SwarmChat members={members} key={nodeApi('/agent/swarms/' + data.id) + ':' + recipient} data={data} recipient={recipient} selected={selected} onSelect={openChat} onWork={openWork} onSession={openTerm} onSent={refresh} />}
         </section>
+        {!phone && workspaceVisible && <SwarmWorkspaceDivider key={panelKey} width={workspaceSize.width || 0} min={workspaceSize.min} max={workspaceSize.max} onResize={workspaceSize.resize} />}
         {!phone && workspaceVisible && <aside className="swarm-collaboration-pane" aria-label={t('swarm.workspace.open')}>{workspace}</aside>}
       </div>
     </>}

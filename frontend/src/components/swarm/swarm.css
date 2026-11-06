@@ -227,8 +227,8 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-conversations { borde
 html[data-pointer="coarse"] .swarm-conversation-head .tt-act { position:relative; }
 html[data-pointer="coarse"] .swarm-conversation-head .tt-act::after { content:''; position:absolute; min-height:var(--tap); min-width:var(--tap); top:50%; left:50%; transform:translate(-50%,-50%); }
 
-.swarm-conversation-workspace[data-scene="true"] { grid-template-columns:calc(var(--sp-5) * 10) minmax(0,3fr) minmax(0,2fr); }
-.swarm-collaboration-pane { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; border-left:1px solid var(--border-subtle); }
+.swarm-conversation-workspace[data-scene="true"] { grid-template-columns:calc(var(--sp-5) * 10) minmax(0,1fr) var(--split-rail) minmax(0,var(--swarm-workspace-width,40%)); }
+.swarm-collaboration-pane { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .swarm-collaboration-pane > .swarm-studio { flex:1; height:auto; }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-collaboration-pane { order:-1; flex:1; border-left:0; border-bottom:1px solid var(--border-subtle); }
 html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspace[data-scene="true"] .swarm-conversation-pane { flex:2; }
@@ -237,7 +237,18 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspac
 .swarm-conversation-history > summary { cursor:pointer; min-height:var(--tap); padding:var(--sp-3); color:var(--text-dim); font-size:var(--fs-meta); box-sizing:border-box; }
 
 .swarm-workbench { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
-.swarm-workbench > .swarm-tabs { flex-shrink:0; padding:var(--sp-2) var(--sp-3); }
+.swarm-workbench-head { display:flex; align-items:center; flex-shrink:0; min-height:var(--tap); padding:var(--sp-2) var(--sp-3); border-bottom:1px solid var(--border-subtle); gap:var(--sp-2); }
+.swarm-workbench-head > .swarm-tabs { flex:1; min-width:0; border:0; padding:0; }
+.swarm-workbench-actions { display:flex; align-items:center; gap:var(--sp-2); }
+.swarm-workbench-actions > .tt-act,.swarm-workbench-actions summary { display:flex; align-items:center; justify-content:center; width:var(--ctl-h); height:var(--ctl-h); min-height:0; }
+.swarm-workbench-actions summary { border-radius:var(--r-xs); color:var(--text-dim); list-style:none; }
+.swarm-workbench-actions summary::-webkit-details-marker { display:none; }
+.swarm-workbench-actions summary:focus-visible { outline:2px solid var(--accent); }
+:where(html[data-pointer="fine"]) .swarm-workbench-actions summary:hover { color:var(--text-bright); background:var(--list-hover); }
+.swarm-workspace-guide { display:none; position:fixed; inset-block:0; width:2px; z-index:var(--z-panel); pointer-events:none; }
+.swarm-workspace-divider { align-self:stretch; height:auto; }
+html[data-pointer="coarse"] .swarm-workbench-actions :is(.tt-act,summary) { position:relative; }
+html[data-pointer="coarse"] .swarm-workbench-actions :is(.tt-act,summary)::after { content:''; position:absolute; width:var(--tap); height:var(--tap); top:50%; left:50%; transform:translate(-50%,-50%); }
 .swarm-workbench > :is(.swarm-studio,.swarm-work-detail) { flex:1; min-height:0; height:auto; }
 .swarm-workbench > .swarm-work-detail { border:0; }
 .swarm-workbench .swarm-studio > .swarm-panel-head { justify-content:flex-end; padding:var(--sp-1) var(--sp-3); }
@@ -260,3 +271,7 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspac
 .swarm-member-chat > :is(.session-chat-shell,.native-session) { flex:1; min-height:0; height:auto; }
 .swarm-member-chat > .swarm-member-session-actions { display:flex; flex-shrink:0; justify-content:flex-end; gap:var(--sp-2); padding:var(--sp-1) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
 .swarm-member-chat > .swarm-note { padding:var(--sp-4); }
+
+:where(html[data-pointer="fine"]) .swarm-studio-label:hover { color:var(--accent); border-color:var(--accent-border); }
+.swarm-studio-label:focus-visible { outline:2px solid var(--accent); }
+html[data-pointer="coarse"] .swarm-studio-label::after { content:''; position:absolute; min-height:var(--tap); min-width:var(--tap); width:100%; top:50%; left:50%; transform:translate(-50%,-50%); }

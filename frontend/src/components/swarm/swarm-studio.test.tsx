@@ -17,6 +17,7 @@ afterEach(cleanup)
 it('releases the renderer outside the collaboration tab and restores it on return', async () => {
   const select = vi.fn()
   const view = render(<SwarmStudio historical nodes={nodes} selected="member" onSelect={select} />)
+  expect(screen.queryByRole('button', { name: 'Member' })).toBeNull()
   await waitFor(() => expect(state.create).toHaveBeenCalledOnce())
   expect(state.motion).toHaveBeenLastCalledWith(true, false, true)
   view.rerender(<SwarmStudio historical active={false} nodes={nodes} selected="member" onSelect={select} />)
