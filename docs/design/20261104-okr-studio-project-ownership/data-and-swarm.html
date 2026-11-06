@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN" data-size="large" data-pointer="fine">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OKR 数据与团队机制 · 设计提案</title>
+<style>
+:root{color-scheme:dark;--bg-base:#0d1117;--bg-container:#161b22;--border-subtle:#21262d;--text-bright:#e6edf3;--text-dim:#8b949e;--accent:#58a6ff;--ok:#3fb950;--warn:#d29922;--fs-meta:12px;--fs-sm:13px;--fs-body:14px;--fs-lg:16px;--fs-title:22px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--r-xs:6px;--r-sm:10px;--r-card:14px;--tap:44px;--sel-bg:rgb(255 255 255 / 6.5%)}html[data-size="compact"]{--fs-body:15px}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}body{font:var(--fs-body)/1.6 Inter,system-ui,sans-serif;color:var(--text-bright);background:var(--bg-base);display:flex;flex-direction:column}button,select,input{font:inherit;color:inherit;background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:var(--r-xs);padding:var(--sp-2) var(--sp-3);min-height:var(--tap)}button{cursor:pointer}button:disabled{cursor:default;color:var(--text-dim)}button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}a{color:var(--accent)}h1,h2,h3,p{margin:0}h1{font-size:var(--fs-title)}h2{font-size:var(--fs-lg)}h3{font-size:var(--fs-body)}.tt-pagehead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--border-subtle)}.muted{color:var(--text-dim)}.meta{font-size:var(--fs-meta)}.status{color:var(--warn)}nav{display:flex;flex-shrink:0;gap:var(--sp-2);overflow:auto;padding:var(--sp-2) var(--sp-5);border-bottom:1px solid var(--border-subtle)}nav button{white-space:nowrap;border-color:transparent}nav button[aria-selected=true]{background:var(--sel-bg);color:var(--accent)}main{min-height:0;flex:1;overflow:auto;padding:var(--sp-5)}section[hidden]{display:none}.stack{display:grid;gap:var(--sp-5)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*16)),1fr));gap:var(--sp-5)}.card{min-width:0;background:var(--bg-container);border-radius:var(--r-card);padding:var(--sp-5)}.card>h2,.card>h3{margin-bottom:var(--sp-3)}.card p+p{margin-top:var(--sp-3)}.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*8)),1fr));gap:var(--sp-3)}.steps button{text-align:left;background:var(--bg-container);border:1px solid var(--border-subtle);padding:var(--sp-4)}.steps button[aria-current=true]{border-color:var(--accent)}.steps span{display:block;color:var(--text-dim);font-size:var(--fs-meta)}.actions{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}.actions label{display:flex;gap:var(--sp-2);align-items:center}.primary{color:var(--accent)}.value{font-size:var(--fs-title);font-weight:600}.ok{color:var(--ok)}.line{padding:var(--sp-3) 0;border-bottom:1px solid var(--border-subtle)}.line:last-child{border:0}.entry{display:flex;justify-content:space-between;gap:var(--sp-3);align-items:center}.entry>span{min-width:0}.diagram{display:grid;gap:var(--sp-3)}.diagram .hub{border-left:2px solid var(--accent);padding:var(--sp-3) var(--sp-4)}.roles{display:flex;flex-wrap:wrap;gap:var(--sp-2)}.roles span{padding:var(--sp-2) var(--sp-3);background:var(--bg-base);border-radius:var(--r-xs)}table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:var(--sp-3) var(--sp-2);border-bottom:1px solid var(--border-subtle);overflow-wrap:anywhere}th{font-size:var(--fs-sm);color:var(--text-dim);font-weight:500}.wide{overflow:auto}pre{max-width:100%;overflow:auto;margin:0;background:var(--bg-base);padding:var(--sp-4);font-size:var(--fs-sm);border-radius:var(--r-xs)}code{font-family:ui-monospace,monospace;overflow-wrap:anywhere}ul,ol{margin:0;padding-left:var(--sp-5)}li+li{margin-top:var(--sp-2)}.detail{padding:var(--sp-4) 0;border-top:1px solid var(--border-subtle)}.detail summary{cursor:pointer;min-height:var(--tap);display:flex;align-items:center}.detail p{margin-bottom:var(--sp-3)}.note{padding:var(--sp-3) 0;color:var(--text-dim)}.callout{padding-left:var(--sp-4);border-left:2px solid var(--accent)}footer{display:flex;flex-wrap:wrap;gap:var(--sp-4);padding:var(--sp-3) var(--sp-5);border-top:1px solid var(--border-subtle);font-size:var(--fs-meta)}.log{display:grid;gap:var(--sp-2);margin-top:var(--sp-4)}.log p{padding:var(--sp-2) 0;border-bottom:1px solid var(--border-subtle)}
+</style>
+</head>
+<body>
+<header class="tt-pagehead"><div><h1>OKR 数据与团队机制</h1><p class="muted">原 Main 带队，数据可追溯，界面只展示当前要处理的事。</p></div><span class="status">设计提案 · 本地演示</span></header>
+<nav role="tablist" aria-label="设计章节">
+<button type="button" role="tab" id="tab-runtime" aria-controls="runtime" aria-selected="true" data-tab="runtime">运行态</button>
+<button type="button" role="tab" id="tab-data" aria-controls="data" aria-selected="false" data-tab="data" tabindex="-1">数据机制</button>
+<button type="button" role="tab" id="tab-team" aria-controls="team" aria-selected="false" data-tab="team" tabindex="-1">团队通信</button>
+<button type="button" role="tab" id="tab-plan" aria-controls="plan" aria-selected="false" data-tab="plan" tabindex="-1">实施顺序</button>
+</nav>
+<main>
+<section id="runtime" role="tabpanel" aria-labelledby="tab-runtime" class="stack">
+<div class="grid">
+<div class="card diagram"><h2>用户主要跟 Main 聊</h2><p class="muted">Main、群聊、原成员都可进入；继续复用全局聊天框及原生对话。</p><div class="hub"><h3>原项目 Main</h3><p>拆解任务，回答问题，核验交付，决定下一轮。</p></div><div class="roles"><span>X 维护成员</span><span>B站维护成员</span><span>数据成员</span></div><p class="muted meta">后续轮次复用原成员、原任务和原 provider 对话。</p></div>
+<div class="card"><h2>一个周期如何完成</h2><ol><li>Main 选择今天要验证的改进。</li><li>原成员执行，Connector 取数并保存证据。</li><li>Main 核验，发布确认数据。</li><li>看板更新，独立验收任务。</li><li>写周期复盘，更新记忆与 Skill。</li></ol></div>
+</div>
+<div class="callout"><h2>先把“写入”和“看见”分清</h2><p class="muted">SQLite 是数据底座；采集写入后先待核验。HTML 只读 Main 已发布的数据。</p></div>
+<div class="grid">
+<div class="card"><h2>B站稿件 <span class="muted meta">表格示例</span></h2><div class="wide"><table><thead><tr><th>稿件</th><th>播放</th><th>完播率</th></tr></thead><tbody><tr><td>示例稿件 A</td><td class="approved-value">100</td><td>未知</td></tr></tbody></table></div><p class="note meta">每个独立数据表一张卡片，标签、单位和筛选来自目录定义。</p></div>
+<div class="card"><h2>任务 <span class="muted meta">交接示例</span></h2><div class="line entry"><span>今日指标取数</span><span class="muted">待 Main 核验</span></div><div class="line entry"><span>下一条内容准备</span><span class="muted">进行中</span></div><div class="line entry"><span>本周复盘</span><span class="muted">待执行</span></div><p class="note meta">任务与消息回执分开；聊天里“完成”不会改变验收结果。</p></div>
+</div><p class="muted meta">这里是行为与布局示意，数字为演示数据，未连接线上项目。</p>
+</section>
+<section id="data" role="tabpanel" aria-labelledby="tab-data" hidden class="stack">
+<div><h2>项目级 SQLite，一套确认版本</h2><p class="muted">目录保存定义、Skill 和证据，数据库保存结构化数据与已发布修订。</p></div>
+<div class="steps" aria-label="数据链路">
+<button type="button" data-step="0" aria-current="true">1. 取数<span>Python / MCP，保留原始证据</span></button>
+<button type="button" data-step="1" aria-current="false">2. 写源表<span>通用脚本，事务与幂等键</span></button>
+<button type="button" data-step="2" aria-current="false">3. Main 核验<span>固定本轮行版本和证据</span></button>
+<button type="button" data-step="3" aria-current="false">4. 发布并展示<span>确认事务，统一读取层</span></button>
+</div>
+<div class="card"><h3 id="step-title">来源先给事实</h3><p id="step-description">记录来源身份、字段、单位、截至时间与采集时间；缺少的值保持未知。</p></div>
+<div class="grid">
+<div class="card"><h2>源库 <span class="muted meta">演示</span></h2><div class="line entry"><span>新采集播放量</span><strong id="raw-value">尚未写入</strong></div><div class="line entry"><span>写入回执</span><span id="ingest-state">尚无</span></div><div class="actions"><button type="button" id="write-demo">模拟写入 128</button><button type="button" id="retry-demo" disabled>同 key 重试</button></div><p class="note meta">重复同一写入不会新增第二批，也不会重新发布看板。</p></div>
+<div class="card"><h2>用户看板 <span class="muted meta">演示</span></h2><div class="line entry"><span>已发布播放量</span><strong class="value approved-value">100</strong></div><div class="line entry"><span>确认修订</span><span id="data-revision">1</span></div><button type="button" id="approve-demo" class="primary" disabled>模拟 Main 核验并发布</button><p class="note meta" id="data-feedback" aria-live="polite">先写候选，确认后看板才更新。</p></div>
+</div>
+<details class="detail"><summary>读取接口与字段标签</summary><p><code>datasets/</code> 定义表名、字段 label、单位、筛选和批准视图。现有指标 SDK 保持兼容，表格拟新增受控 table 入口。</p><pre>await okr.ready();
+const result = await okr.data.table('bili-videos', {
+  filters: { dateRange: ['YYYY-MM-DD', 'YYYY-MM-DD'] },
+  limit: 20
+});
+// label · columns · rows · revision · asOf · quality</pre><p class="muted meta">拟实现接口，当前尚不可作为已交付能力调用。</p></details>
+<details class="detail"><summary>原子性与迁移</summary><p>证据/页面资源先按摘要归档，SQLite 在一个事务中提交确认数据、修订和回执。JSONL 与 current.json 是可修复导出，最终态只认数据库确认版本。</p><p>现有项目先冻结同一确认修订、备份并逐项对比，再切换存储模式。过渡阶段仍使用原文件权威，不能静默双写两套“当前数据”。</p></details>
+</section>
+<section id="team" role="tabpanel" aria-labelledby="tab-team" hidden class="stack">
+<div><h2>共享群聊，Main 负责协调</h2><p class="muted">普通进展保持共享可读；问题、阻塞与交付进入持久收件箱。</p></div>
+<div class="steps"><button type="button" data-team-view="note" aria-current="true">普通发言<span>写群聊，其他成员可读</span></button><button type="button" data-team-view="question" aria-current="false">成员提问<span>排入原 Main 收件箱</span></button><button type="button" data-team-view="steer" aria-current="false">Main 续派<span>继续原成员的真实任务</span></button></div>
+<div class="card"><h3 id="team-title">群聊记录不等于执行</h3><p id="team-description">当前 swarm_post 只写共享讨论。把 @Main 写进正文不会自动补齐可靠唤醒。</p></div>
+<div class="grid">
+<div class="card"><h2>Main 收件箱 <span class="muted meta">行为演示</span></h2><div class="actions"><label for="main-state">Main 状态 <select id="main-state"><option value="idle">空闲</option><option value="busy">正在执行</option><option value="waiting">等待用户</option><option value="failed">需要恢复</option></select></label></div><div class="line entry"><span>待处理问题</span><strong id="pending-count">0</strong></div><div class="line entry"><span>本批 Main 处理轮次</span><strong id="turn-count">0</strong></div><div class="actions"><button type="button" id="ask-demo">成员提出问题</button><button type="button" id="handle-demo" class="primary">Main 处理本批</button><button type="button" id="reply-demo" disabled>Main 回复</button></div><p id="team-feedback" class="note" aria-live="polite">可以连续提交两个问题，观察合并处理。</p></div>
+<div class="card"><h2>回执与下一步</h2><div class="log" id="team-log" aria-live="polite"><p class="muted">尚无演示消息。</p></div><p class="note meta">收到、读取、回复与任务独立验收是不同状态。Main 自己的回复不会唤醒自己。</p></div>
+</div>
+<details class="detail"><summary>成员之间如何互通</summary><p>成员按同群稳定身份定向提问、回复与交付依赖，Main 看到需要协调的内容。成员读各自收件箱；忙碌 TUI 保持待处理，Main 在受管边界续派原成员，不并发注入终端输入。</p></details>
+<details class="detail"><summary>身份与授权</summary><p>作者由真实 Main 或当前成员 task/revision/run 绑定。团队事件不是新的用户授权；旧实例引用、跨项目目标、过期运行不得覆盖当前路由。人的 say 与 Agent post 保持不同署名。</p></details>
+</section>
+<section id="plan" role="tabpanel" aria-labelledby="tab-plan" hidden class="stack">
+<div><h2>先定机制，再分阶段落地</h2><p class="muted">模板与宣传项目采用同一套约定；各阶段分别证明交付与真实运行。</p></div>
+<div class="card wide"><table><thead><tr><th>阶段</th><th>交付</th><th>验收重点</th></tr></thead><tbody><tr><td>0 · 设计</td><td>本设计、数据模型、通信状态机</td><td>权威数据源、确认边界与恢复路径明确</td></tr><tr><td>1 · 通用源库</td><td>初始化 / schema / 读写 / 备份 Skill</td><td>完整模板可复制；重试、回滚、零与未知</td></tr><tr><td>2 · 确认发布</td><td>SQLite 修订、迁移和兼容导出</td><td>故障时原子性；旧事实与去重语义保留</td></tr><tr><td>3 · 看板读取</td><td>标签、表格 SDK、筛选与更新</td><td>实际 DB 经只读宿主层到 HTML</td></tr><tr><td>4 · 团队互通</td><td>持久收件箱、Main 合并唤醒与续派</td><td>不丢消息、不换实例、不自我唤醒</td></tr><tr><td>5 · 日常闭环</td><td>原团队取数、发布、复盘与 Skill 改进</td><td>真实本轮证据、独立验收和定时回执</td></tr></tbody></table></div>
+<div class="grid"><div class="card"><h2>AGENTS.md 必须教会的事</h2><ul><li>数据库在哪里，何时初始化与建表。</li><li>如何运行来源 Skill、事务写入和对账。</li><li>如何核验候选、发布并检查真实看板。</li><li>如何向 Main/成员发消息，判断已送达或待处理。</li><li>如何把日周月年复盘提炼成个人/团队记忆与 Skill。</li></ul></div><div class="card"><h2>模板与真实项目</h2><p>模板含完整目录、空库初始化资源、schema 和操作手册；实际运行才创建数据库。</p><p>宣传项目按真实来源迁移全部现有数据、页面和回执，保留原 Main、原成员、原任务与历史。</p><p class="muted">本设计稿不建真实库、不启用调度，也不假称新增通信协议已运行。</p></div></div>
+</section>
+</main>
+<footer><a href="sqlite-data-design.md">完整数据设计</a><a href="../20261104-okr-main-workspace/swarm-communication-design.md">完整通信设计</a><span class="muted">#743 数据 · #744 通信 · 所有交互仅在本页模拟</span></footer>
+<script>
+const tabs=[...document.querySelectorAll('[data-tab]')];
+function selectTab(tab){for(const item of tabs){const active=item===tab;item.setAttribute('aria-selected',String(active));item.tabIndex=active?0:-1;document.getElementById(item.dataset.tab).hidden=!active;}document.querySelector('main').scrollTop=0;}
+for(const tab of tabs){tab.addEventListener('click',()=>selectTab(tab));tab.addEventListener('keydown',event=>{const move=event.key==='ArrowRight'?1:event.key==='ArrowLeft'?-1:0;if(!move)return;event.preventDefault();const next=tabs[(tabs.indexOf(tab)+move+tabs.length)%tabs.length];selectTab(next);next.focus();});}
+const stepText=[['来源先给事实','记录来源身份、字段、单位、截至时间与采集时间；缺少的值保持未知。'],['源库写入有独立回执','类型检查与参数化事务写入；同一 key 重试复用原结果，不能把一次 SQLite 写入当成看板已发布。'],['Main 核验固定版本','核对本轮原始证据、账号、口径与源行版本；下一次采集不能悄悄替换这批待验收数据。'],['发布事务后统一展示','一个 SQLite 事务提交确认数据、修订与回执；HTML 通过项目绑定 SDK 读取，兼容文件可重建。']];
+function selectStep(index){for(const item of document.querySelectorAll('[data-step]'))item.setAttribute('aria-current',String(Number(item.dataset.step)===index));const text=stepText[index];document.getElementById('step-title').textContent=text[0];document.getElementById('step-description').textContent=text[1];}for(const button of document.querySelectorAll('[data-step]'))button.addEventListener('click',()=>selectStep(Number(button.dataset.step)));
+let ingested=false,published=false;
+function ingest(retry){selectStep(published?3:1);ingested=true;document.getElementById('retry-demo').disabled=false;document.getElementById('raw-value').textContent='128';document.getElementById('ingest-state').textContent=retry?'原回执 · 1 批':'已写入 · 1 批';document.getElementById('approve-demo').disabled=published;document.getElementById('data-feedback').textContent=published?'重试沿用原写入回执，看板仍是同一确认修订。':'候选已写入，看板仍显示已发布的 100。';}
+document.getElementById('write-demo').addEventListener('click',()=>ingest(false));document.getElementById('retry-demo').addEventListener('click',()=>ingest(true));document.getElementById('approve-demo').addEventListener('click',()=>{if(!ingested||published)return;selectStep(3);published=true;for(const item of document.querySelectorAll('.approved-value'))item.textContent='128';document.getElementById('data-revision').textContent='2';document.getElementById('data-feedback').textContent='模拟核验完成，确认修订 2 的看板显示 128。';document.getElementById('approve-demo').disabled=true;});
+const teamText={note:['群聊记录不等于执行','当前 swarm_post 只写共享讨论。把 @Main 写进正文不会自动补齐可靠唤醒。'],question:['问题进入原 Main 收件箱','消息与递送记录一起持久保存。Main 忙或等待用户时排队，空闲后合并处理。'],steer:['派工继续原成员','Main 使用受管 plan/steer，核对当前任务与轮次。成员回报后再读取本轮文件并独立验收。']};
+for(const button of document.querySelectorAll('[data-team-view]'))button.addEventListener('click',()=>{for(const item of document.querySelectorAll('[data-team-view]'))item.setAttribute('aria-current',String(item===button));const text=teamText[button.dataset.teamView];document.getElementById('team-title').textContent=text[0];document.getElementById('team-description').textContent=text[1];});
+let pending=0,turns=0,awaitingReply=false;const log=[];const feedback=document.getElementById('team-feedback');
+function paintTeam(message){document.getElementById('pending-count').textContent=String(pending);document.getElementById('turn-count').textContent=String(turns);if(message)log.unshift(message);const area=document.getElementById('team-log');if(log.length){area.replaceChildren(...log.slice(0,5).map(text=>{const p=document.createElement('p');p.textContent=text;return p;}));}document.getElementById('reply-demo').disabled=!awaitingReply;}
+document.getElementById('ask-demo').addEventListener('click',()=>{pending++;paintTeam('成员提交问题，已进入演示收件箱。');feedback.textContent='问题已保留，处理轮次尚未增加。';});
+document.getElementById('handle-demo').addEventListener('click',()=>{const state=document.getElementById('main-state').value;if(state!=='idle'||awaitingReply){feedback.textContent=state==='waiting'?'Main 等待用户回答，问题保留。':state==='failed'?'Main 需要先恢复，问题保留。':'Main 正在执行，问题排队。';return;}if(!pending){feedback.textContent='没有新问题，不创建处理轮次。';return;}const count=pending;pending=0;turns++;awaitingReply=true;paintTeam('Main 获取 '+count+' 条问题，合并为一次演示处理轮次。');feedback.textContent='已送达本批问题，仍待 Main 回复；任务尚未验收。';});
+document.getElementById('reply-demo').addEventListener('click',()=>{if(!awaitingReply)return;awaitingReply=false;paintTeam('Main 回复本批问题；自己的回复没有创建新唤醒。');feedback.textContent='本批已回应。后续执行与任务独立验收继续分别核对。';});
+</script>
+</body>
+</html>
