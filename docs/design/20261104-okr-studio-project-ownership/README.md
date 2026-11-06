@@ -41,3 +41,13 @@
 [本轮原型验收](acceptance.md)。
 
 补充：Connector 位于 connectors/ 的 Skill 包；[用户 HTML 读取数据的可运行样例](dashboard-example.html)，以及[生成/编辑 Skill 扩展示例](templates/okr-development/SKILL.md)。数据保存、读取 API、组件与模板规范均见技术方案。
+
+## 2026-11-06：先设计 SQLite 与团队通信
+
+[交互式设计稿](data-and-swarm.html) · [SQLite、读取层与模板](sqlite-data-design.md) · [Swarm 通信与 Main 收件箱](../20261104-okr-main-workspace/swarm-communication-design.md)。
+
+本轮为设计提案。未评审的 SQLite 实现草稿已移出工作区；真实项目没有建立本提案的数据库、改变存储权威或启用新增通信协议。
+
+[数据与团队设计稿检查](data-team-design-acceptance.md)：仅文档与模拟交互，非新增底层机制验收。
+
+通信重点：[逐跳与多个 OKR 演示](../20261104-okr-main-workspace/communication-engine.html)。实现前补充 [SQLite v1 契约](sqlite-v1-contract.md) 与 [协调回合契约](../20261104-okr-main-workspace/swarm-delivery-contract.md)。
