@@ -22,7 +22,7 @@ export default function AgentOutbox({ outbox, ready, running }: { outbox: Return
         {item.state === 'failed' || item.state === 'unconfirmed' ? <button type="button" className="tt-act" aria-label={t('agent.retry')} disabled={!!outbox.sending} onClick={() => outbox.retry(item.id)}><RefreshIcon size={16} /></button> : <button type="button" className="tt-act agent-outbox-priority" aria-label={t(running ? 'agent.outbox.interruptNow' : 'agent.outbox.sendNow')} disabled={!ready || !!outbox.sending || !!editing} onClick={() => outbox.sendNow(item.id)}><ArrowUp size={16} /><span>{t('agent.outbox.runNow')}</span></button>}
         <button type="button" className="tt-act" aria-label={t('agent.outbox.remove')} disabled={item.id === outbox.sending} onClick={() => { if (outbox.remove(item.id) && editing === item.id) setEditing('') }}><TrashIcon size={16} /></button>
         <Dropdown trigger={['click']} overlayClassName="agent-outbox-menu" menu={{ items: [
-          { key: 'edit', label: t('agent.outbox.edit'), disabled: item.state !== 'waiting' || !!outbox.sending || !!editing },
+          { key: 'edit', label: t('agent.outbox.edit'), disabled: item.payload !== undefined || item.state !== 'waiting' || !!outbox.sending || !!editing },
           { key: 'pause', label: t(outbox.paused ? 'agent.outbox.resume' : 'agent.outbox.pause') },
           { key: 'expand', label: t(expanded ? 'agent.outbox.collapse' : 'agent.outbox.expand', { count: outbox.items.length }) },
           { type: 'divider' }, { key: 'local', label: t('agent.outbox.localHint'), disabled: true },

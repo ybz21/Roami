@@ -39,8 +39,9 @@
 .okr-project-select{width:100%}
 .okr-activities{height:100%;min-height:0;min-width:0}
 .okr-files{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;overflow:hidden}
-.okr-main-chat{height:100%;min-height:0;display:flex;flex-direction:column;padding:var(--sp-4);gap:var(--sp-3);background:var(--bg-base)}
-.okr-chat-head{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-shrink:0}
+.okr-main-chat{height:100%;min-height:0;display:flex;flex-direction:column;background:var(--bg-base)}
+.okr-main-chat>.agent-workspace{flex:1;min-height:0;width:100%}
+.okr-chat-head{padding:var(--sp-3) var(--sp-4);display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-shrink:0}
 .okr-chat-hint{margin:0;font-size:var(--fs-meta);color:var(--text-dim)}
 .okr-chat-messages{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
 .okr-chat-message{padding-block:var(--sp-3);overflow-wrap:anywhere}
