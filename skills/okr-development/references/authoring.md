@@ -31,7 +31,7 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | connectors/<name>/SKILL.md | 来源、口径、账号、指标映射、采集步骤、校验、证据和失败处理 | 不宣称一个文件就是启用状态 |
 | connectors/<name>/scripts/ | 真实 Python 取数/标准化；输出候选事实与原始证据 | 不写 JSONL/current.json/runtime SQLite |
 | connectors/<name>/references/ | MCP 工具/effect/schema、账号与字段映射，必要来源说明 | 不猜连接名、不携带凭证 |
-| connectors/<name>/connector.json | 当前支持的来源绑定；未来 Skill schema 需兼容迁移 | 不执行任意 command 字段 |
+| connectors/<name>/connector.json | 来源/账号、窗口、文件与指标绑定；新宿主支持 Skill schema2 | 不执行任意 command 字段 |
 | agents/main.json / main.md | 项目 Main 的指引和已支持技能列表；职责是协调、指挥与核验 | 不写首页 Main 或另造 conversation ID |
 | agents/team.json | schema1、稳定角色 id、名称、executor、职责；空 roles 也合法 | 不把期望职责当真实成员/实例 |
 | agents/swarm.json | 受管团队登记后取得的真实绑定；未建团队先为空 | 不复制其他项目团队 ID |
@@ -41,7 +41,7 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | memory/decisions.md | 日期、来源、决定、负责人、当前状态/未决事项 | 不静默覆盖旧决定 |
 | memory/members/ | 取得真实 stable-member-id 后写个人笔记 | 不按 r2/r3 另建记忆 |
 | schedules/daily.json | 默认关闭提案，确认 Skill、时刻与 IANA 时区后再注册 | 不虚构 nextDue、不能用提醒冒充执行 |
-| data/observations.jsonl / reviews.jsonl | 新草稿为空；事实由受管操作发布并导出 | 不放演示数字、不替换旧历史 |
+| data/observations.jsonl / reviews.jsonl / connector-batches.jsonl | 新草稿为空；事实由受管操作发布并导出 | 不放演示数字、不替换旧历史 |
 | evidence/ | 实际来源/验收证据，保留原文件与哈希 | 不用空占位证据声称完成 |
 | state/ | 宿主生成 immutable snapshots 与 current.json | 模板不生成确认指针 |
 | YYYY/YYYYMM/YYYYMMDD/ | 真正发生工作后按方法/task/revision/run 记录产物与索引 | 不预造完成目录或把旧文件移成当天成果 |
@@ -81,3 +81,7 @@ README 的 projectName 与所有配置中的 {{...}} 是有意的模板参数，
 
 回读发布的 workspace、文件及 UI，核对 source/date/units、指针 revision、期望团队和
 真实登记的区别。一个复制成功的目录不是已启用 HTML、已采集数据或每日执行的证明。
+
+新宿主报告 connectorSkillBatches 后，可把 source 提案填实并加入配置 connectors。
+按 [批次协议](connector-batches.md) 确认包摘要、保存原始证据，再由 Main record；
+旧宿主保留提案，继续已支持路径。目录名与 SKILL frontmatter.name 要一致。

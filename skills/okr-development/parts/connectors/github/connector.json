@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "execution": "skill",
+  "skill": {
+    "id": "github",
+    "name": "{{sourceName}}",
+    "service": "github",
+    "identity": "{{repositoryId}}",
+    "repo": "{{githubRepo}}",
+    "timezone": "Asia/Shanghai",
+    "window": "snapshot",
+    "files": ["SKILL.md", "scripts/fetch_github.py", "scripts/prepare_batch.py", "references/evidence.md"],
+    "bindings": [{"metricId": "{{starsMetricId}}", "field": "stars"}, {"metricId": "{{forksMetricId}}", "field": "forks"}]
+  }
+}

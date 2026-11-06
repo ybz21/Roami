@@ -84,3 +84,15 @@ keepalive；催办要针对真实当前任务与阻塞，无新信息时避免�
 cron.add 创建提案显式使用 enabled=false 和 IANA timezone；编辑不重置原启停与未指定的时区。
 
 Use [durable team bindings](team-bindings.md) when reconciling current roles or an interrupted configuration save. Current/history presentation does not change old host task states.
+
+## 已确认的运行态交互
+
+团队页左侧选择 Main、群聊或原成员，中间保留该对话，右侧工作区切换协作与任务列表。
+查看任务详情不等于给成员追加任务；派工、群聊投递、执行结果、Main 独立验收分别核对。
+关闭右栏应释放宽度并保留草稿；手机工作区与详情逐层返回原聊天。浏览器缩窄/粗指针
+模拟不能记为真机通过，验收命令须限定自己的 target，并将按钮限定到对应模块，避免
+点到全局同名入口。
+
+看板同一天的有效版本按宿主确认追加顺序取最后一条，不按 capturedAt 最大值排序。
+跨日比较使用真实日期与当前 sourceKey；缺失/未知不是零。使用 Connector Skill 批次时，
+Main 先阅读并核对当前轮原始字节，再 record；批次回执与群聊/任务验收保持独立。

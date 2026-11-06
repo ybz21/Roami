@@ -185,3 +185,19 @@ it.each([false, true])('describes the confirmed HTML and role capabilities to Ma
     expect(payload).not.toContain('也支持schemaVersion:2')
   }
 })
+
+it.each([false, true])('offers Skill batch publication only with the real host capability (%s)', async supported => {
+  const draft = emptyConfiguration()
+  const connectors = [{ id: 'metrics', name: 'Metrics', service: 'mcp', identity: 'account', timezone: 'Asia/Shanghai', window: 'day' as const, files: ['SKILL.md'], bindings: [{ metricId: 'users', field: 'users' }] }]
+  const workspace: Workspace = { ...draft, connectors, projectId: 'project', revision: 3, updatedAt: 'now', observations: [], reviews: [], projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 3, connectorSkillBatches: supported } }
+  render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Collect the confirmed source' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
+  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
+  const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
+  expect(context.projectContext.connectorSkillBatches).toBe(supported)
+  expect(context.connectors).toEqual(connectors)
+  expect(payload.includes('payload={revision,batch}')).toBe(supported)
+  expect(payload.includes('initiatives、dashboard、team和connectors')).toBe(supported)
+})

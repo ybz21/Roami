@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OkrDashboard from './OkrDashboard'
+import OkrConfiguration from './OkrConfiguration'
 import OkrCurrentStatus from './OkrCurrentStatus'
 import OkrTeamMemory from './OkrTeamMemory'
 import type { Workspace } from './okr-workspace'
@@ -116,4 +117,14 @@ it('preserves a memory draft after conflict, compares the latest text and retrie
   fireEvent.click(screen.getByRole('button', { name: 'okr.saveMemory' }))
   await waitFor(() => expect(state.api).toHaveBeenLastCalledWith('PUT', '/projects/project/okr/memory', { content: 'My preserved draft', expectedSha256: 'latest-hash' }))
   await waitFor(() => expect(dirty).toHaveBeenLastCalledWith(false))
+})
+
+it('keeps confirmed Skill bindings read-only while allowing ordinary goal editing', () => {
+  const connectors = [{ id: 'analytics', name: 'Approved analytics', service: 'mcp', identity: 'account', timezone: 'Asia/Shanghai', window: 'day' as const, files: ['SKILL.md'], bindings: [{ metricId: 'clicks', field: 'clicks' }] }]
+  render(<OkrConfiguration value={{ ...workspace, connectors }} onChange={vi.fn()} onSave={vi.fn()} busy={false} swarms={[]} swarmError={false} onLoadSwarms={vi.fn()} />)
+  expect(screen.getByText('Approved analytics')).toBeTruthy()
+  expect(screen.getByText('okr.connectorManaged')).toBeTruthy()
+  const bound = screen.getByText('Approved analytics').closest('.okr-editor-row')!
+  expect(bound.querySelector('.ant-select')).toBeNull()
+  expect((bound.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
 })

@@ -97,3 +97,15 @@ it('round-trips explicit member bindings including clears without inventing bind
     expect(configurationOf({ ...workspace, team }).team).toEqual(team)
   }
 })
+
+it('preserves source workflows while projecting away server-owned history and source keys', () => {
+  const connectors = [{ id: 'github', name: 'GitHub', service: 'github', identity: '42', repo: 'owner/repo', timezone: 'Asia/Shanghai', window: 'snapshot' as const, files: ['SKILL.md'], packageSha256: 'a'.repeat(64), bindings: [{ metricId: 'stars', field: 'stars' }] }]
+  const projected = configurationOf({ ...workspace, connectors })
+  expect(projected.connectors).toEqual(connectors)
+  projected.connectors![0].files.push('scripts/fetch.py')
+  projected.connectors![0].bindings[0].field = 'forks'
+  expect(connectors[0].files).toEqual(['SKILL.md'])
+  expect(connectors[0].bindings[0].field).toBe('stars')
+  expect(projected.metrics[0]).not.toHaveProperty('sourceKey')
+  expect(projected).not.toHaveProperty('connectorBatches')
+})

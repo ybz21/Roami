@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "execution": "skill",
+  "skill": {
+    "id": "source",
+    "name": "{{sourceName}}",
+    "service": "{{sourceService}}",
+    "identity": "{{sourceIdentity}}",
+    "timezone": "{{timezone}}",
+    "window": "{{sourceWindow}}",
+    "files": ["SKILL.md"],
+    "bindings": [{"metricId": "metric", "field": "{{sourceField}}"}]
+  }
+}

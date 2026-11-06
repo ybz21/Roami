@@ -161,3 +161,5 @@
 - [项目 HTML 看板运行态与只读数据桥](html-dashboard-runtime.md)
 
 - [右侧任务列表与协作切换](task-workbench.md)（#711）
+
+- [Connector Skill 批次确认与来源绑定](connector-skill-batches.md)（#679）

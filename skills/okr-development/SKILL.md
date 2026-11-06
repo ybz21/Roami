@@ -57,6 +57,8 @@ Read [the file-by-file authoring guide](references/authoring.md); edit existing
 definitions in an isolated draft, preserving unrelated confirmed content.
 For user-authored HTML, read [dashboard data](references/dashboard-data.md).
 For Python/MCP collection, read [Connector Skills](references/connectors.md).
+For confirmed source/Skill bindings and candidate publication, read
+[Connector batches](references/connector-batches.md).
 The project directory is the workspace; `.roami/okr/` contains its definitions
 and confirmed data. Keep existing directories, identities and history.
 
@@ -112,7 +114,8 @@ member's memory and original provider conversation. Unknown execution results
 require reconciliation, not a new instance. Keep task results and group-chat
 receipts distinct from independent acceptance.
 
-Collect registered sources through `collect`; record observed manual facts
+Use the host-supported Connector batch workflow for confirmed Skills.
+Collect unbound legacy sources through `collect`; record verified unbound manual facts
 through `record`. Collection updates dated JSONL facts and a confirmed file
 snapshot, which drives the dashboard. Source failures preserve existing facts;
 they never become zero. Unsupported Connector execution or chart types require
@@ -134,12 +137,14 @@ proposal can be prepared without it. Use a real scheduler receipt and next due
 time to report activation. A reminder, an idle member, `autoCollect`, or a saved
 schedule proposal does not prove that a custom Skill will run every day.
 
-The current execution adapters support registered GitHub collection and verified
-manual observations. Python/MCP-backed workflows can prepare evidence in an
-authorized managed task and Main can record it through the project operation.
-They are not yet automatically scheduled by this product. Keep unsupported
-execution pending instead of installing an ad hoc cron job or pretending a file
-is an active timer. Preserve the original Main and long-lived team identities.
+Check `projectFiles.connectorSkillBatches` and its live `connectorBatchProtocol`.
+On capable hosts, confirm the Connector's files/source/metric bindings, have the
+original member execute the reviewed Python/MCP workflow, and let Main publish
+its reviewed evidence through the existing `record` batch operation. Check the
+actual receipt and dashboard; a batch receipt is not task acceptance or a schedule.
+Older hosts retain registered GitHub/manual compatibility operations. Daily Skill
+execution still needs its real scheduler and nextDue receipt; a saved proposal or
+builtin autoCollect is not that runner. Preserve the original Main and team.
 
 ## Operate and learn
 

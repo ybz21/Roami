@@ -83,7 +83,10 @@ repository identity plus field. Manual sources record verified account, date,
 measurement window and evidence; missing login is unknown, not zero.
 
 `collect` accepts `{revision:N}`. `record` accepts
-`{revision:N,metricId,date,value,note}`. Same-day corrections append versions.
+`{revision:N,metricId,date,value,note}` for an unbound explicit metric. On a host
+with `connectorSkillBatches`, it also accepts `{revision:N,batch:{...}}` for a
+confirmed Skill workflow; see [Connector batches](connector-batches.md).
+Same-day corrections append versions.
 After a source change, old source identities remain in history and are not
 relabeled as the new source. Preserve the last confirmed revision on failure or
 concurrent edits. Do not edit Connector Go references and call them executable
@@ -109,9 +112,11 @@ Do not create empty script/reference directories for an MCP-only or simple Skill
 Source binding JSON describes the configured source; it is not another plugin
 entrypoint. Keep secrets in the existing credential system, outside the bundle.
 The Connector package location is `connectors/<name>/`, not project `skills/`.
-Current project discovery only reads registered `skills/<name>/SKILL.md`; the
-new Connector reader/protocol is pending. Do not claim a source was loaded merely
-from saving these files. See [Connector Skills](connectors.md).
+A capable host confirms configuration.connectors and exposes those exact
+Connector Skills in projectFiles.skills alongside registered project skills.
+Check connectorSkillBatches and the live connectorBatchProtocol before using it.
+Older hosts retain the proposal without activation. A confirmed definition is not
+an execution receipt. See [Connector Skills](connectors.md).
 
 Before enabling a collection Skill, establish the source/account, permission,
 metric IDs, date window, unit and evidence required for each output. Python

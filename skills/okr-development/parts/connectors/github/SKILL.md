@@ -16,8 +16,15 @@ description: 获取本项目公开 GitHub 仓库的 Star 和 Fork 候选观测�
 evidence.http.body 保留原响应 UTF-8 文本，按 UTF-8 重算 evidence.sha256；解析后的
 payload 重新序列化不等于原始字节。公开响应头只保留时间、缓存和请求标识，不复制凭据。
 
-当前产品的确认写入仍使用已注册 collect 操作；它会独立取数，不是把 Python 候选批量
-写入同一条观测。分开记录两次采集的时间和证据，核对同一来源，不混淆响应 SHA。
-未来 Skill 批次提交须等待宿主能力，不能用 shell/SQLite 绕过项目身份或 revision 拒绝。
+宿主 projectFiles.connectorSkillBatches=true 时，读取其 connectorBatchProtocol，将本包
+声明文件与 metric bindings 加入配置 connectors，由 Main 保存确认 packageSha256。
+使用 scripts/prepare_batch.py 将候选、当前 workspace 与稳定批次 key 转成请求文件，
+原始 evidence.http.body 按原 UTF-8 字节保存。Main 阅读并核验本轮证据后，通过已绑定
+project_okr_update 的 record 操作提交 {revision,batch}；核对 connectorBatches 回执及
+真实看板值。脚本只准备候选，不发布数据，也不注册调度。
+
+旧宿主仍可用已注册 collect，它会独立取数，不能声称 Python 的这份响应已写入。
+分开保留两次采集时间与证据；不使用 shell/SQLite 绕过拒绝。未知提交结果复用原
+payload/revision/key，先读取回执，不能重建负责人、成员或批次去避开冲突。
 
 定时执行是独立配置。没有真实 schedule/nextDue 回执，不说已经每日运行。

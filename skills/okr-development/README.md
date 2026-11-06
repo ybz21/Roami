@@ -24,7 +24,7 @@ assets/                         # 复制后的项目根目录
     │   ├── index.html
     │   ├── style.css
     │   └── page.js
-    ├── connectors/metric/       # 采集 Skill 和来源绑定
+    ├── connectors/source/       # 采集 Skill 和来源绑定
     │   ├── SKILL.md
     │   └── connector.json
     ├── agents/                 # 项目 Main、职责和团队绑定

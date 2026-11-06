@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -80,5 +81,38 @@ func TestProjectOKRSyncAndMemoryCommands(t *testing.T) {
 				t.Fatal(code, calls)
 			}
 		})
+	}
+}
+
+func TestProjectOKRRecordForwardsExactSkillBatchWithoutRetry(t *testing.T) {
+	t.Setenv("ROAMI_HOME", t.TempDir())
+	body := `{"revision":9,"batch":{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","connectorId":"github","packageSha256":"pinned","values":[{"metricId":"stars","unit":"","value":0}]}}`
+	file := filepath.Join(t.TempDir(), "batch.json")
+	if err := os.WriteFile(file, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != "POST" || r.URL.Path != "/api/projects/project/okr/observations" {
+			t.Error("wrong batch route", r.URL)
+		}
+		var raw json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Fatal(err)
+		}
+		var expected, actual any
+		_ = json.Unmarshal([]byte(body), &expected)
+		_ = json.Unmarshal(raw, &actual)
+		if !reflect.DeepEqual(expected, actual) {
+			t.Error("CLI altered the stable batch payload")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(409)
+		_, _ = w.Write([]byte(`{"error":"OKR_CONFLICT"}`))
+	}))
+	defer server.Close()
+	if code := runProjectOKR([]string{"record", "project", "--file", file, "--server", server.URL, "--json"}); code == 0 || calls != 1 {
+		t.Fatal("CLI replayed a conflict or claimed success", code, calls)
 	}
 }

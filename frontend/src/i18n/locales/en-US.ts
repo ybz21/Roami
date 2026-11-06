@@ -172,6 +172,7 @@ const enUS = {
   'okr.metricName': "Metric name",
   'okr.unit': "Unit",
   'okr.source': "Source",
+  'okr.connectorManaged': 'Discuss source changes with Main',
   'okr.source.manual': "Manual entry",
   'okr.source.github': "Public GitHub repository",
   'okr.repo': "Public repository",

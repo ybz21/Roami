@@ -511,7 +511,13 @@ func workingConfig(root *os.Root) (Config, error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return c, err
 	}
+	if err := workingConnectorSkills(root, &c); err != nil {
+		return c, err
+	}
 	for _, metric := range c.Metrics {
+		if connector, _ := connectorMetric(&c, metric.ID); connector != nil {
+			continue
+		}
 		var connector connectorDefinition
 		if err := decodeFile(root, "connectors/"+metric.ID+"/connector.json", &connector); err != nil {
 			return c, err
@@ -565,7 +571,7 @@ func (s *Store) decorateConfirmed(root *os.Root, w *Workspace, dashboardDigest s
 	if err := s.seedWorkflow(root, w.ProjectID); err != nil {
 		return err
 	}
-	metadata := &ProjectFiles{TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
+	metadata := &ProjectFiles{ConnectorBatchProtocol: connectorBatchProtocol, ConnectorSkillBatches: true, TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
 	workflow, err := readFile(root, "AGENTS.md", maxMemory)
 	if err != nil {
 		return err
@@ -619,6 +625,15 @@ func (s *Store) decorateConfirmed(root *os.Root, w *Workspace, dashboardDigest s
 			metadata.PendingChanges = true
 		}
 	}
+	for _, connector := range w.Connectors {
+		name := path.Join("connectors", connector.ID, "SKILL.md")
+		body, err := readFile(root, name, maxMemory)
+		if err != nil {
+			metadata.PendingChanges = true
+			continue
+		}
+		metadata.Skills = append(metadata.Skills, ProjectSkill{"connector-" + connector.ID, name, string(body), hashText(body)})
+	}
 	return nil
 }
 
@@ -647,7 +662,15 @@ func definitions(root *os.Root, w *Workspace, referenceSources map[string]string
 			return err
 		}
 	}
+	for _, connector := range w.Connectors {
+		if err := writeJSON(root, path.Join("connectors", connector.ID, "connector.json"), skillConnectorDefinition{2, "skill", connector}); err != nil {
+			return err
+		}
+	}
 	for _, metric := range w.Metrics {
+		if connector, _ := connectorMetric(&w.Config, metric.ID); connector != nil {
+			continue
+		}
 		file := "connectors/" + metric.ID + "/"
 		connector := connectorDefinition{SchemaVersion: 1, MetricID: metric.ID, Execution: "builtin", Builtin: metric.Source, Repo: metric.Repo, Field: metric.Field, Implementation: "README.md"}
 		sources := []string{"store.go"}
@@ -736,6 +759,10 @@ func publish(root *os.Root, snapshot *confirmedSnapshot, writeDefinitions bool) 
 	if err != nil {
 		return err
 	}
+	batches, err := jsonLines(w.ConnectorBatches)
+	if err != nil {
+		return err
+	}
 	reviews, err := jsonLines(w.Reviews)
 	if err != nil {
 		return err
@@ -743,7 +770,7 @@ func publish(root *os.Root, snapshot *confirmedSnapshot, writeDefinitions bool) 
 	for _, item := range []struct {
 		name string
 		body []byte
-	}{{"data/observations.jsonl", observations}, {"data/reviews.jsonl", reviews}} {
+	}{{"data/observations.jsonl", observations}, {"data/reviews.jsonl", reviews}, {"data/connector-batches.jsonl", batches}} {
 		if err := atomicFile(root, item.name, item.body); err != nil {
 			return err
 		}
