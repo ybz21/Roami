@@ -16,6 +16,8 @@
 
 [GitHub Connector Skill 的原始证据与验收](github-connector-skill.md)（#679）。
 
+[B站公开统计 Connector Skill](bilibili-connector-skill.md)（#736）。
+
 ## 产品设计
 
 一个已注册项目当前承载一个 OKR。这个 OKR 只有一个持久主智能体对话，目标讨论、团队指挥、任务计划和群聊共用此身份；关闭页面只收起视图，停止执行需要明确动作。已有专用团队 Main 优先复用，保留原任务、回执和历史，不迁改旧运行的归属。新建或重开页面不能产生第二个负责人，也不能回退到节点首页 Main。

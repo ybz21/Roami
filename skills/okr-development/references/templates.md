@@ -50,5 +50,7 @@ Do not copy this overlay to a host without the HTML capability.
 The complete template contains an unbound `connectors/source/` Skill proposal;
 fill it and select Python/MCP parts before adding it to configuration.connectors.
 The GitHub overlay includes its complete file/binding declaration and a preparation
-script. Keep existing custom code until reviewed; copy parts into a draft first,
+script. The optional Bilibili part similarly includes a Python fetch/prepare CLI
+for a confirmed public video's cumulative statistics; its Skill describes the
+source identity, declared files and field mapping. Keep existing custom code until reviewed; copy parts into a draft first,
 not over an existing live package. See [Connector batches](connector-batches.md).
