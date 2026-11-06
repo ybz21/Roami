@@ -1,7 +1,7 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 UPGRADES = {
     2: "0002_artifact_metadata.sql",
     3: "0003_resource_controls.sql",
@@ -24,6 +24,7 @@ UPGRADES = {
     20: "0020_swarm_members.sql",
     21: "0021_member_instances.sql",
     22: "0022_native_session_labels.sql",
+    23: "0023_swarm_project_scopes.sql",
 }
 
 
@@ -40,6 +41,9 @@ def schema_file(name):
 
 def upgrade_schema(connection, version):
     for target in range(version + 1, SCHEMA_VERSION + 1):
+        if target == 23:
+            rebuild_swarm_scopes(connection)
+            continue
         try:
             connection.executescript(
                 "BEGIN IMMEDIATE;\n"
@@ -51,3 +55,37 @@ def upgrade_schema(connection, version):
             if connection.in_transaction:
                 connection.execute("ROLLBACK")
             raise
+
+
+def rebuild_swarm_scopes(connection):
+    if connection.in_transaction:
+        raise RuntimeError("AGENT_SCHEMA_TRANSACTION_ACTIVE")
+    foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
+    objects = connection.execute(
+        "SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL AND "
+        "(type IN ('trigger','view') OR (type='index' AND tbl_name='swarm_groups')) ORDER BY rowid"
+    ).fetchall()
+    drops = "\n".join(
+        f'DROP {kind.upper()} "{name.replace(chr(34), chr(34) * 2)}";' for kind, name, _ in objects
+    )
+    restores = "\n".join(sql + ";" for _, _, sql in objects)
+    try:
+        connection.execute("PRAGMA foreign_keys=OFF")
+        connection.executescript(
+            "BEGIN IMMEDIATE;\n"
+            + drops
+            + "\n"
+            + schema_file(UPGRADES[23])
+            + "\n"
+            + restores
+            + "\nINSERT INTO schema_meta(version,applied_ms) VALUES(23,CAST(strftime('%s','now') AS INTEGER)*1000);"
+        )
+        if connection.execute("PRAGMA foreign_key_check").fetchone():
+            raise RuntimeError("AGENT_SCHEMA_FOREIGN_KEY_CONFLICT")
+        connection.execute("COMMIT")
+    except BaseException:
+        if connection.in_transaction:
+            connection.execute("ROLLBACK")
+        raise
+    finally:
+        connection.execute("PRAGMA foreign_keys=" + str(foreign_keys))

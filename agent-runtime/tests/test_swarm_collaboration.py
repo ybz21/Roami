@@ -792,12 +792,14 @@ async def test_project_memory_uses_canonical_cli_and_never_falls_back(collaborat
     from roami_agent.storage.swarm_memory import digest
 
     swarms, created = collaboration
-    await swarms.db.call(
-        lambda db: db.execute(
-            "UPDATE swarm_groups SET target_json=? WHERE id=?",
-            (json.dumps({"kind": "project", "projectId": "registered-project"}), created["id"]),
-        ),
-        write=True,
+    created = await swarms.create(
+        "alice",
+        {
+            "name": "Project",
+            "goal": "Read canonical memory",
+            "target": {"kind": "project", "projectId": "registered-project"},
+            "commandKey": "project-memory",
+        },
     )
     swarms.settings = SimpleNamespace(
         cli_bin="roami", provider_key_environments=lambda: ["MODEL_API_KEY"]
@@ -1100,12 +1102,14 @@ async def test_scoped_project_update_uses_current_bound_project_and_json(
     from roami_agent.tools.swarm_catalog import register_swarm_tools
 
     swarms, created = collaboration
-    await swarms.db.call(
-        lambda db: db.execute(
-            "UPDATE swarm_groups SET target_json=? WHERE id=?",
-            (json.dumps({"kind": "project", "projectId": "registered"}), created["id"]),
-        ),
-        write=True,
+    created = await swarms.create(
+        "alice",
+        {
+            "name": "Project",
+            "goal": "Read canonical context",
+            "target": {"kind": "project", "projectId": "registered"},
+            "commandKey": "project-context",
+        },
     )
     swarms.settings = SimpleNamespace(cli_bin="roami", provider_key_environments=list)
     calls, tools = [], {}

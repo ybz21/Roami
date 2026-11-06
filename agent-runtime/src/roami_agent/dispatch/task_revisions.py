@@ -12,6 +12,8 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_repository import group
+from roami_agent.storage.swarm_scopes import require_scope
 from roami_agent.storage.task_request import member_authorization_context, task_user_request
 from roami_agent.storage.transcript_repository import message, owned
 
@@ -179,6 +181,8 @@ class TaskRevisions:
                 if source_turn_id
                 else None
             )
+            if team:
+                require_scope(group(db, owner, team["id"]))
             main_instructions = bool(team and source_user and source_quote is None)
             if source_user:
                 # Preserve Main's member assignment separately from its user authorization.

@@ -34,13 +34,15 @@ def project_main(db, owner, project_id, title, create, *, swarm_id=None):
             raise DomainError("PROJECT_OKR_MAIN_CONFLICT", 409)
         candidate = current["conversation_id"]
     if not candidate:
-        previous = row(
+        previous = rows(
             db,
             "SELECT p.conversation_id FROM project_okr_conversations p JOIN conversations c ON c.id=p.conversation_id "
-            "WHERE p.owner_id=? AND p.project_id=? AND c.deleted_ms IS NULL ORDER BY c.updated_ms DESC,c.id LIMIT 1",
+            "WHERE p.owner_id=? AND p.project_id=? AND c.deleted_ms IS NULL LIMIT 2",
             (owner, project_id),
         )
-        candidate = previous["conversation_id"] if previous else None
+        if len(previous) > 1:
+            raise DomainError("PROJECT_OKR_MAIN_CONFLICT", 409)
+        candidate = previous[0]["conversation_id"] if previous else None
     if candidate:
         conversation = owned(db, owner, candidate)
         if row(
@@ -70,4 +72,7 @@ def project_main(db, owner, project_id, title, create, *, swarm_id=None):
     db.execute(
         "INSERT OR IGNORE INTO project_okr_mains VALUES(?,?,?)", (owner, project_id, candidate)
     )
+    from roami_agent.storage.swarm_scopes import bind_project_scope
+
+    bind_project_scope(db, owner, project_id, candidate)
     return conversation

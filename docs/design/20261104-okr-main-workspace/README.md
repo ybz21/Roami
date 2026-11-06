@@ -193,3 +193,5 @@
 - [群聊通信与多个 OKR（HTML）](communication-engine.html)：CLI/后端逐跳、落库与投影、Main 排队及错投演示；[统一引擎设计](communication-engine-design.md) 与 [投递契约](swarm-delivery-contract.md)。
 
 [通信机制设计核对](communication-design-acceptance.md)：真实代码基线、逐跳与多 OKR 本地演示、布局检查；不是生产功能验收。
+
+- [多OKR范围绑定的第一批实现](project-scope-implementation.md)：原Main、同名团队、命令与投递键隔离和保留历史的迁移（#746，未计生产验收）。

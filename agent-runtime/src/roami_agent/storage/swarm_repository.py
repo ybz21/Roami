@@ -7,6 +7,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.swarm_scopes import legacy_receipt_in_scope, project_scope, require_scope
 from roami_agent.storage.transcript_repository import owned
 
 
@@ -15,20 +16,49 @@ def group(db, owner, swarm_id):
     if not value:
         raise DomainError("SWARM_NOT_FOUND", 404)
     owned(db, owner, value["conversation_id"])
+    if value["scope_project_id"] is not None and (
+        project_scope(db, owner, value["conversation_id"], json.loads(value["target_json"]))
+        != value["scope_project_id"]
+    ):
+        raise DomainError("SWARM_PROJECT_SCOPE_CONFLICT", 409)
     return value
 
 
-def receipt(db, owner, key, payload, write):
+def receipt(db, owner, key, payload, write, *, swarm_id=None, scope_project_id=None):
     if not isinstance(key, str) or not key.strip() or len(key) > 200:
         raise DomainError("INVALID_REQUEST_KEY")
     digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
-    prior = row(db, "SELECT * FROM swarm_commands WHERE owner_id=? AND command_key=?", (owner, key))
+    value = group(db, owner, swarm_id) if swarm_id else None
+    scope = (value["scope_project_id"] if value else scope_project_id) or ""
+    prior = row(
+        db,
+        "SELECT * FROM swarm_commands WHERE owner_id=? AND scope_project_id=? AND command_key=?",
+        (owner, scope, key),
+    )
+    if scope:
+        legacy = row(
+            db,
+            "SELECT * FROM swarm_commands WHERE owner_id=? AND scope_project_id='' AND command_key=?",
+            (owner, key),
+        )
+        if legacy and legacy_receipt_in_scope(db, owner, scope, legacy):
+            if prior and (prior["digest"], prior["receipt_json"]) != (
+                legacy["digest"],
+                legacy["receipt_json"],
+            ):
+                raise DomainError("REQUEST_KEY_CONFLICT", 409)
+            prior = legacy
     if prior:
         if prior["digest"] != digest:
             raise DomainError("REQUEST_KEY_CONFLICT", 409)
         return json.loads(prior["receipt_json"])
+    if value:
+        require_scope(value)
     result = write()
-    db.execute("INSERT INTO swarm_commands VALUES(?,?,?,?)", (owner, key, digest, encoded(result)))
+    db.execute(
+        "INSERT INTO swarm_commands(owner_id,command_key,digest,receipt_json,scope_project_id) VALUES(?,?,?,?,?)",
+        (owner, key, digest, encoded(result), scope),
+    )
     return result
 
 
@@ -280,6 +310,13 @@ def snapshot(db, owner, swarm_id):
     return {
         "id": swarm_id,
         "name": value["name"],
+        "scope": {"kind": "project", "projectId": value["scope_project_id"]}
+        if value["scope_project_id"]
+        else {
+            "kind": "unbound"
+            if json.loads(value["target_json"]).get("kind") == "project"
+            else "general"
+        },
         "goal": value["goal"],
         "engine": "roami_v2",
         "mainConversationId": value["conversation_id"],

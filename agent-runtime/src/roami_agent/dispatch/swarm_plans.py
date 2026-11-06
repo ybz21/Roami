@@ -1,6 +1,7 @@
 """Main-owned collaboration plans over revision-bound managed tasks."""
 
 import asyncio
+import hashlib
 import json
 import sqlite3
 
@@ -16,6 +17,7 @@ from roami_agent.storage.swarm_repository import (
     receipt,
     snapshot,
 )
+from roami_agent.storage.swarm_scopes import project_scope, require_scope
 from roami_agent.storage.transcript_repository import owned
 
 EXECUTORS = {"native", "codex", "claude", "opencode", "pi"}
@@ -57,6 +59,8 @@ class SwarmPlans:
         payload = {**spec, "mainConversationId": cid, "target": target}
 
         def write(db):
+            scope = project_scope(db, owner, cid, target)
+
             def new():
                 conversation = owned(db, owner, cid)
                 if row(
@@ -77,14 +81,14 @@ class SwarmPlans:
                     raise DomainError("PROJECT_OKR_TEAM_CONFLICT", 409)
                 sid = "sw-" + identity()
                 db.execute(
-                    "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?)",
-                    (sid, owner, name, cid, goal, encoded(target), now_ms(), now_ms()),
+                    "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms,scope_project_id) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (sid, owner, name, cid, goal, encoded(target), now_ms(), now_ms(), scope),
                 )
                 value = group(db, owner, sid)
                 changed(db, value, "swarm.created")
                 return {"id": sid, "mainConversationId": conversation["id"], "revision": 1}
 
-            return receipt(db, owner, spec["commandKey"], payload, new)
+            return receipt(db, owner, spec["commandKey"], payload, new, scope_project_id=scope)
 
         try:
             result = await self.db.call(write, write=True)
@@ -184,7 +188,9 @@ class SwarmPlans:
                 changed(db, value, "swarm.members_changed")
                 return {"id": sid, "revision": value["revision"], "members": result}
 
-            return receipt(db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply)
+            return receipt(
+                db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply, swarm_id=sid
+            )
 
         async with self.lock(sid):
             return await self.db.call(write, write=True)
@@ -395,7 +401,9 @@ class SwarmPlans:
                 enqueue(db, sid, identity())
                 return {"id": sid, "revision": value["revision"]}
 
-            return receipt(db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply)
+            return receipt(
+                db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply, swarm_id=sid
+            )
 
         async with self.lock(sid):
             try:
@@ -445,7 +453,9 @@ class SwarmPlans:
                     "targets": targets,
                 }
 
-            return receipt(db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply)
+            return receipt(
+                db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply, swarm_id=sid
+            )
 
         async with self.lock(sid):
             result = await self.db.call(write, write=True)
@@ -535,9 +545,13 @@ class SwarmPlans:
                         raise DomainError("SWARM_MAIN_REQUIRED", 403)
                     else:
                         author = "main"
+                delivery_key = (
+                    "swarm.message:"
+                    + hashlib.sha256(encoded([sid, spec["commandKey"]]).encode()).hexdigest()
+                )
                 ident = db.execute(
-                    "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms) VALUES(?,?,?,?,?)",
-                    (sid, author, text, task_id, now_ms()),
+                    "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_key) VALUES(?,?,?,?,?,?)",
+                    (sid, author, text, task_id, now_ms(), delivery_key),
                 ).lastrowid
                 changed(db, value, "swarm.message")
                 return {"id": ident, "swarmId": sid}
@@ -548,6 +562,7 @@ class SwarmPlans:
                 spec["commandKey"],
                 {"swarmId": sid, **spec, "binding": identity_binding},
                 apply,
+                swarm_id=sid,
             )
 
         return await self.db.call(write, write=True)
@@ -555,9 +570,23 @@ class SwarmPlans:
     async def advance(self, job):
         sid = job["aggregate_id"]
         async with self.lock(sid):
-            info = await self.db.call(
-                lambda db: row(db, "SELECT * FROM swarm_groups WHERE id=?", (sid,))
-            )
+
+            def admitted(db):
+                value = row(db, "SELECT * FROM swarm_groups WHERE id=?", (sid,))
+                if value:
+                    try:
+                        require_scope(group(db, value["owner_id"], sid))
+                    except DomainError as exc:
+                        pending = db.execute(
+                            "UPDATE swarm_work_items SET dispatch_error=? WHERE swarm_id=? AND task_id IS NULL AND dispatch_error IS NULL",
+                            (exc.code, sid),
+                        )
+                        if pending.rowcount:
+                            changed(db, value)
+                        return None
+                return value
+
+            info = await self.db.call(admitted, write=True)
             if info and info["origin_message_id"] and not info["paused"] and not info["archived"]:
                 stale_tasks = await self.db.call(
                     lambda db: rows(
@@ -766,7 +795,9 @@ class SwarmPlans:
                 enqueue(db, sid, identity())
                 return {"id": sid, "revision": value["revision"], "taskId": work["task_id"]}
 
-            return receipt(db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply)
+            return receipt(
+                db, owner, spec["commandKey"], {"swarmId": sid, **spec}, apply, swarm_id=sid
+            )
 
         async with self.lock(sid):
             result = await self.db.call(write, write=True)
@@ -789,13 +820,15 @@ class SwarmPlans:
         info = await self.db.call(lambda db: snapshot(db, owner, sid))
         spec = recipient(spec, info)
         posted = await self.post(owner, sid, spec)
-        key = "swarm.message:" + spec["commandKey"]
         post_id = posted["id"]
         stored = await self.db.call(
-            lambda db: row(db, "SELECT delivery_json FROM swarm_posts WHERE id=?", (post_id,))
+            lambda db: row(
+                db, "SELECT delivery_json,delivery_key FROM swarm_posts WHERE id=?", (post_id,)
+            )
         )
         if stored["delivery_json"]:
             return json.loads(stored["delivery_json"])
+        key = stored["delivery_key"] or "swarm.message:" + spec["commandKey"]
         if spec.get("workId"):
             item = next((item for item in info["work"] if item["id"] == spec["workId"]), None)
             if not item or not item["task_id"]:
