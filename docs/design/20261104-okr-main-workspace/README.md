@@ -167,3 +167,5 @@
 - [成员原生对话与工作区筛选](native-member-chat.md)：群聊优先目录、原实例聊天、右侧任务过滤。
 
 - [右栏工具栏、拖拽与场景点击](workspace-controls.md)（#721）。
+
+- [Main 复用完整 Roami 输入框](main-composer.md)（#723）。

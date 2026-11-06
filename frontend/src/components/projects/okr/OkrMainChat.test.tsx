@@ -3,16 +3,16 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OkrMainChat from './OkrMainChat'
 import { emptyConfiguration, type Workspace } from './okr-workspace'
-const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn(), thread: vi.fn(), globalNode: null as string | null }))
+const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn(), thread: vi.fn(), view: null as any, globalNode: null as string | null }))
 vi.mock('../../../api', () => ({ api: state.api }))
 vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: false, size: 'large' }) }))
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, currentNodeId: () => state.globalNode }))
-vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (...args: unknown[]) => { state.thread(...args); return { refresh: state.refresh, view: null } } }))
+vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, currentNodeId: () => state.globalNode, nodeApi: (path: string) => '/api' + path }))
+vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (...args: unknown[]) => { state.thread(...args); return { refresh: state.refresh, view: state.view } } }))
 vi.mock('../../shell/AdaptivePanel', () => ({ default: ({ children }: any) => children }))
 vi.mock('../../markdown/Markdown', () => ({ default: ({ children }: any) => children }))
-beforeEach(() => { state.globalNode = null; localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
-afterEach(cleanup)
+beforeEach(() => { state.view = null; state.globalNode = null; localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true } : path === '/agent/model-settings' ? { main: { model: 'saved-main', reasoningEffort: 'low', reasoningEfforts: ['low', 'high'], reasoningSupport: 'supported', images: true }, worker: { model: 'saved-worker' } } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 it('restores the same persistent Main when reopened and closing the view never stops it', async () => {
   const close = vi.fn()
   const view = render(<OkrMainChat projectId="project" projectDir="/repo" draft={emptyConfiguration()} workspace={null} onClose={close} />)
@@ -40,6 +40,7 @@ it('preserves the draft and reuses the exact message key after an ambiguous fail
     if (path === '/agent/status') return { data: { projectOkr: true, projectOkrMain: true } }
     if (path === '/agent/main-conversation') return { data: { id: 'home' } }
     if (path === '/agent/conversations') return { data: { id: 'independent' } }
+    if (!path.endsWith('/messages')) return { data: {} }
     if (!failed) { failed = true; throw new Error('lost receipt') }
     return { data: { kind: 'message' } }
   })
@@ -80,7 +81,7 @@ it('preserves input and explains a runtime that cannot bind project conversation
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await screen.findByText('okr.agentUpgradeRequired')
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep the goal in this project')
-  expect(state.api.mock.calls.every(call => call[1] === '/agent/status')).toBe(true)
+  expect(state.api.mock.calls.every(call => call[0] === 'GET' && ['/agent/status', '/agent/model-settings', '/speech/config'].includes(call[1]))).toBe(true)
 })
 
 const savedWorkspace = () => ({ ...emptyConfiguration(), projectId: 'project', revision: 1, updatedAt: 'now', observations: [], reviews: [], swarm: 'sw-existing' })
@@ -200,4 +201,89 @@ it.each([false, true])('offers Skill batch publication only with the real host c
   expect(context.connectors).toEqual(connectors)
   expect(payload.includes('payload={revision,batch}')).toBe(supported)
   expect(payload.includes('initiatives、dashboard、team和connectors')).toBe(supported)
+})
+
+
+it('reuses the complete composer and reads Main model settings without changing them', async () => {
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  await screen.findByText('saved-main')
+  expect(screen.queryByText('saved-worker')).toBeNull()
+  expect(screen.getByRole('button', { name: 'agent.reasoning.picker' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'agent.composer.more' })).toBeTruthy()
+  expect(document.querySelector('.conversation-composer .tt-cend button')).toBeTruthy()
+  expect(state.api.mock.calls.some(call => call[0] === 'PUT')).toBe(false)
+})
+it('sends restored attachments through the original project Main and preserves the exact retry payload', async () => {
+  const attachment = { key: 'file-key', name: 'source.csv', sizeBytes: 12, state: 'ready', reference: { id: 'file-id', name: 'source.csv', sizeBytes: 12, mimeType: 'text/csv' } }
+  localStorage.setItem('roami.agent.attachments.roami.okr.main.draft:local:project', JSON.stringify([attachment]))
+  let count = 0
+  state.api.mockImplementation(async (_method, path) => {
+    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/conversations') return { data: { id: 'original-main' } }
+    if (path.endsWith('/messages') && count++ === 0) throw Error('ambiguous')
+    return { data: {} }
+  })
+  const view = render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  await screen.findByText('source.csv')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await screen.findByRole('alert')
+  const first = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2]
+  expect(first.attachmentIds).toEqual(['file-id'])
+  view.unmount()
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  await screen.findByText('source.csv')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages'))).toHaveLength(2))
+  expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages'))[1][2]).toEqual(first)
+  await waitFor(() => expect(screen.queryByText('source.csv')).toBeNull())
+})
+it('sends an explicit slash command without adding the OKR context to its argument', async () => {
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: '/status' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
+  expect(state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2]).toMatchObject({ text: '/status', attachmentIds: [] })
+})
+
+
+it('blocks sending until a real attachment upload finishes', async () => {
+  let finish!: (value: unknown) => void
+  vi.stubGlobal('fetch', vi.fn(() => new Promise(resolve => { finish = resolve })))
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('agent.composer.addFiles'), { target: { files: [new File(['facts'], 'source.csv', { type: 'text/csv' })] } })
+  await screen.findByText('agent.composer.uploading')
+  expect((screen.getByRole('button', { name: 'okr.send' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(false)
+  finish({ ok: true, json: async () => ({ data: { id: 'uploaded-file', name: 'source.csv', sizeBytes: 5, mimeType: 'text/csv' } }) })
+  await screen.findByText('agent.composer.fileReady')
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
+  expect(state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].attachmentIds).toEqual(['uploaded-file'])
+})
+it('keeps a later Main draft when an earlier send returns', async () => {
+  let finish!: (value: unknown) => void
+  state.api.mockImplementation(async (_method, path) => {
+    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/conversations') return { data: { id: 'original-main' } }
+    if (path.endsWith('/messages')) return new Promise(resolve => { finish = resolve })
+    return { data: {} }
+  })
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  const input = screen.getByLabelText('okr.chatInput')
+  fireEvent.change(input, { target: { value: 'First instruction' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(finish).toBeTypeOf('function'))
+  fireEvent.change(input, { target: { value: 'Next instruction' } })
+  finish({ data: { kind: 'message' } })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'okr.send' }).getAttribute('aria-busy')).toBeNull())
+  expect((input as HTMLTextAreaElement).value).toBe('Next instruction')
+})
+it('keeps historical Main branches read only with the complete composer', async () => {
+  state.view = { branchId: 'historical', conversation: { active_branch_id: 'current' }, messages: [], turns: [] }
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
+  await screen.findByText('agent.historicalBranch')
+  expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: 'agent.composer.more' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(false)
 })

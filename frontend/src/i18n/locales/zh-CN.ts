@@ -4827,7 +4827,7 @@ const zhCN = {
   'composer.transcribing': '转写中…',
   'composer.transcribingHint': '识别结果会加入草稿',
 
-  'composer.mainModelHint': '用于首页对话；任务执行器的模型在对应会话中选择。',
+  'composer.mainModelHint': '当前节点的所有 Main 对话共用此模型。',
   'composer.taskPlaceholder': '描述要交办的任务…',
   'composer.createTask': '创建任务',
 
