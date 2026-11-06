@@ -29,6 +29,8 @@ ProjectOkr 的现有共享30秒刷新提供 workspace，不增加逐卡 HTTP 轮
 
 dashboard-datasets.ts 沿用来源身份过滤和同日追加顺序。latest=null 表示未知，0为真实值；points 为每日最后观测。quality仅 observed/unknown，lastError=null不代表采集健康。workspace尚无持久失败/时效状态，不伪造 stale/error；源失败保留旧事实。
 
+Main 的页面上下文也带上真实 htmlDashboardSupported/teamRoleBindings 和已确认 team；OkrMainChat 根据能力生成内部编写说明。新宿主说明 schema2/html 与资产先准备后保存，旧宿主继续限制 schema1/widgets；不能在支持HTML的宿主仍告诉Main只支持旧组件。未确认的发送重试继续保留原幂等载荷和原Main，不借能力更新创建替身。专项覆盖两类宿主及原职责绑定。
+
 ### 模板与组件
 
 使用语义 HTML 卡片/表格和项目令牌，等待 okr.ready() 再读数据或使用 echarts，退出时销毁订阅和图表。parts/dashboard/html/dashboard.json 是可选覆盖；完整 assets 包含 AGENTS.md、OKR、Connector Skill、团队、记忆及禁用计划。清单、HTML与okr.json的指标ID一致。检查 htmlDashboardSupported 后才启用，旧宿主继续schema1。
@@ -48,6 +50,18 @@ dashboard-datasets.ts 沿用来源身份过滤和同日追加顺序。latest=nul
 - 浏览器内验证 parent DOM、document.cookie 和未声明指标均不可读，真实ECharts画布存在。
 - 新增真实 fixture 观测0→7、revision3→4，页面原有共享刷新推送到现存HTML；未增加逐卡HTTP请求。资产重新确认推进到revision5仍保留3条事实。
 - 专项覆盖未确认文件不执行、非法发布保留旧确认、越界/远程资源/符号链接、文件篡改、错误project/digest、旧异步响应、隐藏/离开释放与再次load关闭。
-- 前端202文件1470项通过，typecheck、5192 key i18n、hover、build通过。Go OKR/API整包通过，Skill包专项3项通过。正式quick/full及PR待完成。
+- 最终前端202文件1472项通过，typecheck、5192 key i18n、hover、build通过。Go全量、正常quick/full、Python运行时及四组Skill检查通过；Skill包专项3项另过。最后仅补验收文档，内部Main提示与分包代码均在full覆盖的源码中。
 
 不触用户手机；粗指针模拟不计真机验收。不替换原项目Main/成员，不触模型路由、账目或busy。公开截图仅使用此fixture。
+
+### 带鉴权的实际项目副本
+
+将真实确认定义/25条观测/2次复盘复制到隔离目录，再由真实Go发布器确认7指标HTML草稿，非看板定义及成员绑定均不变。独立浏览器context使用合成HttpOnly/SameSite=Lax cookie：无cookie401，受保护iframe文档收到cookie并正常握手；子页仍读不到Cookie/父DOM。7张卡实际显示11、5、2及4项未知，无数据时不画零线。没有使用生产凭据或改真实项目。证据 /tmp/okr-html-dashboard-auth-qa-20261106/acceptance.json。
+
+普通图表包的生产构建前后均516452B；HTML专用脚本1122085B独立动态加载，不进入普通图表依赖。只证明加载/传输边界，不宣称CPU或内存降低。证据 /tmp/okr-html-dashboard-chunk-proof-20261106.json。
+
+### 原Main、原成员与口径纠正
+
+真实项目通过roami chrome让原Main续派原数据成员的原任务至第7轮；实例、原生对话/分支、任务和native session五类身份均保留。成员回群后Main读取实际文件并受管验收。独立复核发现报告虽数值正确，却把同日规则写成capturedAt最大；Main保留原件、CAS追加记忆更正，再续派第8轮纠正。修正版的10份输入哈希、7项事实和全部逐日末条/追加索引已独立复核，Main再执行受管验收并更新日索引。
+
+这证明原实例可以追加任务、群聊交付后唤起Main、记忆保留旧文并明确纠正；投递、执行器完成、Main验收与独立复核是不同证据。该轮未新增观测、未启用HTML、未发布或开日程。材料在 /tmp/okr-project-html-draft-20261106/。
