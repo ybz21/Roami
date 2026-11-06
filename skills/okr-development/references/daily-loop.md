@@ -96,3 +96,25 @@ Use [durable team bindings](team-bindings.md) when reconciling current roles or 
 看板同一天的有效版本按宿主确认追加顺序取最后一条，不按 capturedAt 最大值排序。
 跨日比较使用真实日期与当前 sourceKey；缺失/未知不是零。使用 Connector Skill 批次时，
 Main 先阅读并核对当前轮原始字节，再 record；批次回执与群聊/任务验收保持独立。
+
+
+## 原有成员聊天的隔离验收
+
+聊天目录按群聊、Main、当前职责排列；查看成员复用其执行器的原会话与全局输入框，
+不能用一条新建会话或另一个成员的历史冒充。注册较早的 CLI 成员可能没有 instance 字段；
+先核对原 task、当前 revision/run、存活 session、执行器与项目归属，不能据缺字段另建成员。
+
+不同 session 名和正确的发送目标不保证历史展示隔离。两个成员可共享 cwd；对受管
+Codex/Claude，应核对宿主 lifecycle 的真实 providerConversationId 与唯一原转录文件，
+再分别打开两名成员确认消息不同。缺失或冲突的绑定保持不可用，不回落同目录最新文件；
+旧缓存 file 参数也不能覆盖当前绑定。这里只读验证，不手改 lifecycle 来制造通过。
+
+迁移旧成员草稿时保留原文；全局原会话已有草稿优先。不确定投递继续使用原 commandKey
+和前置任务 revision，不能在切换页面或恢复后改成新请求。请求晚回时不得清除后来输入。
+
+## 采集与验收的角色证据
+
+成员报告即使命名为 main-verification，仍是成员产物。核对实际作者和工具执行记录，
+Main 必须独立读取当前轮原始响应与批次请求后再验收。批次已经提交时先对账现有回执，
+不能为了补 Main 验收重复采集、换 key 或再 record。明确区分请求文件的原字节 SHA 与宿主
+规范化请求摘要；二者不同不代表证据损坏。
