@@ -8,6 +8,7 @@ import sqlite3
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_repository import (
     changed,
@@ -50,6 +51,42 @@ class SwarmPlans:
         name, goal = str(spec.get("name", "")).strip(), str(spec.get("goal", "")).strip()
         if not name or len(name) > 100 or not goal or len(goal) > 30000:
             raise DomainError("INVALID_SWARM")
+        bound = binding is not None
+
+        def origin(db):
+            if not bound:
+                return None
+            if not isinstance(binding, dict):
+                raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
+            source = row(
+                db,
+                "SELECT m.id,m.conversation_id FROM messages m JOIN turns t ON t.id=m.turn_id "
+                "AND t.conversation_id=m.conversation_id JOIN conversations c ON c.id=m.conversation_id "
+                "WHERE t.id=? AND t.trigger_kind='user' AND t.state IN ('queued','running') "
+                "AND t.branch_id=c.active_branch_id AND m.role='user' AND c.owner_id=? "
+                "AND c.deleted_ms IS NULL AND m.deleted_ms IS NULL AND m.status!='deleted' "
+                "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=c.owner_id AND o.message_id=m.id) "
+                "ORDER BY m.seq LIMIT 1",
+                (binding.get("turnId"), owner),
+            )
+            if not source or any(
+                value and value != source["conversation_id"]
+                for value in (cid, binding.get("conversation"))
+            ):
+                raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
+            assert_context_admitted(
+                db,
+                {
+                    "id": binding["turnId"],
+                    "owner_id": owner,
+                    "conversation_id": source["conversation_id"],
+                },
+            )
+            return source
+
+        if bound:
+            source = await self.db.call(origin)
+            cid = source["conversation_id"]
         if not cid:
             cid = (
                 await self.conversations.create(owner, name, project_id=target["projectId"])
@@ -59,6 +96,7 @@ class SwarmPlans:
         payload = {**spec, "mainConversationId": cid, "target": target}
 
         def write(db):
+            source = origin(db)
             scope = project_scope(db, owner, cid, target)
 
             def new():
@@ -81,37 +119,37 @@ class SwarmPlans:
                     raise DomainError("PROJECT_OKR_TEAM_CONFLICT", 409)
                 sid = "sw-" + identity()
                 db.execute(
-                    "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms,scope_project_id) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (sid, owner, name, cid, goal, encoded(target), now_ms(), now_ms(), scope),
+                    "INSERT INTO swarm_groups(id,owner_id,name,conversation_id,goal,target_json,created_ms,updated_ms,scope_project_id,origin_message_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        sid,
+                        owner,
+                        name,
+                        cid,
+                        goal,
+                        encoded(target),
+                        now_ms(),
+                        now_ms(),
+                        scope,
+                        source["id"] if source else None,
+                    ),
                 )
                 value = group(db, owner, sid)
                 changed(db, value, "swarm.created")
                 return {"id": sid, "mainConversationId": conversation["id"], "revision": 1}
 
-            return receipt(db, owner, spec["commandKey"], payload, new, scope_project_id=scope)
+            result = receipt(db, owner, spec["commandKey"], payload, new, scope_project_id=scope)
+            if source:
+                db.execute(
+                    "UPDATE swarm_groups SET origin_message_id=COALESCE(origin_message_id,?) WHERE id=?",
+                    (source["id"], result["id"]),
+                )
+            return result
 
         try:
             result = await self.db.call(write, write=True)
         except sqlite3.IntegrityError as exc:
             raise DomainError("SWARM_NAME_EXISTS", 409) from exc
-        if binding:
-            source = await self.db.call(
-                lambda db: row(
-                    db,
-                    "SELECT id FROM messages WHERE turn_id=? AND role='user' AND conversation_id=? ORDER BY seq LIMIT 1",
-                    (binding["turnId"], cid),
-                )
-            )
-            if not source:
-                raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
-            await self.db.call(
-                lambda db: db.execute(
-                    "UPDATE swarm_groups SET origin_message_id=COALESCE(origin_message_id,?) WHERE id=?",
-                    (source["id"], result["id"]),
-                ),
-                write=True,
-            )
-        elif self.chat:
+        if not bound and self.chat:
             kickoff = (
                 goal
                 + "\n\nSwarm collaboration ID: "
