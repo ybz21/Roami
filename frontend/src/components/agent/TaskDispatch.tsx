@@ -67,7 +67,7 @@ export default function TaskDispatch({ task, goal, steering }: { task: AgentTask
   const pending = !!steering?.text && steering.state !== 'applied'
   return <>
     {isAgentKind(taskExecutor(task)) && <section className="agent-task-section agent-task-dispatch">
-      <button type="button" className="tt-act agent-task-disclosure" aria-expanded={dispatch} onClick={() => setDispatch(!dispatch)}>
+      <button type="button" className="tt-act agent-task-disclosure agent-task-disclosure-row" aria-expanded={dispatch} onClick={() => setDispatch(!dispatch)}>
         <ChevronRight />{t('agent.task.dispatch')}
       </button>
       {dispatch && <>
@@ -82,8 +82,8 @@ export default function TaskDispatch({ task, goal, steering }: { task: AgentTask
       </>}
       {pending && <p className="agent-task-note" role="status"><b>{t('agent.task.unappliedRequirements')}</b>{steering.text}</p>}
     </section>}
-    <section className="agent-task-section">
-      <button type="button" className="tt-act agent-task-disclosure" aria-expanded={tools} onClick={() => setTools(!tools)}>
+    <section className="agent-task-section agent-task-tools">
+      <button type="button" className="tt-act agent-task-disclosure agent-task-disclosure-row" aria-expanded={tools} onClick={() => setTools(!tools)}>
         <ChevronRight />{t('agent.task.externalTools')}
       </button>
       {tools && <>
