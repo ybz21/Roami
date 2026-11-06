@@ -84,3 +84,23 @@ it('keeps a lost priority-send receipt unconfirmed and never releases the remain
   expect(hook.result.current.items[1].state).toBe('waiting')
   expect(send).toHaveBeenCalledTimes(1)
 })
+
+it('freezes a project context payload before delivery and reuses it after a lost receipt and reload', async () => {
+  const send = vi.fn().mockRejectedValueOnce(Error('lost receipt')).mockResolvedValue(undefined)
+  const prepare = vi.fn((text: string) => text + ':revision1')
+  const hook = renderHook(() => useAgentOutbox('project:original-main', true, true, send, prepare))
+  act(() => { hook.result.current.enqueue('analyse', []) })
+  await waitFor(() => expect(hook.result.current.items[0]?.state).toBe('unconfirmed'))
+  const id = hook.result.current.items[0].id
+  hook.unmount()
+  prepare.mockImplementation(text => text + ':revision2')
+  const restored = renderHook(() => useAgentOutbox('project:original-main', true, false, send, prepare))
+  act(() => { restored.result.current.retry(id) })
+  act(() => { restored.result.current.edit(id, 'changed') })
+  expect(restored.result.current.items[0].text).toBe('analyse')
+  act(() => { restored.result.current.sendNow(id) })
+  await waitFor(() => expect(restored.result.current.items).toHaveLength(0))
+  expect(send.mock.calls[0][0].payload).toBe('analyse:revision1')
+  expect(send.mock.calls[1][0]).toEqual(send.mock.calls[0][0])
+  expect(prepare).toHaveBeenCalledTimes(1)
+})

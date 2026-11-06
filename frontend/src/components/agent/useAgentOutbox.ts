@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AgentAttachment } from './useAgentAttachments'
 import { publishOutboxDebug } from './agent-outbox-debug'
 
-export type OutboxMessage = { id: string; text: string; attachments: AgentAttachment[]; state: 'waiting' | 'sending' | 'unconfirmed' | 'failed' }
+export type OutboxMessage = { id: string; text: string; payload?: string; attachments: AgentAttachment[]; state: 'waiting' | 'sending' | 'unconfirmed' | 'failed' }
 type OutboxState = { items: OutboxMessage[]; paused: boolean }
 const prefix = 'roami.agent.outbox.'
 function read(scope: string): OutboxState {
@@ -13,7 +13,7 @@ function read(scope: string): OutboxState {
   return { items: [], paused: false }
 }
 
-export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, send: (item: OutboxMessage) => Promise<void>) {
+export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, send: (item: OutboxMessage) => Promise<void>, prepare?: (text: string) => string) {
   const snapshots = useRef<Record<string, OutboxState>>({})
   const [version, setVersion] = useState(0), [storageFailed, setStorageFailed] = useState(false), [forced, setForced] = useState('')
   const active = useRef(scope); active.current = scope
@@ -44,10 +44,11 @@ export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, sen
     if (!selected) { if (forced) setForced(''); return }
     if (selected.state !== 'waiting') return
     const owner = scope, id = selected.id
-    if (!change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: 'sending' } : item) }))) return
+    const request = { ...selected, payload: selected.payload ?? prepare?.(selected.text) }
+    if (!change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...request, state: 'sending' } : item) }))) return
     flight.current = { scope: owner, id }; setForced('')
     // A stable request ID makes a lost receipt safe to retry after refresh.
-    void sender.current(selected).then(() => { change(owner, value => ({ ...value, items: value.items.filter(item => item.id !== id) })) }).catch(reason => { change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: reason?.apiError ? 'failed' : 'unconfirmed' } : item) })) }).finally(() => { flight.current = null; publishOutboxDebug(owner, snapshots.current[owner] || read(owner)); if (mounted.current) setVersion(value => value + 1) })
+    void sender.current(request).then(() => { change(owner, value => ({ ...value, items: value.items.filter(item => item.id !== id) })) }).catch(reason => { change(owner, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: reason?.apiError ? 'failed' : 'unconfirmed' } : item) })) }).finally(() => { flight.current = null; publishOutboxDebug(owner, snapshots.current[owner] || read(owner)); if (mounted.current) setVersion(value => value + 1) })
   }, [scope, ready, idle, current, forced, storageFailed, version])
   const locked = (id: string) => flight.current?.scope === scope && flight.current.id === id
   return {
@@ -55,7 +56,7 @@ export function useAgentOutbox(scope: string, ready: boolean, idle: boolean, sen
     enqueue: (text: string, attachments: AgentAttachment[]) => change(scope, value => ({ ...value, items: [...value.items, { id: crypto.randomUUID(), text, attachments, state: 'waiting' }] })),
     pause: (paused: boolean) => change(scope, value => ({ ...value, paused })),
     remove: (id: string) => !locked(id) && change(scope, value => ({ ...value, items: value.items.filter(item => item.id !== id) })),
-    edit: (id: string, text: string) => !locked(id) && change(scope, value => ({ ...value, items: value.items.map(item => item.id === id && item.state === 'waiting' ? { ...item, text } : item) })),
+    edit: (id: string, text: string) => !locked(id) && change(scope, value => ({ ...value, items: value.items.map(item => item.id === id && item.state === 'waiting' && item.payload === undefined ? { ...item, text } : item) })),
     retry: (id: string) => { setStorageFailed(false); return !locked(id) && change(scope, value => ({ ...value, items: value.items.map(item => item.id === id ? { ...item, state: 'waiting' } : item) })) },
     sendNow: (id: string) => { if (ready && !flight.current) setForced(id) },
     sending: flight.current?.scope === scope ? flight.current.id : '',

@@ -8,7 +8,7 @@ vi.mock('../../../api', () => ({ api: state.api }))
 vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: false, size: 'large' }) }))
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, currentNodeId: () => state.globalNode, nodeApi: (path: string) => '/api' + path }))
-vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (...args: unknown[]) => { state.thread(...args); return { refresh: state.refresh, view: state.view } } }))
+vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (...args: unknown[]) => { state.thread(...args); return { accepted: vi.fn(), refresh: state.refresh, view: state.view } } }))
 vi.mock('../../shell/AdaptivePanel', () => ({ default: ({ children }: any) => children }))
 vi.mock('../../markdown/Markdown', () => ({ default: ({ children }: any) => children }))
 beforeEach(() => { state.view = null; state.globalNode = null; localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true } : path === '/agent/model-settings' ? { main: { model: 'saved-main', reasoningEffort: 'low', reasoningEfforts: ['low', 'high'], reasoningSupport: 'supported', images: true }, worker: { model: 'saved-worker' } } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
@@ -286,4 +286,40 @@ it('keeps historical Main branches read only with the complete composer', async 
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).disabled).toBe(true)
   expect((screen.getByRole('button', { name: 'agent.composer.more' }) as HTMLButtonElement).disabled).toBe(true)
   expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(false)
+})
+
+it('refuses a restored ambiguous request bound to a different Main instead of rekeying or retargeting it', async () => {
+  const pending = { text: 'Original request', payload: 'Original request\noriginal context', key: 'same-key', conversationId: 'old-main', attachmentIds: [] }
+  localStorage.setItem('roami.okr.main.draft:local:project:pending', JSON.stringify(pending))
+  localStorage.setItem('roami.okr.main.draft:local:project', pending.text)
+  render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} />)
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await screen.findByRole('alert')
+  expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(false)
+  expect(JSON.parse(localStorage.getItem('roami.okr.main.draft:local:project:pending')!)).toEqual(pending)
+  expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe(pending.text)
+})
+
+it('retries an ambiguous direct message with its original key even if SSE already shows Main running', async () => {
+  let count = 0
+  state.api.mockImplementation(async (_method, path) => {
+    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/conversations') return { data: { id: 'original-main' } }
+    if (path.endsWith('/messages') && count++ === 0) throw Error('lost receipt')
+    return { data: {} }
+  })
+  const props = { projectId: 'project', draft: emptyConfiguration(), workspace: null, onClose: vi.fn() }
+  const page = render(<OkrMainChat {...props} />)
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('original-main', '', null, ''))
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Keep one instruction' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await screen.findByRole('alert')
+  state.view = { branchId: 'current', conversation: { id: 'original-main', active_branch_id: 'current' }, messages: [], turns: [{ id: 'accepted-turn', state: 'running' }] }
+  page.rerender(<OkrMainChat {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages'))).toHaveLength(2))
+  const messages = state.api.mock.calls.filter(call => call[1].endsWith('/messages'))
+  expect(messages[0][2]).toEqual(messages[1][2])
+  expect(screen.queryByRole('region', { name: 'agent.outbox.title' })).toBeNull()
 })

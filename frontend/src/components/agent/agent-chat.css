@@ -6,7 +6,7 @@
 .agent-reading { display:flex; position:relative; flex:1; min-height:0; min-width:0; }
 .agent-messages { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--sp-4); }
 .agent-message { min-width:0; overflow-wrap:anywhere; font-size:var(--fs-body); }
-.agent-typing { width:var(--sp-2); height:var(--sp-2); border-radius:50%; background:var(--accent); }
+.agent-typing { display:inline-block; width:var(--sp-2); height:var(--sp-2); border-radius:50%; background:var(--accent); }
 .agent-message-action { display:inline-flex; align-items:center; justify-content:center; position:relative; width:calc(var(--sp-4) * 2); height:calc(var(--sp-4) * 2); padding:0; border:0; border-radius:var(--r-xs); color:var(--text-dim); background:transparent; cursor:pointer; }
 .agent-muted { color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-feedback { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); background:var(--warn-soft); color:var(--text-bright); font-size:var(--fs-sm); }
@@ -156,3 +156,5 @@ html[data-pointer="coarse"] .agent-executor-menu .ant-dropdown-menu-item::before
 
 .agent-page-boundary { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-2); padding: var(--sp-3); }
 .agent-page-boundary .tt-act { min-height: var(--tap); }
+
+.agent-project-panel { flex:1; min-height:0; overflow:auto; padding:var(--sp-4); overscroll-behavior:contain; }
