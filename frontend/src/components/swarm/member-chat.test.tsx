@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({ api: vi.fn(), sessions: [{ name: 'original', a
 vi.mock('../../api', () => ({ api: (...args: unknown[]) => state.api(...args) }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../../session-overview', () => ({ useSessionOverview: () => ({ value: state.sessions, failed: state.failed }) }))
-vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => path, useCurrentNodeId: () => null }))
+vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => path, useCurrentNodeId: () => null, currentNodeId: () => null }))
 vi.mock('../chat/CodexChat', () => ({ default: ({ name, onSend }: any) => <button onClick={() => { void onSend('Continue').catch(() => {}) }}>codex:{name}</button> }))
 vi.mock('../chat/ClaudeChat', () => ({ default: ({ name }: any) => <p>claude:{name}</p> }))
 vi.mock('../chat/OpenCodeChat', () => ({ default: ({ name }: any) => <p>opencode:{name}</p> }))
@@ -70,4 +70,28 @@ it('steers the original member and preserves an uncertain command key through re
   fireEvent.click(screen.getByText('codex:original'))
   await waitFor(() => expect(state.api.mock.calls).toHaveLength(4))
   expect(state.api.mock.calls[3]).toEqual(request)
+})
+
+it('reuses a registered legacy CLI member without allocating a replacement instance', async () => {
+  const data = snapshot(); data.members![0].instance = null
+  state.api.mockResolvedValue({ data: { ...detail(), task: { ...detail().task, projectId: null, origin_conversation_id: 'main' } } })
+  render(view(data)); expect(await screen.findByText('codex:original')).toBeTruthy()
+  fireEvent.click(screen.getByText('codex:original'))
+  await waitFor(() => expect(state.api.mock.calls).toHaveLength(2))
+  expect(state.api.mock.calls[1]).toEqual(['POST', '/agent/swarms/swarm/messages', expect.objectContaining({ workId: 'work', taskRevision: 2 })])
+})
+it.each(['missing home', 'other home', 'other Main'])('rejects legacy CLI with %s', async kind => {
+  const data = snapshot(); data.members![0].instance = null
+  state.sessions[0].projectKey = kind === 'missing home' ? '' : kind === 'other home' ? 'foreign' : 'project'
+  state.api.mockResolvedValue({ data: { ...detail(), task: { ...detail().task, projectId: null, origin_conversation_id: kind === 'other Main' ? 'foreign' : 'main' } } })
+  render(view(data)); expect(await screen.findByText('swarm.member.sessionUnavailable')).toBeTruthy()
+  expect(screen.queryByText('codex:original')).toBeNull()
+})
+it('migrates the original uncertain legacy command once and permits a later intentional same-text message', async () => {
+  const data=snapshot();data.members![0].instance=null
+  localStorage.setItem('roami.swarm.draft:/agent/swarms/swarm', JSON.stringify({scope:'work',draft:'Continue',pending:{key:'original-command-key',body:{text:'Continue',workId:'work',taskRevision:1}}}))
+  const first=render(view(data));await screen.findByText('codex:original');fireEvent.click(screen.getByText('codex:original'))
+  await waitFor(()=>expect(state.api.mock.calls).toHaveLength(2));expect(state.api.mock.calls[1][2]).toMatchObject({commandKey:'original-command-key',taskRevision:1})
+  first.unmount();render(view(data));await screen.findByText('codex:original');fireEvent.click(screen.getByText('codex:original'))
+  await waitFor(()=>expect(state.api.mock.calls).toHaveLength(4));expect(state.api.mock.calls[3][2].commandKey).not.toBe('original-command-key');expect(state.api.mock.calls[3][2].taskRevision).toBe(2)
 })
