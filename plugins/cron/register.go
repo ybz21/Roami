@@ -53,8 +53,8 @@ func Manifest() manifest.Manifest {
 				{ID: "cron.run", Title: manifest.LocaleText{"zh-CN": "立即触发一个任务(不改动排期)", "en-US": "Run a task now (schedule untouched)"}},
 				{ID: "cron.runs", Title: manifest.LocaleText{"zh-CN": "查看执行记录(每次触发的结果、会话、输出)", "en-US": "Show run history (result, session, output)"}},
 				{ID: "cron.preview", Title: manifest.LocaleText{"zh-CN": "预览一条 cron 表达式接下来几次触发", "en-US": "Preview upcoming fire times for a cron expression"}},
-				{ID: "cron.tick", Title: manifest.LocaleText{"zh-CN": "巡检一次并触发所有到期任务", "en-US": "Fire all due tasks once"}},
-				{ID: "cron.serve", Title: manifest.LocaleText{"zh-CN": "常驻调度器:按点持续触发到期任务", "en-US": "Resident scheduler loop"}},
+				{ID: "cron.tick", Title: manifest.LocaleText{"zh-CN": "巡检到期任务（可用 --names 指定范围）", "en-US": "Fire due tasks (--names selects a scope)"}},
+				{ID: "cron.serve", Title: manifest.LocaleText{"zh-CN": "常驻调度器（可用 --names 指定范围）", "en-US": "Resident scheduler (--names selects a scope)"}},
 			},
 		},
 	}

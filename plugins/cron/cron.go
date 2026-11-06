@@ -11,6 +11,7 @@ package cron
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -185,7 +186,7 @@ func list(ctx *sdk.Ctx, args map[string]string) (any, error) {
 	for _, j := range jobs {
 		views = append(views, jobView(j))
 	}
-	return map[string]any{"count": len(views), "jobs": views}, nil
+	return map[string]any{"count": len(views), "jobs": views, "scopedScheduler": true}, nil
 }
 
 // remove 按 name 删除一条任务。
@@ -289,7 +290,11 @@ func runNow(ctx *sdk.Ctx, args map[string]string) (any, error) {
 // tick 巡检一次:触发所有已启用且到期的任务,并把它们排到下一次。
 // 无常驻场景可让系统 crontab 周期性调它(如每分钟一次)。幂等:未到期不动。
 func tick(ctx *sdk.Ctx, args map[string]string) (any, error) {
-	fired, err := tickOnce(ctx)
+	scope, err := schedulerScope(args)
+	if err != nil {
+		return nil, err
+	}
+	fired, err := tickScoped(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -301,10 +306,17 @@ func tick(ctx *sdk.Ctx, args map[string]string) (any, error) {
 //
 //	tmux new-session -d -s _ttmux-cron 'roami plugin run cron.serve'
 func serve(ctx *sdk.Ctx, args map[string]string) (any, error) {
+	scope, err := schedulerScope(args)
+	if err != nil {
+		return nil, err
+	}
 	fmt.Fprintf(os.Stderr, "[%s] cron 调度器启动,每 %s 巡检一次\n", now(), tickInterval)
 	ctx.Logf("scheduler loop started (tick=%s)", tickInterval)
 	for {
-		fired, err := tickOnce(ctx)
+		fired, err := tickScoped(ctx, scope)
+		if errors.Is(err, errJobScopeNotFound) {
+			return nil, err
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[%s] 巡检出错: %v\n", now(), err)
 		} else if len(fired) > 0 {
@@ -316,21 +328,41 @@ func serve(ctx *sdk.Ctx, args map[string]string) (any, error) {
 
 // ── 调度核心 ──
 
-// tickOnce 触发所有到期任务并推进排期,返回本轮触发的任务名。
-func tickOnce(ctx *sdk.Ctx) ([]string, error) {
+func tickScoped(ctx *sdk.Ctx, scope jobScope) ([]string, error) {
 	jobs, err := loadJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now()
+	fired, changed, err := tickJobs(jobs, scope, time.Now(), func(job *Job) error {
+		_, err := fireJob(ctx, job, "schedule")
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if changed {
+		if err := saveJobs(ctx, jobs); err != nil {
+			return fired, err
+		}
+	}
+	return fired, nil
+}
+
+func tickJobs(jobs []Job, scope jobScope, now time.Time, fire func(*Job) error) ([]string, bool, error) {
+	if err := scope.validate(jobs); err != nil {
+		return nil, false, err
+	}
 	fired := []string{}
 	changed := false
 	for i := range jobs {
 		j := &jobs[i]
+		if scope != nil && !scope[j.Name] {
+			continue
+		}
 		if !j.Enabled || j.NextRun == 0 || time.Unix(j.NextRun, 0).After(now) {
 			continue
 		}
-		if _, ferr := fireJob(ctx, j, "schedule"); ferr != nil {
+		if ferr := fire(j); ferr != nil {
 			// 单个任务触发失败不阻断其余;记日志,排期照常推进避免热循环重试
 			fmt.Fprintf(os.Stderr, "[%s] 任务 %s 触发失败: %v\n", nowStr(now), j.Name, ferr)
 		} else {
@@ -345,12 +377,7 @@ func tickOnce(ctx *sdk.Ctx) ([]string, error) {
 		}
 		changed = true
 	}
-	if changed {
-		if err := saveJobs(ctx, jobs); err != nil {
-			return fired, err
-		}
-	}
-	return fired, nil
+	return fired, changed, nil
 }
 
 // fireJob 执行一条任务的动作,并就地更新其 LastRun/Runs 计数,再落一条执行记录。
