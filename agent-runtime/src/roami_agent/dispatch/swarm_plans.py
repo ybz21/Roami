@@ -8,6 +8,7 @@ import sqlite3
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_repository import (
     changed,
@@ -73,6 +74,14 @@ class SwarmPlans:
                 for value in (cid, binding.get("conversation"))
             ):
                 raise DomainError("TASK_REQUIRES_ORIGIN_MESSAGE", 409)
+            assert_context_admitted(
+                db,
+                {
+                    "id": binding["turnId"],
+                    "owner_id": owner,
+                    "conversation_id": source["conversation_id"],
+                },
+            )
             return source
 
         if bound:

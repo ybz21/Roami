@@ -261,3 +261,40 @@ async def test_forgotten_source_is_not_reused_for_a_team(origin_swarms):
             binding={"turnId": source["turnId"]},
         )
     assert await swarms.db.call(counts) == before
+
+
+async def test_durable_user_stop_prevents_a_late_team_create(store):
+    from test_runtime import ConversationModel
+
+    from roami_agent.app import Runtime
+
+    runtime = Runtime(store, ConversationModel())
+    try:
+        main = await runtime.conversations.create("alice")
+        source = await runtime.conversations.accept(
+            "alice", main["id"], "source", "Coordinate this goal"
+        )
+        job = await store.call(
+            lambda db: row(
+                db,
+                "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?",
+                (source["turnId"],),
+            )
+        )
+        await runtime.mailbox.claim(job)
+        await runtime.chat.interrupt("alice", main["id"], "stop")
+        before = await store.call(counts)
+        with pytest.raises(DomainError, match="TURN_INTERRUPTED"):
+            await runtime.swarms.create(
+                "alice",
+                {
+                    "name": "Stopped",
+                    "goal": "No late team",
+                    "commandKey": "stopped",
+                    "mainConversationId": main["id"],
+                },
+                binding={"turnId": source["turnId"], "conversation": main["id"]},
+            )
+        assert await store.call(counts) == before
+    finally:
+        await runtime.close()
