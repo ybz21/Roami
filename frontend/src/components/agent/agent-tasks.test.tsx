@@ -376,16 +376,18 @@ it('shows the verifier reason before the original executor report', async () => 
   await screen.findByText('Result one')
 })
 
-it('separates the name, expandable task details and collapsed current agent instructions', async () => {
+it('shows the task body once and keeps the applied dispatch delta collapsed', async () => {
   const original = 'Original task details.\n' + 'Retain this full requirement. '.repeat(20)
-  const sent = 'Actual current instructions, including the applied continuation.'
+  const sent = original + '\n\nAdditional user requirements:\nApply the new constraint.'
   const scroll = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('agent-task-description') ? 300 : 0 })
   const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('agent-task-description') ? 60 : 0 })
   try {
     vi.mocked(api).mockImplementation(async (_method, path) => {
       if (path.endsWith('/resources')) return { data: controls() }
       if (path.startsWith('/agent/artifacts')) return { data: [] }
+      if (path === '/agent/capability-settings') return { data: { skills: [{ name: 'roami', enabled: true }, { name: 'browser', enabled: true }], cli: [{ name: 'cli', commands: [{ name: 'roami', enabled: true }, { name: 'mcp_x', enabled: true }] }], mcp: [{ name: 'server', state: 'connected' }] } }
       const value = detail('one')
+      ;(value.task as any).latestAttempt = { state: 'running', executorKind: 'claude' }
       value.task.intent_json = JSON.stringify({ initialIntent: { title: 'Short task name', goal: original }, goal: sent })
       return { data: value }
     })
@@ -394,16 +396,36 @@ it('separates the name, expandable task details and collapsed current agent inst
     const expand = await screen.findByRole('button', { name: 'agent.task.expandContent' })
     expect(expand.getAttribute('aria-expanded')).toBe('false')
     expect(page.container.querySelector('.agent-task-description')?.textContent).toBe(original)
-    const instructions = page.container.querySelector('details.agent-task-requirements') as HTMLDetailsElement
-    expect(instructions.open).toBe(false)
-    expect(instructions.querySelector('p')?.textContent).toBe(sent)
+    const dispatch = page.container.querySelector('.agent-task-dispatch .agent-task-disclosure') as HTMLButtonElement
+    expect(dispatch.getAttribute('aria-expanded')).toBe('false')
+    expect(page.container.textContent?.match(/Original task details\./g)).toHaveLength(1)
     fireEvent.click(expand)
     expect(screen.getByRole('button', { name: 'agent.task.collapseContent' }).getAttribute('aria-expanded')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'agent.task.collapseContent' }))
     expect(screen.getByRole('button', { name: 'agent.task.expandContent' }).getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(screen.getByText('agent.task.instructions'))
-    expect(instructions.open).toBe(true)
+    fireEvent.click(screen.getByText('agent.task.dispatch'))
+    expect(dispatch.getAttribute('aria-expanded')).toBe('true')
+    await screen.findByText('Apply the new constraint.')
+    expect(page.container.textContent?.match(/Original task details\./g)).toHaveLength(1)
+    fireEvent.click(screen.getByText('agent.task.externalTools'))
+    await screen.findByText('agent.task.capabilitySummary 2 1 1')
+    expect(screen.getByRole('button', { name: 'agent.task.copyCommand agent.task.commandTrace' })).toBeTruthy()
   } finally { scroll.mockRestore(); height.mockRestore() }
+})
+
+it('does not repeat the task body when the dispatched text is unchanged', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    const value = detail('one')
+    ;(value.task as any).title = 'Short task name'
+    value.task.intent_json = JSON.stringify({ goal: 'One unchanged task body' })
+    return { data: value }
+  })
+  render(<AgentTasks cid="conversation" selectedTask="one" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByRole('heading', { name: 'Short task name' })
+  expect(screen.getAllByText('One unchanged task body')).toHaveLength(1)
+  expect(screen.queryByText('agent.task.currentDispatch')).toBeNull()
 })
 
 

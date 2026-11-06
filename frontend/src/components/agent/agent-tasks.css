@@ -1,4 +1,8 @@
-.agent-tasks { display:flex; flex-direction:column; gap:var(--sp-3); min-height:0; max-height:calc(100dvh - var(--kb) - var(--safe-t) - var(--safe-b) - var(--sp-5) * 6); overflow:auto; overscroll-behavior:contain; padding-right:var(--sp-1); }
+.agent-tasks { display:flex; flex-direction:column; gap:var(--sp-3); min-height:0; max-height:calc(100dvh - var(--kb) - var(--safe-t) - var(--safe-b) - var(--sp-5) * 6); overflow:auto; overscroll-behavior:contain; padding-right:var(--sp-1); container:task-detail / inline-size; }
+/* 详情按「实际可用宽度」排版：右栏工作台里的详情和对话弹窗都窄，按 viewport 分栏会把它们压扁。 */
+.agent-task-layout { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
+.agent-task-main { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
+.agent-task-side { display:flex; flex-direction:column; min-width:0; }
 .agent-task-wrap { padding-bottom:calc(var(--kb) + var(--safe-b)); box-sizing:border-box; }
 .agent-tasks .tt-act { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); min-height:var(--tap); min-width:var(--tap); padding:var(--sp-1) var(--sp-2); }
 .agent-task-section-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
@@ -23,16 +27,22 @@
 .agent-task-state[data-state="running"],.agent-task-state[data-state="succeeded"] { color:var(--ok); background:var(--ok-soft); }
 .agent-task-state[data-state="waiting_user"],.agent-task-state[data-state="interrupted"] { color:var(--warn); background:var(--warn-soft); }
 .agent-task-state[data-state="failed"] { color:var(--danger); background:var(--danger-soft); }
+.agent-task-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-3); color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-task-meta > span { display:inline-flex; align-items:center; gap:var(--sp-1); min-width:0; }
+.agent-task-meta .agent-task-executor { color:var(--text-bright); font-weight:500; }
+.agent-task-meta .agent-task-workspace { max-width:100%; padding:2px var(--sp-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:var(--bg-container); border-radius:var(--r-pill); font-size:var(--fs-micro); }
 .agent-tasks p { margin:0; }
 .agent-task-section { display:flex; flex-direction:column; gap:var(--sp-2); padding-top:var(--sp-3); border-top:1px solid var(--border-subtle); }
 .agent-task-section h4 { font-size:var(--fs-sm); font-weight:500; margin:0; }
 .agent-task-result { overflow-wrap:anywhere; white-space:pre-wrap; font-size:var(--fs-body); }
 .agent-task-workspace { color:var(--text-dim); font-size:var(--fs-meta); overflow-wrap:anywhere; }
-.agent-task-note { padding:var(--sp-3); border-radius:var(--r-xs); color:var(--text-bright); background:var(--warn-soft); font-size:var(--fs-sm); }
+.agent-task-note { max-width:76ch; padding:var(--sp-3); border-radius:var(--r-xs); color:var(--text-bright); background:var(--warn-soft); font-size:var(--fs-sm); }
 .agent-task-note.error { background:var(--danger-soft); }
 .agent-task-resource { display:flex; flex-direction:column; gap:var(--sp-2); padding-block:var(--sp-2); }
 .agent-task-resource b { font-size:var(--fs-body); font-weight:500; overflow-wrap:anywhere; }
-.agent-task-artifact { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--sp-2) var(--sp-3); padding-block:var(--sp-3); border-bottom:1px solid var(--border-subtle); }
+.agent-task-artifact-list { display:flex; flex-direction:column; min-width:0; }
+.agent-task-artifact { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--sp-2) var(--sp-3); margin-inline:calc(-1 * var(--sp-2)); padding:var(--sp-3) var(--sp-2); border-bottom:1px solid var(--border-subtle); border-radius:var(--r-xs); }
+:where(html[data-pointer="fine"]) .agent-task-artifact:hover { background:var(--list-hover); }
 .agent-task-artifact:last-child { border-bottom:0; }
 .agent-task-file-icon { display:flex; align-items:center; color:var(--text-dim); }
 .agent-task-file-info { min-width:0; overflow-wrap:anywhere; }
@@ -47,7 +57,25 @@ html[data-size="compact"] .agent-task-file-actions { grid-column:2; justify-self
 .agent-task-artifact small { display:block; }
 .agent-task-preview { width:100%; max-height:calc(var(--tap) * 6); object-fit:contain; background:var(--bg-container); border-radius:var(--r-xs); }
 .agent-task-disclosure { align-self:flex-start; }
+.agent-tasks .agent-task-disclosure { min-width:0; height:var(--ctl-h); min-height:var(--ctl-h); padding:0 var(--sp-2); border-color:transparent; color:var(--text-dim); }
+.agent-tasks .agent-task-disclosure-row { width:100%; justify-content:flex-start; text-align:left; }
+.agent-tasks .agent-task-disclosure > svg { flex:none; }
+.agent-tasks .agent-task-disclosure[aria-expanded="true"] { color:var(--text-bright); }
+:where(html[data-pointer="fine"]) .agent-tasks .agent-task-disclosure:hover { color:var(--text-bright); background:var(--list-hover); }
+html[data-pointer="coarse"] .agent-tasks .agent-task-disclosure { height:auto; min-height:var(--tap); }
 .agent-task-disclosure[aria-expanded="true"] > svg { transform:rotate(90deg); }
+.agent-task-template { display:flex; flex-direction:column; gap:var(--sp-2); margin:0; }
+.agent-task-template > div { display:grid; grid-template-columns:minmax(4.5em, auto) minmax(0, 1fr); gap:var(--sp-3); align-items:baseline; }
+.agent-task-template dt { color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-task-template dd { margin:0; font-size:var(--fs-sm); overflow-wrap:anywhere; }
+.agent-task-delta { display:flex; flex-direction:column; gap:var(--sp-1); padding:var(--sp-2) var(--sp-3); border-left:2px solid var(--accent-border); border-radius:var(--r-xs); background:var(--accent-soft); }
+.agent-task-delta b { color:var(--text-dim); font-size:var(--fs-meta); font-weight:500; }
+.agent-task-delta p { font-size:var(--fs-sm); overflow-wrap:anywhere; white-space:pre-wrap; }
+.agent-task-command { display:flex; align-items:center; gap:var(--sp-2); }
+.agent-task-command code { flex:1; min-width:0; padding:var(--sp-1) var(--sp-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:var(--bg-container); border-radius:var(--r-xs); font-size:var(--fs-meta); }
+.agent-task-command .tt-act { flex:none; }
+.agent-task-capabilities { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
+.agent-task-section h4 .agent-task-count { margin-left:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; }
 .agent-task-attempt { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); font-size:var(--fs-sm); padding-block:var(--sp-2); border-bottom:1px solid var(--border-subtle); }
 .agent-task-attempt time { font-size:var(--fs-meta); color:var(--text-dim); margin-left:auto; }
 .agent-task-attempt .agent-task-result { flex-basis:100%; }
@@ -87,14 +115,48 @@ html[data-pointer="coarse"] .agent-task-filters > button::after { content:''; po
 .agent-task-card-meta .agent-task-state[data-state="unknown"] { color:var(--warn); }
 .agent-task-card-meta time { margin-left:auto; font-variant-numeric:tabular-nums; }
 
-.agent-task-outcome > p:last-child { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.agent-task-outcome { max-width:76ch; padding:var(--sp-3); border-top:0; border-radius:var(--r-card); background:var(--bg-container); }
+.agent-task-outcome h4 { color:var(--text-dim); }
+.agent-task-outcome > p:last-child { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; color:var(--text-bright); font-size:var(--fs-body); }
 .agent-task-requirements summary { gap:var(--sp-2); cursor:pointer; min-height:var(--tap); display:flex; align-items:center; font-size:var(--fs-sm); color:var(--text-dim); }
 .agent-task-delivery-link { align-self:flex-start; }
 
 .agent-task-requirements[open] > summary > svg { transform:rotate(90deg); }
 
-.agent-task-description { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-body); }
+.agent-task-description { max-width:76ch; white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-body); }
 .agent-task-description.clipped { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+/* 追加要求是输入卡：独立内容块，用容器面与卡片圆角，不再和正文挤成一条长表单。 */
+.agent-task-composer { max-width:76ch; padding:var(--sp-3); border-top:0; border-radius:var(--r-card); background:var(--bg-container); }
+.agent-task-composer > label { color:var(--text-dim); font-size:var(--fs-sm); }
+.agent-task-composer-actions { display:flex; justify-content:flex-end; }
+html[data-size="compact"] .agent-task-composer-actions .ant-btn,
+html[data-size="medium"] .agent-task-composer-actions .ant-btn { flex:1; }
+
+/* 宽容器两栏：正文一列、执行信息一列。容器宽度而不是视口——右栏与任务弹窗本身很窄，
+   按视口分栏会把它们压扁。 */
+@container task-detail (min-width: 1060px) {
+  .agent-task-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,340px); column-gap:var(--sp-5); align-items:start; }
+  .agent-task-layout > .agent-task-heading,
+  .agent-task-layout > .agent-task-meta { grid-column:1 / -1; }
+  .agent-task-layout > .agent-task-meta { padding-bottom:var(--sp-3); border-bottom:1px solid var(--border-subtle); }
+  .agent-task-layout > .agent-task-main { grid-column:1; }
+  .agent-task-layout > .agent-task-side { grid-column:2; }
+  .agent-task-layout > .agent-task-main > :first-child,
+  .agent-task-layout > .agent-task-side > :first-child { border-top:0; padding-top:0; }
+  .agent-task-layout > .agent-task-heading h3 { font-size:var(--fs-title); line-height:1.25; }
+}
+
+/* 超宽工作区：右栏提到标题右侧，结果文件两列。否则标题与状态、文件名与下载按钮之间隔着一千多岁像素的空白。 */
+@container task-detail (min-width: 1600px) {
+  .agent-task-layout { grid-template-rows:auto auto 1fr; }
+  .agent-task-layout > .agent-task-heading { grid-column:1; grid-row:1; }
+  .agent-task-layout > .agent-task-meta { grid-column:1; grid-row:2; }
+  .agent-task-layout > .agent-task-main { grid-column:1; grid-row:3; }
+  .agent-task-layout > .agent-task-side { grid-column:2; grid-row:1 / span 3; }
+  .agent-task-artifact-list { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:var(--sp-5); }
+  .agent-task-artifact { margin-inline:0; border-bottom:0; border-top:1px solid var(--border-subtle); }
+}
 
 .agent-task-record { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
 .agent-task-conversation { display:flex; flex-direction:column; gap:var(--sp-3); min-width:0; }
