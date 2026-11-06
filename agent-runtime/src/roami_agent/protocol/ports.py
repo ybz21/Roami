@@ -25,6 +25,16 @@ class TurnWriter(Protocol):
     async def origin(self, turn: dict) -> dict | None: ...
     async def start(self, turn: dict) -> str: ...
     async def delta(self, turn: dict, mid: str, text: str, delta: str) -> None: ...
+    async def preview(
+        self,
+        turn: dict,
+        mid: str,
+        text: str | None,
+        state: str = "generating",
+        *,
+        clipped: bool = False,
+    ) -> None: ...
+
     async def finish(
         self,
         turn: dict,

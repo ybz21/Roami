@@ -80,3 +80,43 @@ it('opens project task commands in a scoped phone subpage and returns to the sam
   await waitFor(() => expect(screen.queryByText('Tasks for project-main')).toBeNull())
   expect(screen.getByRole('textbox', { name: 'okr.chatInput' })).toBeTruthy()
 })
+
+it('streams provisional prose through both hosts, keeps checking visible, then replaces it once', async () => {
+  render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} />
+    <OkrMainChat embedded projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.size).toBe(2))
+  for (const cid of ['home', 'project-main']) {
+    await emit(cid, { id: 1, kind: 'message.started', branchId: 'branch', payload: { messageId: 'draft', turnId: 'turn' } })
+    await emit(cid, { id: 2, kind: 'reply.preview', branchId: 'branch', payload: { messageId: 'draft', turnId: 'turn', offset: 0, text: '正文😀', state: 'generating' } })
+  }
+  await waitFor(() => expect(screen.getAllByText('正文😀')).toHaveLength(2))
+  expect(screen.getAllByText('agent.replyPreview.generating')).toHaveLength(2)
+  expect(screen.queryByRole('button', { name: 'agent.remember' })).toBeNull()
+  for (const cid of ['home', 'project-main']) {
+    await emit(cid, { id: 3, kind: 'reply.preview', branchId: 'branch', payload: { messageId: 'draft', turnId: 'turn', offset: 3, text: '继续', state: 'checking' } })
+    await emit(cid, { id: 4, kind: 'message.tool_calls', branchId: 'branch', payload: { messageId: 'draft', calls: [{ id: 'reply-call' }] } })
+  }
+  await waitFor(() => expect(screen.getAllByText('正文😀继续')).toHaveLength(2))
+  expect(screen.getAllByText('agent.replyPreview.checking')).toHaveLength(2)
+  for (const cid of ['home', 'project-main']) {
+    await emit(cid, { id: 5, kind: 'message.started', branchId: 'branch', payload: { messageId: 'approved', turnId: 'turn' } })
+    await emit(cid, { id: 6, kind: 'message.delta', branchId: 'branch', payload: { messageId: 'approved', turnId: 'turn', offset: 0, text: '正文😀继续' } })
+    await emit(cid, { id: 7, kind: 'message.completed', branchId: 'branch', payload: { messageId: 'approved', turnId: 'turn' } })
+  }
+  await waitFor(() => expect(screen.getAllByText('正文😀继续')).toHaveLength(2))
+  expect(document.querySelectorAll('.agent-reply-preview')).toHaveLength(0)
+  expect(screen.getAllByRole('button', { name: 'agent.remember' })).toHaveLength(2)
+})
+
+it('withdraws a failed candidate and ignores its late preview event', async () => {
+  render(<App><OkrMainChat embedded projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.has('project-main')).toBe(true))
+  await emit('project-main', { id: 1, kind: 'message.started', branchId: 'branch', payload: { messageId: 'draft', turnId: 'turn' } })
+  await emit('project-main', { id: 2, kind: 'reply.preview', branchId: 'branch', payload: { messageId: 'draft', turnId: 'turn', offset: 0, text: 'Provisional only', state: 'generating' } })
+  await screen.findByText('Provisional only')
+  await emit('project-main', { id: 3, kind: 'turn.failed', branchId: 'branch', payload: { turnId: 'turn', error: 'MODEL_HTTP_500' } })
+  await waitFor(() => expect(screen.queryByText('Provisional only')).toBeNull())
+  await emit('project-main', { id: 4, kind: 'reply.preview', branchId: 'branch', payload: { messageId: 'draft', turnId: 'turn', offset: 0, text: 'Late candidate', state: 'generating' } })
+  expect(screen.queryByText('Late candidate')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'agent.remember' })).toBeNull()
+})

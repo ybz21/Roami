@@ -72,7 +72,7 @@ function Footer({ m, align, actions }: { m: Msg; align: 'flex-start' | 'flex-end
   )
 }
 
-function Prose({ blocks, accent, side, resolveHref }: { blocks: Block[]; accent: string; side: Side; resolveHref?: ResolveHref }) {
+function Prose({ blocks, accent, side, resolveHref, allowImages }: { allowImages?: boolean; blocks: Block[]; accent: string; side: Side; resolveHref?: ResolveHref }) {
   const { t } = useI18n()
   const thinkLabel = side === 'claude' ? t('chat.thinking') : t('chat.reasoning')
   return (
@@ -82,7 +82,7 @@ function Prose({ blocks, accent, side, resolveHref }: { blocks: Block[]; accent:
           const text = b.text === REDACTED_THINKING ? t('chat.thinkingRedacted') : localizeSentinels(b.text || '', t)
           return <Collapsible key={i} label={thinkLabel} text={text} color="var(--text-dim)" />
         }
-        return <Markdown key={i} accent={accent} resolveHref={resolveHref}>{localizeSentinels(b.text || '', t)}</Markdown>
+        return <Markdown key={i} accent={accent} resolveHref={resolveHref} allowImages={allowImages}>{localizeSentinels(b.text || '', t)}</Markdown>
       })}
     </>
   )
@@ -163,7 +163,7 @@ function UserMessage({ m, accent, renderUserText }: { m: Msg; accent: string; re
   )
 }
 
-export const ChatMessage = memo(function ChatMessage({ m, results, side, renderUserText, resolveHref, footerActions }: { m: Msg; results: Record<string, Block>; side: Side; renderUserText?: (text: string) => ReactNode; resolveHref?: ResolveHref; footerActions?: ReactNode }) {
+export const ChatMessage = memo(function ChatMessage({ m, results, side, renderUserText, resolveHref, footerActions, allowImages }: { allowImages?: boolean; m: Msg; results: Record<string, Block>; side: Side; renderUserText?: (text: string) => ReactNode; resolveHref?: ResolveHref; footerActions?: ReactNode }) {
   const accent = 'var(--accent)'
   const solid = 'var(--accent-solid)'
 
@@ -187,7 +187,7 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side, renderU
         </div>
       ) : (
         <div key={i} style={{ background: 'var(--bg-container)', border: '1px solid var(--border)', borderRadius: 'var(--r-card)', padding: 'var(--sp-2) var(--sp-3)', color: 'var(--text-bright)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
-          <Prose blocks={sg.blocks} accent={accent} side={side} resolveHref={resolveHref} />
+          <Prose blocks={sg.blocks} accent={accent} side={side} resolveHref={resolveHref} allowImages={allowImages} />
         </div>
       )))}
       {hasProse && <Footer m={m} align="flex-start" actions={footerActions} />}

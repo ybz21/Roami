@@ -19,6 +19,7 @@ from roami_agent.protocol.ports import (
     ToolInvoker,
     TurnWriter,
 )
+from roami_agent.protocol.reply_stream_preview import ReplyStreamPreview
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_batches import invalid_ending_batch
 
@@ -165,6 +166,13 @@ class AgentLoop:
                     mid = await self.journal.start(turn)
                     text, calls, usage, buffer, flushed = "", [], None, "", self.clock()
                     first_delta = True
+                    preview = ReplyStreamPreview(
+                        tool_final,
+                        lambda value, state, clipped, message_id=mid: self.journal.preview(
+                            turn, message_id, value, state, clipped=clipped
+                        ),
+                        self.clock,
+                    )
                     phase = "model"
                     if role == "main":
                         self.preemptible.add(tid)
@@ -178,6 +186,8 @@ class AgentLoop:
                         async for part in model.stream(prompt, catalog):
                             elapsed = (self.clock() - model_started) * 1000
                             if part.kind == "telemetry":
+                                if part.value.get("phase") == "retry":
+                                    await preview.reset()
                                 if len(timing["providerEvents"]) < 16:
                                     timing["providerEvents"].append(
                                         dict(part.value, elapsedMs=elapsed)
@@ -210,10 +220,13 @@ class AgentLoop:
                                     await self.journal.delta(turn, mid, text, buffer)
                                     buffer, flushed = "", self.clock()
                                     first_delta = False
+                            elif part.kind == "tool_delta":
+                                await preview.observe(part.value)
                             elif part.kind == "tool":
                                 calls.append(part.value)
                             elif part.kind == "usage":
                                 usage = part.value
+                    await preview.finish(calls)
                     self.preemptible.discard(tid)
                     phase = "tools"
                     invalid_reply = (
@@ -318,6 +331,14 @@ class AgentLoop:
                             if missing_final_tool
                             else await self.gateway.invoke(turn, mid, call, role, binding)
                         )
+                        if (
+                            preview.seen
+                            and call["function"]["name"] == "reply"
+                            and not (
+                                isinstance(value, dict) and isinstance(value.get("reply"), str)
+                            )
+                        ):
+                            await self.journal.preview(turn, mid, None)
                         if isinstance(value, dict) and value.get("finalizeFromEvidence") is True:
                             finalizing = True
                             finalization_error = value.get("error")

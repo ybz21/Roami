@@ -4,6 +4,7 @@ import json
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.reply_previews import public_preview_message
 from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import owned
 
@@ -44,14 +45,25 @@ def message_view(value, completed=None, *, compact=True):
         content = {
             k: v
             for k, v in content.items()
-            if k in {"text", "question", "sessionReply", "taskStatus", "attachments", "tool_calls"}
+            if k
+            in {
+                "text",
+                "question",
+                "sessionReply",
+                "taskStatus",
+                "attachments",
+                "tool_calls",
+                "replyPreview",
+            }
         }
         if len(content.get("text", "")) > 2000:
             content["text"] = content["text"][:2000]
             truncated = True
         if content.get("tool_calls"):
             content["tool_calls"] = [{"id": call.get("id")} for call in content["tool_calls"]]
-        if len(json.dumps(content, ensure_ascii=False).encode()) > 12000:
+        if len(json.dumps(content, ensure_ascii=False).encode()) > (
+            40_000 if content.get("replyPreview") else 12_000
+        ):
             content = {"text": str(content.get("text") or "")[:2000]}
             truncated = True
     return {
@@ -164,7 +176,9 @@ def conversation_page(db, owner, cid, branch=None, *, before=None, anchor=None, 
                     aliases[entry["id"]] = source["id"]
                     continue
         visible.append(entry)
-    messages = [message_view(m, completed.get(m["id"])) for m in visible]
+    messages = [
+        message_view(public_preview_message(db, m), completed.get(m["id"])) for m in visible
+    ]
     while len(json.dumps(messages, ensure_ascii=False).encode()) > 220000 and len(messages) > 1:
         messages.pop(0)
         visible.pop(0)
@@ -227,4 +241,4 @@ def message_detail(db, owner, cid, mid, branch=None):
     )
     if not value:
         raise DomainError("MESSAGE_NOT_FOUND", 404)
-    return message_view(value, compact=False)
+    return message_view(public_preview_message(db, value), compact=False)

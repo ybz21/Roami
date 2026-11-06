@@ -76,6 +76,9 @@ def context_history(db, branch_id, through_turn=None):
     for group in groups.values():
         for m in group:
             content = json.loads(m["content_json"])
+            if "replyPreview" in content:
+                content.pop("replyPreview")
+                m = dict(m, content_json=encoded(content))
             if content.get("attachments"):
                 previews, evidence = context_attachments(db, owner, content)
                 content.update(attachmentPreviews=previews, attachmentEvidence=evidence)
