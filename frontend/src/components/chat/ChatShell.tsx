@@ -15,6 +15,7 @@ import { LiveTail } from './LiveTail'
 import { useLayout } from '../../layout'
 import { ArrowToBottom, ArrowUp, ChevronDown, FileTextIcon, PaperclipIcon, TerminalIcon } from '../../icons'
 import { SESSION_MIME, buildIntro, canDrop, readDrag, type SessionDrag } from '../shell/session-drop'
+import { sessionDraftKey } from './session-draft'
 import { useAgentDraft } from '../agent/useAgentDraft'
 import { currentNodeId } from '../cluster/node-url'
 import { sessionDisplay } from '../sessions/session-label'
@@ -62,7 +63,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   active?: boolean
 }) {
   const live = active !== false
-  const draftKey = 'roami.session.draft:' + (currentNodeId() || '') + ':' + name
+  const draftKey = sessionDraftKey(name)
   const [input, editInput] = useAgentDraft(draftKey)
   const inputRef = useRef(input); inputRef.current = input
   const setInput = (value: string | ((previous: string) => string)) => {
@@ -277,7 +278,11 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     try {
       if (onSend) await onSend(text)
       else await api('POST', '/tasks/_/send', { sess: name, msg: text, activity: 'dialogue' })
-      if (inputRef.current === original) setInput('')
+      if (inputRef.current === original) {
+        let unchanged = true
+        try { unchanged = (localStorage.getItem(draftKey) || '') === original } catch { /* Keep sending without storage. */ }
+        if (unchanged) setInput('')
+      }
       atBottom.current = true
       setOutbox((q) => [...q, { id: q.length ? q[q.length - 1].id + 1 : 1, text }])
     }

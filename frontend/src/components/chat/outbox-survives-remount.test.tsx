@@ -106,3 +106,17 @@ it('keeps the original session draft through remount and uses a managed sender w
   expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/tasks/_/send'), expect.anything())
   cleanup(); vi.unstubAllGlobals()
 })
+
+it('does not clear a newer draft when the old mounted sender finishes after switching conversations', async () => {
+  localStorage.clear(); localStorage.setItem('ttmux-locale','zh-CN')
+  vi.stubGlobal('ResizeObserver',ResizeObserverStub)
+  vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
+  let resolve!: () => void
+  const pending = new Promise<void>(done => { resolve=done })
+  const chat = () => <I18nProvider><AntApp><ChatShell name="late-draft-session" accent="var(--accent)" placeholder="late draft" messages={[]} renderMessage={()=>null} onSend={()=>pending}/></AntApp></I18nProvider>
+  const first=render(chat());fireEvent.change(screen.getByPlaceholderText('late draft'),{target:{value:'Original request'}});fireEvent.click(screen.getByRole('button',{name:'发送'}));first.unmount()
+  const second=render(chat());fireEvent.change(screen.getByPlaceholderText('late draft'),{target:{value:'Newer unsent message'}})
+  resolve();await waitFor(()=>expect((screen.getByPlaceholderText('late draft') as HTMLTextAreaElement).value).toBe('Newer unsent message'))
+  second.unmount();render(chat());expect((screen.getByPlaceholderText('late draft') as HTMLTextAreaElement).value).toBe('Newer unsent message')
+  cleanup();vi.unstubAllGlobals()
+})

@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import ManagedSwarm from './ManagedSwarm'
 import type { SwarmSnapshot } from './swarm-protocol'
 
 const test = vi.hoisted(() => ({ sessions: [{ name: "real-session", agent: "codex", dormant: false }] as { name: string; agent: string; dormant: boolean; projectKey?: string }[], mainTurns: null as { state: string }[] | null, nativeSessions: [] as { taskId: string; revision: number; lifecycle: string }[], phone: false, api: vi.fn(), refresh: vi.fn(), openTask: vi.fn(), error: vi.fn(), data: null as SwarmSnapshot | null }))
+vi.mock('../chat/CodexChat', () => ({ default: ({ name, onSend }: { name: string; onSend: (text: string) => Promise<void> }) => {
+  const key = 'roami.session.draft::' + name, [value, edit] = useState(() => localStorage.getItem(key) || '')
+  return <><textarea value={value} onChange={event => { edit(event.target.value); localStorage.setItem(key, event.target.value) }} /><button onClick={() => { void onSend(value) }}>common.send</button></>
+} }))
 vi.mock('../../session-overview', () => ({ useSessionOverview: () => ({ value: test.sessions, failed: false }) }))
 vi.mock('../agent/useAgentThread', () => ({ useAgentThread: (cid: string) => ({ view: cid && test.mainTurns ? { turns: test.mainTurns, messages: [] } : null, refresh: test.refresh }) }))
 vi.mock('../agent/useAgentData', () => ({ useAgentData: () => ({ value: test.nativeSessions, failed: false }) }))
@@ -372,7 +376,7 @@ it('keeps the phone member identity in the heading and puts secondary details in
   expect(heading.querySelector('.swarm-detail-actions')).toBeNull()
   const more = heading.querySelector('details')!
   expect(more.querySelector('button')?.textContent).toBe('swarm.member.details')
-  expect(test.api).not.toHaveBeenCalled()
+  expect(test.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
 })
 
 it('returns from a phone collaboration member to that conversation without sending', () => {
@@ -502,6 +506,8 @@ it('keeps a missing historical recipient draft out of Main without deleting it',
 function registeredTeam() {
   test.data!.memberProtocol = 1
   test.data!.work[0].memberId = 'role'
+  test.data!.work[0].attempt!.sessionId = 'real-session'
+  test.api.mockImplementation((method: string) => Promise.resolve({ data: method === 'GET' ? { task: { id: 'task', revision: 1, executor: 'codex' }, attempts: [{ id: 'run', revision: 1, sessionId: 'real-session' }] } : {} }))
   test.data!.members = [{ id: 'role', swarm_id: 'sw-one', name: 'frontend', executor: 'codex', dutyPreview: 'Maintain the interface', workId: 'work', taskId: 'task', taskRevision: 1, state: 'waiting_user', memoryPath: 'members/role/memory.md', roundCount: 3 }]
 }
 it('restores an exact old work draft to the stable role without changing its destination', async () => {
@@ -510,10 +516,10 @@ it('restores an exact old work draft to the stable role without changing its des
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   chooseConversation('role')
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('role')
-  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep working')
+  expect((await screen.findByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep working')
   fireEvent.click(screen.getByRole('button', { name: 'common.send' }))
-  await waitFor(() => expect(test.api).toHaveBeenCalledOnce())
-  expect(test.api.mock.calls[0][2]).toMatchObject({ workId: 'work', taskRevision: 1 })
+  await waitFor(() => expect(test.api).toHaveBeenCalledTimes(2))
+  expect(test.api.mock.calls[1][2]).toMatchObject({ workId: 'work', taskRevision: 1 })
   expect(within(screen.getByRole('navigation', { name: 'swarm.conversation.list' })).getAllByRole('button', { name: 'frontend' })).toHaveLength(1)
 })
 it('keeps an idle registered role visible but never sends its draft through Main implicitly', () => {
@@ -522,8 +528,8 @@ it('keeps an idle registered role visible but never sends its draft through Main
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: 'frontend', pressed: false }))
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('role')
-  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'A new request' } })
-  expect((screen.getByRole('button', { name: 'common.send' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'common.send' })).toBeNull()
   expect(screen.getByText('swarm.member.unassigned')).toBeTruthy()
   expect(test.api).not.toHaveBeenCalled()
 })
@@ -541,27 +547,27 @@ it('a failed deferred lookup returns to the current task instead of the old task
   test.api.mockImplementationOnce(() => new Promise((_resolve, failure) => { reject = failure }))
   const terminal = vi.fn(), view = render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
   chooseConversation('role')
-  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.openSession' }))
   test.data = { ...test.data!, work: [{ ...test.data!.work[0], task_id: 'current-task' }], members: [{ ...test.data!.members![0], taskId: 'current-task' }] }
   view.rerender(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
   reject(new Error('network failed'))
+  fireEvent.click(await screen.findByRole('button', { name: 'swarm.managed.openTask' }))
   await waitFor(() => expect(test.openTask).toHaveBeenCalledWith('tasks', 'current-task'))
   expect(test.openTask).not.toHaveBeenCalledWith('tasks', 'task')
   expect(terminal).not.toHaveBeenCalled()
 })
 it('loads role history only on demand and preserves the chat recipient and draft', async () => {
   registeredTeam()
-  test.api.mockResolvedValueOnce({ data: { member: { ...test.data!.members![0], duty: 'Durable responsibility' }, rounds: { items: [], hasMore: false, nextBefore: null } } })
+  const implementation = test.api.getMockImplementation()!
+  test.api.mockImplementation((method: string, path: string) => path === '/agent/swarms/sw-one/members/role' ? Promise.resolve({ data: { member: { ...test.data!.members![0], duty: 'Durable responsibility' }, rounds: { items: [], hasMore: false, nextBefore: null } } }) : implementation(method, path))
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   chooseConversation('role')
-  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Preserve this draft' } })
-  expect(test.api).not.toHaveBeenCalled()
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Preserve this draft' } })
+  expect(test.api.mock.calls.some(call => call[1].includes('/members/'))).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'swarm.member.details' }))
   expect(await screen.findByText('Durable responsibility')).toBeTruthy()
-  expect(test.api).toHaveBeenCalledOnce()
-  expect(test.api.mock.calls[0]).toEqual(['GET', '/agent/swarms/sw-one/members/role'])
+  expect(test.api.mock.calls.filter(call => call[1].includes('/members/'))).toEqual([['GET', '/agent/swarms/sw-one/members/role']])
   fireEvent.click(screen.getByRole('button', { name: 'common.close' }))
-  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Preserve this draft')
+  expect((await screen.findByRole('textbox') as HTMLTextAreaElement).value).toBe('Preserve this draft')
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('role')
 })
 
@@ -641,7 +647,9 @@ it.each(['project', 'Main'])('rejects a %s binding changed during the session lo
 })
 
 it('focuses bound roles while retaining unknown history and exact task routing', async () => {
-  const current = snapshot().work[0]
+  const current = snapshot().work[0]; current.attempt!.sessionId = 'real-session'
+  test.sessions[0].projectKey = 'project'
+  test.api.mockImplementation((method: string) => Promise.resolve({ data: method === 'GET' ? { task: { id:'task', revision:1, executor:'codex', projectId:'project' }, attempts:[{ id:'run', revision:1, sessionId:'real-session' }] } : {} }))
   test.data = { ...snapshot(), target: { projectId: 'project' }, memberProtocol: 1, members: [
     { id: 'member', swarm_id: 'sw-one', name: 'frontend', executor: 'codex', dutyPreview: 'Build', workId: 'work', taskId: 'task', taskRevision: 1, state: 'waiting_user', memoryPath: '', roundCount: 1 },
     { id: 'old', swarm_id: 'sw-one', name: 'old-run', executor: 'codex', dutyPreview: 'Old', workId: 'old-work', taskId: 'old-task', taskRevision: 1, state: 'unknown', memoryPath: '', roundCount: 1 },
@@ -655,7 +663,7 @@ it('focuses bound roles while retaining unknown history and exact task routing',
   expect(history.textContent).toContain('old-run')
   expect(history.textContent).toContain('swarm.managed.state.unknown')
   fireEvent.click(within(directory).getByRole('button', { name: 'Content' }))
-  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Continue this role' } })
+  fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Continue this role' } })
   fireEvent.click(screen.getByRole('button', { name: 'common.send' }))
   await waitFor(() => expect(test.api).toHaveBeenCalledWith('POST', '/agent/swarms/sw-one/messages', expect.objectContaining({ text: 'Continue this role', workId: 'work', taskRevision: 1 })))
   showTasks()

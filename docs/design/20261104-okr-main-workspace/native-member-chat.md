@@ -14,7 +14,7 @@
 
 `SwarmConversations` 调整目录顺序。`ManagedSwarm` 持有工作区开合、页签、任务筛选；`swarm-task-filter` 依照现有任务列表的活跃/结束/待处理状态分类，运行中但执行器状态 unknown 进入待处理。
 
-`SwarmMemberChat` 仅服务具有明确持久实例的成员；旧数据继续使用既有任务消息视图。身份键包含节点、项目、Main、成员、任务、revision、run 和实例完整绑定。只在该键变化或显式恢复时 GET 任务，不增加按成员轮询。加载取消且旧键结果不渲染；每次渲染用共享会话概览重新核对 CLI 存活、执行器和归属。
+`SwarmMemberChat` 仅服务具有明确持久实例的成员；已注册的旧 CLI 成员即使没有 instance 字段，也可用原任务/轮次/run 与宿主持久项目 home、存活会话核验后复用原聊天；缺少可信身份则保留恢复入口。身份键包含节点、项目、Main、成员、任务、revision、run 和实例完整绑定。只在该键变化或显式恢复时 GET 任务，不增加按成员轮询。加载取消且旧键结果不渲染；每次渲染用共享会话概览重新核对 CLI 存活、执行器和归属。
 
 `swarm-member-session` 核对实例 taskId、conversationId 与独立 branch，任务/attempt 的 revision 和 run、执行器、项目、关闭状态。Roami 进一步核对 nativeSessionId / conversationId；`NativeSession` 的嵌入模式以预期任务、项目、conversation、branch、revision、open lifecycle 验证真实元数据。CLI 复用 `CodexChat` / `ClaudeChat` / `OpenCodeChat`，相同 session 名读取原转录。
 
@@ -24,4 +24,6 @@
 
 ## 验收记录
 
-实现与验收中；以 PR 内最终检查、截图和部署回执为准。
+#714 已合入、Web/CLI 已部署，桌面 205 文件 / 1501 项、四档宽度、紧凑模拟通过。真实项目发现两个旧 CLI 注册成员 instance 为空，继续补齐兼容并重新打开 #713；不能将新版协议 fixture 通过当作实际旧成员通过。
+
+旧成员转入原生聊天时，将原 work/成员草稿一次性迁入同节点/原 session 的全局草稿；已有全局草稿优先，原文保留且相同旧文本不重复迁回。原不确定投递保留原 commandKey 和 taskRevision，绝不按最新轮次自动重写请求。
