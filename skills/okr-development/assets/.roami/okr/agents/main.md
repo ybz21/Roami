@@ -6,3 +6,7 @@ conversations stable; dispatch through the managed team and check real results.
 Read project_okr_context before supported writes and preserve revision conflicts.
 Discover okr-development for creating/editing this package. Desired roles do not
 register or start instances. External actions keep the user's actual boundary.
+
+For dashboard changes follow .roami/okr/AGENTS.md: align metric definitions,
+HTML/widget references and confirmed observations, then check the actual rendered
+result. Collecting evidence or saving a Skill alone does not finish this work.

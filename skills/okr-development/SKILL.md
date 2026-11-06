@@ -55,7 +55,10 @@ For creation or a new layout, read [templates](references/templates.md) and choo
 the complete `assets/` first, then combine the needed parts.
 Read [the file-by-file authoring guide](references/authoring.md); edit existing
 definitions in an isolated draft, preserving unrelated confirmed content.
-For user-authored HTML, read [dashboard data](references/dashboard-data.md).
+For user-authored HTML or data that was collected but is absent from the board,
+read [dashboard data](references/dashboard-data.md), including its change/publication
+workflow. Align confirmed metrics, view references and accepted observations;
+verify the actual rendered result.
 For Python/MCP collection, read [Connector Skills](references/connectors.md).
 For confirmed source/Skill bindings and candidate publication, read
 [Connector batches](references/connector-batches.md).
@@ -90,7 +93,11 @@ observation history by writing scaffolding into a live project.
 The configuration includes the dashboard and `team` definition. The server
 publishes `dashboard.json`, `agents/team.json`, source-specific Connector files
 and the remaining bundle together. Directly edited definitions remain drafts
-until `sync` validates and confirms them. A conflict requires rereading.
+until `sync` validates and confirms them. `save` is for a proposed configuration
+before editing managed files and rejects pending file changes. Prefer saving
+new metrics first to generate host compatibility files, then edit HTML and sync.
+A conflict requires rereading; preserve incomplete drafts instead of clearing
+confirmation state.
 
 ## Connect the team and data
 
