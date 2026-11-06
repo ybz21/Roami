@@ -7,16 +7,92 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from fastapi import FastAPI
+from test_runtime import ConversationModel
 from test_swarm_collaboration import advance, item, plan
 from test_swarm_collaboration import collaboration as collaboration_fixture
 from test_swarm_project_scopes import create_project
 from test_swarm_project_scopes import scoped_swarms as scoped_swarms_fixture
 
+from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.swarm_routes import mount_swarm_routes
+from roami_agent.storage.database import row
 
 collaboration = collaboration_fixture
 scoped_swarms = scoped_swarms_fixture
+
+
+@pytest.fixture
+async def main_admission(store):
+    runtime = Runtime(store, ConversationModel())
+    main = await runtime.conversations.create("alice", project_id="project-a")
+    accepted = await runtime.conversations.accept("alice", main["id"], "goal", "协调原团队")
+    job = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?", (accepted["turnId"],)
+        )
+    )
+    turn = await runtime.mailbox.claim(job)
+    binding = {"conversation": main["id"], "turnId": turn["id"], "leaseEpoch": turn["lease_epoch"]}
+    team = await runtime.swarms.create(
+        "alice",
+        {
+            "name": "Team",
+            "goal": "协调原团队",
+            "mainConversationId": main["id"],
+            "target": {"kind": "project", "projectId": "project-a"},
+            "commandKey": "create",
+        },
+        binding=binding,
+    )
+    try:
+        yield runtime, team, binding, turn
+    finally:
+        await runtime.close()
+
+
+async def test_durable_main_stop_rejects_a_late_post_without_losing_old_receipt(main_admission):
+    runtime, team, binding, _ = main_admission
+    original = {"commandKey": "original", "text": "已回报"}
+    posted = await runtime.swarms.post("alice", team["id"], original, binding=binding)
+    await runtime.chat.interrupt("alice", team["mainConversationId"], "stop")
+    before = await totals(runtime.swarms)
+    with pytest.raises(DomainError, match="TURN_INTERRUPTED"):
+        await runtime.swarms.post(
+            "alice", team["id"], {"commandKey": "late", "text": "迟到写入"}, binding=binding
+        )
+    assert await totals(runtime.swarms) == before
+    assert await runtime.swarms.post("alice", team["id"], original, binding=binding) == posted
+
+
+async def test_stopped_main_cannot_mark_inbox_read(main_admission):
+    runtime, team, binding, _ = main_admission
+    await runtime.swarms.post(
+        "alice", team["id"], {"commandKey": "question", "text": "待确认", "kind": "question"}
+    )
+    await runtime.chat.interrupt("alice", team["mainConversationId"], "stop")
+    with pytest.raises(DomainError, match="TURN_INTERRUPTED"):
+        await runtime.swarms.inbox("alice", team["id"], {}, binding=binding)
+    preview = await runtime.swarms.inbox("alice", team["id"], {})
+    assert len(preview["items"]) == 1 and preview["items"][0]["readMs"] is None
+
+
+@pytest.mark.parametrize("change", ["lease", "ended", "missing"])
+async def test_main_binding_must_still_name_the_current_running_turn(main_admission, change):
+    runtime, team, binding, turn = main_admission
+    if change == "lease":
+        binding = {**binding, "leaseEpoch": binding["leaseEpoch"] - 1}
+    elif change == "missing":
+        binding = {**binding, "turnId": "missing"}
+    else:
+        mid = await runtime.journal.start(turn)
+        await runtime.journal.finish(turn, mid, "完成", [], None, 1, final=True, completion=None)
+    before = await totals(runtime.swarms)
+    with pytest.raises(DomainError, match="SWARM_MAIN_TURN_REQUIRED"):
+        await runtime.swarms.post(
+            "alice", team["id"], {"commandKey": "late", "text": "迟到写入"}, binding=binding
+        )
+    assert await totals(runtime.swarms) == before
 
 
 @pytest.fixture

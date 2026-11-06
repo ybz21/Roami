@@ -12,6 +12,8 @@ schema24使用独立 `swarm_post_routes` 保存新消息的路由与来源，不
 
 `storage/swarm_inbox.py`负责稳定作者、业务去重、路由与收件箱；`dispatch/swarm_plans.py`保持受管fresh身份检查并在同一事务调用。`tools/swarm_catalog.py`、私有member-post入口和真实CLI保留新字段；Main/成员通过绑定入口读取各自收件箱，人的只读预览不冒充Main已读。快照只投影真实递送状态；页面不新增工具栏或内部ID输入。
 
+带turn上下文的Main读写还在实际writer事务中检查原Main当前运行回合、活动分支、lease（宿主提供时）及持久stop/遗忘保护。不能只在工具预检时检查一次：已停止但仍在返回中的post调用会被拒绝，不留下新消息或命令回执；已存在的原命令仍可取回原回执。停止后取收件箱也不伪造已读。无turn的旧内部绑定保持兼容，不作为新模型或CLI的身份入口。
+
 ## 随后接入宿主协调，不能偷换成user唤醒
 
 协调批次另有宿主持久登记，绑定原目标委托、原Main、活动分支和冻结的message集合。`continuation`只是已有turn类型，不等于授权。Core的origin、PromptBuilder、reply来源审核、请求coverage及TaskRevisions均必须显式识别经过核验的批次，不能去取最近一条用户消息当授权。普通completion保护保留。
