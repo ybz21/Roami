@@ -69,3 +69,40 @@ scripts, frames/forms/workers; the document response also enforces sandboxing.
 Do not describe this as a complete network/CPU sandbox for arbitrary JavaScript:
 self-navigation remains possible. Use reviewed project-authored views. No secret
 or host capability belongs in the data stream. A second frame load closes it.
+
+
+## Change a view after collecting a new field
+
+A successful source read may return a field the current dashboard never declared.
+Read the confirmed context and actual dashboard assets first. Match the requested
+field to its metric ID, unit, source/account/item and measurement window. Reuse an
+existing matching metric; add the requested metric if absent. Do not repurpose an
+unrelated metric (plays cannot stand in for completion percentage or watch time).
+Observed zero and unavailable data have different meanings.
+
+For JSON views update dashboard.widgets. For HTML views update the confirmed
+metric definitions, dashboard.html.metricIds allowlist and the corresponding
+HTML/JS rendering together. A static data-metric attribute is only a template
+convention: page.js must read that same ID with okr.data.read and subscribe.
+Preserve unrelated resources and widgets. Data belongs in accepted observations,
+not hardcoded HTML, another private JSON file or a database fetched by the frame.
+
+Use save for a proposed config before editing managed files. Once files have
+changed, use revision-checked sync for the complete bundle; save rejects pending
+changes. For new metrics, prefer save first to generate host compatibility files,
+then edit the HTML and sync. Older unbound manual metrics require the exported
+connector.json and unchanged store.go reference as well; these are compatibility
+artifacts, not executable custom Connectors. Preserve incomplete drafts and use
+the host's existing export structure, rather than deleting confirmation state.
+Then independently review evidence and
+publish through record using the host's actual protocol: a bound Connector Skill
+uses its confirmed batch identity; an unbound manual metric uses the manual
+observation operation. See [Connector batches](connector-batches.md). Re-read on
+conflicts; never hand-edit current.json, dated exports or the runtime database.
+
+Accept the change only after checking each link: confirmed metric -> declared
+view reference -> accepted observation for the same metric/source -> dataset API
+-> actual rendered value. Preserve prior history. Report the platform's as-of
+time separately from when collection occurred, and name any values still unknown.
+A saved raw file, Skill registration, sent request or agent message is not proof
+that a value reached the dashboard. Main owns this final publication and check.

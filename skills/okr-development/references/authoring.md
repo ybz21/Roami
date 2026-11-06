@@ -23,6 +23,7 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | --- | --- | --- |
 | 项目 AGENTS.md | 指向 .roami/okr/AGENTS.md，团队/重要事项/个人记忆位置，产物目录 | 不替换已有项目规则 |
 | .roami/okr/AGENTS.md | 团队协作、当轮产物、独立验收、消息来源与记忆约定 | 不把自述当验收，不绕过 unknown |
+| manuals/ | 看板编辑、取数入库、协作与日常运行的实际手册，由 AGENTS.md 路由 | 不把模板占位符当运行记录 |
 | okr.json | objective、日期、metrics、keyResults、initiatives、当前 revision、实际 swarm、autoCollect | 不塞观测、运行回执或虚构实例 |
 | dashboard.json | schema1/widgets 或支持宿主上的 schema2/html 入口、资产与指标绑定 | 不把任意 HTML 写进现有 widget.type |
 | dashboard/index.html | 用户自己的 HTML 布局；一指标一卡，组件绑定清晰 | 不读绝对路径、数据库、鉴权凭证 |
@@ -85,3 +86,8 @@ README 的 projectName 与所有配置中的 {{...}} 是有意的模板参数，
 新宿主报告 connectorSkillBatches 后，可把 source 提案填实并加入配置 connectors。
 按 [批次协议](connector-batches.md) 确认包摘要、保存原始证据，再由 Main record；
 旧宿主保留提案，继续已支持路径。目录名与 SKILL frontmatter.name 要一致。
+
+
+## 项目操作手册
+
+完整 assets/. 同时复制 manuals/README.md 及 dashboard/data/team/daily 手册。AGENTS.md 保留职责、必读入口和验收规则，具体改文件、确认定义、记录数据、原实例协作和日常运行的操作放手册。创建项目时按实际能力、来源和目录补充，不能把模板里的示例和命令占位符当成已执行结果。修改既有项目时合并原有手册，不覆盖用户定制说明。
