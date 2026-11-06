@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OkrMainChat from './OkrMainChat'
-import { emptyConfiguration } from './okr-workspace'
+import { emptyConfiguration, type Workspace } from './okr-workspace'
 const state = vi.hoisted(() => ({ api: vi.fn(), refresh: vi.fn(), thread: vi.fn(), globalNode: null as string | null }))
 vi.mock('../../../api', () => ({ api: state.api }))
 vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: false, size: 'large' }) }))
@@ -153,4 +153,35 @@ it('does not create or send on a newly selected node before React re-renders', a
   await screen.findByRole('alert')
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep this project request')
+})
+
+
+it.each([false, true])('describes the confirmed HTML and role capabilities to Main (HTML=%s)', async htmlSupported => {
+  const draft = emptyConfiguration()
+  const workspace: Workspace = { ...savedWorkspace(), dashboard: htmlSupported
+    ? { schemaVersion: 2, widgets: [], html: { entry: 'dashboard/index.html', assets: ['dashboard/index.html'], metricIds: ['users'], libraries: ['echarts'] } }
+    : { schemaVersion: 1, widgets: [{ id: 'users', type: 'metricTrend' }] },
+    team: { schemaVersion: 1, roles: [{ id: 'data', name: 'Data', executor: 'native', duty: 'Review facts', memberId: 'a'.repeat(32) }] },
+    projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 1, teamRoleBindings: true, htmlDashboardSupported: htmlSupported },
+  }
+  render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
+  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Change the dashboard using these files' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
+  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
+  const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
+  expect(context.projectContext.htmlDashboardSupported).toBe(htmlSupported)
+  expect(context.projectContext.teamRoleBindings).toBe(true)
+  expect(context.team).toEqual(workspace.team)
+  expect(context.dashboard).toEqual(workspace.dashboard)
+  expect(payload).toContain('保留当前职责到原成员的绑定')
+  if (htmlSupported) {
+    expect(payload).toContain('也支持schemaVersion:2')
+    expect(payload).toContain('先放未引用资产再save')
+    expect(payload).not.toContain('组件仅支持keyResults')
+  } else {
+    expect(payload).toContain('组件仅支持keyResults')
+    expect(payload).not.toContain('也支持schemaVersion:2')
+  }
 })

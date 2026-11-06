@@ -36,6 +36,7 @@ type confirmedPointer struct {
 }
 
 type confirmedSnapshot struct {
+	DashboardBundle  string               `json:"dashboardBundle,omitempty"`
 	Workspace        Workspace            `json:"workspace"`
 	Evidence         map[string]Workspace `json:"evidence"`
 	ReferenceSources map[string]string    `json:"referenceSources,omitempty"`
@@ -370,7 +371,7 @@ func (s *Store) getFiles(projectID string) (*Workspace, error) {
 	}
 	w := &snapshot.Workspace
 	w.ProjectID = projectID
-	if err := s.decorate(root, w); err != nil {
+	if err := s.decorateConfirmed(root, w, snapshot.DashboardBundle); err != nil {
 		return nil, err
 	}
 	return w, nil
@@ -391,7 +392,7 @@ func (s *Store) migrateFiles(projectID string) (*Workspace, error) {
 	if err == nil {
 		w := &snapshot.Workspace
 		w.ProjectID = projectID
-		if err := s.decorate(root, w); err != nil {
+		if err := s.decorateConfirmed(root, w, snapshot.DashboardBundle); err != nil {
 			return nil, err
 		}
 		return w, nil
@@ -444,7 +445,7 @@ func (s *Store) migrateFiles(projectID string) (*Workspace, error) {
 	if _, err := s.db.Exec(`INSERT OR IGNORE INTO file_workspaces(project_id) VALUES(?)`, projectID); err != nil {
 		return nil, err
 	}
-	if err := s.decorate(root, legacy); err != nil {
+	if err := s.decorateConfirmed(root, legacy, snapshot.DashboardBundle); err != nil {
 		return nil, err
 	}
 	return legacy, nil
@@ -549,6 +550,18 @@ func workingConfig(root *os.Root) (Config, error) {
 }
 
 func (s *Store) decorate(root *os.Root, w *Workspace) error {
+	digest := ""
+	if w.Dashboard != nil && w.Dashboard.HTML != nil {
+		snapshot, err := loadSnapshot(root)
+		if err != nil {
+			return err
+		}
+		digest = snapshot.DashboardBundle
+	}
+	return s.decorateConfirmed(root, w, digest)
+}
+
+func (s *Store) decorateConfirmed(root *os.Root, w *Workspace, dashboardDigest string) error {
 	if err := s.seedWorkflow(root, w.ProjectID); err != nil {
 		return err
 	}
@@ -589,6 +602,14 @@ func (s *Store) decorate(root *os.Root, w *Workspace) error {
 		a, _ := json.Marshal(c)
 		b, _ := json.Marshal(confirmed)
 		metadata.PendingChanges = !bytes.Equal(a, b)
+	}
+	metadata.HTMLDashboardSupported = true
+	if w.Dashboard != nil && w.Dashboard.HTML != nil {
+		metadata.DashboardDigest = dashboardDigest
+		bundle, err := captureDashboard(root, w.Dashboard)
+		if err != nil || bundle == nil || bundle.Digest != dashboardDigest {
+			metadata.PendingChanges = true
+		}
 	}
 	w.ProjectFiles = metadata
 	var main projectMainDefinition
@@ -696,6 +717,17 @@ func publish(root *os.Root, snapshot *confirmedSnapshot, writeDefinitions bool) 
 		snapshot.ReferenceSources = map[string]string{}
 	}
 	if writeDefinitions {
+		bundle, err := captureDashboard(root, w.Dashboard)
+		if err != nil {
+			return err
+		}
+		snapshot.DashboardBundle = ""
+		if bundle != nil {
+			if err := persistDashboard(root, bundle); err != nil {
+				return err
+			}
+			snapshot.DashboardBundle = bundle.Digest
+		}
 		if err := definitions(root, w, snapshot.ReferenceSources); err != nil {
 			return err
 		}
@@ -808,7 +840,7 @@ func (s *Store) mutateFiles(projectID string, revision int64, create bool, chang
 	if _, err := s.db.Exec(`INSERT OR IGNORE INTO file_workspaces(project_id) VALUES(?)`, projectID); err != nil {
 		return nil, err
 	}
-	if err := s.decorate(root, w); err != nil {
+	if err := s.decorateConfirmed(root, w, snapshot.DashboardBundle); err != nil {
 		return nil, err
 	}
 	return w, nil

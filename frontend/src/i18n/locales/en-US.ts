@@ -1,4 +1,6 @@
 const enUS = {
+  'okr.html.editFiles': 'This dashboard uses project HTML files. Ask Main to change it.',
+  'okr.html.loadFailed': 'The dashboard could not load. Check its files and try again.',
   'okr.tab.okr': 'OKR',
   'okr.tab.dashboard': 'Dashboard',
   'okr.tab.status': 'Current status',

@@ -20,7 +20,7 @@ assets/                         # 复制后的项目根目录
     ├── README.md
     ├── okr.json                 # O、KR、指标、实施手段
     ├── dashboard.json           # 当前可用的看板组件和数据绑定
-    ├── dashboard/               # 自定义 HTML 看板草稿
+    ├── dashboard/               # 自定义 HTML 看板（须确认宿主支持）
     │   ├── index.html
     │   ├── style.css
     │   └── page.js
@@ -53,5 +53,6 @@ assets/                         # 复制后的项目根目录
 `examples/` 是可选业务案例。项目 Main 和成员的真实实例、确认数据、有效调度由实际
 注册和执行产生，初始化模板不预造这些结果。
 
-自定义 HTML 的只读数据 SDK、通用 Connector Skill 执行与每日调度仍需宿主接通；
-当前可运行路径使用已支持的 JSON 看板、内置取数和人工核验数据。
+自定义 HTML 先检查宿主 htmlDashboardSupported，再使用 parts/dashboard/html 清单和只读 SDK。
+旧宿主继续使用 JSON 看板。通用 Connector Skill 执行与每日调度仍需对应适配器和实际注册回执，
+当前内置取数和人工核验路径继续可用。

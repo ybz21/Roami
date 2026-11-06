@@ -1,10 +1,16 @@
+import { Suspense } from 'react'
+import { lazyRetry } from '../../lazy-retry'
+import { Spin } from 'antd'
 import { useI18n } from '../../../i18n'
 import { dashboardOf, resultOverview, type Workspace } from './okr-workspace'
 import OkrResult from './OkrResult'
 import OkrTrend from './OkrTrend'
 
-export default function OkrDashboard({ workspace }: { workspace: Workspace }) {
+const OkrHtmlDashboard = lazyRetry(() => import('./OkrHtmlDashboard'))
+
+export default function OkrDashboard({ workspace, active = true, onRefresh }: { workspace: Workspace; active?: boolean; onRefresh?: () => void }) {
   const { t } = useI18n()
+  if (workspace.dashboard?.html) return <Suspense fallback={<Spin />}><OkrHtmlDashboard workspace={workspace} active={active} onRefresh={onRefresh} /></Suspense>
   const widgets = dashboardOf(workspace).widgets.filter(widget => ['keyResults', 'metricTrend'].includes(widget.type))
   const cards = widgets.flatMap(widget => {
     if (widget.type === 'keyResults') {

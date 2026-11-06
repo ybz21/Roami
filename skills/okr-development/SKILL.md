@@ -40,8 +40,9 @@ Produce the objective/KRs/methods, dashboard definition, user HTML/CSS/JS,
 Connector Skill packages, desired team, instructions/memory locations and a
 schedule proposal. Show the resulting runtime preview and meaningful diff.
 Apply only supported definitions with the current project revision, then reread
-the actual result. Keep unsupported HTML/Skill-scheduler definitions as drafts;
-current JSON widgets and builtin/manual sources remain the compatibility path.
+the actual result. Check `projectFiles.htmlDashboardSupported` before enabling custom HTML.
+Keep unsupported HTML or Skill-scheduler definitions as drafts; schema1 widgets
+and builtin/manual sources remain available on older hosts.
 
 A template choice does not replace long-lived members in an existing project.
 Saving the desired team, registering it, dispatching work and activating a daily

@@ -1,35 +1,71 @@
 # User HTML and dashboard data
 
-Store dashboard/index.html, style.css and page.js under .roami/okr/.
-Dashboard.json is the entry/binding authority. Existing schema1 widget rendering
-works today; HTML entry/SDK loading is a proposed extension, not a current API.
-Use existing ECharts for trends/bars, token-based number/progress cards and
-semantic tables. Let the user choose their HTML/layout; React is not required.
+Copy the complete `assets/.` first. Dashboard HTML/CSS/JS live at
+`.roami/okr/dashboard/`; `dashboard.json` declares the entry, asset files,
+metric IDs and optional host libraries. Check `projectFiles.htmlDashboardSupported`
+on the current workspace before enabling schema2. Older hosts use schema1 widgets.
+The reusable schema2 overlay is `parts/dashboard/html/dashboard.json`.
 
-The proposed read-only API is:
+## Write the view
+
+Use ordinary HTML/CSS/JS. React and a build step are not required. Cards/tables
+use semantic HTML and host tokens; optional `libraries: ["echarts"]` provides the
+installed ECharts build after `okr.ready()`, without a CDN. The complete template
+supports number cards and the trend/bar fragment in `parts/dashboard/`.
 
 ```js
-const metric = await okr.data.read("github-stars");
-render(metric);
-const unsubscribe = okr.data.subscribe("github-stars", render);
+await okr.ready();
+const draw = data => { element.textContent = data.latest.value ?? "Unknown"; };
+draw(await okr.data.read("github-stars"));
+const unsubscribe = okr.data.subscribe("github-stars", draw);
+window.addEventListener("pagehide", unsubscribe);
 ```
 
-A dataset contains snapshotId/revision, latest(value/unit), points(date/value),
-source, asOf/capturedAt and quality/lastError. Null means unknown. A failed run
-keeps the previous value and data version; its status can change independently.
+`okr.data.ids` lists declared metric IDs. `read(id)` returns a fresh copy;
+`subscribe(id, callback)` receives later snapshots and returns unsubscribe.
+Only IDs declared in the confirmed manifest are readable. There is no database,
+file-path, credential, write, project-switch or arbitrary host API. Use
+`okr.context.locale/theme/size/pointer/revision` and injected design tokens.
+Redraw charts when a subscription arrives; dispose charts/listeners on pagehide.
+Use ResizeObserver for chart dimensions, and `data-size`/`data-pointer` for layout.
 
-The host reads the project-bound confirmed snapshot and passes only declared
-bindings through this iframe's MessageChannel. HTML receives no database, server
-path, credential, project switch, write API or arbitrary host capability. Sharing
-one page-owned fetch/subscription prevents per-card polling. Hidden/closed views
-release their subscription and reconcile the current version on return.
+A dataset has id/name/unit, snapshotId/revision, latest(value/date/capturedAt),
+points(date/value), source(kind/identity/resource), asOf, quality and lastError.
+Null means unknown; observed zero stays zero. Same-day corrections use the latest
+appended fact, and a changed source excludes old-source history. `quality` is
+currently observed/unknown. `lastError: null` does **not** assert collector health:
+the confirmed workspace does not yet expose per-collector failure/freshness state.
+A failed collection preserves the last successful observation.
 
-The Go file publisher writes dated observations and immutable snapshots, then
-atomically switches state/current.json. Data/observations.jsonl is an export, not
-a second import endpoint. Runtime SQLite owns schedules/jobs/runs/retries;
-large source detail may remain in its source DB. Do not create dual metric masters.
+## Confirm assets and data
 
-Custom HTML must not execute inside the main app DOM. A production loader needs
-confirmed assets, source-isolated iframe/handshake, a scoped read-only bridge,
-resource policy, theme/locale and lifecycle handling. CSP is not a complete network
-sandbox for arbitrary JS. Do not describe the prototype as that production loader.
+Declare UTF-8 .html/.css/.js assets under dashboard/ (up to 32 files, 1 MiB each,
+2 MiB total), and include the entry. Relative script src and stylesheet href are
+rewritten from these exact assets. Inline scripts/styles and data images work.
+Remote resources, forms, embedded frames, refresh meta and project-relative paths
+outside dashboard/ are rejected. Bundle module imports before publishing; bare
+imports and a network module loader are unsupported. CSS imports/fonts are not
+host-resolved. Use system fonts and the provided tokens.
+
+Save/sync with the current project revision confirms the files and records an
+immutable content digest. Edits stay pending until confirmed, even if observations
+or reviews advance meanwhile. Invalid assets cannot replace the confirmed view.
+The host serves only that digest and a project-bound readonly snapshot stream.
+The page's existing shared refresh drives all cards; do not add per-card polling.
+Switching projects/nodes, hiding/closing the page or leaving the tab closes the
+channel and frame. Returning rereads the current confirmed configuration.
+
+The Go publisher stores observations/reviews and immutable snapshots in the OKR
+bundle and atomically switches state/current.json. Observations.jsonl is an
+export, not a second import endpoint. SQLite owns runtime schedules/jobs/runs;
+never invent a schedule or mutate current.json to claim a Connector ran.
+
+## Browser boundary
+
+The host uses a sandboxed iframe with an opaque origin and a single MessageChannel.
+It injects the SDK before user scripts and transfers only declared datasets,
+locale/theme/tokens and requested host libraries. CSP denies fetch/socket, remote
+scripts, frames/forms/workers; the document response also enforces sandboxing.
+Do not describe this as a complete network/CPU sandbox for arbitrary JavaScript:
+self-navigation remains possible. Use reviewed project-authored views. No secret
+or host capability belongs in the data stream. A second frame load closes it.
