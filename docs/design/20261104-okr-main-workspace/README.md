@@ -173,3 +173,5 @@
 - [桌面左侧返回](back-navigation.md)（#726）。
 
 - [Main 与成员的指令边界](member-instruction-scope.md)：限定续派、授权来源和原实例验收。
+
+- [指定日程的调度范围](scoped-scheduler.md)：原 Main 的日更执行与其他日程隔离。
