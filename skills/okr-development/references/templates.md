@@ -20,7 +20,7 @@ change against the latest revision rather than applying a whole template blindly
 
 Fill `{{startDate}}`, `{{endDate}}`, `{{githubRepo}}` and agreed numeric targets
 before validation. Do not turn missing baseline/access into zero. Config seeds
-use supported widgets and source protocols; general Connector Skill execution still needs its documented host adapter.
+use supported widgets and source protocols; Connector Skills require the host connectorSkillBatches capability for confirmed publication.
 For HTML, check `projectFiles.htmlDashboardSupported` before selecting schema2.
 
 Start by copying `assets/.` into an empty draft, preserving .roami.
@@ -46,3 +46,9 @@ the metrics grid when needed. The optional `echarts` library is host supplied;
 remove it for number/table-only layouts. Fill dashboardWaiting/unknownValue and
 visible labels in the user's language. Bind one card to each intended dataset.
 Do not copy this overlay to a host without the HTML capability.
+
+The complete template contains an unbound `connectors/source/` Skill proposal;
+fill it and select Python/MCP parts before adding it to configuration.connectors.
+The GitHub overlay includes its complete file/binding declaration and a preparation
+script. Keep existing custom code until reviewed; copy parts into a draft first,
+not over an existing live package. See [Connector batches](connector-batches.md).

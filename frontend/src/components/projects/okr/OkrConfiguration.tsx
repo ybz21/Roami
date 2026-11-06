@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Button, Checkbox, Input, InputNumber, Select } from 'antd'
 import { useI18n } from '../../../i18n'
 import { PlusIcon, TrashIcon } from '../../../icons'
-import { dashboardOf, stableId, type Configuration, type DashboardWidget, type Initiative, type KeyResult, type Metric } from './okr-workspace'
+import { dashboardOf, metricConnector, stableId, type Configuration, type DashboardWidget, type Initiative, type KeyResult, type Metric } from './okr-workspace'
 
 export function OkrField({ label, children }: { label: string; children: ReactNode }) {
   return <label className="okr-field"><span>{label}</span>{children}</label>
@@ -50,18 +50,19 @@ export default function OkrConfiguration({ value, onChange, onSave, onCancel, bu
         <OkrField label={t('okr.endDate')}><input type="date" required min={value.startDate} value={value.endDate} onChange={e => patch({ endDate: e.target.value })} /></OkrField>
       </div>
       <h3>{t('okr.metrics')}</h3>
-      {value.metrics.map(m => <section className="okr-editor-row" key={m.id}>
+      {!!value.connectors?.length && <p className="okr-muted">{t('okr.connectorManaged')}</p>}
+      {value.metrics.map(m => { const connector = metricConnector(value, m.id); return <section className="okr-editor-row" key={m.id}>
         <div className="okr-grid">
           <OkrField label={t('okr.metricName')}><Input required value={m.name} onChange={e => metric(m.id, { name: e.target.value })} /></OkrField>
           <OkrField label={t('okr.unit')}><Input value={m.unit} onChange={e => metric(m.id, { unit: e.target.value })} /></OkrField>
-          <OkrField label={t('okr.source')}><Select disabled={busy} aria-label={t('okr.source')} value={m.source} onChange={source => metric(m.id, { source })} options={(['manual', 'github'] as const).map(source => ({ value: source, label: t('okr.source.' + source) }))} /></OkrField>
+          <OkrField label={t('okr.source')}>{connector ? <span>{connector.name}</span> : <Select disabled={busy} aria-label={t('okr.source')} value={m.source} onChange={source => metric(m.id, { source })} options={(['manual', 'github'] as const).map(source => ({ value: source, label: t('okr.source.' + source) }))} />}</OkrField>
           {m.source === 'github' && <>
-            <OkrField label={t('okr.repo')}><Input required value={m.repo || ''} placeholder={t('okr.repoPlaceholder')} onChange={e => metric(m.id, { repo: e.target.value })} /></OkrField>
-            <OkrField label={t('okr.githubField')}><Select disabled={busy} aria-label={t('okr.githubField')} value={m.field} onChange={field => metric(m.id, { field })} options={['stars', 'forks'].map(field => ({ value: field, label: t('okr.github.' + field) }))} /></OkrField>
+            <OkrField label={t('okr.repo')}><Input disabled={!!connector} required value={m.repo || ''} placeholder={t('okr.repoPlaceholder')} onChange={e => metric(m.id, { repo: e.target.value })} /></OkrField>
+            <OkrField label={t('okr.githubField')}><Select disabled={busy || !!connector} aria-label={t('okr.githubField')} value={m.field} onChange={field => metric(m.id, { field })} options={['stars', 'forks'].map(field => ({ value: field, label: t('okr.github.' + field) }))} /></OkrField>
           </>}
         </div>
-        <Button danger icon={<TrashIcon />} disabled={value.keyResults.some(k => k.metricId === m.id) || dashboard.html?.metricIds.includes(m.id)} onClick={() => patch({ metrics: value.metrics.filter(x => x.id !== m.id), ...(value.dashboard ? { dashboard: { ...value.dashboard, widgets: value.dashboard.widgets.map(item => ({ ...item, metricIds: item.metricIds?.filter(id => id !== m.id) })) } } : {}) })}>{t('okr.removeMetric')}</Button>
-      </section>)}
+        <Button danger icon={<TrashIcon />} disabled={!!connector || value.keyResults.some(k => k.metricId === m.id) || dashboard.html?.metricIds.includes(m.id)} onClick={() => patch({ metrics: value.metrics.filter(x => x.id !== m.id), ...(value.dashboard ? { dashboard: { ...value.dashboard, widgets: value.dashboard.widgets.map(item => ({ ...item, metricIds: item.metricIds?.filter(id => id !== m.id) })) } } : {}) })}>{t('okr.removeMetric')}</Button>
+      </section> })}
       <Button icon={<PlusIcon />} onClick={() => patch({ metrics: [...value.metrics, { id: stableId('m'), name: '', unit: '', source: 'manual' }] })}>{t('okr.addMetric')}</Button>
       <h3>{t('okr.keyResults')}</h3>
       {value.keyResults.map(k => <section className="okr-editor-row" key={k.id}>

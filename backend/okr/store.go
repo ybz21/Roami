@@ -136,7 +136,7 @@ func (s *Store) Save(projectID string, c Config) (*Workspace, error) {
 
 // Validate the effective configuration after preserving fields omitted by older clients.
 func (s *Store) SaveValidated(projectID string, c Config, validateConfig func(*Config) error) (*Workspace, error) {
-	if c.Dashboard != nil && c.Dashboard.HTML != nil && s.projects == nil {
+	if (c.Dashboard != nil && c.Dashboard.HTML != nil || len(c.Connectors) > 0) && s.projects == nil {
 		return nil, ErrInvalid
 	}
 	if err := validate(&c); err != nil {
@@ -161,6 +161,16 @@ func (s *Store) SaveValidated(projectID string, c Config, validateConfig func(*C
 		if err := validate(&w.Config); err != nil {
 			return err
 		}
+		if len(w.Connectors) > 0 {
+			root, err := s.openBundle(projectID, false)
+			if err != nil {
+				return err
+			}
+			defer root.Close()
+			if err := confirmConnectorPackages(root, &w.Config, true); err != nil {
+				return err
+			}
+		}
 		if validateConfig != nil {
 			return validateConfig(&w.Config)
 		}
@@ -169,6 +179,9 @@ func (s *Store) SaveValidated(projectID string, c Config, validateConfig func(*C
 }
 
 func applyConfig(w *Workspace, c Config) {
+	if c.Connectors == nil {
+		c.Connectors = w.Connectors
+	}
 	if c.Team == nil {
 		c.Team = w.Team
 	}
@@ -192,6 +205,10 @@ func applyConfig(w *Workspace, c Config) {
 	for i := range c.Metrics {
 		m := &c.Metrics[i]
 		m.SourceKey = ""
+		if connector, field := connectorMetric(&c, m.ID); connector != nil {
+			m.SourceKey = connectorSourceKey(*connector, field, *m)
+			continue
+		}
 		if m.Source == "manual" {
 			m.SourceKey = "manual:" + m.ID
 			continue
@@ -220,7 +237,7 @@ func (s *Store) Observe(projectID string, revision int64, metricID, date string,
 			return ErrInvalid
 		}
 		for _, m := range w.Metrics {
-			if m.ID == metricID && m.Source == "manual" {
+			if connector, _ := connectorMetric(&w.Config, m.ID); m.ID == metricID && m.Source == "manual" && connector == nil {
 				w.Observations = append(w.Observations, Observation{ID: id.New(), MetricID: m.ID, Date: date, Value: value, Source: "manual", SourceKey: m.SourceKey, CapturedAt: timestamp(s.now()), Note: note})
 				return nil
 			}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Spin } from 'antd'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
-import type { Workspace } from './okr-workspace'
+import { metricConnector, type Workspace } from './okr-workspace'
 
 export default function OkrReviewEvidence({ projectId, reviewId }: { projectId: string; reviewId: string }) {
   const { t, locale } = useI18n()
@@ -39,7 +39,7 @@ export default function OkrReviewEvidence({ projectId, reviewId }: { projectId: 
       <h4>{t('okr.keyResults')}</h4>
       {snapshot.keyResults.map(kr => <p key={kr.id}>{t('okr.snapshotKr', { title: kr.title, metric: snapshot.metrics.find(m => m.id === kr.metricId)?.name || '', mode: t('okr.mode.' + kr.mode), target: number(kr.target), date: date(kr.dueDate) })}</p>)}
       <h4>{t('okr.metrics')}</h4>
-      {snapshot.metrics.map(metric => <div className="okr-version" key={metric.id}><strong>{metric.name}</strong><span>{metric.unit}</span><span>{metric.source === 'github' ? t('okr.githubSource', { repo: metric.repo, field: t('okr.github.' + metric.field) }) : t('okr.source.manual')}</span>{metric.sourceKey && <code>{metric.sourceKey}</code>}</div>)}
+      {snapshot.metrics.map(metric => <div className="okr-version" key={metric.id}><strong>{metric.name}</strong><span>{metric.unit}</span><span>{metricConnector(snapshot, metric.id)?.name || (metric.source === 'github' ? t('okr.githubSource', { repo: metric.repo, field: t('okr.github.' + metric.field) }) : t('okr.source.manual'))}</span>{metric.sourceKey && <code>{metric.sourceKey}</code>}</div>)}
       <h4>{t('okr.snapshotObservations')}</h4>
       {!(snapshot.observations || []).length && <p className="okr-muted">{t('okr.noEvidence')}</p>}
       {(snapshot.observations || []).slice().reverse().map(observation => <div className="okr-version" key={observation.id}>

@@ -172,6 +172,7 @@ const zhCN = {
   'okr.metricName': "指标名称",
   'okr.unit': "单位",
   'okr.source': "来源",
+  'okr.connectorManaged': '与 Main 调整数据来源',
   'okr.source.manual': "手动填报",
   'okr.source.github': "GitHub 公开仓库",
   'okr.repo': "公开仓库",

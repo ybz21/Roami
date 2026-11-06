@@ -5,10 +5,13 @@ it in scripts/; MCP/source contracts belong in references/. Connector.json only
 binds confirmed source/account, metric IDs and workflow identity. It is not a new
 arbitrary-command plugin entrypoint. One request/Skill may serve several metrics.
 
-The current product only executes builtin GitHub and verified manual observations.
-New package discovery, candidate batch publishing and general daily Skill jobs
-are pending. Retain legacy schema1 definitions and their source/history on migration;
-writing a new SKILL.md alone does not activate it. Keep preparation in a draft.
+Read [Connector batches](connector-batches.md) and the current host's
+`projectFiles.connectorSkillBatches`/`connectorBatchProtocol`. Capable hosts confirm
+Skill files, source/account and metric bindings, then accept reviewed batches
+through Main's existing record operation. The host never launches arbitrary code;
+the original authorized member executes Python/MCP and Main reviews its evidence.
+Older hosts keep builtin GitHub/manual compatibility and leave Skill proposals
+unconfirmed. Daily Skill scheduling still needs its real runner and receipt.
 
 Python seed: parts/connectors/github/ contains a real public-data fetcher. Its
 stdout is candidate evidence, never a confirmed observation or publish receipt.

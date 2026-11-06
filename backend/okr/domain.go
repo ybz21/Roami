@@ -97,6 +97,8 @@ type TeamDefinition struct {
 }
 
 type ProjectFiles struct {
+	ConnectorBatchProtocol string         `json:"connectorBatchProtocol,omitempty"`
+	ConnectorSkillBatches  bool           `json:"connectorSkillBatches,omitempty"`
 	TeamRoleBindings       bool           `json:"teamRoleBindings,omitempty"`
 	HTMLDashboardSupported bool           `json:"htmlDashboardSupported,omitempty"`
 	DashboardDigest        string         `json:"dashboardDigest,omitempty"`
@@ -122,28 +124,31 @@ type ProjectSkill struct {
 }
 
 type Config struct {
-	Team        *TeamDefinition `json:"team,omitempty"`
-	Initiatives []Initiative    `json:"initiatives,omitempty"`
-	Dashboard   *Dashboard      `json:"dashboard,omitempty"`
-	Revision    int64           `json:"revision"`
-	Objective   string          `json:"objective"`
-	StartDate   string          `json:"startDate"`
-	EndDate     string          `json:"endDate"`
-	KeyResults  []KeyResult     `json:"keyResults"`
-	Metrics     []Metric        `json:"metrics"`
-	Swarm       string          `json:"swarm"`
-	AutoCollect bool            `json:"autoCollect"`
+	Connectors  []SkillConnector `json:"connectors,omitempty"`
+	Team        *TeamDefinition  `json:"team,omitempty"`
+	Initiatives []Initiative     `json:"initiatives,omitempty"`
+	Dashboard   *Dashboard       `json:"dashboard,omitempty"`
+	Revision    int64            `json:"revision"`
+	Objective   string           `json:"objective"`
+	StartDate   string           `json:"startDate"`
+	EndDate     string           `json:"endDate"`
+	KeyResults  []KeyResult      `json:"keyResults"`
+	Metrics     []Metric         `json:"metrics"`
+	Swarm       string           `json:"swarm"`
+	AutoCollect bool             `json:"autoCollect"`
 }
 
 type Observation struct {
-	ID         string  `json:"id"`
-	MetricID   string  `json:"metricId"`
-	Date       string  `json:"date"`
-	Value      float64 `json:"value"`
-	Source     string  `json:"source"`
-	SourceKey  string  `json:"sourceKey"`
-	CapturedAt string  `json:"capturedAt"`
-	Note       string  `json:"note"`
+	ConnectorID string  `json:"connectorId,omitempty"`
+	BatchID     string  `json:"batchId,omitempty"`
+	ID          string  `json:"id"`
+	MetricID    string  `json:"metricId"`
+	Date        string  `json:"date"`
+	Value       float64 `json:"value"`
+	Source      string  `json:"source"`
+	SourceKey   string  `json:"sourceKey"`
+	CapturedAt  string  `json:"capturedAt"`
+	Note        string  `json:"note"`
 }
 
 type Review struct {
@@ -156,11 +161,12 @@ type Review struct {
 
 type Workspace struct {
 	Config
-	ProjectFiles *ProjectFiles `json:"projectFiles,omitempty"`
-	ProjectID    string        `json:"projectId"`
-	Observations []Observation `json:"observations"`
-	Reviews      []Review      `json:"reviews"`
-	UpdatedAt    string        `json:"updatedAt"`
+	ConnectorBatches []ConnectorBatchReceipt `json:"connectorBatches,omitempty"`
+	ProjectFiles     *ProjectFiles           `json:"projectFiles,omitempty"`
+	ProjectID        string                  `json:"projectId"`
+	Observations     []Observation           `json:"observations"`
+	Reviews          []Review                `json:"reviews"`
+	UpdatedAt        string                  `json:"updatedAt"`
 }
 
 func validDate(s string) bool {
@@ -215,6 +221,9 @@ func validate(c *Config) error {
 		default:
 			return ErrInvalid
 		}
+	}
+	if err := validateConnectorSkills(c); err != nil {
+		return err
 	}
 	keys := map[string]bool{}
 	for _, k := range c.KeyResults {

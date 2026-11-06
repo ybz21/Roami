@@ -112,7 +112,8 @@ This directory belongs to this project. It is created only for a saved OKR.
 - dashboard.json: registered HTML/chart components, order and metric bindings.
 - data/observations.jsonl: dated, versioned facts; a missing value is unknown.
 - data/reviews.jsonl and evidence/: reviews and their original evidence snapshots.
-- connectors/<metric-id>/: source definition and reviewable implementation references.
+- connectors/<source-id>/SKILL.md: reviewed Python/MCP workflows and confirmed source bindings; legacy metric directories remain compatibility references.
+- data/connector-batches.jsonl: exported publication receipts; state snapshots remain authoritative.
 - agents/main.json and main.md: on-demand coordinator configuration and instructions.
 - agents/team.json: desired persistent role definitions; live identities remain with the managed team.
 - agents/swarm.json: the existing managed team's binding; its board/chat remain authoritative.

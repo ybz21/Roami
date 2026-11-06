@@ -206,13 +206,27 @@ func (a *API) ProjectOKRObserve(c *gin.Context) {
 		return
 	}
 	var b struct {
-		Revision int64    `json:"revision"`
-		MetricID string   `json:"metricId"`
-		Date     string   `json:"date"`
-		Value    *float64 `json:"value"`
-		Note     string   `json:"note"`
+		Batch    *okr.ConnectorBatch `json:"batch"`
+		Revision int64               `json:"revision"`
+		MetricID string              `json:"metricId"`
+		Date     string              `json:"date"`
+		Value    *float64            `json:"value"`
+		Note     string              `json:"note"`
 	}
 	if !decodeOKR(c, &b) {
+		return
+	}
+	if b.Batch != nil {
+		if b.MetricID != "" || b.Date != "" || b.Value != nil || b.Note != "" {
+			okrError(c, okr.ErrInvalid)
+			return
+		}
+		w, err := a.ProjectOKR.RecordConnectorBatch(projectID, b.Revision, *b.Batch)
+		if err != nil {
+			okrError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": w})
 		return
 	}
 	if b.Value == nil {

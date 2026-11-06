@@ -3,6 +3,7 @@ package okr
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -103,6 +104,15 @@ func (s *Store) Collect(ctx context.Context, github GitHub, projectID string, re
 				continue
 			}
 			counts[repo] = c
+		}
+		if connector, _ := connectorMetric(&w.Config, m.ID); connector != nil && connector.Identity != fmt.Sprint(c.ID) {
+			s.recordAttempt(retryKey, ErrSource)
+			if !automatic {
+				return nil, ErrSource
+			}
+			failedRepos[repo] = true
+			failures = append(failures, ErrSource)
+			continue
 		}
 		key := sourceKey(c.ID, m.Field)
 		value := c.Stars

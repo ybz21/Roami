@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "metricId": "metric",
-  "execution": "builtin",
-  "builtin": "manual",
-  "implementation": "store.go"
-}
