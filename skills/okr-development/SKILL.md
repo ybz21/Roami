@@ -155,6 +155,13 @@ builtin autoCollect is not that runner. Preserve the original Main and team.
 
 ## Operate and learn
 
+The complete root `assets/AGENTS.md` specifies dashboard/data work, personal and
+team memory, daily/weekly/monthly/yearly archives, project Skills and scoped
+scheduling. Merge these durable sections into an existing project root AGENTS.md
+without losing its own rules. Copy the matching manuals, including memory.md and
+skills.md; links alone do not replace the root working agreement. Preserve real
+identities, evidence and existing customizations.
+
 For an existing team's daily execution, browser validation, recovery, memory and
 scheduling, read [the daily loop](references/daily-loop.md). Use `roami chrome`
 for the actual Main/group/member and dashboard interactions. Preserve the original

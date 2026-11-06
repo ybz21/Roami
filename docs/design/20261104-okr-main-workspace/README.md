@@ -181,3 +181,5 @@
 - [指定日程的调度范围](scoped-scheduler.md)：原 Main 的日更执行与其他日程隔离。
 
 - [同一实例的对话与原生终端](conversation-views.md)：共享切换入口、Pi 转录与隔离验收。
+
+- [完整团队工作约定与手册](team-working-agreement.md)：看板取数、个人/团队/周期记忆、Skill 演进及原 Main 定时改进。
