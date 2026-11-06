@@ -185,3 +185,5 @@
 - [完整团队工作约定与手册](team-working-agreement.md)：看板取数、个人/团队/周期记忆、Skill 演进及原 Main 定时改进。
 
 2026-11-07：[首页与项目 Main 共用对话组件及真实流式边界](conversation-component.md)（#748）。
+
+- [Main 正文流式通道](reply-streaming.md)：真实参数增量、核验与候选生命周期（#748，实现候选）。

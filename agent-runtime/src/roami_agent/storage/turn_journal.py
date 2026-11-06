@@ -1,5 +1,7 @@
 """Transactional assistant messages, streaming deltas and turn outcomes."""
 
+import json
+
 from roami_agent.context.task_evidence import completion_for_reply
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
@@ -7,6 +9,7 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.artifact_links import deliverable_links
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.reply_previews import assert_preview_current, clear_reply_previews
 from roami_agent.storage.transcript_repository import message
 
 
@@ -67,6 +70,7 @@ class TurnJournal:
                 "UPDATE messages SET status='interrupted' WHERE turn_id=? AND status='streaming'",
                 (turn["id"],),
             )
+            clear_reply_previews(db, turn["id"])
             db.execute("UPDATE turns SET state='queued' WHERE id=?", (turn["id"],))
             db.execute(
                 "UPDATE jobs SET state='queued',payload_json=json_set(payload_json,'$.deferred',1) WHERE id=?",
@@ -116,6 +120,7 @@ class TurnJournal:
     async def start(self, turn):
         def write(db):
             assert_context_admitted(db, turn)
+            clear_reply_previews(db, turn["id"])
             mid = message(
                 db,
                 turn["conversation_id"],
@@ -159,6 +164,47 @@ class TurnJournal:
 
         await self.db.call(write, write=True)
 
+    async def preview(self, turn, mid, text, state="generating", *, clipped=False):
+        def write(db):
+            assert_context_admitted(db, turn)
+            epoch = assert_preview_current(db, turn, mid, clearing=text is None)
+            current = row(db, "SELECT content_json FROM messages WHERE id=?", (mid,))
+            content = json.loads(current["content_json"])
+            previous = content.get("replyPreview")
+            if text is None:
+                if not previous:
+                    return
+                content.pop("replyPreview")
+                payload = {"messageId": mid, "turnId": turn["id"], "clear": True}
+            else:
+                value = {"text": text, "state": state, "clipped": clipped, "leaseEpoch": epoch}
+                if previous == value:
+                    return
+                old = previous.get("text", "") if previous else ""
+                reset = not text.startswith(old)
+                offset = 0 if reset else len(old)
+                content["replyPreview"] = value
+                payload = {
+                    "messageId": mid,
+                    "turnId": turn["id"],
+                    "offset": offset,
+                    "text": text[offset:],
+                    "state": state,
+                    "clipped": clipped,
+                    "reset": reset,
+                }
+            db.execute("UPDATE messages SET content_json=? WHERE id=?", (encoded(content), mid))
+            event(
+                db,
+                turn["conversation_id"],
+                "reply.preview",
+                payload,
+                turn_id=turn["id"],
+                message_id=mid,
+            )
+
+        await self.db.call(write, write=True)
+
     async def finish(
         self, turn, mid, text, calls, usage, attempt, *, final, completion, question=None
     ):
@@ -167,7 +213,16 @@ class TurnJournal:
             delivery = text
             if final:
                 delivery = deliverable_links(text, completion_artifacts(db, turn, completion))
+            previous = row(db, "SELECT content_json FROM messages WHERE id=?", (mid,))
+            preview = json.loads(previous["content_json"]).get("replyPreview") if previous else None
             content = {"text": delivery, **({"tool_calls": calls} if calls else {})}
+            if (
+                preview
+                and not final
+                and len(calls) == 1
+                and calls[0].get("function", {}).get("name") == "reply"
+            ):
+                content["replyPreview"] = preview
             if question:
                 content["question"] = question
             if completion:
@@ -244,6 +299,12 @@ class TurnJournal:
 
     async def fail(self, turn, state, code, *, completion=None):
         def write(db):
+            current = row(db, "SELECT lease_epoch FROM turns WHERE id=?", (turn["id"],))
+            if not current or current["lease_epoch"] != turn.get(
+                "lease_epoch", current["lease_epoch"]
+            ):
+                return
+            clear_reply_previews(db, turn["id"])
             db.execute(
                 "UPDATE turns SET state=?,finished_ms=? WHERE id=? AND state='running'",
                 (state, now_ms(), turn["id"]),

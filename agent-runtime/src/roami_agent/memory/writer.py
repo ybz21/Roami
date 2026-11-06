@@ -1,6 +1,7 @@
 """Validate source snapshots and commit inferred candidates separately from confirmed facts."""
 
 import hashlib
+import json
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -51,7 +52,7 @@ def source_snapshot(db, owner, message_id):
             "SELECT e.*,c.owner_id FROM events e JOIN conversations c ON c.id=e.conversation_id WHERE e.id=? AND c.owner_id=? AND c.deleted_ms IS NULL",
             (message_id[6:], owner),
         )
-        if not source:
+        if not source or source["kind"] == "reply.preview":
             raise DomainError("MEMORY_SOURCE_NOT_FOUND", 404)
         source.update(
             id=message_id,
@@ -69,6 +70,10 @@ def source_snapshot(db, owner, message_id):
     )
     if not source:
         raise DomainError("MEMORY_SOURCE_NOT_FOUND", 404)
+    content = json.loads(source["content_json"])
+    if "replyPreview" in content:
+        content.pop("replyPreview")
+        source["content_json"] = encoded(content)
     source["sha256"] = hashlib.sha256(source["content_json"].encode()).hexdigest()
     source.update(message_id=source["id"], event_id=None)
     return source

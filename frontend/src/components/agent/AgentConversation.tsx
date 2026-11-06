@@ -128,7 +128,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const bodies = useMemo(() => (thread.view?.messages || []).filter(m => m.role === 'user' || m.role === 'assistant').map(m => project && m.role === 'user' && m.content.text ? { ...m, content: { ...m.content, text: project.displayText(m.content.text) } } : m), [thread.view?.messages, project?.displayText])
   const settledDispatches = useMemo(() => new Set(bodies.filter(m => ['completed', 'failed'].includes(m.content.sessionReply?.status || '')).map(m => m.content.sessionReply!.dispatchId)), [bodies])
   const timeline = useMemo(() => groupAgentTimeline(agentTimeline(bodies, mainTaskActivities(thread.view?.activities || []))), [bodies, thread.view?.activities])
-  const visible = useMemo(() => bodies.filter(m => m.content.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming'), [bodies])
+  const visible = useMemo(() => bodies.filter(m => m.content.text || m.content.replyPreview?.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming'), [bodies])
   const history = { entries: timeline }
   const prepend = useRef<{ top: number; height: number } | null>(null)
   const older = () => {

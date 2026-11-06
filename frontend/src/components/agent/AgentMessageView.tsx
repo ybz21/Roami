@@ -1,5 +1,6 @@
 import { api } from '../../api'
 import AgentQuestion from './AgentQuestion'
+import AgentReplyPreview from './AgentReplyPreview'
 import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image } from 'antd'
 import { FileTextIcon, NotebookIcon } from '../../icons'
@@ -72,7 +73,8 @@ function AgentMessageView({ item: source, node, focused, remember, canAnswer = f
   const transcript = useMemo<Msg>(() => ({ id: item.id, role: item.role, blocks: item.content.text ? [{ kind: 'text', text: item.content.text }] : [], ...(item.created_ms ? { ts: new Date(item.created_ms).toISOString() } : {}) }), [item.id, item.role, item.content.text, item.created_ms])
   const rememberAction = !readOnly && !item.contentTruncated && assistant && item.status === 'completed' && item.content.text && !item.content.tool_calls?.length ? <button type="button" className="agent-message-action" aria-label={t('agent.remember')} onClick={() => remember(item)}><NotebookIcon size={16} /></button> : undefined
   return <article data-message-id={item.id} data-notification-focus={focused || undefined} className={`agent-message ${item.role}`}>
-    {assistant && item.status === 'streaming' && <span className="agent-typing" aria-label={t('agent.responding')} />}
+    {assistant && item.status === 'streaming' && !item.content.replyPreview && <span className="agent-typing" aria-label={t('agent.responding')} />}
+    {item.content.replyPreview && <AgentReplyPreview value={item.content.replyPreview} messageId={item.id} resolveResource={resolveResource} />}
     {report && <div className="agent-session-reply" role="status"><strong>{t('agent.sessionReply.' + reportStatus)}</strong><code>{report.sessionId}</code><small>{t('agent.sessionReply.unverified')}</small></div>}
     {item.content.text && <ChatMessage m={transcript} results={{}} side="native" resolveHref={resolveResource} footerActions={rememberAction} />}
     {item.contentTruncated && conversationId && <button type="button" className="tt-act" disabled={loading} onClick={() => { void readFull() }}>{t(loading ? 'agent.pagination.loading' : failed ? 'agent.retry' : 'agent.pagination.fullMessage')}</button>}

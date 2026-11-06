@@ -150,7 +150,17 @@ async def test_provider_stream_tool_fragments_and_usage():
     client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     provider = ChatCompletions("https://model.invalid/v1", "test", client=client)
     result = [e async for e in provider.stream([{"role": "user", "content": "Hi"}], [])]
-    assert [e.kind for e in result if e.kind != "telemetry"] == ["text", "usage", "tool"]
+    assert [e.kind for e in result if e.kind != "telemetry"] == [
+        "text",
+        "tool_delta",
+        "tool_delta",
+        "usage",
+        "tool",
+    ]
+    assert [e.value for e in result if e.kind == "tool_delta"] == [
+        {"index": 0, "name": "status", "arguments": "{"},
+        {"index": 0, "name": "status", "arguments": "{}"},
+    ]
     assert result[-1].value["function"]["arguments"] == "{}"
     await provider.close()
 

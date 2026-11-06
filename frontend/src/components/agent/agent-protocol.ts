@@ -2,9 +2,10 @@ import { mainTaskActivities } from './main-task-activity'
 
 export type AgentQuestion = { prompt: string; options: { label: string; description?: string }[] }
 export type AgentConversation = { id: string; title: string; active_branch_id: string; updated_ms: number }
+export type AgentReplyPreview = { text: string; state: 'generating' | 'checking'; clipped: boolean }
 export type AgentMessage = {
   id: string; branch_id: string; role: string; status: string; seq: number; turn_id?: string; created_ms?: number; contentTruncated?: boolean; contentOffset?: number
-  content: { question?: AgentQuestion; text?: string; tool_call_id?: string; toolState?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
+  content: { replyPreview?: AgentReplyPreview; question?: AgentQuestion; text?: string; tool_call_id?: string; toolState?: string; tool_calls?: unknown[]; sessionReply?: { dispatchId: string; sessionId: string; status: string; verified: boolean }; taskStatus?: { taskId: string; state: string; errorCode?: string; reportError?: string }; attachments?: { id: string; name: string; sizeBytes: number; mimeType: string; previewState?: string }[] }; completedEventId?: number
 }
 export type AgentRoutingDecision = { version: number; policyVersion: string; action: string; executor: string; complexity: 'bounded' | 'complex'; complexityBasis: Record<string, string>; routingExplanation: string; reasonCode: string; capabilityVerification?: string }
 export type AgentActivityPreview = { input: { text: string; truncated: boolean }; output: { text: string; truncated: boolean } | null }
@@ -31,7 +32,7 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
     const state = deferred ? 'queued' : event.kind.slice(5)
     next.turns = view.turns.map(turn => turn.id === data.turnId ? { ...turn, state } : turn)
     if (typeof data.turnId === 'string' && !next.turns.some(turn => turn.id === data.turnId)) next.turns = [...next.turns, { id: data.turnId, state }]
-    next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: deferred ? 'interrupted' : event.kind.slice(5) } : message)
+    next.messages = view.messages.map(message => message.turn_id === data.turnId && message.status === 'streaming' ? { ...message, status: deferred ? 'interrupted' : event.kind.slice(5), content: { ...message.content, replyPreview: undefined } } : message.turn_id === data.turnId && message.content.replyPreview ? { ...message, content: { ...message.content, replyPreview: undefined } } : message)
     if (!deferred) {
       const messages = view.messages.filter(message => message.turn_id === data.turnId)
       const anchor = messages[messages.length - 1]
@@ -47,13 +48,28 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
     }
     return { view: next, reload: true }
   }
+  if (event.kind === 'reply.preview') {
+    const message = view.messages.find(item => item.id === data.messageId && item.turn_id === data.turnId)
+    if (!message) return { view: next, reload: !data.clear }
+    if (data.clear) {
+      next.messages = view.messages.map(item => item.id === message.id ? { ...item, content: { ...item.content, replyPreview: undefined } } : item)
+      return { view: next, reload: false }
+    }
+    if (!view.turns.some(turn => turn.id === data.turnId && turn.state === 'running') || view.messages.some(item => item.turn_id === data.turnId && item.role === 'assistant' && item.seq > message.seq)) return { view: next, reload: false }
+    const previous = message.content.replyPreview?.text || ''
+    if (!data.reset && Array.from(previous).length !== data.offset) return { view: next, reload: true }
+    if (typeof data.text !== 'string' || !['generating', 'checking'].includes(data.state)) return { view: next, reload: true }
+    next.messages = view.messages.map(item => item.id === message.id ? { ...item, content: { ...item.content, replyPreview: { text: (data.reset ? '' : previous) + data.text, state: data.state, clipped: data.clipped === true } } } : item)
+    return { view: next, reload: false }
+  }
   if (event.kind === 'message.tool_calls') {
     if (!view.messages.some(message => message.id === data.messageId)) return { view: next, reload: true }
     next.messages = view.messages.map(message => message.id === data.messageId ? { ...message, status: 'completed', content: { ...message.content, tool_calls: data.calls } } : message)
     return { view: next, reload: false }
   }
   if (event.kind === 'message.started') {
-    if (!view.messages.some((m) => m.id === data.messageId)) next.messages = [...view.messages, {
+    next.messages = view.messages.map(item => item.turn_id === data.turnId && item.content.replyPreview ? { ...item, content: { ...item.content, replyPreview: undefined } } : item)
+    if (!view.messages.some((m) => m.id === data.messageId)) next.messages = [...next.messages, {
       id: data.messageId, branch_id: view.branchId, role: 'assistant', status: 'streaming',
       created_ms: event.created_ms, turn_id: data.turnId, seq: Math.max(0, ...view.messages.map((m) => m.seq)) + 1, content: { text: '' },
     }]
@@ -68,7 +84,7 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   }
   if (event.kind.startsWith('context.compaction.')) next.compaction = { operationId: data.operationId, state: event.kind.split('.').pop() || '', snapshotId: data.snapshotId }
   if (event.kind === 'message.completed') {
-    next.messages = view.messages.map((m) => m.id === data.messageId ? { ...m, content: { ...m.content, ...(data.question ? { question: data.question } : {}) }, status: 'completed', completedEventId: event.id } : m)
+    next.messages = view.messages.map((m) => m.id === data.messageId ? { ...m, content: { ...m.content, replyPreview: undefined, ...(data.question ? { question: data.question } : {}) }, status: 'completed', completedEventId: event.id } : data.turnId && m.turn_id === data.turnId && m.content.replyPreview ? { ...m, content: { ...m.content, replyPreview: undefined } } : m)
     next.turns = view.turns.map((t) => t.id === data.turnId ? { ...t, state: 'completed' } : t)
   }
   return { view: next, reload: true }

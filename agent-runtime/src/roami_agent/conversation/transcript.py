@@ -12,6 +12,11 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import Database, event, row, rows
+from roami_agent.storage.reply_previews import (
+    clear_reply_previews,
+    preview_visible,
+    public_preview_message,
+)
 from roami_agent.storage.task_request import task_user_request
 from roami_agent.storage.transcript_repository import history, message, owned
 
@@ -209,7 +214,8 @@ class Conversations:
                         content=json.loads(m["content_json"]),
                         completedEventId=completed.get(m["id"]),
                     )
-                    for m in visible
+                    for entry in visible
+                    for m in [public_preview_message(db, entry)]
                 ],
                 "turns": rows(
                     db,
@@ -375,6 +381,17 @@ class Conversations:
                     (cid, cursor),
                 )
             ]
+            preview_visibility = {}
+            for item in batch:
+                if item["kind"] == "reply.preview" and item["message_id"] not in preview_visibility:
+                    preview_visibility[item["message_id"]] = preview_visible(db, item["message_id"])
+                if item["kind"] == "reply.preview" and not preview_visibility[item["message_id"]]:
+                    item["payload"] = {
+                        "messageId": item["message_id"],
+                        "turnId": item["turn_id"],
+                        "clear": True,
+                    }
+                    item["payload_json"] = encoded(item["payload"])
             if summaries:
                 from roami_agent.conversation.pages import lineage
 
@@ -444,6 +461,7 @@ class Conversations:
     async def recover(self):
         def write(db):
             for turn in rows(db, "SELECT * FROM turns WHERE state='running'"):
+                clear_reply_previews(db, turn["id"])
                 db.execute(
                     "UPDATE turns SET state='interrupted',finished_ms=? WHERE id=?",
                     (now_ms(), turn["id"]),

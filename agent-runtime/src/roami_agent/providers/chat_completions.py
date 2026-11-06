@@ -125,7 +125,7 @@ class ChatCompletions:
                         async for event in self._stream_once(messages, tools, attempt):
                             if event.kind == "telemetry" and event.value.get("phase") == "headers":
                                 response_started = True
-                            emitted = emitted or event.kind != "telemetry"
+                            emitted = emitted or event.kind not in {"telemetry", "tool_delta"}
                             yield event
                         return
                     except ModelAdmissionRejected as exc:
@@ -375,6 +375,14 @@ class ChatCompletions:
                             call["function"][field] += function.get(field, "")
                         if len(call["id"]) > 256 or len(call["function"]["name"]) > 200:
                             raise DomainError("MODEL_TOOL_CALL_INVALID", 502)
+                        yield ModelEvent(
+                            "tool_delta",
+                            {
+                                "index": key,
+                                "name": call["function"]["name"],
+                                "arguments": call["function"]["arguments"],
+                            },
+                        )
                     reason = choice.get("finish_reason")
                     if reason:
                         if not isinstance(reason, str):
