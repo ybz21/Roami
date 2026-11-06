@@ -159,3 +159,5 @@
 - [首页与 OKR 消息隔离](home-message-isolation.md)
 
 - [项目 HTML 看板运行态与只读数据桥](html-dashboard-runtime.md)
+
+- [右侧任务列表与协作切换](task-workbench.md)（#711）

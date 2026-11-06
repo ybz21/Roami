@@ -5160,6 +5160,7 @@ const zhCN = {
   'swarm.managed.stop': '停止任务',
   'swarm.managed.reconnecting': '连接中断，正在恢复；保留已有内容。',
   'swarm.managed.archived': '已归档，成员会话与产物已保留。',
+  'swarm.workspace.open': '工作区',
   'swarm.managed.workspace': '蜂群工作区',
   'swarm.managed.tab.studio': '协作',
   'swarm.managed.tab.chat': '群聊',

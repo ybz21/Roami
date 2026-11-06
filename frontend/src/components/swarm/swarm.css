@@ -235,3 +235,19 @@ html:is([data-size="compact"],[data-size="medium"]) .swarm-conversation-workspac
 
 .swarm-conversation-history { margin-top:var(--sp-3); }
 .swarm-conversation-history > summary { cursor:pointer; min-height:var(--tap); padding:var(--sp-3); color:var(--text-dim); font-size:var(--fs-meta); box-sizing:border-box; }
+
+.swarm-workbench { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+.swarm-workbench > .swarm-tabs { flex-shrink:0; padding:var(--sp-2) var(--sp-3); }
+.swarm-workbench > :is(.swarm-studio,.swarm-work-detail) { flex:1; min-height:0; height:auto; }
+.swarm-workbench > .swarm-work-detail { border:0; }
+.swarm-workbench .swarm-studio > .swarm-panel-head { justify-content:flex-end; padding:var(--sp-1) var(--sp-3); }
+.swarm-task-list { flex:1; min-height:0; overflow:auto; margin:0; padding:0; list-style:none; }
+.swarm-task-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--sp-1) var(--sp-3); width:100%; min-height:var(--tap); padding:var(--sp-3) var(--sp-4); border:0; border-bottom:1px solid var(--border-subtle); border-radius:0; background:transparent; color:var(--text-bright); font:inherit; text-align:start; cursor:pointer; }
+.swarm-task-row strong { grid-column:1; font-size:var(--fs-body); font-weight:500; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.swarm-task-row small { grid-column:1; font-size:var(--fs-meta); color:var(--text-dim); }
+.swarm-task-row .swarm-state { grid-column:2; grid-row:1 / 3; align-self:center; }
+.swarm-task-row:focus-visible { outline:2px solid var(--accent); outline-offset:calc(-1 * var(--sp-1)); }
+:where(html[data-pointer="fine"]) .swarm-task-row:hover { background:var(--list-hover); }
+
+.swarm-control-menu { position:absolute; inset-inline-end:0; top:100%; z-index:var(--z-popup); min-width:calc(var(--sp-5) * 8); padding:var(--sp-2); border:1px solid var(--border-subtle); border-radius:var(--r-sm); background:var(--bg-elevated); }
+.swarm-control-menu button { width:100%; text-align:start; min-height:var(--tap); }

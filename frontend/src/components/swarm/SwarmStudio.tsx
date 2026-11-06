@@ -4,7 +4,7 @@ import { useI18n } from '../../i18n'
 import type { StudioNode } from './swarm-protocol'
 import type { createStudio } from './studio/studio-scene'
 
-export default function SwarmStudio({ nodes, selected, onSelect, active = true, historical = false }: { nodes: StudioNode[]; selected: string; onSelect: (id: string) => void; active?: boolean; historical?: boolean }) {
+export default function SwarmStudio({ nodes, selected, onSelect, active = true, historical = false, compactHeader = false }: { nodes: StudioNode[]; selected: string; onSelect: (id: string) => void; active?: boolean; historical?: boolean; compactHeader?: boolean }) {
   const { t } = useI18n(), layout = useLayout()
   const host = useRef<HTMLDivElement>(null), labels = useRef<HTMLDivElement>(null), scene = useRef<ReturnType<typeof createStudio> | null>(null)
   const [failed, setFailed] = useState(false), [motion, setMotion] = useState(() => localStorage.getItem('roami.swarm.motion') !== 'off')
@@ -26,7 +26,7 @@ export default function SwarmStudio({ nodes, selected, onSelect, active = true, 
   useEffect(() => { scene.current?.select(selected) }, [selected])
   useEffect(() => { scene.current?.motion(motion, layout.reducedMotion, historical) }, [motion, layout.reducedMotion, historical])
   return <section className="swarm-studio" aria-label={t('swarm.studio.title')}>
-    <header className="swarm-panel-head"><strong>{t(historical ? 'swarm.legacy.studio' : 'swarm.studio.title')}</strong><button type="button" className="tt-act" aria-pressed={motion} onClick={() => setMotion(value => { localStorage.setItem('roami.swarm.motion', value ? 'off' : 'on'); return !value })}>{t(motion ? 'swarm.studio.motionOn' : 'swarm.studio.motionOff')}</button></header>
+    <header className="swarm-panel-head"><strong hidden={compactHeader}>{t(historical ? 'swarm.legacy.studio' : 'swarm.studio.title')}</strong><button type="button" className="tt-act" aria-pressed={motion} onClick={() => setMotion(value => { localStorage.setItem('roami.swarm.motion', value ? 'off' : 'on'); return !value })}>{t(motion ? 'swarm.studio.motionOn' : 'swarm.studio.motionOff')}</button></header>
     <div className="swarm-stage" ref={host}>
       <div className="swarm-labels" ref={labels} hidden={failed}>{nodes.slice(0, 24).map(node => <button type="button" key={node.id} data-studio-id={node.id} className="swarm-studio-label" aria-pressed={node.id === selected} onClick={() => onSelect(node.id)}>{node.name}</button>)}</div>
       {failed && <div className="swarm-scene-fallback" role="status"><p>{t('swarm.studio.unavailable')}</p><button type="button" className="tt-act" onClick={() => setRetry(value => value + 1)}>{t('agent.retry')}</button></div>}
