@@ -133,7 +133,7 @@ func (s Service) paneBinding(target string, pane bool) (SessionBinding, error) {
 }
 
 func (binding SessionBinding) resourceID() string {
-	return workspaceHash(strings.Join([]string{binding.Name, binding.TmuxID, binding.Created, binding.Server, binding.Pane}, "\x00"))
+	return agentlifecycle.SessionResourceID(binding.Name, binding.TmuxID, binding.Created, binding.Server, binding.Pane)
 }
 
 func (s Service) lifecycleFile(binding SessionBinding) (string, error) {

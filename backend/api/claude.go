@@ -281,6 +281,9 @@ func (a *API) ClaudeStatus(c *gin.Context) {
 	pdir := filepath.Join(home, ".claude", "projects", encodeProject(dir))
 	// 按这个进程自己的命令行和启动时刻挑文件：新开的 claude 不认上一段的旧文件（claude-transcript-pick.go）
 	file := pickTranscript(pdir, processArgv(pid), processStart(pid))
+	if bound, managed := managedTranscript(name, "claude"); managed {
+		file = bound
+	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": file}})
 }
 
@@ -541,7 +544,14 @@ func scanStatus(line string, st cStatus) cStatus {
 // 解析 JSONL 为对话；offset 为已消费的物理行数，仅返回其后的新内容（供前端增量轮询）。
 func (a *API) ClaudeTranscript(c *gin.Context) {
 	file := c.Query("file")
-	if file == "" { // 未传则按会话现场定位
+	providerHome, _ := os.UserHomeDir()
+	if file != "" && !transcriptFileWithin(filepath.Join(providerHome, ".claude", "projects"), file) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_FILE"}})
+		return
+	}
+	if bound, managed := managedTranscript(a.sessionTarget(c), "claude"); managed {
+		file = bound
+	} else if file == "" { // 未传则按会话现场定位
 		if dir, pid := paneClaudeProc(a.sessionTarget(c)); dir != "" {
 			home, _ := os.UserHomeDir()
 			file = pickTranscript(filepath.Join(home, ".claude", "projects", encodeProject(dir)), processArgv(pid), processStart(pid))
