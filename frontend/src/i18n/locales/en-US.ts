@@ -5151,6 +5151,7 @@ const enUS = {
   'swarm.managed.stop': 'Stop tasks',
   'swarm.managed.reconnecting': 'Connection interrupted. Reconnecting while keeping existing content.',
   'swarm.managed.archived': 'Archived. Member sessions and outputs are preserved.',
+  'swarm.workspace.open': 'Workspace',
   'swarm.managed.workspace': 'Swarm workspace',
   'swarm.managed.tab.studio': 'Studio',
   'swarm.managed.tab.chat': 'Group chat',
