@@ -18,7 +18,7 @@ import './conversation.css'
 
 export const CODEX_ACCENT = 'var(--accent)'
 
-export type Side = 'claude' | 'codex' | 'opencode' | 'native'
+export type Side = 'claude' | 'codex' | 'opencode' | 'pi' | 'native'
 type ResolveHref = ComponentProps<typeof Markdown>['resolveHref']
 
 // 后端对 redacted_thinking 只能给个占位；文案在前端出，后端不写死中文（见 backend/api/claude.go）

@@ -10,6 +10,8 @@ import { stopSession, sendSessionPrompt, sessionActionError } from '../sessions/
 import ClaudeChat from '../chat/ClaudeChat'
 import CodexChat from '../chat/CodexChat'
 import OpenCodeChat from '../chat/OpenCodeChat'
+import PiChat from '../chat/PiChat'
+import AgentViewToggle from './AgentViewToggle'
 import FileBrowser from '../files/FileBrowser'
 import { FileView } from '../files/fileview'
 import { FileTypeIcon } from '../files/file-icons'
@@ -208,7 +210,9 @@ export default function TerminalPane(props: {
     (codexMap[name]?.running || (isPhone && !codexMap[name] && agentKinds[name] === 'codex'))
   const showOpenCodeChat = (name: string) => (openCodeView[name] === true || (isPhone && openCodeView[name] !== false)) &&
     (openCodeMap[name]?.running || (isPhone && !openCodeMap[name] && agentKinds[name] === 'opencode'))
-  const inChat = !!active && !!(nativeSessionId(active) || showClaudeChat(active) || showCodexChat(active) || showOpenCodeChat(active))
+  const [piView, setPiView] = useState<Record<string, boolean>>({})
+  const showPiChat = (name: string) => agentKinds[name] === 'pi' && (piView[name] === true || (isPhone && piView[name] !== false))
+  const inChat = !!active && !!(nativeSessionId(active) || showClaudeChat(active) || showCodexChat(active) || showOpenCodeChat(active) || showPiChat(active))
   const sendRaw = (s: string) => { if (active) termRefs.current[active]?.send(s, true) } // keepFocus：不抢 xterm 焦点 → 软键盘不收起
   // 滚上去看历史会让 tmux 进 copy-mode，此时输入被它截走（要先按「底」才生效）。
   // 发送前先回到底部退出 copy-mode，省去手动按「底」。
@@ -1009,6 +1013,9 @@ export default function TerminalPane(props: {
         {active && openCodeMap[active]?.running && <SheetRow icon={<AgentLogo kind="opencode" size={20} />} title={t('chat.agentOpenCode')}
           desc={t(openCodeView[active] ? 'common.on' : 'common.off')}
           onClick={() => { setMoreSheet(false); setOpenCodeView((v) => ({ ...v, [active]: !v[active] })) }} />}
+        {active && agentKinds[active] === 'pi' && <SheetRow icon={<AgentLogo kind="pi" size={20} />} title={agentName('pi')}
+          desc={t(showPiChat(active) ? 'chat.switchToTerminal' : 'chat.switchToRendered', { name: 'Pi' })}
+          onClick={() => { setMoreSheet(false); setPiView(v => ({ ...v, [active]: !showPiChat(active) })) }} />}
         <SheetRow icon={TI.rename} title={t('session.rename')} onClick={() => { setMoreSheet(false); active && setRenameSession(active) }} />
         <SheetRow icon={TI.newTab} title={t('terminal.newTab')}
           onClick={() => { setMoreSheet(false); active && window.open(`/#/term/${encodeURIComponent(active)}`, '_blank') }} />
@@ -1071,18 +1078,10 @@ export default function TerminalPane(props: {
   const sessionLead = (
     <>
       <span className="tt-status">{statusDot(dot, 7)}{connLabel}</span>
-      {active && claudeMap[active]?.running && (
-        <TBtn icon={<AgentLogo kind="claude" size={14} />} label="Claude" on={!!claudeView[active]}
-          title={t('chat.switchToClaude')} onClick={() => setClaudeView((v) => ({ ...v, [active!]: !v[active!] }))} />
-      )}
-      {active && codexMap[active]?.running && (
-        <TBtn icon={<AgentLogo kind="codex" size={14} />} label="Codex" on={!!codexView[active]}
-          title={t('chat.switchToCodex')} onClick={() => setCodexView((v) => ({ ...v, [active!]: !v[active!] }))} />
-      )}
-      {active && openCodeMap[active]?.running && (
-        <TBtn icon={<AgentLogo kind="opencode" size={14} />} label="OpenCode" on={!!openCodeView[active]}
-          title={t('chat.switchToOpenCode')} onClick={() => setOpenCodeView((v) => ({ ...v, [active!]: !v[active!] }))} />
-      )}
+      {active && claudeMap[active]?.running && <AgentViewToggle agent="claude" chat={!!showClaudeChat(active)} onToggle={() => setClaudeView(v => ({ ...v, [active]: !showClaudeChat(active) }))} />}
+      {active && codexMap[active]?.running && <AgentViewToggle agent="codex" chat={!!showCodexChat(active)} onToggle={() => setCodexView(v => ({ ...v, [active]: !showCodexChat(active) }))} />}
+      {active && openCodeMap[active]?.running && <AgentViewToggle agent="opencode" chat={!!showOpenCodeChat(active)} onToggle={() => setOpenCodeView(v => ({ ...v, [active]: !showOpenCodeChat(active) }))} />}
+      {active && agentKinds[active] === 'pi' && <AgentViewToggle agent="pi" chat={showPiChat(active)} onToggle={() => setPiView(v => ({ ...v, [active]: !showPiChat(active) }))} />}
     </>
   )
   const sessionToolbar = active && nativeSessionId(active) ? null : (
@@ -1211,8 +1210,11 @@ export default function TerminalPane(props: {
                 <OpenCodeChat name={termName} file={openCodeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>
             )}
+            {showPiChat(termName) && <div style={{ position: 'absolute', inset: 0 }}>
+              <PiChat name={termName} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+            </div>}
             {/* 悬浮话筒只留给手机：桌面的在工具条上（重命名旁边） */}
-            {!nativeSessionId(termName) && showVoice && isPhone && !claudeView[termName] && !codexView[termName] && !openCodeView[termName] && (
+            {!nativeSessionId(termName) && showVoice && isPhone && !claudeView[termName] && !codexView[termName] && !openCodeView[termName] && !showPiChat(termName) && (
               <VoiceInput accent="var(--accent)" onResult={(text) => { api('POST', `/sessions/${encodeURIComponent(termName)}/type`, { text }).catch((e: any) => message.error(e.message)) }} />
             )}
           </div>

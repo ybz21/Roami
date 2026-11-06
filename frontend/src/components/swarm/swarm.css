@@ -269,7 +269,11 @@ html[data-pointer="coarse"] .swarm-workbench-actions :is(.tt-act,summary)::after
 :where(html[data-pointer="fine"]) .swarm-task-filters button:hover { color:var(--text-bright); background:var(--list-hover); }
 .swarm-member-chat { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .swarm-member-chat > :is(.session-chat-shell,.native-session) { flex:1; min-height:0; height:auto; }
-.swarm-member-chat > .swarm-member-session-actions { display:flex; flex-shrink:0; justify-content:flex-end; gap:var(--sp-2); padding:var(--sp-1) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.swarm-member-chat > .swarm-member-session-actions { display:flex; flex-shrink:0; justify-content:space-between; gap:var(--sp-2); padding:var(--sp-1) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.swarm-member-session-actions > .tt-act { margin-left:auto; }
+.swarm-member-session-view { position:relative; display:flex; flex:1; min-width:0; min-height:0; overflow:hidden; }
+.swarm-member-session-view > .session-chat-shell { flex:1; min-height:0; height:auto; }
+.swarm-member-terminal { position:absolute; inset:0; }
 .swarm-member-chat > .swarm-note { padding:var(--sp-4); }
 
 :where(html[data-pointer="fine"]) .swarm-studio-label:hover { color:var(--accent); border-color:var(--accent-border); }

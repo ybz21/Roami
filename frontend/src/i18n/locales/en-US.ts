@@ -2054,6 +2054,8 @@ const enUS = {
   'chat.compact': 'Compact context',
   'chat.queued': 'Queued — waiting for the agent',
   'chat.fileManager': 'File manager',
+  'chat.switchToTerminal': 'Switch to native terminal',
+  'chat.switchToRendered': 'Switch to {name} chat',
   'chat.switchToClaude': 'Switch to Claude Code chat view',
   'chat.switchToCodex': 'Switch to Codex chat view',
   'chat.switchToOpenCode': 'Switch to OpenCode chat view',

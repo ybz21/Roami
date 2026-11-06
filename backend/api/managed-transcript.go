@@ -22,8 +22,16 @@ func managedTranscript(name, executor string) (string, bool) {
 	root, suffix := codexSessionsRoot(), "-"+provider+".jsonl"
 	if executor == "claude" {
 		root, suffix = filepath.Join(home, ".claude", "projects"), provider+".jsonl"
+	} else if executor == "pi" {
+		root, suffix = piSessionsRoot(), "_"+provider+".jsonl"
 	}
-	return providerTranscriptFile(root, suffix, executor == "claude"), true
+	file := providerTranscriptFile(root, suffix, executor == "claude")
+	if executor == "pi" {
+		if header, ok := piHeader(file); !ok || header.ID != provider {
+			return "", true
+		}
+	}
+	return file, true
 }
 
 func providerTranscriptFile(root, suffix string, exact bool) string {

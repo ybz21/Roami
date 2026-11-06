@@ -175,3 +175,5 @@
 - [Main 与成员的指令边界](member-instruction-scope.md)：限定续派、授权来源和原实例验收。
 
 - [指定日程的调度范围](scoped-scheduler.md)：原 Main 的日更执行与其他日程隔离。
+
+- [同一实例的对话与原生终端](conversation-views.md)：共享切换入口、Pi 转录与隔离验收。

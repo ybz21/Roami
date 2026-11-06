@@ -134,3 +134,8 @@ describe('goalFromPane', () => {
     expect(goalFromPane('› Ask Codex to do anything')).toBeUndefined()
   })
 })
+
+it('Pi exposes supported model and compact controls without Claude modes or review', () => {
+  const rows = plusGroups({ agent: 'pi', t: key => key }).flatMap(group => group.rows.map(row => row.id))
+  expect(rows).toEqual(['files', 'model', 'compact'])
+})
