@@ -111,6 +111,13 @@ func codexResumeID(argv []string) string {
 }
 
 // Codex 可以在同一目录开多个会话；按 cwd 取最新会把旧会话的模型和消息串到新会话。
+func codexSessionRollout(name, cwd string, pid int, capture string) string {
+	if file, managed := managedTranscript(name, "codex"); managed {
+		return file
+	}
+	return codexRollout(cwd, pid, capture)
+}
+
 func codexRollout(cwd string, pid int, capture string) string {
 	files := listRollouts()
 	if len(files) == 0 {
@@ -317,7 +324,7 @@ func (a *API) CodexStatus(c *gin.Context) {
 			dir := parts[1]
 			capture := sessionCapture(name, 80)
 			dir = paneWorktreeDir(dir, capture)
-			c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": codexRollout(dir, codexPID, capture)}})
+			c.JSON(http.StatusOK, gin.H{"data": gin.H{"running": true, "dir": dir, "file": codexSessionRollout(name, dir, codexPID, capture)}})
 			return
 		}
 	}
@@ -540,7 +547,13 @@ func scanCodexStatus(line string, st cStatus, quota *float64) cStatus {
 // 与 ClaudeTranscript 同构：offset 为已消费物理行数，仅返回其后新内容（供增量轮询）。
 func (a *API) CodexTranscript(c *gin.Context) {
 	file := c.Query("file")
-	if file == "" {
+	if file != "" && !transcriptFileWithin(codexSessionsRoot(), file) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_FILE"}})
+		return
+	}
+	if bound, managed := managedTranscript(a.sessionTarget(c), "codex"); managed {
+		file = bound
+	} else if file == "" {
 		name := a.sessionTarget(c)
 		if dir, pid := paneToolProc(name, cmdlineHasCodex); dir != "" {
 			capture := sessionCapture(name, 80)
