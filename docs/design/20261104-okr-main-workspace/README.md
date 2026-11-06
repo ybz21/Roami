@@ -194,4 +194,6 @@
 
 [通信机制设计核对](communication-design-acceptance.md)：真实代码基线、逐跳与多 OKR 本地演示、布局检查；不是生产功能验收。
 
+- [Main 建团队的来源准入](coordination-origin-admission.md)：先验证当前用户来源，再原子保存团队、来源与回执；失败不遗留空团队或首页替身（#744）。
+
 - [多OKR范围绑定的第一批实现](project-scope-implementation.md)：原Main、同名团队、命令与投递键隔离和保留历史的迁移（#746，未计生产验收）。
