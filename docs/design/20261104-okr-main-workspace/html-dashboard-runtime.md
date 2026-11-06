@@ -65,3 +65,7 @@ Main 的页面上下文也带上真实 htmlDashboardSupported/teamRoleBindings �
 真实项目通过roami chrome让原Main续派原数据成员的原任务至第7轮；实例、原生对话/分支、任务和native session五类身份均保留。成员回群后Main读取实际文件并受管验收。独立复核发现报告虽数值正确，却把同日规则写成capturedAt最大；Main保留原件、CAS追加记忆更正，再续派第8轮纠正。修正版的10份输入哈希、7项事实和全部逐日末条/追加索引已独立复核，Main再执行受管验收并更新日索引。
 
 这证明原实例可以追加任务、群聊交付后唤起Main、记忆保留旧文并明确纠正；投递、执行器完成、Main验收与独立复核是不同证据。该轮未新增观测、未启用HTML、未发布或开日程。材料在 /tmp/okr-project-html-draft-20261106/。
+
+### 全屏 Main 的可见性边界
+
+后续线上粗指针模拟发现：compact/medium 打开Main次级页面时，Data页签仍为选中，不能仅按页签判断iframe可见。ProjectOkr现在同时判断Main是否覆盖工作区：覆盖时传active=false，移除iframe/通道；关闭后恢复确认快照。large双栏中看板仍可见，保留iframe，不干扰Main或任务。专项先在compact/medium复现、large通过，修正后三档及原页面/通道专项23项通过；未操作真机。
