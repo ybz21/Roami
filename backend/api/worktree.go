@@ -495,7 +495,8 @@ func (a *API) SessionCloseWithWorktree(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
-	ctx, cancel := wtCtx(c)
+	// Once accepted, closing must finish even if navigation or a phone disconnects.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 60*time.Second)
 	defer cancel()
 
 	stages := []string{}
@@ -514,19 +515,63 @@ func (a *API) SessionCloseWithWorktree(c *gin.Context) {
 	// 关掉一个会话把同 worktree 的另外两个会话的目录一起删了（分支也没了）。
 	// 收尾整个任务（前端 finishTask）是先结束其余会话再关最后一个，走到这里时 others 已经空了
 	if (b.Mode == "merge" || b.Mode == "discard") && b.Path != "" {
-		if list, err := a.WT.List(ctx, b.Path); err == nil {
-			for _, w := range list {
-				if others := otherSessions(w, name); w.Path == b.Path && len(others) > 0 {
+		path, err := filepath.EvalSymlinks(b.Path)
+		if err != nil {
+			fail("inspect", err)
+			return
+		}
+		b.Path = filepath.Clean(path)
+		list, err := a.WT.List(ctx, b.Path)
+		if err != nil {
+			fail("inspect", err)
+			return
+		}
+		found := false
+		for _, w := range list {
+			if w.Path == b.Path {
+				found = true
+				if w.IsMain {
+					fail("inspect", &worktree.Err{Code: "MAIN_WORKTREE", Message: "refusing to remove the main worktree"})
+					return
+				}
+				if others := otherSessions(w, name); len(others) > 0 {
 					c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "WORKTREE_IN_USE", "message": "worktree 里还有别的会话", "sessions": others}})
 					return
 				}
 			}
 		}
+		if !found {
+			fail("inspect", &worktree.Err{Code: "BAD_PATH", Message: "path is not a registered linked worktree"})
+			return
+		}
 	}
 	kill := func() error {
-		out, err := a.TT.Run("kill", name, "--yes")
+		out, err := a.TT.RunCtx(ctx, "kill", name, "--yes")
 		if err != nil {
-			return &worktree.Err{Code: "KILL_FAILED", Message: ttmux.StripANSI(out)}
+			// A previous attempt may have closed the session before removal failed.
+			// Only a successful live snapshot can prove it is safe to resume cleanup.
+			if b.Mode == "merge" || b.Mode == "discard" {
+				snapshot, observeErr := a.TT.RunCtx(ctx, "ls", "--live", "--json")
+				var live []struct {
+					Name string `json:"name"`
+				}
+				if observeErr == nil && strings.HasPrefix(strings.TrimSpace(snapshot), "[") && json.Unmarshal([]byte(snapshot), &live) == nil {
+					absent := true
+					for _, session := range live {
+						if session.Name == "" || session.Name == name {
+							absent = false
+						}
+					}
+					if absent {
+						return nil
+					}
+				}
+			}
+			msg := strings.TrimSpace(ttmux.StripANSI(out))
+			if msg == "" {
+				msg = err.Error()
+			}
+			return &worktree.Err{Code: "KILL_FAILED", Message: msg}
 		}
 		return nil
 	}

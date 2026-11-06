@@ -196,6 +196,11 @@ func TestMergeSquashAndConflict(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, "feat.txt")); err != nil {
 		t.Fatal("squash result missing in main worktree")
 	}
+	// A close retry must reach removal after the previous attempt already merged.
+	retried, err := s.Merge(ctx, MergeReq{Path: resp.Path, Strategy: "squash"})
+	if err != nil || retried.MergedOid != mr.MergedOid {
+		t.Fatalf("squash retry changed the result: %+v, %v", retried, err)
+	}
 
 	// 冲突：两边改同一文件
 	c, err := s.Create(ctx, CreateReq{Dir: repo, Branch: "roam/conflict", Base: "main"})

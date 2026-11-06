@@ -1132,9 +1132,12 @@ func (s *Service) Merge(ctx context.Context, req MergeReq) (MergeResp, error) {
 			}
 			return MergeResp{}, err
 		}
-		if out, e := gitID(ctx, site, "commit", "--no-verify", "-m", fmt.Sprintf("squash: merge %s into %s (roam)", srcBranch, base)); e != nil {
-			_, _ = git(ctx, site, "reset", "--merge")
-			return MergeResp{}, errf("COMMIT_FAILED", "%s", out)
+		// Retrying cleanup after a successful squash has nothing left to commit.
+		if !isClean(ctx, site) {
+			if out, e := gitID(ctx, site, "commit", "--no-verify", "-m", fmt.Sprintf("squash: merge %s into %s (roam)", srcBranch, base)); e != nil {
+				_, _ = git(ctx, site, "reset", "--merge")
+				return MergeResp{}, errf("COMMIT_FAILED", "%s", out)
+			}
 		}
 	case "rebase":
 		// 第一步：在 source worktree 把 source rebase onto base
