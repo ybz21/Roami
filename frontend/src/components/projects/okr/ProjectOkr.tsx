@@ -172,7 +172,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     setMainPanel(next)
   }
   const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-view={mainPanel} data-dashboard={workspace?.dashboard?.html ? 'html' : 'widgets'} data-mobile-refresh-scroll>
-    {!phone && <header className="tt-pagehead"><h2>{title}</h2><div className="acts"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')}</Button></div></header>}
+    {!phone && <header className="tt-pagehead"><div className="okr-page-identity"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')}</Button><h2>{title}</h2></div></header>}
     {error && <div className="okr-error" role="alert">
       <p>{t(error)}</p>
       {(conflict || !loaded || error === 'okr.loadFailed') && <Button disabled={busy} onClick={() => void reload()}>{t(conflict ? 'okr.loadLatest' : 'inbox.retry')}</Button>}

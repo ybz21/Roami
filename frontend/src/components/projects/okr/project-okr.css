@@ -45,3 +45,7 @@ html:is([data-size="compact"],[data-size="medium"]) .okr-page{max-width:none;fle
 html[data-pointer="coarse"] .okr-page :is(.ant-btn,summary,.okr-swarm,.ant-checkbox-wrapper){position:relative}
 html[data-pointer="coarse"] .okr-page :is(.ant-btn,summary,.okr-swarm,.ant-checkbox-wrapper)::after{content:"";position:absolute;inset:0 calc(-1 * var(--sp-1));min-height:var(--tap);min-width:var(--tap);top:50%;transform:translateY(-50%)}
 html[data-pointer="coarse"] .okr-field :is(input[type="date"],.ant-select-selector){min-height:var(--tap)}
+
+.okr-page-identity { display:flex; align-items:center; gap:var(--sp-3); min-width:0; flex:1; }
+.okr-page-identity > .ant-btn { flex-shrink:0; }
+.okr-page-identity > h2 { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
