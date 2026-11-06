@@ -174,7 +174,27 @@ func TestExternalWorktreeBaseUnknown(t *testing.T) {
 	t.Fatal("external worktree not listed")
 }
 
+func TestGitIDPreservesAuthorWhenCommitterMissing(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_AUTHOR_NAME", "Task Author")
+	t.Setenv("GIT_AUTHOR_EMAIL", "author@example.test")
+	t.Setenv("GIT_COMMITTER_NAME", "")
+	t.Setenv("GIT_COMMITTER_EMAIL", "")
+	repo := mkRepo(t)
+	ctx := context.Background()
+	if out, err := gitID(ctx, repo, "commit", "--allow-empty", "-m", "identity fallback"); err != nil {
+		t.Fatalf("commit: %v: %s", err, out)
+	}
+	got, err := git(ctx, repo, "show", "-s", "--format=%an <%ae>|%cn <%ce>")
+	if err != nil || got != "Task Author <author@example.test>|roam <roam@localhost>" {
+		t.Fatalf("identity changed: %q, %v", got, err)
+	}
+}
+
 func TestMergeSquashAndConflict(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	ctx := context.Background()
 	s := New("", nil)
 	repo := mkRepo(t)

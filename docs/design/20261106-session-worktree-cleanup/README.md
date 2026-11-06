@@ -51,6 +51,16 @@
   typecheck 与秘密扫描；未修改前端或 Python，未执行无关的 Python 依赖同步和测试。
 - 回归证据截图：`/tmp/worktree-cleanup-evidence.png`；门禁日志：`/tmp/worktree-cleanup-quality.log`。
 
+### CI 身份兜底回归
+
+PR #747 的首次 Quality Gate 在重复 squash 时暴露 `Committer identity unknown`。
+本机全局 Git 身份掩盖了这个问题：`git merge --squash` 也会读取提交者身份，
+不能只在随后的 commit 上兜底。该调用改用现有 `gitID`，仍优先保留用户已配置的身份。
+提交钩子还会只传入作者身份，`gitID` 因此改为分别检查作者与提交者，独立补齐缺失项；
+新增回归确认补齐提交者时不会覆盖已知作者。
+两项 squash 回归通过 `GIT_CONFIG_GLOBAL=/dev/null`、`GIT_CONFIG_NOSYSTEM=1`
+隔离全局和系统 Git 配置；同条件下旧调用失败，修复后通过。
+
 ## 本机遗留情况与边界
 
 2026-11-06 只读盘点时，本仓库共注册 60 个 worktree（含主工作区），54 个目录存在，

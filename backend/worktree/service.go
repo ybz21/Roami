@@ -90,15 +90,15 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 
 // gitID 同 git()，用于会产生提交的操作（merge/squash commit/rebase/wip commit）：
 // 仓库连全局都没配 user.name/email 时（CI、裸机），注入 roam 机器身份兜底——
-// 只在 `git var GIT_AUTHOR_IDENT` 解析失败时注入，绝不覆盖用户已配置的身份。
+// 作者和提交者分别兜底，保留用户已配置的身份。
 func gitID(ctx context.Context, dir string, args ...string) (string, error) {
 	full := append([]string{"-C", dir, "-c", "core.quotepath=false"}, args...)
 	cmd := exec.CommandContext(ctx, "git", full...)
 	cmd.Env = append(scrubGitEnv(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
-	if _, err := git(ctx, dir, "var", "GIT_AUTHOR_IDENT"); err != nil {
-		cmd.Env = append(cmd.Env,
-			"GIT_AUTHOR_NAME=roam", "GIT_AUTHOR_EMAIL=roam@localhost",
-			"GIT_COMMITTER_NAME=roam", "GIT_COMMITTER_EMAIL=roam@localhost")
+	for _, role := range []string{"AUTHOR", "COMMITTER"} {
+		if _, err := git(ctx, dir, "var", "GIT_"+role+"_IDENT"); err != nil {
+			cmd.Env = append(cmd.Env, "GIT_"+role+"_NAME=roam", "GIT_"+role+"_EMAIL=roam@localhost")
+		}
 	}
 	out, err := cmd.CombinedOutput()
 	return strings.TrimRight(string(out), "\n"), err
@@ -1125,7 +1125,7 @@ func (s *Service) Merge(ctx context.Context, req MergeReq) (MergeResp, error) {
 			return MergeResp{}, err
 		}
 	case "squash":
-		if out, e := git(ctx, site, "merge", "--squash", "--", srcBranch); e != nil {
+		if out, e := gitID(ctx, site, "merge", "--squash", "--", srcBranch); e != nil {
 			err := conflictErr("merge", site, out)
 			if _, e2 := git(ctx, site, "merge", "--abort"); e2 != nil {
 				_, _ = git(ctx, site, "reset", "--merge")

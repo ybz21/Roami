@@ -128,6 +128,8 @@ func TestCloseWorktreeInspectsBeforeClosingSession(t *testing.T) {
 }
 
 func TestCloseWorktreeRetriesAfterSquashAlreadyCompleted(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	r, path, _ := closeWorktreeFixture(t, "case $1 in\nkill) exit 1;;\nls) echo '[]';;\nesac\n")
 	ctx := context.Background()
 	wt := worktree.New("", nil)
