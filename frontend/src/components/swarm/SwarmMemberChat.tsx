@@ -1,0 +1,51 @@
+import { useEffect, useRef, useState } from 'react'
+import { Spin } from 'antd'
+import { api } from '../../api'
+import { useI18n } from '../../i18n'
+import { useSessionOverview } from '../../session-overview'
+import { nodeApi, useCurrentNodeId } from '../cluster/node-url'
+import { openAgentPage } from '../agent/agent-page-route'
+import type { TaskDetail } from '../agent/agent-task-protocol'
+import NativeSession from '../agent/NativeSession'
+import CodexChat from '../chat/CodexChat'
+import ClaudeChat from '../chat/ClaudeChat'
+import OpenCodeChat from '../chat/OpenCodeChat'
+import type { SwarmTeamMember } from './swarm-members'
+import type { SwarmSnapshot } from './swarm-protocol'
+import { memberSession, memberSessionIdentity } from './swarm-member-session'
+
+export default function SwarmMemberChat({ data, member, onMain, onSession, onChanged }: { data: SwarmSnapshot; member: SwarmTeamMember; onMain: () => void; onSession: (id: string) => void; onChanged: () => void }) {
+  const { t } = useI18n(), node = useCurrentNodeId(), sessions = useSessionOverview(!data.archived)
+  const identity = nodeApi('/agent/swarms/' + data.id) + ':' + memberSessionIdentity(data, member)
+  const [loaded, setLoaded] = useState<{ identity: string; detail?: TaskDetail }>({ identity: '' })
+  const [retry, setRetry] = useState(0)
+  const taskId = member.work?.task_id
+  const pendingKey = 'roami.swarm.member.pending:' + nodeApi('/agent/swarms/' + data.id) + ':' + member.id
+  const pending = useRef<{ text: string; revision: number; key: string; workId: string } | null>((() => { try { const saved = JSON.parse(localStorage.getItem(pendingKey) || 'null'); return saved && typeof saved.text === 'string' && Number.isInteger(saved.revision) && typeof saved.key === 'string' && typeof saved.workId === 'string' ? saved : null } catch { return null } })())
+  const send = async (text: string) => {
+    if (!member.work?.task_id || !member.work.revision || !target || data.archived) throw new Error(t('swarm.member.sessionUnavailable'))
+    if (!pending.current || pending.current.text !== text || pending.current.workId !== member.work.id) pending.current = { text, revision: member.work.revision, workId: member.work.id, key: crypto.randomUUID() }
+    const request = pending.current
+    try { localStorage.setItem(pendingKey, JSON.stringify(request)) } catch { /* Keep the in-memory retry key. */ }
+    await api('POST', '/agent/swarms/' + encodeURIComponent(data.id) + '/messages', { text: request.text, workId: request.workId, taskRevision: request.revision, commandKey: request.key })
+    pending.current = null
+    try { localStorage.removeItem(pendingKey) } catch { /* The successful command remains idempotent. */ }
+    onChanged()
+  }
+  useEffect(() => {
+    if (!taskId || member.registered?.instance?.state !== 'assigned' || data.archived) { setLoaded({ identity }); return }
+    const controller = new AbortController()
+    void api('GET', '/agent/tasks/' + encodeURIComponent(taskId), undefined, { signal: controller.signal }).then(response => {
+      if (!controller.signal.aborted) setLoaded({ identity, detail: response.data })
+    }).catch(() => { if (!controller.signal.aborted) setLoaded({ identity }) })
+    return () => controller.abort()
+  }, [identity, retry, data.archived])
+  const target = loaded.identity === identity && loaded.detail ? memberSession(data, member, loaded.detail, sessions.failed ? [] : sessions.value) : null
+  const loading = loaded.identity !== identity
+  return <section className="swarm-member-chat" aria-label={member.name}>
+    {loading ? <Spin /> : !target ? <div className="swarm-note" role="status"><p>{t(taskId ? 'swarm.member.sessionUnavailable' : 'swarm.member.unassigned')}</p><div className="swarm-detail-actions">{taskId && <><button type="button" className="tt-act" onClick={() => setRetry(value => value + 1)}>{t('agent.retry')}</button><button type="button" className="tt-act" onClick={() => openAgentPage('tasks', taskId)}>{t('swarm.managed.openTask')}</button></>}<button type="button" className="tt-act" onClick={onMain}>{t('swarm.relations.adjustMain')}</button></div></div> : <>
+      <div className="swarm-member-session-actions"><button type="button" className="tt-act" onClick={() => target.kind === 'native' ? openAgentPage('session', target.id) : onSession(target.id)}>{t('swarm.managed.openSession')}</button></div>
+      {target.kind === 'codex' ? <CodexChat key={target.id} name={target.id} onSend={send} /> : target.kind === 'claude' ? <ClaudeChat key={target.id} name={target.id} onSend={send} /> : target.kind === 'opencode' ? <OpenCodeChat key={target.id} name={target.id} onSend={send} /> : target.kind === 'native' ? <NativeSession key={target.id} id={target.id} node={node} projects={[]} embedded expectedTask={{ id: target.taskId, projectId: target.projectId, conversationId: member.registered!.instance!.conversationId, branchId: member.registered!.instance!.branchId, revision: member.work!.revision! }} onChanged={onChanged} onSession={onSession} /> : <p className="swarm-note">{t('swarm.managed.openSession')}</p>}
+    </>}
+  </section>
+}

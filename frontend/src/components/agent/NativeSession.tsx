@@ -26,14 +26,15 @@ import { useAgentDraft } from './useAgentDraft'
 import { useAgentTask } from './useAgentTask'
 import './native-session.css'
 
-type Metadata = { nativeSessionId: string; taskId: string; projectId?: string; title?: string }
+type Metadata = { nativeSessionId: string; taskId: string; projectId?: string; title?: string; conversationId?: string; branchId?: string; revision?: number; lifecycle?: string }
 type Page = AgentSnapshot & { before: number | null }
 
-export default function NativeSession({ id, node, projects, onChanged, onSession, embedded = false }: { id: string; node: string | null; embedded?: boolean; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
+export default function NativeSession({ id, node, projects, onChanged, onSession, embedded = false, expectedTask }: { expectedTask?: { id: string; projectId?: string; conversationId: string; branchId: string; revision: number }; id: string; node: string | null; embedded?: boolean; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
   const { t } = useI18n()
   const session = useAgentData<Metadata>('/agent/native-sessions/' + encodeURIComponent(id), 0)
   useEffect(() => { if (session.value?.title) updateSessionLabel(nativeSessionName(id), session.value.title) }, [id, session.value?.title])
-  return <>{session.loading && <Spin />}{session.failed && <p role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={session.refresh}>{t('agent.retry')}</button></p>}{session.value && <SessionConversation key={agentDataKey('/agent/native-sessions/' + id)} embedded={embedded} metadata={session.value} refreshMetadata={session.refresh} node={node} projects={projects} onChanged={onChanged} onSession={onSession} />}</>
+  const matches = !expectedTask || session.value?.nativeSessionId === id && session.value.taskId === expectedTask.id && (!expectedTask.projectId || session.value.projectId === expectedTask.projectId) && session.value.conversationId === expectedTask.conversationId && session.value.branchId === expectedTask.branchId && session.value.revision === expectedTask.revision && session.value.lifecycle === 'open'
+  return <>{session.value && !matches && <p role="alert">{t('swarm.member.sessionUnavailable')} <button type="button" className="tt-act" onClick={session.refresh}>{t('agent.retry')}</button></p>}{session.loading && <Spin />}{session.failed && <p role="alert">{t('agent.activity.detailsUnavailable')} <button type="button" className="tt-act" onClick={session.refresh}>{t('agent.retry')}</button></p>}{session.value && matches && <SessionConversation key={agentDataKey('/agent/native-sessions/' + id)} embedded={embedded} metadata={session.value} refreshMetadata={session.refresh} node={node} projects={projects} onChanged={onChanged} onSession={onSession} />}</>
 }
 
 function SessionConversation({ embedded, metadata, refreshMetadata, node, projects, onChanged, onSession }: { embedded?: boolean; metadata: Metadata; refreshMetadata: () => void; node: string | null; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {

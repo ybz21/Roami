@@ -16,6 +16,8 @@ import { useSwarmSnapshot } from './useSwarmSnapshot'
 import SwarmStudio from './SwarmStudio'
 import SwarmConversations from './SwarmConversations'
 import SwarmMainChat from './SwarmMainChat'
+import SwarmMemberChat from './SwarmMemberChat'
+import { matchesSwarmTaskFilter, swarmTaskFilters, type SwarmTaskFilter } from './swarm-task-filter'
 import ConversationComposer from '../chat/ConversationComposer'
 import SwarmMemberDetails from './SwarmMemberDetails'
 import { swarmRoleMembers, swarmMember, type SwarmRoleBinding, type SwarmTeamMember } from './swarm-members'
@@ -44,7 +46,11 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const roster = useMemo(() => data ? swarmRoleMembers(data, roles, projectId) : null, [data?.members, data?.work, data?.memberProtocol, data?.id, data?.target.projectId, roles, projectId])
   const members = roster?.members || [], currentMembers = roster?.current || []
   const [includeHistory, setIncludeHistory] = useState(false)
+  const filterKey = panelKey + ':tasks'
+  const [taskFilter, setTaskFilter] = useState<SwarmTaskFilter>(() => { const saved = localStorage.getItem(filterKey); return swarmTaskFilters.includes(saved as SwarmTaskFilter) ? saved as SwarmTaskFilter : 'active' })
+  const filterTasks = (value: SwarmTaskFilter) => { setTaskFilter(value); localStorage.setItem(filterKey, value); taskScroll.current = 0 }
   const boardWork = data?.work.filter(work => !roster?.configured || includeHistory || currentMembers.some(member => member.work?.id === work.id)) || []
+  const filteredWork = boardWork.filter(work => matchesSwarmTaskFilter(work, taskFilter))
   const [memoryOpen, setMemoryOpen] = useState(false), [teamOpen, setTeamOpen] = useState(false)
   const controlKey = useRef<{ action: string; revision: number; key: string } | null>(null)
   useEffect(() => { localStorage.setItem(panelKey, tab) }, [tab, panelKey])
@@ -103,8 +109,9 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
     <nav className="swarm-tabs" aria-label={t('swarm.managed.workspace')}>
       {['chat', 'board'].map(key => <button type="button" key={key} aria-pressed={tab === key} onClick={() => switchTab(key)}>{t(key === 'chat' ? 'swarm.managed.tab.studio' : 'swarm.managed.tab.board')}</button>)}
     </nav>
-    {tab === 'chat' ? studio : !phone && work ? view : !boardWork.length ? <p className="swarm-note">{t('swarm.managed.planning')}</p> : <ul ref={taskList} className="swarm-task-list" aria-label={t('swarm.managed.tab.board')}>
-      {boardWork.map(item => <li key={item.id}><button type="button" className="swarm-task-row" aria-pressed={detail === item.id} onClick={() => openWork(item)}><strong>{item.title}</strong><small>{swarmMember(members, item.id)?.name || item.member_name}</small><State state={item.state} /></button></li>)}
+    {tab === 'board' && !work && <div className="swarm-task-filters" role="group" aria-label={t('agent.task.filter.label')}>{swarmTaskFilters.map(value => <button type="button" key={value} aria-pressed={taskFilter === value} onClick={() => filterTasks(value)}>{t('agent.task.filter.' + value)}</button>)}</div>}
+    {tab === 'chat' ? studio : !phone && work ? view : !filteredWork.length ? <p className="swarm-note" role="status">{t(taskFilter === 'all' && !boardWork.length ? 'swarm.managed.planning' : 'agent.task.filter.empty')}</p> : <ul ref={taskList} className="swarm-task-list" aria-label={t('swarm.managed.tab.board')}>
+      {filteredWork.map(item => <li key={item.id}><button type="button" className="swarm-task-row" aria-pressed={detail === item.id} onClick={() => openWork(item)}><strong>{item.title}</strong><small>{swarmMember(members, item.id)?.name || item.member_name}</small><State state={item.state} /></button></li>)}
     </ul>}
   </div>
   return <div className="swarm-managed" data-embedded={embedded} data-team-open={teamOpen}>
@@ -122,7 +129,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
             <button type="button" className="tt-act" aria-expanded={studioOpen} onClick={() => showWorkspace(!studioOpen)}>{t('swarm.workspace.open')}</button>{embedded && controls}
             {currentMember && !phone && <div className="swarm-detail-actions"><State state={currentMember.state} />{currentMember.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}</div>}
           </header>
-          {memberView && !phone ? memberView : recipient === 'main' ? data.mainConversationId ? renderMain ? renderMain(data.mainConversationId) : <SwarmMainChat key={nodeApi('/agent/conversations/' + data.mainConversationId)} conversationId={data.mainConversationId} projectId={data.target?.projectId} onSent={refresh} /> : <p role="alert" className="swarm-note">{t('swarm.relations.mainUnavailable')}</p> : <SwarmChat members={members} key={nodeApi('/agent/swarms/' + data.id) + ':' + recipient} data={data} recipient={recipient} selected={selected} onSelect={openChat} onWork={openWork} onSession={openTerm} onSent={refresh} />}
+          {memberView && !phone ? memberView : recipient === 'main' ? data.mainConversationId ? renderMain ? renderMain(data.mainConversationId) : <SwarmMainChat key={nodeApi('/agent/conversations/' + data.mainConversationId)} conversationId={data.mainConversationId} projectId={data.target?.projectId} onSent={refresh} /> : <p role="alert" className="swarm-note">{t('swarm.relations.mainUnavailable')}</p> : currentMember?.registered?.instance ? <SwarmMemberChat key={nodeApi('/agent/swarms/' + data.id) + ':' + currentMember.id} data={data} member={currentMember} onMain={() => openChat('main')} onSession={openTerm} onChanged={refresh} /> : <SwarmChat members={members} key={nodeApi('/agent/swarms/' + data.id) + ':' + recipient} data={data} recipient={recipient} selected={selected} onSelect={openChat} onWork={openWork} onSession={openTerm} onSent={refresh} />}
         </section>
         {!phone && workspaceVisible && <aside className="swarm-collaboration-pane" aria-label={t('swarm.workspace.open')}>{workspace}</aside>}
       </div>

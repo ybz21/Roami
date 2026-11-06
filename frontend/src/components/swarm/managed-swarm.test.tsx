@@ -44,6 +44,7 @@ function showTasks() {
   const toggle = screen.getByRole('button', { name: 'swarm.workspace.open' })
   if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle)
   fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.board' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.all' }))
 }
 function snapshot(): SwarmSnapshot {
   return { id: 'sw-one', name: 'Team', goal: 'Goal', mainConversationId: 'main', revision: 2, sequence: 10, paused: false, archived: false, state: 'review', target: {}, posts: [{ id: 1, author: 'frontend', text: 'Task update', taskId: 'task', createdMs: 1 }], mainMessages: [{ id: 'reply', role: 'assistant', text: 'Main response', createdMs: 10 }], work: [{ id: 'work', member_name: 'frontend', executor: 'codex', title: 'Build page', goal: 'Full instructions', acceptance: 'Verify results', integration: 0, task_id: 'task', revision: 1, state: 'waiting_user', dispatch_error: null, dependencies: [], attempt: { runId: 'run', state: 'verifying', summary: 'Reported outcome' } }] }
@@ -673,4 +674,27 @@ it('does not expose a different project group behind configured role bindings', 
   expect(screen.queryByRole('navigation', { name: 'swarm.conversation.list' })).toBeNull()
   expect(screen.queryByText('Task update')).toBeNull()
   expect(test.api).not.toHaveBeenCalled()
+})
+
+it('puts Group before Main, then the current members', () => {
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  const buttons = within(screen.getByRole('navigation', { name: 'swarm.conversation.list' })).getAllByRole('button')
+  expect(buttons.map(button => button.getAttribute('aria-label')).slice(0, 3)).toEqual(['swarm.managed.tab.chat', 'Main', 'frontend'])
+})
+it('defaults to active work, filters by real state, and remembers the selection', () => {
+  test.data!.work.push({ ...test.data!.work[0], id: 'active', title: 'In progress', state: 'running', attempt: { runId: 'active-run', state: 'running' } }, { ...test.data!.work[0], id: 'finished', title: 'Verified output', state: 'succeeded' })
+  const view = render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.tab.board' }))
+  expect(screen.getByRole('button', { name: 'agent.task.filter.active' }).getAttribute('aria-pressed')).toBe('true')
+  expect(screen.getByRole('button', { name: /In progress/ })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /Build page|Verified output/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.attention' }))
+  expect(screen.getByRole('button', { name: /Build page/ })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /In progress|Verified output/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.filter.all' }))
+  expect(document.querySelectorAll('.swarm-task-row')).toHaveLength(3)
+  view.unmount()
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect(screen.getByRole('button', { name: 'agent.task.filter.all' }).getAttribute('aria-pressed')).toBe('true')
+  expect(document.querySelectorAll('.swarm-task-row')).toHaveLength(3)
 })
