@@ -510,6 +510,8 @@ class SwarmPlans:
         return result
 
     async def post(self, owner, sid, spec, *, binding=None):
+        if binding is not None and (not isinstance(binding, dict) or not binding):
+            raise DomainError("SWARM_MAIN_REQUIRED", 403)
         text = spec.get("text", "").strip()
         if not text or len(text) > 8000:
             raise DomainError("INVALID_SWARM_MESSAGE")
@@ -525,9 +527,13 @@ class SwarmPlans:
 
         def write(db):
             def apply():
+                from roami_agent.dispatch.swarm_message_binding import bound_member
+                from roami_agent.storage.swarm_inbox import record_post
+
                 value = group(db, owner, sid)
                 if value["archived"]:
                     raise DomainError("SWARM_ARCHIVED", 409)
+                actor = bound_member(db, value, binding) if binding is not None else None
                 author = "human"
                 task_id = None
                 if spec.get("workId"):
@@ -545,54 +551,24 @@ class SwarmPlans:
                     current = row(db, "SELECT revision FROM tasks WHERE id=?", (task_id,))
                     if not current or current["revision"] != revision:
                         raise DomainError("TASK_REVISION_CHANGED", 409)
-                if binding:
+                if binding is not None:
                     if binding.get("taskId"):
                         if spec.get("workId"):
                             raise DomainError("SWARM_MAIN_REQUIRED", 403)
                         task_id = binding["taskId"]
-                        member = row(
-                            db,
-                            "SELECT member_name FROM swarm_work_items WHERE swarm_id=? AND task_id=?",
-                            (sid, task_id),
-                        )
-                        if not member:
-                            raise DomainError("SWARM_MEMBER_REQUIRED", 403)
-                        attempt = row(
-                            db,
-                            "SELECT id FROM task_attempts WHERE task_id=? AND task_revision=(SELECT revision FROM tasks WHERE id=?) ORDER BY attempt_no DESC LIMIT 1",
-                            (task_id, task_id),
-                        )
-                        if not attempt or attempt["id"] != binding.get("runId"):
-                            raise DomainError("TASK_RESULT_SUPERSEDED", 409)
-                        current = row(db, "SELECT revision,state FROM tasks WHERE id=?", (task_id,))
-                        if (
-                            binding.get("taskRevision") is not None
-                            and current["revision"] != binding["taskRevision"]
-                        ):
-                            raise DomainError("TASK_RESULT_SUPERSEDED", 409)
-                        if current["state"] not in {
-                            "queued",
-                            "preparing",
-                            "running",
-                            "verifying",
-                            "waiting_user",
-                        }:
-                            raise DomainError("TASK_RESULT_SUPERSEDED", 409)
-                        author = member["member_name"]
-                    elif binding.get("conversation") != value["conversation_id"]:
-                        raise DomainError("SWARM_MAIN_REQUIRED", 403)
+                        author = actor["name"]
                     else:
                         author = "main"
                 delivery_key = (
                     "swarm.message:"
                     + hashlib.sha256(encoded([sid, spec["commandKey"]]).encode()).hexdigest()
                 )
-                ident = db.execute(
-                    "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_key) VALUES(?,?,?,?,?,?)",
-                    (sid, author, text, task_id, now_ms(), delivery_key),
-                ).lastrowid
-                changed(db, value, "swarm.message")
-                return {"id": ident, "swarmId": sid}
+                result, created = record_post(
+                    db, value, spec, author, task_id, binding, delivery_key
+                )
+                if created:
+                    changed(db, value, "swarm.message")
+                return result
 
             return receipt(
                 db,
@@ -604,6 +580,33 @@ class SwarmPlans:
             )
 
         return await self.db.call(write, write=True)
+
+    async def inbox(self, owner, sid, spec, *, binding=None):
+        from roami_agent.dispatch.swarm_message_binding import bound_member
+        from roami_agent.storage.swarm_inbox import inbox
+
+        def read(db):
+            value = group(db, owner, sid)
+            member_id = spec.get("memberId")
+            if binding is not None:
+                actor = bound_member(db, value, binding)
+                member_id = actor["id"] if actor else None
+                if spec.get("memberId") not in (None, member_id):
+                    raise DomainError("SWARM_MEMBER_REQUIRED", 403)
+            before_changes = db.total_changes
+            result = inbox(
+                db,
+                value,
+                member_id=member_id,
+                limit=spec.get("limit", 20),
+                before=spec.get("before"),
+                mark_read=binding is not None,
+            )
+            if db.total_changes > before_changes:
+                changed(db, value, "swarm.inbox.read")
+            return result
+
+        return await self.db.call(read, write=binding is not None)
 
     async def advance(self, job):
         sid = job["aggregate_id"]

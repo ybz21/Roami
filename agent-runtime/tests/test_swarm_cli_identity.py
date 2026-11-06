@@ -7,6 +7,7 @@ from test_swarm_command_contract import command
 
 from roami_agent.app import Runtime
 from roami_agent.server.configuration import Settings
+from roami_agent.storage.database import row
 from roami_agent.tools.process import execute
 
 
@@ -52,10 +53,20 @@ async def test_main_registered_post_retains_identity_without_new_turn(store):
             "commandKey": "create-team",
         },
     )
+    accepted = await runtime.conversations.accept(
+        "alice", conversation["id"], "progress", "Report verified progress to the team"
+    )
+    job = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?", (accepted["turnId"],)
+        )
+    )
+    turn = await runtime.mailbox.claim(job)
     binding = {
         "owner": "alice",
         "conversation": conversation["id"],
-        "turnId": "progress-turn",
+        "turnId": turn["id"],
+        "leaseEpoch": turn["lease_epoch"],
         "toolCallId": "progress-call",
     }
     prior_posts = (await runtime.swarms.snapshot("alice", created["id"]))["posts"]

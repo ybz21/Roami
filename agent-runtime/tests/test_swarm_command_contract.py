@@ -51,10 +51,20 @@ async def test_swarm_post_receipt_uses_identity_not_runtime_callbacks(store):
             "commandKey": "create-posting",
         },
     )
+    accepted = await runtime.conversations.accept(
+        "alice", conversation["id"], "post", "Share verified progress in the group"
+    )
+    job = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?", (accepted["turnId"],)
+        )
+    )
+    turn = await runtime.mailbox.claim(job)
     binding = {
         "owner": "alice",
         "conversation": conversation["id"],
-        "turnId": "post-turn",
+        "turnId": turn["id"],
+        "leaseEpoch": turn["lease_epoch"],
         "toolCallId": "post-call",
         "assistantMessageId": "message-one",
         "progress": lambda *_: None,

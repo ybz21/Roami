@@ -72,6 +72,8 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 	case "chat", "feed":
 		valueFlags = "limit"
 		switchFlags = "follow"
+	case "inbox":
+		valueFlags = "member before limit task run task-revision"
 	case "plan", "control":
 		valueFlags = "file"
 	case "member-register":
@@ -87,7 +89,7 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 	case "say":
 		valueFlags = "file key to task-revision"
 	case "post":
-		valueFlags = "file key task run task-revision"
+		valueFlags = "file key task run task-revision kind message-key reply-to recipient-member"
 	case "pause", "resume", "stop", "archive":
 		valueFlags = "key revision"
 	default:
@@ -155,6 +157,9 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		return err
 	}
 	defer client.close()
+	if command == "inbox" {
+		return readInbox(ctx, client, path, options, w, jsonOutput)
+	}
 	if command == "member-inspect" {
 		return inspectMember(ctx, client, path, options, w, jsonOutput)
 	}

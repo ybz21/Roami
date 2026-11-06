@@ -148,7 +148,10 @@ async def test_schema22_upgrade_keeps_all_facts_and_old_unknown_message_receipt(
     upgraded = database_module.Database(path, root, managed=False)
     await upgraded.open()
     try:
-        assert await upgraded.call(facts) == original
+        current = await upgraded.call(facts)
+        assert current.pop("swarm_post_routes") == []
+        assert current.pop("swarm_inbox") == []
+        assert current == original
         assert (
             await upgraded.call(
                 lambda db: [
@@ -271,7 +274,10 @@ async def test_scope_rebuild_rolls_back_every_object_and_restores_foreign_keys(
     )
     assert facts(db) == original
     migrations.upgrade_schema(db, 22)
-    assert db.execute("SELECT max(version) FROM schema_meta").fetchone()[0] == 23
+    assert (
+        db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
+        == migrations.SCHEMA_VERSION
+    )
     assert db.execute("PRAGMA foreign_key_check").fetchall() == []
     db.close()
 

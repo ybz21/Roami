@@ -64,9 +64,12 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         return await swarms.post(
             binding["owner"],
             args["swarmId"],
-            {"text": args["text"], "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
+            {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
             binding=binding,
         )
+
+    async def inbox(args, binding):
+        return await swarms.inbox(binding["owner"], args["swarmId"], args, binding=binding)
 
     async def control(args, binding):
         await main(binding, args["swarmId"])
@@ -333,11 +336,39 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_post",
-            "Post a coordination question or progress note to your swarm group chat. Author is bound to Main or the current managed member/run. Does not mark tasks complete or send terminal input.",
-            object_schema({"swarmId": string, "text": string}, ["swarmId", "text"]),
+            "Post to your group under the current Main/member/run identity. Default progress is discussion only. question/blocker/handoff persist in the original Main inbox; recipientMemberId addresses a same-team persistent role. Preserve messageKey for retries. reply needs replyTo and records an actual response, not task acceptance. Does not inject terminal input or claim an automatic Main wake.",
+            object_schema(
+                {
+                    "swarmId": string,
+                    "text": string,
+                    "kind": {
+                        "type": "string",
+                        "enum": ["progress", "question", "blocker", "handoff", "reply"],
+                    },
+                    "messageKey": {"type": "string", "minLength": 1, "maxLength": 200},
+                    "replyTo": {"type": "integer", "minimum": 1},
+                    "recipientMemberId": string,
+                },
+                ["swarmId", "text"],
+            ),
             post,
             True,
             "write",
+        ),
+        (
+            "swarm_inbox_read",
+            "Read pending group messages addressed to your bound Main or persistent member. Records retrieval, not understanding, resolution or task success. Unanswered messages remain pending. Replies use swarm_post kind=reply and the original postId. sourceCurrent=false is historical evidence; do not apply it to a new task revision.",
+            object_schema(
+                {
+                    "swarmId": string,
+                    "before": {"type": "integer", "minimum": 1},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                },
+                ["swarmId"],
+            ),
+            inbox,
+            True,
+            "read",
         ),
         (
             "swarm_control",
