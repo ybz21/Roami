@@ -19,6 +19,13 @@ It validates the repository and records the repository ID, date and capture time
 it does not backfill old dates or edit runtime/project data. Run in an authorized
 managed workspace. Missing login or data remains unknown; do not use invented zero.
 
+Bilibili seed: `parts/connectors/bilibili/` collects one confirmed public video's
+cumulative view/like/danmaku/reply/share/favorite counts through anonymous Python.
+Confirm BVID and owner MID; the offline prepare command verifies original bytes
+and builds the host's batch request. Missing fields, completion rates and watch
+duration stay unknown. A newly bound source needs its own accepted observation;
+old manual history remains intact. This optional part is not a default for every OKR.
+
 MCP seed: discover an available connection and its actual tool/effect/schema.
 Record account and field mapping; a tool list is not collected data. Unknown effects
 are not read-only by assumption. Respect existing authorization and no browser/phone
