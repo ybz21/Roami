@@ -360,6 +360,20 @@ it('opens phone collaboration as a secondary page and preserves the mounted conv
   expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
 })
 
+it('keeps the phone member identity in the heading and puts secondary details in More', () => {
+  test.phone = true
+  test.data = { ...snapshot(), memberProtocol: 1, members: [{ id: 'member', swarm_id: 'sw-one', name: 'frontend', executor: 'codex', dutyPreview: 'Build', workId: 'work', taskId: 'task', taskRevision: 1, state: 'waiting_user', memoryPath: '', roundCount: 1 }] }
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  chooseConversation('member')
+  const heading = document.querySelector('.swarm-conversation-head')!
+  expect(heading.querySelector('strong')?.textContent).toBe('frontend')
+  expect(heading.querySelector('small')?.textContent).toBe('swarm.managed.state.waiting_user')
+  expect(heading.querySelector('.swarm-detail-actions')).toBeNull()
+  const more = heading.querySelector('details')!
+  expect(more.querySelector('button')?.textContent).toBe('swarm.member.details')
+  expect(test.api).not.toHaveBeenCalled()
+})
+
 it('returns from a phone collaboration member to that conversation without sending', () => {
   test.phone = true
   test.data!.work[0].attempt!.sessionId = 'real-session'
