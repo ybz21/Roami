@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 后台任务详情展示 | [20261106-task-detail-polish](20261106-task-detail-polish/README.md) | 结果优先、命令用途、窄栏溢出修复与桌面/真机验收 |
 | 会话列表精简 | [20261105-session-list-metadata](20261105-session-list-metadata/README.md) | 侧栏只保留会话身份与状态，分支与目录集中到顶部查看 |
 | Python 与 Skill 检查分流 | [20261105-python-check-scope](20261105-python-check-scope/README.md) | 完整 PR 范围、共享依赖回退与发布回归 |
 | 会话同等展示 | [20261105-task-session-separation](20261105-task-session-separation/README.md) | 统一会话列表与聊天入口，关闭会话后任务独立留存 |

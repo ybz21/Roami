@@ -191,14 +191,14 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
     {snapshot.detail.failed && <p role="alert">{t('agent.requestFailed')}</p>}
     {task && <>
       <div className="agent-task-layout">
-        <div className="agent-task-heading"><h3>{taskTopic(task) || t('agent.task.untitled')}</h3><span className="agent-task-state" data-state={uncertain ? 'unknown' : task.state}>{t(uncertain ? 'agent.task.executionUnconfirmed' : 'agent.state.' + task.state)}</span></div>
+        <header className="agent-task-identity"><div className="agent-task-heading"><h3>{taskTopic(task) || t('agent.task.untitled')}</h3><span className="agent-task-state" data-state={uncertain ? 'unknown' : task.state}>{t(uncertain ? 'agent.task.executionUnconfirmed' : 'agent.state.' + task.state)}</span></div>
         <div className="agent-task-meta">
           {!!executor && <span className="agent-task-executor">{isAgentKind(executor) ? <AgentLogo kind={executor} size={14} /> : executor === 'native' ? <RoamiLogo size={14} /> : <BotIcon size={14} />}{executorLabel}</span>}
           <span>{t('agent.task.revision', { n: task.revision })}</span>
           {task.latestAttempt?.workspace && <code className="agent-task-workspace" title={task.latestAttempt.workspace.directory}>{task.latestAttempt.workspace.branch || task.latestAttempt.workspace.directory}</code>}
         </div>
+        </header>
         <div className="agent-task-main">
-          <TaskDescription content={goal === task.id ? '' : goal} />
           {uncertain && <p className="agent-task-note" role="status">{t('agent.task.executionUnconfirmedHint')}</p>}
           {failed ? <p className="agent-task-note error" role="status">{t(reason || 'agent.task.incomplete')}</p> : outcome && <section className="agent-task-section agent-task-outcome"><h4>{t('agent.task.result')}</h4>{task.state !== 'succeeded' && <p className="agent-muted">{t('agent.task.resultPending')}</p>}<p>{outcome}</p></section>}
           {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={taskReportSummary(reported)} title={false} /></section>}
@@ -234,6 +234,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
           </section>}
           {phone && previewFile && <TaskArtifactMobilePreview artifact={previewFile} onBack={() => setPreview('')} />}
           {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.accept')}</Button><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
+          <TaskDescription content={goal === task.id ? '' : goal} />
           {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskTopic(child) || t('agent.task.untitled')}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
           {sessionClosed && draft.trim() && <section className="agent-task-section"><h4>{t('agent.task.unsentDraft')}</h4><p className="agent-task-note">{draft}</p></section>}
           <section className="agent-task-section agent-task-record"><button type="button" className="tt-act agent-task-disclosure agent-task-disclosure-row" aria-expanded={history} onClick={() => setHistory(!history)}><ChevronRight />{t('agent.task.viewRecord')}</button>

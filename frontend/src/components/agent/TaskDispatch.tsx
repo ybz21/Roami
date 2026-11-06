@@ -43,11 +43,12 @@ function CopyCommand({ command, label }: { command: string; label: string }) {
       timer.current = window.setTimeout(() => setCopied(false), 1500)
     }, () => {})
   }
-  return <div className="agent-task-command">
-    <code>{command}</code>
+  return <div className="agent-task-command-block">
+    <span className="agent-task-command-label">{label}</span>
+    <div className="agent-task-command"><code>{command}</code>
     <button type="button" className="tt-act" aria-label={t('agent.task.copyCommand', { name: label })} onClick={copy}>
       {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-    </button>
+    </button></div>
   </div>
 }
 
