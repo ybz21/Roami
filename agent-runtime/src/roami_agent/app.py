@@ -79,6 +79,7 @@ from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.mcp_broker import MCPBroker, node_socket
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
+from roami_agent.tools.project_file_scope import ProjectFileScope
 from roami_agent.tools.project_okr import register_project_okr_tools
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
@@ -203,7 +204,9 @@ class Runtime:
             database, self.settings, artifacts=self.artifacts
         )
         targets = TargetDirectory(self.settings, self.session_dispatches)
-        self.tools.admission = SwarmCoordinationPolicy(database, targets).admit
+        self.tools.admission = ProjectFileScope(
+            database, targets, SwarmCoordinationPolicy(database, targets)
+        ).admit
         self.tasks.revisions.project_workspace = targets.project_workspace
         if isinstance(self.executor, CodingExecutor):
             self.executor.project_workspace = targets.project_workspace
