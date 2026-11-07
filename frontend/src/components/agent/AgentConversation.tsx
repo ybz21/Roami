@@ -120,7 +120,6 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const outbox = useAgentOutbox(project ? draftKey + ':' + cid : draftKey, outboxReady, !running, async item => {
     if (project && !project.isCurrent()) throw new Error('Conversation changed')
     const owner = draftKey, origin = cid
-    if (project && await project.ensureConversation() !== origin) throw new Error('Project Main changed')
     const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: item.id, text: item.payload ?? item.text, attachmentIds: item.attachments.map(file => file.id), ...(item.okrContext ? { okrContext: item.okrContext } : {}) })
     if (activeScope.current !== owner || project && !project.isCurrent()) return
     if (data.kind === 'message') thread.accepted(data, item.text, item.okrContext)
