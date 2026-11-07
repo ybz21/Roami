@@ -2,7 +2,7 @@
 
 ## Product Design
 
-将识别服务配置从「设置 / 语音输入」移至「能力 / 大模型 / 语音识别」。沿用大模型页的标签与页内滚动、表单宽度和移动端控件，不增加页面外框。识别服务可关闭，或配置 OpenAI 与 Volcano Engine。
+将识别服务配置从「设置 / 语音输入」移至「能力 / 大模型」第一个「模型」标签的模型列表下方，作为「语音识别」区块，不单独占用标签。沿用页内滚动、表单宽度和移动端控件，不增加页面外框。识别服务可关闭，或配置 OpenAI 与 Volcano Engine。
 
 「显示语音按钮」仍是个人偏好，归入「设置 / 会话与交互」。移除设置目录中的独立语音页；旧 `settings/node/speech` 与 `env/node/speech` 链接继续打开迁移后的配置页，保留现有节点参数处理。
 
@@ -15,7 +15,7 @@
 
 ## Technical Design
 
-- `ModelHub.tsx` 新增 `speech` 标签，复用 `SpeechSettings`；语音设置的读取不依赖模型目录读取成功，也不显示无关的模型网关说明与错误。
+- `ModelHub.tsx` 在模型列表与使用情况下方复用 `SpeechSettings`，保留模型、用量与限额、模型定价三个标签。模型目录加载中或失败时仍可配置语音；旧 `speech` 子路由打开第一个模型标签。嵌入式新用户引导保持原模型配置范围。
 - `speech-settings.tsx` 保持 `/speech/config` GET/PUT、原字段、默认值和 `speech` 草稿键，采用现有 `agent-settings-*` 表单样式及能力页的触屏下拉菜单。所有字段具有可访问名称，保存期间禁用编辑。
 - `registry.tsx` 将 `voiceItem` 移入 `agent.new`，移除 `node.speech`；`route-hash.ts` 兼容旧链接。
 - 新标签及提示同时提供中英文。服务商品牌名遵循现有专有名词例外。
@@ -39,3 +39,9 @@
 - `/tmp/speech-settings-after-phone.png`
 - `/tmp/speech-all-tests.log`
 - `/tmp/speech-quality.log`
+
+## 位置调整
+
+根据后续反馈，语音识别改为第一个「模型」标签下的区块，去掉独立标签。补充验收截图使用 `/tmp/speech-inline-desktop.png` 与 `/tmp/speech-inline-phone.png`；测试和构建日志使用 `/tmp/speech-inline-tests.log`、`/tmp/speech-inline-build.log`。
+
+本次位置调整重新通过全部 214 个文件、1565 项前端测试及 typecheck、i18n、hover、build、quick 门禁。桌面四档宽度无横向溢出，模型编辑面板可开关；中英文均核对。Android LAN 页面确认模型列表下方出现语音区块；为避开同机其他实例的 Cookie 覆盖，后续触控通过 ADB 反向转发使用独立 localhost 域名。ADB 上滑后该页 scrollTop 从 0 增至 316，文档与视口均为 392 CSS px。手机截图通过选定的真机 Chrome 标签采集，避免其他任务切换前台干扰截图。

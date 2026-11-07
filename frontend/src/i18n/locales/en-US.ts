@@ -4950,7 +4950,7 @@ const enUS = {
   'hub.connectionOptions': "Connection options",
   'hub.tab.sources': "Sources",
   'hub.tab.catalog': "Models",
-  'hub.tab.speech': 'Speech recognition',
+  'hub.speechTitle': 'Speech recognition',
   'hub.speechHint': 'Configure the speech recognition model for voice input in sessions.',
   'hub.tab.usage': "Usage and limits",
   'hub.tab.prices': "Model pricing",
