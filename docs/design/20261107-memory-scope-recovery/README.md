@@ -141,7 +141,8 @@ pane 迁移未完成或失败时，继承的工作 scope 因而会被误认为�
 - `memguard/compression.go` 读取活跃 zram 设备的 `mm_stat`，使用 `mem_used_total` 计算实际占用，
   不假定固定压缩比；zswap 只报告开关状态。
 - 下载脚本的唯一来源为嵌入二进制的 `internal/memguard/zram-setup.sh`。
-  新安装入口为设置页下载或 `roami session memory-setup-script`；原有开发脚本本轮未改动。
+  正式部署 `install.sh`、设置页下载、`roami session memory-setup-script` 和旧开发脚本
+  统一使用这份实现。
   新脚本验证参数、保留已有压缩后端与磁盘 swap、为自有设备记录归属；
   停止时必须成功停用该设备后才重置，禁止全局 `swapoff -a`。
 - CLI 增加 `reclaim`、`compact`、`memory-status` 和 `memory-setup-script`；
@@ -171,3 +172,19 @@ pane 迁移未完成或失败时，继承的工作 scope 因而会被误认为�
 | 回收不足告警 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-reclaim-warning.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-reclaim-warning.png) |
 | 保留冻结保护 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-reclaim-paused.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-reclaim-paused.png) |
 | 整理与系统压缩设置 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-recovery-settings.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-recovery-settings.png) |
+
+### 正式部署集成
+
+`install.sh` 的新装、升级、离线包和源码构建路径，在完整包校验、存储预检和智能体运行环境
+验证成功之后、版本切换之前调用压缩配置。脚本从已验证版本的 CLI 提取，不额外下载主分支脚本。
+默认仅对运行 systemd 的 Linux 尝试启用；保留已有 zram/zswap，重复部署不增加设备。
+
+可用 `ROAMI_NO_ZRAM=1` 跳过，或用 `ROAMI_ZRAM_SIZE`、`ROAMI_ZRAM_MEMORY_LIMIT` 指定容量。
+参数先 dry-run 验证；root 直接运行，交互 sudo 可输入密码，无终端时使用 `sudo -n`。
+权限不足、脚本失败或读回未确认启用，都提示并继续安装，保留脚本及带原参数的重试命令。
+保存位置为 `$ROAMI_INSTALL_ROOT/system/roami-zram-setup.sh`。旧开发安装入口也转发同一实现。
+
+回归使用假的发布程序和提权命令，不触碰真实系统配置；覆盖新装、重复部署、已有 zram/zswap、
+macOS、无 systemd、显式跳过、旧发布不支持命令、错误容量、无提权、启用失败和读回失败。
+
+部署回归截图：[实际命令输出](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/deployment-memory-checks.png)。

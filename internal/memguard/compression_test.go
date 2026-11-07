@@ -58,3 +58,10 @@ func TestReclaimNeverTargetsTheController(t *testing.T) {
 		t.Fatal("controller reclaim accepted")
 	}
 }
+
+func TestDeploymentConfiguresCompressionFromTheVerifiedRelease(t *testing.T) {
+	out, err := exec.Command("bash", "../../scripts/dev/selftest/install-memory-compression.sh").CombinedOutput()
+	if err != nil {
+		t.Fatalf("deployment: %s %v", out, err)
+	}
+}

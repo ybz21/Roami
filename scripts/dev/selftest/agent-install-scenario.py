@@ -67,7 +67,9 @@ for name in (
     binary = shutil.which(name)
     if binary:
         (tools / name).symlink_to(binary)
-assert not any((tools / name).exists() for name in ("python", "python3", "uv", "go", "node", "npm"))
+assert not any(
+    (tools / name).exists() for name in ("python", "python3", "uv", "go", "node", "npm")
+)
 password = secrets.token_urlsafe(30)
 with socket.socket() as listener:
     listener.bind(("127.0.0.1", 0))
@@ -180,13 +182,23 @@ env.update(
     ROAMI_NO_CHROME="1",
     ROAMI_NO_ADB="1",
     ROAMI_NO_KVM="1",
+    ROAMI_NO_ZRAM="1",
 )
 
 
 def install(name, success=True):
     command = f"curl -fsSL http://127.0.0.1:{httpd.server_port}/install.sh | bash"
     result = subprocess.run(
-        [*launcher, "env", "PATH=" + str(tools), "bash", "-o", "pipefail", "-c", command],
+        [
+            *launcher,
+            "env",
+            "PATH=" + str(tools),
+            "bash",
+            "-o",
+            "pipefail",
+            "-c",
+            command,
+        ],
         check=False,
         env=env,
         stdout=subprocess.PIPE,
@@ -218,7 +230,9 @@ def wait_status(previous=None):
             if previous is None or status["pid"] != previous:
                 return status
         time.sleep(0.1)
-    raise AssertionError("runtime not ready: " + (root / "service.log").read_text()[-4000:])
+    raise AssertionError(
+        "runtime not ready: " + (root / "service.log").read_text()[-4000:]
+    )
 
 
 try:
@@ -242,8 +256,12 @@ try:
 
     request("/api/login", {"password": password})
     settings = request("/api/agent/model-settings")["data"]
-    assert settings["main"]["model"] == "" and not settings["connection"]["keyConfigured"]
-    conversation = request("/api/agent/conversations", {"title": "Persist across install"})["data"]
+    assert (
+        settings["main"]["model"] == "" and not settings["connection"]["keyConfigured"]
+    )
+    conversation = request(
+        "/api/agent/conversations", {"title": "Persist across install"}
+    )["data"]
     saved_config = (root / "config.yaml").read_bytes()
     current = (root / "versions with spaces/current").readlink()
     install("repeat")
@@ -254,7 +272,10 @@ try:
     assert conversation["id"] in json.dumps(catalog)
     # A changed archive exercises a new immutable slot with the same protocol/schema.
     upgraded_archive = root / archive.name
-    with tarfile.open(archive, "r:gz") as source, tarfile.open(upgraded_archive, "w:gz") as output:
+    with (
+        tarfile.open(archive, "r:gz") as source,
+        tarfile.open(upgraded_archive, "w:gz") as output,
+    ):
         for member in source:
             if member.isfile():
                 payload = source.extractfile(member).read()
@@ -267,7 +288,10 @@ try:
             else:
                 output.addfile(member)
     Path(str(upgraded_archive) + ".sha256").write_text(
-        hashlib.sha256(upgraded_archive.read_bytes()).hexdigest() + "  " + archive.name + "\n"
+        hashlib.sha256(upgraded_archive.read_bytes()).hexdigest()
+        + "  "
+        + archive.name
+        + "\n"
     )
     original_archive = archive
     archive = upgraded_archive
