@@ -5,7 +5,6 @@ import { HotkeyRecorder } from './hotkey-recorder'
 import { KEY_ACTIONS, DEFAULT_KEYBINDINGS, keybindingConflicts, resolveKeybindings, type KeyAction } from '../shell/keybindings'
 import { BrowserSettings } from './browser-settings'
 import { PhoneSettings } from './phone-settings'
-import { SpeechSettings } from './speech-settings'
 import { P2PSettings } from './p2p-settings'
 import { EnvVarsSettings } from './env-vars'
 import { MemoryGuardSettings } from './memory-settings'
@@ -207,6 +206,7 @@ export function buildSettings(deps: {
           key: 'quickCommands', control: { kind: 'custom', node: <QuickCommandsSettings /> },
         },
         promptPopupItem,
+        voiceItem,
       ],
     },
     {
@@ -222,14 +222,6 @@ export function buildSettings(deps: {
       items: [{
         id: 'phone', label: t('settings.phoneTitle'), bare: true, control: { kind: 'custom', node: <PhoneSettings /> },
         keywords: 'android ios adb avd emulator 模拟器 真机 镜像',
-      }],
-    },
-    {
-      id: 'node.speech', name: t('settings.speech'), scope: 'node',
-      note: t('settings.speechHelp'),
-      items: [voiceItem, {
-        id: 'speech', label: t('settings.speech'), bare: true, control: { kind: 'custom', node: <SpeechSettings /> },
-        keywords: 'asr whisper openai volcano 火山 语音 识别 密钥 apikey',
       }],
     },
     {
@@ -293,7 +285,7 @@ export function buildSettings(deps: {
   const groups: SettingsGroup[] = [
     { title: t('set.groupPreferences'), pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
     { title: t('set.groupAgent'), pages: ['agent.runtime', 'agent.memory', ...(deps.developmentRsi ? ['experiments.rsi'] : [])] },
-    { title: t('set.groupNotifications'), pages: ['agent.messages', 'node.speech'] },
+    { title: t('set.groupNotifications'), pages: ['agent.messages'] },
     { title: t('set.groupDevices'), pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
     { title: t('set.groupSystem'), pages: ['node.env', 'sec', 'about'] },
   ]

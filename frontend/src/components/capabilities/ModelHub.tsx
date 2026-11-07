@@ -5,6 +5,7 @@ import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
 import { PlusIcon, LinkIcon } from '../../icons'
 import { useSettingsDraft } from '../settings/settings-draft'
+import { SpeechSettings } from '../settings/speech-settings'
 import MobileSubPage from '../MobileSubPage'
 import LocalModelSources from './LocalModelSources'
 import ModelSourceEditor, { initialSourceDraft, type SourceDraft } from './ModelSourceEditor'
@@ -13,7 +14,7 @@ import { useModelCatalog, type ModelSource, type CatalogModel } from './model-hu
 import '../settings/agent-settings.css'
 import './model-hub.css'
 
-const tabs = ['catalog', 'usage', 'prices']
+const tabs = ['catalog', 'speech', 'usage', 'prices']
 const newID = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36)
 export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: string; onNav: (path: string) => void; embedded?: boolean }) {
   const { t } = useI18n(), { message, modal } = App.useApp(), layout = useLayout()
@@ -32,7 +33,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const error = controller.error && <Alert type="error" role="alert" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />
   const models = value?.models || [], sources = value?.sources || []
   const priceModels = [...new Set(models.flatMap(model => model.candidates.map(candidate => candidate.model)).concat(models.flatMap(model => [model.id, ...model.candidates.map(candidate => candidate.sourceId + "/" + candidate.model)])))]
-  if (!loaded && tab !== 'usage' && tab !== 'prices') return <div className="tt-model-hub-scroll">{error || <Spin />}</div>
+  if (!loaded && tab === 'catalog') return <div className="tt-model-hub-scroll">{error || <Spin />}</div>
   const sourceBase: ModelSource = sources.find(source => source.id === id) || { id: newSourceId, name: '', baseUrl: '', protocol: 'openai-completions', authMode: 'api_key', apiKey: '' }
   const sourceDraft = sourceDrafts[id] || initialSourceDraft(sourceBase, id !== 'new')
   const modelBase: CatalogModel = models.find(model => model.id === id) || value.drafts.find(model => model.id === id) || { id: newModelId, name: '', protocol: sources[0]?.protocol || 'openai-completions', strategy: 'fixed', candidates: [{ sourceId: sources[0]?.id || '', model: '' }] }
@@ -105,10 +106,10 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
     {draftNotice}
     {(!detail || !layout.phone) && <div className="tt-model-hub-scroll">
-      {error}
-      <details className="tt-model-hub-entry"><summary><LinkIcon />{t('hub.entry')}</summary><p>{t('hub.entryHint')}</p><code>{value.baseUrl}</code><p>{t('hub.continuationHint')}</p></details>
+      {tab !== 'speech' && error}
+      {tab !== 'speech' && <details className="tt-model-hub-entry"><summary><LinkIcon />{t('hub.entry')}</summary><p>{t('hub.entryHint')}</p><code>{value.baseUrl}</code><p>{t('hub.continuationHint')}</p></details>}
       <Tabs activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key) }))} />
-      {tab === 'usage' || tab === 'prices' ? <><GatewaySettingsForm controller={billing} mode={tab === 'usage' ? 'proxy' : 'prices'} active models={priceModels} /><GatewayReconciliation controller={billing} /></>
+      {tab === 'speech' ? <SpeechSettings /> : tab === 'usage' || tab === 'prices' ? <><GatewaySettingsForm controller={billing} mode={tab === 'usage' ? 'proxy' : 'prices'} active models={priceModels} /><GatewayReconciliation controller={billing} /></>
         : <><div className="tt-model-hub-actions"><Button type="primary" icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button><Button onClick={() => navigate('catalog/local')}>{t('hub.local.title')}</Button><Button onClick={() => onNav('capabilities/agents')}>{t('hub.configureAgents')}</Button></div>{rows.length ? rows : <p>{t('hub.empty.connections')}</p>}
         {!!consumers.length && <section className="tt-model-hub-consumers"><div className="tt-model-hub-actions"><h3>{t('hub.consumers')}</h3></div>{consumers.map(([model, users]) => <div className="tt-model-hub-row" key={model}><div><strong>{models.find(row => row.id === model)?.name || model}</strong><small>{[...new Set(users)].join(', ')}</small></div><Button onClick={() => onNav('capabilities/agents/' + users[0] + '/models')}>{t('hub.configure')}</Button></div>)}</section>}</>}
     </div>}

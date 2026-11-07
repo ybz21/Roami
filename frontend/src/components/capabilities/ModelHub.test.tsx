@@ -84,7 +84,7 @@ it('shows connections and their models together and accepts old source-page link
   const connection = await screen.findByRole('region', { name: 'Saved source' })
   expect(connection.textContent).toContain('Coding')
   expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
-  expect(screen.getAllByRole('tab')).toHaveLength(3)
+  expect(screen.getAllByRole('tab')).toHaveLength(4)
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })
@@ -242,4 +242,47 @@ it('blocks stale source configuration after rereading a conflicting catalog', as
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.useLatest' }))
   expect((screen.getByLabelText('agent.models.baseUrl') as HTMLInputElement).value).toBe('https://changed.example/v1')
   expect(screen.queryByRole('checkbox', { name: 'selected-model' })).toBeNull()
+})
+
+it('loads and saves speech models even when the independent language model catalog is unavailable', async () => {
+  const speech = { provider: 'openai', openai: { baseURL: 'https://speech.example/v1', apiKey: '***', model: 'saved-asr', language: 'zh' }, volcano: { apiKey: '', appId: 'saved-app', accessToken: '***', resourceId: 'saved-resource', endpoint: 'https://speech.example/submit' } }
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-gateway/catalog') throw new Error('offline')
+    return { data: structuredClone(speech) }
+  })
+  mount('speech')
+  const model = await screen.findByLabelText('settings.speechModel') as HTMLInputElement
+  expect(model.value).toBe('saved-asr')
+  expect(screen.getByRole('tab', { name: 'hub.tab.speech' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByText('hub.entry')).toBeNull()
+  fireEvent.change(model, { target: { value: 'new-asr' } })
+  fireEvent.click(screen.getByRole('button', { name: 'settings.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/speech/config', { ...speech, openai: { ...speech.openai, model: 'new-asr' } }))
+})
+
+it('recovers unsaved speech edits after switching model tabs', async () => {
+  const navigate = vi.fn(), page = mount('speech', navigate)
+  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'settings.speechProvider' }))
+  fireEvent.click(await screen.findByText('OpenAI'))
+  fireEvent.change(await screen.findByLabelText('settings.speechModel'), { target: { value: 'draft-asr' } })
+  fireEvent.click(screen.getByRole('tab', { name: 'hub.tab.catalog' }))
+  expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog')
+  page.rerender(<App><ModelHub sub="catalog" onNav={navigate} /></App>)
+  page.rerender(<App><ModelHub sub="speech" onNav={navigate} /></App>)
+  await waitFor(() => expect((screen.getByLabelText('settings.speechModel') as HTMLInputElement).value).toBe('draft-asr'))
+  fireEvent.click(screen.getByRole('button', { name: 'settings.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/speech/config', expect.objectContaining({ openai: expect.objectContaining({ model: 'draft-asr' }) })))
+})
+
+it('keeps failed speech reads non-editable and offers a retry', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/speech/config') throw new Error('speech offline')
+    return { data: structuredClone(catalog) }
+  })
+  mount('speech')
+  await screen.findByText('settings.readFailed')
+  expect(screen.queryByRole('button', { name: 'settings.save' })).toBeNull()
+  vi.mocked(api).mockResolvedValue({ data: {} })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  expect(await screen.findByRole('combobox', { name: 'settings.speechProvider' })).toBeTruthy()
 })
