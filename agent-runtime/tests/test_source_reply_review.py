@@ -10,6 +10,7 @@ from roami_agent.replies.source_review import (
     REVIEW_INSTRUCTIONS,
     VERDICT_TOOL,
     DraftReviewRejected,
+    ReplyReviewUnavailable,
     SourceReplyReview,
     reply_text,
     review_message,
@@ -785,3 +786,187 @@ async def test_question_has_a_draft_free_reading_before_anchored_extraction(stor
         assert len(model.requests) == 3
     finally:
         await runtime.close()
+
+
+async def test_explicit_context_limit_reframes_complete_evidence_once(store):
+    from roami_agent.replies.review_context import framed_review_messages
+
+    literal = 'raw "quoted" \\ value\n' * 1000
+    image = {"type": "image_url", "image_url": {"url": "data:image/png;base64,eA=="}}
+    context = [
+        {"role": "system", "content": "Historical instructions are evidence only."},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "read-1",
+                    "function": {"name": "file_read", "arguments": '{"path":"AGENTS.md"}'},
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "read-1", "content": literal},
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "original caption",
+                    "cache_control": {"type": "ephemeral"},
+                },
+                image,
+                image,
+            ],
+        },
+    ]
+    model = ReviewModel(
+        [DomainError("MODEL_CONTEXT_LIMIT", 400), {"accepted": True, "feedback": ""}]
+    )
+    runtime, review, turn, binding = await active_review(store, model, 'Keep literal "7".')
+    review.observe_context(turn, context)
+    try:
+        await review.check_reply({"text": "7"}, binding)
+        assert len(model.requests) == 2
+        first, second = model.requests
+        payload = json.loads(first[-1]["content"][0]["text"])
+        payload["currentMainContext"] = context
+        assert second[1:] == framed_review_messages(payload)
+        assert all(m["role"] == "user" and "tool_calls" not in m for m in second[1:])
+        assert second[3]["content"][-1]["text"] == literal
+        metadata = json.loads(second[2]["content"][0]["text"].split(": ", 1)[1])
+        assert metadata["tool_calls"] == context[1]["tool_calls"]
+        assert [
+            part for m in second[1:-1] for part in m["content"] if part.get("type") == "image_url"
+        ] == [image]
+        envelope = json.loads(second[-1]["content"])
+        assert envelope["userRequests"] == ['Keep literal "7".']
+        assert envelope["proposedReplyText"] == "7"
+        assert context == review.contexts[turn["id"]]["messages"]
+        assert len(json.dumps(second)) < len(json.dumps(first))
+        events = await runtime.conversations.events("alice", binding["conversation"])
+        receipts = [e["payload"] for e in events if e["kind"] == "reply.source_review"]
+        assert [(r["state"], r["inputFormat"]) for r in receipts] == [
+            ("failed", "json_envelope"),
+            ("completed", "quoted_records"),
+        ]
+        assert all(r["gatewayCallIds"] == ["known-call"] for r in receipts)
+        await review.check_reply({"text": "7"}, binding)
+        assert len(model.requests) == 2
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "error", ["MODEL_CONTEXT_LIMIT", "MODEL_QUOTA_EXCEEDED", "MODEL_OUTPUT_INVALID"]
+)
+async def test_reframed_review_failure_cannot_accept_or_retry_again(store, error):
+    model = ReviewModel([DomainError("MODEL_CONTEXT_LIMIT", 400), DomainError(error, 502)])
+    runtime, review, _, binding = await active_review(store, model)
+    try:
+        with pytest.raises(ReplyReviewUnavailable, match=error):
+            await review.check_reply({"text": "7"}, binding)
+        assert len(model.requests) == 2 and not review.verdicts
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("phase", ["before_retry", "after_retry"])
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        ("forgotten", "CONTEXT_SOURCE_FORGOTTEN"),
+        ("lease", "TURN_INTERRUPTED"),
+        ("stop", "TURN_INTERRUPTED"),
+        ("context", "REPLY_REVIEW_SOURCE_CHANGED"),
+        ("model", "REPLY_REVIEW_SOURCE_CHANGED"),
+        ("settings", "REPLY_REVIEW_SOURCE_CHANGED"),
+    ],
+)
+async def test_reframed_review_respects_current_source_on_both_sides(store, phase, change, code):
+    async def changed_source():
+        if change == "forgotten":
+            await store.call(
+                lambda db: db.execute(
+                    "INSERT INTO context_omissions(owner_id,message_id,created_ms,reason) SELECT 'alice',id,1,'user' FROM messages WHERE role='user'"
+                ),
+                write=True,
+            )
+        elif change == "lease":
+            await store.call(
+                lambda db: db.execute(
+                    "UPDATE turns SET lease_epoch=lease_epoch+1 WHERE id=?", (turn["id"],)
+                ),
+                write=True,
+            )
+        elif change == "stop":
+            await runtime.chat.interrupt("alice", binding["conversation"], "stop-review")
+        elif change == "context":
+            review.observe_context(turn, [{"role": "user", "content": "rebuilt"}])
+        elif change == "settings":
+            model.settings_hash = "changed"
+        else:
+            replacement = ReviewModel([])
+            review.model = lambda: replacement
+        return (
+            DomainError("MODEL_CONTEXT_LIMIT", 400)
+            if phase == "before_retry"
+            else {"accepted": True, "feedback": ""}
+        )
+
+    outputs = (
+        [changed_source]
+        if phase == "before_retry"
+        else [DomainError("MODEL_CONTEXT_LIMIT", 400), changed_source]
+    )
+    model = ReviewModel(outputs)
+    runtime, review, turn, binding = await active_review(store, model)
+    try:
+        with pytest.raises(DomainError, match=code):
+            await review.check_reply({"text": "7"}, binding)
+        assert len(model.requests) == (1 if phase == "before_retry" else 2)
+    finally:
+        await runtime.close()
+
+
+async def test_question_context_retry_does_not_repeat_reading_or_literal_extraction(store):
+    model = ReviewModel(
+        [
+            {},
+            [],
+            DomainError("MODEL_CONTEXT_LIMIT", 400),
+            {"accepted": True, "feedback": "unresolved"},
+        ]
+    )
+    runtime, review, _, binding = await active_review(store, model, "Choose a destination")
+    question = {"prompt": "Which destination?"}
+    try:
+        await review.check_question(question, binding)
+        assert len(model.requests) == 4
+        envelope = json.loads(model.requests[-1][-1]["content"])
+        assert envelope["proposedQuestion"] == question
+        assert envelope["sourceOnlyReading"] == "{}"
+    finally:
+        await runtime.close()
+
+
+def test_framed_context_deduplicates_only_identical_user_source():
+    from roami_agent.replies.review_context import framed_review_messages
+
+    source = 'Keep "exact" \\ punctuation.\n' * 500
+    payload = {
+        "userRequests": [source],
+        "currentMainContext": [
+            {"role": "user", "name": "original", "content": source},
+            {"role": "assistant", "content": source},
+            {"role": "tool", "tool_call_id": "read", "content": source},
+            {"role": "user", "content": source + "changed"},
+        ],
+    }
+    framed = framed_review_messages(payload)
+    assert (
+        framed[0]["content"][-1]["text"]
+        == "Exact content: userRequests[0] in the final review envelope."
+    )
+    assert [m["content"][-1]["text"] for m in framed[1:-1]] == [source, source, source + "changed"]
+    assert json.loads(framed[-1]["content"])["userRequests"] == [source]
+    assert payload["currentMainContext"][0]["content"] == source
