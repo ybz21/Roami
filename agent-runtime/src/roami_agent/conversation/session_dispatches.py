@@ -51,7 +51,7 @@ class SessionDispatches:
         ]
         return shlex.join(argv)
 
-    async def prepare(self, session_id, text, key, binding):
+    async def prepare(self, session_id, text, key, binding, *, resolve):
         digest = hashlib.sha256(encoded([session_id, text]).encode()).hexdigest()
 
         def admitted(db):
@@ -97,6 +97,8 @@ class SessionDispatches:
         if old and old["delivery_state"] != "prepared":
             return old
         files = await verified_attachment_inputs(self.artifacts, binding["owner"], attachments)
+        target = await resolve("session", session_id)
+        canonical_session = target["sessionId"]
 
         def write(db):
             owner, cid = binding["owner"], binding["conversation"]
@@ -105,7 +107,17 @@ class SessionDispatches:
                 return old
             if current_attachments != attachments:
                 raise DomainError("MESSAGE_KEY_CONFLICT", 409)
+            if row(
+                db,
+                "SELECT 1 FROM task_attempts WHERE session_id=? "
+                "UNION ALL SELECT 1 FROM tasks WHERE json_extract(target_json,'$.sessionId')=? "
+                "OR json_extract(intent_json,'$.target.sessionId')=? LIMIT 1",
+                (canonical_session, canonical_session, canonical_session),
+            ):
+                raise DomainError("TASK_SESSION_BINDING_REQUIRED", 409)
             if old:
+                if old["session_id"] != canonical_session:
+                    raise DomainError("MESSAGE_KEY_CONFLICT", 409)
                 return old
             did = identity()
             inputs = (
@@ -146,7 +158,7 @@ class SessionDispatches:
                     turn["branch_id"],
                     turn["id"],
                     origin["id"],
-                    session_id,
+                    canonical_session,
                     prompt,
                     now_ms(),
                     now_ms(),

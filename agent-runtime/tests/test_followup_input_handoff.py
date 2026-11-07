@@ -92,6 +92,11 @@ async def test_existing_session_receives_current_image_and_file_once(store, monk
         sent = []
 
         async def execute(argv, **kwargs):
+            if argv[1:3] == ["session", "resolve"]:
+                return {
+                    "exitCode": 0,
+                    "stdout": json.dumps({"id": "original-session", "label": "X"}),
+                }
             sent.append(json.loads(kwargs["input_data"]))
             return {
                 "exitCode": 0,
@@ -313,9 +318,13 @@ async def test_session_input_forgotten_during_integrity_check_does_not_send(stor
             return result
 
         monkeypatch.setattr(runtime.artifacts, "verified_path", forget)
+
+        async def resolve(kind, identifier):
+            return {"sessionId": identifier}
+
         with pytest.raises(DomainError, match="CONTEXT_SOURCE_FORGOTTEN"):
             await runtime.session_dispatches.prepare(
-                "original-session", "Use this diagram", "send", binding
+                "original-session", "Use this diagram", "send", binding, resolve=resolve
             )
         assert not await store.call(lambda db: row(db, "SELECT id FROM session_dispatches"))
     finally:
@@ -331,6 +340,11 @@ async def test_unknown_image_delivery_is_not_replayed(store, monkeypatch):
         sent = []
 
         async def execute(argv, **kwargs):
+            if argv[1:3] == ["session", "resolve"]:
+                return {
+                    "exitCode": 0,
+                    "stdout": json.dumps({"id": "original-session", "label": "X"}),
+                }
             sent.append(json.loads(kwargs["input_data"]))
             raise TimeoutError
 
@@ -424,6 +438,11 @@ async def test_recorded_image_delivery_keeps_its_receipt_after_blob_removal(
         sent = []
 
         async def execute(argv, **kwargs):
+            if argv[1:3] == ["session", "resolve"]:
+                return {
+                    "exitCode": 0,
+                    "stdout": json.dumps({"id": "original-session", "label": "X"}),
+                }
             sent.append(True)
             if outcome == "unknown":
                 raise TimeoutError

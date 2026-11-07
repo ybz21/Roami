@@ -36,7 +36,12 @@ async def origin(runtime, key="one"):
 
 
 async def prepare(runtime, binding, key="one"):
-    return await runtime.session_dispatches.prepare("session-codex", "Open a PR", key, binding)
+    async def resolve(kind, identifier):
+        return {"sessionId": identifier}
+
+    return await runtime.session_dispatches.prepare(
+        "session-codex", "Open a PR", key, binding, resolve=resolve
+    )
 
 
 async def test_delivery_includes_stable_callback_and_never_replays_an_unknown_send(
@@ -47,6 +52,8 @@ async def test_delivery_includes_stable_callback_and_never_replays_an_unknown_se
     calls = []
 
     async def execute(argv, **kwargs):
+        if argv[1:3] == ["session", "resolve"]:
+            return {"exitCode": 0, "stdout": json.dumps({"id": "session-codex", "label": "X"})}
         calls.append(json.loads(kwargs["input_data"]))
         return {
             "exitCode": 0,
@@ -57,6 +64,7 @@ async def test_delivery_includes_stable_callback_and_never_replays_an_unknown_se
 
     monkeypatch.setattr(targets, "execute", execute)
     directory = TargetDirectory(runtime.settings, runtime.session_dispatches)
+    resolver = directory.resolve
     receipt = await directory.send("session-codex", "Open a PR", "one", binding=binding)
     assert receipt["replyExpected"] and not receipt["executionTracked"]
     assert "agent reply --dispatch " + receipt["dispatchId"] in calls[0]["text"]
@@ -69,6 +77,10 @@ async def test_delivery_includes_stable_callback_and_never_replays_an_unknown_se
     async def unknown(*args, **kwargs):
         raise TimeoutError
 
+    async def resolve(*args):
+        return {"sessionId": "session-codex"}
+
+    monkeypatch.setattr(directory, "resolve", resolve)
     monkeypatch.setattr(targets, "execute", unknown)
     with pytest.raises(DomainError, match="TOOL_OUTCOME_UNKNOWN"):
         await directory.send("session-codex", "Second work", "two", binding=binding)
@@ -76,6 +88,7 @@ async def test_delivery_includes_stable_callback_and_never_replays_an_unknown_se
     with pytest.raises(DomainError, match="TOOL_OUTCOME_UNKNOWN"):
         await directory.send("session-codex", "Second work", "two", binding=binding)
     assert len(calls) == 1
+    monkeypatch.setattr(directory, "resolve", resolver)
 
 
 async def test_reports_return_only_to_original_branch_survive_service_recreation_and_dedupe(store):
@@ -258,6 +271,8 @@ async def test_known_delivery_rejection_stays_failed_without_resending_or_accept
     calls = []
 
     async def execute(*args, **kwargs):
+        if args[0][1:3] == ["session", "resolve"]:
+            return {"exitCode": 0, "stdout": json.dumps({"id": "gone-session", "label": "Gone"})}
         calls.append(True)
         return {"exitCode": 1, "stderr": "SESSION_TARGET_NOT_FOUND"}
 
