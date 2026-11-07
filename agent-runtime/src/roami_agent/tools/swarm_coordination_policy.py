@@ -9,11 +9,13 @@ from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination import admitted_batch
 from roami_agent.storage.swarm_coordination_admission import for_turn
 from roami_agent.storage.swarm_evidence import evidence
+from roami_agent.tools.swarm_coordination_artifacts import current_tool_artifact
 from roami_agent.tools.swarm_coordination_catalog import (
     COORDINATION_OPERATIONS,
     SWARM_READS,
     SWARM_WRITES,
 )
+from roami_agent.tools.swarm_coordination_writes import project_write
 
 
 class SwarmCoordinationPolicy:
@@ -158,7 +160,9 @@ class SwarmCoordinationPolicy:
                 )
                 if attempt:
                     allowed.update(item["id"] for item in evidence(db, task, attempt))
-            if args.get("id") not in allowed:
+            if args.get("id") not in allowed and not current_tool_artifact(
+                db, value, args.get("id")
+            ):
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
         if name == "swarm_project_update" and args.get("operation") not in {"record", "review"}:
             raise DomainError("SWARM_COORDINATION_OPERATION_UNAVAILABLE", 403)
@@ -204,4 +208,6 @@ class SwarmCoordinationPolicy:
                 raise DomainError("SWARM_COORDINATION_WORKSPACE_CHANGED", 409)
             binding = {**binding, "workspace": workspace}
             await self.db.call(lambda db: self.context(db, binding))
-        return args, binding
+        return await self.db.call(
+            lambda db: project_write(db, self.context(db, binding), tool.name, args, binding)
+        )

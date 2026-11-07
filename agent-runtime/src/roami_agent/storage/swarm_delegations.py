@@ -64,12 +64,12 @@ def source_messages(db, turn, source):
     return result
 
 
-def current_delegation(db, owner, swarm_id, delegation_id=None):
+def current_delegation(db, owner, swarm_id, delegation_id=None, *, allow_paused=False):
     team = group(db, owner, swarm_id)
     require_scope(team)
     if team["scope_project_id"] is None:
         raise DomainError("SWARM_PROJECT_REQUIRED", 409)
-    if team["paused"] or team["archived"]:
+    if team["archived"] or (team["paused"] and not allow_paused):
         raise DomainError("SWARM_COORDINATION_PAUSED", 409)
     value = row(
         db,

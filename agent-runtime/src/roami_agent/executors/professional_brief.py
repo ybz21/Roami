@@ -3,6 +3,7 @@
 import json
 
 from roami_agent.conversation.attachments import context_attachments, verified_attachment_inputs
+from roami_agent.conversation.okr_message_context import human_text
 from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
@@ -43,7 +44,7 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
                 mid == current["origin_message_id"]
                 and intent.get("continuation", {}).get("instructionAuthor") == "main"
             ):
-                authorization = content.get("text", "")
+                authorization = human_text(content)
             _, evidence = context_attachments(db, task["owner_id"], content)
             if len(evidence) != len(content.get("attachments", [])):
                 raise DomainError("ATTACHMENT_NOT_FOUND")

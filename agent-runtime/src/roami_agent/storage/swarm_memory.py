@@ -85,6 +85,24 @@ def from_project(workspace):
         "source": ".roami/okr/memory/team.md",
         "available": True,
     }
+    if files.get("operationReceiptsSupported") is True:
+        result["operationReceiptsSupported"] = True
+    receipt = files.get("operationReceipt")
+    if receipt is not None:
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("kind") != "memory_append"
+            or not isinstance(receipt.get("key"), str)
+            or not receipt["key"]
+            or any(
+                not isinstance(receipt.get(k), str) or not re.fullmatch(r"[0-9a-f]{64}", receipt[k])
+                for k in ("requestSha256", "previousSha256", "resultSha256")
+            )
+            or not isinstance(receipt.get("recordedAt"), str)
+            or not receipt["recordedAt"]
+        ):
+            raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
+        result["operationReceipt"] = receipt
     instructions = files.get("mainInstructions", "")
     workflow = files.get("workflow", "")
     skills = files.get("skills", [])
@@ -172,10 +190,18 @@ async def write_memory(swarms, owner, sid, spec):
     workspace = await project_context(swarms, owner, sid, memory=spec)
     if workspace is not None:
         result = from_project(workspace)
+        if spec.get("operationKey") and (
+            spec.get("mode") != "append"
+            or (result.get("operationReceipt") or {}).get("key") != spec["operationKey"]
+        ):
+            raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
         await swarms.db.call(
             lambda db: changed(db, group(db, owner, sid), "swarm.memory_changed"), write=True
         )
         return result
+
+    if spec.get("operationKey") is not None or spec.get("mode") is not None:
+        raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
 
     def write(db):
         current = row(db, "SELECT sha256 FROM swarm_memories WHERE swarm_id=?", (sid,))

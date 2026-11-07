@@ -37,7 +37,17 @@ def operation(tool):
         description = (
             "Record a dated observation or review evidence in this batch's bound project, using "
             "its current revision and validated payload. Read swarm_project_context first. "
+            "The host keeps one review or one manual observation per metric/date in this batch; "
+            "retries return the original receipt and changed content conflicts. Connector retries "
+            "keep the original source/window request, batch ID and revision. Do not supply operationKey. "
             "Saving definitions, collection, sync and publication are unavailable in this batch."
+        )
+    elif tool.name == "swarm_memory_write":
+        description = (
+            "Append only new verified knowledge to this batch's project team memory. Read "
+            "swarm_memory_read first; pass its sha256 as expectedSha256. Supply the new paragraph only; "
+            "never copy or replace the existing document. The host preserves one stable append "
+            "receipt per batch, so a new call or CAS cannot repeat it. Changed content conflicts."
         )
     elif tool.name == "task_steer":
         description = (

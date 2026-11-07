@@ -5,6 +5,7 @@ import json
 
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.conversation.attachments import context_attachments
+from roami_agent.conversation.okr_message_context import human_text
 from roami_agent.dispatch.navigation_recovery import recovered_navigation, stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_sessions import assert_session_open
@@ -215,7 +216,7 @@ class TaskRevisions:
                 source_text = (
                     coordinated["delegation"]["source_quote"]
                     if coordinated
-                    else json.loads(source_user["content_json"]).get("text", "")
+                    else human_text(json.loads(source_user["content_json"]))
                 )
                 if any(
                     quote is not None and quote not in source_text
@@ -595,7 +596,7 @@ class TaskRevisions:
                     if payload.get("instructionAuthor") == "main":
                         execution_text = (
                             member_authorization_context(
-                                json.loads(source["content_json"]).get("text", "")
+                                human_text(json.loads(source["content_json"]))
                             )
                             + "\n\nMain's assignment for this member:\n"
                             + execution_text
