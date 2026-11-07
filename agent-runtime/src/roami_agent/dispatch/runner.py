@@ -13,6 +13,7 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination_tasks import assert_dispatch_authorized
+from roami_agent.storage.task_result_receipts import receipt_for_run, record_execution_result
 
 log = logging.getLogger(__name__)
 
@@ -643,6 +644,7 @@ class TaskDispatcher:
                     "UPDATE task_attempts SET state='unknown',result_json=? WHERE id=? AND task_revision=?",
                     (encoded(result), run["id"], run["task_revision"]),
                 )
+                record_execution_result(db, task["id"], run["id"])
             elif current["state"] == "cancelling":
                 children = rows(
                     db,
@@ -685,6 +687,11 @@ class TaskDispatcher:
                 "state": state,
                 "result": result,
             }
+            execution_receipt = receipt_for_run(
+                db, task["id"], run["id"], expected_result_json=run.get("result_json")
+            )
+            if execution_receipt:
+                completion["executionReceipt"] = execution_receipt
             db.execute(
                 "UPDATE tasks SET state=?,updated_ms=? WHERE id=?", (state, now_ms(), task["id"])
             )
