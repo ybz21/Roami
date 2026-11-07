@@ -97,23 +97,25 @@ type TeamDefinition struct {
 }
 
 type ProjectFiles struct {
-	ConnectorBatchProtocol string         `json:"connectorBatchProtocol,omitempty"`
-	ConnectorSkillBatches  bool           `json:"connectorSkillBatches,omitempty"`
-	TeamRoleBindings       bool           `json:"teamRoleBindings,omitempty"`
-	HTMLDashboardSupported bool           `json:"htmlDashboardSupported,omitempty"`
-	DashboardDigest        string         `json:"dashboardDigest,omitempty"`
-	Root                   string         `json:"root"`
-	SchemaVersion          int            `json:"schemaVersion"`
-	Revision               int64          `json:"revision"`
-	MainInstructionsFile   string         `json:"mainInstructionsFile"`
-	TeamMemoryFile         string         `json:"teamMemoryFile"`
-	MainInstructions       string         `json:"mainInstructions,omitempty"`
-	WorkflowFile           string         `json:"workflowFile,omitempty"`
-	Workflow               string         `json:"workflow,omitempty"`
-	TeamMemory             string         `json:"teamMemory,omitempty"`
-	TeamMemorySha256       string         `json:"teamMemorySha256"`
-	PendingChanges         bool           `json:"pendingChanges"`
-	Skills                 []ProjectSkill `json:"skills"`
+	OperationReceiptsSupported bool                     `json:"operationReceiptsSupported,omitempty"`
+	OperationReceipt           *ProjectOperationReceipt `json:"operationReceipt,omitempty"`
+	ConnectorBatchProtocol     string                   `json:"connectorBatchProtocol,omitempty"`
+	ConnectorSkillBatches      bool                     `json:"connectorSkillBatches,omitempty"`
+	TeamRoleBindings           bool                     `json:"teamRoleBindings,omitempty"`
+	HTMLDashboardSupported     bool                     `json:"htmlDashboardSupported,omitempty"`
+	DashboardDigest            string                   `json:"dashboardDigest,omitempty"`
+	Root                       string                   `json:"root"`
+	SchemaVersion              int                      `json:"schemaVersion"`
+	Revision                   int64                    `json:"revision"`
+	MainInstructionsFile       string                   `json:"mainInstructionsFile"`
+	TeamMemoryFile             string                   `json:"teamMemoryFile"`
+	MainInstructions           string                   `json:"mainInstructions,omitempty"`
+	WorkflowFile               string                   `json:"workflowFile,omitempty"`
+	Workflow                   string                   `json:"workflow,omitempty"`
+	TeamMemory                 string                   `json:"teamMemory,omitempty"`
+	TeamMemorySha256           string                   `json:"teamMemorySha256"`
+	PendingChanges             bool                     `json:"pendingChanges"`
+	Skills                     []ProjectSkill           `json:"skills"`
 }
 
 type ProjectSkill struct {

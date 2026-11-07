@@ -223,3 +223,4 @@
 - [长历史回复审核](reply-review-context.md)：明确超限后的无损引文传输，保留来源和审核，不重建 Main（#774）。
 
 - [用户原文与 OKR 草稿分离](literal-user-messages.md)：移除页面合成指令，保留原 Main、草稿与请求重试（#777）。
+- [项目写入回执](project-write-receipts.md)：观测、复盘和记忆追加的稳定身份与崩溃对账（Go/API 第一段）。

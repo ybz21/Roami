@@ -206,18 +206,19 @@ func (a *API) ProjectOKRObserve(c *gin.Context) {
 		return
 	}
 	var b struct {
-		Batch    *okr.ConnectorBatch `json:"batch"`
-		Revision int64               `json:"revision"`
-		MetricID string              `json:"metricId"`
-		Date     string              `json:"date"`
-		Value    *float64            `json:"value"`
-		Note     string              `json:"note"`
+		OperationKey *string             `json:"operationKey,omitempty"`
+		Batch        *okr.ConnectorBatch `json:"batch"`
+		Revision     int64               `json:"revision"`
+		MetricID     string              `json:"metricId"`
+		Date         string              `json:"date"`
+		Value        *float64            `json:"value"`
+		Note         string              `json:"note"`
 	}
 	if !decodeOKR(c, &b) {
 		return
 	}
 	if b.Batch != nil {
-		if b.MetricID != "" || b.Date != "" || b.Value != nil || b.Note != "" {
+		if b.OperationKey != nil || b.MetricID != "" || b.Date != "" || b.Value != nil || b.Note != "" {
 			okrError(c, okr.ErrInvalid)
 			return
 		}
@@ -233,7 +234,13 @@ func (a *API) ProjectOKRObserve(c *gin.Context) {
 		okrError(c, okr.ErrInvalid)
 		return
 	}
-	w, err := a.ProjectOKR.Observe(projectID, b.Revision, b.MetricID, b.Date, *b.Value, b.Note)
+	var w *okr.Workspace
+	var err error
+	if b.OperationKey != nil {
+		w, err = a.ProjectOKR.ObserveOnce(projectID, *b.OperationKey, b.Revision, b.MetricID, b.Date, *b.Value, b.Note)
+	} else {
+		w, err = a.ProjectOKR.Observe(projectID, b.Revision, b.MetricID, b.Date, *b.Value, b.Note)
+	}
 	if err != nil {
 		okrError(c, err)
 		return
@@ -266,14 +273,21 @@ func (a *API) ProjectOKRReview(c *gin.Context) {
 		return
 	}
 	var b struct {
-		Revision int64  `json:"revision"`
-		Summary  string `json:"summary"`
-		Actions  string `json:"actions"`
+		OperationKey *string `json:"operationKey,omitempty"`
+		Revision     int64   `json:"revision"`
+		Summary      string  `json:"summary"`
+		Actions      string  `json:"actions"`
 	}
 	if !decodeOKR(c, &b) {
 		return
 	}
-	w, err := a.ProjectOKR.Review(projectID, b.Revision, b.Summary, b.Actions)
+	var w *okr.Workspace
+	var err error
+	if b.OperationKey != nil {
+		w, err = a.ProjectOKR.ReviewOnce(projectID, *b.OperationKey, b.Revision, b.Summary, b.Actions)
+	} else {
+		w, err = a.ProjectOKR.Review(projectID, b.Revision, b.Summary, b.Actions)
+	}
 	if err != nil {
 		okrError(c, err)
 		return
@@ -337,6 +351,7 @@ func (a *API) ProjectOKRMemory(c *gin.Context) {
 		return
 	}
 	var body struct {
+		OperationKey   *string `json:"operationKey,omitempty"`
 		Content        *string `json:"content"`
 		ExpectedSha256 string  `json:"expectedSha256"`
 		Revision       *int64  `json:"revision,omitempty"`
@@ -352,9 +367,17 @@ func (a *API) ProjectOKRMemory(c *gin.Context) {
 	var err error
 	switch body.Mode {
 	case "", "replace":
-		w, err = a.ProjectOKR.WriteMemory(projectID, *body.Content, body.ExpectedSha256)
+		if body.OperationKey != nil {
+			err = okr.ErrInvalid
+		} else {
+			w, err = a.ProjectOKR.WriteMemory(projectID, *body.Content, body.ExpectedSha256)
+		}
 	case "append":
-		w, err = a.ProjectOKR.AppendMemory(projectID, *body.Content, body.ExpectedSha256)
+		if body.OperationKey != nil {
+			w, err = a.ProjectOKR.AppendMemoryOnce(projectID, *body.OperationKey, *body.Content, body.ExpectedSha256)
+		} else {
+			w, err = a.ProjectOKR.AppendMemory(projectID, *body.Content, body.ExpectedSha256)
+		}
 	default:
 		err = okr.ErrInvalid
 	}

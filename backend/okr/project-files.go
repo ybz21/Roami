@@ -571,7 +571,7 @@ func (s *Store) decorateConfirmed(root *os.Root, w *Workspace, dashboardDigest s
 	if err := s.seedWorkflow(root, w.ProjectID); err != nil {
 		return err
 	}
-	metadata := &ProjectFiles{ConnectorBatchProtocol: connectorBatchProtocol, ConnectorSkillBatches: true, TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
+	metadata := &ProjectFiles{OperationReceiptsSupported: true, ConnectorBatchProtocol: connectorBatchProtocol, ConnectorSkillBatches: true, TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
 	workflow, err := readFile(root, "AGENTS.md", maxMemory)
 	if err != nil {
 		return err
@@ -828,6 +828,10 @@ func (s *Store) mutateFiles(projectID string, revision int64, create bool, chang
 		return nil, err
 	}
 	defer unlock()
+	return s.mutateFilesLocked(root, projectID, revision, create, change, writeDefinitions)
+}
+
+func (s *Store) mutateFilesLocked(root *os.Root, projectID string, revision int64, create bool, change func(*Workspace) error, writeDefinitions bool) (*Workspace, error) {
 	snapshot, err := loadSnapshot(root)
 	if err != nil {
 		if !create || !errors.Is(err, fs.ErrNotExist) {
