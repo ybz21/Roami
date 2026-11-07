@@ -118,6 +118,10 @@ func (a App) Run(args []string) error {
 		// 前者随会话生死，后者是会话死后唯一还认得出它的东西。
 		_, _, err := session.Rename(a.rt, a.meta(), a.infrastructureSessions(), rest, out)
 		return err
+	case "pause", "resume":
+		return session.Pause(a.rt, rest, cmd == "pause", out)
+	case "reclaim", "compact", "memory-status", "memory-setup-script":
+		return session.MemoryRecovery(a.rt, rest, cmd, out)
 	case "resolve": // 把展示名/id/老名字解析成 tmux 会话名（后端与脚本用）
 		return session.Resolve(a.rt, rest, out)
 	case "send":
@@ -241,7 +245,7 @@ func (a App) WithContext(ctx context.Context) App { a.rt.Context = ctx; return a
 func sessionCommand(command string) bool {
 	switch command {
 	case "__autoconfirm", "_plugin-host", "help", "-h", "--help", "-i", "--interactive", "completion", "-v", "--version",
-		"ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "resolve", "send", "keys",
+		"ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "pause", "resume", "reclaim", "compact", "memory-status", "memory-setup-script", "resolve", "send", "keys",
 		"nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm", "db", "plugin":
 		return true
 	}

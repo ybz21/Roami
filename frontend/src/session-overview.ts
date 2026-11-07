@@ -1,10 +1,12 @@
 import type { SessionAgent } from './components/sessions/session-record'
+import type { SessionMem } from './components/sessions/session-memory'
 import { createSessionPoll } from './session-poll'
 
 export type OverviewItem = {
   name: string; label: string; lastActivity: number; dormant: boolean; parent?: string; cwd?: string
   projectKey?: string; project?: string; projectDir?: string; worktree?: string; branch?: string
   agent?: SessionAgent | ''; running: boolean; waiting: boolean; tail?: string
+  mem?: SessionMem
 }
 
 export const useSessionOverview = createSessionPoll<OverviewItem[]>('/sessions/overview', 5000, [], response => response?.data?.items || [])

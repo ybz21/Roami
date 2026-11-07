@@ -1,0 +1,17 @@
+.tt-session-memory {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--warn);
+  font-size: var(--fs-meta);
+  flex: 0 0 auto;
+}
+.tt-session-memory .copy { flex: 1; min-width: 0; }
+.tt-session-memory .detail { display: block; color: var(--text-dim); }
+.tt-session-memory .actions { display: flex; gap: var(--sp-2); flex: 0 0 auto; }
+html[data-size="compact"] .tt-session-memory, html[data-size="medium"] .tt-session-memory { flex-wrap: wrap; }
+html[data-size="compact"] .tt-session-memory .copy, html[data-size="medium"] .tt-session-memory .copy { flex-basis: 100%; }
+html[data-size="compact"] .tt-session-memory .actions, html[data-size="medium"] .tt-session-memory .actions { margin-left: auto; }
+html[data-pointer="coarse"] .tt-session-pause { min-height: var(--tap); min-width: var(--tap); }

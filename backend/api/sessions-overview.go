@@ -71,22 +71,23 @@ func (l *liveTable) prune(alive map[string]string) {
 }
 
 type overviewItem struct {
-	Name         string `json:"name"`
-	Label        string `json:"label"`
-	Parent       string `json:"parent,omitempty"`
-	Cwd          string `json:"cwd,omitempty"`
-	LastActivity int64  `json:"lastActivity"`
-	Dormant      bool   `json:"dormant"`
-	ProjectKey   string `json:"projectKey,omitempty"`
-	Project      string `json:"project,omitempty"`
-	ProjectDir   string `json:"projectDir,omitempty"`
-	Worktree     string `json:"worktree,omitempty"`
-	Branch       string `json:"branch,omitempty"`
-	Agent        string `json:"agent,omitempty"`
-	Running      bool   `json:"running"`
-	Waiting      bool   `json:"waiting"`
-	Tail         string `json:"tail,omitempty"`
-	YesNo        bool   `json:"yesNo,omitempty"`
+	Name         string   `json:"name"`
+	Label        string   `json:"label"`
+	Parent       string   `json:"parent,omitempty"`
+	Cwd          string   `json:"cwd,omitempty"`
+	LastActivity int64    `json:"lastActivity"`
+	Dormant      bool     `json:"dormant"`
+	ProjectKey   string   `json:"projectKey,omitempty"`
+	Project      string   `json:"project,omitempty"`
+	ProjectDir   string   `json:"projectDir,omitempty"`
+	Worktree     string   `json:"worktree,omitempty"`
+	Branch       string   `json:"branch,omitempty"`
+	Agent        string   `json:"agent,omitempty"`
+	Running      bool     `json:"running"`
+	Waiting      bool     `json:"waiting"`
+	Tail         string   `json:"tail,omitempty"`
+	YesNo        bool     `json:"yesNo,omitempty"`
+	Mem          *sessMem `json:"mem,omitempty"`
 }
 
 func (a *API) SessionsOverview(c *gin.Context) {
@@ -115,6 +116,7 @@ func (a *API) SessionsOverview(c *gin.Context) {
 			continue
 		}
 		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: rawInt(s.LastActivity), Dormant: s.State == "dormant"}
+		it.Mem = s.Mem
 		if it.Label == "" {
 			it.Label = s.Name
 		}
@@ -143,6 +145,9 @@ func (a *API) SessionsOverview(c *gin.Context) {
 			it.Agent, it.Waiting, it.Tail = snap.Agent, snap.Waiting, snap.Tail
 			it.YesNo = snap.Waiting && snap.YesNo
 			it.Running = snap.running()
+		}
+		if s.Mem != nil && s.Mem.Paused {
+			it.Running, it.Waiting, it.YesNo = false, false, false
 		}
 		items = append(items, it)
 	}

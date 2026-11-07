@@ -1,4 +1,5 @@
 import SessionLocation from './SessionLocation'
+import { SessionPauseButton } from './SessionMemoryControl'
 import { useNativeSessionList } from './native-session-list'
 import { nativeSessionRecord } from './session-record'
 import { agentName, useAgentKinds } from '../../agent-kind'
@@ -431,6 +432,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                     </span>
                     <span className="tm" title={absTime(s.last_activity)}>{relTime(s.last_activity, t)}</span>
                     <span className="acts" onClick={(e) => e.stopPropagation()}>
+                      {!dormant && <SessionPauseButton name={s.name} mem={s.mem} onChanged={() => { void load() }} />}
                       {!sw && wide && <a onClick={() => setForking(s.name)}>{t('session.fork.entry')}</a>}
                       {sw && <button type="button" className="tt-act" onClick={() => goSwarm(sw.swarm)}>{t('session.swarmPage')}</button>}
                       {sw ? (

@@ -36,7 +36,7 @@ export function MobileSessionSwitch({ open, active, terms, onPick, onAll, onClos
     <SheetRow key={s.name} minHeight={56} active={s.name === active}
       icon={s.agent ? <AgentLogo kind={s.agent} size={16} /> : <TerminalIcon size={16} />}
       title={<span className="ttl">{s.project && <span className="pj">{s.project} ·</span>}<span className="nm">{s.label}</span></span>}
-      desc={s.name === active ? t('workspace.current') : s.waiting ? (s.tail || t('mobile.st.waiting')) : s.running ? t('mobile.st.running') : t('mobile.st.idle')}
+      desc={s.mem?.paused ? t('session.mem.paused') : s.name === active ? t('workspace.current') : s.waiting ? (s.tail || t('mobile.st.waiting')) : s.running ? t('mobile.st.running') : t('mobile.st.idle')}
       onClick={() => afterSheetGone(() => onPick(s.name))} />
   )
   return (

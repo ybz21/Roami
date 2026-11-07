@@ -5,7 +5,7 @@ import { App as AntApp, Button, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { setBadge } from '../../push'
-import { CheckIcon, CloseIcon, QuestionIcon } from '../../icons'
+import { CheckIcon, CloseIcon, QuestionIcon, WarnIcon } from '../../icons'
 import { ICONS } from '../nav-icons'
 import { useLayout } from '../../layout'
 
@@ -69,13 +69,14 @@ export default function InboxPage({ onOpenSession }: { onOpenSession: (name: str
   const waiting = visible.filter((x) => x.type === 'session.waiting')
   const done = visible.filter((x) => x.type === 'session.done')
   const errors = visible.filter((x) => x.type === 'session.error')
+  const memory = visible.filter(x => x.type === 'session.memory')
   const unread = items.some((x) => !x.read)
 
   const row = (it: InboxItem) => (
     <div key={it.id} className="tt-inbox-entry">
       <button type="button" className={`tt-inbox-row${it.read ? '' : ' unread'} ${it.type.split('.')[1]}`} onClick={() => open(it)}>
-        <span className="ic">{it.type === 'session.waiting' ? <QuestionIcon size={18} /> : it.type === 'session.error' ? <CloseIcon size={18} /> : <CheckIcon size={18} />}</span>
-        <span className="t"><b>{it.label || it.session}</b><span>{it.body || t('inbox.noSummary')}</span></span>
+        <span className="ic">{it.type === 'session.memory' ? <WarnIcon size={18} /> : it.type === 'session.waiting' ? <QuestionIcon size={18} /> : it.type === 'session.error' ? <CloseIcon size={18} /> : <CheckIcon size={18} />}</span>
+        <span className="t"><b>{it.label || it.session}</b><span>{it.type === 'session.memory' ? t('session.mem.notice.' + (['paused', 'warning', 'failed'].includes(it.body) ? it.body : 'warning')) : it.body || t('inbox.noSummary')}</span></span>
         <em>{ago(it.at, t)}</em>
       </button>
       {it.type === 'session.waiting' && approvable.has(it.session) && <div className="tt-inbox-acts">
@@ -101,6 +102,7 @@ export default function InboxPage({ onOpenSession }: { onOpenSession: (name: str
       {loadError && <div className="tt-data-error" role="alert">{t('inbox.loadFailed')} <button type="button" className="tt-act" onClick={() => void load()}>{t('inbox.retry')}</button></div>}
       {!visible.length && !loadError && <div className="tt-inbox-empty"><span className="tt-inbox-empty-icon">{ICONS.inbox}</span><p>{t(filter === 'all' ? 'inbox.empty' : 'inbox.emptyFilter')}</p></div>}
       {section(t('inbox.waiting'), waiting)}
+      {section(t('session.mem.alerts'), memory)}
       {section(t('inbox.done'), done)}
       {section(t('inbox.errors'), errors)}
     </div>

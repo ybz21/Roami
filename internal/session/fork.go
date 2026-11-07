@@ -7,6 +7,7 @@ package session
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ybz21/Roami/internal/memguard"
 	"io"
 	"os"
 	"sort"
@@ -335,6 +336,14 @@ func KillTree(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool,
 	for i := len(victims) - 1; i >= 0; i-- {
 		v := victims[i]
 		if rt.HasSession(v) {
+			for _, pid := range rt.PanePIDs(v) {
+				if frozen, err := memguard.FreezeState(pid); err == nil && frozen {
+					if err := rt.SetPaused(v, false, ""); err != nil {
+						return err
+					}
+					break
+				}
+			}
 			if err := rt.Tmux("kill-session", "-t", "="+v); err != nil {
 				return err
 			}

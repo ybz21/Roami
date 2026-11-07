@@ -20,18 +20,18 @@ import (
 
 // warnPercent 预警档位：占到上限这么多就说一声。
 //
-// 85 是「还有余量、但趋势已经明确」的位置：L1 的软限在 75%（那里内核开始
-// throttle），到 85% 说明 throttle 也没按住它。再高就没有反应时间了。
-const warnPercent = 85
+// 在软限和自动暂停之前提醒，给人留出处理时间。
+const warnPercent = 60
 
 // Sample 一个会话此刻的内存画像。Limit=0 表示没设上限，那就无从谈起百分比。
 type Sample struct {
-	Session  string
-	Label    string
-	Cur      int64
-	Peak     int64
-	Limit    int64
-	OOMKills int64
+	Session                     string
+	Label                       string
+	Cur                         int64
+	Peak                        int64
+	Limit                       int64
+	OOMKills                    int64
+	Paused, Warning, PauseError bool
 }
 
 // Check 比对每个会话的内存与「已经提醒过什么」，只在状态**变化**时写通知。
@@ -64,19 +64,50 @@ func Check(db *metadb.DB, now time.Time, samples []Sample) {
 		if s.Limit > 0 && s.Cur*100/s.Limit >= warnPercent {
 			level = warnPercent
 		}
+		if s.Warning {
+			level = warnPercent
+		}
+		if s.Paused {
+			level = 80
+		}
+		if s.PauseError {
+			level = 90
+		}
 		if level == levelWas {
 			continue
 		}
-		if level > 0 {
-			add(db, now, Notification{
-				Type: "memory", Severity: "warning",
-				Title: fmt.Sprintf("会话「%s」内存 %s / %s", s.name(), human(s.Cur), human(s.Limit)),
-				Body:  "已占到上限的 85%，还在涨。撞顶时这个会话里的进程会被内核终止（其他会话不受影响）。",
-				// 档位变化本就只发一次，dedupe 只是防同一轮里的重复写入。
-				Dedupe: fmt.Sprintf("mem-high:%s", s.Session),
-			})
+		tx, err := db.Begin()
+		if err != nil {
+			continue
 		}
-		_, _ = db.Exec(`UPDATE sessions SET mem_alert_level=? WHERE id=?`, level, s.Session)
+		res, err := tx.Exec(`UPDATE sessions SET mem_alert_level=? WHERE id=? AND IFNULL(mem_alert_level,0)=?`, level, s.Session, levelWas)
+		if err != nil {
+			_ = tx.Rollback()
+			continue
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			_ = tx.Rollback()
+			continue
+		}
+		if level == 0 {
+			_ = tx.Commit()
+			continue
+		}
+		body := "warning"
+		if level == 80 {
+			body = "paused"
+		}
+		if level == 90 {
+			body = "failed"
+		}
+		_, err = tx.Exec(`INSERT INTO plugin_notifications (type,severity,title,body,source,dedupe,created) VALUES (?,?,?,?,?,?,?)`,
+			"session.memory", "warn", s.name(), body, "roam.web", fmt.Sprintf("session.memory|%s|%d", s.Session, now.Unix()), now.Format(time.RFC3339))
+		if err != nil {
+			_ = tx.Rollback()
+			continue
+		}
+		_ = tx.Commit()
 	}
 }
 
@@ -126,7 +157,7 @@ func Throttled(db *metadb.DB, now time.Time, session, label string, high int64, 
 			Type: "memory", Severity: "warn",
 			Title: "已给「" + name + "」减速",
 			Body: "机器可用内存不足，这个会话是当前最大的一个，已把它的软限压到 " + human(high) +
-				"。它会变慢，但不会被杀；内存缓过来会自动松开。",
+				"。内存缓过来会自动松开；系统仍可能因内存不足终止进程。",
 			Dedupe: "memthrottle-brake-" + session,
 		})
 		return

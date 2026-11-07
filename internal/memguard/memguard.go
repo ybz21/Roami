@@ -324,7 +324,9 @@ func Apply(pid int, l Limits) error {
 		if cgroupPath(pid) == "" {
 			return nil
 		}
-		if unit := ScopeOf(pid); unit != "" {
+		if unit, err := memoryScope(pid); err != nil {
+			lastErr = err
+		} else {
 			if err := setProperty(unit, l); err != nil {
 				lastErr = err
 			} else if got, ok := currentMax(pid); ok && got == want {
@@ -408,7 +410,9 @@ func SetHigh(pid int, bytes int64) error {
 		if cgroupPath(pid) == "" {
 			return nil // 进程没了，没什么好设的
 		}
-		if unit := ScopeOf(pid); unit != "" {
+		if unit, err := memoryScope(pid); err != nil {
+			lastErr = err
+		} else {
 			if err := exec.Command("systemctl", "--user", "set-property", unit, "MemoryHigh="+val).Run(); err != nil {
 				lastErr = err
 			} else if got, ok := HighOf(pid); ok && got == bytes {
@@ -486,7 +490,7 @@ func Current(pid int) (cur, peak int64, ok bool) {
 	// 查出来的 peak 会是 0（实测如此），那正好把最该看见的那一刻丢了。
 	// 代价是 peak 偏高（含缓存），所以它是**上界**不是精确值——用它定位
 	// 「是哪个会话」够了，别拿它算百分比。
-	anon, ok1 := statField(filepath.Join(dir, "memory.stat"), "anon")
+	anon, ok1 := workingSet(filepath.Join(dir, "memory.stat"))
 	if !ok1 {
 		// 老内核没有 anon 这一行时退回 current：偏高，但总比没有强。
 		anon, ok1 = readInt(filepath.Join(dir, "memory.current"))
@@ -496,6 +500,13 @@ func Current(pid int) (cur, peak int64, ok bool) {
 		peak = anon
 	}
 	return anon, peak, ok1
+}
+
+// tmpfs pages consume RAM too; file includes shmem, so only add it to anon.
+func workingSet(path string) (int64, bool) {
+	anon, ok := statField(path, "anon")
+	shmem, _ := statField(path, "shmem")
+	return anon + shmem, ok
 }
 
 // statField 从 memory.stat 里取一个字段（每行 `<名字> <值>`）。
@@ -585,6 +596,9 @@ const reclaimWait = 900 * time.Millisecond
 func Reclaim(pid int, bytes int64) error {
 	if bytes <= 0 {
 		return errors.New("memguard: 要压的字节数得是正数")
+	}
+	if _, err := memoryScope(pid); err != nil {
+		return err
 	}
 	dir := cgroupDir(pid)
 	if dir == "" {

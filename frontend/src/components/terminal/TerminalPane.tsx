@@ -1,4 +1,5 @@
 import { TBtn, TI } from './terminal-toolbar'
+import { SessionMemoryBanner } from '../sessions/SessionMemoryControl'
 import { atPath, atPaths } from '../../agent-paths'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -1338,7 +1339,7 @@ export default function TerminalPane(props: {
           dir={cwd} accent="var(--accent)"
           explorerOpen={showFiles} onExplorerClose={() => setShowFiles(false)} onExplorerOpen={() => setShowFiles(true)}
           leadingTitle={active || ''} leadingTab={sessionTab}
-          leadingContent={terminalArea} chrome={sessionToolbar} footer={sessionBottom}
+          leadingContent={terminalArea} chrome={<>{sessionToolbar}{active && !curFile && <SessionMemoryBanner name={active} />}</>} footer={sessionBottom}
         />
       ) : (
         <div ref={phoneRootRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
@@ -1346,6 +1347,7 @@ export default function TerminalPane(props: {
             {phoneChrome || <>{tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip}{curFile
               ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)} />
               : sessionToolbar}</>}
+            {active && !curFile && <SessionMemoryBanner name={active} />}
             {isPhone && active && reconnectFailures[active] && !curFile &&
               <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
                 <span>{t('terminal.recoveryAlert')}</span><strong>{t('terminal.recoveryAction')}</strong>

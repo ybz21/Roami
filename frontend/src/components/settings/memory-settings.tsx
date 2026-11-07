@@ -4,9 +4,12 @@
 // 用 systemctl set-property 设到那个会话的 cgroup 上。
 // 见 docs/design/reliability/memory-guard.html。
 import { useEffect, useState } from 'react'
-import { App as AntApp, Button, Input, Radio, Space, Tag } from 'antd'
+import { App as AntApp, Button, Checkbox, Input, Radio, Space, Tag } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
+import { nodeApi } from '../cluster/node-url'
+import { humanBytes } from '../sessions/session-memory'
+import './memory-recovery.css'
 
 const KEY = 'ROAM_SESSION_MEM_MAX'
 
@@ -91,6 +94,48 @@ export function MemoryGuardSettings() {
       <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', lineHeight: 1.7 }}>
         {t('set.mem.note')}
       </div>
+      <MemoryRecoverySettings />
     </Space>
   )
+}
+
+type Compression = { zram: boolean; zswap: boolean; swapTotal: number; swapFree: number; original: number; memory: number; saved: number }
+
+export function MemoryRecoverySettings() {
+  const { t } = useI18n(), { message } = AntApp.useApp()
+  const [status, setStatus] = useState<Compression | null>(null)
+  const [flags, setFlags] = useState<Record<string, boolean>>({})
+  const [failed, setFailed] = useState(false), [busy, setBusy] = useState(false)
+  const load = async () => {
+    setFailed(false)
+    try {
+      const [compression, entries] = await Promise.all([api('GET', '/memory/compression'), api('GET', '/env')])
+      const values = Object.fromEntries((Array.isArray(entries) ? entries : []).map((e: any) => [e.key, e.value]))
+      setFlags(Object.fromEntries(['ROAM_MEMORY_RECLAIM', 'ROAM_MEMORY_COMPACT'].map(key => [key, !['off', '0', 'false'].includes(String(values[key] || '').toLowerCase())])))
+      setStatus(compression)
+    } catch { setFailed(true) }
+  }
+  useEffect(() => { void load() }, [])
+  const save = async (key: string, value: boolean) => {
+    setBusy(true)
+    try { await api('PUT', '/env', { key, value: value ? 'on' : 'off' }); setFlags(f => ({ ...f, [key]: value })) }
+    catch { message.error(t('session.mem.actionFailed')) }
+    finally { setBusy(false) }
+  }
+  return <div className="tt-memory-recovery-settings">
+    <strong>{t('set.mem.recovery')}</strong>
+    {failed ? <div role="alert">{t('set.mem.statusFailed')} <button type="button" className="tt-act" onClick={() => void load()}>{t('inbox.retry')}</button></div> : !status ? <span>{t('common.loading')}</span> : <>
+      <Checkbox className="tt-memory-option" disabled={busy} checked={flags.ROAM_MEMORY_RECLAIM} onChange={e => void save('ROAM_MEMORY_RECLAIM', e.target.checked)}>{t('set.mem.autoReclaim')}</Checkbox>
+      <Checkbox className="tt-memory-option" disabled={busy} checked={flags.ROAM_MEMORY_COMPACT} onChange={e => void save('ROAM_MEMORY_COMPACT', e.target.checked)}>{t('set.mem.autoCompact')}</Checkbox>
+      <p>{t('set.mem.compactHint')}</p>
+      <div><Tag color={status.zram || status.zswap ? 'success' : 'warning'}>{t(status.zram || status.zswap ? 'set.mem.compressionOn' : 'set.mem.compressionOff', { backend: status.zram ? 'zram' : 'zswap' })}</Tag></div>
+      <span>{t('set.mem.swapRoom', { free: humanBytes(status.swapFree), total: humanBytes(status.swapTotal) })}</span>
+      {status.zram && <span>{t('set.mem.compressionStats', { original: humanBytes(status.original), memory: humanBytes(status.memory), saved: humanBytes(status.saved) })}</span>}
+      {!status.zram && !status.zswap && <>
+        <p>{t('set.mem.setupHint')}</p>
+        <Button href={nodeApi('/memory/setup-script')} download="roami-zram-setup.sh">{t('set.mem.downloadSetup')}</Button>
+        <code>sudo bash roami-zram-setup.sh</code>
+      </>}
+    </>}
+  </div>
 }
