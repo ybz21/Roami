@@ -59,13 +59,16 @@ class ToolDirectory:
     def __init__(self, registry, settings):
         self.registry, self.settings = registry, settings
 
-    def operations(self, role):
+    def operations(self, role, *, allowed=None):
+        from roami_agent.tools.swarm_coordination_catalog import operation
+
         return [
-            tool
+            operation(tool) if allowed is not None else tool
             for tool in self.registry.registry.values()
             if tool.name not in FOUNDATIONS
             and tool.name not in FILE_OPERATIONS
             and tool.name != "web_research"
+            and (allowed is None or tool.name in allowed)
             and (role != "main" or tool.main or tool.name == "artifact_read")
         ]
 
@@ -85,12 +88,12 @@ class ToolDirectory:
             if name not in self.registry.disabled_skills
         ]
 
-    def list(self, query="", kind="all", limit=10, role="main", offset=0):
+    def list(self, query="", kind="all", limit=10, role="main", offset=0, *, allowed=None):
         limit, offset = min(max(limit, 1), 20), max(offset, 0)
         entries = self.skill_entries()
         if "bash" not in self.registry.disabled_tools:
-            entries.extend(self.command_entries(role))
-            for tool in self.operations(role):
+            entries.extend(self.command_entries(role, allowed=allowed))
+            for tool in self.operations(role, allowed=allowed):
                 if (
                     tool.name in self.registry.disabled_tools
                     or tool.source == "builtin"
@@ -126,7 +129,7 @@ class ToolDirectory:
                 )
         version = hashlib.sha256(encoded(entries).encode()).hexdigest()
         if query and "bash" not in self.registry.disabled_tools:
-            commands = self.command_entries(role, query=query)
+            commands = self.command_entries(role, query=query, allowed=allowed)
             if commands and commands[0]["name"] in COMMANDS:
                 entries = [item for item in entries if item["id"] != "cli:roami"] + commands
         normalize = lambda value: re.sub(r"[-_\s]+", " ", value.casefold()).strip()
@@ -196,9 +199,13 @@ class ToolDirectory:
         ):
             selected = []
         result = {
-            "scope": "current_role",
+            "scope": "current_coordination" if allowed is not None else "current_role",
             "hint": (
-                "Local capabilities callable in this role only, not web search results. Zero matches "
+                "This project's current coordination operations and readable Skill instructions. "
+                "Skill instructions do not grant permission to execute their workflows. "
+                "Use the listed registered commands; shell and unrelated operations are unavailable."
+                if allowed is not None
+                else "Local capabilities callable in this role only, not web search results. Zero matches "
                 "do not prove a worker lacks integrations or external services are unavailable. "
                 "For external facts, use the requested enabled MCP or an appropriate delegated browser lookup."
             ),
@@ -221,17 +228,19 @@ class ToolDirectory:
                 + kind
                 + " operation. Follow the suggested workflow or capability instead of repeating the same search."
             )
-            if any(item["name"] == "browser_use" for item in result["suggestions"]):
+            if allowed is None and any(
+                item["name"] == "browser_use" for item in result["suggestions"]
+            ):
                 result["hint"] += (
                     ' browser_use guides public research. Main can delegate with executor="native" '
                     "for bounded browser work or the configured default for complex investigations."
                 )
         return result
 
-    def command_entries(self, role, *, query=""):
+    def command_entries(self, role, *, query="", allowed=None):
         available = {
             tool.name: tool
-            for tool in self.operations(role)
+            for tool in self.operations(role, allowed=allowed)
             if tool.name not in self.registry.disabled_tools
         }
         normalized = re.sub(r"[-_\s]+", " ", query.casefold()).strip()
@@ -284,10 +293,17 @@ class ToolDirectory:
                     "kind": "cli",
                     "name": "roami",
                     "skill": "roami",
-                    "description": "Roami projects, sessions, tasks, executors, reminders, memory, local host process CPU/memory/load diagnostics and capability marketplace search/install. Use ordinary --kebab-case options for scalar arguments; --input JSON remains available for structured arguments. Omit options for parameterless commands.",
+                    "description": (
+                        "Registered operations for this project's current coordination batch. "
+                        "Use the exact listed command and input schema."
+                        if allowed is not None
+                        else "Roami projects, sessions, tasks, executors, reminders, memory, local host process CPU/memory/load diagnostics and capability marketplace search/install. Use ordinary --kebab-case options for scalar arguments; --input JSON remains available for structured arguments. Omit options for parameterless commands."
+                    ),
                     "argv": ["roami", "help"],
                     "commands": commands,
-                    "searchTerms": list(COMMANDS),
+                    "searchTerms": list(COMMANDS)
+                    if allowed is None
+                    else [name for name in COMMANDS if name in available],
                     "effect": "mixed",
                     "source": "builtin",
                     "mutable": False,
@@ -371,7 +387,26 @@ class ToolDirectory:
             entry["name"] = "roami " + " ".join(prefix)
 
         async def help_command(args, binding):
-            return command_strings(entry)
+            allowed = await self.registry.binding_scope(binding)
+            if allowed is None:
+                return command_strings(entry)
+            scoped = [
+                item
+                for group in self.command_entries(role, allowed=allowed)
+                if group["name"] == family
+                for item in group["commands"]
+                if not prefix or item["argv"][1 : len(prefix) + 1] == prefix
+            ]
+            if not scoped:
+                raise DomainError("TOOL_UNAVAILABLE")
+            return command_strings(
+                {
+                    **entry,
+                    "description": "Commands admitted for the current coordination batch.",
+                    "commands": scoped,
+                    "searchTerms": [],
+                }
+            )
 
         return Tool(
             "command_help",
@@ -533,14 +568,19 @@ def register_foundations(registry, settings):
     registry.directory = directory
 
     async def list_tools(args, binding):
+        allowed = await registry.binding_scope(binding)
         result = directory.list(
             args.get("query", ""),
             args.get("kind", "all"),
             args.get("limit", settings.tool_directory_page_size),
             binding.get("role", "main"),
             args.get("offset", 0),
+            allowed=allowed,
         )
-        result["availability"] = await registry.registry["capability_overview"].handler({}, binding)
+        if allowed is None:
+            result["availability"] = await registry.registry["capability_overview"].handler(
+                {}, binding
+            )
         for field in ("items", "suggestions"):
             if field in result:
                 result[field] = [command_strings(item) for item in result[field]]

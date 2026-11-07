@@ -4,24 +4,33 @@ import hashlib
 import json
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination import admitted_batch
 from roami_agent.storage.swarm_coordination_admission import for_turn
 from roami_agent.storage.swarm_evidence import evidence
-
-SWARM_READS = {
-    "swarm_status",
-    "swarm_member",
-    "swarm_inbox_read",
-    "swarm_memory_read",
-    "swarm_project_context",
-}
-SWARM_WRITES = {"swarm_post", "swarm_memory_write", "swarm_project_update", "swarm_verify"}
+from roami_agent.tools.swarm_coordination_catalog import (
+    COORDINATION_OPERATIONS,
+    SWARM_READS,
+    SWARM_WRITES,
+)
 
 
 class SwarmCoordinationPolicy:
     def __init__(self, database, targets):
         self.db, self.targets = database, targets
+
+    async def tool_names(self, turn, role):
+        if role != "main":
+            return None
+
+        def read(db):
+            if for_turn(db, turn) is None:
+                return None
+            assert_context_admitted(db, turn)
+            return COORDINATION_OPERATIONS
+
+        return await self.db.call(read)
 
     @staticmethod
     def steer_arguments(db, value, task, args):
@@ -119,16 +128,7 @@ class SwarmCoordinationPolicy:
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
             if args.get("memberId") is not None and args["memberId"] not in members:
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
-        elif name not in {
-            "tool_list",
-            "skill_read",
-            "file_read",
-            "artifact_read",
-            "task_status",
-            "task_steer",
-            "reply",
-            "ask_user",
-        }:
+        elif name not in COORDINATION_OPERATIONS:
             raise DomainError("SWARM_COORDINATION_OPERATION_UNAVAILABLE", 403)
         if name in {"task_status", "task_steer", "swarm_verify"}:
             task = by_id.get(args.get("taskId"))
