@@ -25,6 +25,7 @@ from roami_agent.storage.task_continuation import (
 )
 from roami_agent.storage.task_reports import reported_progress
 from roami_agent.storage.task_request import task_user_request
+from roami_agent.storage.task_result_receipts import receipt_for_run, record_execution_result
 from roami_agent.storage.transcript_repository import history, message, owned
 
 TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
@@ -549,6 +550,10 @@ class Tasks:
         if task["latestAttempt"]:
             result_json = task["latestAttempt"].pop("inspectionResultJson")
             result = json.loads(result_json) if result_json else {}
+            if result_json:
+                receipt = receipt_for_run(db, task["id"], task["latestAttempt"]["runId"])
+                if receipt:
+                    task["latestAttempt"]["executionReceipt"] = receipt
             task["latestAttempt"]["outcomeKnown"] = result.get(
                 "outcomeKnown", False if task["latestAttempt"]["state"] == "unknown" else None
             )
@@ -779,6 +784,7 @@ class Tasks:
                 "UPDATE task_attempts SET state=?,result_json=?,finished_ms=? WHERE id=?",
                 (result["state"], encoded(result), now_ms(), run_id),
             )
+            record_execution_result(db, task_id, run_id)
             # A late old revision is evidence, never authority over the current task.
             if task["revision"] == revision and task["state"] not in TERMINAL:
                 state = "cancelling" if task["state"] == "cancelling" else "verifying"
