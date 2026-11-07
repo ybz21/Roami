@@ -92,15 +92,21 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         return await swarms.memory_read(binding["owner"], args["swarmId"])
 
     async def memory_write(args, binding):
-        await main(binding, args["swarmId"])
-        return await swarms.memory_write(
-            binding["owner"],
-            args["swarmId"],
-            {
-                "content": args["content"],
-                "expectedSha256": args["expectedSha256"],
-            },
-        )
+        info = await main(binding, args["swarmId"])
+        if (
+            binding.get("coordinationMemoryKey")
+            and (info.get("teamMemory") or {}).get("operationReceiptsSupported") is not True
+        ):
+            raise DomainError("SWARM_PROJECT_WRITE_RECEIPTS_UNAVAILABLE", 503)
+        spec = {"content": args["content"], "expectedSha256": args["expectedSha256"]}
+        if binding.get("coordinationMemoryKey"):
+            spec.update(mode="append", operationKey=binding["coordinationMemoryKey"])
+        result = await swarms.memory_write(binding["owner"], args["swarmId"], spec)
+        if binding.get("coordinationMemoryKey"):
+            return {
+                key: result[key] for key in ("available", "sha256", "source", "operationReceipt")
+            }
+        return result
 
     async def project_read(args, binding):
         await status(args, binding)
@@ -115,6 +121,13 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         info = await main(binding, args["swarmId"])
         if info["archived"]:
             raise DomainError("SWARM_ARCHIVED", 409)
+        expected = binding.get("coordinationProjectWrite")
+        if (
+            expected
+            and expected["kind"] != "connector_batch"
+            and (info.get("teamMemory") or {}).get("operationReceiptsSupported") is not True
+        ):
+            raise DomainError("SWARM_PROJECT_WRITE_RECEIPTS_UNAVAILABLE", 503)
         from roami_agent.storage.swarm_memory import project_context
 
         workspace = await project_context(
@@ -126,6 +139,10 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         )
         if workspace is None:
             raise DomainError("SWARM_PROJECT_REQUIRED", 409)
+        if binding.get("coordinationProjectWrite"):
+            from roami_agent.tools.swarm_coordination_writes import project_receipt
+
+            return project_receipt(workspace, binding["coordinationProjectWrite"])
         return workspace
 
     async def verify(args, binding):

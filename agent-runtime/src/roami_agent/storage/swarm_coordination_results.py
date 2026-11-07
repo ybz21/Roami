@@ -105,13 +105,17 @@ def frozen(db, batch_id):
 def _status_receipts(db, value, message_id, content):
     stored = row(
         db,
-        "SELECT native_content(m.content_json) AS body FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+        "SELECT x.arguments_json,native_content(m.content_json) AS body FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
         "WHERE m.id=? AND x.turn_id=? AND x.tool_name='task_status' AND x.state='succeeded' "
         "AND m.conversation_id=? AND m.deleted_ms IS NULL AND m.status!='deleted' "
         "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND o.message_id=m.id)",
         (message_id, value["turn_id"], value["conversation_id"], value["owner_id"]),
     )
-    if not stored or json.loads(stored["body"]).get("text") != content:
+    if (
+        not stored
+        or json.loads(stored["body"]).get("text") != content
+        or json.loads(stored["arguments_json"]).get("includeResult") is not True
+    ):
         return []
     try:
         tasks = json.loads(content)
@@ -143,7 +147,10 @@ def _status_receipts(db, value, message_id, content):
         if not isinstance(receipt, dict) or type(receipt.get("receiptId")) is not int:
             continue
         if (
-            receipt.get("taskId") != task["id"]
+            not isinstance(task.get("executorResult"), dict)
+            or hashlib.sha256(encoded(task["executorResult"]).encode()).hexdigest()
+            != receipt.get("resultSha256")
+            or receipt.get("taskId") != task["id"]
             or receipt.get("taskRevision") != task.get("revision")
             or receipt.get("runId") != task["latestAttempt"].get("runId")
         ):

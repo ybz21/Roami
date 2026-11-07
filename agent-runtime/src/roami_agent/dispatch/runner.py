@@ -724,6 +724,12 @@ class TaskDispatcher:
                 if job_id:
                     db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
                 return
+            from roami_agent.storage.swarm_completion_bridge import route
+
+            if route(db, current, run, completion, key):
+                if job_id:
+                    db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
+                return
             if not row(db, "SELECT id FROM jobs WHERE dedupe_key=?", (key,)):
                 tid = identity()
                 db.execute(

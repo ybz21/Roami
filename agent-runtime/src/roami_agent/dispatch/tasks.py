@@ -804,7 +804,34 @@ class Tasks:
                     "VALUES(?,'task.verify',?,?,?,'queued',?)",
                     (identity(), task_id, "verify:" + run_id, encoded({"runId": run_id}), now_ms()),
                 )
-            return row(db, "SELECT * FROM tasks WHERE id=?", (task_id,))
+            current = row(db, "SELECT * FROM tasks WHERE id=?", (task_id,))
+            if current["state"] in {
+                "interrupted",
+                "failed",
+                "cancelled",
+                "waiting_user",
+                "succeeded",
+            }:
+                from roami_agent.storage.swarm_completion_bridge import route
+                from roami_agent.storage.task_result_receipts import receipt_for_run
+
+                receipt = receipt_for_run(db, task_id, run_id)
+                if receipt:
+                    route(
+                        db,
+                        current,
+                        run,
+                        {
+                            "taskId": task_id,
+                            "taskRevision": revision,
+                            "runId": run_id,
+                            "state": current["state"],
+                            "result": result,
+                            "executionReceipt": receipt,
+                        },
+                        "task.completion:" + run_id + ":" + current["state"],
+                    )
+            return current
 
         result_task = await self.db.call(write, write=True)
         if self.deliverables:

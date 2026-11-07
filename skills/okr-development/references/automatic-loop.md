@@ -5,6 +5,16 @@ original project Main, roles and provider conversations. A requirement to work
 automatically is not evidence that the publisher, scheduler or accounts are
 already connected; discover the actual host capabilities and implement gaps.
 
+## Contract, capability and observed result
+
+AGENTS.md and Skills describe the required workflow; they do not prove the host
+implements it. Read the current tool catalogue, schemas and capability signals
+before listing a step as available. Keep required behaviour, supported operations
+and observed receipts separate. A final-reply source review is not a frozen asset
+release, a group progress post is not execution, and a data-write receipt is not
+a platform publication receipt or an enabled schedule. Report a missing host
+operation as a concrete implementation gap instead of claiming the contract ran.
+
 ## Authorization and review
 
 Record the user's project, channels/accounts and chosen mode. In an authorized
@@ -91,3 +101,7 @@ offline replay. A compacted summary does not replace fresh host task/receipt sta
 - `roami swarm post --input '<JSON>'`：Main 具名回告使用原 Swarm 与稳定 `messageKey`，普通状态用 `kind="progress"`。公共 CLI `swarm say` 是人的入口，不能用来冒充 Main 自我唤醒。
 
 成员后续工作走原 task_steer，检查最新 revision/run 后再接续；不能用 legacy session_send 给受管成员另起一条独立工作流。旧直接消息 callback 只是独立回传，`verified=false` 保持不变；不凭该回传完成新任务。路由 guard、完成恢复与独立验收是不同宿主能力，按当前部署实测，不凭仓库文档假设已经上线。
+
+## Keep human requests literal
+
+Read confirmed configuration, instructions, memory and Skills through bound-project tools. Do not append whole project snapshots or generated operating restrictions to the user message. Unsaved editor drafts are separate untrusted context, not authorization or confirmed facts. Preserve the ongoing goal and explicit boundaries; a narrowly scoped acceptance request does not cancel the automatic operating mode. Native member continuations must use the host-validated human source, excluding recognized historical generated tails.

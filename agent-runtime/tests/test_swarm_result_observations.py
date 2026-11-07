@@ -44,11 +44,12 @@ async def report(runtime, actor, *, known=True):
         callback = await runtime.db.call(
             lambda db: row(
                 db,
-                "SELECT aggregate_id FROM jobs WHERE dedupe_key=?",
+                "SELECT kind,aggregate_id FROM jobs WHERE dedupe_key=?",
                 ("task.completion:" + actor["runId"] + ":interrupted",),
             )
         )
-        await finish(runtime, await claim(runtime, {"turnId": callback["aggregate_id"]}))
+        if callback["kind"] == "turn.run":
+            await finish(runtime, await claim(runtime, {"turnId": callback["aggregate_id"]}))
     return result
 
 
@@ -61,14 +62,14 @@ async def build(runtime, turn):
     return await runtime.loop.context.build(turn, "Base instructions", [], None)
 
 
-async def status(runtime, turn, actor, *, cli=False):
+async def status(runtime, turn, actor, *, cli=False, include_result=True):
     source = await runtime.journal.origin(turn)
     mid = await runtime.journal.start(turn)
     call = {
         "id": "read-current",
         "function": {
             "name": "task_status",
-            "arguments": json.dumps({"taskId": actor["taskId"], "includeResult": True}),
+            "arguments": json.dumps({"taskId": actor["taskId"], "includeResult": include_result}),
         },
     }
     if cli:

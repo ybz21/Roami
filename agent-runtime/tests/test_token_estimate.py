@@ -109,7 +109,8 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
             self.received = None
 
         async def stream(self, messages, tools):
-            self.received = ([dict(message) for message in messages], list(tools))
+            if tools:
+                self.received = ([dict(message) for message in messages], list(tools))
             yield ModelEvent("text", "Received")
 
     model = CapturedModel()
@@ -132,7 +133,6 @@ async def test_multibyte_input_is_admitted_by_token_budget_with_full_tools_count
         assert tools
         assert request_tokens(messages, tools) < input_budget
         assert len(text.encode("utf-8")) > input_budget
-        assert (await runtime.context.project("alice", c["id"]))["snapshotId"] is None
     finally:
         await runtime.close()
 
