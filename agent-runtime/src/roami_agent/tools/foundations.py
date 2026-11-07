@@ -605,7 +605,7 @@ def register_foundations(registry, settings):
     registry.add(
         Tool(
             "read",
-            "Read files within bound/configured roots, skill://NAME[/references/FILE.md] or artifact://ID. Load relevant references only. First-page local images reach Main or Worker when that role is configured for image input; other roles receive metadata.",
+            "Read files within bound/configured roots, skill://NAME[/references/FILE.md] or artifact://ID. Project Main reads known paths relative to its registered project root. Load relevant references only. First-page local images reach Main or Worker when that role is configured for image input; other roles receive metadata.",
             registry.registry["file_read"].schema,
             resolved_only,
             main=True,

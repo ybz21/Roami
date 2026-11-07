@@ -9,7 +9,7 @@ def register_file_tools(registry, files, *, images=None):
     registry.add(
         Tool(
             "file_read",
-            "Read one file in bounded byte pages with its original content hash. Raw non-UTF-8 pages are base64. Main: delegate repository/code work when only a directory is known; do not guess filenames.",
+            "Read one file in bounded byte pages with its original content hash. Raw non-UTF-8 pages are base64. Project Main can read known files relative to its bound project root. Delegate repository/code work when only a directory is known; do not guess filenames.",
             object_schema(
                 {
                     "path": path,
