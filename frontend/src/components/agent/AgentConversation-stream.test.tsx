@@ -81,6 +81,38 @@ it('opens project task commands in a scoped phone subpage and returns to the sam
   expect(screen.getByRole('textbox', { name: 'okr.chatInput' })).toBeTruthy()
 })
 
+it('shows live tool execution and its result before the final reply in both hosts', async () => {
+  const page = render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} />
+    <OkrMainChat embedded projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.size).toBe(2))
+  for (const cid of ['home', 'project-main']) {
+    await emit(cid, { id: 1, kind: 'message.started', branchId: 'branch', payload: { messageId: 'working', turnId: 'turn' } })
+    await emit(cid, { id: 2, kind: 'message.delta', branchId: 'branch', payload: { messageId: 'working', turnId: 'turn', offset: 0, text: 'Checking the source.' } })
+    await emit(cid, { id: 3, kind: 'tool.started', branchId: 'branch', payload: { activity: {
+      id: 'tool:read', kind: 'tool', name: 'file_read', anchorMessageId: 'working', state: 'running', startedMs: 100, updatedMs: 100,
+      preview: { input: { text: 'README.md', truncated: false }, output: null },
+    } } })
+  }
+  expect(page.container.querySelectorAll('.agent-activity[data-state="running"]')).toHaveLength(2)
+  expect(screen.queryByText('The source is verified.')).toBeNull()
+  for (const button of screen.getAllByRole('button', { name: /agent.activity.read/ })) fireEvent.click(button)
+  expect(screen.getAllByText('README.md')).toHaveLength(2)
+  for (const cid of ['home', 'project-main']) await emit(cid, { id: 4, kind: 'tool.completed', branchId: 'branch', payload: { activity: {
+    id: 'tool:read', kind: 'tool', name: 'file_read', anchorMessageId: 'working', state: 'succeeded', startedMs: 100, updatedMs: 200,
+    preview: { input: { text: 'README.md', truncated: false }, output: { text: 'Verified source content', truncated: false } },
+  } } })
+  await waitFor(() => expect(screen.getAllByText('Verified source content')).toHaveLength(2))
+  expect(page.container.querySelectorAll('.agent-activity[data-state="succeeded"]')).toHaveLength(2)
+  expect(screen.queryByText('The source is verified.')).toBeNull()
+  for (const cid of ['home', 'project-main']) {
+    await emit(cid, { id: 5, kind: 'message.started', branchId: 'branch', payload: { messageId: 'answer', turnId: 'turn' } })
+    await emit(cid, { id: 6, kind: 'message.delta', branchId: 'branch', payload: { messageId: 'answer', turnId: 'turn', offset: 0, text: 'The source is verified.' } })
+    await emit(cid, { id: 7, kind: 'message.completed', branchId: 'branch', payload: { messageId: 'answer', turnId: 'turn' } })
+  }
+  expect(screen.getAllByText('The source is verified.')).toHaveLength(2)
+  expect(screen.getAllByText('Verified source content')).toHaveLength(2)
+})
+
 it('streams provisional prose through both hosts, keeps checking visible, then replaces it once', async () => {
   render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} />
     <OkrMainChat embedded projectId="project" draft={emptyConfiguration()} workspace={null} onClose={vi.fn()} /></App>)

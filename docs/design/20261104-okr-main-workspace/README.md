@@ -187,6 +187,7 @@
 2026-11-07：[首页与项目 Main 共用对话组件及真实流式边界](conversation-component.md)（#748）。
 
 - [Main 正文流式通道](reply-streaming.md)：真实参数增量、核验与候选生命周期（#748，实现候选）。
+- [对话正文与工具过程](message-body.md)：移除用户消息折叠，复用首页过程与正文组件。
 
 - [Swarm 互通与 Main 收件箱设计](swarm-communication-design.md)：先明确消息、唤醒、续派与验收，再实施可靠通信；与 [SQLite 读取层设计](../20261104-okr-studio-project-ownership/sqlite-data-design.md) 配套。
 
