@@ -672,6 +672,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "configured": bool(runtime.model.model),
                 "projectOkr": True,
                 "projectOkrMain": True,
+                "okrMessageContext": True,
                 "conversationIdentity": True,
                 "projectMainWake": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
@@ -800,7 +801,12 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def send(cid: str, body: SendMessage, owner: Owner):
         return {
             "data": await runtime.chat.submit(
-                owner, cid, body.requestKey, body.text, body.attachmentIds
+                owner,
+                cid,
+                body.requestKey,
+                body.text,
+                body.attachmentIds,
+                okr_context=body.okrContext,
             )
         }
 

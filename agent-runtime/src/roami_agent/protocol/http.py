@@ -22,6 +22,7 @@ class CancelTask(Payload):
 
 
 class SendMessage(Payload):
+    okrContext: dict | None = None
     requestKey: str = Field(min_length=1, max_length=200)
     text: str = Field(default="", max_length=100_000)
     attachmentIds: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(

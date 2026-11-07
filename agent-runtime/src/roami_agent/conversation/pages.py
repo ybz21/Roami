@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.conversation.okr_message_context import human_text
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.reply_previews import public_preview_message
@@ -42,6 +43,10 @@ def message_view(value, completed=None, *, compact=True):
     offset = len(content.get("text", ""))
     truncated = False
     if compact:
+        context = content.get("okrContext")
+        if value["role"] == "user":
+            content["text"] = human_text(content)
+            offset = len(content["text"])
         content = {
             k: v
             for k, v in content.items()
@@ -56,6 +61,8 @@ def message_view(value, completed=None, *, compact=True):
                 "replyPreview",
             }
         }
+        if isinstance(context, dict) and context.get("version") == 1:
+            content["okrContext"] = {"version": 1, "revision": context["revision"]}
         if len(content.get("text", "")) > 2000:
             content["text"] = content["text"][:2000]
             truncated = True
@@ -64,7 +71,10 @@ def message_view(value, completed=None, *, compact=True):
         if len(json.dumps(content, ensure_ascii=False).encode()) > (
             40_000 if content.get("replyPreview") else 12_000
         ):
-            content = {"text": str(content.get("text") or "")[:2000]}
+            content = {
+                "text": str(content.get("text") or "")[:2000],
+                **({"okrContext": content["okrContext"]} if "okrContext" in content else {}),
+            }
             truncated = True
     return {
         **{

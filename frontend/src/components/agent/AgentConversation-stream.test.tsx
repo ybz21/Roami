@@ -24,7 +24,7 @@ beforeEach(() => {
   state.phone = false; clearAgentDataCache(); localStorage.clear(); state.streams.clear(); state.snapshots.clear(); state.api.mockReset()
   for (const cid of ['home', 'project-main']) state.snapshots.set(cid, snapshot(cid))
   state.api.mockImplementation(async (method, path, body) => {
-    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/status') return { data: { projectOkrMain: true, okrMessageContext: true } }
     if (path === '/agent/conversations') return { data: { id: 'project-main' } }
     if (method === 'POST' && path.endsWith('/messages') && body.text === '/tasks') return { data: { kind: 'ui_action', action: 'tasks' } }
     if (method === 'POST' && path.endsWith('/messages')) return { data: { kind: 'message', messageId: 'user', turnId: 'turn' } }

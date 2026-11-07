@@ -104,3 +104,30 @@ it('freezes a project context payload before delivery and reuses it after a lost
   expect(send.mock.calls[1][0]).toEqual(send.mock.calls[0][0])
   expect(prepare).toHaveBeenCalledTimes(1)
 })
+
+it('keeps editor metadata separate and frozen through an unknown receipt, reload and changed draft', async () => {
+  const send = vi.fn().mockRejectedValueOnce(Error('lost')).mockResolvedValue(undefined)
+  let revision = 3
+  const prepare = vi.fn((text: string) => ({ payload: text, okrContext: { version: 1 as const, revision, draft: { objective: 'Draft ' + revision } } }))
+  const hook = renderHook(() => useAgentOutbox('metadata', true, true, send, prepare))
+  act(() => { hook.result.current.enqueue('Publish automatically', []) })
+  await waitFor(() => expect(hook.result.current.items[0]?.state).toBe('unconfirmed'))
+  const id = hook.result.current.items[0].id
+  hook.unmount(); revision = 4
+  const restored = renderHook(() => useAgentOutbox('metadata', true, true, send, prepare))
+  act(() => { restored.result.current.retry(id) })
+  await waitFor(() => expect(restored.result.current.items).toHaveLength(0))
+  expect(send.mock.calls[0][0]).toMatchObject({ text: 'Publish automatically', payload: 'Publish automatically', okrContext: { revision: 3, draft: { objective: 'Draft 3' } } })
+  expect(send.mock.calls[1][0]).toEqual(send.mock.calls[0][0])
+  expect(prepare).toHaveBeenCalledOnce()
+})
+
+it('retains a queued instruction when draft preparation fails and never sends a partial request', async () => {
+  const send = vi.fn()
+  const prepare = vi.fn(() => { throw Error('OKR_MESSAGE_CONTEXT_TOO_LARGE') })
+  const hook = renderHook(() => useAgentOutbox('oversize', true, true, send, prepare))
+  act(() => { hook.result.current.enqueue('Keep my instruction', []) })
+  await waitFor(() => expect(hook.result.current.items[0]?.state).toBe('failed'))
+  expect(hook.result.current.items[0].text).toBe('Keep my instruction')
+  expect(send).not.toHaveBeenCalled()
+})

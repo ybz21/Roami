@@ -45,6 +45,7 @@ def request_basis(context):
 
 def request_context(settings, instructions, catalog, role="main"):
     return {
+        "messageProjectionVersion": "literal-okr-v1",
         "instructions": image_role_instructions(settings, instructions, role),
         "catalog": catalog,
         "route": asdict(settings.route(role)),

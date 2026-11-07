@@ -3,9 +3,11 @@
 import hashlib
 import json
 
+from roami_agent.conversation.okr_message_context import human_text
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
+from roami_agent.storage.request_quotes import source_quote
 from roami_agent.storage.swarm_repository import group
 from roami_agent.storage.swarm_scopes import require_scope
 
@@ -83,6 +85,8 @@ def current_delegation(db, owner, swarm_id, delegation_id=None):
     source = user_source(db, owner, team["conversation_id"], value["source_message_id"])
     if not source or source_digest(source["body"]) != value["source_sha256"]:
         raise DomainError("SWARM_DELEGATION_SOURCE_FORGOTTEN", 409)
+    if source_quote(human_text(json.loads(source["body"])), value["source_quote"]) is None:
+        raise DomainError("SWARM_DELEGATION_SOURCE_REQUIRED", 409)
     for message_id in json.loads(value["source_messages_json"]):
         actual = user_source(db, owner, team["conversation_id"], message_id)
         if not actual or not visible_source(db, conversation["active_branch_id"], actual):

@@ -123,6 +123,7 @@ const enUS = {
   'okr.firstDay': "Only one observation day is available; a trend cannot be inferred yet.",
   'okr.trendTable': "View daily data",
   'okr.chatTitle': "OKR coordinator",
+  'okr.chatDraftTooLarge': 'The draft is too large. Reduce or save it first. Your input is kept.',
   'okr.agentUpgradeRequired': 'Update the agent service to discuss this project. Your input is kept.',
   'okr.chatOpen': "Coordinator",
   'okr.chatHint': "This goal’s persistent coordinator for planning, tasks and collaboration.",
