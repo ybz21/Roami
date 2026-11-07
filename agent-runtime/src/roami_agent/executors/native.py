@@ -12,6 +12,10 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row
+from roami_agent.storage.swarm_coordination_tasks import (
+    assert_dispatch_authorized,
+    prepared_authority,
+)
 from roami_agent.storage.task_deliverables import TaskDeliverables
 
 
@@ -25,10 +29,12 @@ class NativeExecutor:
         *,
         resources=None,
         artifacts=None,
+        project_workspace=None,
     ):
         self.run_turn, self.db, self.settings = run_turn, database, settings
         self.workspace_factory = workspace_factory
         self.resources, self.artifacts = resources, artifacts
+        self.project_workspace = project_workspace
 
     def requires_workspace(self, task):
         target = json.loads(task["intent_json"])["target"]
@@ -72,6 +78,7 @@ class NativeExecutor:
         )
 
         async def execute(prepared):
+            await prepared_authority(self.db, task, run, self.project_workspace)
             text = await self.run_turn(
                 dict(
                     prepared,
@@ -175,8 +182,11 @@ class NativeExecutor:
                 return pending is None
 
             async def execute_bound(workspace):
+                await prepared_authority(self.db, task, run, self.project_workspace)
+
                 def bind(db):
                     assert_context_admitted(db, turn)
+                    assert_dispatch_authorized(db, task, run)
                     changed = db.execute(
                         "UPDATE tasks SET state='running',target_json=?,updated_ms=? WHERE id=? AND revision=? AND state IN ('preparing','running')",
                         (
@@ -196,18 +206,21 @@ class NativeExecutor:
                     )
                     if changed.rowcount != 1:
                         raise DomainError("TASK_CANCELLING")
+                    assert_dispatch_authorized(db, task, run)
                     db.execute(
                         "UPDATE task_attempts SET state='running' WHERE id=? AND task_revision=? AND state='starting'",
                         (run["id"], run["task_revision"]),
                     )
-                    event(
-                        db,
-                        task["origin_conversation_id"],
-                        "task.workspace_prepared",
-                        {"taskId": task["id"], "runId": run["id"], "workspace": workspace},
-                        task_id=task["id"],
-                        key="workspace:" + run["id"],
-                    )
+                    workspace_key = "workspace:" + run["id"]
+                    if not row(db, "SELECT id FROM events WHERE event_key=?", (workspace_key,)):
+                        event(
+                            db,
+                            task["origin_conversation_id"],
+                            "task.workspace_prepared",
+                            {"taskId": task["id"], "runId": run["id"], "workspace": workspace},
+                            task_id=task["id"],
+                            key=workspace_key,
+                        )
                     event(
                         db,
                         task["origin_conversation_id"],

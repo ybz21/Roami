@@ -12,6 +12,7 @@ from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
 from roami_agent.storage.request_quotes import quote_text
+from roami_agent.storage.swarm_coordination_tasks import request_context as coordination_request
 from roami_agent.storage.task_continuation import (
     continuation_candidates,
     unresolved_repeated_requests,
@@ -34,6 +35,13 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
     async def reply_source(binding):
         if not binding.get("turnId") or not binding.get("owner"):
             return ""
+        coordination = await tasks.db.call(
+            lambda db: coordination_request(
+                db, binding["owner"], binding["turnId"], binding.get("leaseEpoch")
+            )
+        )
+        if coordination:
+            return coordination["delegation"]["source_quote"]
         source = await tasks.db.call(
             lambda db: row(
                 db,
@@ -779,6 +787,11 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
     )
 
     async def steer_task(args, binding):
+        coordination = await tasks.db.call(
+            lambda db: coordination_request(
+                db, binding["owner"], binding["turnId"], binding.get("leaseEpoch")
+            )
+        )
         if "revision" not in args:
             current = await tasks.db.call(
                 lambda db: row(
@@ -802,7 +815,7 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
             if current is None:
                 raise DomainError("TASK_NOT_FOUND", 404)
             args = dict(args, revision=current["revision"])
-        outcomes = await coverage(args, binding, handoff=True)
+        outcomes = None if coordination else await coverage(args, binding, handoff=True)
         source_quote = args.get("sourceQuote")
         authorization_quote = None
         if outcomes:
@@ -813,18 +826,21 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
                 source_quote = current_quote
             authorization_quote = current_quote
         handoffs = await tasks.db.call(lambda db: accepted_handoffs(db, binding.get("turnId")))
-        if args["taskId"] in handoffs:
+        if args["taskId"] in handoffs and not coordination:
             raise DomainError("TASK_ALREADY_HANDED_OFF", 409)
         receipt = await tasks.revisions.request(
             binding["owner"],
             args["taskId"],
             args["text"],
             args["revision"],
-            binding["turnId"] + ":" + binding["toolCallId"],
+            "coordination:" + coordination["id"] + ":" + args["taskId"]
+            if coordination
+            else binding["turnId"] + ":" + binding["toolCallId"],
             source_turn_id=binding["turnId"],
             source_conversation_id=binding["conversation"],
             source_quote=source_quote,
             authorization_quote=authorization_quote,
+            source_lease_epoch=binding.get("leaseEpoch"),
         )
         result = {
             **receipt,

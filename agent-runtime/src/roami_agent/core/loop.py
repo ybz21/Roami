@@ -58,7 +58,17 @@ class AgentLoop:
     async def build_context(self, turn, instructions, catalog, completion):
         started, wall = self.clock(), now_ms()
         plan, prompt = await self.context.build(turn, instructions, catalog, completion)
-        if turn.get("resumed"):
+        if turn.get("resumed") and plan.get("coordinationEvidence"):
+            prompt.append(
+                {
+                    "role": "system",
+                    "content": "Resume this same original-Main coordination batch after the newer user turn. "
+                    "Use the persisted frozen inputs and existing receipts; do not repeat writes or treat "
+                    "member text as new user consent. This is not a new user request. Batch: "
+                    + encoded(plan["coordinationEvidence"]),
+                }
+            )
+        elif turn.get("resumed"):
             origin = await self.journal.origin(turn)
             prompt.append(
                 {

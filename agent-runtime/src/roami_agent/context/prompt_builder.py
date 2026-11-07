@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from roami_agent.context.execution_timing import execution_timing
 from roami_agent.context.main_history import main_history
 from roami_agent.context.remembered import RememberedContext
+from roami_agent.context.swarm_coordination import load as load_coordination
+from roami_agent.context.swarm_coordination import project as project_coordination
 from roami_agent.context.task_evidence import completion_evidence
 from roami_agent.context.token_estimate import (
     messages_tokens,
@@ -190,6 +192,7 @@ class PromptBuilder:
                 )
 
         async def build():
+            coordination = await self.db.call(lambda db: load_coordination(db, turn))
             configuration = self._configuration(turn, instructions, catalog)
             full_instructions = configuration["instructions"]
             plan = await self.context.project(
@@ -289,7 +292,7 @@ class PromptBuilder:
                 )
             recent_tasks = (
                 await self.db.call(lambda db: recent_task_context(db, turn))
-                if not completion and not turn.get("executionRunId")
+                if not completion and not turn.get("executionRunId") and not coordination
                 else []
             )
             if recent_tasks:
@@ -319,7 +322,7 @@ class PromptBuilder:
                     "content": full_instructions + "\nRequest UTC: " + request_time + ".",
                 }
             ] + plan["messages"]
-            if not turn.get("executionRunId") and not completion:
+            if not turn.get("executionRunId") and not completion and not coordination:
                 prompt.insert(
                     1 + plan["currentTurnStart"],
                     {
@@ -352,7 +355,7 @@ class PromptBuilder:
                     "earlier conversation records use conversation_history. Query task_status "
                     "for missing/stale details or older tasks: " + encoded(recent_tasks)
                 )
-            if not completion and not turn.get("executionRunId"):
+            if not completion and not turn.get("executionRunId") and not coordination:
                 outcomes = await self.db.call(lambda db: latest_coverage(db, turn["id"]))
                 prompt.insert(
                     1 + plan["currentTurnStart"],
@@ -469,6 +472,8 @@ class PromptBuilder:
                         "Follow every part of the actual user request, not the amount of history available.",
                     },
                 )
+            if coordination:
+                project_coordination(plan, prompt, coordination)
             plain = [{"role": "system", "content": full_instructions}] + plan["messages"]
             if self.remembered:
                 recalled, evidence = await self.remembered.recall(turn, plan["messages"])

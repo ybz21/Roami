@@ -4,6 +4,7 @@ import logging
 from roami_agent.observability.execution_debug import CONTEXT_FIELDS
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
+from roami_agent.storage.swarm_coordination import record_retrieval
 
 log = logging.getLogger(__name__)
 
@@ -15,8 +16,10 @@ class PromptManifests:
     async def record(self, turn, attempt, model_key, wire_hash, plan, catalog, role):
         tid = turn["id"]
         step = attempt - 1
-        await self.db.call(
-            lambda db, step=step, wire_hash=wire_hash, plan=plan, catalog=catalog: db.execute(
+
+        def write(db):
+            coordination = record_retrieval(db, turn, plan.get("coordinationEvidence"))
+            db.execute(
                 "INSERT INTO prompt_manifests(id,turn_id,attempt_no,provider_key,model_key,serializer_version,prefix_sha256,snapshot_id,memory_epoch,parts_json,created_ms) "
                 "VALUES(?,?,?,?,?,'chat-v1',?,?,?,?,?)",
                 (
@@ -50,15 +53,16 @@ class PromptManifests:
                             "attachmentEvidence": plan.get("attachmentEvidence", []),
                             "imageError": plan.get("imageError"),
                             "taskEvidence": plan.get("taskEvidence"),
+                            "coordinationEvidence": coordination,
                             "memoryEvidence": plan.get("memoryEvidence", []),
                             "timing": plan.get("timing"),
                         }
                     ),
                     now_ms(),
                 ),
-            ),
-            write=True,
-        )
+            )
+
+        await self.db.call(write, write=True)
 
     async def timing(self, turn, attempt, timing):
         try:

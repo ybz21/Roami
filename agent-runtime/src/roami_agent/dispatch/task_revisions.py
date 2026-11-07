@@ -1,5 +1,6 @@
 """Durable user steering waits for stop proof before admitting a new task revision."""
 
+import asyncio
 import json
 
 from roami_agent.conversation.activity_events import activity_event as event
@@ -12,6 +13,11 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_coordination_tasks import (
+    create_authority,
+    current_authority,
+    request_context,
+)
 from roami_agent.storage.swarm_repository import group
 from roami_agent.storage.swarm_scopes import require_scope
 from roami_agent.storage.task_request import member_authorization_context, task_user_request
@@ -23,6 +29,7 @@ STABLE = {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}
 class TaskRevisions:
     def __init__(self, database):
         self.db = database
+        self.project_workspace = None
 
     @staticmethod
     def _receipt(job):
@@ -62,6 +69,7 @@ class TaskRevisions:
         source_conversation_id=None,
         source_quote=None,
         authorization_quote=None,
+        source_lease_epoch=None,
     ):
         if (
             not isinstance(text, str)
@@ -84,7 +92,17 @@ class TaskRevisions:
                 raise DomainError("INVALID_TASK_STEER")
             spec["authorizationQuote"] = authorization_quote
 
+        coordinated = await self.db.call(
+            lambda db: request_context(db, owner, source_turn_id, source_lease_epoch)
+        )
+        project_workspace = None
+        if coordinated:
+            if self.project_workspace is None:
+                raise DomainError("SWARM_COORDINATION_WORKSPACE_REQUIRED", 409)
+            project_workspace = await self.project_workspace(coordinated["delegation"]["projectId"])
+
         def write(db):
+            coordinated = request_context(db, owner, source_turn_id, source_lease_epoch)
             if source_turn_id:
                 source = row(
                     db,
@@ -102,7 +120,10 @@ class TaskRevisions:
             owned(db, owner, task["origin_conversation_id"])
             if source_conversation_id and task["origin_conversation_id"] != source_conversation_id:
                 raise DomainError("TASK_SOURCE_CONVERSATION_MISMATCH", 409)
-            dedupe = "task.steer:" + owner + ":" + key
+            command_key = (
+                "coordination:" + coordinated["id"] + ":" + task_id if coordinated else key
+            )
+            dedupe = "task.steer:" + owner + ":" + command_key
             previous = row(db, "SELECT * FROM jobs WHERE dedupe_key=?", (dedupe,))
             if previous:
                 payload = json.loads(previous["payload_json"])
@@ -160,6 +181,9 @@ class TaskRevisions:
                             task_id=task_id,
                             key="navigation-recovery:" + run["id"],
                         )
+            authorization = (
+                create_authority(db, task, coordinated, project_workspace) if coordinated else None
+            )
             intent = json.loads(task["intent_json"])
             operation = identity()
             source_user = (
@@ -171,6 +195,8 @@ class TaskRevisions:
                 if source_turn_id
                 else None
             )
+            if coordinated:
+                source_user = coordinated["delegation"]["source"]
             team = (
                 row(
                     db,
@@ -186,7 +212,11 @@ class TaskRevisions:
             main_instructions = bool(team and source_user and source_quote is None)
             if source_user:
                 # Preserve Main's member assignment separately from its user authorization.
-                source_text = json.loads(source_user["content_json"]).get("text", "")
+                source_text = (
+                    coordinated["delegation"]["source_quote"]
+                    if coordinated
+                    else json.loads(source_user["content_json"]).get("text", "")
+                )
                 if any(
                     quote is not None and quote not in source_text
                     for quote in (source_quote, authorization_quote)
@@ -236,6 +266,11 @@ class TaskRevisions:
                 "status": "stopping",
                 "stateAtRequest": task["state"],
                 **({"instructionAuthor": "main"} if main_instructions else {}),
+                **(
+                    {"coordinationAuthorization": {**authorization, "operationId": operation}}
+                    if authorization
+                    else {}
+                ),
             }
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
@@ -288,6 +323,11 @@ class TaskRevisions:
     @staticmethod
     def _blocked(db, task, run, payload):
         owner = task["owner_id"]
+        if authorization := payload.get("coordinationAuthorization"):
+            try:
+                current_authority(db, task, authorization)
+            except DomainError as exc:
+                return exc.code
         for mid in (task["origin_message_id"], payload["messageId"]):
             source = row(
                 db,
@@ -371,6 +411,36 @@ class TaskRevisions:
         return None
 
     async def advance(self):
+        def candidates(db):
+            projects = set()
+            for job in rows(
+                db,
+                "SELECT j.* FROM jobs j JOIN tasks t ON t.id=j.aggregate_id WHERE j.kind='task.steer' AND j.state='queued' AND json_type(j.payload_json,'$.coordinationAuthorization')='object' AND t.state IN ('succeeded','failed','cancelled','interrupted','waiting_user') ORDER BY j.rowid LIMIT 32",
+            ):
+                payload = json.loads(job["payload_json"])
+                task = row(db, "SELECT * FROM tasks WHERE id=?", (job["aggregate_id"],))
+                run = row(
+                    db,
+                    "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=? ORDER BY attempt_no DESC LIMIT 1",
+                    (task["id"], task["revision"]),
+                )
+                if task["revision"] == payload["expectedRevision"] and not self._blocked(
+                    db, task, run, payload
+                ):
+                    projects.add(payload["coordinationAuthorization"]["projectId"])
+                if len(projects) == 4:
+                    break
+            return sorted(projects)
+
+        projects = await self.db.call(candidates)
+        if self.project_workspace is not None:
+            values = await asyncio.gather(
+                *(self.project_workspace(project) for project in projects), return_exceptions=True
+            )
+        else:
+            values = [DomainError("SWARM_COORDINATION_WORKSPACE_REQUIRED", 409) for _ in projects]
+        workspaces = dict(zip(projects, values, strict=True))
+
         def write(db):
             for job in rows(
                 db,
@@ -396,7 +466,24 @@ class TaskRevisions:
                     if task["revision"] != payload["expectedRevision"]
                     else self._blocked(db, task, run, payload)
                 )
+                if not error and (authorization := payload.get("coordinationAuthorization")):
+                    if authorization["projectId"] not in workspaces:
+                        continue
+                    actual = workspaces[authorization["projectId"]]
+                    if isinstance(actual, BaseException):
+                        error = (
+                            actual.code
+                            if isinstance(actual, DomainError)
+                            else "TARGET_DISCOVERY_UNAVAILABLE"
+                        )
+                    elif (
+                        actual.get("projectId") != authorization["projectId"]
+                        or actual.get("directory") != authorization["projectDirectory"]
+                    ):
+                        error = "SWARM_COORDINATION_WORKSPACE_CHANGED"
                 if error:
+                    if error == "SWARM_COORDINATION_PAUSED":
+                        continue
                     payload.update(status="blocked", errorCode=error)
                     db.execute(
                         "UPDATE jobs SET state='failed',payload_json=? WHERE id=?",
@@ -412,6 +499,10 @@ class TaskRevisions:
                     continue
                 intent = json.loads(task["intent_json"])
                 intent.setdefault("initialIntent", dict(intent))
+                if payload.get("coordinationAuthorization"):
+                    intent["coordinationAuthorization"] = payload["coordinationAuthorization"]
+                else:
+                    intent.pop("coordinationAuthorization", None)
                 previous = intent.get("continuation", {})
                 from roami_agent.storage.task_provider import provider_binding
 
@@ -508,6 +599,11 @@ class TaskRevisions:
                             )
                             + "\n\nMain's assignment for this member:\n"
                             + execution_text
+                        )
+                    if payload.get("coordinationAuthorization"):
+                        execution_text += (
+                            "\n\nOngoing delegated goal (authorization limit, not extra work):\n"
+                            + encoded(payload["coordinationAuthorization"]["goalQuote"])
                         )
                     message(
                         db,

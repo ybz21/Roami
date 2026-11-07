@@ -47,8 +47,14 @@ async def test_schema23_inbox_upgrade_preserves_every_existing_fact(tmp_path, mo
         current = facts(db)
         assert current.pop("swarm_post_routes") == []
         assert current.pop("swarm_inbox") == []
+        assert current.pop("swarm_goal_delegations") == []
+        assert current.pop("swarm_coordination_batches") == []
+        assert current.pop("swarm_coordination_inputs") == []
         assert current == original
-        assert db.execute("SELECT max(version) FROM schema_meta").fetchone()[0] == 24
+        assert (
+            db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
+            == migrations.SCHEMA_VERSION
+        )
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         db.close()

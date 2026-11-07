@@ -14,12 +14,13 @@ def assert_project_main(db, owner, cid, project_id):
         raise DomainError("PROJECT_MAIN_IDENTITY_MISMATCH", 409)
 
 
-def assert_main_idle(db, conversation):
+def assert_main_idle(db, conversation, *, ignore_turn_id=None):
     branch = conversation["active_branch_id"]
     if row(
         db,
-        "SELECT id FROM turns WHERE branch_id=? AND state IN ('queued','running') LIMIT 1",
-        (branch,),
+        "SELECT id FROM turns WHERE branch_id=? AND state IN ('queued','running') "
+        "AND (? IS NULL OR id!=?) LIMIT 1",
+        (branch, ignore_turn_id, ignore_turn_id),
     ):
         raise DomainError("MAIN_BUSY", 409)
     messages = history(db, branch)

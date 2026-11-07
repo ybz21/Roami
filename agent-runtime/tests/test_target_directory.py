@@ -14,6 +14,30 @@ from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 
 
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"key": "other-project"},
+        {"dir": "relative"},
+        {"dir": "/"},
+        {"dir": None},
+        {"archived": True},
+    ],
+)
+async def test_project_workspace_rejects_untrusted_or_unavailable_host_directory(
+    monkeypatch, tmp_path, change
+):
+    directory = TargetDirectory(Settings())
+
+    async def query(*args):
+        assert args == ("project", "show", "project-a", "--json")
+        return {"data": {"key": "project-a", "name": "Project", "dir": str(tmp_path), **change}}
+
+    monkeypatch.setattr(directory, "_query", query)
+    with pytest.raises(DomainError, match="INVALID_TARGET_RECEIPT"):
+        await directory.project_workspace("project-a")
+
+
 async def test_project_discovery_pages_stable_ids_and_discards_unrelated_fields(monkeypatch):
     calls = []
 

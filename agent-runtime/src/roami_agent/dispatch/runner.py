@@ -12,6 +12,7 @@ from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_coordination_tasks import assert_dispatch_authorized
 
 log = logging.getLogger(__name__)
 
@@ -95,6 +96,14 @@ class TaskDispatcher:
             if task["state"] != "queued" or run["state"] != "accepted":
                 db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
                 return None
+            try:
+                assert_dispatch_authorized(db, task, run)
+            except ToolPreflightError as exc:
+                if exc.code == "SWARM_COORDINATION_PAUSED":
+                    db.execute(
+                        "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 1000, job["id"])
+                    )
+                    return None
             db.execute(
                 "UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=?", (job["id"],)
             )
@@ -182,6 +191,7 @@ class TaskDispatcher:
             )
             if not admitted:
                 raise DomainError("SWARM_DEPENDENCY_NOT_VERIFIED")
+            await self.db.call(lambda db: assert_dispatch_authorized(db, task, run))
             if turn:
                 result = await self.native_executor.run(task, run, turn=turn)
             elif self.executor:
@@ -270,6 +280,10 @@ class TaskDispatcher:
             )
 
     async def _finish_failure(self, task, run, turn, job, exc):
+        if isinstance(exc, ToolPreflightError) and exc.code == "SWARM_COORDINATION_PAUSED":
+            await self.end_prepared_turn(turn, "interrupted", exc.code)
+            if await self.defer_coordination(task, run, job):
+                return
         if (
             isinstance(exc, DomainError)
             and exc.code == "SESSION_NOT_IDLE"
@@ -311,6 +325,27 @@ class TaskDispatcher:
             await self.complete(task, run, result, "interrupted", unknown=True)
             return
         await self.tasks.report(task["owner_id"], task["id"], run["id"], task["revision"], result)
+
+    async def defer_coordination(self, task, run, job):
+        def write(db):
+            current = row(db, "SELECT state,revision FROM tasks WHERE id=?", (task["id"],))
+            if current["revision"] != run["task_revision"] or current["state"] not in {
+                "preparing",
+                "running",
+            }:
+                return False
+            db.execute("UPDATE tasks SET state='queued' WHERE id=?", (task["id"],))
+            db.execute(
+                "UPDATE task_attempts SET state='accepted' WHERE id=? AND result_json IS NULL",
+                (run["id"],),
+            )
+            db.execute(
+                "UPDATE jobs SET state='queued',available_ms=? WHERE id=?",
+                (now_ms() + 1000, job["id"]),
+            )
+            return True
+
+        return await self.db.call(write, write=True)
 
     async def defer_session_submission(self, task, run, job):
         def write(db):

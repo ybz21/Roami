@@ -8,11 +8,12 @@ from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.executors.professional_brief import professional_brief
 from roami_agent.executors.project import provision_project
 from roami_agent.executors.task_directory import automatic_task_directory, prepare_task_directory
-from roami_agent.protocol.errors import DomainError, public_error_code
+from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_error_code
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_coordination_tasks import prepared_authority
 from roami_agent.storage.task_reports import retain_reported_progress
 from roami_agent.tools.process import execute
 
@@ -58,6 +59,7 @@ class CodingExecutor:
         self.persistent = persistent
         self.artifacts = None
         self.capabilities = None
+        self.project_workspace = None
 
     async def command(self, sub, *args, spec=None):
         response = await execute(
@@ -199,6 +201,8 @@ class CodingExecutor:
             launch["directory"] = str(Path(directory).resolve())
         try:
             receipt = await self.launch(task, run, launch)
+        except ToolPreflightError:
+            raise
         except DomainError as exc:
             if exc.code == "SESSION_NOT_IDLE":
                 # Go rejects this before journaling or sending the new prompt.
@@ -220,6 +224,7 @@ class CodingExecutor:
         return self.result(receipt)
 
     async def launch(self, task, run, launch):
+        await prepared_authority(self.db, task, run, self.project_workspace)
         try:
             return await self.command("launch", "--file", "-", spec=launch)
         except DomainError as exc:
@@ -228,6 +233,7 @@ class CodingExecutor:
             source = await self.recovery_source(task, run, launch["sessionId"])
             if not source:
                 raise
+        await prepared_authority(self.db, task, run, self.project_workspace)
         return await self.command(
             "launch",
             "--file",

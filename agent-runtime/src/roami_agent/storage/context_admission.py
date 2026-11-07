@@ -9,6 +9,13 @@ from roami_agent.storage.swarm_completion import self_verified_completion
 
 
 def assert_context_admitted(db, turn):
+    if turn.get("trigger_kind") == "continuation" and row(
+        db,
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='swarm_coordination_batches'",
+    ):
+        from roami_agent.storage.swarm_coordination_admission import for_turn
+
+        for_turn(db, turn)
     if row(
         db,
         "SELECT 1 FROM jobs WHERE kind='control.stop' "
