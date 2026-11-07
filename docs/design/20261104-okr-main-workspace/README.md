@@ -6,6 +6,8 @@
 
 [Main 优先的团队对话入口](main-first-conversations.md)（2026-11-05）
 
+[跨布局保留当前群聊与成员收件人](conversation-selection.md)（#770）。
+
 [长期成员直达原会话与宿主项目归属佐证](member-session-navigation.md)（#693）。
 
 [日更 Skill：外部定时唤醒原 Main](daily-main-wakeup.md)。
