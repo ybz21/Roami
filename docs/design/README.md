@@ -36,6 +36,7 @@
 | 手机文档预览 | [20261024-手机文档预览](20261024-手机文档预览/README.md) | [1 条](20261024-手机文档预览/records/README.md) |
 | 本地模型代理与每日限额 | [20261026-本地模型代理与每日限额](20261026-本地模型代理与每日限额/README.md) | [2 条](20261026-本地模型代理与每日限额/records/README.md) |
 | 设置分类 | [20261027-设置分类](20261027-设置分类/README.md) | [2 条](20261027-设置分类/records/README.md) |
+| 关闭会话后的 worktree 清理 | [20261106-session-worktree-cleanup](20261106-session-worktree-cleanup/README.md) | 断连收尾、已关闭会话重试与 squash 恢复回归 |
 
 ## 其它主题
 

@@ -174,7 +174,27 @@ func TestExternalWorktreeBaseUnknown(t *testing.T) {
 	t.Fatal("external worktree not listed")
 }
 
+func TestGitIDPreservesAuthorWhenCommitterMissing(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_AUTHOR_NAME", "Task Author")
+	t.Setenv("GIT_AUTHOR_EMAIL", "author@example.test")
+	t.Setenv("GIT_COMMITTER_NAME", "")
+	t.Setenv("GIT_COMMITTER_EMAIL", "")
+	repo := mkRepo(t)
+	ctx := context.Background()
+	if out, err := gitID(ctx, repo, "commit", "--allow-empty", "-m", "identity fallback"); err != nil {
+		t.Fatalf("commit: %v: %s", err, out)
+	}
+	got, err := git(ctx, repo, "show", "-s", "--format=%an <%ae>|%cn <%ce>")
+	if err != nil || got != "Task Author <author@example.test>|roam <roam@localhost>" {
+		t.Fatalf("identity changed: %q, %v", got, err)
+	}
+}
+
 func TestMergeSquashAndConflict(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	ctx := context.Background()
 	s := New("", nil)
 	repo := mkRepo(t)
@@ -195,6 +215,11 @@ func TestMergeSquashAndConflict(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repo, "feat.txt")); err != nil {
 		t.Fatal("squash result missing in main worktree")
+	}
+	// A close retry must reach removal after the previous attempt already merged.
+	retried, err := s.Merge(ctx, MergeReq{Path: resp.Path, Strategy: "squash"})
+	if err != nil || retried.MergedOid != mr.MergedOid {
+		t.Fatalf("squash retry changed the result: %+v, %v", retried, err)
 	}
 
 	// 冲突：两边改同一文件
