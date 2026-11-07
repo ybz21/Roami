@@ -404,6 +404,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	if structuredExecutor(spec.Executor) && (!state.Structured || !sessionProcessesStopped(state.Binding)) {
 		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 	}
+	if err = s.reconcileDirectCodexCompletion(binding, &state, path); err != nil {
+		return Status{}, err
+	}
 	if state.State != "idle" || state.LaunchKey != "" || len(state.Tools) != 0 {
 		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 	}
