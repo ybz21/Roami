@@ -128,7 +128,7 @@ function RoamNotice({ m }: { m: Msg }) {
   )
 }
 
-function UserMessage({ m, accent, renderUserText }: { m: Msg; accent: string; renderUserText?: (text: string) => ReactNode }) {
+function UserMessage({ m, accent }: { m: Msg; accent: string }) {
   const { t } = useI18n()
   const parsed = m.blocks.map((b) => (b.kind === 'text' ? parseUserText(b.text || '') : null))
   const extras = parsed.filter(Boolean) as UserText[]
@@ -150,7 +150,7 @@ function UserMessage({ m, accent, renderUserText }: { m: Msg; accent: string; re
                     <TerminalIcon size={12} />{p.command}{p.args ? ` ${p.args}` : ''}
                   </span>
                 )}
-                {p.body && (renderUserText ? renderUserText(p.body) : <BodyWithImages text={p.body} accent="#fff" />)}
+                {p.body && <BodyWithImages text={p.body} accent="#fff" />}
               </div>
             )
           })}
@@ -163,7 +163,7 @@ function UserMessage({ m, accent, renderUserText }: { m: Msg; accent: string; re
   )
 }
 
-export const ChatMessage = memo(function ChatMessage({ m, results, side, renderUserText, resolveHref, footerActions, allowImages }: { allowImages?: boolean; m: Msg; results: Record<string, Block>; side: Side; renderUserText?: (text: string) => ReactNode; resolveHref?: ResolveHref; footerActions?: ReactNode }) {
+export const ChatMessage = memo(function ChatMessage({ m, results, side, resolveHref, footerActions, allowImages }: { allowImages?: boolean; m: Msg; results: Record<string, Block>; side: Side; resolveHref?: ResolveHref; footerActions?: ReactNode }) {
   const accent = 'var(--accent)'
   const solid = 'var(--accent-solid)'
 
@@ -171,7 +171,7 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side, renderU
   // SendPromptSubmit 投进输入框并回车的，转录里就记成一个 user turn——可它不是
   // 你说的话，画成实心蓝气泡会把对话搅浑。收成一条可展开的通知。
   if (m.role === 'user' && isRoamNotice(m)) return <RoamNotice m={m} />
-  if (m.role === 'user') return <UserMessage m={m} accent={solid} renderUserText={renderUserText} />
+  if (m.role === 'user') return <UserMessage m={m} accent={solid} />
 
   const segs = segments(m.blocks)
   const hasProse = segs.some((sg) => !sg.tool)
