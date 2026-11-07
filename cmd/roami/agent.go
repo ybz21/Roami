@@ -131,6 +131,12 @@ func runAgent(args []string) int {
 		fmt.Fprintf(os.Stderr, "unknown agent command %q\n", sub)
 		return 2
 	}
+	if hasAgentToolContext() {
+		switch sub {
+		case "new", "send", "notify", "steer":
+			return fail(fmt.Errorf("USE_REGISTERED_CLI_CAPABILITY"))
+		}
+	}
 	paths, err := agentruntime.Resolve("", "")
 	if err != nil {
 		return fail(err)
@@ -160,7 +166,7 @@ func runAgent(args []string) int {
 			return fail(err)
 		}
 	case "wake":
-		if os.Getenv("ROAMI_AGENT_CALLER_ROLE") != "" || os.Getenv("ROAMI_AGENT_TURN_ID") != "" {
+		if hasAgentToolContext() {
 			return fail(fmt.Errorf("EXTERNAL_TRIGGER_REQUIRED"))
 		}
 		if *conversation == "" || *project == "" || *key == "" {
@@ -252,6 +258,10 @@ func runAgent(args []string) int {
 		return fail(err)
 	}
 	return 0
+}
+
+func hasAgentToolContext() bool {
+	return os.Getenv("ROAMI_AGENT_CALLER_ROLE") != "" || os.Getenv("ROAMI_AGENT_TURN_ID") != "" || os.Getenv("ROAMI_AGENT_TOOL_CALL_ID") != ""
 }
 
 func agentRuntimeDir(explicit string) (string, error) {

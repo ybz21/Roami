@@ -8,7 +8,9 @@ import (
 // 改名不能让老脚本失灵：ROAM_* 与 ROAMI_* 必须互相看得见。
 func TestBridgeEnvAliases(t *testing.T) {
 	t.Setenv("ROAM_WEB_PASSWORD", "老脚本写的")
+	t.Setenv("ROAMI_WEB_PASSWORD", "")
 	t.Setenv("ROAMI_HOME", "/tmp/new")
+	t.Setenv("ROAM_HOME", "")
 	t.Setenv("ROAM_DATA", "/tmp/old-data")
 	t.Setenv("ROAMI_DATA", "/tmp/new-data") // 两个都写：新名说了算
 	BridgeEnvAliases()
