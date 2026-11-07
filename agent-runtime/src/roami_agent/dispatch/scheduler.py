@@ -58,8 +58,8 @@ class Scheduler:
                 "LEFT JOIN turns t ON j.kind='turn.run' AND t.id=j.aggregate_id "
                 "LEFT JOIN task_attempts a ON j.kind='task.run' AND a.id=json_extract(j.payload_json,'$.runId') "
                 "LEFT JOIN branches b ON b.id=a.native_branch_id "
-                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','task.run','task.verify','task.close_session','swarm.advance','swarm.coordinate','memory.daily','memory.extract') "
-                "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'task.verify' THEN 0 WHEN 'task.close_session' THEN 1 WHEN 'turn.run' THEN 2 WHEN 'swarm.coordinate' THEN 2 WHEN 'task.run' THEN 3 WHEN 'context.compact' THEN 4 WHEN 'memory.daily' THEN 5 ELSE 6 END,"
+                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','task.run','task.verify','task.close_session','swarm.advance','swarm.coordinate','swarm.goal.start','swarm.inbox.wakeup','memory.daily','memory.extract') "
+                "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'task.verify' THEN 0 WHEN 'task.close_session' THEN 1 WHEN 'turn.run' THEN 2 WHEN 'swarm.coordinate' THEN 2 WHEN 'swarm.goal.start' THEN 2 WHEN 'swarm.inbox.wakeup' THEN 2 WHEN 'task.run' THEN 3 WHEN 'context.compact' THEN 4 WHEN 'memory.daily' THEN 5 ELSE 6 END,"
                 "CASE WHEN j.kind='turn.run' AND t.trigger_kind='user' AND COALESCE(json_extract(j.payload_json,'$.deferred'),0)=0 THEN 0 ELSE 1 END,j.rowid LIMIT 100",
                 (now_ms(),),
             )
@@ -80,7 +80,13 @@ class Scheduler:
                 continue
             group = (
                 "control"
-                if job["kind"] in {"task.close_session", "swarm.coordinate"}
+                if job["kind"]
+                in {
+                    "task.close_session",
+                    "swarm.coordinate",
+                    "swarm.goal.start",
+                    "swarm.inbox.wakeup",
+                }
                 else "main"
                 if job["kind"] == "turn.run"
                 else "worker"
@@ -124,6 +130,16 @@ class Scheduler:
 
     async def _job(self, job):
         try:
+            if job["kind"] == "swarm.inbox.wakeup":
+                from roami_agent.storage.swarm_inbox_wakeup import advance
+
+                await self.db.call(lambda db: advance(db, job["id"]), write=True)
+                return
+            if job["kind"] == "swarm.goal.start":
+                from roami_agent.storage.swarm_goal_start import advance
+
+                await self.db.call(lambda db: advance(db, job["id"]), write=True)
+                return
             if job["kind"] == "swarm.coordinate":
                 from roami_agent.storage.swarm_completion_bridge import advance
 

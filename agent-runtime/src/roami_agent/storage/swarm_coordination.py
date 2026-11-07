@@ -14,10 +14,12 @@ from roami_agent.storage.swarm_delegations import current_delegation
 from roami_agent.storage.swarm_repository import changed, group
 
 
-def enqueue(db, owner, swarm_id, *, limit=20):
+def enqueue(db, owner, swarm_id, *, limit=20, initial_goal_id=None):
     if type(limit) is not int or not 1 <= limit <= 100:
         raise DomainError("INVALID_SWARM_COORDINATION")
     delegation = current_delegation(db, owner, swarm_id)
+    if initial_goal_id is not None and initial_goal_id != delegation["id"]:
+        raise DomainError("SWARM_DELEGATION_REQUIRED", 409)
     conversation = row(
         db, "SELECT * FROM conversations WHERE id=?", (delegation["mainConversationId"],)
     )
@@ -41,7 +43,7 @@ def enqueue(db, owner, swarm_id, *, limit=20):
         "ORDER BY i.id LIMIT ?",
         (conversation["id"], swarm_id, encoded(members), limit - len(results)),
     )
-    if not items and not results:
+    if not items and not results and initial_goal_id is None:
         return None
     batch_id, turn_id, stamp = identity(), identity(), now_ms()
     db.execute(
@@ -66,7 +68,12 @@ def enqueue(db, owner, swarm_id, *, limit=20):
             identity(),
             turn_id,
             "swarm.coordination:" + batch_id,
-            encoded({"coordinationBatchId": batch_id}),
+            encoded(
+                {
+                    "coordinationBatchId": batch_id,
+                    **({"initialGoalId": initial_goal_id} if initial_goal_id else {}),
+                }
+            ),
             stamp,
         ),
     )
@@ -93,11 +100,18 @@ def admitted_batch(db, owner, turn_id, *, lease_epoch=None):
         "SELECT payload_json FROM swarm_coordination_inputs WHERE batch_id=? ORDER BY inbox_id",
         (value["id"],),
     )
+    start = row(
+        db,
+        "SELECT id FROM jobs WHERE kind='turn.run' AND aggregate_id=? "
+        "AND json_extract(payload_json,'$.initialGoalId')=?",
+        (turn_id, value["delegation_id"]),
+    )
     return {
         **value,
         "delegation": value["delegation"],
         "inputs": [json.loads(i["payload_json"]) for i in items],
         "results": frozen(db, value["id"]),
+        **({"initialGoal": True} if start else {}),
     }
 
 
@@ -122,6 +136,7 @@ def evidence(value):
         "resultReceiptIds": [
             item["executionReceipt"]["receiptId"] for item in value.get("results", [])
         ],
+        **({"initialGoal": True} if value.get("initialGoal") else {}),
     }
 
 

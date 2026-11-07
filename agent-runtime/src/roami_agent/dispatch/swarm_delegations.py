@@ -57,7 +57,9 @@ class SwarmDelegations:
         assert_context_admitted(db, turn)
         return turn, source
 
-    async def enable(self, owner, swarm_id, spec, *, binding):
+    async def enable(
+        self, owner, swarm_id, spec, *, binding, bootstrap=False, require_existing_tasks=False
+    ):
         members, quote, expected = (
             spec.get("memberIds"),
             spec.get("sourceQuote"),
@@ -108,6 +110,8 @@ class SwarmDelegations:
                     )
                     if not member:
                         raise DomainError("SWARM_MEMBER_REQUIRED", 403)
+                    if require_existing_tasks and not member["task_id"]:
+                        raise DomainError("SWARM_MEMBER_TASK_REQUIRED", 409)
                     if member["task_id"]:
                         assert_session_open(db, member["task_id"])
                 stamp = now_ms()
@@ -130,19 +134,31 @@ class SwarmDelegations:
                         stamp,
                     ),
                 )
+                start = None
+                if bootstrap:
+                    from roami_agent.storage.swarm_goal_start import queue_start
+
+                    start = queue_start(db, swarm_id, delegation_id)
                 changed(db, team, "swarm.delegation.changed")
                 return {
                     "delegationId": delegation_id,
                     "revision": previous + 1,
                     "sourceMessageId": source["id"],
                     "memberIds": members,
+                    **({"startJobId": start} if start else {}),
                 }
 
             return receipt(
                 db,
                 owner,
                 spec["commandKey"],
-                {"swarmId": swarm_id, **spec, "sourceTurnId": turn["id"]},
+                {
+                    "swarmId": swarm_id,
+                    **spec,
+                    "sourceTurnId": turn["id"],
+                    **({"startGoal": True} if bootstrap else {}),
+                    **({"existingTasksRequired": True} if require_existing_tasks else {}),
+                },
                 apply,
                 swarm_id=swarm_id,
             )

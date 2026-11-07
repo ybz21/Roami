@@ -102,6 +102,16 @@ offline replay. A compacted summary does not replace fresh host task/receipt sta
 
 成员后续工作走原 task_steer，检查最新 revision/run 后再接续；不能用 legacy session_send 给受管成员另起一条独立工作流。旧直接消息 callback 只是独立回传，`verified=false` 保持不变；不凭该回传完成新任务。路由 guard、完成恢复与独立验收是不同宿主能力，按当前部署实测，不凭仓库文档假设已经上线。
 
+## 持续目标与成员提问
+
+先核对宿主目录是否实际提供 `roami swarm goal status/enable/revoke`；缺少时报告入口未接通，不猜命令或新建替代 Main。已有 active 目标直接接续。需要启用新目标时，先读真实版本与项目已确认的分工，按 memberId 选择当前职责；保留的历史成员不因同名加入本轮。引用当次用户的完整目标，按实际 schema 传 `expectedDelegationRevision` 和 `memberIds`。没有当前任务的角色先在真实用户回合完成分工；协调回合不新建替代任务。启用回执、首次唤醒、真实工作完成与每日排期是不同事实。
+
+成员向 Main 提问、报阻塞或交接时，使用当前任务/轮次/执行身份与稳定 messageKey。Main 对实际 postId 回答；普通 progress 不派工。群聊回复不代表成员已执行，仍需原任务继续工作时，先读最新 task_status，再用原 task_steer 接续。人的群聊输入已有真实 Main 用户入口，不再额外造一个协调回合；Main 自己的进度也不能再次唤醒自己。
+
+暂停时保留通知；已停止的同一批次不靠换键/换实例重新执行。要停止整个循环，应在 Main 撤销持续目标或暂停团队；来源遗忘或轮次失效后不继续执行。已冻结、已读取、已回答和已验收分别核对。报告用 Markdown 链接声明真实交付，行内配置路径可以只是输入引用；不因缺失提示重复执行已完成工作。
+
+需要每天运行时，复用项目 daily-operations Skill 的 Python 入口与实际支持的原目标唤醒能力，再登记仅本项目的 cron 范围。既有 cron 的 action=agent 会新开实例；长期团队应使用可核验的原目标调用，而不是定时开新指挥。普通提醒、只读日报、active 目标或首次启动回执均不证明日程已装好，必须核对真实 nextRun/lastRun 和执行结果。通道尚未连接时如实报告；用户已授权的自动模式不永久改为逐条人工批准。
+
 ## Keep human requests literal
 
 Read confirmed configuration, instructions, memory and Skills through bound-project tools. Do not append whole project snapshots or generated operating restrictions to the user message. Unsaved editor drafts are separate untrusted context, not authorization or confirmed facts. Preserve the ongoing goal and explicit boundaries; a narrowly scoped acceptance request does not cancel the automatic operating mode. Native member continuations must use the host-validated human source, excluding recognized historical generated tails.

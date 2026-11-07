@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN" data-pointer="fine">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OKR 自动协作机制</title>
+<style>
+:root{color-scheme:dark;--bg-base:#0d1117;--bg-container:#161b22;--border-subtle:#21262d;--text-bright:#e6edf3;--text-dim:#8b949e;--accent:#58a6ff;--sel-bg:rgba(255,255,255,.065);--fs-meta:12px;--fs-sm:13px;--fs-body:14px;--fs-lg:16px;--fs-title:22px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--r-xs:6px;--tap:44px}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden}body{font:var(--fs-body)/1.6 system-ui,sans-serif;color:var(--text-bright);background:var(--bg-base);display:flex;flex-direction:column}.tt-pagehead{padding:var(--sp-5);border-bottom:1px solid var(--border-subtle)}h1{font-size:var(--fs-title);margin:0}p{margin:var(--sp-2) 0}header p,.state,.muted{color:var(--text-dim)}main{flex:1;min-height:0;overflow:auto;padding:var(--sp-5)}nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2);margin-bottom:var(--sp-5)}button{font:inherit;color:inherit;cursor:pointer;background:transparent;border:0;border-bottom:1px solid var(--border-subtle);text-align:left;min-height:var(--tap);padding:var(--sp-3);min-width:0;overflow-wrap:anywhere}button[aria-pressed="true"]{background:var(--sel-bg);border-bottom-color:var(--accent)}button:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}button span{display:block;font-size:var(--fs-meta);color:var(--text-dim)}.workspace{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*16)),1fr));gap:var(--sp-5)}section{min-width:0}h2{font-size:var(--fs-lg);margin:0 0 var(--sp-3)}h3{font-size:var(--fs-sm);margin:var(--sp-5) 0 var(--sp-2)}ul{padding-left:var(--sp-5);margin:var(--sp-2) 0}li{margin-bottom:var(--sp-2)}dl{margin:0}dt{font-size:var(--fs-sm);color:var(--text-dim)}dd{margin:var(--sp-1) 0 var(--sp-4);overflow-wrap:anywhere}code{font-size:var(--fs-meta);overflow-wrap:anywhere}.note{margin-top:var(--sp-5);padding-top:var(--sp-4);border-top:1px solid var(--border-subtle);color:var(--text-dim)}a{color:var(--accent)}
+</style>
+<header class="tt-pagehead"><h1>OKR 自动协作机制</h1><p>一个项目 Main，持续指挥原成员。2026-11-08 机制原型，非实时运行状态。</p></header>
+<main>
+<nav aria-label="查看循环环节" id="steps"></nav>
+<div class="workspace">
+<section aria-live="polite"><h2 id="title"></h2><p class="state" id="state"></p><p id="route"></p><h3>如何运行</h3><ul id="actions"></ul></section>
+<section><h2>宿主如何保证</h2><dl id="guarantees"></dl></section>
+</div>
+<p class="note">这个原型不会派工、装日程或发布。完整闭环仍需真实发布通道和连续运行验收。<a href="goal-activation.md">查看技术实现</a></p>
+</main>
+<script>
+const steps=[
+{title:'持续目标',state:'候选实现，尚未部署',route:'用户在原项目 Main 说明持续目标；Main 选择已有成员，宿主保存目标和首次唤醒通知。',actions:['先读取当前目标版本，再引用真实用户原文启用。已有 active 目标直接接续。','原成员已有当前任务才能启用；没有任务的角色先完成初始分工。','当前用户回合结束后启动首批，不伪造成员提问或结果。'],checks:[['当前来源','只有原 Main 的真实用户回合能启用；成员消息、协调回合和生成附注不能授权。'],['一次启动','目标与通知一起保存。同一请求重放返回同一回执。'],['没有扩大权限','启用目标不是装每日排期，也不是素材发布审批。']]},
+{title:'Main 与原团队',state:'原项目已验证原 Data 接续和验收；其他运行环节继续补齐',route:'原 Main 指挥 X 维护、B站维护和数据分析；后续任务追加到原角色与原对话。',actions:['读取当前 task/revision/run，再继续原任务。','保持 Codex、Claude 或原生对话的原身份与历史，不按轮次创建替代成员。','接续受理、实际执行、产物和独立验收分别核对。'],checks:[['职责','Main 负责决策和验收；成员生产真实产物并报告证据。'],['长期记忆','保留原会话，并将可核验经验写入个人与团队记忆。'],['身份变化','任务轮次、执行器或原生分支发生变化时重新核对，不向旧会话投递。']]},
+{title:'群聊与结果',state:'结果桥接已部署；提问事件唤醒为候选实现',route:'成员提问进入 Main 收件箱，宿主创建持久通知；无需等成员交付最终结果。完成结果走独立的真实执行回执。',actions:['提问、阻塞、交接和成员答复按当前任务身份路由。普通进度不触发派工。','Main 忙或团队暂停时保留同一通知；超过首批的晚到消息进入后续批次。','Main 对原 postId 回答；需要继续执行时使用原 task_steer。'],checks:[['避免回声','人的群聊输入走既有真实 Main 用户入口；Main 自己的消息不再唤醒自己。'],['不把读取当完成','已冻结、已读取、已回答和已验收分别记录。'],['及时失效','停止、撤销、遗忘、过期轮次或非所选成员不能触发执行。']]},
+{title:'审核与冻结',state:'任务独立验收已验证；素材发布冻结待接通',route:'Main 实际读取成员产物并独立审核，冻结审核通过的文字、图片或视频版本，交给发布环节。',actions:['检查真实产物字节、来源与当前执行轮次，不能只相信成员摘要。','用户选择自动模式后，不把逐条人工批准固定为流程。','改动素材或切换账号、通道后必须重新核验冻结版本。'],checks:[['不同回执','任务验收、素材可发布、平台实际发布是不同事实。'],['版本绑定','发布资格必须绑定具体内容和附件的摘要，不能按文件名借用旧审批。'],['待实现','发布冻结和平台通道尚未接通，不能按现有任务验收冒充已支持。']]},
+{title:'发布与取数',state:'真实发布通道待连接；Connector 取数已有部分基础',route:'发布环节返回真实平台回执；数据成员通过项目 Connector Skill 采集对应内容的数据，再由 Main 核对并写入看板。',actions:['只发布 Main 独立审核通过的冻结版本。','发布超时但结果不明时先对账，不换请求键重发。','记录来源、账号、内容标识、时间窗口与采集证据；缺数据保持 unknown。'],checks:[['数据位置','使用项目确认的 Connector、看板定义和数据接口，不另建一套孤立看板。'],['动态展示','前端 HTML 读取宿主提供的数据，不读取任意服务器路径或凭空补零。'],['真实循环','有平台回执和实际数据回流才能证明这一轮发生，计划和素材包不能代替。']]},
+{title:'下一天与记忆',state:'每日生产者及完整连续两轮待实现与验证',route:'插件按项目排期调用 daily-operations Skill，唤醒原目标；Main 根据结果复盘，再继续原团队。',actions:['复用项目 Skill 的 Python 入口和原目标唤醒能力，不每天启动新指挥。','按日期槽保留稳定回执，暂停和停止后不补发大量旧任务。','将有效经验写入项目记忆与通用 okr-development Skill。'],checks:[['插件复用','既有 cron 的默认 agent 动作会新开实例，不能直接用于长期团队。'],['排期证据','检查实际 nextRun、lastRun 和执行结果；首次唤醒与普通提醒不是每日生产。'],['最终验收','保留原 Main、成员和历史，验证连续真实发布、取数、复盘循环。']]}
+];
+const nav=document.querySelector('#steps');
+function select(index){const step=steps[index];document.querySelector('#title').textContent=step.title;document.querySelector('#state').textContent=step.state;document.querySelector('#route').textContent=step.route;document.querySelector('#actions').replaceChildren(...step.actions.map(text=>{const li=document.createElement('li');li.textContent=text;return li}));document.querySelector('#guarantees').replaceChildren(...step.checks.flatMap(([label,text])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=text;return[dt,dd]}));nav.querySelectorAll('button').forEach((button,i)=>button.setAttribute('aria-pressed',String(i===index)))}
+steps.forEach((step,index)=>{const button=document.createElement('button');button.type='button';button.textContent=(index+1)+'. '+step.title;button.addEventListener('click',()=>select(index));nav.append(button)});select(2);
+</script>
+</html>
