@@ -5,6 +5,7 @@ import json
 
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.attachments import Attachments
+from roami_agent.conversation.okr_message_context import assert_context_binding, validate_context
 from roami_agent.conversation.project_main import project_main
 from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
 from roami_agent.memory.intake import remember_request
@@ -229,9 +230,18 @@ class Conversations:
         return await self.db.call(read)
 
     async def accept(
-        self, owner, cid, request_key, text, attachment_ids=None, *, wake_project=None
+        self,
+        owner,
+        cid,
+        request_key,
+        text,
+        attachment_ids=None,
+        *,
+        wake_project=None,
+        okr_context=None,
     ):
         attachment_ids = attachment_ids or []
+        okr_context = validate_context(okr_context)
         if (
             not request_key
             or (not text.strip() and not attachment_ids)
@@ -245,6 +255,10 @@ class Conversations:
         ):
             raise DomainError("INVALID_MESSAGE")
         payload = {"conversation": cid, "text": text}
+        if okr_context is not None:
+            if wake_project is not None:
+                raise DomainError("INVALID_OKR_MESSAGE_CONTEXT")
+            payload["okrContext"] = okr_context
         if wake_project is not None:
             payload["wakeProject"] = wake_project
         if attachment_ids:
@@ -253,6 +267,8 @@ class Conversations:
 
         def write(db):
             c = owned(db, owner, cid)
+            if okr_context is not None:
+                assert_context_binding(db, owner, cid)
             if wake_project is not None:
                 assert_project_main(db, owner, cid, wake_project)
             old = row(
@@ -291,6 +307,8 @@ class Conversations:
             )
             db.execute("UPDATE requests SET turn_id=? WHERE id=?", (tid, rid))
             content = {"text": text}
+            if okr_context is not None:
+                content["okrContext"] = okr_context
             if wake_project is not None:
                 content["scheduled"] = {"projectId": wake_project}
             mid = message(db, cid, c["active_branch_id"], "user", content, turn_id=tid)
@@ -298,7 +316,7 @@ class Conversations:
                 references = Attachments.bind(db, owner, mid, attachment_ids)
                 db.execute(
                     "UPDATE messages SET content_json=? WHERE id=?",
-                    (encoded({"text": text, "attachments": references}), mid),
+                    (encoded({**content, "attachments": references}), mid),
                 )
             if wake_project is None:
                 remember_request(db, owner, cid, mid, text)

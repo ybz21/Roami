@@ -15,6 +15,7 @@ from roami_agent.context.token_estimate import (
     text_tokens,
 )
 from roami_agent.conversation.attachments import context_attachments
+from roami_agent.conversation.okr_message_context import draft_reference, human_text
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.improvement import policy_value
@@ -39,6 +40,16 @@ def fingerprint(messages):
             ]
         ).encode()
     ).hexdigest()
+
+
+def projection_policy(messages):
+    for message in messages:
+        if message["role"] != "user":
+            continue
+        content = json.loads(message["content_json"])
+        if content.get("okrContext") or human_text(content) != content.get("text", ""):
+            return "v2-okr-literal-sources"
+    return "v1"
 
 
 def context_history(db, branch_id, through_turn=None):
@@ -93,6 +104,10 @@ def model_messages(messages):
 
 def model_entries(messages):
     result, paired = [], set()
+    latest_user = next(
+        (m["id"] for m in reversed(messages) if m["role"] == "user" and m["status"] == "completed"),
+        None,
+    )
     available = {
         (m["turn_id"], json.loads(m["content_json"]).get("tool_call_id"))
         for m in messages
@@ -102,7 +117,13 @@ def model_entries(messages):
         if m["status"] != "completed" or m["role"] not in {"user", "assistant", "tool"}:
             continue
         content = json.loads(m["content_json"])
-        entry = {"role": m["role"], "content": content.get("text", "")}
+        entry = {
+            "role": m["role"],
+            "content": human_text(content) if m["role"] == "user" else content.get("text", ""),
+        }
+        reference = draft_reference(content) if m["id"] == latest_user else None
+        if reference:
+            entry["content"] += "\n\n" + reference
         if m.get("agent_task_instruction"):
             entry = {
                 "role": "system",
@@ -207,9 +228,11 @@ class Context:
                 summary = json.loads(snapshot["summary_json"])
                 source_ids = summary["sourceIds"]
                 source = messages[: len(source_ids)]
-                if [m["id"] for m in source] == source_ids and fingerprint(source) == snapshot[
-                    "source_sha256"
-                ]:
+                if (
+                    [m["id"] for m in source] == source_ids
+                    and fingerprint(source) == snapshot["source_sha256"]
+                    and snapshot["policy_version"] == projection_policy(source)
+                ):
                     prefix = [
                         {
                             "role": "system",
@@ -512,8 +535,8 @@ class Context:
             existing = row(
                 db,
                 "SELECT id FROM context_snapshots WHERE branch_id=? AND source_sha256=? "
-                "AND state='ready' AND memory_epoch=? AND branch_epoch=?",
-                (b["id"], source_hash, epoch, b["epoch"]),
+                "AND state='ready' AND memory_epoch=? AND branch_epoch=? AND policy_version=?",
+                (b["id"], source_hash, epoch, b["epoch"], projection_policy(source)),
             )
             if existing and not p["focus"]:
                 p["state"] = "skipped"
@@ -599,7 +622,7 @@ class Context:
                         fingerprint(source),
                         fingerprint(source),
                         branch["epoch"],
-                        "v1",
+                        projection_policy(source),
                         epoch,
                         encoded({"text": text, "sourceIds": [m["id"] for m in source]}),
                         now_ms(),

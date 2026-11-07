@@ -10,7 +10,7 @@ import AgentConversation from '../../agent/AgentConversation'
 import MobileSubPage from '../../MobileSubPage'
 import type { SwarmSnapshot } from '../../swarm/swarm-protocol'
 import type { Configuration, Workspace } from './okr-workspace'
-import { displayOkrMessage, prepareOkrMessage } from './okr-conversation-context'
+import { displayOkrMessage, prepareOkrContext } from './okr-conversation-context'
 
 type Props = {
   embedded?: boolean; expectedConversationId?: string
@@ -21,7 +21,7 @@ export default function OkrMainChat(props: Props) {
   const node = useCurrentNodeId()
   return <OkrMainInstance key={`${node}:${props.projectId}:${props.workspace?.swarm || ''}:${props.reference?.conversationId || ''}:${props.expectedConversationId || ''}`} {...props} />
 }
-function OkrMainInstance({ embedded = false, expectedConversationId, reference: sourceReference, onClearReference, projectId, projectDir, draft, workspace, onClose, onUpdated, onSession }: Props) {
+function OkrMainInstance({ embedded = false, expectedConversationId, reference: sourceReference, onClearReference, projectId, draft, workspace, onClose, onUpdated, onSession }: Props) {
   const { t } = useI18n()
   const { phone, size } = useLayout()
   const secondaryPage = !embedded && (phone || size !== 'large')
@@ -37,6 +37,7 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
   const latest = useRef(identity); latest.current = identity
   const current = () => alive.current && latest.current === identity && currentNodeId() === node
   const create = useRef({ requestKey: crypto.randomUUID(), title: t('okr.chatTitle'), projectId })
+  const contextSupported = useRef(false)
   const conversation = useRef('')
   const acquiring = useRef<Promise<string> | null>(null)
   const alive = useRef(true)
@@ -46,6 +47,7 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
     acquiring.current = (async () => {
       const status = await api('GET', '/agent/status')
       if (!current()) throw new Error('Conversation changed')
+      contextSupported.current = status.data?.okrMessageContext === true
       let id: string
       if (reference && status.data?.conversationIdentity === true) {
         const response = await api('GET', '/agent/conversations/' + encodeURIComponent(reference.conversationId) + '/identity')
@@ -86,7 +88,7 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
     {(failed || upgradeRequired) && <div className="okr-error" role="alert"><p>{t(upgradeRequired ? 'okr.agentUpgradeRequired' : 'agent.requestFailed')}</p><Button onClick={() => { setFailed(false); setUpgradeRequired(false); void acquire().catch(() => setFailed(true)) }}>{t('inbox.retry')}</Button></div>}
     <AgentConversation cid={cid} branch={reference?.branchId || ''} focusMessage={reference?.messageId || ''} node={node} onSession={onSession} select={(conversationId, branchId = '', messageId = '') => { if (conversationId === cid) setLocalReference({ conversationId, branchId, messageId }) }} project={{
       draftKey, ensureConversation: acquire, isCurrent: current,
-      prepareMessage: text => prepareOkrMessage(text, projectId, projectDir, draft, workspace), displayText: displayOkrMessage,
+      prepareContext: text => prepareOkrContext(text, draft, workspace, contextSupported.current), displayText: displayOkrMessage,
       onUpdated, onCurrentBranch: () => { setLocalReference(undefined); onClearReference?.() }, inputLabel: t('okr.chatInput'), sendLabel: t('okr.send'),
       placeholder: t('chat.sendTo', { name: t('swarm.conversation.main') }),
     }} />

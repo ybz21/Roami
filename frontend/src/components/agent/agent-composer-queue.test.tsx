@@ -58,7 +58,7 @@ it('queues a normal busy-time send above the composer and lets the user interrup
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/conversations/main/messages', { requestKey: saved.items[0].id, text: 'do this next', attachmentIds: [] }))
   await waitFor(() => expect(screen.queryByRole('region', { name: 'agent.outbox.title' })).toBeNull())
   expect(api).toHaveBeenCalledTimes(1)
-  expect(state.accepted).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'urgent' }), 'do this next')
+  expect(state.accepted).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'urgent' }), 'do this next', undefined)
 })
 
 it('sends slash commands immediately instead of leaving stop trapped behind the current reply', async () => {

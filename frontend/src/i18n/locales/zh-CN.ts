@@ -123,6 +123,7 @@ const zhCN = {
   'okr.firstDay': "目前只有一个观测日，尚不能判断趋势。",
   'okr.trendTable': "查看逐日数据",
   'okr.chatTitle': "OKR 主智能体",
+  'okr.chatDraftTooLarge': '草稿太大，请先缩减或保存改动。当前输入已保留。',
   'okr.agentUpgradeRequired': '目标对话需要更新智能体服务，当前输入已保留。',
   'okr.chatOpen': "主智能体",
   'okr.chatHint': "本目标的固定负责人，负责规划、分工和协作。",

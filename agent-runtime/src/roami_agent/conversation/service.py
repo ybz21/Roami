@@ -24,7 +24,7 @@ class ConversationService:
         self.model, self.wakeup, self.turn_tasks = model, wakeup, turn_tasks
         self.preempt = preempt
 
-    async def submit(self, owner, cid, request_key, text, attachment_ids=None):
+    async def submit(self, owner, cid, request_key, text, attachment_ids=None, *, okr_context=None):
         native = await self.db.call(
             lambda db: row(
                 db,
@@ -39,6 +39,8 @@ class ConversationService:
         if text.strip().startswith("/") and "\n" not in text.strip():
             if attachment_ids:
                 raise DomainError("ATTACHMENTS_WITH_COMMAND")
+            if okr_context is not None:
+                raise DomainError("INVALID_OKR_MESSAGE_CONTEXT")
             name = command[1:]
             if name not in {c["name"] for c in COMMANDS}:
                 raise DomainError("UNKNOWN_COMMAND")
@@ -58,7 +60,9 @@ class ConversationService:
             return {"kind": "ui_action", "action": name, "conversationId": cid}
         if not self.model.model:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
-        result = await self.conversations.accept(owner, cid, request_key, text, attachment_ids)
+        result = await self.conversations.accept(
+            owner, cid, request_key, text, attachment_ids, okr_context=okr_context
+        )
         if self.preempt and not result.get("reused"):
             running = await self.db.call(
                 lambda db: row(

@@ -46,7 +46,7 @@ function AgentImageAttachment({ file, node }: { file: Attachment; node: string |
   </span>
 }
 
-function AgentMessageView({ item: source, node, focused, remember, canAnswer = false, answer, readOnly = false, conversationId, branchId, transformText }: { transformText?: (text: string) => string; conversationId?: string; branchId?: string; item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
+function AgentMessageView({ item: source, node, focused, remember, canAnswer = false, answer, readOnly = false, conversationId, branchId, transformText }: { transformText?: (text: string, content?: AgentMessage['content']) => string; conversationId?: string; branchId?: string; item: AgentMessage; node: string | null; focused: boolean; readOnly?: boolean; remember: (item: AgentMessage) => void; canAnswer?: boolean; answer?: (text: string) => Promise<boolean> }) {
   const { t, locale } = useI18n()
   const { phone } = useLayout()
   const [preview, setPreview] = useState<FileLink | null>(null)
@@ -54,7 +54,7 @@ function AgentMessageView({ item: source, node, focused, remember, canAnswer = f
   const request = useRef<AbortController | null>(null)
   useEffect(() => { setFull(null); setFailed(false); setLoading(false); return () => request.current?.abort() }, [source.id, source.status, node, conversationId, branchId])
   const raw = full?.id === source.id ? { ...source, ...full, status: source.status } : source
-  const item = transformText && raw.role === 'user' && raw.content.text ? { ...raw, content: { ...raw.content, text: transformText(raw.content.text) } } : raw
+  const item = transformText && raw.role === 'user' && raw.content.text ? { ...raw, content: { ...raw.content, text: transformText(raw.content.text, raw.content) } } : raw
   const readFull = async () => {
     if (!conversationId || loading) return
     const controller = new AbortController(); request.current = controller

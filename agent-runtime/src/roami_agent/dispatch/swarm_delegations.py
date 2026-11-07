@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.conversation.okr_message_context import human_text
 from roami_agent.dispatch.task_sessions import assert_session_open
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -84,7 +85,7 @@ class SwarmDelegations:
             if team["paused"] or team["archived"]:
                 raise DomainError("SWARM_COORDINATION_PAUSED", 409)
             turn, source = self._source(db, owner, team, binding)
-            actual_quote = source_quote(json.loads(source["body"]).get("text", ""), quote)
+            actual_quote = source_quote(human_text(json.loads(source["body"])), quote)
             if actual_quote is None:
                 raise DomainError("SWARM_DELEGATION_SOURCE_REQUIRED", 409)
 

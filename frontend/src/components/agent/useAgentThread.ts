@@ -3,7 +3,7 @@ import { api, openEventStream } from '../../api'
 import { agentCacheEpoch, agentDataKey, invalidateAgentData, loadAgentData, peekAgentData, storeAgentData } from './agent-data-cache'
 import { publishMemoryEvent } from './agent-memory-events'
 import { publishTaskEvent } from './agent-task-events'
-import { agentEvents, projectAgentEvent, type AgentSnapshot } from './agent-protocol'
+import { agentEvents, projectAgentEvent, type AgentSnapshot, type AgentMessage } from './agent-protocol'
 
 export function useAgentThread(cid: string, branch = '', node: string | null = null, focus = '') {
   const path = `/agent/conversations/${encodeURIComponent(cid)}`
@@ -14,7 +14,7 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
   const [state, setState] = useState<{ scope: string; view: AgentSnapshot | null; loading: boolean; connected: boolean; failed: boolean; loadingOlder?: boolean; olderFailed?: boolean }>(() => ({ scope, view: cached(), loading: !!cid && !cached(), connected: false, failed: false }))
   const refreshRef = useRef<() => void>(() => {})
   const olderRef = useRef<() => Promise<void>>(async () => {})
-  const acceptedRef = useRef<(receipt: any, text: string) => void>(() => {})
+  const acceptedRef = useRef<(receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => void>(() => {})
   useEffect(() => {
     if (scope !== agentDataKey(messages)) return
     setState({ scope, view: cached(), loading: !!cid && !cached(), connected: false, failed: false })
@@ -60,13 +60,13 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
       timer = setTimeout(() => { timer = undefined; void snapshot().catch(() => {}) }, 60)
     }
     refreshRef.current = () => { invalidateAgentData(scope); schedule() }
-    acceptedRef.current = (receipt, text) => {
+    acceptedRef.current = (receipt, text, context) => {
       if (!view || !receipt.messageId || view.messages.some((m) => m.id === receipt.messageId)) { schedule(); return }
       const first = view.messages.findIndex(message => message.turn_id === receipt.turnId)
       const index = first < 0 ? view.messages.length : first
       const seq = view.messages[index]?.seq ?? Math.max(0, ...view.messages.map(message => message.seq)) + 1
       const started = view.messages[index]?.created_ms ?? view.activities?.find(activity => activity.id === 'turn:' + receipt.turnId)?.startedMs
-      const accepted = { id: receipt.messageId, branch_id: view.branchId, role: 'user', status: 'completed', seq, created_ms: started ?? Date.now(), turn_id: receipt.turnId, content: { text } }
+      const accepted = { id: receipt.messageId, branch_id: view.branchId, role: 'user', status: 'completed', seq, created_ms: started ?? Date.now(), turn_id: receipt.turnId, content: { text, ...(context ? { okrContext: { version: context.version, revision: context.revision } } : {}) } }
       // SSE can settle this turn before the POST receipt reaches the client.
       view = { ...view,
         messages: [...view.messages.slice(0, index), accepted, ...view.messages.slice(index).map(message => ({ ...message, seq: message.seq + 1 }))],
@@ -125,5 +125,5 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
     void connect()
     return () => { olderRef.current = async () => {}; if (view) storeAgentData(scope, view, owner); stopped = true; abort.abort(); olderAbort?.abort(); document.removeEventListener('visibilitychange', visibility); clearTimeout(timer); clearTimeout(retryTimer) }
   }, [cid, branch, node, scope, focus])
-  return { ...(state.scope === scope ? state : { view: cached(), loading: !!cid && !cached(), connected: false, failed: false, loadingOlder: false, olderFailed: false }), loadOlder: useCallback(() => olderRef.current(), []), refresh: useCallback(() => refreshRef.current(), []), accepted: useCallback((receipt: any, text: string) => acceptedRef.current(receipt, text), []) }
+  return { ...(state.scope === scope ? state : { view: cached(), loading: !!cid && !cached(), connected: false, failed: false, loadingOlder: false, olderFailed: false }), loadOlder: useCallback(() => olderRef.current(), []), refresh: useCallback(() => refreshRef.current(), []), accepted: useCallback((receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => acceptedRef.current(receipt, text, context), []) }
 }

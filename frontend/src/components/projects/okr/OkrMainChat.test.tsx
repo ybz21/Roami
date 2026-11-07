@@ -11,7 +11,7 @@ vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, current
 vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (...args: unknown[]) => { state.thread(...args); return { accepted: vi.fn(), refresh: state.refresh, view: state.view } } }))
 vi.mock('../../shell/AdaptivePanel', () => ({ default: ({ children }: any) => children }))
 vi.mock('../../markdown/Markdown', () => ({ default: ({ children }: any) => children }))
-beforeEach(() => { state.view = null; state.globalNode = null; localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true } : path === '/agent/model-settings' ? { main: { model: 'saved-main', reasoningEffort: 'low', reasoningEfforts: ['low', 'high'], reasoningSupport: 'supported', images: true }, worker: { model: 'saved-worker' } } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
+beforeEach(() => { state.view = null; state.globalNode = null; localStorage.clear(); state.thread.mockReset(); state.api.mockReset(); state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkr: true, projectOkrMain: true, okrMessageContext: true } : path === '/agent/model-settings' ? { main: { model: 'saved-main', reasoningEffort: 'low', reasoningEfforts: ['low', 'high'], reasoningSupport: 'supported', images: true }, worker: { model: 'saved-worker' } } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } })); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 it('restores the same persistent Main when reopened and closing the view never stops it', async () => {
   const close = vi.fn()
@@ -19,7 +19,7 @@ it('restores the same persistent Main when reopened and closing the view never s
   await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
   fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Help define my goal' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
-  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: expect.stringContaining('"projectId":"project"') })))
+  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/independent/messages', expect.objectContaining({ text: 'Help define my goal', okrContext: expect.objectContaining({ version: 1, revision: 0 }) })))
   expect(state.api.mock.calls.filter(call => call[1].endsWith('/messages')).every(call => call[1] === '/agent/conversations/independent/messages')).toBe(true)
   expect(state.api.mock.calls.find(call => call[1] === '/agent/conversations')[2]).toMatchObject({ projectId: 'project' })
   const first = state.api.mock.calls.find(call => call[1] === '/agent/conversations')[2].requestKey
@@ -37,7 +37,7 @@ it('restores the same persistent Main when reopened and closing the view never s
 it('preserves the draft and reuses the exact message key after an ambiguous failure', async () => {
   let failed = false
   state.api.mockImplementation(async (_method, path) => {
-    if (path === '/agent/status') return { data: { projectOkr: true, projectOkrMain: true } }
+    if (path === '/agent/status') return { data: { projectOkr: true, projectOkrMain: true, okrMessageContext: true } }
     if (path === '/agent/main-conversation') return { data: { id: 'home' } }
     if (path === '/agent/conversations') return { data: { id: 'independent' } }
     if (!path.endsWith('/messages')) return { data: {} }
@@ -56,22 +56,17 @@ it('preserves the draft and reuses the exact message key after an ambiguous fail
   expect(state.api.mock.calls.filter(call => call[1] === '/agent/conversations')).toHaveLength(1)
 })
 
-it('provides verified board evidence for analysis without requiring unregistered CLI access', async () => {
-  const draft = emptyConfiguration()
-  const workspace = { ...draft, projectId: 'project', revision: 8, updatedAt: '2026-11-03T10:00:00Z', objective: 'Grow the project', keyResults: [{ id: 'growth', title: 'Stars', horizon: 'long' as const, metricId: 'stars', target: 100, mode: 'increase' as const, dueDate: draft.endDate }], metrics: [{ id: 'stars', name: 'Stars', unit: 'stars', source: 'manual' as const }], observations: [{ id: 'one', metricId: 'stars', date: draft.startDate, value: 11, source: 'manual' as const, sourceKey: 'manual:stars', capturedAt: 'now', note: '' }], reviews: [], initiatives: [{ id: 'x-posts', title: 'Product posts', channel: 'x', keyResultIds: ['growth'], description: 'Weekly examples', acceptance: 'Publication receipts' }], dashboard: { schemaVersion: 1 as const, widgets: [{ id: 'stars', type: 'metricTrend' as const, metricIds: ['stars'] }] }, projectFiles: { root: '.roami/okr', schemaVersion: 1 as const, revision: 8, mainInstructions: 'Use the project acceptance process', teamMemory: 'The last video is still unverified' } }
-  render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
-  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'What next?' } })
+it('sends literal instructions without duplicating saved history, skills or project guidance', async () => {
+  const workspace: Workspace = { ...emptyConfiguration(), projectId: 'project', revision: 8, updatedAt: 'now', observations: [], reviews: [], objective: 'Automatic publishing', projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 8, mainInstructions: 'Old publishing ban', teamMemory: 'x'.repeat(44000), skills: [{ id: 'source', path: 'source/SKILL.md', content: 'old instructions', sha256: 'hash' }] } }
+  render(<OkrMainChat projectId="project" draft={workspace} workspace={workspace} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Automatically review, publish and collect' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
-  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
-  const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
-  expect(context.revision).toBe(8)
-  expect(context.initiatives).toEqual(workspace.initiatives)
-  expect(context.dashboard).toEqual(workspace.dashboard)
-  expect(context.projectContext).toMatchObject({ mainInstructions: workspace.projectFiles.mainInstructions, teamMemory: workspace.projectFiles.teamMemory })
-  expect(context.snapshot.keyResults[0].latest.value).toBe(11)
-  expect(context.snapshot.metrics[0].recentDays[0]).toMatchObject({ value: 11, delta: null })
-  expect(state.api.mock.calls.some(call => call[1].includes('/okr'))).toBe(false)
+  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2]
+  expect(payload.text).toBe('Automatically review, publish and collect')
+  expect(payload.okrContext).toEqual({ version: 1, revision: 8 })
+  expect(JSON.stringify(payload)).not.toContain('Old publishing ban')
+  expect(JSON.stringify(payload).length).toBeLessThan(400)
 })
 
 it('preserves input and explains a runtime that cannot bind project conversations', async () => {
@@ -121,7 +116,7 @@ it('keeps a private Main instruction out of the shared group even when a team ex
 
 it('opens a verified project notification in the existing Main without creating or sending anything', async () => {
   const team = { id: 'sw-existing', mainConversationId: 'existing-main', target: { projectId: 'project' } }
-  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true } : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true, okrMessageContext: true } : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} reference={{ conversationId: 'existing-main', branchId: 'original-branch', messageId: 'original-message' }} onClose={vi.fn()} />)
   await waitFor(() => expect(state.thread).toHaveBeenCalledWith('existing-main', 'original-branch', null, 'original-message'))
   expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations' || call[1].endsWith('/messages'))).toBe(false)
@@ -129,7 +124,7 @@ it('opens a verified project notification in the existing Main without creating 
 
 it('rejects a notification for another conversation and keeps the project draft', async () => {
   const team = { id: 'sw-existing', mainConversationId: 'existing-main', target: { projectId: 'project' } }
-  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true } : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true, okrMessageContext: true } : path === '/agent/main-conversation' ? { id: 'home' } : path === '/agent/swarms' ? [team] : team }))
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} reference={{ conversationId: 'another-project-main', branchId: '', messageId: '' }} onClose={vi.fn()} />)
   await screen.findByRole('alert')
   expect(state.thread.mock.calls.every(call => !call[0])).toBe(true)
@@ -137,7 +132,7 @@ it('rejects a notification for another conversation and keeps the project draft'
 })
 
 it('restores a referenced fixed Main before a team exists using read-only identity', async () => {
-  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true, conversationIdentity: true } : { kind: 'project_main', projectId: 'project', conversationId: 'fixed-main' } }))
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true, okrMessageContext: true, conversationIdentity: true } : { kind: 'project_main', projectId: 'project', conversationId: 'fixed-main' } }))
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={null} reference={{ conversationId: 'fixed-main', branchId: 'branch', messageId: 'message' }} onClose={vi.fn()} />)
   await waitFor(() => expect(state.thread).toHaveBeenCalledWith('fixed-main', 'branch', null, 'message'))
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
@@ -150,59 +145,43 @@ it('does not create or send on a newly selected node before React re-renders', a
   fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Keep this project request' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   state.globalNode = 'another-node'
-  resolve({ data: { projectOkrMain: true } })
+  resolve({ data: { projectOkrMain: true, okrMessageContext: true } })
   await screen.findByRole('alert')
   expect(state.api.mock.calls.every(call => call[0] === 'GET')).toBe(true)
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep this project request')
 })
 
 
-it.each([false, true])('describes the confirmed HTML and role capabilities to Main (HTML=%s)', async htmlSupported => {
-  const draft = emptyConfiguration()
-  const workspace: Workspace = { ...savedWorkspace(), dashboard: htmlSupported
-    ? { schemaVersion: 2, widgets: [], html: { entry: 'dashboard/index.html', assets: ['dashboard/index.html'], metricIds: ['users'], libraries: ['echarts'] } }
-    : { schemaVersion: 1, widgets: [{ id: 'users', type: 'metricTrend' }] },
-    team: { schemaVersion: 1, roles: [{ id: 'data', name: 'Data', executor: 'native', duty: 'Review facts', memberId: 'a'.repeat(32) }] },
-    projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 1, teamRoleBindings: true, htmlDashboardSupported: htmlSupported },
-  }
+it('keeps unsaved dashboard, source and team edits in separate reference data', async () => {
+  const workspace = savedWorkspace()
+  const draft = { ...workspace, objective: 'New objective', dashboard: { schemaVersion: 2 as const, widgets: [], html: { entry: 'dashboard/index.html', assets: ['dashboard/index.html'], metricIds: ['users'] } }, team: { schemaVersion: 1 as const, roles: [{ id: 'data', name: 'Data', executor: 'native' as const, duty: 'Review facts', memberId: 'original-member' }] } }
   render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
-  await waitFor(() => expect(state.thread).toHaveBeenCalledWith('independent', '', null, ''))
-  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Change the dashboard using these files' } })
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Discuss these edits' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
-  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
-  const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
-  expect(context.projectContext.htmlDashboardSupported).toBe(htmlSupported)
-  expect(context.projectContext.teamRoleBindings).toBe(true)
-  expect(context.team).toEqual(workspace.team)
-  expect(context.dashboard).toEqual(workspace.dashboard)
-  expect(payload).toContain('保留当前职责到原成员的绑定')
-  if (htmlSupported) {
-    expect(payload).toContain('也支持schemaVersion:2')
-    expect(payload).toContain('先放未引用资产再save')
-    expect(payload).not.toContain('组件仅支持keyResults')
-  } else {
-    expect(payload).toContain('组件仅支持keyResults')
-    expect(payload).not.toContain('也支持schemaVersion:2')
-  }
+  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2]
+  expect(payload.text).toBe('Discuss these edits')
+  expect(payload.okrContext).toMatchObject({ version: 1, revision: 1, draft: { objective: 'New objective', dashboard: draft.dashboard, team: draft.team } })
+  expect(payload.okrContext.draft).not.toHaveProperty('projectId')
+  expect(payload.okrContext.draft).not.toHaveProperty('observations')
 })
 
-it.each([false, true])('offers Skill batch publication only with the real host capability (%s)', async supported => {
-  const draft = emptyConfiguration()
-  const connectors = [{ id: 'metrics', name: 'Metrics', service: 'mcp', identity: 'account', timezone: 'Asia/Shanghai', window: 'day' as const, files: ['SKILL.md'], bindings: [{ metricId: 'users', field: 'users' }] }]
-  const workspace: Workspace = { ...draft, connectors, projectId: 'project', revision: 3, updatedAt: 'now', observations: [], reviews: [], projectFiles: { root: '.roami/okr', schemaVersion: 1, revision: 3, connectorSkillBatches: supported } }
-  render(<OkrMainChat projectId="project" draft={draft} workspace={workspace} onClose={vi.fn()} />)
-  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Collect the confirmed source' } })
+it('preserves an unsaved draft on an older host but sends saved discussion literally', async () => {
+  state.api.mockImplementation(async (_method, path) => ({ data: path === '/agent/status' ? { projectOkrMain: true } : path === '/agent/conversations' ? { id: 'independent' } : { kind: 'message' } }))
+  const workspace = savedWorkspace()
+  const view = render(<OkrMainChat projectId="project" draft={{ ...workspace, objective: 'Unsaved edit' }} workspace={workspace} onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('okr.chatInput'), { target: { value: 'Discuss my edit' } })
+  fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
+  await screen.findByRole('alert')
+  expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(false)
+  expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Discuss my edit')
+  view.rerender(<OkrMainChat projectId="project" draft={workspace} workspace={workspace} onClose={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await waitFor(() => expect(state.api.mock.calls.some(call => call[1].endsWith('/messages'))).toBe(true))
-  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2].text
-  const context = JSON.parse(payload.split('<roami-okr-context>\n')[1].split('\n')[0])
-  expect(context.projectContext.connectorSkillBatches).toBe(supported)
-  expect(context.connectors).toEqual(connectors)
-  expect(payload.includes('payload={revision,batch}')).toBe(supported)
-  expect(payload.includes('initiatives、dashboard、team和connectors')).toBe(supported)
+  const payload = state.api.mock.calls.find(call => call[1].endsWith('/messages'))![2]
+  expect(payload.text).toBe('Discuss my edit')
+  expect(payload).not.toHaveProperty('okrContext')
 })
-
 
 it('reuses the complete composer and reads Main model settings without changing them', async () => {
   render(<OkrMainChat projectId="project" draft={emptyConfiguration()} workspace={savedWorkspace()} onClose={vi.fn()} />)
@@ -218,7 +197,7 @@ it('sends restored attachments through the original project Main and preserves t
   localStorage.setItem('roami.agent.attachments.roami.okr.main.draft:local:project', JSON.stringify([attachment]))
   let count = 0
   state.api.mockImplementation(async (_method, path) => {
-    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/status') return { data: { projectOkrMain: true, okrMessageContext: true } }
     if (path === '/agent/conversations') return { data: { id: 'original-main' } }
     if (path.endsWith('/messages') && count++ === 0) throw Error('ambiguous')
     return { data: {} }
@@ -264,7 +243,7 @@ it('blocks sending until a real attachment upload finishes', async () => {
 it('keeps a later Main draft when an earlier send returns', async () => {
   let finish!: (value: unknown) => void
   state.api.mockImplementation(async (_method, path) => {
-    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/status') return { data: { projectOkrMain: true, okrMessageContext: true } }
     if (path === '/agent/conversations') return { data: { id: 'original-main' } }
     if (path.endsWith('/messages')) return new Promise(resolve => { finish = resolve })
     return { data: {} }
@@ -304,7 +283,7 @@ it('refuses a restored ambiguous request bound to a different Main instead of re
 it('retries an ambiguous direct message with its original key even if SSE already shows Main running', async () => {
   let count = 0
   state.api.mockImplementation(async (_method, path) => {
-    if (path === '/agent/status') return { data: { projectOkrMain: true } }
+    if (path === '/agent/status') return { data: { projectOkrMain: true, okrMessageContext: true } }
     if (path === '/agent/conversations') return { data: { id: 'original-main' } }
     if (path.endsWith('/messages') && count++ === 0) throw Error('lost receipt')
     return { data: {} }

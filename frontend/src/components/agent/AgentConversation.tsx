@@ -50,7 +50,7 @@ export type HomeConversationProps = {
 }
 export type ProjectConversationBinding = {
   draftKey: string; ensureConversation: () => Promise<string>; isCurrent: () => boolean
-  prepareMessage: (text: string) => string; displayText: (text: string) => string
+  prepareContext: (text: string) => AgentMessage['content']['okrContext']; displayText: (text: string, content?: AgentMessage['content']) => string
   onUpdated?: () => void; onCurrentBranch?: () => void
   inputLabel: string; placeholder: string; sendLabel: string
 }
@@ -88,7 +88,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const scroll = useRef<HTMLDivElement>(null), stick = useRef(true), sendingRef = useRef(false)
   const activeCID = useRef(cid); activeCID.current = cid
   const panelRequest = useRef(0)
-  const pending = useRef<{ text: string; payload?: string; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
+  const pending = useRef<{ text: string; payload?: string; okrContext?: AgentMessage['content']['okrContext']; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
   const pendingOwner = useRef('')
   const createKey = useMemo(newKey, [cid, node])
   const draftKey = project?.draftKey || `roami.agent.draft.${node || 'local'}.${cid || 'new'}`
@@ -120,12 +120,12 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const outbox = useAgentOutbox(project ? draftKey + ':' + cid : draftKey, outboxReady, !running, async item => {
     if (project && !project.isCurrent()) throw new Error('Conversation changed')
     const owner = draftKey, origin = cid
-    const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: item.id, text: item.payload ?? item.text, attachmentIds: item.attachments.map(file => file.id) })
+    const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: item.id, text: item.payload ?? item.text, attachmentIds: item.attachments.map(file => file.id), ...(item.okrContext ? { okrContext: item.okrContext } : {}) })
     if (activeScope.current !== owner || project && !project.isCurrent()) return
-    if (data.kind === 'message') thread.accepted(data, item.text)
+    if (data.kind === 'message') thread.accepted(data, item.text, item.okrContext)
     thread.refresh(); inbox?.refresh()
-  }, project?.prepareMessage)
-  const bodies = useMemo(() => (thread.view?.messages || []).filter(m => m.role === 'user' || m.role === 'assistant').map(m => project && m.role === 'user' && m.content.text ? { ...m, content: { ...m.content, text: project.displayText(m.content.text) } } : m), [thread.view?.messages, project?.displayText])
+  }, project ? text => ({ payload: text, okrContext: project.prepareContext(text) }) : undefined)
+  const bodies = useMemo(() => (thread.view?.messages || []).filter(m => m.role === 'user' || m.role === 'assistant').map(m => project && m.role === 'user' && m.content.text ? { ...m, content: { ...m.content, text: project.displayText(m.content.text, m.content) } } : m), [thread.view?.messages, project?.displayText])
   const settledDispatches = useMemo(() => new Set(bodies.filter(m => ['completed', 'failed'].includes(m.content.sessionReply?.status || '')).map(m => m.content.sessionReply!.dispatchId)), [bodies])
   const timeline = useMemo(() => groupAgentTimeline(agentTimeline(bodies, mainTaskActivities(thread.view?.activities || []))), [bodies, thread.view?.activities])
   const visible = useMemo(() => bodies.filter(m => m.content.text || m.content.replyPreview?.text || m.content.question || m.content.taskStatus || m.content.attachments?.length || m.status === 'streaming'), [bodies])
@@ -199,10 +199,13 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     const value = text.trim()
     if ((project && !project.isCurrent()) || (!value && !attachmentIds.length) || (consumeDraft && attachments.blocked) || sendingRef.current || readOnly || (destination !== 'direct' && !value.startsWith('/') && value.length > 20000)) return
     sendingRef.current = true; setSending(true); setError('')
-    if (!pending.current || pending.current.text !== value || pending.current.target !== destination || pending.current.executor !== executor || JSON.stringify(pending.current.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && !project && pending.current.cid !== cid)) pending.current = { text: value, payload: project?.prepareMessage(value), target: destination, executor, cid, key: newKey(), attachmentIds, scope: draftKey }
-    const request = pending.current
+    let request = pending.current
     try {
       const origin = await ensureConversation()
+      if (!request || request.text !== value || request.target !== destination || request.executor !== executor || JSON.stringify(request.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && !project && request.cid !== cid)) {
+        request = { text: value, payload: value, okrContext: project?.prepareContext(value), target: destination, executor, cid, key: newKey(), attachmentIds, scope: draftKey }
+        pending.current = request
+      }
       if (project && request.cid && request.cid !== origin) throw new Error('Project Main changed')
       request.cid = origin
       if (project) localStorage.setItem(request.scope + ':pending', JSON.stringify(request))
@@ -214,13 +217,13 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
         invalidateAgentData(agentDataKey('/agent/tasks?conversationId=' + encodeURIComponent(origin)))
         if (current()) { setTarget('direct'); showPanel('tasks') }
       } else {
-        const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: request.payload ?? value, attachmentIds: request.attachmentIds })
+        const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: request.payload ?? value, attachmentIds: request.attachmentIds, ...(request.okrContext ? { okrContext: request.okrContext } : {}) })
         if (request.attachmentIds.length) attachments.clear(request.scope)
         if (!current()) { inbox?.refresh(); return }
         if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
         else if (data.kind === 'commands') showPanel('context')
         else if (data.kind === 'status' || data.kind === 'compaction') showPanel('context')
-        else if (data.kind === 'message' && origin === cid) thread.accepted(data, value)
+        else if (data.kind === 'message' && origin === cid) thread.accepted(data, value, request.okrContext)
       }
       if (!current()) { inbox?.refresh(); return }
       if (pending.current === request) { pending.current = null; if (project) localStorage.removeItem(request.scope + ':pending') }
@@ -228,8 +231,8 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
       if (consumeDraft && !project) { try { localStorage.removeItem(`roami.agent.draft.${node || 'local'}.new`) } catch {} }
       return true
     } catch (reason) {
-      const owner = request.cid || cid
-      if ((!project || project.isCurrent()) && activeScope.current === request.scope && (project || activeCID.current === owner || (!activeCID.current && !cid))) {
+      const owner = request?.cid || cid
+      if ((!project || project.isCurrent()) && activeScope.current === (request?.scope || draftKey) && (project || activeCID.current === owner || (!activeCID.current && !cid))) {
         setError(agentFailure(reason, t))
       }
     }
