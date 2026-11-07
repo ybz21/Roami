@@ -324,7 +324,9 @@ func Apply(pid int, l Limits) error {
 		if cgroupPath(pid) == "" {
 			return nil
 		}
-		if unit := ScopeOf(pid); unit != "" {
+		if unit, err := memoryScope(pid); err != nil {
+			lastErr = err
+		} else {
 			if err := setProperty(unit, l); err != nil {
 				lastErr = err
 			} else if got, ok := currentMax(pid); ok && got == want {
@@ -408,7 +410,9 @@ func SetHigh(pid int, bytes int64) error {
 		if cgroupPath(pid) == "" {
 			return nil // 进程没了，没什么好设的
 		}
-		if unit := ScopeOf(pid); unit != "" {
+		if unit, err := memoryScope(pid); err != nil {
+			lastErr = err
+		} else {
 			if err := exec.Command("systemctl", "--user", "set-property", unit, "MemoryHigh="+val).Run(); err != nil {
 				lastErr = err
 			} else if got, ok := HighOf(pid); ok && got == bytes {
