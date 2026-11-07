@@ -68,6 +68,7 @@ class CLICommands:
             "owner": owner,
             "conversation": turn["conversation_id"],
             "turnId": turn["id"],
+            "leaseEpoch": turn["lease_epoch"],
             "toolCallId": payload["toolCallId"],
             "assistantMessageId": call["assistant_message_id"],
             "originMessageId": origin["id"] if origin else None,

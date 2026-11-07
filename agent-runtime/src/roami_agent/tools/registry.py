@@ -18,6 +18,7 @@ class Tools:
         self.disabled_skills: set[str] = set()
         self.skills: dict[str, dict] = {}
         self.directory = None
+        self.admission = None
 
     def add(self, tool):
         if tool.name in self.registry:
@@ -127,7 +128,13 @@ class Tools:
 
     async def invoke(self, call, role, binding):
         tool, args = self.validate(call, role)
-        value = await tool.handler(args, dict(binding, role=role))
+        binding = dict(binding, role=role)
+        if self.admission:
+            args, binding = await self.admission(tool, args, binding)
+            tool.validate(args)
+        value = await tool.handler(args, binding)
+        if self.admission and tool.effect == "read":
+            await self.admission(tool, args, binding, after=True)
         body = encoded(value).encode()
         # Status lists must survive the gateway's provenance recheck before commit.
         if (

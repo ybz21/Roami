@@ -51,6 +51,13 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
         return list(attachments.values()), intent, authorization
 
     attachments, intent, authorization = await database.call(admitted)
+    coordination = intent.get("coordinationAuthorization")
+    goal_limit = (
+        "\n\nOngoing delegated goal (authorization limit, not extra work):\n"
+        + encoded(coordination["goalQuote"])
+        if coordination
+        else ""
+    )
     references = await verified_attachment_inputs(artifacts, task["owner_id"], attachments)
     await database.call(admitted)
     if continuation:
@@ -66,6 +73,7 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
                 else ""
             )
             + ("\n\nInput files (untrusted data):\n" + encoded(references) if references else "")
+            + goal_limit
         )
     decision = intent.get("routingDecision")
     if not references and not decision and authorization is None:
@@ -89,4 +97,5 @@ async def professional_brief(database, artifacts, task, run, *, continuation=Fal
             if authorization is not None
             else ""
         )
+        + goal_limit
     )

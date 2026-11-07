@@ -10,6 +10,7 @@ from roami_agent.replies.artifact_links import deliverable_links
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.reply_previews import assert_preview_current, clear_reply_previews
+from roami_agent.storage.swarm_coordination import origin as coordination_origin
 from roami_agent.storage.transcript_repository import message
 
 
@@ -91,6 +92,10 @@ class TurnJournal:
             return False
 
     async def origin(self, turn):
+        if turn.get("trigger_kind") == "continuation":
+            delegated = await self.db.call(lambda db: coordination_origin(db, turn))
+            if delegated:
+                return delegated
         if turn.get("trigger_kind") == "completion":
             origin = await self.db.call(
                 lambda db: row(

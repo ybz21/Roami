@@ -87,6 +87,12 @@ class ToolGateway:
             args = attempted if isinstance(attempted, dict) else {}
         tool_id = identity()
         operation_name = tool.name if tool else call["function"]["name"]
+        if tool and not validation_error and getattr(self.tools, "admission", None):
+            try:
+                args, binding = await self.tools.admission(tool, args, dict(binding, role=role))
+                tool.validate(args)
+            except DomainError as exc:
+                validation_error = exc
 
         def plan(db):
             assert_context_admitted(db, turn)

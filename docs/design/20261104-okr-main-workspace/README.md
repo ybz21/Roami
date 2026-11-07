@@ -200,3 +200,5 @@
 - [多OKR范围绑定的第一批实现](project-scope-implementation.md)：原Main、同名团队、命令与投递键隔离和保留历史的迁移（#746，未计生产验收）。
 
 - [群聊收件箱实施边界](swarm-inbox-implementation.md)：业务消息、真实读/答复回执，再接入原目标委托和宿主协调；分批验收不缩小最终协作目标（#744）。
+
+- [原 Main 的受限自动协调实施](swarm-coordination-implementation.md)：真实用户目标委托、持久批次与后续接线边界；授权和存储专项不是线上自动循环验收（#744）。

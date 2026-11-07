@@ -83,6 +83,7 @@ from roami_agent.tools.project_okr import register_project_okr_tools
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.swarm_catalog import register_swarm_tools
+from roami_agent.tools.swarm_coordination_policy import SwarmCoordinationPolicy
 from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 from roami_agent.tools.workspace_images import WorkspaceImageReads
@@ -202,6 +203,10 @@ class Runtime:
             database, self.settings, artifacts=self.artifacts
         )
         targets = TargetDirectory(self.settings, self.session_dispatches)
+        self.tools.admission = SwarmCoordinationPolicy(database, targets).admit
+        self.tasks.revisions.project_workspace = targets.project_workspace
+        if isinstance(self.executor, CodingExecutor):
+            self.executor.project_workspace = targets.project_workspace
         register_main_tools(
             self.tools,
             self.tasks,
@@ -280,6 +285,7 @@ class Runtime:
                 if self.browser.config.get("enabled") or self.desktop.config["enabled"]
                 else None,
                 artifacts=self.artifacts,
+                project_workspace=targets.project_workspace,
             ),
             self.wakeup,
             self.active,

@@ -1,6 +1,7 @@
 """Bounded target discovery through the unified CLI; no second project/session catalog."""
 
 import json
+from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
@@ -10,6 +11,23 @@ from roami_agent.tools.process import execute
 class TargetDirectory:
     def __init__(self, settings, dispatches=None):
         self.settings, self.dispatches = settings, dispatches
+
+    async def project_workspace(self, project_id):
+        payload = await self._query("project", "show", project_id, "--json")
+        entry = payload.get("data") if isinstance(payload, dict) else None
+        identity = self._project(entry)
+        directory = entry.get("dir")
+        if (
+            identity["projectId"] != project_id
+            or identity["archived"]
+            or not isinstance(directory, str)
+            or not directory
+            or "\0" in directory
+            or not Path(directory).is_absolute()
+            or Path(directory) == Path("/")
+        ):
+            raise DomainError("INVALID_TARGET_RECEIPT")
+        return {"projectId": project_id, "directory": str(Path(directory).resolve())}
 
     async def send(self, session_id, text, key, *, binding=None):
         dispatch = None
