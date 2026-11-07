@@ -172,8 +172,9 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
             "Works with legacy Codex/Claude sessions without lifecycle callbacks. Returns delivery only, "
             "NOT task completion. replyExpected=true includes a durable dispatchId and a local CLI return channel for executor reports; "
             "executionTracked=false means no provider lifecycle proof. Wait for the report in Main, never claim completion from delivery. "
-            "Use immediately when the user asks to message, hand work to, or continue an existing session; the request authorizes sending, so do not ask again. Resolve the destination using available context or discovery, never guess among ambiguous matches. "
-            "For a new session/project or tracked task use delegate instead. Do not retry unknown outcomes.",
+            "Use for an authorized message to an unrelated legacy session. Resolve the destination using available context or discovery, never guess among ambiguous matches. "
+            "Managed task/Swarm members, including idle or completed members, require task_steer on their original task. "
+            "Never bypass this with session_send or a replacement instance. For genuinely new work use delegate. Do not retry unknown outcomes.",
             object_schema(
                 {
                     "sessionId": {"type": "string", "minLength": 1, "maxLength": 300},

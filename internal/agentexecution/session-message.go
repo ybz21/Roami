@@ -62,6 +62,24 @@ func (s Service) SendMessage(spec MessageSpec) (MessageReceipt, error) {
 	if err != nil {
 		return MessageReceipt{}, err
 	}
+	lifecycle, err := s.lifecycleFile(binding)
+	if err != nil {
+		return MessageReceipt{}, err
+	}
+	stateUnlock, err := lock(filepath.Join(filepath.Dir(lifecycle), "state.lock"))
+	if err != nil {
+		return MessageReceipt{}, err
+	}
+	defer stateUnlock()
+	var state sessionLifecycle
+	if err = readJSON(lifecycle, &state); err == nil {
+		// Also fence the interval before the Python attempt records this session.
+		if state.LaunchKey != "" || state.CompletedKey != "" || state.InitialLaunch {
+			return MessageReceipt{}, fmt.Errorf("TASK_SESSION_BINDING_REQUIRED")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return MessageReceipt{}, err
+	}
 	receipt := MessageReceipt{Key: spec.Key, Session: binding.ID, State: "unknown"}
 	if err = writeJSON(path, savedMessage{Digest: hash, Receipt: receipt}); err != nil {
 		return MessageReceipt{}, err

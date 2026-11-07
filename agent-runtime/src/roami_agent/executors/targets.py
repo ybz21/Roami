@@ -32,7 +32,9 @@ class TargetDirectory:
     async def send(self, session_id, text, key, *, binding=None):
         dispatch = None
         if self.dispatches and binding:
-            dispatch = await self.dispatches.prepare(session_id, text, key, binding)
+            dispatch = await self.dispatches.prepare(
+                session_id, text, key, binding, resolve=self.resolve
+            )
             if dispatch["delivery_state"] == "failed":
                 raise DomainError(json.loads(dispatch["delivery_receipt_json"])["errorCode"])
             if dispatch["delivery_receipt_json"]:
@@ -40,6 +42,7 @@ class TargetDirectory:
             if dispatch["delivery_state"] in {"unknown", "failed"}:
                 raise DomainError("TOOL_OUTCOME_UNKNOWN")
             text = dispatch["prompt"]
+            session_id = dispatch["session_id"]
         try:
             result = await self._send(session_id, text, key)
         except BaseException as exc:
@@ -54,6 +57,7 @@ class TargetDirectory:
                         "SESSION_PANE_AMBIGUOUS",
                         "MESSAGE_KEY_CONFLICT",
                         "INVALID_SESSION_MESSAGE",
+                        "TASK_SESSION_BINDING_REQUIRED",
                     }
                     else None
                 )
@@ -85,6 +89,7 @@ class TargetDirectory:
                     "SESSION_PANE_AMBIGUOUS",
                     "MESSAGE_KEY_CONFLICT",
                     "INVALID_SESSION_MESSAGE",
+                    "TASK_SESSION_BINDING_REQUIRED",
                 }
                 else "TOOL_OUTCOME_UNKNOWN"
             )

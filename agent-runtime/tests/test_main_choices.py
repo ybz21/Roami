@@ -73,7 +73,7 @@ async def test_main_existing_session_delegate_sends_without_provider_hooks_or_co
                 db, "SELECT id FROM turns WHERE id=? AND state='completed'", (sent["turnId"],)
             ),
         )
-        assert len(calls) == 2
+        assert len(calls) == 3
         assert (
             await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
         )

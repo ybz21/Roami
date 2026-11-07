@@ -32,6 +32,9 @@ async def test_report_after_review_and_new_revision_keeps_source_privacy(review_
     turn = await runtime.mailbox.claim(job)
     dispatches = []
 
+    async def resolve(kind, identifier):
+        return {"sessionId": identifier}
+
     class MainReview:
         model = "review-before-independent-return"
 
@@ -53,6 +56,7 @@ async def test_report_after_review_and_new_revision_keeps_source_privacy(review_
                         "Complete the independently requested work",
                         "independent-return",
                         {**binding, "turnId": turn["id"]},
+                        resolve=resolve,
                     )
                 )
                 await runtime.session_dispatches.record_delivery(

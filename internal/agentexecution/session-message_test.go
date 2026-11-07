@@ -77,3 +77,83 @@ func TestPartialMessageDeliveryIsUnknownAndNeverReplayed(t *testing.T) {
 		t.Fatalf("replayed unknown: %s", submits)
 	}
 }
+
+func TestManagedSessionMessagesRequireTaskContinuationBeforeAnyInput(t *testing.T) {
+	for _, field := range []string{"launch", "completed", "initial"} {
+		t.Run(field, func(t *testing.T) {
+			s := messageService(t)
+			binding, err := s.paneBinding("message-test", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path, err := s.lifecycleFile(binding)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state := sessionLifecycle{Binding: binding, State: "idle", Executor: "codex"}
+			switch field {
+			case "launch":
+				state.LaunchKey, state.State = "managed-round", "submitting"
+			case "completed":
+				state.CompletedKey = "previous-round"
+			case "initial":
+				state.InitialLaunch = true
+			}
+			if err = writeJSON(path, state); err != nil {
+				t.Fatal(err)
+			}
+			spec := MessageSpec{Key: "blocked", SessionID: "message-test", Text: "Continue original member"}
+			for i := 0; i < 2; i++ {
+				if _, err = s.SendMessage(spec); err == nil || err.Error() != "TASK_SESSION_BINDING_REQUIRED" {
+					t.Fatalf("guard=%v", err)
+				}
+			}
+			dir, _ := s.directory("message:" + spec.Key)
+			for _, artifact := range []string{filepath.Join(dir, "message.json"), filepath.Join(s.Runtime.DataDir, "received"), filepath.Join(s.Runtime.DataDir, "submits")} {
+				if _, err = os.Stat(artifact); !os.IsNotExist(err) {
+					t.Fatalf("unexpected effect %s: %v", artifact, err)
+				}
+			}
+		})
+	}
+}
+
+func TestRecordedMessageReceiptSurvivesManagedBindingAndMissingSession(t *testing.T) {
+	for _, partial := range []bool{false, true} {
+		t.Run(fmt.Sprint(partial), func(t *testing.T) {
+			s := messageService(t)
+			if partial {
+				if err := os.WriteFile(filepath.Join(s.Runtime.DataDir, "fail"), nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			spec := MessageSpec{Key: "historical", SessionID: "message-test", Text: "Original legacy work"}
+			receipt, err := s.SendMessage(spec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			binding, err := s.paneBinding(spec.SessionID, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path, err := s.lifecycleFile(binding)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = writeJSON(path, sessionLifecycle{Binding: binding, State: "busy", LaunchKey: "now-managed"}); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(s.Runtime.TmuxBin, []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			again, err := s.SendMessage(spec)
+			if err != nil || again != receipt {
+				t.Fatalf("receipt=%+v err=%v", again, err)
+			}
+			submits, _ := os.ReadFile(filepath.Join(s.Runtime.DataDir, "submits"))
+			if strings.Count(string(submits), "paste") != 1 {
+				t.Fatalf("replayed receipt: %s", submits)
+			}
+		})
+	}
+}
