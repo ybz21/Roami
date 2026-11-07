@@ -10,7 +10,7 @@
 
 ## 已开始的授权层
 
-尚未注册新工具或启用调度。本工作区的schema25草案新增空的 `swarm_goal_delegations`、`swarm_coordination_batches` 和 `swarm_coordination_inputs`；没有迁移、猜测或自动激活已有团队的委托。
+基础层已随 PR #754 合入，尚未注册公开目标工具或启用调度。schema25迁移定义新增空的 `swarm_goal_delegations`、`swarm_coordination_batches` 和 `swarm_coordination_inputs`；不猜测或自动激活已有团队的委托。代码合入不代表生产已迁移。
 
 - `dispatch/swarm_delegations.py` 在同一事务检查原项目Main、当前实际user turn、原上下文准入、目标quote与明确的同群成员，并保存委托/请求回执。当前回合的停止、遗忘和错误身份不能获得委托。
 - `storage/swarm_delegations.py` 复用 canonical project Main 及实际群绑定，不新增另一份Main注册表。来源是未删除/未遗忘的实际用户消息，带scheduled的user记录也不合格；保存引用和内容摘要，成员文本不能填权限字段。
@@ -40,7 +40,7 @@
 - `TargetDirectory.project_workspace` 从实际Go项目show取得同一注册项目绝对目录；文件读取覆盖调用夹带的workspace，仍走既有无符号链接穿越文件I/O。读取返回前复核来源及项目目录，目录变动/委托撤销时不返回旧字节。
 - 新建角色/团队、任意shell/session、跨项目任务和配置改写拒绝。项目写入先限已存在的record/review及共享记忆CAS；通用文件写入不开放。`task_steer` 只在同回合先取得当前task/revision/latest run的成功状态回执后开放；宿主填入revision、原目标来源、当前lease以及batch/task稳定业务键。一次批次对同一原任务只接受一个有界指令，换tool call或调用key不能重复续派；不同正文返回键冲突。不会借普通Main权限扩大协调范围。
 
-本轮127项集成专项通过，另包含真实Core处理宿主批次的17项工具专项：原Main答复后回合正常结束，原成员取得关联回复，不新增user消息/实例/任务，不代替任务验收。仍为受控模型、私有数据库和直接注册CLI别名；不是生产模型、真实Go私有socket/浏览器/原宣传团队验收。普通Main、基础工具、目标发现与原completion回归覆盖在本轮专项中。完整门禁及roami chrome的协调批次链路尚未完成。
+早期127项集成专项另包含Core处理宿主批次的17项工具专项：原Main答复后回合正常结束，原成员取得关联回复，不新增user消息/实例/任务，不代替任务验收。普通Main、基础工具、目标发现与原completion回归也在覆盖范围。随后完成的真实Go私有上下文/roami chrome链路及完整门禁见文末；仍未计生产模型或原宣传团队的自动协调通过。
 
 `PromptManifests.record` 已在同一事务校验真实宿主批次/当前lease/有效委托与上下文中的batch证据，持久保存coordinationEvidence，并为实际投影的冻结inbox条目记录一次read回执。只冻结、构建候选prompt及人类预览都不写已读；晚到消息保留未读，不修改handled或任务验收。撤销、错误lease、证据不匹配或manifest插入失败均不留下已读/事件副作用。这里的已读表示已装入该轮实际模型请求上下文，不表示模型理解或任务完成。
 
@@ -80,7 +80,7 @@ NativeExecutor在workspace返回后、绑定事务内及进入真实Core前复�
 
 ## 交付边界
 
-本授权层仍在独立工作区开发，没有完整门禁、PR、部署或原团队运行证据。新schema必须同步Go备份兼容、故障回滚和旧库副本验证；随后完成上述接线及故障矩阵、roami chrome真实Core链路，再做原项目交接。#744保持开放。
+本基础层已通过完整门禁、正常提交钩子及CI，并在PR #754合入。Go备份兼容、旧库副本迁移和真实Core/CLI/浏览器隔离链路已验证；没有生产部署或原宣传团队自动协调的运行证据。继续按[显式恢复设计](coordination-recovery.md)补齐恢复、结果桥接和生产者，再做原项目交接；#744保持开放。下面保留首次失败、业务键修正与最终验收的证据边界。
 
 首次完整门禁在Skill package.files内容哈希校验停止（1 failed、2399 passed、28 skipped），原因是经验文档变更未同步资源清单。按仓库生成器刷新后，模板/Skill三项专项通过；本次失败日志保留，不计为full通过，随后重新运行完整门禁。
 
