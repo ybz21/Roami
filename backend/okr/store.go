@@ -28,7 +28,26 @@ func Open(paths storage.Paths) (*Store, error) {
 	db, err := storage.OpenManaged(paths, storage.DatabaseDescriptor{ID: "project-okr", Kind: "project-okr", Owner: "project-okr", Path: filepath.Join(paths.Database, "project-okr.db")}, []storage.Step{{Version: 1, Name: "project OKR evidence", SQL: `
 CREATE TABLE workspaces(project_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, body TEXT NOT NULL);
 CREATE TABLE review_evidence(review_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL);
-`}, {Version: 2, Name: "project file ownership", SQL: `CREATE TABLE file_workspaces(project_id TEXT PRIMARY KEY);`}}, storage.Options{})
+`}, {Version: 2, Name: "project file ownership", SQL: `CREATE TABLE file_workspaces(project_id TEXT PRIMARY KEY);`}, {Version: 3, Name: "project operation receipts", SQL: `
+CREATE TABLE project_operations(
+ project_id TEXT NOT NULL,
+ operation_key TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('review','observation','memory_append')),
+ request_sha256 TEXT NOT NULL CHECK(length(request_sha256)=64),
+ intent_json TEXT NOT NULL CHECK(json_valid(intent_json)),
+ state TEXT NOT NULL CHECK(state IN ('prepared','applied')),
+ receipt_json TEXT CHECK(receipt_json IS NULL OR json_valid(receipt_json)),
+ created_at TEXT NOT NULL,
+ PRIMARY KEY(project_id,operation_key),
+ CHECK((state='prepared' AND receipt_json IS NULL) OR (state='applied' AND receipt_json IS NOT NULL))
+);
+CREATE TRIGGER project_operation_identity BEFORE UPDATE OF project_id,operation_key,kind,request_sha256,intent_json,created_at ON project_operations BEGIN
+ SELECT RAISE(ABORT,'PROJECT_OPERATION_IMMUTABLE');
+END;
+CREATE TRIGGER project_operation_applied BEFORE UPDATE ON project_operations WHEN OLD.state='applied' BEGIN
+ SELECT RAISE(ABORT,'PROJECT_OPERATION_IMMUTABLE');
+END;
+`}}, storage.Options{})
 	if err != nil {
 		return nil, err
 	}
