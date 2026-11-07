@@ -63,7 +63,12 @@ async def summarize(model, history, focus, target_tokens, configuration, validat
     whole = prompt(focus, history, target_tokens)
     if budget is None or request_tokens(whole, []) <= budget:
         await validate()
-        return await read_summary(model, whole)
+        try:
+            return await read_summary(model, whole)
+        except DomainError as exc:
+            if exc.code != "MODEL_CONTEXT_LIMIT":
+                raise
+            budget = request_tokens(whole, []) // 2
 
     serialized = encoded(history)
     position, summary = 0, ""
@@ -90,6 +95,15 @@ async def summarize(model, history, focus, target_tokens, configuration, validat
                 high = middle - 1
         if low == position:
             raise DomainError("COMPACTION_INPUT_BUDGET_TOO_SMALL", 409)
-        summary = await read_summary(model, part(low))
+        candidate = part(low)
+        try:
+            updated = await read_summary(model, candidate)
+        except DomainError as exc:
+            if exc.code != "MODEL_CONTEXT_LIMIT":
+                raise
+            # The provider's tokenizer can exceed the local estimate; retry the same source.
+            budget = request_tokens(candidate, []) // 2
+            continue
+        summary = updated
         position = low
     return summary
