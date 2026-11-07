@@ -13,7 +13,10 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.replies.notifications import Notifications
-from roami_agent.storage.context_admission import assert_context_admitted
+from roami_agent.storage.context_admission import (
+    assert_context_admitted,
+    assert_context_sources_available,
+)
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.transcript_repository import owned
 
@@ -184,18 +187,19 @@ class SessionDispatches:
             if not dispatch:
                 raise DomainError("SESSION_DISPATCH_NOT_FOUND", 404)
             owned(db, owner, dispatch["conversation_id"])
-            try:
-                assert_context_admitted(db, {"id": dispatch["turn_id"], "owner_id": owner})
-            except DomainError as exc:
-                # Stopping Main intake does not cancel independently dispatched work.
-                if exc.code != "TURN_INTERRUPTED":
-                    raise
-            if row(
+            if not row(
+                db,
+                "SELECT 1 FROM messages WHERE id=? AND conversation_id=? "
+                "AND deleted_ms IS NULL AND status!='deleted'",
+                (dispatch["origin_message_id"], dispatch["conversation_id"]),
+            ) or row(
                 db,
                 "SELECT 1 FROM context_omissions WHERE owner_id=? AND message_id=?",
                 (owner, dispatch["origin_message_id"]),
             ):
                 raise DomainError("CONTEXT_SOURCE_FORGOTTEN", 409)
+            # A report returns independent work; it does not execute the old turn again.
+            assert_context_sources_available(db, {"id": dispatch["turn_id"], "owner_id": owner})
             prior = row(
                 db,
                 "SELECT * FROM session_dispatch_reports WHERE dispatch_id=? AND report_key=?",

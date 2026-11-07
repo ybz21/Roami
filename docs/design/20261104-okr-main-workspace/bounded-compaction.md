@@ -43,3 +43,5 @@ schema25 新包的原 Main 已能继续回复，但自动整理仍返回 400。�
 真实 Runtime 调度器的隔离假模型验证也通过：第二段失败后重新发起，只有一个会话、一个分支和一个最终快照，旧历史不变，同一 Main 随后完成新回复。正常 full 通过，包含 Go 全量、Python **3763 passed / 49 skipped / 6 subtests passed** 与前端静态检查、构建；四套无关 Skill 检查按范围跳过。记录同目录 `scheduler-proof.json`、`full.log`。
 
 生产原Main仍待修复包的标准部署及真实页面整理/独立验收。没有修改线上Python、模型配置、费用配置、busy或手机状态，不以隔离假模型替代实际运行通过。
+
+生产验收补记：#760已合入并部署。原Main的真实页面整理已完成，ready快照含4576条来源与7375字符摘要；整理前4605条消息的内容摘要、角色和状态全部保留。随后原Main自动接收原X成员下一轮完成回调，独立读取并重算28项文件后通过受管swarm_verify，保留改稿项且未把草稿交付验收当发布批准。原Main、分支、成员及保存路由未替换，#738据此关闭。私有证据 `/tmp/okr-compaction-release-20261107/{compaction-final.json,actual-history-proof.json,actual-main-post-compaction-verification.json}`。后续精简turn回传/预览问题另由#763跟踪。
