@@ -37,8 +37,8 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number }>()
   const reference = readOkrMessageReference()
   const [chatting, setChatting] = useState(!!reference)
-  const [teamMainRequest, setTeamMainRequest] = useState(0)
-  useEffect(() => { if (reference) { if (mainPanel === 'activities') { setChatting(false); setTeamMainRequest(value => value + 1) } else setChatting(true) } }, [reference?.conversationId, reference?.messageId, mainPanel])
+  const [teamMainRequest, setTeamMainRequest] = useState('')
+  useEffect(() => { if (reference) { if (mainPanel === 'activities') { setChatting(false); setTeamMainRequest(crypto.randomUUID()) } else setChatting(true) } }, [reference?.conversationId, reference?.messageId, mainPanel])
   const [incoming, setIncoming] = useState<Workspace | null>(null)
   const [busy, setBusy] = useState(false)
   const writing = useRef(false)
@@ -164,11 +164,11 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     setMainPanel('okr')
   }
   const openMain = () => {
-    if (mainPanel === 'activities' && workspace?.swarm) { setChatting(false); setTeamMainRequest(value => value + 1) }
+    if (mainPanel === 'activities' && workspace?.swarm) { setChatting(false); setTeamMainRequest(crypto.randomUUID()) }
     else setChatting(true)
   }
   const selectPanel = (next: string) => {
-    if (next === 'activities') { setChatting(false); setTeamMainRequest(value => value + 1) }
+    if (next === 'activities') { setChatting(false); setTeamMainRequest(crypto.randomUUID()) }
     setMainPanel(next)
   }
   const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-view={mainPanel} data-dashboard={workspace?.dashboard?.html ? 'html' : 'widgets'} data-mobile-refresh-scroll>
@@ -188,7 +188,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
           <OkrGoalMap workspace={workspace} />
         </> },
         { key: 'data', label: t('okr.tab.dashboard'), children: workspace ? <OkrDashboard workspace={workspace} active={mainPanel === 'data' && (!chatting || (!phone && size === 'large'))} onRefresh={() => { void refreshDiscussion() }} /> : <p className="okr-muted">{t('okr.confirmBeforeData')}</p> },
-        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} roles={workspace.team?.roles} embedded initialSwarm={workspace.swarm} openTerm={onSession} mainRequest={teamMainRequest} renderMain={cid => <Suspense fallback={<Spin />}><OkrMainChat onSession={onSession} embedded expectedConversationId={cid} reference={reference} onClearReference={clearOkrMessageReference} projectId={projectId} projectDir={projectDir} workspace={workspace} draft={draft} onUpdated={() => { void refreshDiscussion() }} onClose={() => {}} /></Suspense>} onNav={() => setMainPanel('okr')} {...{ projectId: workspace.projectId, onManage: configureTeam }} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={configureTeam}>{t('okr.edit')}</Button></div> : null },
+        { key: 'activities', label: t('okr.tab.activities'), children: mainPanel === 'activities' ? workspace?.swarm ? <div className="okr-activities"><Suspense fallback={<Spin />}><Swarm key={workspace.swarm} roles={workspace.team?.roles} embedded initialSwarm={workspace.swarm} openTerm={onSession} mainRequest={teamMainRequest} onRecipientChange={recipient => { if (recipient !== 'main' && reference) clearOkrMessageReference() }} renderMain={cid => <Suspense fallback={<Spin />}><OkrMainChat onSession={onSession} embedded expectedConversationId={cid} reference={reference} onClearReference={clearOkrMessageReference} projectId={projectId} projectDir={projectDir} workspace={workspace} draft={draft} onUpdated={() => { void refreshDiscussion() }} onClose={() => {}} /></Suspense>} onNav={() => setMainPanel('okr')} {...{ projectId: workspace.projectId, onManage: configureTeam }} /></Suspense></div> : <div className="okr-empty"><p>{t('okr.noSwarm')}</p><Button onClick={configureTeam}>{t('okr.edit')}</Button></div> : null },
         { key: 'memory', label: t('okr.teamMemory'), children: <Suspense fallback={<Spin />}><OkrProjectFiles key={projectDir + ':memory'} dir={projectDir ? projectDir.replace(/\/$/, '') + '/' + (workspace?.projectFiles?.root || '.roami/okr') + '/memory' : undefined} active={mainPanel === 'memory'} /></Suspense> },
         { key: 'files', label: t('okr.tab.files'), children: <Suspense fallback={<Spin />}><OkrProjectFiles key={projectDir} dir={projectDir} active={mainPanel === 'files'} openRequest={fileRequest} /></Suspense> },
       ]} />

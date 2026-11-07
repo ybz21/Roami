@@ -720,3 +720,32 @@ it('keeps workspace controls in its header and restores the opening action after
   showScene()
   expect(screen.getByRole('separator', { name: 'workspace.resizeInspector' })).toBeTruthy()
 })
+
+
+it('retains a group draft across a compact remount without replaying the old Main request', () => {
+  const changed = vi.fn()
+  const props = { id: 'sw-one', embedded: true, onBack: vi.fn(), openTerm: vi.fn(), renderMain: (cid: string) => <div>{'original ' + cid}</div>, mainRequest: 'group-remount-integration', onRecipientChange: changed }
+  const view = render(<ManagedSwarm {...props} />)
+  chooseConversation('group')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep this group draft' } })
+  expect(changed).toHaveBeenLastCalledWith('group')
+  view.unmount()
+  test.phone = true
+  render(<ManagedSwarm {...props} />)
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('group')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep this group draft')
+  expect(test.api).not.toHaveBeenCalled()
+})
+
+it('honors a fresh Main entry after a saved group selection without sending the draft', () => {
+  const props = { id: 'sw-one', onBack: vi.fn(), openTerm: vi.fn(), renderMain: (cid: string) => <div>{'original ' + cid}</div>, mainRequest: 'explicit-main-first' }
+  const view = render(<ManagedSwarm {...props} />)
+  chooseConversation('group')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Unsent group draft' } })
+  view.rerender(<ManagedSwarm {...props} mainRequest="explicit-main-next" />)
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('main')
+  expect(screen.getByText('original main')).toBeTruthy()
+  chooseConversation('group')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Unsent group draft')
+  expect(test.api).not.toHaveBeenCalled()
+})

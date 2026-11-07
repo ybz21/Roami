@@ -18,6 +18,7 @@ import SwarmWorkspaceDivider, { useSwarmWorkspaceWidth } from './SwarmWorkspaceD
 import SwarmConversations from './SwarmConversations'
 import SwarmMainChat from './SwarmMainChat'
 import SwarmMemberChat from './SwarmMemberChat'
+import { useSwarmConversationSelection } from './swarm-conversation-selection'
 import { matchesSwarmTaskFilter, swarmTaskFilters, type SwarmTaskFilter } from './swarm-task-filter'
 import ConversationComposer from '../chat/ConversationComposer'
 import SwarmMemberDetails from './SwarmMemberDetails'
@@ -33,11 +34,11 @@ function State({ state }: { state: string }) {
   const { t } = useI18n()
   return <span className="swarm-state" style={{ color: `var(${swarmStateToken(state)})` }}>{t(`swarm.managed.state.${state}`)}</span>
 }
-export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, projectId, onManage, renderMain, mainRequest, roles }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean; projectId?: string; onManage?: () => void; renderMain?: (id: string) => ReactNode; mainRequest?: number; roles?: SwarmRoleBinding[] }) {
+export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, projectId, onManage, renderMain, mainRequest, onRecipientChange, roles }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean; projectId?: string; onManage?: () => void; renderMain?: (id: string) => ReactNode; mainRequest?: string; onRecipientChange?: (recipient: string) => void; roles?: SwarmRoleBinding[] }) {
   const { data, error, missing, refresh } = useSwarmSnapshot(id), { t } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const panelKey = 'roami.swarm.panel.v2:' + nodeApi('/agent/swarms/' + id)
-  const [selected, setSelected] = useState('main'), [tab, setTab] = useState(() => localStorage.getItem(panelKey) === 'board' ? 'board' : 'chat'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
-  const [recipient, setRecipient] = useState('main')
+  const [recipient, setRecipient] = useSwarmConversationSelection(panelKey + ':conversation', mainRequest)
+  const [selected, setSelected] = useState(recipient), [tab, setTab] = useState(() => localStorage.getItem(panelKey) === 'board' ? 'board' : 'chat'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
   const sceneKey = panelKey + ':scene:' + (phone ? 'phone' : 'desktop')
   const [sceneChoice, setSceneChoice] = useState<Record<string, boolean>>({})
   const studioOpen = sceneChoice[sceneKey] ?? (localStorage.getItem(sceneKey) ? localStorage.getItem(sceneKey) === 'on' : !phone)
@@ -55,7 +56,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const [memoryOpen, setMemoryOpen] = useState(false), [teamOpen, setTeamOpen] = useState(false)
   const controlKey = useRef<{ action: string; revision: number; key: string } | null>(null)
   useEffect(() => { localStorage.setItem(panelKey, tab) }, [tab, panelKey])
-  useEffect(() => { if (mainRequest) { setRecipient('main'); setSelected('main'); setMemberDetail(null); setDetail(null); setTeamOpen(false) } }, [mainRequest])
+  useLayoutEffect(() => { if (mainRequest && recipient === 'main') { setSelected('main'); setMemberDetail(null); setDetail(null); setTeamOpen(false) } }, [mainRequest, recipient])
   const switchTab = (next: string) => {
     if (taskList.current) taskScroll.current = taskList.current.scrollTop
     setTab(next)
@@ -88,7 +89,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const inspectedMember = members.find(member => member.id === memberDetail)
   const work = data.work.find(item => item.id === detail)
   const openWork = (item: SwarmWork) => { setMemberDetail(null); setSelected(swarmMember(members, item.id)?.id || item.id); setDetail(item.id); switchTab('board'); showWorkspace(true) }
-  const openChat = (requested: string) => { const id = swarmMember(members, requested)?.id || requested; setMemberDetail(null); setSelected(id); setRecipient(id); setDetail(null); setTeamOpen(false) }
+  const openChat = (requested: string) => { const id = swarmMember(members, requested)?.id || requested; setMemberDetail(null); setSelected(id); setRecipient(id); setDetail(null); setTeamOpen(false); onRecipientChange?.(id) }
   const view = <div className="swarm-work-detail">
     {work && <>{!phone && <div className="swarm-panel-head"><h3>{work.title}</h3><button type="button" className="tt-act" aria-label={t('common.close')} onClick={() => setDetail(null)}><CloseIcon /></button></div>}<State state={work.state} />
       {work.evidence?.verification?.state === 'missing' && <p role="status">{t('swarm.managed.evidenceMissing')}</p>}
