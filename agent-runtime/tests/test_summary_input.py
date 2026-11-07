@@ -75,6 +75,80 @@ async def test_small_history_uses_one_original_structured_prompt():
     assert "7500 tokens" in model.prompts[0][0]["content"]
 
 
+class TokenizerMismatch:
+    def __init__(self, actual_budget=500, *, reject_later=False, error="MODEL_CONTEXT_LIMIT"):
+        self.actual_budget = actual_budget
+        self.reject_later = reject_later
+        self.error = error
+        self.rejected = []
+        self.accepted = []
+
+    async def stream(self, messages, tools):
+        data = json.loads(messages[1]["content"])
+        late = self.reject_later and self.accepted and not self.rejected
+        if request_tokens(messages, tools) > self.actual_budget or late:
+            self.rejected.append(data)
+            if late:
+                self.actual_budget = request_tokens(messages, tools) // 2
+            raise DomainError(self.error, 502)
+        self.accepted.append(data)
+        yield ModelEvent("text", "Keep the original Main and confirmed work.")
+
+
+@pytest.mark.parametrize("configuration", [{}, {"contextWindow": 1600}])
+async def test_provider_tokenizer_rejection_reduces_fragments_without_losing_history(configuration):
+    history = [{"role": "tool", "content": '中文结果 "\\\n' * 1200}]
+    model = TokenizerMismatch()
+    assert await summarize(model, history, "retain evidence", None, configuration, valid)
+    assert model.rejected and len(model.accepted) > 1
+    assert "".join(item["historyFragment"] for item in model.accepted) == encoded(history)
+    assert all(item["previousSummary"] for item in model.accepted[1:])
+
+
+async def test_later_rejection_retries_same_position_and_preserves_successful_summary():
+    history = [{"role": "tool", "content": "evidence " * 3000}]
+    model = TokenizerMismatch(1200, reject_later=True)
+    await summarize(model, history, "", None, {"contextWindow": 1200}, valid)
+    rejected = model.rejected[0]
+    retried = next(
+        item for item in model.accepted if item["startCharacter"] == rejected["startCharacter"]
+    )
+    assert retried["previousSummary"] == rejected["previousSummary"]
+    assert retried["endCharacter"] < rejected["endCharacter"]
+    assert "".join(item["historyFragment"] for item in model.accepted) == encoded(history)
+
+
+async def test_other_bad_requests_are_not_retried_as_context_rejection():
+    model = TokenizerMismatch(0, error="MODEL_HTTP_400")
+    with pytest.raises(DomainError, match="^MODEL_HTTP_400$"):
+        await summarize(model, [{"role": "user", "content": "unchanged"}], "", None, {}, valid)
+    assert len(model.rejected) == 1 and not model.accepted
+
+
+async def test_cancel_between_rejection_and_retry_sends_no_more_requests():
+    model = TokenizerMismatch(0)
+
+    async def validate():
+        if model.rejected:
+            raise DomainError("COMPACTION_CANCELLED", 409)
+
+    with pytest.raises(DomainError, match="^COMPACTION_CANCELLED$"):
+        await summarize(
+            model, [{"role": "user", "content": "evidence " * 400}], "", None, {}, validate
+        )
+    assert len(model.rejected) == 1 and not model.accepted
+
+
+async def test_impossible_provider_budget_fails_without_looping_or_omitting_history():
+    model = TokenizerMismatch(0)
+    with pytest.raises(DomainError, match="^COMPACTION_INPUT_BUDGET_TOO_SMALL$"):
+        await summarize(
+            model, [{"role": "user", "content": "evidence " * 1000}], "", None, {}, valid
+        )
+    assert 1 < len(model.rejected) < 20
+    assert not model.accepted
+
+
 async def test_focus_that_cannot_fit_fails_before_model_call():
     model = BudgetModel(50)
     with pytest.raises(DomainError, match="COMPACTION_INPUT_BUDGET_TOO_SMALL"):
@@ -137,6 +211,25 @@ async def test_multiple_model_windows_activate_one_snapshot_without_rewriting_hi
     source = await store.call(lambda db: model_messages(context_history(db, c["active_branch_id"])))
     serialized = "".join(json.loads(p[1]["content"])["historyFragment"] for p in model.prompts)
     assert serialized == encoded(source)
+
+
+async def test_late_provider_rejection_still_activates_one_complete_snapshot(store):
+    c = await large_conversation(store)
+    before = await Conversations(store).messages("alice", c["id"])
+    model = TokenizerMismatch(1200, reject_later=True)
+    context = Context(store, model, keep_recent_tokens=500)
+    configure(context)
+    job = await context.request("alice", c["id"], "provider-retry")
+    await context.run(job["id"])
+    state = await context.compaction("alice", c["id"], job["id"])
+    assert state["state"] == "completed" and model.rejected
+    assert (await Conversations(store).messages("alice", c["id"]))["messages"] == before["messages"]
+    source = await store.call(lambda db: model_messages(context_history(db, c["active_branch_id"])))
+    assert "".join(item["historyFragment"] for item in model.accepted) == encoded(source)
+    assert (await store.call(lambda db: row(db, "SELECT COUNT(*) AS n FROM context_snapshots")))[
+        "n"
+    ] == 1
+    assert (await context.project("alice", c["id"]))["snapshotId"] == state["snapshotId"]
 
 
 @pytest.mark.parametrize("action", ["cancel", "memory"])

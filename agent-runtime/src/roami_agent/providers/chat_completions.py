@@ -15,6 +15,7 @@ from roami_agent.protocol.model_observation import model_observation
 from roami_agent.protocol.model_tool_selection import selected_reply_tool
 from roami_agent.protocol.models import ModelEvent, model_endpoint
 from roami_agent.protocol.serialization import encoded
+from roami_agent.providers.context_rejection import context_rejected
 from roami_agent.providers.generation_parameters import generation_parameters
 from roami_agent.providers.request_policy import (
     normalized_usage,
@@ -34,6 +35,7 @@ STREAM_ERROR_CODES = frozenset(
     {
         "MODEL_OUTPUT_LENGTH",
         "MODEL_OUTPUT_CONTENT_FILTER",
+        "MODEL_CONTEXT_LIMIT",
         "MODEL_IMAGES_UNSUPPORTED",
         "MODEL_TOOLS_UNSUPPORTED",
         "MODEL_DEADLINE",
@@ -263,6 +265,8 @@ class ChatCompletions:
             if 300 <= response.status_code < 400:
                 raise DomainError("MODEL_REDIRECT_BLOCKED", 502)
             if response.status_code >= 400:
+                if await context_rejected(response):
+                    raise DomainError("MODEL_CONTEXT_LIMIT", 502)
                 # Provider bodies can contain echoed prompts and credentials; do not relay them.
                 raise DomainError("MODEL_HTTP_" + str(response.status_code), 502)
             first_delta = True
