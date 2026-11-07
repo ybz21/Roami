@@ -29,6 +29,7 @@ from roami_agent.storage.database import row, rows
 from roami_agent.storage.reply_history import replied_message_ids
 from roami_agent.storage.request_coverage import latest_coverage
 from roami_agent.storage.swarm_completion import self_verified_completion
+from roami_agent.storage.swarm_coordination_results import status_evidence
 from roami_agent.storage.task_context import recent_task_context
 from roami_agent.storage.task_handoff import handoff_receipt_context
 from roami_agent.storage.task_request import task_user_request
@@ -541,6 +542,9 @@ class PromptBuilder:
                     }
                 )
             supplemental = max(0, request_tokens(prompt, catalog) - request_tokens(plain, catalog))
+            plan["executionResultEvidence"] = await self.db.call(
+                lambda db: status_evidence(db, turn, prompt)
+            )
             return {**plan, "estimatedTokens": plan["estimatedTokens"] + supplemental}, prompt
 
         plan, prompt = await build()
