@@ -12,6 +12,7 @@ import { projectPath } from '../components/projects/okr/okr-workspace'
 import MobilePullRefresh from '../components/mobile/MobilePullRefresh'
 import { ICONS } from '../components/nav-icons'
 import { sessionDisplay, sessionLabel } from '../components/sessions/session-label'
+import { SessionMemoryAlerts } from '../components/sessions/SessionMemoryControl'
 import { useSessionProject } from '../components/sessions/session-project'
 import { isLooseTask } from '../components/sessions/task-key'
 import { InspectorPanels } from '../components/shell/InspectorPanels'
@@ -183,6 +184,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-base)' }}>
+      <SessionMemoryAlerts onOpen={openTerm} visibleSession={(isMobile ? overlay : space.mode !== 'page') && !curFile ? active || undefined : undefined} />
 
       {isMobile && <MobileTopBar tab={tab} route={routing.route} go={go} unread={agentInbox.unread} notifications={notifications}
         newTask={projectActions.newTask}

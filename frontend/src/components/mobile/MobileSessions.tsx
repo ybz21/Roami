@@ -25,6 +25,8 @@ import { readMobileProjects, writeMobileProjects, type MobileProject } from './m
 import { projectPath } from '../projects/okr/okr-workspace'
 import { getHashParams, setHashParams } from '../../route-hash'
 import { useSessionOverview } from '../../session-overview'
+import { SessionPauseButton } from '../sessions/SessionMemoryControl'
+import { MemBar } from '../sessions/session-memory'
 export type { OverviewItem } from './mobile-overview-cache'
 
 export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject, searchNonce = 0, initialProjectKey }: {
@@ -47,7 +49,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   useEffect(() => pollWhileVisible(async () => { setActivityTick(tick => tick + 1) }, 30000).stop, [])
   const [projects, setProjects] = useState<MobileProject[] | null>(() => readMobileProjects())
   const native = useNativeSessionList()
-  const allItems = useMemo(() => [...(items || []), ...native.value.map(session => {
+  const allItems = useMemo<OverviewItem[]>(() => [...(items || []), ...native.value.map(session => {
     const record = nativeSessionRecord(session), project = projects?.find(project => project.key === session.projectId)
     return { ...record, project: project?.name, projectDir: project?.dir }
   })].sort((a, b) => b.lastActivity - a.lastActivity || a.name.localeCompare(b.name)), [items, native.value, projects])
@@ -153,7 +155,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     ...unfinishedProjects.filter(project => !groups.some(group => group.dir === project.dir)).map(project => ({ name: project.name, dir: project.dir, list: [] as OverviewItem[] })),
   ] : groups
 
-  const status = (s: OverviewItem) => s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
+  const status = (s: OverviewItem) => s.mem?.paused ? t('session.mem.paused') : s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
   const row = (s: OverviewItem, sub = false) => (
     <button key={s.name} type="button" className={`tt-msess-row${sub ? ' sub' : ''}${s.waiting ? ' wait' : ''}${s.dormant ? ' dormant' : ''}`}
       onClick={() => { if (lp.current.fired) { lp.current.fired = false; return } onOpen(s.name) }}
@@ -164,6 +166,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
         <b>{s.label}</b>
         <span className="st"><i>{status(s)}</i>{(s.waiting || s.running) && s.tail ? <span className="tail"> · {s.tail}</span> : null}</span>
         <SessionLocation {...s} />
+        {(s.mem?.warning || s.mem?.paused) && <MemBar mem={s.mem} compact />}
       </span>
       <em title={absTime(s.lastActivity)}>{relTime(s.lastActivity, t)}</em>
     </button>
@@ -251,6 +254,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
       {filter !== 'activity' && filter !== 'unfinished' && !visibleGroups.length && <div className="tt-msess-empty">{t('tree.noTasks')}</div>}
       <MobileSheet open={!!menu} title={menu?.label || ''} onClose={() => setMenu(null)}>
         {menu && <>
+          {!menu.dormant && <SessionPauseButton name={menu.name} mem={allItems.find(s => s.name === menu.name)?.mem} />}
           <SheetRow icon={<PencilIcon size={16} />} title={t('session.rename')} onClick={() => { setRenameVal(menu.label); setRenaming(menu); setMenu(null) }} />
           {(menu.running || menu.waiting) && <SheetRow icon={<StopIcon size={16} />} title={t('mobile.interrupt')} desc={t('mobile.interruptHelp')} onClick={() => { void interrupt(menu); setMenu(null) }} />}
           <SheetRow icon={<CloseIcon size={16} />} title={t('session.close')} danger onClick={() => { const m = menu; setMenu(null); close(m) }} />

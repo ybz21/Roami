@@ -28,6 +28,7 @@ func Show(version string, w io.Writer) {
 	fmt.Fprintf(w, "    %s %s   关闭会话 %s\n", g("kill"), d("<会话> [--cascade]"), d("(默认孤儿收养子会话)"))
 	fmt.Fprintf(w, "    %s %s  发送具名按键或单个字母数字\n", g("keys"), d("<会话> <按键...>"))
 	fmt.Fprintf(w, "    %s %s  重命名会话\n\n", g("rename"), d("<旧名> <新名>"))
+	fmt.Fprintf(w, "    %s %s  暂停 / 继续会话（保留进程与终端）\n\n", g("pause | resume"), d("<会话> [--json]"))
 
 	fmt.Fprintf(w, "  %s %s\n", b("子会话"), m("(subSession — 平坦 tmux 会话 + parent 关系)"))
 	fmt.Fprintf(w, "    %s %s  从父会话派生子会话(继承 cwd/env)\n", g("fork"), d("[<父>] <子> [--dir <目录>] [--detach] [--json]"))

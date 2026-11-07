@@ -7,6 +7,7 @@ import (
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/memalert"
 	"github.com/ybz21/Roami/internal/memguard"
+	"github.com/ybz21/Roami/internal/mempause"
 	"github.com/ybz21/Roami/internal/memthrottle"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/storage"
@@ -25,7 +26,7 @@ import (
 // sessionListFormat 一次问齐列表要用的字段。两个出口共用同一份格式串，
 // 免得字段顺序在两边悄悄分叉。
 const sessionListFormat = "#{session_name}\t#{session_windows}\t#{session_created}\t" +
-	"#{session_attached}\t#{session_activity}\t#{window_activity}\t#{session_id}\t#{" + runtime.LabelOption + "}"
+	"#{session_attached}\t#{session_activity}\t#{window_activity}\t#{session_id}\t#{" + runtime.LabelOption + "}\t#{@roam_pause_reason}\t#{@roam_memory_resume_until}"
 
 // Collect 返回本机所有会话：tmux 里活着的，加上台账里**休眠**的
 // （机器重启带走了 tmux 那一半，点开即恢复）。
@@ -44,21 +45,55 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 	// 一次读两个文件，比轮询 ps 聚合整棵进程树便宜也准（含子进程全部后代）。
 	samples := make([]memalert.Sample, 0, len(live))
 	brakes := make([]memthrottle.Sample, 0, len(live))
+	pauses := make([]mempause.Sample, 0, len(live))
+	pauseHost := mempause.Host{Total: memguard.TotalMemory(), Available: memguard.AvailableMemory(), Pressure: memguard.Pressure()}
 	for i := range live {
 		m := sampleMem(rt, live[i].Name)
 		if !m.OK {
 			continue
 		}
-		live[i].Mem = &memInfo{Cur: m.Cur, Peak: m.Peak, Limit: m.Limit}
+		live[i].Mem = &memInfo{Cur: m.Cur, Peak: m.Peak, Limit: m.Limit, Paused: m.Paused, PauseReason: live[i].pauseReason}
+		ps := mempause.Sample{Name: live[i].Name, Current: m.Cur, Limit: m.Limit, Paused: m.Paused, Grace: live[i].resumeUntil > rt.Now().Unix(), PressurePaused: live[i].pauseReason == "pressure"}
+		live[i].Mem.Warning = mempause.Warning(ps)
+		pauses = append(pauses, ps)
 		samples = append(samples, memalert.Sample{
 			Session: live[i].Name, Label: live[i].Label,
 			Cur: m.Cur, Peak: m.Peak, Limit: m.Limit, OOMKills: m.OOMKills,
 		})
-		brakes = append(brakes, memthrottle.Sample{
-			Session: live[i].Name, Label: live[i].Label,
-			PIDs: m.PIDs, Cur: m.Cur, Swap: m.Swap, High: m.High, Max: m.Limit,
-		})
+		if !m.Paused {
+			brakes = append(brakes, memthrottle.Sample{
+				Session: live[i].Name, Label: live[i].Label,
+				PIDs: m.PIDs, Cur: m.Cur, Swap: m.Swap, High: m.High, Max: m.Limit,
+			})
+		}
 	}
+	for name, reason := range mempause.Plan(pauseHost, pauses) {
+		for i := range live {
+			if live[i].Name != name {
+				continue
+			}
+			m := live[i].Mem
+			m.Warning = true
+			if err := rt.SetPaused(name, true, reason); err != nil {
+				m.PauseError = true
+				m.Paused = sampleMem(rt, name).Paused
+				continue
+			}
+			// A concurrent explicit resume can veto an automatic pause.
+			m.Paused = sampleMem(rt, name).Paused
+			if m.Paused {
+				m.PauseReason = reason
+			}
+		}
+	}
+	for i := range samples {
+		for _, s := range live {
+			if s.Name == samples[i].Session && s.Mem != nil {
+				samples[i].Paused, samples[i].Warning, samples[i].PauseError = s.Mem.Paused, s.Mem.Warning, s.Mem.PauseError
+			}
+		}
+	}
+	brakes = filterPausedBrakes(brakes, live)
 	// tmux 盲态（list-sessions 出错但不是「server 不在」）时 alive 为空，
 	// Reconcile 内部会一行不动——「看不见的时候不下判断」。这里照常调用，让它自己决定。
 	if meta != nil {
@@ -114,11 +149,15 @@ type memSample struct {
 	High                       int64 // 当前软限（总量闸靠它认出谁已经踩着刹车）
 	PIDs                       []int
 	OK                         bool
+	Paused                     bool
 }
 
 func sampleMem(rt runtime.Runtime, sess string) memSample {
 	var m memSample
 	for _, pid := range rt.PanePIDs(sess) {
+		if frozen, err := memguard.FreezeState(pid); err == nil && frozen {
+			m.Paused = true
+		}
 		m.PIDs = append(m.PIDs, pid)
 		if c, p, got := memguard.Current(pid); got {
 			m.OK = true
@@ -181,6 +220,14 @@ func parseSessionLines(out string, exclude map[string]bool) []sessionInfo {
 			label = strings.TrimSpace(parts[7])
 		}
 		created, _ := strconv.ParseInt(parts[2], 10, 64)
+		reason := ""
+		var resumeUntil int64
+		if len(parts) > 8 {
+			reason = parts[8]
+		}
+		if len(parts) > 9 {
+			resumeUntil, _ = strconv.ParseInt(parts[9], 10, 64)
+		}
 		row := runtime.SessionRow{Name: parts[0], Label: label, TmuxID: tmuxID, Created: created}
 		sessions = append(sessions, sessionInfo{
 			Name:         row.Name,
@@ -192,6 +239,8 @@ func parseSessionLines(out string, exclude map[string]bool) []sessionInfo {
 			Attached:     attached,
 			LastActivity: lastActivity,
 			State:        "live",
+			pauseReason:  reason,
+			resumeUntil:  resumeUntil,
 		})
 	}
 	return sessions

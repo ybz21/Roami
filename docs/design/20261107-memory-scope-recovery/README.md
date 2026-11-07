@@ -8,6 +8,31 @@
 恢复会话沿用原工作目录和已核对的 Codex 对话 ID。恢复的是终端入口与对话记录，
 被终止的进程无法原地恢复。
 
+### 告警、暂停与继续的界面
+
+| 状态 | 触发条件 | 用户看到的内容与动作 |
+| --- | --- | --- |
+| 正常 | 用量低于上限的 60% | 列表保留内存条；终端不显示告警条。 |
+| 告警 | 用量达到 60% | 黄色状态条显示当前用量、上限、百分比和“暂停”；后台会话弹出提醒，可“查看会话”。消息页保留记录。 |
+| 自动暂停 | 用量达到 80%，或整机可用内存不足 12% / PSI 达到 10% 时选中较大会话 | 显示“会话已暂停，进程和终端已保留”，动作变为“继续”；列表标记“已暂停”，不再显示正在运行或待输入。 |
+| 手动暂停 | 用户点“暂停” | 冻结同一会话所有 pane 的进程和后代，包括脱离进程组的子进程；保持终端画面。 |
+| 手动继续 | 用户点“继续” | 恢复原进程。30 秒内不再自动暂停；仍处于告警线之上时保留黄色告警，超过宽限期且仍达暂停线则再次暂停。 |
+| 暂停失败 | 环境不支持、窗格共用或内核状态未完成 | 说明自动暂停未成功，保留关闭不需要会话的处理建议；不把请求成功当作冻结成功。 |
+
+整机压力策略只选至少 512MiB 的最大会话，一轮已有因压力暂停的会话时，不继续逐个冻结。
+暂停不立即释放内存；硬上限、内核 OOM 和系统 oomd 仍可能终止进程。
+
+桌面状态条位于会话工具栏下，手机位于固定返回栏下。当前正在查看的会话只显示状态条，
+避免重复弹窗遮挡“继续”；后台会话通过全局提醒和消息页可达。
+
+| 界面证据 | 桌面 | Android 真机 |
+| --- | --- | --- |
+| 改前，同一终端缺少内存状态和恢复动作 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-before.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-before.png) |
+| 正常，释放内存后告警消失 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-normal.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-normal.png) |
+| 告警：175MiB / 256MiB，68% | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-warning.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-warning.png) |
+| 自动暂停：227MiB / 256MiB，89% | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-paused.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-paused.png) |
+| 手动继续：仍超告警线，原进程继续运行 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-resumed.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-resumed.png) |
+
 ## User Stories
 
 - 开发者使用 128MiB 限额验证内存保护时，当前工作会话与测试服务器继续运行。
@@ -42,6 +67,12 @@ pane 迁移未完成或失败时，继承的工作 scope 因而会被误认为�
   保留现有 2 秒重试与内核回读确认，以便 pane 迁移完成后正常设置限额。
 - `internal/memguard/pane-scope_test.go`：覆盖控制进程、父进程、嵌套 cgroup、未知路径和
   正常独立 pane。用替身 `systemctl` 验证对自身设硬限和软限均不会执行写入命令。
+- `internal/mempause` 选择告警和暂停目标；`memguard/freezer.go` 写入并回读内核冻结状态；
+  `tmuxruntime/pause.go` 串行化 CLI/HTTP 操作，验证共用窗格并在部分失败时回滚。
+- `session.Collect` 在现有采集链中执行策略；概览、项目与列表统一输出内存状态。
+  `memalert` 将状态变化写入收件箱，并用事务保证失败可重试。
+- `SessionMemoryControl` 复用共享概览订阅，提供全局提醒、终端状态条和暂停/继续按钮；
+  桌面列表、手机项目列表、切换页和消息页使用同一状态，无新增逐会话轮询。
 
 ### 恢复结果
 
@@ -64,5 +95,14 @@ pane 迁移未完成或失败时，继承的工作 scope 因而会被误认为�
   4 个 128MiB 测试会话：4 个 pane 均进入不同的独立 scope，`memory.max` 均回读为
   134217728；工作会话前后均为 13304680448，测试 server 保持存活。
   结果保存在 `/tmp/roami-memory-recovery-20261107/scope-regression.json`。
-- 本次只修复限额写入的隔离检查。原告警与冻结功能仍是原工作树内的未提交工作，
-  本次提交不代表该功能已经发布；运行中的 Roami 也未被替换。
+- 已将原告警与冻结功能的 34 个文件接入本 PR，保留限额隔离修复。
+  运行中的正式 Roami 未被替换，验证使用独立测试实例。
+- 完整功能验证：`scripts/dev/quality/check.sh full`、前端 typecheck/i18n/hover/build
+  以及 212 个测试文件中的 1551 个测试全部通过。
+- 真机验证：Redmi Note 8（`216d6a43`），LAN HTTPS。ADB 点按继续与手动暂停有效；
+  原 PID 和启动时间保持不变，父进程及分离子进程的心跳随冻结停止、随继续恢复。
+  保持用量 89% 时，30 秒宽限期后再次自动暂停；释放至约 43MiB 后告警消失。
+- 布局验证：1280、1920、2560、3440 CSS px 下分别打开/关闭侧栏，均无文档横向溢出，
+  终端有效高度为 915px，状态条和按钮在可用区域内且命中正确。
+  手机返回栏为 60 CSS px，继续按钮命中区至少 44 CSS px，无重复告警弹窗遮挡。
+- 中英文暂停文案均在真实浏览器中检查，语言已恢复为简体中文。

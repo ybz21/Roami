@@ -490,7 +490,7 @@ func Current(pid int) (cur, peak int64, ok bool) {
 	// 查出来的 peak 会是 0（实测如此），那正好把最该看见的那一刻丢了。
 	// 代价是 peak 偏高（含缓存），所以它是**上界**不是精确值——用它定位
 	// 「是哪个会话」够了，别拿它算百分比。
-	anon, ok1 := statField(filepath.Join(dir, "memory.stat"), "anon")
+	anon, ok1 := workingSet(filepath.Join(dir, "memory.stat"))
 	if !ok1 {
 		// 老内核没有 anon 这一行时退回 current：偏高，但总比没有强。
 		anon, ok1 = readInt(filepath.Join(dir, "memory.current"))
@@ -500,6 +500,13 @@ func Current(pid int) (cur, peak int64, ok bool) {
 		peak = anon
 	}
 	return anon, peak, ok1
+}
+
+// tmpfs pages consume RAM too; file includes shmem, so only add it to anon.
+func workingSet(path string) (int64, bool) {
+	anon, ok := statField(path, "anon")
+	shmem, _ := statField(path, "shmem")
+	return anon + shmem, ok
 }
 
 // statField 从 memory.stat 里取一个字段（每行 `<名字> <值>`）。

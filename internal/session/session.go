@@ -44,15 +44,21 @@ type sessionInfo struct {
 	// Mem 这个会话此刻吃了多少（字节）。休眠会话没有进程，恒为 nil。
 	Mem *memInfo `json:"mem,omitempty"`
 	// 平铺与树形列表共用父子关系，供客户端按真实来历组织会话。
-	Parent    string `json:"parent,omitempty"`
-	CreatedBy string `json:"created_by,omitempty"`
+	Parent      string `json:"parent,omitempty"`
+	CreatedBy   string `json:"created_by,omitempty"`
+	pauseReason string
+	resumeUntil int64
 }
 
 // memInfo 会话内存画像。Limit=0 表示没设上限（护栏关掉或装不上）。
 type memInfo struct {
-	Cur   int64 `json:"cur"`
-	Peak  int64 `json:"peak,omitempty"`
-	Limit int64 `json:"limit,omitempty"`
+	Cur         int64  `json:"cur"`
+	Peak        int64  `json:"peak,omitempty"`
+	Limit       int64  `json:"limit,omitempty"`
+	Paused      bool   `json:"paused,omitempty"`
+	PauseReason string `json:"pauseReason,omitempty"`
+	Warning     bool   `json:"warning,omitempty"`
+	PauseError  bool   `json:"pauseError,omitempty"`
 }
 
 type infoJSON struct {

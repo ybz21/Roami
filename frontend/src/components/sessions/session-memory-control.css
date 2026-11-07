@@ -1,0 +1,12 @@
+.tt-session-memory {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--warn);
+  font-size: var(--fs-meta);
+  flex: 0 0 auto;
+}
+.tt-session-memory > span { flex: 1; min-width: 0; }
+html[data-pointer="coarse"] .tt-session-pause { min-height: var(--tap); min-width: var(--tap); }

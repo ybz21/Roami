@@ -246,6 +246,8 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/sessions/:name/restore", h.SessionRestore) // 按台账重开一个壳
 		g.POST("/sessions", h.NewSession)
 		g.PATCH("/sessions/:name", h.RenameSession)
+		g.POST("/sessions/:name/pause", h.SessionPause)
+		g.POST("/sessions/:name/resume", h.SessionResume)
 		g.DELETE("/sessions/:name", h.KillSession)
 		g.GET("/sessions/:name/capture", h.Capture)
 		g.POST("/sessions/:name/keys", h.Keys)                       // 注入原始按键（响应 TUI 选择框）

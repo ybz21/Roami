@@ -1,11 +1,11 @@
 import { useI18n } from '../../i18n'
 
 /** 会话内存画像（后端 ls --json 的 mem 字段）。limit=0 表示没设上限。 */
-export type SessionMem = { cur: number; peak?: number; limit?: number }
+export type SessionMem = { cur: number; peak?: number; limit?: number; paused?: boolean; pauseReason?: string; warning?: boolean; pauseError?: boolean }
 
-/** 60% 起转警示色，85% 起转危险色——与看门狗发通知的阈值是同一个数。 */
+/** Warning and pause thresholds match the session memory policy. */
 const WARN_AT = 60
-const DANGER_AT = 85
+const DANGER_AT = 80
 
 export function memPercent(m?: SessionMem | null): number {
   if (!m || !m.limit || m.limit <= 0) return 0
@@ -14,7 +14,7 @@ export function memPercent(m?: SessionMem | null): number {
 
 /** 超过警示线才值得在信息密度已经很高的地方占位置。 */
 export function memNoteworthy(m?: SessionMem | null): boolean {
-  return memPercent(m) >= WARN_AT
+  return !!(m?.paused || m?.warning || m?.pauseError) || memPercent(m) >= WARN_AT
 }
 
 export function humanBytes(n: number): string {
@@ -48,6 +48,7 @@ export function MemBar({ mem, compact }: { mem?: SessionMem | null; compact?: bo
         <i className="tr"><i className="fi" style={{ width: `${Math.max(pct, 2)}%`, background: tone }} /></i>
       ) : null}
       <b style={{ color: pct >= WARN_AT ? tone : undefined }}>{cur}</b>
+      {mem.paused && <span>{t('session.mem.paused')}</span>}
       {/* 手机上分母是噪声：条本身已经表达了占比，数字留当前值就够 */}
       {!compact && lim && <span className="lim">/ {lim}</span>}
     </span>
