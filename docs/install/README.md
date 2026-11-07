@@ -111,6 +111,27 @@ curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
 - `ROAMI_SYSTEM=1` —— 注册**系统级** systemd 服务（`/etc/systemd/system`，需 root/sudo）。
 - `ROAMI_NO_SERVICE=1` —— 只装二进制，不注册服务。
 - `ROAMI_FROM_SOURCE=1` —— 在 clone 内从源码构建（需 go+node），而非下载 release。
+- `ROAMI_NO_ZRAM=1` —— 跳过 Linux 压缩交换区配置；默认在运行 systemd 的 Linux 上自动尝试启用。
+- `ROAMI_ZRAM_SIZE=16G` —— 压缩交换区逻辑容量，默认物理内存的一半。
+- `ROAMI_ZRAM_MEMORY_LIMIT=4G` —— 压缩区实际内存上限，默认物理内存的 1/8。
+
+安装和升级在完整包校验、存储预检及智能体验证通过后，从该版本程序提取内置的
+zram 配置脚本。已有 zram 或 zswap 时保留配置；首次启用需要管理员权限。
+交互安装可输入 sudo 密码，无终端的自动部署只尝试免密码 sudo；权限不足、内核不支持
+或启用失败会给出明确提示并继续安装 Roami。macOS 沿用系统内存压缩，不配置 zram。
+
+启用后由 `roami-zram.service` 在重启后恢复，现有磁盘 swap 保留。
+逻辑容量不等于实际内存占用，压缩效果以设置 → 会话内存里的真实数据为准。
+重复部署不会新建第二个压缩设备，也不会覆盖已有压缩后端的参数。
+
+例如，安装时指定容量与实际内存上限：
+
+```bash
+ROAMI_ZRAM_SIZE=16G ROAMI_ZRAM_MEMORY_LIMIT=4G bash install.sh
+```
+
+启用失败后，安装器保留脚本并打印可直接重试的 `sudo bash ...` 命令，
+默认脚本路径为 `~/.local/share/roami/system/roami-zram-setup.sh`；也可在设置页下载。
 
 服务管理：
 

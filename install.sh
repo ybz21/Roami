@@ -16,6 +16,9 @@
 #   ROAMI_INSTALL_ROOT=DIR 版本目录（默认 ~/.local/share/roami）
 #   ROAMI_SYSTEM=1         注册系统级 systemd 服务（/etc/systemd/system，需 root/sudo）
 #   ROAMI_NO_KVM=1         跳过 /dev/kvm 授权（则本机 Android 模拟器起不来）
+#   ROAMI_NO_ZRAM=1        跳过 Linux 压缩交换区配置（默认自动尝试启用）
+#   ROAMI_ZRAM_SIZE=16G    指定压缩交换区逻辑容量（默认物理内存的一半）
+#   ROAMI_ZRAM_MEMORY_LIMIT=4G 压缩区实际内存上限（默认物理内存的 1/8）
 #   ROAMI_FROM_SOURCE=1    在仓库 clone 内从源码构建（需 go+node），而非下载 release
 #
 # 开发/源码构建请用 start.sh --dev（会从源码构建 CLI/chrome/skills + 前后端）。
@@ -344,6 +347,58 @@ ensure_kvm() {
   [ "$lib" = "$here/scripts/install/kvm-access.sh" ] || rm -f "$lib"
 }
 
+memory_compression_supported() {
+  command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
+}
+
+ensure_memory_compression() {
+  [ "$OS" = linux ] || return 0
+  [ "${ROAMI_NO_ZRAM:-0}" != 1 ] || { step "ROAMI_NO_ZRAM=1：跳过压缩交换区配置"; return 0; }
+  if ! memory_compression_supported; then
+    warn "本机没有运行 systemd，跳过压缩交换区配置"; return 0
+  fi
+  local status setup saved command
+  if ! status="$(run_as_service_user "$INSTALL_SLOT/bin/roami" session memory-status --json)" \
+      || ! printf '%s' "$status" | grep -Eq '"zram"[[:space:]]*:[[:space:]]*(true|false)'; then
+    warn "此版本无法检查压缩交换区，跳过配置；部署继续"; return 0
+  fi
+  if printf '%s' "$status" | grep -Eq '"(zram|zswap)"[[:space:]]*:[[:space:]]*true'; then
+    info "压缩交换区已启用，保留现有配置"; return 0
+  fi
+  setup="$INSTALL_WORK/roami-zram-setup.sh"
+  if ! run_as_service_user "$INSTALL_SLOT/bin/roami" session memory-setup-script > "$setup"; then
+    warn "无法从已校验的版本提取压缩配置脚本；部署继续"; return 0
+  fi
+  local -a args=() elevate=()
+  [ -z "${ROAMI_ZRAM_SIZE:-}" ] || args+=("$ROAMI_ZRAM_SIZE")
+  [ -z "${ROAMI_ZRAM_MEMORY_LIMIT:-}" ] || args+=(--memory-limit "$ROAMI_ZRAM_MEMORY_LIMIT")
+  if ! bash "$setup" "${args[@]}" --dry-run; then
+    warn "压缩交换区参数无效，未修改系统；部署继续"; return 0
+  fi
+  saved="$INSTALL_ROOT/system/roami-zram-setup.sh"
+  if ! run_as_service_user mkdir -p "$INSTALL_ROOT/system" || ! run_as_service_user cp "$setup" "$saved"; then
+    warn "无法保存压缩配置脚本；部署继续"; return 0
+  fi
+  printf -v command 'sudo bash %q' "$saved"
+  local arg
+  for arg in "${args[@]}"; do printf -v command '%s %q' "$command" "$arg"; done
+  if [ "$(id -u)" != 0 ]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+      warn "压缩交换区需要管理员权限；稍后执行：$command"; return 0
+    fi
+    elevate=(sudo)
+    [ -t 1 ] || elevate+=(-n)
+  fi
+  step "配置压缩交换区（保留磁盘 swap，限制实际内存占用）..."
+  if "${elevate[@]}" bash "$setup" "${args[@]}" \
+      && status="$(run_as_service_user "$INSTALL_SLOT/bin/roami" session memory-status --json)" \
+      && printf '%s' "$status" | grep -Eq '"(zram|zswap)"[[:space:]]*:[[:space:]]*true'; then
+    info "压缩交换区已启用，重启后自动恢复"
+  else
+    warn "压缩交换区未能启用，部署继续；稍后执行：$command"
+  fi
+}
+
 # 旧名 roam 留一条软链：改名之前写好的脚本、别人的 crontab、自己的手指记忆都还在。
 # 已经存在同名**真文件**（旧版二进制）时也换成软链——留着两个二进制只会让人不知道跑的是哪个。
 link_legacy_name() {
@@ -487,6 +542,7 @@ ensure_tmux
 ensure_chrome || warn "Chrome 安装失败，可稍后安装"
 ensure_adb || warn "ADB 安装失败，可稍后安装"
 ensure_kvm || warn "KVM 授权未完成"
+ensure_memory_compression
 activate_installation
 
 if [ "${ROAMI_NO_SERVICE:-0}" = 1 ]; then

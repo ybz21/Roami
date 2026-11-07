@@ -27,7 +27,7 @@ fi
 for command in modprobe zramctl mkswap swapon swapoff systemctl; do command -v "$command" >/dev/null; done
 if [[ -r /sys/module/zswap/parameters/enabled ]] && [[ $(cat /sys/module/zswap/parameters/enabled) == Y ]]; then
   echo "zswap is already enabled; keeping the existing compression backend." >&2
-  exit 1
+  exit 0
 fi
 if swapon --noheadings --raw --show=NAME | grep -q '^/dev/zram'; then
   echo "A zram swap device is already active; leaving it unchanged."
