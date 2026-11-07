@@ -115,7 +115,7 @@ func TestAgentWakeUsesScopedEndpointAndLiteralInput(t *testing.T) {
 	go server.Serve(listener)
 	executable, _ := os.Executable()
 	command := exec.Command(executable, "-test.run=^TestAgentIdentityChild$")
-	command.Env = append(os.Environ(), "ROAMI_IDENTITY_FIXTURE=1", "ROAMI_WAKE_FIXTURE=1", "ROAMI_HOME="+root, "ROAMI_DATA="+root, "ROAMI_DATABASE_DIR="+paths.Storage.Database, "ROAMI_AGENT_CALLER_ROLE=", "ROAMI_AGENT_TURN_ID=")
+	command.Env = append(os.Environ(), "ROAMI_IDENTITY_FIXTURE=1", "ROAMI_WAKE_FIXTURE=1", "ROAMI_HOME="+root, "ROAMI_DATA="+root, "ROAMI_DATABASE_DIR="+paths.Storage.Database, "ROAMI_AGENT_CALLER_ROLE=", "ROAMI_AGENT_TURN_ID=", "ROAMI_AGENT_TOOL_CALL_ID=")
 	command.Stdin = strings.NewReader("Keep the original Main. $(echo literal)\nSecond line")
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -125,10 +125,14 @@ func TestAgentWakeUsesScopedEndpointAndLiteralInput(t *testing.T) {
 	if payload["projectId"] != "project" || payload["requestKey"] != "daily" || payload["text"] != "Keep the original Main. $(echo literal)\nSecond line" {
 		t.Fatal(payload)
 	}
-	command = exec.Command(executable, "-test.run=^TestAgentIdentityChild$")
-	command.Env = append(os.Environ(), "ROAMI_IDENTITY_FIXTURE=1", "ROAMI_WAKE_FIXTURE=1", "ROAMI_HOME="+root, "ROAMI_DATA="+root, "ROAMI_DATABASE_DIR="+paths.Storage.Database, "ROAMI_AGENT_CALLER_ROLE=main")
-	output, err = command.CombinedOutput()
-	if err == nil || !strings.Contains(string(output), "EXTERNAL_TRIGGER_REQUIRED") || len(requests) != 0 {
-		t.Fatalf("native caller reached wake endpoint: %s %v", output, err)
+	for _, marker := range []string{"ROAMI_AGENT_CALLER_ROLE=main", "ROAMI_AGENT_TURN_ID=original-turn", "ROAMI_AGENT_TOOL_CALL_ID=original-call"} {
+		t.Run(marker, func(t *testing.T) {
+			command := exec.Command(executable, "-test.run=^TestAgentIdentityChild$")
+			command.Env = append(os.Environ(), "ROAMI_IDENTITY_FIXTURE=1", "ROAMI_WAKE_FIXTURE=1", "ROAMI_HOME="+root, "ROAMI_DATA="+root, "ROAMI_DATABASE_DIR="+paths.Storage.Database, "ROAMI_AGENT_CALLER_ROLE=", "ROAMI_AGENT_TURN_ID=", "ROAMI_AGENT_TOOL_CALL_ID=", marker)
+			output, err := command.CombinedOutput()
+			if err == nil || !strings.Contains(string(output), "EXTERNAL_TRIGGER_REQUIRED") || len(requests) != 0 {
+				t.Fatalf("native caller reached wake endpoint: %s %v", output, err)
+			}
+		})
 	}
 }
