@@ -26,3 +26,5 @@
 61项专项通过，包含新的项目读取边界、既有文件服务、项目 Main 身份和自动协调限制。再用真实项目绑定、Go项目接口和只读运行时数据库联调，读出项目AGENTS.md且全文SHA一致，全局shell roots未改；这是开发端诊断，不替代原Main执行。
 
 完整门禁日志及只读联调记录位于 `/tmp/okr-project-file-scope-20261107/`。真实Main读取仍需部署后另行验证，不将本地通过写成线上恢复。
+
+生产验收补记：#762已合入并部署为 `okr-files-cbadced9`（schema25）。原Main/原分支通过真实页面发起只读验证，实际用read读取项目相对路径AGENTS.md和.roami/okr/manuals/daily.md，两份回执SHA与磁盘全文一致，未用bash或Root诊断替代。19库、205附件、164原生文件备份校验完成，配置与原身份保持；#759据此关闭。私有记录为同目录 `actual-main-file-read-proof.json`、`actual-main-read.png`。

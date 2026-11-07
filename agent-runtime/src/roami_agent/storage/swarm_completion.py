@@ -8,6 +8,18 @@ from roami_agent.storage.database import row
 def self_verified_completion(db, turn, source):
     if source.get("state") != "waiting_user" or turn.get("executionRunId"):
         return None
+    context = row(
+        db,
+        "SELECT t.conversation_id FROM turns t JOIN conversations c ON c.id=t.conversation_id "
+        "WHERE t.id=? AND c.owner_id=? AND c.deleted_ms IS NULL",
+        (turn["id"], turn["owner_id"]),
+    )
+    if (
+        not context
+        or turn.get("conversation_id", context["conversation_id"]) != context["conversation_id"]
+    ):
+        return None
+    conversation_id = context["conversation_id"]
     task_id = source.get("taskId")
     revision = source.get("taskRevision", source.get("revision", 1))
     run_id = source.get("runId")
@@ -37,7 +49,7 @@ def self_verified_completion(db, turn, source):
         "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=m.id) "
         "AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.kind='task.steer' AND j.aggregate_id=t.id AND j.state='queued') "
         "AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.kind='control.stop' AND json_extract(j.payload_json,'$.turnId')=?)",
-        (task_id, turn["owner_id"], revision, turn["conversation_id"], turn["id"]),
+        (task_id, turn["owner_id"], revision, conversation_id, turn["id"]),
     )
     latest = row(
         db,
@@ -59,7 +71,7 @@ def self_verified_completion(db, turn, source):
         "AND json_extract(e.payload_json,'$.taskId')=e.task_id "
         "AND json_extract(e.payload_json,'$.revision')=? "
         "AND json_extract(e.payload_json,'$.runId')=? ORDER BY e.id DESC LIMIT 1",
-        (task_id, turn["id"], turn["conversation_id"], turn["owner_id"], revision, run_id),
+        (task_id, turn["id"], conversation_id, turn["owner_id"], revision, run_id),
     )
     if not audit:
         return None
@@ -74,7 +86,7 @@ def self_verified_completion(db, turn, source):
         "AND id<? ORDER BY id DESC LIMIT 1",
         (
             task_id,
-            turn["conversation_id"],
+            conversation_id,
             "task." + task["state"],
             task_id,
             revision,
