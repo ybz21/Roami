@@ -24,6 +24,27 @@ beforeEach(() => {
 })
 
 describe('session memory recovery', () => {
+  it.each([1, 2])('removes the warning banner after recovery to %i%% despite retained recovery records', pct => {
+    const relief = { reclaimStatus: 'done', reclaimed: 82, compactStatus: 'requested' }
+    mocks.overview.value = [{ name: 'one', mem: { cur: 65, limit: 100, warning: true, relief } }]
+    const view = render(<SessionMemoryBanner name="one" />)
+    expect(screen.getByRole('status')).toBeTruthy()
+    mocks.overview.value = [{ name: 'one', mem: { cur: pct, limit: 100, relief } }]
+    view.rerender(<SessionMemoryBanner name="one" />)
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it.each([
+    { cur: 60, limit: 100 },
+    { cur: 1, limit: 100, paused: true },
+    { cur: 1, limit: 100, pauseError: true },
+    { cur: 1, limit: 100, warning: true },
+  ])('retains the banner for current memory pressure or a pause requiring attention: %j', mem => {
+    mocks.overview.value = [{ name: 'one', mem }]
+    render(<SessionMemoryBanner name="one" />)
+    expect(screen.getByRole('status')).toBeTruthy()
+  })
+
   it('resumes a paused session and refreshes shared lists', async () => {
     const refresh = vi.fn()
     window.addEventListener('roami:sessions-changed', refresh)
