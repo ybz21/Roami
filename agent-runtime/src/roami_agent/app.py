@@ -204,9 +204,9 @@ class Runtime:
             database, self.settings, artifacts=self.artifacts
         )
         targets = TargetDirectory(self.settings, self.session_dispatches)
-        self.tools.admission = ProjectFileScope(
-            database, targets, SwarmCoordinationPolicy(database, targets)
-        ).admit
+        coordination = SwarmCoordinationPolicy(database, targets)
+        self.tools.admission = ProjectFileScope(database, targets, coordination).admit
+        self.tools.turn_scope = coordination.tool_names
         self.tasks.revisions.project_workspace = targets.project_workspace
         if isinstance(self.executor, CodingExecutor):
             self.executor.project_workspace = targets.project_workspace

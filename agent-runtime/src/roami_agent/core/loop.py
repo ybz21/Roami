@@ -121,7 +121,7 @@ class AgentLoop:
                     if role == "main"
                     else self.settings.worker_instructions
                 )
-                catalog = self.tools.catalog(role)
+                catalog = await self.tools.turn_catalog(turn, role)
                 if role == "main" and await self.journal.defer(turn, only_if_pending=True):
                     return None
                 plan, prompt = await self.build_context(turn, instructions, catalog, completion)
@@ -495,7 +495,7 @@ class AgentLoop:
                         return text
                     if role == "main" and await self.journal.defer(turn, only_if_pending=True):
                         return None
-                    catalog = self.tools.catalog(role)
+                    catalog = await self.tools.turn_catalog(turn, role)
                     phase = "context"
                     plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                     if finalizing:
