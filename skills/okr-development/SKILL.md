@@ -169,6 +169,12 @@ Main and member identities; distinguish human `swarm say` from Main `swarm_post`
 Never probe live write endpoints with placeholder content. Extract only verified
 lessons, keeping project IDs/accounts and private transcripts out of this package.
 
+For goals that include autonomous review, publication and collection, read
+[the automatic loop](references/automatic-loop.md). Preserve the user's chosen
+automation mode; delivery acceptance, publication eligibility and platform
+confirmation are separate receipts. Do not impose per-item human approval on a
+user-authorized automatic workflow or claim unavailable host capabilities ran.
+
 ## Verify the result
 
 Reread the saved workspace and actual files. Check widget/metric bindings, source

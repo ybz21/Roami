@@ -50,6 +50,8 @@ async def test_schema23_inbox_upgrade_preserves_every_existing_fact(tmp_path, mo
         assert current.pop("swarm_goal_delegations") == []
         assert current.pop("swarm_coordination_batches") == []
         assert current.pop("swarm_coordination_inputs") == []
+        assert current.pop("swarm_coordination_results") == []
+        assert current.pop("swarm_result_observations") == []
         assert current == original
         assert (
             db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]

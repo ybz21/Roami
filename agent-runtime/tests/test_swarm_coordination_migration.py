@@ -49,6 +49,8 @@ async def test_schema25_failure_and_retry_preserve_old_data_without_legacy_grant
         assert current.pop("swarm_goal_delegations") == []
         assert current.pop("swarm_coordination_batches") == []
         assert current.pop("swarm_coordination_inputs") == []
+        assert current.pop("swarm_coordination_results") == []
+        assert current.pop("swarm_result_observations") == []
         assert current == original
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
