@@ -8,6 +8,7 @@ import httpx
 
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.web_evidence import retrieved_sources
+from roami_agent.executors.workspace import NativeWorkspaceRejected
 from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -36,12 +37,20 @@ def execution_failure(exc):
         ):
             causes.append(public)
         cause = cause.__cause__ or (None if cause.__suppress_context__ else cause.__context__)
-    return {
+    result = {
         "state": "failed",
         "summary": code,
         "errorCode": code,
         "failure": {"exceptionType": type(exc).__name__, "causeCodes": causes},
     }
+    if isinstance(exc, NativeWorkspaceRejected):
+        result.update(exc.result)
+        result["failure"] = {
+            "exceptionType": type(exc).__name__,
+            "causeCodes": causes,
+            **exc.result["failure"],
+        }
+    return result
 
 
 class TaskDispatcher:
@@ -316,12 +325,14 @@ class TaskDispatcher:
         )
         if pending and not isinstance(exc, DomainError):
             result["summary"] = "TOOL_STOP_UNCONFIRMED"
-        if pending or result["summary"] in {
+        unknown = result["summary"] in {
+            "WORKSPACE_OUTCOME_UNKNOWN",
             "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
             "NATIVE_WORKSPACE_RELEASE_UNKNOWN",
             "TOOL_OUTCOME_UNKNOWN",
             "MCP_OUTCOME_UNKNOWN",
-        }:
+        }
+        if pending or unknown and not isinstance(exc, NativeWorkspaceRejected):
             result.update(outcomeKnown=False, retryable=False)
             await self.complete(task, run, result, "interrupted", unknown=True)
             return

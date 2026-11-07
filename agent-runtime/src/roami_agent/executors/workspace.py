@@ -4,6 +4,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import signal
 from contextlib import asynccontextmanager
 
@@ -11,6 +12,48 @@ from roami_agent.executors.project import provision_project
 from roami_agent.protocol.errors import DomainError, public_error_code
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
+
+
+class NativeWorkspaceRejected(DomainError):
+    """A trusted holder rejected this new execution before Native tools started."""
+
+    def __init__(self, code, failure):
+        super().__init__(code)
+        self.result = {
+            "state": "failed",
+            "summary": failure["reasonCode"],
+            "errorCode": code,
+            "executionStarted": False,
+            "exitCode": -1,
+            "exitCodeSource": "not_started",
+            "retryable": False,
+            "failure": failure,
+        }
+
+
+def workspace_rejection(receipt):
+    code = public_error_code(receipt.get("errorCode")) or "NATIVE_WORKSPACE_UNAVAILABLE"
+    failure = receipt.get("failure")
+    if (
+        code not in {"WORKSPACE_BUSY", "WORKSPACE_OUTCOME_UNKNOWN", "WORKSPACE_LEASE_FAILED"}
+        or receipt.get("executionStarted") is not False
+        or type(receipt.get("exitCode")) is not int
+        or receipt["exitCode"] != -1
+        or receipt.get("exitCodeSource") != "not_started"
+        or not isinstance(failure, dict)
+        or failure.get("phase") != "workspace_claim"
+        or not public_error_code(failure.get("reasonCode"))
+    ):
+        return DomainError(code)
+    safe = {"phase": "workspace_claim", "reasonCode": failure["reasonCode"]}
+    for name, pattern in [
+        ("blockingExecutionId", r"[0-9a-f]{64}"),
+        ("blockingSessionId", r"[A-Za-z0-9_.:@-]{1,200}"),
+    ]:
+        value = failure.get(name)
+        if isinstance(value, str) and re.fullmatch(pattern, value):
+            safe[name] = value
+    return NativeWorkspaceRejected(code, safe)
 
 
 @asynccontextmanager
@@ -72,8 +115,7 @@ async def hold_workspace(settings, task, run, *, stopped=None):
         try:
             receipt = json.loads(line)
             if isinstance(receipt, dict) and receipt.get("state") == "failed":
-                code = public_error_code(receipt.get("errorCode"))
-                raise DomainError(code or "NATIVE_WORKSPACE_UNAVAILABLE")
+                raise workspace_rejection(receipt)
             workspace = receipt["workspace"]
             if (
                 receipt["state"] != "native_running"

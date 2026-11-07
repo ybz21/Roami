@@ -11,7 +11,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 
 
-@pytest.mark.parametrize("kind", ["timeout", "os", "workspace"])
+@pytest.mark.parametrize("kind", ["timeout", "os", "workspace", "legacy_workspace"])
 async def test_dispatch_failure_result_survives_verification(store, kind):
     class Executor:
         async def run(self, task, run):
@@ -19,6 +19,8 @@ async def test_dispatch_failure_result_survives_verification(store, kind):
                 raise TimeoutError("private URL and credentials")
             if kind == "os":
                 raise OSError("private filesystem path")
+            if kind == "legacy_workspace":
+                raise DomainError("WORKSPACE_OUTCOME_UNKNOWN")
             try:
                 raise DomainError("MODEL_HTTP_401")
             except DomainError as cause:
@@ -44,13 +46,18 @@ async def test_dispatch_failure_result_survives_verification(store, kind):
             "timeout": "EXECUTION_TIMEOUT",
             "os": "EXECUTION_FAILED",
             "workspace": "NATIVE_WORKSPACE_OUTCOME_UNKNOWN",
+            "legacy_workspace": "WORKSPACE_OUTCOME_UNKNOWN",
         }[kind]
         assert result["summary"] == result["errorCode"] == expected
-        assert current["state"] == ("interrupted" if kind == "workspace" else "failed")
+        assert current["state"] == (
+            "interrupted" if kind in {"workspace", "legacy_workspace"} else "failed"
+        )
         assert "private" not in attempt["result_json"]
-        if kind == "workspace":
+        if kind in {"workspace", "legacy_workspace"}:
             assert result["outcomeKnown"] is False and result["retryable"] is False
-            assert result["failure"]["causeCodes"] == [expected, "MODEL_HTTP_401"]
+            assert result["failure"]["causeCodes"] == (
+                [expected, "MODEL_HTTP_401"] if kind == "workspace" else [expected]
+            )
         else:
             assert result["failure"]["exceptionType"] == (
                 "TimeoutError" if kind == "timeout" else "OSError"

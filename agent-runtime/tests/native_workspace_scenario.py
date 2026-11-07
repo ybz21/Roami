@@ -1,6 +1,7 @@
 """Cross-language scenario invoked by the Go integration test with an isolated instance."""
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -381,7 +382,7 @@ async def main():
         attempt = await db.call(
             lambda connection: row(
                 connection,
-                "SELECT native_branch_id FROM task_attempts WHERE task_id=?",
+                "SELECT native_branch_id,launch_id,result_json FROM task_attempts WHERE task_id=?",
                 (blocked["id"],),
             )
         )
@@ -392,6 +393,28 @@ async def main():
                 (attempt["native_branch_id"],),
             )
         )
+        rejected = json.loads(attempt["result_json"])
+        assert rejected["executionStarted"] is False
+        assert rejected["exitCodeSource"] == "not_started"
+        assert rejected["failure"]["phase"] == "workspace_claim"
+        assert rejected["failure"]["reasonCode"] == "WORKSPACE_PRIOR_RESULT_MISSING"
+        launch = (
+            root / "agents/executions" / hashlib.sha256(attempt["launch_id"].encode()).hexdigest()
+        )
+        persisted = json.loads((launch / "result.json").read_text())
+        assert (
+            persisted["failure"]["blockingExecutionId"]
+            == rejected["failure"]["blockingExecutionId"]
+        )
+        assert persisted["executionStarted"] is False and not (launch / "started").exists()
+        prior = await db.call(
+            lambda connection: row(
+                connection,
+                "SELECT result_json FROM task_attempts WHERE task_id=?",
+                (uncertain["id"],),
+            )
+        )
+        assert prior["result_json"] == details["result_json"]
         print(
             "native workspace scenario passed: project binding, default shell cwd, confirmation, cancellation, child stop, workspace reuse"
         )
