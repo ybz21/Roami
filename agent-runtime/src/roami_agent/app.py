@@ -85,6 +85,7 @@ from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.swarm_catalog import register_swarm_tools
 from roami_agent.tools.swarm_coordination_policy import SwarmCoordinationPolicy
+from roami_agent.tools.swarm_goal_catalog import register_swarm_goal_tools
 from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 from roami_agent.tools.workspace_images import WorkspaceImageReads
@@ -256,6 +257,7 @@ class Runtime:
             artifacts=self.artifacts,
         )
         register_project_okr_tools(self.tools, database, self.settings)
+        register_swarm_goal_tools(self.tools, database, self.wakeup)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 

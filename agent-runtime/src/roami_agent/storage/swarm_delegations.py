@@ -85,6 +85,12 @@ def current_delegation(db, owner, swarm_id, delegation_id=None, *, allow_paused=
     source = user_source(db, owner, team["conversation_id"], value["source_message_id"])
     if not source or source_digest(source["body"]) != value["source_sha256"]:
         raise DomainError("SWARM_DELEGATION_SOURCE_FORGOTTEN", 409)
+    if row(
+        db,
+        "SELECT id FROM jobs WHERE kind='control.stop' AND json_extract(payload_json,'$.turnId')=?",
+        (source["turn_id"],),
+    ):
+        raise DomainError("SWARM_DELEGATION_SOURCE_STOPPED", 409)
     if source_quote(human_text(json.loads(source["body"])), value["source_quote"]) is None:
         raise DomainError("SWARM_DELEGATION_SOURCE_REQUIRED", 409)
     for message_id in json.loads(value["source_messages_json"]):

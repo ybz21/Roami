@@ -130,6 +130,10 @@ def record_post(db, group, spec, author, task_id, binding, delivery_key):
             "INSERT INTO swarm_inbox(post_id,main_conversation_id,member_id,created_ms) VALUES(?,?,?,?)",
             (post_id, main_id, member_id, now_ms()),
         )
+    if author_kind == "member" and (group["conversation_id"], None) in targets:
+        from roami_agent.storage.swarm_inbox_wakeup import queue_post
+
+        queue_post(db, group, post_id)
     return {"id": post_id, "swarmId": group["id"]}, True
 
 

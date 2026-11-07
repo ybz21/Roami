@@ -229,3 +229,5 @@
 - [原结果回传到原 Main](completion-result-bridge.md)：实际回执、晚到结果和既有通知桥接。
 
 - [报告里的输入引用与交付文件](delivery-input-references.md)：避免配置路径被误报为缺失产物，保留真实交付和安全检查。
+
+- [持续目标与提问唤醒](goal-activation.md)：真实用户入口、原成员首批与收件箱事件；[HTML 机制原型](goal-activation.html)。
