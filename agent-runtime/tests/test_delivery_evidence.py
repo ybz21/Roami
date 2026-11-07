@@ -57,7 +57,7 @@ async def completed_delivery(
                 return
             summary = f"[Report]({DATA['output_path']})"
             if mention_input:
-                summary = f"Compared `{DATA['input_name']}`. " + summary
+                summary = f"Compared `{mention_input}`. " + summary
             if explicit:
                 captures = await runtime.artifacts.list("alice", task_id=task["id"])
                 log = next(a for a in captures if a["metadata"].get("source") == "shell")
@@ -114,8 +114,11 @@ async def completed_delivery(
         await runtime.close()
 
 
-async def test_inline_input_basename_does_not_invent_a_missing_output(store, tmp_path):
-    result, _, retained = await completed_delivery(store, tmp_path, mention_input=True)
+@pytest.mark.parametrize(
+    "name", [DATA["input_name"], "schedules/daily.json", "config/deep/input.json"]
+)
+async def test_inline_input_path_does_not_invent_a_missing_output(store, tmp_path, name):
+    result, _, retained = await completed_delivery(store, tmp_path, mention_input=name)
     assert result.get("unavailableOutputs", []) == []
     assert [a["name"] for a in result["artifactRefs"]] == ["report.txt"]
     assert [a["name"] for a in retained] == ["report.txt"]
@@ -144,7 +147,9 @@ async def test_requested_log_is_downloadable_after_the_prioritized_deliverable(s
     [
         ("incidental", False),
         ("link", True),
-        ("scoped", True),
+        ("scoped", False),
+        ("nested_input", False),
+        ("nested_link", True),
         ("absolute", True),
         ("missing_root", True),
         ("symlink", True),
@@ -166,6 +171,13 @@ async def test_explicit_missing_outputs_and_workspace_failures_stay_visible(
     elif reference == "scoped":
         name = "output/missing.txt"
         summary = f"Output: `{name}`"
+    elif reference == "nested_input":
+        name = "schedules/daily.json"
+        (root / "schedules").mkdir()
+        summary = f"Input `{name}` has no configured daily slot."
+    elif reference == "nested_link":
+        name = "output/missing.txt"
+        summary = f"[Requested report]({name})"
     elif reference == "absolute":
         name = str(root / name)
         summary = f"Output: `{name}`"

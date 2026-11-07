@@ -246,11 +246,7 @@ class TaskDeliverables:
                 if isinstance(item["path"], str)
                 and (item["tool_name"] == "file_write" or item["path"] in result.get("summary", ""))
             ]
-            weak_names = {
-                name
-                for name in sources
-                if name not in declared and len(Path(unquote(name)).parts) == 1
-            }
+            weak_names = {name for name in sources if name not in declared}
             observed_files = {
                 str(output_path(root, item["path"]))
                 for item in observed
@@ -353,12 +349,13 @@ class TaskDeliverables:
                     if remaining is not None:
                         remaining -= size
                 except (OSError, ValueError, DomainError) as error:
-                    # A bare inline filename can describe an input, rather than declare an output.
+                    # Inline relative paths can name inputs; links and observed files remain required.
                     if (
                         isinstance(error, FileNotFoundError)
                         and source in weak_names
                         and canonical not in observed_files
-                        and error.filename == unquote(source)
+                        and isinstance(root, str)
+                        and Path(root).is_dir()
                     ):
                         continue
                     unavailable.append(
