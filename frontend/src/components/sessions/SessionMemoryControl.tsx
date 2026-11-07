@@ -30,15 +30,38 @@ export function SessionPauseButton({ name, mem, onChanged }: { name: string; mem
 export function SessionMemoryBanner({ name }: { name: string }) {
   const { t } = useI18n()
   const overview = useSessionOverview(!nativeSessionId(name))
-  const mem = overview.value.find(s => s.name === name)?.mem
+  const session = overview.value.find(s => s.name === name)
+  const mem = session?.mem
   if (!memNoteworthy(mem)) return null
   const usage = mem?.limit
     ? t('session.mem.tip', { cur: humanBytes(mem.cur), limit: humanBytes(mem.limit), pct: String(memPercent(mem)) })
     : t('session.mem.tipNoLimit', { cur: humanBytes(mem?.cur || 0) })
   return <div className="tt-session-memory" role="status">
-    <span>{t(mem?.pauseError ? 'session.mem.notice.failed' : mem?.paused ? 'session.mem.notice.paused' : 'session.mem.notice.warning')} <b>{usage}</b></span>
-    <SessionPauseButton name={name} mem={mem} />
+    <div className="copy"><span>{t(mem?.pauseError ? 'session.mem.notice.failed' : mem?.paused ? 'session.mem.notice.paused' : mem?.warning ? 'session.mem.notice.warning' : 'session.mem.recovery')} <b>{usage}</b></span>
+      {mem?.relief?.reclaimStatus && <span className="detail">{t('session.mem.reclaim.' + mem.relief.reclaimStatus, { bytes: humanBytes(mem.relief.reclaimed || 0) })}</span>}
+      {mem?.relief?.compactStatus && mem.relief.compactStatus !== 'unsupported' && <span className="detail">{t('session.mem.compact.' + mem.relief.compactStatus)}</span>}
+    </div>
+    <div className="actions"><SessionRecoveryButton name={name} action="reclaim" />
+      {session?.agent && ['codex', 'claude'].includes(session.agent) && <SessionRecoveryButton name={name} action="compact" disabled={!!mem?.paused || session.running || session.waiting} />}
+      <SessionPauseButton name={name} mem={mem} />
+    </div>
   </div>
+}
+
+export function SessionRecoveryButton({ name, action, disabled }: { name: string; action: 'reclaim' | 'compact'; disabled?: boolean }) {
+  const { t } = useI18n(), { message } = AntApp.useApp()
+  const [busy, setBusy] = useState(false)
+  const act = async () => {
+    setBusy(true)
+    try {
+      const result = await api('POST', `/sessions/${encodeURIComponent(name)}/${action}`)
+      if (action === 'reclaim' && result?.reclaimStatus !== 'done') message.warning(t('session.mem.reclaim.' + (result?.reclaimStatus || 'failed')))
+    } catch (error: any) {
+      const code = error?.apiError?.code
+      message.error(t(code === 'MEMORY_COMPACT_DEFERRED' ? 'session.mem.compact.deferred' : code === 'MEMORY_COMPACT_UNSUPPORTED' ? 'session.mem.compact.unsupported' : 'session.mem.actionFailed'))
+    } finally { refreshSessionLists(); setBusy(false) }
+  }
+  return <button type="button" className="tt-act tt-session-pause" disabled={busy || disabled} onClick={e => { e.stopPropagation(); void act() }}>{t('session.mem.action.' + action)}</button>
 }
 
 // Uses the existing shared overview subscription; no per-session requests.

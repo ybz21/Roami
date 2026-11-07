@@ -1,7 +1,7 @@
 import { useI18n } from '../../i18n'
 
 /** 会话内存画像（后端 ls --json 的 mem 字段）。limit=0 表示没设上限。 */
-export type SessionMem = { cur: number; peak?: number; limit?: number; paused?: boolean; pauseReason?: string; warning?: boolean; pauseError?: boolean }
+export type SessionMem = { cur: number; peak?: number; limit?: number; paused?: boolean; pauseReason?: string; warning?: boolean; pauseError?: boolean; relief?: { reclaimAt?: number; reclaimStatus?: string; reclaimed?: number; swapDelta?: number; compactAt?: number; compactStatus?: string } }
 
 /** Warning and pause thresholds match the session memory policy. */
 const WARN_AT = 60
@@ -14,7 +14,7 @@ export function memPercent(m?: SessionMem | null): number {
 
 /** 超过警示线才值得在信息密度已经很高的地方占位置。 */
 export function memNoteworthy(m?: SessionMem | null): boolean {
-  return !!(m?.paused || m?.warning || m?.pauseError) || memPercent(m) >= WARN_AT
+  return !!(m?.paused || m?.warning || m?.pauseError || m?.relief) || memPercent(m) >= WARN_AT
 }
 
 export function humanBytes(n: number): string {

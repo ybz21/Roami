@@ -8,6 +8,7 @@ import (
 	"github.com/ybz21/Roami/internal/memalert"
 	"github.com/ybz21/Roami/internal/memguard"
 	"github.com/ybz21/Roami/internal/mempause"
+	"github.com/ybz21/Roami/internal/memrelief"
 	"github.com/ybz21/Roami/internal/memthrottle"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/storage"
@@ -46,6 +47,7 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 	samples := make([]memalert.Sample, 0, len(live))
 	brakes := make([]memthrottle.Sample, 0, len(live))
 	pauses := make([]mempause.Sample, 0, len(live))
+	recoveries := make([]memrelief.Sample, 0, len(live))
 	pauseHost := mempause.Host{Total: memguard.TotalMemory(), Available: memguard.AvailableMemory(), Pressure: memguard.Pressure()}
 	for i := range live {
 		m := sampleMem(rt, live[i].Name)
@@ -56,6 +58,7 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 		ps := mempause.Sample{Name: live[i].Name, Current: m.Cur, Limit: m.Limit, Paused: m.Paused, Grace: live[i].resumeUntil > rt.Now().Unix(), PressurePaused: live[i].pauseReason == "pressure"}
 		live[i].Mem.Warning = mempause.Warning(ps)
 		pauses = append(pauses, ps)
+		recoveries = append(recoveries, memrelief.Sample{Name: live[i].Name, Current: m.Cur, Limit: m.Limit, Paused: m.Paused, Grace: ps.Grace, State: rt.MemoryReliefState(live[i].Name)})
 		samples = append(samples, memalert.Sample{
 			Session: live[i].Name, Label: live[i].Label,
 			Cur: m.Cur, Peak: m.Peak, Limit: m.Limit, OOMKills: m.OOMKills,
@@ -65,6 +68,35 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 				Session: live[i].Name, Label: live[i].Label,
 				PIDs: m.PIDs, Cur: m.Cur, Swap: m.Swap, High: m.High, Max: m.Limit,
 			})
+		}
+	}
+	if name := memrelief.Target(recoveries, mempause.Pressure(pauseHost), rt.Now()); name != "" && rt.MemoryRecoveryEnabled(runtime.MemoryReclaimEnv) {
+		_, _ = rt.ReclaimSession(name, true)
+		for i := range live {
+			if live[i].Name != name {
+				continue
+			}
+			next := sampleMem(rt, name)
+			if next.OK {
+				live[i].Mem.Cur = next.Cur
+			}
+			for j := range pauses {
+				if pauses[j].Name == name {
+					pauses[j].Current = live[i].Mem.Cur
+					live[i].Mem.Warning = mempause.Warning(pauses[j])
+				}
+			}
+		}
+	}
+	// Context compaction is best effort; it is never a prerequisite for an urgent pause.
+	if rt.MemoryRecoveryEnabled(runtime.MemoryCompactEnv) {
+		for _, s := range live {
+			if s.Mem != nil && s.Mem.Warning && !s.Mem.Paused && s.Mem.Limit > 0 && float64(s.Mem.Cur)/float64(s.Mem.Limit) < .80 {
+				state, _ := rt.CompactSession(s.Name, true)
+				if state.CompactStatus != "unsupported" {
+					break
+				}
+			}
 		}
 	}
 	for name, reason := range mempause.Plan(pauseHost, pauses) {
@@ -86,9 +118,19 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 			}
 		}
 	}
+	for i := range live {
+		if live[i].Mem == nil {
+			continue
+		}
+		state := rt.MemoryReliefState(live[i].Name)
+		if state.ReclaimAt > rt.Now().Unix()-60 || state.CompactAt > rt.Now().Unix()-60 || (rt.MemoryRecoveryEnabled(runtime.MemoryCompactEnv) && live[i].Mem.Warning && state.CompactStatus == "deferred") {
+			live[i].Mem.Relief = &state
+		}
+	}
 	for i := range samples {
 		for _, s := range live {
 			if s.Name == samples[i].Session && s.Mem != nil {
+				samples[i].Cur = s.Mem.Cur
 				samples[i].Paused, samples[i].Warning, samples[i].PauseError = s.Mem.Paused, s.Mem.Warning, s.Mem.PauseError
 			}
 		}
@@ -122,11 +164,13 @@ func Collect(rt runtime.Runtime, meta *sessmeta.Store, exclude map[string]bool) 
 				SwapFree: room.Free, Compressed: room.Compressed,
 			}
 			th := memthrottle.FromEnv()
-			for _, d := range memthrottle.Apply(memthrottle.Plan(host, th, brakes), memthrottle.Cgroup()) {
-				if d.Reclaim > 0 {
-					memalert.Compressed(db, rt.Now(), d.Session, d.Label, d.Reclaim)
-					continue
+			decisions := []memthrottle.Decision{}
+			for _, d := range memthrottle.Plan(host, th, brakes) {
+				if d.Reclaim == 0 {
+					decisions = append(decisions, d)
 				}
+			}
+			for _, d := range memthrottle.Apply(decisions, memthrottle.Cgroup()) {
 				memalert.Throttled(db, rt.Now(), d.Session, d.Label, d.High, d.Brake)
 			}
 			// 该动手却没落点：这一层自己解决不了（开 zram 要 root），只能让人知道。

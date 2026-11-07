@@ -243,7 +243,7 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 
 func legacySessionCommand(word string) bool {
 	switch word {
-	case "ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "pause", "resume", "resolve", "send", "keys", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info":
+	case "ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "pause", "resume", "reclaim", "compact", "memory-status", "memory-setup-script", "resolve", "send", "keys", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info":
 		return true
 	}
 	return false

@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/backend/project"
 	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/memrelief"
 )
 
 type projectSession struct {
@@ -92,13 +93,14 @@ type sessListItem struct {
 
 // sessMem 会话内存画像，原样从 roami session ls --json 透传给前端。
 type sessMem struct {
-	Cur         int64  `json:"cur"`
-	Peak        int64  `json:"peak,omitempty"`
-	Limit       int64  `json:"limit,omitempty"`
-	Paused      bool   `json:"paused,omitempty"`
-	PauseReason string `json:"pauseReason,omitempty"`
-	Warning     bool   `json:"warning,omitempty"`
-	PauseError  bool   `json:"pauseError,omitempty"`
+	Cur         int64            `json:"cur"`
+	Peak        int64            `json:"peak,omitempty"`
+	Limit       int64            `json:"limit,omitempty"`
+	Paused      bool             `json:"paused,omitempty"`
+	PauseReason string           `json:"pauseReason,omitempty"`
+	Warning     bool             `json:"warning,omitempty"`
+	PauseError  bool             `json:"pauseError,omitempty"`
+	Relief      *memrelief.State `json:"relief,omitempty"`
 }
 
 // dormant 这个会话是不是「点开才恢复」的休眠会话。

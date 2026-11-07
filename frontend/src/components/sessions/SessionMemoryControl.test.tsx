@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SessionMemoryAlerts, SessionPauseButton } from './SessionMemoryControl'
+import { SessionMemoryAlerts, SessionPauseButton, SessionRecoveryButton, SessionMemoryBanner } from './SessionMemoryControl'
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(), error: vi.fn(), warning: vi.fn(), destroy: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../../session-overview', () => ({ useSessionOverview: () => mocks.overview }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
 vi.mock('antd', () => ({
-  App: { useApp: () => ({ message: { error: mocks.error }, notification: { warning: mocks.warning, destroy: mocks.destroy } }) },
+  App: { useApp: () => ({ message: { error: mocks.error, warning: mocks.warning }, notification: { warning: mocks.warning, destroy: mocks.destroy } }) },
   Button: ({ children, onClick }: any) => <button type="button" onClick={onClick}>{children}</button>,
 }))
 
@@ -71,5 +71,25 @@ describe('session memory recovery', () => {
     mocks.overview.value = [{ name: 'one', label: 'Work', mem: { paused: true } }]
     view.rerender(<SessionMemoryAlerts onOpen={vi.fn()} visibleSession="one" />)
     expect(mocks.warning).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports blocked reclaim without claiming success and refreshes after errors', async () => {
+    mocks.api.mockResolvedValue({ reclaimStatus: 'no-swap', reclaimed: 0 })
+    const view = render(<SessionRecoveryButton name="one" action="reclaim" />)
+    fireEvent.click(screen.getByRole('button'))
+    await waitFor(() => expect(mocks.warning).toHaveBeenCalledWith('session.mem.reclaim.no-swap'))
+    mocks.api.mockRejectedValue({ apiError: { code: 'MEMORY_COMPACT_DEFERRED' } })
+    view.rerender(<SessionRecoveryButton name="one" action="compact" />)
+    fireEvent.click(screen.getByRole('button'))
+    await waitFor(() => expect(mocks.error).toHaveBeenCalledWith('session.mem.compact.deferred'))
+    expect(screen.getByRole('button').hasAttribute('disabled')).toBe(false)
+  })
+
+  it('keeps context compaction disabled while a paused Agent retains its processes', () => {
+    mocks.overview.value = [{ name: 'one', agent: 'codex', mem: { cur: 100, paused: true, relief: { reclaimStatus: 'done', reclaimed: 20, compactStatus: 'requested' } } }]
+    render(<SessionMemoryBanner name="one" />)
+    expect(screen.getByRole('button', { name: 'session.mem.action.compact' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('session.mem.compact.requested')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'session.mem.action.reclaim' }).hasAttribute('disabled')).toBe(false)
   })
 })

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ybz21/Roami/internal/memrelief"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -52,13 +53,14 @@ type sessionInfo struct {
 
 // memInfo 会话内存画像。Limit=0 表示没设上限（护栏关掉或装不上）。
 type memInfo struct {
-	Cur         int64  `json:"cur"`
-	Peak        int64  `json:"peak,omitempty"`
-	Limit       int64  `json:"limit,omitempty"`
-	Paused      bool   `json:"paused,omitempty"`
-	PauseReason string `json:"pauseReason,omitempty"`
-	Warning     bool   `json:"warning,omitempty"`
-	PauseError  bool   `json:"pauseError,omitempty"`
+	Cur         int64            `json:"cur"`
+	Peak        int64            `json:"peak,omitempty"`
+	Limit       int64            `json:"limit,omitempty"`
+	Paused      bool             `json:"paused,omitempty"`
+	PauseReason string           `json:"pauseReason,omitempty"`
+	Warning     bool             `json:"warning,omitempty"`
+	PauseError  bool             `json:"pauseError,omitempty"`
+	Relief      *memrelief.State `json:"relief,omitempty"`
 }
 
 type infoJSON struct {

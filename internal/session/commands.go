@@ -383,6 +383,11 @@ func Send(rt runtime.Runtime, exclude map[string]bool, args []string, w io.Write
 	// 尾随的 C-m 当成输入换行而非提交，导致「只打字不发送」。SendPromptSubmit
 	// 走 paste-buffer 落文本再单独按回车，对多行 prompt 和 TUI 都可靠。
 	// pane 目标的精确匹配要写成 "=名:"（tmux 3.4 对裸 "=名" 报 can't find pane）
+	unlock, err := rt.LockSessionMemory(target)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if err := rt.SendPromptSubmit("="+target+":", cmdStr); err != nil {
 		return err
 	}

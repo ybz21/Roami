@@ -106,3 +106,68 @@ pane 迁移未完成或失败时，继承的工作 scope 因而会被误认为�
   终端有效高度为 915px，状态条和按钮在可用区域内且命中正确。
   手机返回栏为 60 CSS px，继续按钮命中区至少 44 CSS px，无重复告警弹窗遮挡。
 - 中英文暂停文案均在真实浏览器中检查，语言已恢复为简体中文。
+
+## 自动回收、上下文整理与系统压缩
+
+### Product Design
+
+告警后先尝试回收，再按最新用量判断是否需要暂停。系统压缩与 Agent 上下文整理分别展示，
+不会把 `/compact` 已提交、请求回收的字节数或普通磁盘交换说成“已节省内存”。
+
+| 能力 | 自动策略 | 界面与限制 |
+| --- | --- | --- |
+| 冷内存回收 | 告警或整机压力时，每轮选择一个较大会话；同会话至少间隔 1 分钟。每轮最多请求 128MiB，且不超过当前用量的 1/8、交换区余量的一半。 | 状态条提供“回收内存”，按实际驻留内存下降量与交换页增量报告结果；交换区不足、不支持或无有效回收分别说明，保留暂停保护。 |
+| Agent 上下文整理 | Codex / Claude 前台交互 TUI，告警但尚未达到 80%；后台未打开、空闲、输入可确认为空时提交 `/compact`，至少间隔 10 分钟。 | 状态条提供“整理上下文”；冻结或运行中禁用。忙碌、草稿、权限交互、未知界面和多 pane 均推迟；不自动重启 Agent。仅表示请求已提交，不保证 RSS 下降。 |
+| zram 压缩交换 | 管理员显式安装后由系统透明压缩，重启后恢复。默认逻辑容量为物理内存的一半，压缩区实际内存上限为物理内存的 1/8。 | 设置 → 会话内存显示自动开关、zram/zswap 状态、交换区余量及 zram 原始量、包含开销的实际占用与节省量。未启用时可下载脚本，不在 Web 服务中提权。 |
+
+两项自动策略默认打开，分别通过 `ROAM_MEMORY_RECLAIM`、`ROAM_MEMORY_COMPACT` 保存设置；
+`off`、`0`、`false` 可关闭。手动继续后的 30 秒宽限期也跳过自动整理。
+
+### User Stories
+
+- 会话过线时先尝试有限回收；确实回收不足时仍暂停，保留原进程。
+- 用户输入中的草稿、正在执行的任务和权限确认不会被自动插入 `/compact`。
+- 用户能看到主机是否真的开启压缩、当前交换区是否有余量，并获得本节点可运行的安装脚本。
+- 手机可保存自动整理开关、手动回收并继续冻结的会话。
+
+### Technical Design
+
+- `internal/memrelief` 负责候选选择、字节预算、冷却和空输入判断。
+- `tmuxruntime/memory-recovery.go` 持久化结果，与暂停/继续、CLI 提交共用会话锁；
+  前台进程组校验、两次一致的终端快照和输入检查后才能提交整理命令。
+  提交前记录冷却；结果未知时不自动重发。
+- `session.Collect` 使用既有概览采样，回收后重新采样并更新告警/暂停判断；没有新增逐会话轮询。
+- `memguard.Reclaim` 同样拒绝控制进程或继承的工作 scope。
+- `memguard/compression.go` 读取活跃 zram 设备的 `mm_stat`，使用 `mem_used_total` 计算实际占用，
+  不假定固定压缩比；zswap 只报告开关状态。
+- 下载脚本的唯一来源为嵌入二进制的 `internal/memguard/zram-setup.sh`。
+  新安装入口为设置页下载或 `roami session memory-setup-script`；原有开发脚本本轮未改动。
+  新脚本验证参数、保留已有压缩后端与磁盘 swap、为自有设备记录归属；
+  停止时必须成功停用该设备后才重置，禁止全局 `swapoff -a`。
+- CLI 增加 `reclaim`、`compact`、`memory-status` 和 `memory-setup-script`；
+  HTTP 提供对应恢复动作、状态与脚本下载，沿用登录鉴权与节点入口。
+
+参考：[Linux zram](https://docs.kernel.org/admin-guide/blockdev/zram.html)、
+[cgroup v2 memory.reclaim](https://docs.kernel.org/admin-guide/cgroup-v2.html)、
+[Claude Code 内存排查](https://code.claude.com/docs/en/troubleshooting#high-cpu-or-memory-usage)、
+[Codex compact](https://learn.chatgpt.com/docs/developer-commands#keep-transcripts-lean-with-compact)。
+
+### Acceptance Evidence
+
+- 单测覆盖回收预算、冷却、恢复宽限、暂停跳过、空闲输入与草稿/忙碌/权限拒绝、
+  活跃压缩设备与开销计算、脚本参数、错误码保留和设置开关持久化。
+- 独立实例中的真实 Codex 接收到 `/compact` 并生成上下文摘要；界面只显示“已请求整理”。
+- 无压缩且磁盘 swap 余量不足时，告警显示未回收原因；测试会话达到约 227MiB / 256MiB 后冻结。
+  原 PID `2223527` 的启动时间不变，父进程和分离子进程心跳停止；ADB 点“继续”后均恢复。
+- 桌面 1280、1920、2560、3440 CSS px，侧栏分别开启/关闭：无文档溢出，终端有效高度 900px。
+  Redmi Note 8 真机完成自动开关点按与保存、滚动、回收、继续；动作命中区为 44 CSS px。
+- 本机没有无密码管理员权限，zram 尚未启用；已验证下载和 dry-run，不声称完成内核压缩实测。
+  管理员可下载后运行 `sudo bash roami-zram-setup.sh`。实际压缩数据解析使用内核格式夹具验证。
+- 最终前端全量测试：213 个文件、1555 项测试通过；完整质量检查、类型、i18n、hover 和构建通过。
+- 真实 Codex 输入 `retain-this-draft` 后，整理返回 `MEMORY_COMPACT_DEFERRED`；草稿未被提交或覆盖。
+
+| 新增界面 | 桌面 | Android 真机 |
+| --- | --- | --- |
+| 回收不足告警 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-reclaim-warning.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-reclaim-warning.png) |
+| 保留冻结保护 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-reclaim-paused.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-reclaim-paused.png) |
+| 整理与系统压缩设置 | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/desktop-recovery-settings.png) | [截图](https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-768/phone-recovery-settings.png) |

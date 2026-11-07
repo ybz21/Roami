@@ -597,6 +597,9 @@ func Reclaim(pid int, bytes int64) error {
 	if bytes <= 0 {
 		return errors.New("memguard: 要压的字节数得是正数")
 	}
+	if _, err := memoryScope(pid); err != nil {
+		return err
+	}
 	dir := cgroupDir(pid)
 	if dir == "" {
 		return errors.New("memguard: 读不到这个 pane 的 cgroup 路径")
