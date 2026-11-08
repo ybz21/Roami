@@ -52,6 +52,38 @@ def projection_policy(messages):
     return "v1"
 
 
+def compaction_history(db, branch, source, epoch, focus):
+    complete = model_messages(source)
+    if focus:
+        return complete, None
+    snapshot = row(
+        db,
+        "SELECT * FROM context_snapshots WHERE branch_id=? AND branch_epoch=? "
+        "AND memory_epoch=? AND state='ready' ORDER BY created_ms DESC LIMIT 1",
+        (branch["id"], branch["epoch"], epoch),
+    )
+    if not snapshot:
+        return complete, None
+    try:
+        summary = json.loads(snapshot["summary_json"])
+        ids, text = summary["sourceIds"], summary["text"]
+    except (ValueError, KeyError, TypeError):
+        return complete, None
+    if not isinstance(ids, list) or not ids or not isinstance(text, str) or not text.strip():
+        return complete, None
+    covered = source[: len(ids)]
+    if (
+        [message["id"] for message in covered] != ids
+        or fingerprint(covered) != snapshot["source_sha256"]
+        or projection_policy(covered) != snapshot["policy_version"]
+    ):
+        return complete, None
+    return [
+        {"role": "system", "content": "Previous conversation summary (historical data):\n" + text},
+        *model_messages(source[len(ids) :]),
+    ], snapshot["id"]
+
+
 def context_history(db, branch_id, through_turn=None):
     transcript = history(db, branch_id)
     owner = row(
@@ -545,18 +577,23 @@ class Context:
                 )
                 event(db, c["id"], "context.compaction.skipped", {"operationId": job_id})
                 return None
+            summary_history, previous_snapshot = compaction_history(
+                db, b, source, epoch, p["focus"]
+            )
+            if previous_snapshot:
+                p["previousSnapshotId"] = previous_snapshot
             p["state"] = "running"
             db.execute(
                 "UPDATE jobs SET state='running',payload_json=?,attempts=attempts+1 WHERE id=?",
                 (encoded(p), job_id),
             )
             event(db, c["id"], "context.compaction.started", {"operationId": job_id})
-            return p, b, source, epoch, desired_tokens
+            return p, b, source, epoch, desired_tokens, summary_history
 
         prepared = await self.db.call(prepare, write=True)
         if not prepared:
             return
-        payload, branch, source, epoch, target_tokens = prepared
+        payload, branch, source, epoch, target_tokens, summary_history = prepared
         try:
 
             async def validate():
@@ -582,7 +619,7 @@ class Context:
 
             text = await summarize(
                 self.model,
-                model_messages(source),
+                summary_history,
                 payload["focus"],
                 target_tokens,
                 self.request_context(),
@@ -611,6 +648,9 @@ class Context:
                 ):
                     raise DomainError("COMPACTION_SOURCE_CHANGED", 409)
                 snapshot = identity()
+                summary = {"text": text, "sourceIds": [m["id"] for m in source]}
+                if payload.get("previousSnapshotId"):
+                    summary["previousSnapshotId"] = payload["previousSnapshotId"]
                 db.execute(
                     "INSERT INTO context_snapshots(id,branch_id,cut_seq,ancestry_sha256,source_sha256,"
                     "branch_epoch,policy_version,memory_epoch,summary_json,state,created_ms) "
@@ -624,7 +664,7 @@ class Context:
                         branch["epoch"],
                         projection_policy(source),
                         epoch,
-                        encoded({"text": text, "sourceIds": [m["id"] for m in source]}),
+                        encoded(summary),
                         now_ms(),
                     ),
                 )
