@@ -108,10 +108,23 @@ authority. Data-only publication retains the confirmed HTML bundle.
 
 After an unknown result, read context and find connectorBatches by the same id.
 A matching receipt is already committed, even if the current revision advanced.
+When advertised, `roami swarm connector batch --input '{"swarmId":"...","batchId":"..."}'`
+reads a compact receipt from the original Main's bound project. `confirmed` is a
+historical fact; its receipt revision differs from the current workspace revision.
+On older hosts, read the complete context artifact instead of its truncated preview.
 Retry the exact original payload/revision/key if needed; do not refresh only its
 revision or generate a new batch id. A reused key with changed content conflicts.
+Preserve `note` too. `CONNECTOR_BATCH_ALREADY_CONFIRMED_REQUEST_CONFLICT` means
+the old fact exists and this request conflicts; it does not discard the old batch.
+`requestSha256` fingerprints the host's typed request, including its original
+revision and batch. It is not the raw file SHA or an arbitrary sorted-JSON hash.
+Check evidence file SHA against evidence bytes; do not invalidate a confirmed
+receipt because a locally reserialized request has a different hash.
 Source/code/evidence failures retain earlier facts. Reread a conflict and prepare
 a new batch only after proving the old one was not published.
+
+New publications expand a later collection's coverage. Collect that new set in a
+fresh real batch; the earlier set remains valid at its earlier capture time.
 
 Reopen the real dashboard with roami chrome and verify current-source values,
 unknowns and same-day append order. A data receipt does not prove task acceptance,

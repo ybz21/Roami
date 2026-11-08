@@ -2,6 +2,7 @@
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.connector_batch_receipts import connector_batch_receipt
 from roami_agent.tools.project_memory_edit import (
     memory_edit_fields,
     memory_edit_payload,
@@ -159,13 +160,35 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
             raise DomainError("SWARM_PROJECT_WRITE_RECEIPTS_UNAVAILABLE", 503)
         from roami_agent.storage.swarm_memory import project_context
 
-        workspace = await project_context(
-            swarms,
-            binding["owner"],
-            args["swarmId"],
-            operation=args["operation"],
-            payload=args["payload"],
-        )
+        try:
+            workspace = await project_context(
+                swarms,
+                binding["owner"],
+                args["swarmId"],
+                operation=args["operation"],
+                payload=args["payload"],
+            )
+        except DomainError as error:
+            batch = args["payload"].get("batch")
+            if (
+                error.code == "OKR_CONFLICT"
+                and args["operation"] == "record"
+                and isinstance(batch, dict)
+            ):
+                try:
+                    current = await project_context(swarms, binding["owner"], args["swarmId"])
+                    if not current or current.get("projectId") != (info.get("scope") or {}).get(
+                        "projectId"
+                    ):
+                        raise DomainError("SWARM_PROJECT_SCOPE_CONFLICT", 403)
+                    confirmed = connector_batch_receipt(current, batch.get("id"))
+                except DomainError:
+                    confirmed = None
+                if confirmed and confirmed["status"] == "confirmed":
+                    raise DomainError(
+                        "CONNECTOR_BATCH_ALREADY_CONFIRMED_REQUEST_CONFLICT", 409
+                    ) from error
+            raise
         if workspace is None:
             raise DomainError("SWARM_PROJECT_REQUIRED", 409)
         if binding.get("coordinationProjectWrite"):
@@ -173,6 +196,17 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
 
             return project_receipt(workspace, binding["coordinationProjectWrite"])
         return workspace
+
+    async def project_batch(args, binding):
+        info = await main(binding, args["swarmId"])
+        from roami_agent.storage.swarm_memory import project_context
+
+        workspace = await project_context(swarms, binding["owner"], args["swarmId"])
+        if workspace is None:
+            raise DomainError("SWARM_PROJECT_REQUIRED", 409)
+        if workspace.get("projectId") != (info.get("scope") or {}).get("projectId"):
+            raise DomainError("SWARM_PROJECT_SCOPE_CONFLICT", 403)
+        return connector_batch_receipt(workspace, args["batchId"])
 
     async def verify(args, binding):
         if confirm is None or artifacts is None:
@@ -323,7 +357,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_project_context",
-            "Read the bound project's current flat OKR workspace: definitions, dashboard, dated observations and reviews, project instructions and team memory via its registered project ID. No shell or host paths required. Missing project bundles remain unavailable.",
+            "Read the bound project's current flat OKR workspace: definitions, dashboard, observations, reviews, instructions and team memory. For one Connector confirmation use swarm_connector_batch. If this full context is externalized, read the retained artifact; its preview is incomplete and may show only old receipts. No shell or host paths. Missing project bundles remain unavailable.",
             object_schema({"swarmId": string}, ["swarmId"]),
             project_read,
             True,
@@ -331,7 +365,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_project_update",
-            "Apply a user-authorized OKR change to this Main swarm's bound registered project using its current revision. Operations save definitions, collect registered sources, record an observation, review evidence or sync staged project files through the existing validated project API. Read swarm_project_context first. Payload is exactly the operation's JSON body; conflicts require rereading, never blind retry. No shell, host paths, credentials, model routes or public publication.",
+            "Apply a user-authorized OKR change to this Main swarm's bound registered project using its current revision. Read swarm_project_context first. Payload is exactly the operation's JSON body. For Connector retries, first read swarm_connector_batch with the same batchId: confirmed means already committed even after revision advances. Preserve the complete original request including note; CONNECTOR_BATCH_ALREADY_CONFIRMED_REQUEST_CONFLICT never invalidates old facts. Read its receipt, do not resubmit or claim it was discarded. No shell, host paths, credentials, model routes or public publication.",
             object_schema(
                 {
                     "swarmId": string,
@@ -346,6 +380,17 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
             project_update,
             True,
             "write",
+        ),
+        (
+            "swarm_connector_batch",
+            "Read one confirmed Connector batch receipt from this Main's bound project. Use the same batchId after an unknown result or conflict, without replaying a write. confirmed remains a historical fact after reviews or new publications; not_found is not permission to submit again. Returns current workspace revision separately from the original receipt revision. Full source evidence stays in project context.",
+            object_schema(
+                {"swarmId": string, "batchId": {"type": "string", "pattern": "^[a-f0-9]{32}$"}},
+                ["swarmId", "batchId"],
+            ),
+            project_batch,
+            True,
+            "read",
         ),
         (
             "swarm_dependencies",
