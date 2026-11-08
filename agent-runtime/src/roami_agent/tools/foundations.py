@@ -416,11 +416,19 @@ class ToolDirectory:
             main=True,
         ), {}
 
-    @staticmethod
-    def argv(args):
+    def argv(self, args):
         if "argv" in args:
             return args["argv"]
         try:
+            lexer = shlex.shlex(args["command"], posix=True)
+            lexer.whitespace_split = True
+            lexer.commenters = ""
+            first = next(lexer, None)
+            if first is None:
+                return []
+            # Shell programs and heredoc bodies are not CLI argument lists.
+            if first not in {"roami", self.settings.cli_bin}:
+                return [first]
             return shlex.split(args["command"])
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
