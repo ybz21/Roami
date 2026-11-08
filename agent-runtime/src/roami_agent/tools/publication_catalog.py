@@ -111,7 +111,7 @@ def register_publication_tools(registry, database, artifacts, reviewer):
     registry.add(
         Tool(
             "swarm_publication_prepare",
-            "Freeze selected files from an original member's current completed run and retained manifest. The manifest must declare identity taskId/revision/runId and files with path/bytes/sha256 and the same identity. content maps body/title/tags/images/video/audio/subtitles to relative manifest paths. Use one stable businessKey per real planned publication through revisions and retries. First independently verify the artifact task with swarm_verify. Returns immutable artifacts to read before review; this does not approve or publish anything.",
+            "Freeze selected files from an original member's current completed run and retained manifest. The manifest JSON requires a nested identity object {taskId, revision: integer, runId}, not flat top-level identity fields; files entries carry the same identity plus path/bytes/sha256. File paths are relative to the manifest file's own directory, not the project or run root. content maps body/title/tags/images/video/audio/subtitles to these exact paths. Use one stable businessKey per real planned publication through revisions and retries. First independently verify the artifact task with swarm_verify. Returns immutable artifacts to read before review; this does not approve or publish anything.",
             object_schema(
                 {
                     **scope,

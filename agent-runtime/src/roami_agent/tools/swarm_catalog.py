@@ -231,7 +231,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_verify",
-            "Main independently verifies a waiting task in its own Swarm at the exact revision/runId. First inspect task state and fully read each selected current-run text artifact with read artifact://ID in this turn, before this assistant message. Metadata, partial pages, execution summaries and checks text alone are not proof. Complete text pages may be read across calls; binary and external-action acceptance stays with UI/host. All external_action tasks are rejected here, even with user-consent claims. accepted=false records rejection with checks. This never executes or retries the task.",
+            "Main independently verifies a waiting task in its own Swarm at the exact revision/runId. First inspect task state and fully read each selected current-run text artifact with read artifact://ID (artifact_read, not filesystem file_read) in this turn, before this assistant message. Metadata, partial pages, execution summaries and checks text alone are not proof. Complete text pages may be read across calls; binary and external-action acceptance stays with UI/host. All external_action tasks are rejected here, even with user-consent claims. accepted=false records rejection with checks. This never executes or retries the task.",
             object_schema(
                 {
                     "swarmId": string,

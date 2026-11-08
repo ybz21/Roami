@@ -167,6 +167,9 @@ async def test_discovery_registered_cli_and_success_require_real_prior_read(
     )
     missing = await verify(runtime, turn, binding, args)
     assert missing["error"] == "SWARM_ARTIFACT_REVIEW_REQUIRED"
+    assert "read artifact://ID" in missing["recovery"]
+    assert "filesystem file_read" in missing["recovery"]
+    assert (await runtime.tasks.get("alice", args["taskId"]))["task"]["state"] == "waiting_user"
     await read(runtime, turn, binding, artifact)
     result = await verify(runtime, turn, binding, args)
     assert result["state"] == "succeeded" and result["runId"] == args["runId"]
