@@ -2,3 +2,7 @@
 /collection.sqlite3-journal
 /collection.sqlite3-wal
 /collection.sqlite3-shm
+/source.sqlite3
+/source.sqlite3-journal
+/source.sqlite3-wal
+/source.sqlite3-shm

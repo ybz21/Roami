@@ -36,6 +36,12 @@ publications can be discovered by a stable Connector without editing the Skill
 package for each post. Candidate batches still require independent Main
 confirmation and a real dashboard readback.
 
+For structured source rows, the copied `dashboard-storage` Skill adds a separate
+empty SQLite source store: declare business schemas, ingest immutable row versions,
+read/export scoped candidates and make consistent backups. Read that Skill before
+initializing it. These rows still require Main confirmation through the supported
+Connector protocol; a source database is not the confirmed dashboard.
+
 Then combine `parts/` for Python/MCP sources, HTML fragments and executor roles.
 Content-growth, product-delivery and operations under `examples/` are optional
 reference overlays, not a substitute for the complete generic directory. Fill

@@ -52,7 +52,13 @@ func connectorFixture(t *testing.T, github bool) (*Store, string, *Workspace, Co
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w.ProjectFiles.PendingChanges || !w.ProjectFiles.ConnectorSkillBatches || len(w.ProjectFiles.Skills) != 4 {
+	foundSource := false
+	for _, skill := range w.ProjectFiles.Skills {
+		if skill.ID == "connector-source" && skill.Path == "connectors/source/SKILL.md" {
+			foundSource = true
+		}
+	}
+	if w.ProjectFiles.PendingChanges || !w.ProjectFiles.ConnectorSkillBatches || !foundSource {
 		t.Fatalf("missing confirmed Skill: %+v", w.ProjectFiles)
 	}
 	evidence := "evidence/source-response.json"
