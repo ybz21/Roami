@@ -81,6 +81,7 @@ from roami_agent.tools.mcp_broker import MCPBroker, node_socket
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.project_file_scope import ProjectFileScope
 from roami_agent.tools.project_okr import register_project_okr_tools
+from roami_agent.tools.publication_catalog import register_publication_tools
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.swarm_catalog import register_swarm_tools
@@ -258,6 +259,7 @@ class Runtime:
         )
         register_project_okr_tools(self.tools, database, self.settings)
         register_swarm_goal_tools(self.tools, database, self.wakeup)
+        register_publication_tools(self.tools, database, self.artifacts, lambda: self.reply_review)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 

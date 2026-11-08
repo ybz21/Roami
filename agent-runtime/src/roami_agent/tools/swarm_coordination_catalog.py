@@ -10,7 +10,14 @@ SWARM_READS = {
     "swarm_memory_read",
     "swarm_project_context",
 }
-SWARM_WRITES = {"swarm_post", "swarm_memory_write", "swarm_project_update", "swarm_verify"}
+SWARM_WRITES = {
+    "swarm_post",
+    "swarm_memory_write",
+    "swarm_project_update",
+    "swarm_verify",
+    "swarm_publication_prepare",
+    "swarm_publication_review",
+}
 COORDINATION_OPERATIONS = (
     SWARM_READS
     | SWARM_WRITES

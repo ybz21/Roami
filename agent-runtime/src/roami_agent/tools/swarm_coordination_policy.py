@@ -132,6 +132,19 @@ class SwarmCoordinationPolicy:
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
         elif name not in COORDINATION_OPERATIONS:
             raise DomainError("SWARM_COORDINATION_OPERATION_UNAVAILABLE", 403)
+        if name == "swarm_publication_prepare" and (
+            args.get("delegationId") != delegation["id"]
+            or args.get("projectId") != delegation["projectId"]
+        ):
+            raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
+        if name == "swarm_publication_review":
+            publication = row(
+                db,
+                "SELECT p.delegation_id FROM swarm_publication_versions v JOIN swarm_publication_items p ON p.id=v.item_id WHERE v.id=? AND p.swarm_id=? AND p.owner_id=?",
+                (args.get("versionId"), value["swarm_id"], value["owner_id"]),
+            )
+            if not publication or publication["delegation_id"] != delegation["id"]:
+                raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
         if name in {"task_status", "task_steer", "swarm_verify"}:
             task = by_id.get(args.get("taskId"))
             if not task:
