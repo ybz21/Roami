@@ -108,3 +108,11 @@ view reference -> accepted observation for the same metric/source -> dataset API
 time separately from when collection occurred, and name any values still unknown.
 A saved raw file, Skill registration, sent request or agent message is not proof
 that a value reached the dashboard. Main owns this final publication and check.
+
+## Structured source rows
+
+The complete template includes `assets/.roami/okr/skills/dashboard-storage/`:
+a standard-library SQLite source store with declarative schemas, immutable row
+versions, transactional/idempotent ingestion, scoped reads/exports and consistent
+backups. Read its SKILL.md before initialization. It starts empty and does not
+replace host confirmation, dataset publication or the read-only HTML SDK.

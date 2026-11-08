@@ -51,3 +51,5 @@
 [数据与团队设计稿检查](data-team-design-acceptance.md)：仅文档与模拟交互，非新增底层机制验收。
 
 通信重点：[逐跳与多个 OKR 演示](../20261104-okr-main-workspace/communication-engine.html)。实现前补充 [SQLite v1 契约](sqlite-v1-contract.md) 与 [协调回合契约](../20261104-okr-main-workspace/swarm-delivery-contract.md)。
+
+SQLite 采集层的 [源库实施与验收范围](sqlite-source-store.md) 单独记录通用脚本、版本与恢复；不代表宿主确认存储迁移或完整自动循环已经完成。

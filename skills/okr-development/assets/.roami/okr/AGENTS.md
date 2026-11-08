@@ -154,4 +154,6 @@ Main 负责把这些步骤落实到确认回执和实际结果，不能只转发
 
 ### 项目 SQLite 发布登记
 
+结构化采集明细使用 [dashboard-storage Skill](skills/dashboard-storage/SKILL.md) 的空库初始化、业务 schema 建表、事务写入、只读查询/导出与一致性备份。源行按项目、来源、账号、日期与不可变版本保存，候选经 Main 核验和宿主确认后才进入看板；完整步骤见 [取数手册](manuals/data.md)。
+
 初始化、写入与冲突处理见 [collection-store Skill](skills/collection-store/SKILL.md)。项目 collection.sqlite3 只登记 Main 已审核的公开稿件，供 Connector 动态发现对象；不会直接更新看板。Main 仍须独立验收候选、通过宿主 record 确认并核对实际卡片。不得对宿主数据库执行 SQL，不能让 HTML 直读此库。

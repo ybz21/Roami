@@ -4,8 +4,11 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"strings"
 	"unicode/utf8"
+
+	okrtemplate "github.com/ybz21/Roami/skills"
 )
 
 type projectMainDefinition struct {
@@ -15,13 +18,10 @@ type projectMainDefinition struct {
 	Skills           []string `json:"skills,omitempty"`
 }
 
-var builtinProjectSkills = []string{
-	"skills/okr-planning/SKILL.md",
-	"skills/metric-collection/SKILL.md",
-	"skills/swarm-execution/SKILL.md",
-}
-
 func seedGuidance(root *os.Root, name, content string) error {
+	if err := mkdir(root, path.Dir(name)); err != nil {
+		return err
+	}
 	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if errors.Is(err, fs.ErrExist) {
 		return safeFile(root, name)
@@ -41,7 +41,11 @@ func seedGuidance(root *os.Root, name, content string) error {
 }
 
 func (s *Store) seedWorkflow(root *os.Root, projectID string) error {
-	if err := seedGuidance(root, "AGENTS.md", projectDailyWorkflow); err != nil {
+	workflow, err := okrtemplate.Files.ReadFile("okr-development/assets/.roami/okr/AGENTS.md")
+	if err != nil {
+		return err
+	}
+	if err := seedGuidance(root, "AGENTS.md", string(workflow)); err != nil {
 		return err
 	}
 	project, err := os.OpenRoot(s.projects()[projectID])
@@ -49,34 +53,29 @@ func (s *Store) seedWorkflow(root *os.Root, projectID string) error {
 		return err
 	}
 	defer project.Close()
-	return seedGuidance(project, "AGENTS.md", projectAgentEntry)
+	entry, err := okrtemplate.Files.ReadFile("okr-development/assets/AGENTS.md")
+	if err != nil {
+		return err
+	}
+	return seedGuidance(project, "AGENTS.md", string(entry))
 }
 
 func seedProjectCapabilities(root *os.Root) error {
-	files := map[string]string{
-		"README.md":             projectBundleReadme,
-		"agents/main.md":        projectMainInstructions,
-		builtinProjectSkills[0]: planningSkill,
-		builtinProjectSkills[1]: collectionSkill,
-		builtinProjectSkills[2]: executionSkill,
-	}
-	for name, content := range files {
-		if _, err := root.Lstat(name); errors.Is(err, fs.ErrNotExist) {
-			if err := atomicFile(root, name, []byte(content)); err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		} else if err := safeFile(root, name); err != nil {
+	const prefix = "okr-development/assets/.roami/okr/"
+	return fs.WalkDir(okrtemplate.Files, strings.TrimSuffix(prefix, "/"), func(name string, item fs.DirEntry, err error) error {
+		if err != nil || item.IsDir() {
 			return err
 		}
-	}
-	if _, err := root.Lstat("agents/main.json"); errors.Is(err, fs.ErrNotExist) {
-		return writeJSON(root, "agents/main.json", projectMainDefinition{1, "main", "main.md", builtinProjectSkills})
-	} else if err != nil {
-		return err
-	}
-	return safeFile(root, "agents/main.json")
+		relative := strings.TrimPrefix(name, prefix)
+		if relative != "README.md" && relative != "agents/main.md" && relative != "agents/main.json" && relative != "schedules/daily.json" && relative != "data/.gitignore" && !strings.HasPrefix(relative, "manuals/") && !strings.HasPrefix(relative, "skills/") {
+			return nil
+		}
+		body, err := okrtemplate.Files.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		return seedGuidance(root, relative, string(body))
+	})
 }
 
 func projectSkills(root *os.Root, main projectMainDefinition) ([]ProjectSkill, error) {
@@ -103,161 +102,3 @@ func projectSkills(root *os.Root, main projectMainDefinition) ([]ProjectSkill, e
 	}
 	return result, nil
 }
-
-const projectBundleReadme = `# Project OKR workspace
-
-This directory belongs to this project. It is created only for a saved OKR.
-
-- okr.json: objective, long/short KRs, methods and confirmed metric definitions.
-- dashboard.json: registered HTML/chart components, order and metric bindings.
-- data/observations.jsonl: dated, versioned facts; a missing value is unknown.
-- data/reviews.jsonl and evidence/: reviews and their original evidence snapshots.
-- connectors/<source-id>/SKILL.md: reviewed Python/MCP workflows and confirmed source bindings; legacy metric directories remain compatibility references.
-- data/connector-batches.jsonl: exported publication receipts; state snapshots remain authoritative.
-- agents/main.json and main.md: on-demand coordinator configuration and instructions.
-- agents/team.json: desired persistent role definitions; live identities remain with the managed team.
-- agents/swarm.json: the existing managed team's binding; its board/chat remain authoritative.
-- skills/: project capabilities used by goal discussions and managed team context.
-- memory/team.md and decisions.jsonl: durable knowledge, separate from proof of execution.
-- state/current.json and confirmed-revisions/: confirmed version pointer and immutable snapshots.
-
-Discuss the objective, KRs, methods, metrics and sources before saving changes. The same validated definitions drive the pages; editing a draft does not silently replace the confirmed version. Use revision-checked save/sync and actual source collection. Connector source references explain the built-in collector; editing them does not execute arbitrary code. A configured skill describes work, not proof that the work ran. Record actual task runs, media and external receipts separately.
-`
-
-const projectMainInstructions = `# Project coordinator
-
-Use this project's confirmed OKR, dashboard, dated evidence, skills and team memory. Discover the current project_okr_context/project_okr_update capabilities; do not guess paths, credentials or project identity. Project context fixes the authorized project. For complete project creation or development, discover the okr-development skill. The team definition in agents/team.json is a plan, not evidence that members were registered or ran.
-
-For a new goal, reason with the user about outcome KRs, shorter experiments, methods, metrics, units, dates and sources. The number and meaning of KRs/widgets follow the goal. Get confirmation before saving configuration or connecting an account. Missing observations remain unknown. Read the current revision before every change.
-
-Use the skills listed in main.json as project guidance. Dispatch authorized work to the bound managed Swarm, using its shared board and group chat. Match each task to its KR, method, workspace, inputs and acceptance evidence. Read actual current-run deliverables before independent verification. Members cannot verify themselves. External actions require actual platform receipts and the user's decision boundary.
-
-Use observed results to propose the next experiment. Keep memory concise and factual. A draft, a skill, an executor success or an idle session is not a completed publication or a configured daily schedule. Never change model routes, parameters, spending limits or accounting.
-`
-
-const planningSkill = `---
-name: okr-planning
-description: Discuss and revise this project's objective, KRs, methods and dashboard bindings.
----
-
-Read the bound project's current context. Explain the outcome, proposed KRs, shorter experiments, methods and metric definitions before saving. Decide their count and composition from this goal. For each metric establish unit, date window, baseline availability and source identity. Get the user's confirmation on targets and sources. Then save through the registered project operation with the observed revision. Preserve existing methods and widgets unless explicitly changing them. Supported widgets are keyResults, metricTrend and nextAction; arbitrary HTML scripts are not an executable dashboard protocol. Report a save only after its real successful receipt.
-`
-
-const collectionSkill = `---
-name: metric-collection
-description: Collect real dated observations through this project's confirmed source bindings.
----
-
-Read current metric definitions and connector.json. The github built-in collector reads public repository identity, stars and forks through the registered collect operation. It appends actual dated observations; it does not invent earlier history. Manual-source metrics require observed account, date, measurement window and evidence before record. Browser/phone access must use an authorized managed task, the current device or browser observation, and real receipts. Missing login or data is unknown, never zero. A local Go reference is documentation, not permission to run edited code. Re-read on revision conflicts. Keep same-day corrections as new versions.
-`
-
-const executionSkill = `---
-name: swarm-execution
-description: Execute, independently review and iterate using the bound managed Swarm.
----
-
-Use the existing Swarm ID, shared board/chat and this project workspace. Declare KR/method, owner, inputs, concrete artifacts, dependencies and acceptance for every task. Serialize conflicting writers and device actions. Pause dispatch, stop execution and steer are distinct controls; use their actual receipts. Never bypass an unknown prior writer or relabel an old artifact as a current run.
-
-After delivery, independently read the current run and source evidence. Main may use the scoped verification capability for supported artifact tasks, never member self-verification. External actions keep their real receipt and user decision gates. Publication preparation, upload, submission, review and public availability are separate states. Reconcile an unknown write on the same resource instead of replaying it. Reflect on dated results and propose the next measurable experiment; do not infer causation from activity counts alone.
-`
-
-const projectAgentEntry = `# Project agent instructions
-
-Before OKR work, read .roami/okr/AGENTS.md, the confirmed .roami/okr/okr.json,
-the bound team's current board/chat and .roami/okr/memory/team.md.
-Follow the daily artifact and multi-agent collaboration contract there.
-
-Store team facts and working rules in .roami/okr/memory/team.md.
-Store important decisions and unresolved matters in .roami/okr/memory/decisions.md,
-including date, source and current status. Each long-lived member keeps its own
-notes in .roami/okr/memory/members/<stable-member-id>/memory.md. Reuse the same
-member, task and native conversation for later rounds; do not create r2/r3 members.
-Keep new deliverables in materials/YYYY-MM-DD/<channel-or-method>/<short-topic>/,
-separate from memory. Keep task/revision/run identities in manifests, not folder names.
-Keep this file's existing project rules when extending it.
-`
-
-const projectDailyWorkflow = `# Daily OKR work and multi-agent collaboration
-
-## Shared authority
-
-Use the confirmed okr.json and dashboard.json in this directory. The bound Swarm
-in agents/swarm.json owns the shared board, group chat and current task state.
-Main coordinates; members work on the same project directory, not private copies
-of the goal. Read agents/main.md, the configured skills and memory/team.md.
-Instructions and plans never prove execution, verification or publication.
-
-## Daily artifacts
-
-Use the project's local timezone (Asia/Shanghai unless explicitly configured).
-Place new deliverables under project-relative materials/YYYY-MM-DD/<channel-or-method>/<short-topic>/,
-for example materials/2026-11-04/x/short-topic/. Use readable topic names and keep
-taskId, revision and runId in manifests, not directory names. This applies to later
-rounds of the same long-lived task too. Preserve historical and currently executing
-paths; link old outputs rather than moving them or claiming they were produced today.
-Use file versions instead of overwriting delivered bytes. Work crossing midnight
-keeps its original directory; the next day's index links to it.
-
-Keep README.md and manifest.json at the day root. Main owns these two shared
-indexes; without direct file writing it assigns one original member to update them
-and independently checks the result. Other workers report candidates in the group chat.
-Each manifest entry records
-relative path, KR/method, owner, taskId, revision, runId, producedAt with timezone,
-bytes, SHA256, upstream evidence and verification status. Data also records asOf
-and source/account; collection time and metric date are different. A migrated
-copy records its original path/date/hash and migratedAt; it is not a new run.
-Daily directories and indexes are created when work actually happens, not as
-empty promises for future days. Paths and indexes do not replace host artifacts.
-
-For X retain copy, image, ALT text, exact account, reviewed version and receipt.
-For video retain script, source recordings, voiceover, subtitles, cover, final
-MP4 and decode/review evidence. Store publishing receipts beside the delivered
-content: prepared, selected, uploaded, submitted, reviewing, public or blocked
-are distinct states. A URL without a verified platform receipt proves no post.
-Do not put credentials, cookies or tokens in deliverables or daily indexes.
-
-## Roles and control
-
-Main reads the confirmed KR/method, plans owners and dependencies, assigns bounded
-work with acceptance criteria, resolves blockers and independently verifies the
-current run's artifacts. Main controls pause/resume/stop/steer through the host;
-members cannot accept their own work or edit host task state. A real resume
-receipt supersedes an old temporary planning pause; external action approval
-still applies to the exact content/account. Never infer publish permission from
-a changed label or another member's assertion.
-
-Content members create real files; the video member produces and checks actual
-media. A data member collects dated facts from confirmed sources, never invented
-zeros. A reflection member compares outcomes to the experiment, identifies
-uncertainty and proposes the next change; Main/user decide and dispatch it.
-One member owns a file, account or device action at a time. Serialize browser and
-phone operations; unknown outcomes are reconciled on the same resource before
-retry. Do not bypass a busy task, old pending tool or login/approval boundary.
-
-Keep members alive between rounds. Reuse the original member/task and native
-conversation through revision-checked steering; do not create r2/r3 replacements.
-A closed terminal requires identity-verified restoration of the original
-conversation, never a silent new conversation.
-
-Use the same group chat for handoffs, blockers, candidate artifacts and decisions.
-Report task/revision/run and paths rather than only saying done. @leader addresses
-Main; a member mention addresses its real task. To change an existing task, use
-the task page or directed chat and preserve host revision checks. A plan-only
-member has no executable session; Main must dispatch it first.
-
-## Daily execution, reflection and memory
-
-At the start of work read today's index, confirmed targets, team memory, recent
-review and current board. Produce bounded artifacts, report them, and let Main
-read actual current-run bytes and dependency evidence before acceptance. External
-actions require their platform receipt and the user's decision boundary.
-
-Record real metric observations through the revision-checked project operation;
-do not hand-edit confirmed snapshots or replace observations.jsonl history. Keep
-same-day corrections as new observations. At day end compare evidence, results
-and unknowns; write reflection and the next experiment in the daily directory.
-Main merges lasting facts into memory/team.md with its current hash and records
-decisions through the supported operation. Memory is concise knowledge, not raw
-logs or proof that a publication succeeded. The loop is execute, observe, reflect,
-decide, then execute again. A daily plan is not an installed recurring scheduler.
-`

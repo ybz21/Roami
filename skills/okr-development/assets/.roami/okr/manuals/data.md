@@ -24,3 +24,9 @@ Main 将实际回执和来源映射写进团队记忆，将大文件和原始证
 ## 新稿自动参与取数
 
 用 [collection-store](../skills/collection-store/SKILL.md) 初始化项目 SQLite 并登记 Main 已审核的实际公开稿件。Connector 按已确认账号查询登记、重新核验平台身份、记录完整覆盖集合；新增稿件不修改 Skill 代码包。保留旧单稿指标，新增“本项目已核验稿件累计”口径；不同覆盖集合的快照不能直接相减声称日增量。数据库写入不是发布看板，候选仍按上文验收确认。当前脚本只提供登记操作，不能当作任意 SQL 或宿主观测写入入口。
+
+## 结构化采集源库
+
+需要按业务表保存明细时，读取 [dashboard-storage Skill](../skills/dashboard-storage/SKILL.md)，使用其 init、schema-apply、write、read/export、backup。它初始化空的 source.sqlite3，业务字段在项目声明，物理源表保存不可变行版本；按来源、字符串账号 ID、日期和业务键隔离。新采集采用持久 ingestKey 与当前 schemaDigest；更正检查 expectedVersion，整批失败回滚，原始证据按实际字节核验。未知用 null，真实 0 不丢失；不得把累计快照相加当增长。
+
+Main 读取固定行版本与原始证据，再按已支持的 Connector 批次确认入库。此源库不替换旧观测或宿主确认修订；导出仍是候选，前端继续只读 SDK。数据库备份用 Skill 的 SQLite backup 操作，不只复制 WAL 主文件；恢复前先核对后来事实，不能用旧备份盖掉新行。完整模板复制后包含此 Skill，不包含生成的数据库或示例业务数据。
