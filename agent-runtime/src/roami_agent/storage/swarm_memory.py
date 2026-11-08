@@ -74,6 +74,17 @@ async def project_context(swarms, owner, sid, *, memory=None, operation=None, pa
         raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503) from exc
 
 
+def guidance_skill_kind(name, path):
+    if not isinstance(name, str):
+        return None
+    if re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,63}", name) and path == f"skills/{name}/SKILL.md":
+        return "project"
+    connector = re.fullmatch(r"connector-([a-zA-Z][a-zA-Z0-9_-]{0,63})", name)
+    if connector and path == f"connectors/{connector[1]}/SKILL.md":
+        return "connector"
+    return None
+
+
 def from_project(workspace):
     files = workspace["projectFiles"]
     content, sha = files.get("teamMemory", ""), files.get("teamMemorySha256")
@@ -112,23 +123,26 @@ def from_project(workspace):
         or not isinstance(workflow, str)
         or len(workflow.encode()) > 65536
         or not isinstance(skills, list)
-        or len(skills) > 16
+        or len(skills) > 48
     ):
         raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
     total, seen = 0, set()
+    counts = {"project": 0, "connector": 0}
     for skill in skills:
         if not isinstance(skill, dict):
             raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
         name, content = skill.get("id"), skill.get("content")
+        kind = guidance_skill_kind(name, skill.get("path"))
         if (
-            not isinstance(name, str)
-            or not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,63}", name)
+            kind is None
             or name in seen
-            or skill.get("path") != "skills/" + name + "/SKILL.md"
             or not isinstance(content, str)
             or not content
             or digest(content) != skill.get("sha256")
         ):
+            raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
+        counts[kind] += 1
+        if counts[kind] > (16 if kind == "project" else 32):
             raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
         seen.add(name)
         total += len(content.encode())

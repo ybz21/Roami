@@ -19,3 +19,11 @@ Main 将 `roami agent task status` 包进 `cd … && … | head` 后，命令落
 ## Acceptance
 
 用真实 Runtime 调用证明：包裹命令不启动 Shell/业务 handler；同一原 Main 的单独命令到达 handler 且保留真实 binding；禁用/角色限制仍生效。验证 JSON/引用文本与普通 Shell、已有原生工作流不被误拦。将实际排障经验写入完整初始化模板和运行手册，不把工具目录等同于成员机器能力，也不把群聊投递等同于完成。
+
+## Go 指导包与团队记忆
+
+生产中原 Main 的 swarm_memory_read 返回 unavailable，而真实项目文件和摘要均完好。实际 Go CLI 返回 5 个 `skills/<id>/SKILL.md` 和 2 个 `connectors/<source>/SKILL.md`；后者的 ID 为 `connector-<source>`。Python 只接受第一种路径，误将整份记忆和操作回执能力一并判为不可用，继而阻止复盘及记忆写入。这不是缺少记忆文件。
+
+校验器按 Go 的两类坐标分别验证 ID、路径和摘要，保留项目范围、去重与上下文总量限制；普通 Skill 最多 16 个，Connector 最多 32 个，Connector 的原 source ID 允许完整 64 字符。不能以接受 Connector 为由放开任意路径、外部来源或执行权限。写入入口也明确禁止以占位内容探测真实记忆；发现接口缺口应读 schema/帮助。
+
+验收包含普通与 Connector 混合指导包、两类数量边界、长 source ID、错路径/身份/摘要、重复与超大内容。另保留真实 Go CLI 只读响应的失败与修复重放，核对原记忆 SHA 不变；上线后必须由原 Main 获取真实记忆/复盘回执再关闭 #800，不能以隔离读取成功替代。
