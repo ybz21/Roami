@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 长期会话增量整理 | [20261109-incremental-context](20261109-incremental-context/README.md) | 复用有效摘要、保留完整来源与记忆版本校验 |
 | OKR 发布后的动态取数 | [20261108-okr-publication-data](20261108-okr-publication-data/README.md) | 项目 SQLite 发布登记、稳定集合来源与 Main 确认边界 |
 | 语音识别模型配置 | [20261107-speech-model-settings](20261107-speech-model-settings/README.md) | 能力中心入口、旧链接兼容与桌面/真机验收 |
 | 会话内存误杀与恢复 | [20261107-memory-scope-recovery](20261107-memory-scope-recovery/README.md) | 两次退出原因、原对话恢复与测试限额隔离回归 |
