@@ -22,7 +22,7 @@ Main 每次更新前读取完整文件和当前 SHA/版本。team.md 使用当�
 
 ## 时间：事实在日目录，结论按周期提炼
 
-1. 日交付：`YYYY/YYYYMM/YYYYMMDD/<方法>/<taskId>/r<revision>/<runId>/`。Main 在日 README/manifest 中登记相对路径、所属 KR/方法、所有者、轮次、产出时间、字节数、SHA、来源和验收状态。跨天任务不移动原目录。
+1. 日交付：`materials/YYYY-MM-DD/<渠道或工作类型>/<简短主题>/`。Main 在日 README/manifest 中登记相对路径、所属 KR/方法、所有者、轮次、产出时间、字节数、SHA、来源和验收状态。跨天任务不移动原目录。
 2. 日复盘：当天 `reflection/` 中引用实际回执，写结果、数据截至/采集时间、未知、失败与下一实验，不用计划充作完成。
 3. 周复盘：`YYYY/reflection/weeks/YYYY-Www.md`，YYYY/周号按项目时区对应日期的 ISO 周年计算。例如 2027-01-01 属于 2026-W53，应放 `2026/reflection/weeks/2026-W53.md`，并链接 2027 的实际日目录。
 4. 月复盘：`YYYY/YYYYMM/reflection/month.md`。年复盘：`YYYY/reflection/year.md`。依据实际公历月/年，跨周期的同一文件保留一个原件，用链接引用。

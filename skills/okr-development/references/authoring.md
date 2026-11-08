@@ -45,7 +45,7 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | data/observations.jsonl / reviews.jsonl / connector-batches.jsonl | 新草稿为空；事实由受管操作发布并导出 | 不放演示数字、不替换旧历史 |
 | evidence/ | 实际来源/验收证据，保留原文件与哈希 | 不用空占位证据声称完成 |
 | state/ | 宿主生成 immutable snapshots 与 current.json | 模板不生成确认指针 |
-| YYYY/YYYYMM/YYYYMMDD/ | 真正发生工作后按方法/task/revision/run 记录产物与索引 | 不预造完成目录或把旧文件移成当天成果 |
+| materials/YYYY-MM-DD/ | 真正发生工作后按渠道与短主题保存物料，任务和运行身份进清单 | 不预造完成目录或把旧文件移成当天成果 |
 
 ## 目标、指标与手段
 

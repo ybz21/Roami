@@ -19,7 +19,7 @@ Main 通过当前宿主提供的 register/plan/steer 工具登记、派工与续
 - `memory/team.md`：团队可复用事实、指标映射与工作约定，由 Main 按当前哈希更新。
 - `memory/decisions.md`：重要决定、边界、未决项，注明来源、负责人和状态，保留变化历史。
 - `memory/members/<稳定成员ID>/memory.md`：成员个人长期记忆，跨轮次复用。
-- `YYYY/YYYYMM/YYYYMMDD/`：真正的交付、证据、复盘与平台回执；不是记忆的替代品。
+- `materials/YYYY-MM-DD/<渠道或工作类型>/<简短主题>/`：真正的交付、证据、复盘与平台回执；不是记忆的替代品。
 
 共享日索引由 Main 维护，成员只写各自任务/修订/运行子目录，避免覆盖他人成果。
 
