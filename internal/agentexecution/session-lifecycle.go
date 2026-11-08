@@ -451,7 +451,7 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	}
 	lease, err := s.claimWorkspace(ctx, binding.Directory, spec.Key)
 	if err != nil {
-		if writeErr := writeJSON(filepath.Join(dir, "result.json"), Result{State: "failed", Summary: workspaceLeaseCode(err), FinishedMS: time.Now().UnixMilli(), ExitCode: -1}); writeErr != nil {
+		if writeErr := writeJSON(filepath.Join(dir, "result.json"), workspaceClaimResult(err)); writeErr != nil {
 			return Status{}, writeErr
 		}
 		return s.Status(spec.Key)
