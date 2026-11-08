@@ -13,4 +13,6 @@ description: 接续固定团队执行并独立验收。
 
 已注册受管CLI命令独立提交，不加cd前缀、管道、重定向或命令链；上下文由宿主提供，不能从环境拼造turn/call。完成回调可以触发原Main验收，但不代表普通群聊和每日调度都已接通。
 
+成员消息显式选择 kind：progress 仅为进展讨论，需要 Main 答复/处理时使用 question、blocker 或 handoff，并保留当前 taskId/runId/taskRevision 与稳定 messageKey；同条重试不换 messageKey。原生 CLI 文件还需稳定 commandKey；受管工具由宿主提供该字段，不手填宿主身份。只在正文写 @leader 不会把 progress 变为待答复问题。实际回复使用 kind=reply 和原 postId 的 replyTo，不把已收件当已读、已答复或已验收。通过当前宿主支持的群聊状态读取真实回复，不直接向受管成员 session send 输入，不借其他项目、成员或旧轮次身份通信。
+
 外部交付按项目根AGENTS和[自动运行手册](../../manuals/automation.md)的实际模式执行。Main的草稿交付验收不是发布资格；自动模式仍需独立审核冻结版本、真实发布通道及平台回执。

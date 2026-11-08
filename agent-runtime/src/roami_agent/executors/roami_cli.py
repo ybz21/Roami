@@ -142,11 +142,16 @@ class CodingExecutor:
                 + swarm["swarm_id"]
                 + "; member: "
                 + swarm["member_name"]
-                + ". For progress or questions, write a JSON file containing the following binding plus commandKey (unique per message) and text, then call roami session swarm post "
+                + ". Write a JSON file containing the following binding, commandKey, messageKey, kind and text, then call roami session swarm post "
                 + swarm["swarm_id"]
                 + " --file /absolute/path/message.json. Binding: "
                 + encoded(collaboration)
-                + ". This posts discussion only; continue using the existing final result handoff for completion. Read group chat and board with roami session swarm status "
+                + '. Choose kind="progress" for discussion only; use kind="question", "blocker" or "handoff" when the original Main needs to respond or verify work. '
+                + "These kinds persist in the original Main inbox; writing @leader in progress text does not route a question. "
+                + "Preserve the same commandKey and messageKey when retrying the same message; changed content is a new message and needs new keys. "
+                + 'For an actual reply use kind="reply" and replyTo equal to the original post ID. '
+                + "Never borrow another task, revision, run or team identity. An accepted inbox receipt is not a reply, execution or task acceptance. "
+                + "Continue using the existing final result handoff for completion. Read group chat, actual replies and board with roami session swarm status "
                 + swarm["swarm_id"]
                 + " --json."
             )
