@@ -27,6 +27,7 @@ from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.task_handoff import request_handoff_complete
 from roami_agent.storage.transcript_repository import message
 from roami_agent.tools.request_coverage_recovery import request_coverage_recovery
+from roami_agent.tools.review_input_recovery import review_input_recovery
 from roami_agent.tools.workspace_images import WorkspaceImageReadError
 
 
@@ -228,6 +229,8 @@ class ToolGateway:
             )
         except (DomainError, TimeoutError, OSError, httpx.HTTPError) as exc:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
+            if recovery := review_input_recovery(value["error"]):
+                value["recovery"] = recovery
             if isinstance(exc, DraftReviewRejected):
                 value.update(
                     executionStarted=False, failurePhase="validation", feedback=exc.feedback

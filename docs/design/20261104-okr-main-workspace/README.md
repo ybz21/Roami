@@ -245,3 +245,5 @@
 - [可读物料与既有发布流程](material-workflow.md)：去掉物料路径中的执行 UID，复用已验证通道并核对限制范围。
 
 - [任务结果文件提示](output-warning.md)：短提示与按需查看完整路径。
+
+- [验收与发布输入纠正](review-input-recovery.md)：保留校验，给 Main 明确的下一步。
