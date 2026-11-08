@@ -1,13 +1,12 @@
 // 语音识别(ASR)：接收前端录音(WAV)，转发到所配置的服务商并返回识别文本。
-// 支持 OpenAI(Whisper/transcriptions 兼容接口) 与 火山引擎(豆包大模型录音识别)：
-//
-//	标准版 volc.bigasr.auc(submit→query 异步) / 极速版 volc.bigasr.auc_turbo(flash 一次性同步)，按 resourceId 自动选路。
+// 火山 API Key 使用豆包流式识别 2.0；旧版双凭据保留录音文件识别兼容。
 //
 // 服务商密钥持久化到 <dataDir>/speech-config.json，单独管理，不走 env(避免被 push 进 shell 会话)。
 package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -37,7 +36,7 @@ type OpenAISpeech struct {
 }
 
 type VolcanoSpeech struct {
-	APIKey      string `json:"apiKey"`      // 新版控制台：一个 API Key（请求头 X-Api-Key），填了就不看下面两个
+	APIKey      string `json:"apiKey"`      // 新版流式识别鉴权，优先于旧凭据
 	AppID       string `json:"appId"`       // 旧版控制台 App ID
 	AccessToken string `json:"accessToken"` // 火山控制台 Access Token
 	ResourceID  string `json:"resourceId"`  // 默认 volc.bigasr.auc(大模型录音识别·标准版)；含 _turbo 走极速版
@@ -146,7 +145,7 @@ func (a *API) SpeechTranscribe(c *gin.Context) {
 	case "openai":
 		text, err = transcribeOpenAI(cfg.OpenAI, audio, fh.Filename)
 	case "volcano":
-		text, err = transcribeVolcano(cfg.Volcano, audio)
+		text, err = transcribeVolcano(c.Request.Context(), cfg.Volcano, audio)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "NOT_CONFIGURED"}})
 		return
@@ -282,10 +281,11 @@ func volcanoText(body []byte) (string, error) {
 	return r.Result.Text, nil
 }
 
-// transcribeVolcano 调火山引擎豆包大模型录音识别，按 resourceId 自动选路：
-// 含 _turbo → 极速版(flash 一次性同步)；否则 → 标准版(submit→query 异步)。
-func transcribeVolcano(cfg VolcanoSpeech, audio []byte) (string, error) {
-	if cfg.APIKey == "" && (cfg.AppID == "" || cfg.AccessToken == "") {
+func transcribeVolcano(ctx context.Context, cfg VolcanoSpeech, audio []byte) (string, error) {
+	if strings.TrimSpace(cfg.APIKey) != "" {
+		return transcribeVolcanoStream(ctx, cfg, audio)
+	}
+	if cfg.AppID == "" || cfg.AccessToken == "" {
 		return "", fmt.Errorf("volcano credentials not set")
 	}
 	resourceID := cfg.ResourceID

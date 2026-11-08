@@ -54,6 +54,8 @@ it('moves legacy model pricing and usage links to their matching capability sect
   expect(normalizeRoute('settings/agent/runtime?modelTab=proxy')).toBe('capabilities/models/usage')
   expect(normalizeRoute('settings/agent/runtime')).toBe('capabilities/models/catalog')
   expect(normalizeRoute('env/agent/runtime?modelTab=prices')).toBe('capabilities/models/prices')
+  expect(normalizeRoute('settings/node/speech?node=n1')).toBe('capabilities/models/speech')
+  expect(normalizeRoute('env/node/speech')).toBe('capabilities/models/speech')
 })
 
 it.each([

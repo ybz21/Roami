@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 语音识别模型配置 | [20261107-speech-model-settings](20261107-speech-model-settings/README.md) | 能力中心入口、旧链接兼容与桌面/真机验收 |
 | 会话内存误杀与恢复 | [20261107-memory-scope-recovery](20261107-memory-scope-recovery/README.md) | 两次退出原因、原对话恢复与测试限额隔离回归 |
 | 后台任务详情展示 | [20261106-task-detail-polish](20261106-task-detail-polish/README.md) | 结果优先、命令用途、窄栏溢出修复与桌面/真机验收 |
 | 会话列表精简 | [20261105-session-list-metadata](20261105-session-list-metadata/README.md) | 侧栏只保留会话身份与状态，分支与目录集中到顶部查看 |

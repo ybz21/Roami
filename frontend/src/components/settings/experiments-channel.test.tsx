@@ -21,14 +21,15 @@ it('keeps every visible setting in one of the five groups and leaves direct link
   expect(model.groups).toEqual([
     { title: 'set.groupPreferences', pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
     { title: 'set.groupAgent', pages: ['agent.runtime', 'agent.memory'] },
-    { title: 'set.groupNotifications', pages: ['agent.messages', 'node.speech'] },
+    { title: 'set.groupNotifications', pages: ['agent.messages'] },
     { title: 'set.groupDevices', pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
     { title: 'set.groupSystem', pages: ['node.env', 'sec', 'about'] },
   ])
-  expect(new Set(model.order).size).toBe(15)
+  expect(new Set(model.order).size).toBe(14)
   for (const id of model.order) expect(model.pages[id].parent).toBe(model.groups.find(group => group.pages.includes(id))!.title)
   expect(model.pages['node.memory']).toBeTruthy()
   expect(model.order).not.toContain('node.memory')
+  expect(model.pages['node.speech']).toBeUndefined()
 })
 
 it('moves fullscreen and sign-out without dropping their controllers or their search terms', () => {
@@ -42,5 +43,5 @@ it('moves fullscreen and sign-out without dropping their controllers or their se
   expect(account.scope).toBe('browser')
   if (account.control.kind === 'custom') expect((account.control.node as any).props.onLogout).toBe(onLogout)
   expect(model.pages['agent.messages'].items.find(item => item.id === 'push')!.scope).toBe('browser')
-  expect(model.pages['node.speech'].items.find(item => item.id === 'showVoiceButton')!.scope).toBe('mine')
+  expect(model.pages['agent.new'].items.find(item => item.id === 'showVoiceButton')!.scope).toBe('mine')
 })
