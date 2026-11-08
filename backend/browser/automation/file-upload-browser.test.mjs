@@ -18,6 +18,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 const form = `<!doctype html><meta charset="utf-8"><title>Private upload fixture</title>
 <form id="form"><label>Video<input id="video" name="video" type="file"></label><input id="text" type="text"></form><pre id="result">Waiting for file</pre>
 <script>document.querySelector('#video').addEventListener('change',async()=>{try{const r=await fetch('/upload',{method:'POST',body:new FormData(document.querySelector('#form'))});document.querySelector('#result').textContent=await r.text()}catch(e){document.querySelector('#result').textContent='FAILED:'+e.message}})</script>`
+const deferredForm = `<!doctype html><meta charset="utf-8"><title>Deferred file reader</title>
+<form id="form"><input id="video" name="video" type="file"><button id="send" type="button">Read selected file</button></form><pre id="result">Waiting</pre>
+<script>document.querySelector('#send').onclick=async()=>{try{await document.querySelector('#video').files[0].arrayBuffer();const r=await fetch('/upload',{method:'POST',body:new FormData(document.querySelector('#form'))});document.querySelector('#result').textContent=await r.text()}catch(e){document.querySelector('#result').textContent='FAILED:'+e.name}}</script>`
 
 async function waitFor(read, description) {
   const until = Date.now() + 15000
@@ -50,7 +53,7 @@ test('private CDP Chrome selects and uploads exact bytes to a local form; repeat
       const receipt = { name: file.name, sizeBytes: file.body.length, sha256: hash(file.body), mimeType: file.mimeType }
       uploads.push(receipt); response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(receipt)); return
     }
-    response.writeHead(200, { 'Content-Type': 'text/html' }); response.end(form)
+    response.writeHead(200, { 'Content-Type': 'text/html' }); response.end(request.url === '/deferred' ? deferredForm : form)
   })
   let chrome, browser
   try {
@@ -105,7 +108,7 @@ test('private CDP Chrome selects and uploads exact bytes to a local form; repeat
     const fresh = { ...flags, 'expected-scene': (await observePage(page)).signature }
     await assert.rejects(executeVerb(browser, 'upload', fresh, ['#text', source], 10000, { log: () => {} }, 'private-fixture'), /CHROME_UPLOAD_INPUT_INVALID/)
     assert.equal(uploads.length, 2)
-    let cliReceipt
+    let cliReceipt, selectDeferred
     if (process.env.ROAMI_TEST_ROAMI_BIN) {
       const data = join(root, 'cli-data'), cache = join(data, 'cache/chrome-runtime')
       await mkdir(cache, { recursive: true })
@@ -125,10 +128,23 @@ test('private CDP Chrome selects and uploads exact bytes to a local form; repeat
       assert.deepEqual(await cli('upload', '#video', source, ...cliFlags), cliReceipt)
       assert.deepEqual(await cli('operation-status', '--operation-id', cliReceipt.id, '--receipt-root', join(root, 'cli-receipts')), cliReceipt)
       assert.equal(uploads.length, 3)
+      selectDeferred = (target, scene) => cli('upload', '#video', source, '--target', target, '--expected-browser', capabilities.browserId, '--expected-scene', scene, '--file-root', root, '--expected-file-sha256', hash(body), '--operation-id', '4'.repeat(32), '--receipt-root', join(root, 'cli-receipts'), '--no-focus', '--no-retry')
       await delay(500)
     }
+    const deferred = await context.newPage(); await deferred.goto(address + '/deferred')
+    const deferredTarget = await targetIdentity(deferred), previousUploads = uploads.length
+    const deferredScene = (await observePage(deferred)).signature
+    if (selectDeferred) await selectDeferred(deferredTarget, deferredScene)
+    else await executeVerb(browser, 'upload', { ...flags, target: deferredTarget, 'expected-scene': deferredScene }, ['#video', source], 10000, { log: () => {} }, 'private-fixture')
+    assert.equal(uploads.length, previousUploads, 'selection must not submit the form')
+    // Read only after upload returned and its private temporary snapshot was removed.
+    await executeVerb(browser, 'click', { target: deferredTarget, 'no-focus': true }, ['#send'], 10000, { log: () => {} }, 'private-fixture')
+    await waitFor(async () => !(await deferred.locator('#result').innerText()).startsWith('Waiting'), 'deferred file read')
     const screenshot = process.env.ROAMI_UPLOAD_ACCEPTANCE_SCREENSHOT
-    if (screenshot) { await page.bringToFront(); await page.screenshot({ path: screenshot, fullPage: true, timeout: 10000 }) }
+    if (screenshot) { await deferred.bringToFront(); await deferred.screenshot({ path: screenshot, fullPage: true, timeout: 10000 }) }
+    assert.equal((await deferred.locator('#result').innerText()).startsWith('FAILED:'), false, await deferred.locator('#result').innerText())
+    await waitFor(() => uploads.length === previousUploads + 1, 'deferred form received stable file bytes')
+    assert.deepEqual(uploads.at(-1), { name: 'demo clip.mp4', sizeBytes: body.length, sha256: hash(body), mimeType: 'video/mp4' })
     console.log(JSON.stringify({ browser: 'dedicated headless CDP', source: 'local HTTP fixture', upload: uploads[0], untouchedTarget: otherTarget, selectedTarget: target, duplicateUploadCount: uploads.length, knownReceipt: selected.state, lostAcknowledgement: result.state, cliReceipt }))
     assert.equal((await stat(source)).size, body.length)
   } catch (error) {
