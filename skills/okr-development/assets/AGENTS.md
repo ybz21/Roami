@@ -49,9 +49,11 @@ OKR 操作手册：`.roami/okr/manuals/README.md`；按当前任务选择看板�
 - 群聊交接使用“本轮任务与结果、产物路径、证据、阻塞、建议的记忆更新”；Main 先核实，再按支持的项目记忆或 Swarm 记忆操作读取全文/版本并 CAS 写入。当前项目 memory 操作写 team.md；decisions.md 和个人文件按各自实际文件权限维护，修改前读原文并核对未被他人更改，不伪造通用 memory API。项目记忆与 Swarm 记忆如为不同存储，要明确各自路径及同步回执，不能假定自动同步。
 - 更新保留已有知识与历史，冲突后重读合并；更正旧结论要追加来源和更正说明，不抹掉失败。记忆不保存密码、Cookie、Token，不代替交付文件、发布回执或独立验收。
 
+- Main 使用 `project_okr_context` 读取当前 `projectFiles.teamMemorySha256`，再用 `project_okr_memory_append` 的 expectedSha256 和仅新增的 content 追加已核验知识。工具未加载时先按 project/okr/memory 查询；缺少通用 file_write 不代表不能更新团队记忆。写后回读，冲突重读合并，已有事实不重复追加。
+
 ### 5. 按日、周、月、年组织产物与记忆
 
-新物料用 `materials/YYYY-MM-DD/<渠道或工作类型>/<简短主题>/`。目录名不用任务或运行 UID；taskId/revision/runId 写入 manifest 和宿主回执。修改使用版本化文件名，不按每轮执行再套一层目录，不覆盖已交付字节。Main 负责每日 README 与清单，无直接写权限时交原数据成员整理再核对。采用项目时区和真实产出日期；已分派任务沿原路径完成，历史文件按原日期保留并通过索引引用。
+新物料用 `materials/YYYY-MM-DD/<渠道或工作类型>/<简短主题>/`。目录名不用任务或运行 UID；taskId/revision/runId 写入 manifest 和宿主回执。修改使用版本化文件名，不按每轮执行再套一层目录，不覆盖已交付字节。Main 负责每日 README 与清单，无直接写权限时交原数据成员整理再核对。采用项目时区和真实产出日期。保留历史和当前正在执行这一轮的原路径；同一长期 task 的后续轮次仍使用上述可读目录，Main 续派时明确新物料位置，不再套 task/revision/run 子目录。已冻结或正在执行的文件不移动，历史通过索引引用。
 
 | 层次 | 位置 | 写什么、谁维护 |
 | --- | --- | --- |
