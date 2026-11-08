@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -10,9 +11,42 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_coordination import admitted_batch, evidence, record_retrieval
 from roami_agent.storage.swarm_daily_goal import advance, queue
+from roami_agent.tools.swarm_coordination_policy import SwarmCoordinationPolicy
 
 delegated_team = delegated_team_fixture
 DAY = datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=9, minute=0, second=0, microsecond=0)
+
+
+async def test_daily_guidance_names_only_tools_in_the_real_batch_catalog(delegated_team):
+    runtime, service, team, _, initial, binding, spec = delegated_team
+    goal = await service.enable("alice", team["id"], spec, binding=binding)
+    await finish(runtime, initial)
+    dated = await step(runtime, await tick(runtime, team, goal, slot="review"))
+    job = await runtime.db.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?", (dated["turnId"],)
+        )
+    )
+    turn = await runtime.mailbox.claim(job)
+    plan, prompt = await runtime.loop.context.build(turn, "Review the actual day.", [], None)
+    assert plan["coordinationEvidence"]["dailySlot"]["slot"] == "review"
+    coordination = [
+        m["content"]
+        for m in prompt
+        if m["role"] == "system"
+        and m["content"].startswith("Current original-Main coordination batch")
+    ]
+    assert len(coordination) == 1
+    instructions = coordination[0].split("Trusted batch metadata and quoted source data:", 1)[0]
+    named = {
+        name
+        for name in runtime.tools.registry
+        if "_" in name
+        and re.search(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])", instructions)
+    }
+    assert named
+    admitted = await SwarmCoordinationPolicy(runtime.db, None).tool_names(turn, "main")
+    assert named <= admitted | {"read", "bash"}
 
 
 async def tick(runtime, team, goal, *, slot="morning", timezone="Asia/Shanghai", clock=None):

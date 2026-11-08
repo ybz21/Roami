@@ -249,3 +249,5 @@
 - [验收与发布输入纠正](review-input-recovery.md)：保留校验，给 Main 明确的下一步。
 
 - [原 Skill 发布与平台回执（设计草案）](publication-native-skill.md)，[交互原型](publication-native-skill.html)：保留原团队与通道，区分审核、提交、平台确认和下一轮。
+
+- [日期槽与真实复盘](daily-review-workflow.md)：读取已声明阶段流程，区分群聊回告与复盘、记忆回执。

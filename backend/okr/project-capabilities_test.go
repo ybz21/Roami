@@ -82,8 +82,11 @@ func TestProjectWorkflowIsSeededOnlyForOKRAndPreservesProjectRules(t *testing.T)
 	if body, _ := os.ReadFile(filepath.Join(project, "AGENTS.md")); string(body) != custom {
 		t.Fatal("existing project rules overwritten")
 	}
-	if w.ProjectFiles.WorkflowFile != "AGENTS.md" || !strings.Contains(w.ProjectFiles.Workflow, "2026/202611/20261104/") || !strings.Contains(w.ProjectFiles.Workflow, "members cannot accept their own work") {
+	if w.ProjectFiles.WorkflowFile != "AGENTS.md" || !strings.Contains(w.ProjectFiles.Workflow, "materials/2026-11-04/x/short-topic/") || !strings.Contains(w.ProjectFiles.Workflow, "members cannot accept their own work") {
 		t.Fatal("daily/team guidance missing", w.ProjectFiles)
+	}
+	if strings.Contains(w.ProjectFiles.Workflow, "<task-id>/r<revision>/<run-id>") {
+		t.Fatal("new project still prescribes execution identities as material directories")
 	}
 	os.Remove(filepath.Join(project, "AGENTS.md"))
 	edited := "# Custom daily workflow\nUse dated evidence.\n"

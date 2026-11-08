@@ -35,3 +35,12 @@ Main 每次更新前读取完整文件和当前 SHA/版本。team.md 使用当�
 ## Main 的团队记忆追加入口
 
 先发现 project_okr_context/project_okr_memory_append，读取 context 的 projectFiles.teamMemorySha256，再以 expectedSha256 和仅新增的 content 调 append。这是 team.md 的受管追加入口，不要求通用文件写入权限，也不写其他个人文件。冲突重读合并，成功后回读；同一事实不重复追加，身份核对不能写成登录或发布成功。
+
+## 协调回合的工具入口
+
+普通用户直接发起的 Main 回合与定时唤醒、成员回调产生的协调批次有不同的工具目录；以当前 tool_list/help 为准，不能把普通项目写工具硬套进协调批次。
+
+- 协调批次复盘：先 swarm_project_context，使用当前 revision 调 swarm_project_update（operation=review），并回读实际复盘回执。
+- 协调批次团队记忆：先 swarm_memory_read，再用返回的 sha256 作为 expectedSha256 调 swarm_memory_write，只追加已核验的新知识；宿主保留批次去重身份。不能自己换 operationKey 绕过去重。
+- 普通用户 Main 回合可按当前目录使用 project_okr_context/project_okr_update/project_okr_memory_append；这些普通项目写入口在协调批次不开放。缺少通用 file_write 不代表没有上述记忆或复盘入口。
+- 协调 Main 不运行任意 shell；文件、任务和留存产物用已登记的读取工具。原生 Codex/Claude 成员按本轮授权使用其真实 CLI/Skill，两者的目录不能互相代替。读文件、讨论投递与实际写回/验收分别留证。
