@@ -7,7 +7,6 @@ import { useI18n } from '../../i18n'
 
 const SPEECH_DEFAULTS = {
   openai: { baseURL: 'https://api.openai.com/v1', model: 'whisper-1' },
-  volcano: { resourceId: 'volc.bigasr.auc', endpoint: 'https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit' },
 }
 function normalizeSpeech(d: any) {
   const c = d || {}
@@ -23,8 +22,8 @@ function normalizeSpeech(d: any) {
       apiKey: c.volcano?.apiKey || '',
       appId: c.volcano?.appId || '',
       accessToken: c.volcano?.accessToken || '',
-      resourceId: c.volcano?.resourceId || SPEECH_DEFAULTS.volcano.resourceId,
-      endpoint: c.volcano?.endpoint || SPEECH_DEFAULTS.volcano.endpoint,
+      resourceId: c.volcano?.resourceId || '',
+      endpoint: c.volcano?.endpoint || '',
     },
   }
 }
@@ -64,11 +63,7 @@ export function SpeechSettings() {
     </>}
     {cfg.provider === 'volcano' && <>
       <label className="agent-settings-field">{t('settings.volcanoApiKey')}<Input.Password aria-label={t('settings.volcanoApiKey')} disabled={saving} autoComplete="new-password" placeholder={t('settings.volcanoApiKeyHint')} value={cfg.volcano.apiKey} onChange={e => setVolc('apiKey', e.target.value)} /></label>
-      <p className="agent-settings-hint">{t('settings.volcanoLegacyHint')}</p>
-      <label className="agent-settings-field">{t('settings.volcanoAppId')}<Input aria-label={t('settings.volcanoAppId')} disabled={saving} value={cfg.volcano.appId} onChange={e => setVolc('appId', e.target.value)} /></label>
-      <label className="agent-settings-field">{t('settings.volcanoAccessToken')}<Input.Password aria-label={t('settings.volcanoAccessToken')} disabled={saving} autoComplete="new-password" value={cfg.volcano.accessToken} onChange={e => setVolc('accessToken', e.target.value)} /></label>
-      <label className="agent-settings-field">{t('settings.volcanoResourceId')}<Input aria-label={t('settings.volcanoResourceId')} disabled={saving} value={cfg.volcano.resourceId} onChange={e => setVolc('resourceId', e.target.value)} /></label>
-      <label className="agent-settings-field">{t('settings.volcanoEndpoint')}<Input aria-label={t('settings.volcanoEndpoint')} disabled={saving} value={cfg.volcano.endpoint} onChange={e => setVolc('endpoint', e.target.value)} /></label>
+      <p className="agent-settings-hint">{t('settings.volcanoModelHint')}</p>
     </>}
     <div className="agent-settings-save"><Button type="primary" htmlType="submit" loading={saving}>{t('settings.save')}</Button></div>
   </form>

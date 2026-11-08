@@ -45,3 +45,24 @@
 根据后续反馈，语音识别改为第一个「模型」标签下的区块，去掉独立标签。补充验收截图使用 `/tmp/speech-inline-desktop.png` 与 `/tmp/speech-inline-phone.png`；测试和构建日志使用 `/tmp/speech-inline-tests.log`、`/tmp/speech-inline-build.log`。
 
 本次位置调整重新通过全部 214 个文件、1565 项前端测试及 typecheck、i18n、hover、build、quick 门禁。桌面四档宽度无横向溢出，模型编辑面板可开关；中英文均核对。Android LAN 页面确认模型列表下方出现语音区块；为避开同机其他实例的 Cookie 覆盖，后续触控通过 ADB 反向转发使用独立 localhost 域名。ADB 上滑后该页 scrollTop 从 0 增至 316，文档与视口均为 392 CSS px。手机截图通过选定的真机 Chrome 标签采集，避免其他任务切换前台干扰截图。
+
+## 火山单 Key 接入（2026-11-08）
+
+### Product Design / User Stories
+
+火山识别服务只展示 API Key 输入框，明确默认使用豆包流式语音识别 2.0。用户无需填写 App ID、Access Token、资源 ID 或接口地址。原「模型」标签下的位置不变，原双凭据配置保留读取与执行兼容，填写 API Key 后优先使用新版协议。
+
+### Technical Design
+
+依据[新版实时识别参数](https://docs.volcengine.com/docs/doubao-voice/bidirectional-streaming-automatic-speech-recognition-websocket?lang=zh)、该页提供的官方 Go 协议示例，以及[流式识别接入说明](https://docs.volcengine.com/docs/doubao-voice/access-must-read-1-1?lang=zh)。
+
+- API Key 路径默认连接 `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async`，选择 `volc.seedasr.sauc.duration`，通过 `X-Api-Key` 鉴权，不发送旧鉴权头。旧录音文件识别的 endpoint/resourceId 自动使用新版默认值。
+- `speech-volcano-stream.go` 封装初始化、gzip 二进制帧、序号和负序号尾包、响应解码、最终文本与服务错误。按 200ms 分包和发送，上传与接收并行，避免长录音阻塞。读取有大小与解压上限，HTTP 请求取消后关闭连接。
+- 延续现有浏览器录完上传 16kHz/16bit/单声道 WAV 的交互，服务端再通过火山流式协议转写；此变更不代表浏览器已实现边录边上屏。超时覆盖录音时长与处理余量。
+- `SpeechSettings` 隐藏旧字段并保留其数据，密钥和草稿仍使用原保存机制。
+
+### Acceptance Evidence
+
+本地 WebSocket 模拟覆盖单 Key 鉴权、2.0 模型默认值、完整录音分包、gzip、最终结果覆盖临时文本、错误帧、取消关闭连接、畸形帧和解压上限；race 检查通过。`backend/api` 与 `backend/server` 回归通过。前端覆盖只显示一个 Key 输入框、隐藏旧字段并保存后保留旧配置。未使用真实火山 Key 调用云端服务。日志：`/tmp/volcano-go-tests.log`、`/tmp/volcano-go-regression.log`、`/tmp/volcano-frontend-tests.log`、`/tmp/volcano-build.log`。
+
+本次验证补充：Go 全量测试与 quick 门禁在隔离 tmux 服务内通过，未触发无关 Python 同步或运行时测试。前端原有 1565 项回归及新增单 Key 表单测试通过，typecheck、i18n、hover 和生产构建通过。桌面 1280/1920/2560/3440 均无横向溢出，中英文已核对；Redmi Note 8 经 LAN 的 HTTPS 服务显示仅 API Key 输入，ADB 上滑使页内 scrollTop 从 0 增至约 45，文档与视口同为 392 CSS px，上下导航及保存可见。截图：`/tmp/volcano-key-desktop.png`、`/tmp/volcano-key-phone.png`；新增 UI 测试日志：`/tmp/volcano-key-ui-test.log`；门禁日志：`/tmp/volcano-quality.log`。
