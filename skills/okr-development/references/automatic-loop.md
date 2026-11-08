@@ -157,6 +157,8 @@ offline replay. A compacted summary does not replace fresh host task/receipt sta
 
 需要每天运行时，复用项目 daily-operations Skill 的 Python 入口与实际支持的原目标唤醒能力，再登记仅本项目的 cron 范围。既有 cron 的 action=agent 会新开实例；长期团队应使用可核验的原目标调用，而不是定时开新指挥。普通提醒、只读日报、active 目标或首次启动回执均不证明日程已装好，必须核对真实 nextRun/lastRun 和执行结果。通道尚未连接时如实报告；用户已授权的自动模式不永久改为逐条人工批准。
 
+实际发布与音轨审计按完整模板的 [发布操作手册](../assets/.roami/okr/manuals/publishing.md) 执行：沿用已核验的原生通道，转写最终成片而不是文稿，使用真实回执时刻。日汇总不得把成员自己的范围扩成项目事实；索引整理不作为已充分核验内容的投稿前置。公开浏览量、曝光与链接点击分别定义来源和口径，不相互填充。
+
 ## Keep human requests literal
 
 Read confirmed configuration, instructions, memory and Skills through bound-project tools. Do not append whole project snapshots or generated operating restrictions to the user message. Unsaved editor drafts are separate untrusted context, not authorization or confirmed facts. Preserve the ongoing goal and explicit boundaries; a narrowly scoped acceptance request does not cancel the automatic operating mode. Native member continuations must use the host-validated human source, excluding recognized historical generated tails.
