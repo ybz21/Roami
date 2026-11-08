@@ -35,6 +35,8 @@ def selected_files(body, scope, paths):
             by_path[path] = item
         result = []
         for path in paths:
+            if path not in by_path:
+                raise DomainError("PUBLICATION_CONTENT_USE_RELATIVE_MANIFEST_FILE_PATH", 409)
             item = by_path[path]
             relative = Path(path)
             if (

@@ -79,13 +79,27 @@ def register_publication_tools(registry, database, artifacts, reviewer):
     }
     scope["revision"] = {"type": "integer", "minimum": 1}
     reference = object_schema(
-        {"id": string, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}, ["id", "sha256"]
+        {
+            "id": {
+                **string,
+                "description": "Retained manifest artifact ID from the host result, never a filename or filesystem path.",
+            },
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        },
+        ["id", "sha256"],
     )
     content = object_schema(
         {
-            **{key: string for key in ("body", "title", "tags", "video", "audio", "subtitles")},
+            **{
+                key: {
+                    **string,
+                    "description": "Exact relative file path in manifest.files[].path, not literal content or a project-root path. For body use e.g. 01-post.en.txt; the host reads and freezes that file.",
+                }
+                for key in ("body", "title", "tags", "video", "audio", "subtitles")
+            },
             "images": {
                 "type": "array",
+                "description": "Exact relative image paths from manifest.files[].path, e.g. 01-card.png; no project-root prefixes.",
                 "minItems": 1,
                 "maxItems": 20,
                 "uniqueItems": True,
