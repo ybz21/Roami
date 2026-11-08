@@ -57,7 +57,9 @@ channel and frame. Returning rereads the current confirmed configuration.
 
 The Go publisher stores observations/reviews and immutable snapshots in the OKR
 bundle and atomically switches state/current.json. Observations.jsonl is an
-export, not a second import endpoint. SQLite owns runtime schedules/jobs/runs;
+export, not a second import endpoint. The host project-okr.db stores confirmed OKR workspaces and operation receipts;
+separate runtime storage owns schedules/jobs/runs. The project collection.sqlite3
+is only a collection registry, not a dashboard data source;
 never invent a schedule or mutate current.json to claim a Connector ran.
 
 ## Browser boundary

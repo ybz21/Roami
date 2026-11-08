@@ -28,6 +28,14 @@ okr_draft_dir="$(mktemp -d)"
 cp -R "$okr_skill_dir/assets/." "$okr_draft_dir/"
 ```
 
+The copied `collection-store` Skill includes a standard-library Python SQLite
+initializer and publication registry. Read its SKILL.md before initialization;
+use the actual project ID, never a fixture. This collection database does not
+replace the host's confirmed OKR database or feed HTML directly. Main-approved
+publications can be discovered by a stable Connector without editing the Skill
+package for each post. Candidate batches still require independent Main
+confirmation and a real dashboard readback.
+
 Then combine `parts/` for Python/MCP sources, HTML fragments and executor roles.
 Content-growth, product-delivery and operations under `examples/` are optional
 reference overlays, not a substitute for the complete generic directory. Fill

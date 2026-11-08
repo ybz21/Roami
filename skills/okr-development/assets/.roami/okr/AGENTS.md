@@ -151,3 +151,7 @@ Main 负责把这些步骤落实到确认回执和实际结果，不能只转发
 - 协调批次团队记忆：先 swarm_memory_read，再用返回的 sha256 作为 expectedSha256 调 swarm_memory_write，只追加已核验的新知识；宿主保留批次去重身份。不能自己换 operationKey 绕过去重。
 - 普通用户 Main 回合可按当前目录使用 project_okr_context/project_okr_update/project_okr_memory_append；这些普通项目写入口在协调批次不开放。缺少通用 file_write 不代表没有上述记忆或复盘入口。
 - 协调 Main 不运行任意 shell；文件、任务和留存产物用已登记的读取工具。原生 Codex/Claude 成员按本轮授权使用其真实 CLI/Skill，两者的目录不能互相代替。读文件、讨论投递与实际写回/验收分别留证。
+
+### 项目 SQLite 发布登记
+
+初始化、写入与冲突处理见 [collection-store Skill](skills/collection-store/SKILL.md)。项目 collection.sqlite3 只登记 Main 已审核的公开稿件，供 Connector 动态发现对象；不会直接更新看板。Main 仍须独立验收候选、通过宿主 record 确认并核对实际卡片。不得对宿主数据库执行 SQL，不能让 HTML 直读此库。
