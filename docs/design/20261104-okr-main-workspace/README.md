@@ -247,3 +247,5 @@
 - [任务结果文件提示](output-warning.md)：短提示与按需查看完整路径。
 
 - [验收与发布输入纠正](review-input-recovery.md)：保留校验，给 Main 明确的下一步。
+
+- [原 Skill 发布与平台回执（设计草案）](publication-native-skill.md)，[交互原型](publication-native-skill.html)：保留原团队与通道，区分审核、提交、平台确认和下一轮。

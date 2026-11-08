@@ -1,6 +1,12 @@
 """Correct rejected review inputs without changing admission or granting authority."""
 
 RECOVERY = {
+    "INVALID_PUBLICATION_IMAGE_ALTS": (
+        "Pair imageAlts with images in the same order, with exactly one frozen ALT text "
+        "artifact per image. Use exact manifest-relative file paths, not literal ALT text. "
+        "Read all frozen ALT text before reviewing the version. Changed ALT bytes require "
+        "a new version and review; keep the original publication businessKey."
+    ),
     "SWARM_ARTIFACT_REVIEW_REQUIRED": (
         "Read each selected current-run text artifact with read artifact://ID (artifact_read), "
         "using its retained host ID. A filesystem file_read is not a retained-artifact read. "
@@ -30,7 +36,8 @@ RECOVERY = {
         "assigned author; do not bypass identity, hash or workspace checks."
     ),
     "PUBLICATION_CONTENT_USE_RELATIVE_MANIFEST_FILE_PATH": (
-        "Use the exact manifest.files[].path for content.body and each content.images entry. "
+        "Use the exact manifest.files[].path for content.body and each content.images or "
+        "content.imageAlts entry. "
         "These are file paths relative to the manifest's directory, not literal post text or "
         "project/run prefixes. Preserve the planned publication's businessKey when correcting."
     ),

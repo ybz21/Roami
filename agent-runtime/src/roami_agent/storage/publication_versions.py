@@ -90,14 +90,22 @@ def freeze_version(db, binding, item_id, author, required, content, *, account_i
     if (
         not isinstance(content, dict)
         or not content
-        or set(content) - {"body", "title", "tags", "images", "video", "audio", "subtitles"}
+        or set(content)
+        - {"body", "title", "tags", "images", "imageAlts", "video", "audio", "subtitles"}
     ):
         raise DomainError("INVALID_PUBLICATION_CONTENT")
+    if "imageAlts" in content and (
+        not isinstance(content["imageAlts"], list)
+        or not isinstance(content.get("images"), list)
+        or not 1 <= len(content["imageAlts"]) <= 20
+        or len(content["imageAlts"]) != len(content["images"])
+    ):
+        raise DomainError("INVALID_PUBLICATION_IMAGE_ALTS")
     artifacts = candidate_artifacts(db, binding, author, required)
     by_id = {a["id"]: a for a in artifacts}
     referenced = []
     for name, value in content.items():
-        values = value if name == "images" else [value]
+        values = value if name in {"images", "imageAlts"} else [value]
         if (
             not isinstance(values, list)
             or not values

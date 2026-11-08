@@ -105,6 +105,13 @@ def register_publication_tools(registry, database, artifacts, reviewer):
                 "uniqueItems": True,
                 "items": string,
             },
+            "imageAlts": {
+                "type": "array",
+                "description": "Exact relative ALT text file paths from manifest.files[].path, paired by position with images. Supply one text artifact per image; these bytes are frozen and must be fully read before independent approval. Never put literal ALT text here.",
+                "minItems": 1,
+                "maxItems": 20,
+                "items": string,
+            },
         },
         ["body"],
     )
