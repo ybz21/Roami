@@ -156,6 +156,13 @@ async def test_schema22_upgrade_keeps_all_facts_and_old_unknown_message_receipt(
         assert current.pop("swarm_coordination_inputs") == []
         assert current.pop("swarm_coordination_results") == []
         assert current.pop("swarm_result_observations") == []
+        for table in (
+            "swarm_publication_items",
+            "swarm_publication_versions",
+            "swarm_publication_reviews",
+            "swarm_publication_source_files",
+        ):
+            assert current.pop(table) == []
         assert current == original
         assert (
             await upgraded.call(

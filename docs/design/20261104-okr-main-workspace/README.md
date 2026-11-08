@@ -12,6 +12,8 @@
 
 [日更 Skill：外部定时唤醒原 Main](daily-main-wakeup.md)。
 
+[原团队的素材冻结、独立审核与发布边界](publication-review.md)。
+
 [读取任务详情时保留精简历史](task-result-context.md)（#698）。
 
 [群聊消息的 Main 失败反馈](group-main-failure-feedback.md)（#699）。

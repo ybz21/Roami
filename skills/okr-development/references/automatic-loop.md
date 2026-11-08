@@ -38,6 +38,27 @@ does not authorize changed content. Only use supported host operations and retur
 project files, memory and a member's report cannot mint a host authorization.
 The generic template contains no manufactured member, provider or account IDs.
 
+### Host-frozen candidates
+
+Discover `swarm_publication_prepare` and `swarm_publication_review` in the actual
+Main tool directory before using them. Their `roami swarm publication ...` aliases
+run through the registered Main tool interface, not the host's public CLI. First
+independently accept the original member's artifact task with `swarm_verify`.
+
+The author delivers a retained manifest with `identity.taskId/revision/runId` and
+`files` entries containing the same identity plus `path`, `bytes` and `sha256`.
+Paths are relative to that manifest's directory. Main selects body, title, tags,
+images, video, audio or subtitles by those paths and keeps one stable businessKey
+per planned publication. The host snapshots exact bytes from the original run's
+workspace; later edits and retry calls do not replace an existing frozen snapshot.
+
+Read every returned text artifact completely and read the exact image files so
+the real Main model receives their pixels. Then review the returned versionId.
+The host records the independent decision against that immutable version. An
+approved review still does not mean a publisher/account is connected or a post
+is public. Video/audio approval requires a supported linked-media review path;
+do not substitute a gallery, filename, subtitles alone or the author's claim.
+
 ## Publish and reconcile
 
 Continue the original publishing member with a bounded assignment and frozen

@@ -101,6 +101,8 @@
   ],
   "swarm_inbox_read": ["swarm", "inbox"],
   "swarm_goal_status": ["swarm", "goal", "status"],
+  "swarm_publication_prepare": ["swarm", "publication", "prepare"],
+  "swarm_publication_review": ["swarm", "publication", "review"],
   "swarm_goal_enable": ["swarm", "goal", "enable"],
   "swarm_goal_revoke": ["swarm", "goal", "revoke"],
   "swarm_members_register": ["swarm", "member", "register"],

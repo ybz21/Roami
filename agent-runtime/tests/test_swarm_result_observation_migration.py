@@ -48,6 +48,13 @@ async def test_schema26_rolls_back_and_preserves_all_old_facts_on_retry(tmp_path
         current = facts(db)
         assert current.pop("swarm_coordination_results") == []
         assert current.pop("swarm_result_observations") == []
+        for table in (
+            "swarm_publication_items",
+            "swarm_publication_versions",
+            "swarm_publication_reviews",
+            "swarm_publication_source_files",
+        ):
+            assert current.pop(table) == []
         assert current == original and db.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         db.close()
