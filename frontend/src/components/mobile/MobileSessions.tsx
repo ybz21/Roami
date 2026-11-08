@@ -16,7 +16,8 @@ import { absTime, relTime } from '../../time-format'
 import MobileProjectDetail from './MobileProjectDetail'
 import { useNativeSessionList, refreshSessionLists } from '../sessions/native-session-list'
 import { nativeSessionRecord } from '../sessions/session-record'
-import { renameSession, closeSession, stopSession, sessionActionError } from '../sessions/session-actions'
+import { renameSession, stopSession, sessionActionError } from '../sessions/session-actions'
+import { useSessionCloser } from '../sessions/session-closer'
 import MobilePageSearch from './MobilePageSearch'
 import MobileSubPage from '../MobileSubPage'
 import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/session-activity'
@@ -95,7 +96,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const handledProject = useRef(0)
   useEffect(() => { if (openProject && projects && handledProject.current !== openProject.at) { handledProject.current = openProject.at; if (!initialProjectKey) enterProject(openProject) } }, [openProject?.at, projects, initialProjectKey]) // eslint-disable-line react-hooks/exhaustive-deps
   // 长按一行：改名 / 中断 / 关闭（24 稿 §5 会话列表）
-  const { message, modal } = AntApp.useApp()
+  const { message } = AntApp.useApp()
   const [menu, setMenu] = useState<OverviewItem | null>(null)
   const lp = useRef<{ timer: number; fired: boolean }>({ timer: 0, fired: false })
   const lpStart = (s: OverviewItem) => { lp.current.fired = false; clearTimeout(lp.current.timer); lp.current.timer = window.setTimeout(() => { lp.current.fired = true; setMenu(s) }, 500) }
@@ -103,14 +104,11 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   const [renaming, setRenaming] = useState<OverviewItem | null>(null)
   const [renameVal, setRenameVal] = useState('')
   const reload = refreshSessionLists
+  const closer = useSessionCloser(() => {}, () => { void reload() })
   const interrupt = async (s: OverviewItem) => {
     try { await stopSession(s.name); message.success(t('mobile.interrupted')) }
     catch (e: any) { message.error(sessionActionError(e, t)) }
   }
-  const close = (s: OverviewItem) => modal.confirm({
-    title: t('session.closeConfirm', { name: s.label }), okText: t('session.close'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
-    onOk: async () => { try { await closeSession(s.name); void reload() } catch (e: any) { message.error(sessionActionError(e, t)) } },
-  })
   const rename = async () => {
     const s = renaming, name = renameVal.trim()
     if (!s || !name || name === s.label) return
@@ -257,9 +255,10 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
           {!menu.dormant && <SessionPauseButton name={menu.name} mem={allItems.find(s => s.name === menu.name)?.mem} />}
           <SheetRow icon={<PencilIcon size={16} />} title={t('session.rename')} onClick={() => { setRenameVal(menu.label); setRenaming(menu); setMenu(null) }} />
           {(menu.running || menu.waiting) && <SheetRow icon={<StopIcon size={16} />} title={t('mobile.interrupt')} desc={t('mobile.interruptHelp')} onClick={() => { void interrupt(menu); setMenu(null) }} />}
-          <SheetRow icon={<CloseIcon size={16} />} title={t('session.close')} danger onClick={() => { const m = menu; setMenu(null); close(m) }} />
+          <SheetRow icon={<CloseIcon size={16} />} title={t('session.close')} danger onClick={() => { const m = menu; setMenu(null); void closer.beginClose(m.name) }} />
         </>}
       </MobileSheet>
+      {closer.node}
       <Modal open={!!renaming} title={t('session.rename')} okText={t('common.confirm')} cancelText={t('common.cancel')} onOk={rename} onCancel={() => setRenaming(null)} destroyOnClose>
         <Input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)} onPressEnter={rename} />
       </Modal>
