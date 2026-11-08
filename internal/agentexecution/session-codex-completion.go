@@ -69,6 +69,10 @@ func codexTranscriptOutcome(binding SessionBinding, turn, promptHash string, can
 }
 
 func codexObservedOutcome(binding SessionBinding, turn, promptHash string, cancelled, initial bool) (*Result, string, map[string]int64) {
+	return codexObservedTerminal(binding, turn, promptHash, cancelled, initial, false)
+}
+
+func codexObservedTerminal(binding SessionBinding, turn, promptHash string, cancelled, initial, reconcileInput bool) (*Result, string, map[string]int64) {
 	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
 		return nil, "", nil
 	}
@@ -133,6 +137,7 @@ func codexObservedOutcome(binding SessionBinding, turn, promptHash string, cance
 	active, assistant := "", ""
 	metadata, matched, finalAnswer, aborted := false, false, false, false
 	startedTurns := 0
+	followups := 0
 	calls := map[string]bool{}
 	commands := map[string]int64{}
 	var result *Result
@@ -204,9 +209,17 @@ func codexObservedOutcome(binding SessionBinding, turn, promptHash string, cance
 				}
 				if value.Role == "user" {
 					if matched {
-						return nil, "", nil
+						if !reconcileInput {
+							return nil, "", nil
+						}
+						followups++
+						assistant, finalAnswer, result = "", false, nil
+					} else {
+						matched = workspaceHash(text) == promptHash
+						if reconcileInput && !matched {
+							return nil, "", nil
+						}
 					}
-					matched = workspaceHash(text) == promptHash
 				} else if value.Role == "assistant" {
 					assistant = text
 					finalAnswer = value.Phase == "final_answer"
@@ -235,6 +248,13 @@ func codexObservedOutcome(binding SessionBinding, turn, promptHash string, cance
 	current, err := os.Lstat(path)
 	if err != nil || !os.SameFile(info, current) || current.Mode().Perm()&0002 != 0 {
 		return nil, "", nil
+	}
+	if reconcileInput {
+		if followups == 0 {
+			return nil, "", nil
+		}
+		// A changed input settles as a failed execution, never the original task's success.
+		result.State, result.Summary = "failed", "SESSION_SCOPE_CHANGED_STOPPED"
 	}
 	return result, hex.EncodeToString(hash.Sum(nil)), commands
 }

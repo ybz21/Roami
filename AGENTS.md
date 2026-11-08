@@ -231,6 +231,11 @@ Use `roami session` for session operations, `roami swarm` for collaboration (`ro
 `ttmux` entry is retired. Public session commands do not forward native tmux commands or expose
 global shutdown. Close only the explicitly identified session or task resources.
 
+Continue managed tasks and Swarm members through `task_steer` or `roami swarm say` at the current
+task revision. Do not use `roami session send` to add input to a managed run: it invalidates the
+host's prompt binding. Reconcile real stop evidence before resuming an uncertain execution;
+never clear its lifecycle or workspace fence by hand, and never replay an unknown external action.
+
 Run development instances through `scripts/dev/isolated-roami.sh <test-directory> <command...>`
 and clean up their tmux server through the same entry with `--stop`. The launcher records a private
 socket and verifies its server identity before cleanup. Setting only `TMUX_TMPDIR` does not isolate
