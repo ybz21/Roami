@@ -171,6 +171,8 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 				return true, runChrome([]string{"help"})
 			case "adb":
 				return true, runADB([]string{"help"})
+			case "speech":
+				return true, runSpeech([]string{"help"})
 			case "agent":
 				return true, runAgent([]string{"help"})
 			case "project", "auth":
@@ -204,6 +206,8 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 		return true, runChrome(rest)
 	case "adb":
 		return true, runADB(rest)
+	case "speech":
+		return true, runSpeech(rest)
 	case "completion":
 		fmt.Print(completionScript)
 		return true, 0
@@ -288,6 +292,7 @@ func printHelp(_ []pluginInfo) {
 	fmt.Println("  swarm <命令>       Main 蜂群：协作、群聊、看板与受管任务")
 	fmt.Println("  chrome <命令>      浏览器自动化")
 	fmt.Println("  adb [参数...]      Android 设备操作（转发系统 ADB）")
+	fmt.Println("  speech <command>  transcribe: configured Node speech service")
 	fmt.Println("  project <命令>     ls / show / sessions / create / prefs / activity / remove")
 	fmt.Println("  agent <命令>       Python Agent 运行时、对话、任务回报与主动消息")
 	fmt.Println("  auth <命令>        login / logout / status")
