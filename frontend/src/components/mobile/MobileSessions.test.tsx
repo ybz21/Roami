@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import MobileSessions from './MobileSessions'
 import { api } from '../../api'
 import { closeSession, renameSession, stopSession } from '../sessions/session-actions'
+import { refreshSessionLists } from '../sessions/native-session-list'
 
 const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
@@ -14,13 +15,18 @@ vi.mock('../swarm/swarm-directory', () => ({ loadSwarmDirectory: async () => [] 
 vi.mock('antd', () => ({
   App: { useApp: () => ({ message: ui, modal: { confirm: ui.confirm } }) },
   Input: ({ onPressEnter: _enter, ...props }: any) => <input {...props} />,
+  Checkbox: ({ children, ...props }: any) => <label><input type="checkbox" {...props} />{children}</label>,
+  Radio: Object.assign(({ children, ...props }: any) => <label><input type="radio" name="close-mode" {...props} />{children}</label>, {
+    Group: ({ children, onChange }: any) => <div onChange={onChange}>{children}</div>,
+  }),
+  Select: () => null,
   Spin: () => null,
   Modal: ({ open, title, children, onOk, okText }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button></div> : null,
 }))
 afterEach(() => { cleanup(); localStorage.clear(); vi.resetAllMocks(); vi.useRealTimers() })
 
-const mount = () => {
-  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/projects' ? { projects: [{ key: 'project', name: 'Project', dir: '/work', unfinished: 0 }] } : { items: [{ name: 'codex', label: 'Codex chat', agent: 'codex', lastActivity: 100, running: true, waiting: false, dormant: false, projectKey: 'project', project: 'Project', projectDir: '/work' }] } }))
+const mount = (worktreeStatus?: Record<string, unknown>) => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/worktree-status') ? worktreeStatus : path === '/projects' ? { projects: [{ key: 'project', name: 'Project', dir: '/work', unfinished: 0 }] } : { items: [{ name: 'codex', label: 'Codex chat', agent: 'codex', lastActivity: 100, running: true, waiting: false, dormant: false, projectKey: 'project', project: 'Project', projectDir: '/work' }] } }))
   return render(<MobileSessions onOpen={vi.fn()} onNewTask={vi.fn()} onNewInWorktree={vi.fn()} />)
 }
 
@@ -38,10 +44,52 @@ it('uses the same rows, ordering, navigation and menu for Roami and Codex', asyn
     expect(menu.getByRole('button', { name: 'session.rename' })).toBeTruthy()
     expect(menu.getByRole('button', { name: /mobile.interrupt/ })).toBeTruthy()
     fireEvent.click(menu.getByRole('button', { name: 'session.close' }))
+    await waitFor(() => expect(ui.confirm).toHaveBeenCalledTimes(row === native ? 1 : 2))
     await ui.confirm.mock.calls[ui.confirm.mock.calls.length - 1][0].onOk()
   }
   expect(closeSession).toHaveBeenCalledWith('roami:native')
   expect(closeSession).toHaveBeenCalledWith('codex')
+})
+
+const worktree = { inWorktree: true, path: '/work/.worktrees/task', base: 'main', external: false, others: 0 }
+const beginCodexClose = async () => {
+  fireEvent.contextMenu(await screen.findByRole('button', { name: /Codex chat/ }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'session.close' }))
+}
+
+it.each([true, false])('honors the worktree deletion checkbox on mobile (delete=%s)', async remove => {
+  mount(worktree)
+  await beginCodexClose()
+  await waitFor(() => expect(ui.confirm).toHaveBeenCalledOnce())
+  const confirm = ui.confirm.mock.calls[0][0]
+  const content = render(confirm.content)
+  const checkbox = content.getByRole('checkbox', { name: 'worktree.close.removeWithSession' }) as HTMLInputElement
+  expect(checkbox.checked).toBe(true)
+  if (!remove) fireEvent.click(checkbox)
+  await act(async () => { await confirm.onOk() })
+  expect(api).toHaveBeenCalledWith('POST', '/sessions/codex/close-with-worktree', { mode: remove ? 'discard' : 'keep', path: worktree.path })
+  expect(closeSession).not.toHaveBeenCalled()
+  expect(refreshSessionLists).toHaveBeenCalled()
+})
+
+it('offers unfinished worktree choices before closing a mobile session', async () => {
+  mount({ ...worktree, dirty: 1 })
+  await beginCodexClose()
+  const dialog = within(await screen.findByRole('dialog'))
+  expect(dialog.getByRole('radio', { name: 'worktree.close.keep' })).toBeTruthy()
+  fireEvent.click(dialog.getByRole('radio', { name: 'worktree.close.discard' }))
+  fireEvent.click(dialog.getByRole('button', { name: 'session.close' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/sessions/codex/close-with-worktree', { mode: 'discard', path: worktree.path }))
+  expect(closeSession).not.toHaveBeenCalled()
+})
+
+it('keeps a worktree used by another session when closing from mobile', async () => {
+  mount({ ...worktree, others: 1 })
+  await beginCodexClose()
+  await waitFor(() => expect(ui.confirm).toHaveBeenCalledOnce())
+  await act(async () => { await ui.confirm.mock.calls[0][0].onOk() })
+  expect(closeSession).toHaveBeenCalledWith('codex')
+  expect(vi.mocked(api).mock.calls.some(([method, path]) => method === 'POST' && path.endsWith('/close-with-worktree'))).toBe(false)
 })
 
 it('renames and stops Roami through the same menu actions', async () => {

@@ -6,7 +6,8 @@
 删除阶段失败时，会话可能已经关闭；再次提交原清理请求应能继续，不能永远卡在关闭会话这一步。
 目录检查失败时应保留会话，避免产生新的孤儿工作区。
 
-本次只修改后端关闭编排，不改变关闭选项，不批量删除历史目录。
+11 月 6 日的修复只修改后端关闭编排；11 月 8 日补齐手机入口的关闭选项。
+不批量删除历史目录。
 
 ## User Stories
 
@@ -70,3 +71,43 @@ PR #747 的首次 Quality Gate 在重复 squash 时暴露 `Committer identity un
 
 这次修复不会自动清除历史遗留，也不保证磁盘错误、权限错误或服务进程退出时完成清理。
 客户端断连后流程仍受服务端超时约束；删除失败时继续返回实际失败阶段。
+
+## 2026-11-08：手机入口遗漏清理
+
+### Product Design / User Stories
+
+手机会话列表应提供与桌面相同的 worktree 收尾选择：干净工作区可选择随会话删除；
+有改动时选择保留、合并或丢弃；其他会话仍占用时只关闭当前会话。
+Roami 原生会话继续使用任务绑定的关闭流程。
+
+### Technical Design
+
+`MobileSessions.tsx` 原先直接调用 `closeSession`，对终端会话只发送
+`DELETE /sessions/:name`，没有 worktree 预检和删除步骤。
+改为复用 `useSessionCloser`，挂载其 `CloseWorktreeModal`，关闭成功后刷新共用会话列表。
+复用已有组件和中英文文案，不增加新的关闭协议。
+
+### Acceptance Evidence
+
+- 当前安装版本 `okr-review-74e7c71e` 的隔离副本使用真实 tmux 和临时 Git 仓库。
+  桌面会话列表保持删除勾选后，回执为 `done=[kill,remove]`，目录、注册与分支均消失。
+  API 的删除、合并删除、保留和关闭后重试按预期完成；另有 10 轮分支改名、忽略文件与
+  并发归属刷新的删除测试，10 轮均成功。
+- Redmi Note 8 / Android Chrome 的旧手机入口实际发送 `DELETE` 并返回 200：
+  会话 `2026-1108-0118-000g` 已结束，但临时 worktree 目录仍存在。
+  确认框没有 worktree 选项。这是本次复现的漏清理路径，不能等同于桌面勾选失效。
+- `MobileSessions.test.tsx` 覆盖默认删除、取消勾选保留、有改动时选择丢弃、其他会话占用
+  以及原生会话关闭。新回归在旧实现上 3 项失败，修改后 7 项全部通过。
+- 前端全量 214 个测试文件、1566 个用例通过；typecheck、i18n、hover、生产构建与
+  `scripts/dev/quality/check.sh quick` 通过。未修改 Python 或 Go。
+- 真机使用本次生产构建后，默认勾选发送 `POST .../close-with-worktree`，
+  `mode=discard`，回执为 `done=[kill,remove]`，新建 worktree 与本地分支均消失。
+  取消勾选的复测发送 `mode=keep`，会话关闭、目录保留；有未提交文件时出现三选一，
+  选择丢弃后目录消失。交互通过手机 Chrome 的真实触摸事件完成。
+- 本次记录位于 `/tmp/roami-close-live-20261108/`：`api-check.log`、
+  `stress-results.json`、`mobile-requests-before.json`、`mobile-tests-before.log`、
+  `mobile-requests-after.json`、`frontend-tests.log`、`frontend-build.log` 和 `quality-quick.log`。
+  手机确认框截图为 `mobile-confirm-before.png` / `mobile-confirm-after.png`，截图不提交。
+
+截图中的近期 worktree 确有修复后关闭的记录，因此不能统一解释为旧版本遗留。
+历史记录未保存删除选项和清理回执，仍不能据此断言每个遗留目录的来源；本次没有批量清理。
