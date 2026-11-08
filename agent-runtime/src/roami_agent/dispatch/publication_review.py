@@ -18,7 +18,12 @@ class PublicationReview:
             if any(name in content for name in ("video", "audio")):
                 raise DomainError("PUBLICATION_MEDIA_REVIEW_UNAVAILABLE", 409)
             by_id = {item["id"]: item for item in manifest["artifacts"]}
-            text_ids = [value for name, value in content.items() if name != "images"]
+            text_ids = [
+                ident
+                for name, value in content.items()
+                if name != "images"
+                for ident in (value if isinstance(value, list) else [value])
+            ]
             text = [by_id[ident] for ident in dict.fromkeys(text_ids)]
             proof["text"] = await PublicationPromptReview(
                 self.db, self.artifacts, self.reviewer

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN" data-pointer="fine">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原团队发布闭环 · 机制原型</title>
+<style>
+:root{color-scheme:dark;--bg-base:#0d1117;--bg-container:#161b22;--border:#30363d;--border-subtle:#21262d;--text-bright:#e6edf3;--text-dim:#8b949e;--accent:#58a6ff;--ok:#3fb950;--warn:#d29922;--sel-bg:rgb(255 255 255 / 6.5%);--fs-meta:12px;--fs-sm:13px;--fs-body:14px;--fs-lg:16px;--fs-title:22px;--r-xs:6px;--r-card:14px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--tap:44px}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}body{background:var(--bg-base);color:var(--text-bright);font:var(--fs-body)/1.6 Inter,system-ui,sans-serif}.shell{height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr)}.tt-pagehead{padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--border-subtle);display:flex;align-items:baseline;gap:var(--sp-4);flex-wrap:wrap}h1{font-size:var(--fs-title);margin:0}h2{font-size:var(--fs-lg);margin:0 0 var(--sp-3)}h3{font-size:var(--fs-body);margin:0 0 var(--sp-2)}p{margin:0 0 var(--sp-3)}small,.hint{font-size:var(--fs-meta);color:var(--text-dim)}.tabs{display:flex;gap:var(--sp-2);padding:var(--sp-2) var(--sp-5);border-bottom:1px solid var(--border-subtle);flex-wrap:wrap}button{font:inherit;min-height:var(--tap);padding:var(--sp-2) var(--sp-4);border:1px solid var(--border);border-radius:var(--r-xs);color:inherit;background:transparent;cursor:pointer}button[aria-selected="true"]{background:var(--sel-bg);border-color:var(--accent)}button:focus-visible{outline:2px solid var(--accent);outline-offset:var(--sp-1)}button:disabled{color:var(--text-dim);cursor:default}main{min-height:0;overflow:auto;padding:var(--sp-5)}.intro{display:flex;justify-content:space-between;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-5)}.roles{display:flex;gap:var(--sp-4);flex-wrap:wrap;color:var(--text-dim)}.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*8)),1fr));gap:var(--sp-4);margin-bottom:var(--sp-5)}article{background:var(--bg-container);border:1px solid var(--border-subtle);border-radius:var(--r-card);padding:var(--sp-4);min-width:0}.ordinal{font-size:var(--fs-meta);color:var(--text-dim)}.state{margin-top:var(--sp-4);color:var(--text-dim)}article[data-state="current"]{border-color:var(--accent)}article[data-state="done"] .state{color:var(--ok)}article[data-state="blocked"]{border-color:var(--warn)}article[data-state="blocked"] .state{color:var(--warn)}.decision{border-top:1px solid var(--border-subtle);padding-top:var(--sp-5);display:flex;gap:var(--sp-5);flex-wrap:wrap;align-items:center}.decision p{margin:0}.detail{margin-top:var(--sp-5);border-top:1px solid var(--border-subtle);padding-top:var(--sp-5)}.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*16)),1fr));gap:var(--sp-5)}.facts section{min-width:0}ul{padding-left:var(--sp-5);margin:0}li{margin-bottom:var(--sp-2)}code{font-size:var(--fs-sm);overflow-wrap:anywhere}.notice{color:var(--warn)}:where(html[data-pointer="fine"]) button:hover:not(:disabled){border-color:var(--accent)}
+</style>
+<div class="shell">
+ <header class="tt-pagehead"><h1>原团队发布闭环</h1><span class="notice">机制原型</span><small>只演示状态，不连接账号、不执行发布。</small></header>
+ <nav class="tabs" role="tablist" aria-label="执行场景">
+  <button type="button" role="tab" aria-selected="true" id="tab-normal" aria-controls="scene-panel" data-scene="normal">正常执行</button>
+  <button type="button" role="tab" aria-selected="false" id="tab-unknown" aria-controls="scene-panel" data-scene="unknown">结果未知</button>
+  <button type="button" role="tab" aria-selected="false" id="tab-boundary" aria-controls="scene-panel" data-scene="boundary">范围待明确</button>
+ </nav>
+ <main id="scene-panel" role="tabpanel" aria-labelledby="tab-normal">
+  <div class="intro"><div><h2 id="scene-title">Main 审核，原成员执行</h2><p id="scene-copy">同一份素材、同一个发布事项，走完回执、取数与复盘。</p></div><div class="roles" aria-label="持久团队"><span>Main：审核与验收</span><span>X / B站：执行</span><span>数据分析：取数</span></div></div>
+  <div class="flow" aria-label="目标机制的五个步骤">
+   <article><span class="ordinal">步骤 1 · Main</span><h3>审核当前版本</h3><p>核对内容、来源和账号身份，保留不可变素材。</p><div class="state"></div></article>
+   <article><span class="ordinal">步骤 2 · 原 X / B站成员</span><h3>执行一次发布</h3><p>读取批准版本，经原 Skill 使用已确认的通道。</p><div class="state"></div></article>
+   <article><span class="ordinal">步骤 3 · 平台与 Main</span><h3>确认真实回执</h3><p>拿到平台 ID，再核对作者、正文与媒体。</p><div class="state"></div></article>
+   <article><span class="ordinal">步骤 4 · 原数据成员</span><h3>采集新对象</h3><p>Connector 取真实新帖数据，Main 确认后更新看板。</p><div class="state"></div></article>
+   <article><span class="ordinal">步骤 5 · Main</span><h3>复盘并续作</h3><p>记录有效经验，给原成员追加下一轮任务。</p><div class="state"></div></article>
+  </div>
+  <section class="decision" aria-live="polite"><div><h2 id="next-title">当前演示</h2><p id="next-copy"></p></div><button type="button" id="advance">演示下一步</button></section>
+  <section class="detail"><h2>实现边界</h2><div class="facts">
+   <section><h3>当前已经验证</h3><ul><li>原成员持续接任务，完成回调唤回原 Main。</li><li>Main 验收输入，并冻结、读取和审核正文与图片。</li><li>公开作者身份核验与当前登录、投稿权限分开。</li></ul></section>
+   <section><h3>接下来需要接通</h3><ul><li>把 ALT、字幕和音频等实际发布输入绑定到批准版本。</li><li>原 Skill 的一次执行记录，以及平台确认的独立事实。</li><li>新对象取数、确认看板、记忆与下一轮的真实闭环。</li></ul></section>
+   <section><h3>执行时必须保持</h3><ul><li>群聊是沟通记录；派工仍走原任务的续派回执。</li><li>先记录提交，再操作；未知结果只读对账，不换键重发。</li><li>按项目隔离账号、素材、执行与回执，不混入首页 Main。</li></ul></section>
+  </div></section>
+ </main>
+</div>
+<script>
+const articles=[...document.querySelectorAll('article')];
+const titles={normal:['Main 审核，原成员执行','同一份素材、同一个发布事项，走完回执、取数与复盘。'],unknown:['先找回执，保留原尝试','提交结果未知时只读对账；没有找到不等于没有发布。'],boundary:['保留素材，先明确执行范围','已有审核可以保留；未明确的设备或账号操作不会被日程自动放行。']};
+const notes=[['内容已审核','账号身份不是当前登录证明；实际执行前还要核对所用账号和资源范围。'],['准备一次提交','沿用原成员及原对话，先保存同一发布事项的提交记录。'],['核对平台回执','真实平台 ID 与作者、正文、媒体一致后，才确认已发布。'],['取数并确认看板','只采集新对象；来源失败保留旧值，缺失数据保持未知。'],['复盘并继续原团队','保存核验后的记忆与下一实验，再续派原成员。'],['演示结束','这是机制演示；没有产生任何实际发布、观测或运行回执。']];
+let scene='normal',step=0,reconciled=false;
+function render(){
+ document.querySelectorAll('[data-scene]').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.scene===scene));b.tabIndex=b.dataset.scene===scene?0:-1});
+ document.querySelector('main').setAttribute('aria-labelledby','tab-'+scene);
+ document.getElementById('scene-title').textContent=titles[scene][0];document.getElementById('scene-copy').textContent=titles[scene][1];
+ let title=notes[step][0],copy=notes[step][1],button='演示下一步';
+ if(scene==='boundary'){step=1;title='执行范围待明确';copy='原 Main 保留当前版本；范围未确认，不触设备、不操作账号页。';button='等待明确执行范围'}
+ if(scene==='unknown'&&!reconciled){step=2;title='提交结果未知';copy='保留原业务键和尝试，只读查找匹配回执；此按钮仅模拟找到证据。';button='演示找到匹配回执'}
+ articles.forEach((a,i)=>{let state=i<step?'done':i===step?'current':'pending';if(scene==='boundary'&&i===step)state='blocked';if(scene==='unknown'&&!reconciled&&i===1)state='blocked';a.dataset.state=state;a.querySelector('.state').textContent=state==='done'?(i===1?'演示已提交':'演示已完成'):state==='current'?(scene==='unknown'?'只读对账中':'演示进行中'):state==='blocked'?(scene==='boundary'?'等待范围确认':'提交结果未知'):'尚未开始'});
+ document.getElementById('next-title').textContent=title;document.getElementById('next-copy').textContent=copy;
+ const next=document.getElementById('advance');next.textContent=step===5?'重新演示':button;next.disabled=scene==='boundary';
+}
+document.querySelectorAll('[data-scene]').forEach(b=>b.addEventListener('click',()=>{scene=b.dataset.scene;step=0;reconciled=false;render()}));
+const tabs=[...document.querySelectorAll('[data-scene]')];tabs.forEach((b,i)=>b.addEventListener('keydown',e=>{const target=e.key==='ArrowRight'?(i+1)%tabs.length:e.key==='ArrowLeft'?(i+tabs.length-1)%tabs.length:e.key==='Home'?0:e.key==='End'?tabs.length-1:null;if(target!==null){e.preventDefault();tabs[target].click();tabs[target].focus()}}));
+document.getElementById('advance').addEventListener('click',()=>{if(scene==='unknown'&&!reconciled){reconciled=true;step=3}else step=step===5?0:step+1;render()});
+render();
+</script>
+</html>

@@ -129,13 +129,19 @@ class PublicationManifest:
                     raise ValueError("changed")
             except (OSError, ValueError) as exc:
                 raise DomainError("PUBLICATION_SOURCE_CHANGED", 409) from exc
+            # Unchanged bytes may deduplicate, but each manifest has separate provenance.
             artifact = await self.artifacts.put(
                 binding["owner"],
                 data,
                 task_id=scope["taskId"],
                 name=Path(entry["path"]).name,
                 mime_type=mimetypes.guess_type(entry["path"])[0] or "application/octet-stream",
-                metadata={"kind": "deliverable", "runId": scope["runId"], "provisional": False},
+                metadata={
+                    "kind": "deliverable",
+                    "runId": scope["runId"],
+                    "provisional": False,
+                    "publicationManifestId": reference["id"],
+                },
             )
 
             def register(db, artifact=artifact, entry=entry):

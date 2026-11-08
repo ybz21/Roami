@@ -40,3 +40,8 @@ prepare 的 `manifest.id` 必须是本轮结果中宿主留存的 artifact ID，
 `accountIdentity` 是有独立证据的平台数字账号 ID 字符串，不是 `@账号名`、昵称或主页网址。例如格式为 `"123456789"`，这里只示范格式，不能把示例 ID 用于真实账号。遇到 `INVALID_PUBLICATION_ACCOUNT_ID` 时保留原业务键、账号及已验收作者，从可信证据核对数字 ID；无法核对就如实停在该缺口，不猜 ID、不换账号。历史账号 ID 只说明身份对应，不能证明当前登录、投稿权限或发布成功；冻结版本也不授予发布权限。
 
 验收所选文本产物必须逐份通过 `read artifact://ID` 读取完整、不截断的留存字节；大文件按工具返回的分页继续读完，并在后续 assistant 消息调用 verify。`file_read /磁盘路径`、artifact 的元数据、状态汇总或另外一份同 SHA 文件，都不替代这份宿主留存读取回执。不要清空 artifactIds 尝试绕过验收。
+
+
+## 图片 ALT 与批准版本
+
+支持 imageAlts 的宿主上，prepare 的 content.imageAlts 是相对清单目录的 ALT 文本文件路径数组，按相同位置对应 content.images；每张图片恰好一个 ALT。例如 images=["card.png"]、imageAlts=["card-alt.txt"]，两份文件都在清单 files 内，不把 ALT 原文直接填进路径。Main 完整读取返回的冻结正文及 ALT，并实际查看对应图片后再 review。改变 ALT 必须重新 prepare 和 review，沿用原业务键；旧版本不包含的侧车文本不能假称已获批准。宿主尚未声明该字段时只保留候选，不探测生产写入口。冻结和内容审核仍不等于发送权限或平台发布。
