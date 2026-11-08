@@ -13,14 +13,15 @@ const detail = (revision = 3, id = 'native-one') => ({ task: { id: 'task-one', r
 const reads = (revision = 3) => vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path === '/agent/native-sessions/native-one' ? { taskId: 'task-one' } : detail(revision) }))
 
 it('preserves ordinary session operations', async () => {
-  vi.mocked(api).mockResolvedValue({ data: {} })
+  vi.mocked(api).mockResolvedValue({ data: { operationId: 'op', resourceId: 'codex-one' } })
   await renameSession('codex-one', 'Follow-up')
   await stopSession('codex-one')
   await closeSession('codex-one')
   expect(vi.mocked(api).mock.calls).toEqual([
     ['PATCH', '/sessions/codex-one', { name: 'Follow-up' }],
     ['POST', '/sessions/codex-one/keys', { keys: ['Escape'] }],
-    ['DELETE', '/sessions/codex-one'],
+    ['GET', '/sessions/codex-one/worktree-status'],
+    ['POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'close', resourceId: 'codex-one', intent: { name: 'codex-one', mode: 'keep', path: undefined, sessionIdentity: undefined } })],
   ])
 })
 

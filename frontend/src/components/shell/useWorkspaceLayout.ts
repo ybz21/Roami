@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLayout, type WindowSize } from '../../layout'
 import { usePreferences, preferencesLoaded, saveWorkspace } from '../../preferences'
-import { reportInspectorCap, useInspectorOpen, useInspectorWantWidth } from './inspector'
+import { reportInspectorCap, useInspectorOpen, useInspectorWantWidth, INSPECTOR_REVEAL_EVENT } from './inspector'
 
 /** 页面最窄 560，与 index.css 的 --canvas-min 同源（14 §8.2）：右栏再宽也不能把页面挤破，挤破就整页让位 */
 export const CANVAS_MIN = 560
@@ -209,6 +209,12 @@ export function useWorkspaceLayout(hasTerms: boolean, taskView = false): Workspa
     setInspectorCollapsedLocal(collapsed)
     saveWorkspace({ inspectorCollapsed: collapsed })
   }, [])
+
+  useEffect(() => {
+    const reveal = () => setInspectorCollapsed(false)
+    window.addEventListener(INSPECTOR_REVEAL_EVENT, reveal)
+    return () => window.removeEventListener(INSPECTOR_REVEAL_EVENT, reveal)
+  }, [setInspectorCollapsed])
 
   // Inspector 折起进偏好：第一次进来收着（WORKSPACE_DEFAULTS），自己拉开过就一直开着。
   //

@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { App as AntApp, Checkbox } from 'antd'
 import { api } from '../../api'
+import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
 import { closeSession, sessionActionError } from './session-actions'
 import { nativeSessionId } from './session-record'
 import { useI18n } from '../../i18n'
@@ -16,17 +17,17 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const [closing, setClosing] = useState<{ name: string; st: any } | null>(null)
-  const done = (n: string) => { message.success(t('session.closed')); closeTerm(n); afterClose?.() }
+  const done = (n: string) => { message.success(t('session.lifecycle.closeAccepted')); closeTerm(n); afterClose?.() }
   const kill = async (n: string) => {
     try { await closeSession(n); done(n) } catch (e: any) { message.error(sessionActionError(e, t)) }
   }
-  const closeWith = async (n: string, mode: 'keep' | 'merge' | 'discard', path?: string) => {
+  const closeWith = async (n: string, mode: 'keep' | 'merge' | 'discard', st?: any) => {
     try {
-      await api('POST', `/sessions/${encodeURIComponent(n)}/close-with-worktree`, { mode, path })
+      await submitLifecycle('close', { mode, path: st?.path, snapshot: st?.snapshot, sessionIdentity: st?.sessionIdentity }, n)
       done(n)
     } catch (e: any) {
       const ae = e.apiError || {}
-      message.error(ae.stage ? t('worktree.close.failedAtStage', { stage: ae.stage, msg: e.message }) : e.message)
+      message.error(ae.stage ? t('worktree.close.failedAtStage', { stage: ae.stage, msg: e.message }) : lifecycleRequestError(e, t))
       throw e
     }
   }
@@ -59,7 +60,7 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
       title: t('session.closeConfirm', { name: sessionDisplay(n) }),
       content: <Checkbox defaultChecked onChange={(e) => { removeToo.current = e.target.checked }}>{t('worktree.close.removeWithSession')}</Checkbox>,
       okText: t('session.close'), cancelText: t('common.cancel'),
-      onOk: () => closeWith(n, removeToo.current ? 'discard' : 'keep', st.path),
+      onOk: () => closeWith(n, removeToo.current ? 'discard' : 'keep', st),
     })
   }
   const node = <CloseWorktreeModal info={closing} onClose={() => setClosing(null)} onDone={(name) => { closeTerm(name); afterClose?.() }} />

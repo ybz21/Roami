@@ -53,8 +53,8 @@ describe('开任务 · 「已有」选择器', () => {
       if (u.includes('/git/is-repo')) return jsonResponse({ data: { repo: true, hasCommits: true } })
       if (u.includes('/git/worktrees')) return jsonResponse({ data: WORKTREES })
       if (u.includes('/git/branches')) return jsonResponse({ data: BRANCHES })
-      if (u.includes('/worktree-sessions')) {
-        return jsonResponse({ name: 'sess-1', data: { session: 'sess-1', path: '/repo/.worktrees/sess-1', branch: 'feat/old', base: 'main' } })
+      if (u.endsWith('/session-lifecycle/operations')) {
+        return jsonResponse({ data: { operationId: 'op', resourceId: 'sess-1' } })
       }
       return jsonResponse({ data: {} })
     })
@@ -106,14 +106,13 @@ describe('开任务 · 「已有」选择器', () => {
     expect(await screen.findByText('建工作区')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /开\s*干/ }))
-    await waitFor(() => expect(body('/worktree-sessions')).toHaveLength(1))
-    expect(body('/worktree-sessions')[0]).toMatchObject({ dir: '/repo', branch: 'feat/old', existing: true })
-    await waitFor(() => expect(body('/tasks/_/send')).toHaveLength(1))
-    expect(body('/tasks/_/send')[0].activity).toBe('task')
-    const msg = body('/tasks/_/send')[0].msg as string
-    expect(msg).toContain('/repo/.worktrees/sess-1')
-    expect(msg).toContain('feat/old')
-    expect(msg).toContain('别改名')
+    await waitFor(() => expect(body('/session-lifecycle/operations')).toHaveLength(1))
+    const intent = body('/session-lifecycle/operations')[0].intent
+    expect(intent).toMatchObject({ dir: '/repo', branch: 'feat/old', existing: true, worktree: true })
+    expect(intent.launch.task).toBe('接着把 P2P 那条分支收尾')
+    expect(intent.launch.preamble).toContain('{{PATH}}')
+    expect(intent.launch.preamble).toContain('别改名')
+    expect(body('/tasks/_/send')).toHaveLength(0)
   })
 
   it('选已有 worktree 仍然只开会话，不建 worktree', async () => {
@@ -124,8 +123,8 @@ describe('开任务 · 「已有」选择器', () => {
 
     fireEvent.click(list().getByText('feat/a'))
     fireEvent.click(screen.getByRole('button', { name: /开\s*干/ }))
-    await waitFor(() => expect(body('/sessions')).toHaveLength(1))
-    expect(body('/sessions')[0]).toMatchObject({ dir: '/repo/.worktrees/a' })
+    await waitFor(() => expect(body('/session-lifecycle/operations')).toHaveLength(1))
+    expect(body('/session-lifecycle/operations')[0].intent).toMatchObject({ dir: '/repo/.worktrees/a', worktree: false })
     expect(body('/worktree-sessions')).toHaveLength(0)
   })
 })

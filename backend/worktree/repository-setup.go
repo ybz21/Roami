@@ -92,7 +92,7 @@ func (s *Service) InitializeRepository(ctx context.Context, dir string) (Reposit
 	if err != nil {
 		return RepositoryState{}, err
 	}
-	unlock, err := s.lock(repo)
+	unlock, err := s.lock(ctx, repo)
 	if err != nil {
 		return RepositoryState{}, err
 	}

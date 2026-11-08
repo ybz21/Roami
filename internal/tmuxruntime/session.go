@@ -241,11 +241,13 @@ func (r Runtime) SessionLabel(name string) string {
 
 // CreateOpts 建会话的参数。Label 是展示名（可空 = 不设，展示时退回 id）。
 type CreateOpts struct {
-	Label  string
-	Dir    string
-	Width  string // -x，空则不传
-	Height string // -y，空则不传
-	Extra  []string
+	ReservedName string // Server-owned lifecycle identity; never parsed from CLI input.
+	OperationID  string
+	Label        string
+	Dir          string
+	Width        string // -x，空则不传
+	Height       string // -y，空则不传
+	Extra        []string
 }
 
 // CreateSession 建一个 detached 会话并返回它的会话名（= 会话 id）。
@@ -254,7 +256,21 @@ type CreateOpts struct {
 // 派生出 id 再 rename——这样 id 与 `$N` 始终一一对应、可反解，与 `ls` 一直以来
 // 展示的 id 是同一个值（老书签/URL 不失效）。中间那个数字名只存在几毫秒。
 func (r Runtime) CreateSession(opt CreateOpts) (string, error) {
+	unlock, err := r.WorkspaceLease(opt.Dir)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	if err := r.CheckLifecycle("", opt.Dir); err != nil {
+		return "", err
+	}
 	args := []string{"new-session", "-d", "-P", "-F", "#{session_id}\t#{session_created}"}
+	if opt.ReservedName != "" {
+		if !id.Valid(opt.ReservedName) || opt.OperationID == "" {
+			return "", fmt.Errorf("LIFECYCLE_IDENTITY_REQUIRED")
+		}
+		args = append(args, "-s", opt.ReservedName, "-e", "ROAMI_LIFECYCLE_OPERATION="+opt.OperationID)
+	}
 	if opt.Dir != "" {
 		args = append(args, "-c", opt.Dir)
 	}
@@ -275,12 +291,17 @@ func (r Runtime) CreateSession(opt CreateOpts) (string, error) {
 	}
 	created, _ := strconv.ParseInt(strings.TrimSpace(createdStr), 10, 64)
 	sess := id.ForSession(created, tmuxID)
+	if opt.ReservedName != "" {
+		sess = opt.ReservedName
+	}
 	if sess == "" || sess == tmuxID { // 派生不出（数据不全）：退回随机 id，别把 `$3` 当会话名
 		sess = id.NewAt(r.Now())
 	}
-	if err := r.Tmux("rename-session", "-t", tmuxID, sess); err != nil {
-		// 改名失败（极罕见）：会话还在，用 tmux 给的临时名兜底，别把它漏成孤儿
-		return r.sessionNameByID(tmuxID), err
+	if opt.ReservedName == "" {
+		if err := r.Tmux("rename-session", "-t", tmuxID, sess); err != nil {
+			// 改名失败（极罕见）：会话还在，用 tmux 给的临时名兜底，别把它漏成孤儿
+			return r.sessionNameByID(tmuxID), err
+		}
 	}
 	if opt.Label != "" {
 		_ = r.SetSessionLabel(tmuxID, opt.Label)

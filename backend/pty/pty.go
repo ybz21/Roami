@@ -17,6 +17,7 @@ import (
 	creackpty "github.com/creack/pty"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 // utf8Env 保证 tmux 客户端 locale 为 UTF-8。tmux 按客户端 LC_ALL/LC_CTYPE/LANG 是否含 UTF-8
@@ -661,7 +662,13 @@ func Handler(c *gin.Context) {
 			tmuxScroll(name, "bottom", 0)
 			inCopy = false
 		}
-		if _, err := ptmx.Write(data); err != nil {
+		unlock, err := runtime.New().InputLease("=" + name)
+		if err != nil {
+			return
+		}
+		_, err = ptmx.Write(data)
+		unlock()
+		if err != nil {
 			return
 		}
 	}

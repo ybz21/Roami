@@ -21,6 +21,8 @@ let slot: HTMLElement | null = null
 let stack: number[] = []
 let seq = 0
 const listeners = new Set<() => void>()
+export const INSPECTOR_REVEAL_EVENT = 'roami:reveal-inspector'
+export function revealInspector() { window.dispatchEvent(new Event(INSPECTOR_REVEAL_EVENT)) }
 
 function emit() { listeners.forEach((fn) => fn()) }
 function subscribe(fn: () => void) {

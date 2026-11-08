@@ -85,6 +85,8 @@ export function Workspace({
       {overlay && <div className="tt-dock-scrim" onClick={onDismiss} aria-hidden="true" />}
 
       <div style={dockStyle}
+        ref={element => { if (element) element.inert = !overlay && !focus }}
+        aria-hidden={!overlay && !focus}
         role={overlay ? 'dialog' : undefined}
         aria-label={overlay ? t('workspace.terminalPanel') : undefined}>
         {dock}

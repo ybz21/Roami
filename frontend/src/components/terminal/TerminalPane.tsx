@@ -1,4 +1,6 @@
 import { TBtn, TI } from './terminal-toolbar'
+import { useSessionLifecycle, blockingLifecycle } from '../sessions/session-lifecycle'
+import { PendingSessionLifecycle, SessionLifecycleDraftNotice } from '../sessions/SessionLifecyclePanel'
 import { SessionMemoryBanner } from '../sessions/SessionMemoryControl'
 import { atPath, atPaths } from '../../agent-paths'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -116,6 +118,8 @@ export default function TerminalPane(props: {
   const fileDock = props.fileDock || 'right'
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
+  const lifecycle = useSessionLifecycle()
+  const preparingSession = (name: string) => !!blockingLifecycle(lifecycle.value, name)
   const closeFile = (p: string) => {
     if (!onCloseFile) return
     if (dirtyFiles.has(p)) {
@@ -1085,7 +1089,7 @@ export default function TerminalPane(props: {
       {active && agentKinds[active] === 'pi' && <AgentViewToggle agent="pi" chat={showPiChat(active)} onToggle={() => setPiView(v => ({ ...v, [active]: !showPiChat(active) }))} />}
     </>
   )
-  const sessionToolbar = active && nativeSessionId(active) ? null : (
+  const sessionToolbar = active && (nativeSessionId(active) || preparingSession(active)) ? null : (
     <div className="tt-tbar tt-session-toolbar">
       {sessionLead}<span className="tt-sep" />
       <Dropdown trigger={['click']} menu={{ items: tmuxMenu(t) as any, onClick: ({ key }) => { if (key === PFX + 'x') openPaneCloseConfirm(); else sendKey(key) } }} placement="bottomLeft">
@@ -1191,22 +1195,23 @@ export default function TerminalPane(props: {
             pointerEvents: termName === active && !curFile ? 'auto' : 'none',
             zIndex: termName === active && !curFile ? 1 : 0,
           }}>
-            {nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
+            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
               onContextMenu={({ x, y, selection }) => { setActive(termName); setCtx({ x, y, session: termName, selection }) }}
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}
               onImagePaste={(files) => { setActive(termName); pasteImage(termName, files) }} />}
-            {showClaudeChat(termName) && (
+            {!preparingSession(termName) && <SessionLifecycleDraftNotice name={termName} />}
+            {!preparingSession(termName) && showClaudeChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
                 <ClaudeChat name={termName} file={claudeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>
             )}
-            {showCodexChat(termName) && (
+            {!preparingSession(termName) && showCodexChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
                 <CodexChat name={termName} file={codexMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>
             )}
-            {showOpenCodeChat(termName) && (
+            {!preparingSession(termName) && showOpenCodeChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
                 <OpenCodeChat name={termName} file={openCodeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
               </div>

@@ -3,150 +3,128 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ybz21/Roami/backend/project"
-	"github.com/ybz21/Roami/backend/ttmux"
 	"github.com/ybz21/Roami/backend/worktree"
+	life "github.com/ybz21/Roami/internal/sessionlifecycle"
+	metadb "github.com/ybz21/Roami/internal/storage"
 )
 
-func closeWorktreeFixture(t *testing.T, script string) (*gin.Engine, string, string) {
+func lifecycleAPI(t *testing.T) (*API, *gin.Engine) {
 	t.Helper()
-	tmp := t.TempDir()
-	cli := filepath.Join(tmp, "session-cli")
-	if err := os.WriteFile(cli, []byte("#!/bin/sh\n"+script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// No terminal observation in this fixture may reach the user's server.
-	t.Setenv("TMUX_BIN", "/bin/false")
-	repo := e2eRepo(t, tmp)
-	wt := worktree.New("", nil)
-	created, err := wt.Create(context.Background(), worktree.CreateReq{Dir: repo, Branch: "close-task", Base: "main"})
+	directory := t.TempDir()
+	db, err := metadb.Open(directory, metadb.Options{HomeDir: directory, DataDir: directory})
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := &API{TT: ttmux.New(cli), WT: wt, Projects: project.NewStore(tmp, nil)}
-	r := gin.New()
-	r.POST("/sessions/:name/close-with-worktree", a.SessionCloseWithWorktree)
-	return r, created.Path, tmp
+	t.Cleanup(func() { _ = metadb.Discard(db.Path()) })
+	a := &API{Lifecycle: life.New(db, db.Path())}
+	router := gin.New()
+	router.POST("/operations", a.LifecycleAccept)
+	router.POST("/operations/:operation/:action", a.LifecycleAction)
+	return a, router
 }
 
-func TestCloseWorktreeCompletesAfterClientDisconnect(t *testing.T) {
-	r, path, tmp := closeWorktreeFixture(t, `if [ "$1" = kill ]; then
-  touch "$CLOSE_STARTED"
-  while [ ! -f "$CLOSE_RELEASE" ]; do sleep 0.01; done
-fi
-`)
-	started, release := filepath.Join(tmp, "started"), filepath.Join(tmp, "release")
-	t.Setenv("CLOSE_STARTED", started)
-	t.Setenv("CLOSE_RELEASE", release)
+func TestLifecycleAcceptanceSurvivesClientDisconnect(t *testing.T) {
+	a, router := lifecycleAPI(t)
+	payload := map[string]any{"kind": "create", "requestKey": "disconnect-request", "intent": life.Intent{Name: "saved task", Dir: t.TempDir(), Task: "Keep this original request"}}
+	data, _ := json.Marshal(payload)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	finished := make(chan struct{})
-	go func() {
-		defer close(finished)
-		deadline := time.Now().Add(5 * time.Second)
-		for time.Now().Before(deadline) {
-			if _, err := os.Stat(started); err == nil {
-				cancel()
-				_ = os.WriteFile(release, nil, 0o600)
-				return
+	cancel()
+	request := httptest.NewRequest(http.MethodPost, "/operations", bytes.NewReader(data)).WithContext(ctx)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusAccepted {
+		t.Fatal(response.Body.String())
+	}
+	stored, err := a.Lifecycle.ByKey("disconnect-request")
+	if err != nil || stored.State != "queued" || stored.Intent.Task != "Keep this original request" {
+		t.Fatalf("lost durable intent: %+v %v", stored, err)
+	}
+}
+
+func TestLifecycleRetryActionIsIdempotentAndKeepsMergeReceipt(t *testing.T) {
+	a, router := lifecycleAPI(t)
+	o, err := a.Lifecycle.Accept("close-operation", "2026-1108-0000-00aa", "original-request", "close", life.Intent{Mode: "merge", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err = a.Lifecycle.Mutate(o.ID, o.Revision, func(o *life.Operation) error {
+		o.State = "attention"
+		o.Stage = "remove"
+		o.Receipts["merge"] = json.RawMessage(`{"result":{"head":"confirmed"},"durationMs":1}`)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := map[string]any{"revision": o.Revision, "requestKey": "retry-request-key"}
+	code, _ := post(t, router, "/operations/"+o.ID+"/retry", body)
+	if code != http.StatusAccepted {
+		t.Fatalf("retry status=%d", code)
+	}
+	first, _ := a.Lifecycle.Get(o.ID)
+	code, _ = post(t, router, "/operations/"+o.ID+"/retry", body)
+	if code != http.StatusAccepted {
+		t.Fatalf("lost ack replay status=%d", code)
+	}
+	again, _ := a.Lifecycle.Get(o.ID)
+	if first.Revision != again.Revision || !again.Has("merge") || again.OriginalIntent.Mode != "merge" || again.State != "queued" {
+		t.Fatalf("retry replayed or lost completed work: %+v", again)
+	}
+	code, _ = post(t, router, "/operations/"+o.ID+"/retain", body)
+	if code != http.StatusConflict {
+		t.Fatal("request key was reused for another action")
+	}
+}
+
+func TestLifecycleRetentionCannotPretendRemovedWorkspaceStillExists(t *testing.T) {
+	a, router := lifecycleAPI(t)
+	o, err := a.Lifecycle.Accept("removed-operation", "2026-1108-0000-00bb", "removed-request", "close", life.Intent{Mode: "discard", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err = a.Lifecycle.Mutate(o.ID, o.Revision, func(o *life.Operation) error {
+		o.State = "attention"
+		o.Stage = "branch"
+		o.Receipts["remove"] = json.RawMessage(`{"result":true,"durationMs":1}`)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _ := post(t, router, "/operations/"+o.ID+"/retain", map[string]any{"revision": o.Revision, "requestKey": "retain-directory"})
+	if code != http.StatusConflict {
+		t.Fatal("removed workspace was reported retained")
+	}
+	code, _ = post(t, router, "/operations/"+o.ID+"/retain-branch", map[string]any{"revision": o.Revision, "requestKey": "retain-local-branch"})
+	if code != http.StatusAccepted {
+		t.Fatal("branch could not be retained independently")
+	}
+	kept, _ := a.Lifecycle.Get(o.ID)
+	if kept.Intent.Mode != "discard" || !kept.Intent.KeepBranch || !kept.Has("remove") {
+		t.Fatal("branch retention changed directory outcome")
+	}
+}
+
+func TestCloseWorktreeInspectionRejectsProtectedDirectories(t *testing.T) {
+	directory := t.TempDir()
+	repo := e2eRepo(t, directory)
+	service := worktree.New("", nil)
+	for _, path := range []string{repo, filepath.Join(repo, "subdirectory"), filepath.Join(directory, "missing"), directory} {
+		if path == filepath.Join(repo, "subdirectory") {
+			if err := os.Mkdir(path, 0700); err != nil {
+				t.Fatal(err)
 			}
-			time.Sleep(10 * time.Millisecond)
 		}
-		cancel()
-		_ = os.WriteFile(release, nil, 0o600)
-	}()
-	req := httptest.NewRequest(http.MethodPost, "/sessions/2026-1106-1442-00aa/close-with-worktree", bytes.NewBufferString(`{"mode":"discard","path":"`+path+`"}`)).WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	<-finished
-	if w.Code != http.StatusOK {
-		t.Fatalf("close interrupted after kill: %d %s", w.Code, w.Body.String())
-	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("worktree survived client disconnect: %v", err)
-	}
-}
-
-func TestCloseWorktreeRetriesAfterSessionAlreadyClosed(t *testing.T) {
-	for _, snapshot := range []string{"[]", `[{"name":"2026-1106-1442-00aa"}]`, "invalid", "null", "[{}]"} {
-		t.Run(snapshot, func(t *testing.T) {
-			r, path, _ := closeWorktreeFixture(t, "case $1 in\nkill) echo 'session not found'; exit 1;;\nls) echo '"+snapshot+"';;\nesac\n")
-			code, body := post(t, r, "/sessions/2026-1106-1442-00aa/close-with-worktree", map[string]any{"mode": "discard", "path": path})
-			if snapshot == "[]" {
-				if code != http.StatusOK {
-					t.Fatalf("retry blocked by already closed session: %d %v", code, body)
-				}
-				if _, err := os.Stat(path); !os.IsNotExist(err) {
-					t.Fatalf("worktree survived retry: %v", err)
-				}
-			} else if code != http.StatusConflict {
-				t.Fatalf("unverified kill must block cleanup: %d %v", code, body)
-			} else if _, err := os.Stat(path); err != nil {
-				t.Fatalf("worktree removed without stop proof: %v", err)
-			}
-		})
-	}
-}
-
-func TestCloseWorktreeInspectsBeforeClosingSession(t *testing.T) {
-	for _, target := range []string{"main", "subdirectory", "missing", "not-git"} {
-		t.Run(target, func(t *testing.T) {
-			r, path, tmp := closeWorktreeFixture(t, "touch \"$CLOSE_STARTED\"\n")
-			started := filepath.Join(tmp, "started")
-			t.Setenv("CLOSE_STARTED", started)
-			switch target {
-			case "main":
-				path = filepath.Join(tmp, "repo")
-			case "subdirectory":
-				path = filepath.Join(path, "sub")
-				if err := os.Mkdir(path, 0o755); err != nil {
-					t.Fatal(err)
-				}
-			case "missing":
-				path = filepath.Join(tmp, "missing")
-			case "not-git":
-				path = tmp
-			}
-			code, body := post(t, r, "/sessions/2026-1106-1442-00aa/close-with-worktree", map[string]any{"mode": "discard", "path": path})
-			if code != http.StatusConflict || body["error"].(map[string]any)["stage"] != "inspect" {
-				t.Fatalf("expected inspection failure: %d %v", code, body)
-			}
-			if _, err := os.Stat(started); !os.IsNotExist(err) {
-				t.Fatalf("session operation ran before inspection: %v", err)
-			}
-		})
-	}
-}
-
-func TestCloseWorktreeRetriesAfterSquashAlreadyCompleted(t *testing.T) {
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	r, path, _ := closeWorktreeFixture(t, "case $1 in\nkill) exit 1;;\nls) echo '[]';;\nesac\n")
-	ctx := context.Background()
-	wt := worktree.New("", nil)
-	if err := os.WriteFile(filepath.Join(path, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := wt.CommitAll(ctx, path, "feature"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := wt.Merge(ctx, worktree.MergeReq{Path: path, Strategy: "squash"}); err != nil {
-		t.Fatal(err)
-	}
-	code, body := post(t, r, "/sessions/2026-1106-1442-00aa/close-with-worktree", map[string]any{"mode": "merge", "path": path})
-	if code != http.StatusOK {
-		t.Fatalf("retry blocked after successful squash: %d %v", code, body)
-	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("worktree survived squash retry: %v", err)
+		if _, err := service.LifecycleDetails(context.Background(), path); err == nil {
+			t.Fatalf("protected directory accepted: %s", path)
+		}
 	}
 }

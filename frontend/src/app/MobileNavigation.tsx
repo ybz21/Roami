@@ -1,3 +1,4 @@
+import { SessionLifecycleInbox } from '../components/sessions/SessionLifecyclePanel'
 import { onboardingTitle, onboardingBack } from '../components/onboarding/onboarding-route'
 import { ICONS } from '../components/nav-icons'
 import { openPalette } from '../components/shell/palette'
@@ -13,9 +14,10 @@ type MobileNavigationProps = {
   notifications: () => void
   newTask: () => void
   search: () => void
+  openSession?: (name: string) => void
   actionsHost: (element: HTMLSpanElement | null) => void
 }
-export function MobileTopBar({ tab, route = tab, go, unread, notifications, newTask, search, actionsHost: setMobileActionsHost }: MobileNavigationProps) {
+export function MobileTopBar({ tab, route = tab, go, unread, notifications, newTask, search, openSession, actionsHost: setMobileActionsHost }: MobileNavigationProps) {
   const { t } = useI18n()
   const navRoot = mobileNavRoot(tab, route)
   const mobilePrimary = MOBILE_NAV_KEYS.includes(tab) || tab === 'sessions'
@@ -36,6 +38,7 @@ export function MobileTopBar({ tab, route = tab, go, unread, notifications, newT
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
           {tab === 'home' && <span ref={setMobileActionsHost} className="tt-mobile-page-actions" />}
+          {(tab === 'projects' || tab === 'sessions') && <SessionLifecycleInbox compact onOpen={name => { if (openSession) openSession(name); else location.hash = '#/term/' + encodeURIComponent(name) }} />}
           {tab === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('okr.title')} onClick={() => go('okr')}><TargetIcon size={20} /></button>}
           <button type="button" className="tt-mobile-topbar-icon agent-bell" aria-label={t('agent.notifications')} onClick={notifications}><BellIcon size={20} />{!!unread && <span className="agent-badge">{unread > 99 ? '99+' : unread}</span>}</button>
           {mobilePrimary && navRoot === 'projects' && <button type="button" className="tt-mobile-topbar-icon" aria-label={t('mobile.newSession')}

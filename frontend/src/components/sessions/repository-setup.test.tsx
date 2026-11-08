@@ -32,7 +32,7 @@ describe('task repository setup', () => {
    }
    if (url.includes('/git/branches')) return json({ data: { default: 'main', branches: [{ name: 'main', worktree: '/project' }], remotes: [] } })
    if (url.includes('/git/worktrees')) return json({ data: [{ path: '/project', branch: 'main', isMain: true }] })
-   if (url.endsWith('/worktree-sessions')) return json({ name: 'task', data: { path: '/project/.worktrees/task', branch: 'task', base: 'main' } })
+   if (url.endsWith('/session-lifecycle/operations')) return json({ data: { operationId: 'op', resourceId: 'task' } })
    if (url.endsWith('/sessions')) return json({ name: 'task' })
    return json({ data: {} })
   })
@@ -40,6 +40,7 @@ describe('task repository setup', () => {
  })
  afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
  const requests = (suffix: string) => fetchMock.mock.calls.filter(([url]) => String(url).endsWith(suffix))
+ const creations = (worktree: boolean) => requests('/session-lifecycle/operations').filter(([, options]) => !!JSON.parse(options.body).intent.worktree === worktree)
  const show = () => render(<I18nProvider><AntApp><TaskComposer dir="/project" isGit openTerm={() => {}} /></AntApp></I18nProvider>)
  const prompt = () => screen.getByRole('textbox') as HTMLTextAreaElement
  const start = () => screen.getByRole('button', { name: /开\s*干/ })
@@ -52,10 +53,10 @@ describe('task repository setup', () => {
   await screen.findByText(/项目尚未初始化 Git/)
   fireEvent.change(prompt(), { target: { value: '手机任务草稿' } })
   fireEvent.keyDown(prompt(), { key: 'Enter' })
-  expect(requests('/sessions')).toHaveLength(0)
+  expect(creations(false)).toHaveLength(0)
   expect(prompt().value).toBe('手机任务草稿')
   fireEvent.click(start())
-  await waitFor(() => expect(requests('/sessions')).toHaveLength(1))
+  await waitFor(() => expect(creations(false)).toHaveLength(1))
  })
 
  it('preserves all executor choices when adding the first-task guidance', async () => {
@@ -67,7 +68,7 @@ describe('task repository setup', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Claude' }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Claude' }).getAttribute('aria-pressed')).toBe('true'))
   expect(prompt().value).toBe('保留首个任务草稿')
-  expect(requests('/sessions')).toHaveLength(0)
+  expect(creations(false)).toHaveLength(0)
   fireEvent.change(prompt(), { target: { value: '' } })
  })
 
@@ -78,9 +79,9 @@ describe('task repository setup', () => {
   fireEvent.change(prompt(), { target: { value: '保留任务内容' } })
   fireEvent.click(screen.getByRole('button', { name: '不启动' }))
   fireEvent.click(start())
-  await waitFor(() => expect(requests('/sessions')).toHaveLength(1))
-  expect(requests('/worktree-sessions')).toHaveLength(0)
-  expect(JSON.parse(requests('/sessions')[0][1].body)).toMatchObject({ dir: '/project' })
+  await waitFor(() => expect(creations(false)).toHaveLength(1))
+  expect(creations(true)).toHaveLength(0)
+  expect(JSON.parse(creations(false)[0][1].body).intent).toMatchObject({ dir: '/project' })
  })
 
  it('confirms initialization, preserves the draft and creates a worktree', async () => {
@@ -97,8 +98,8 @@ describe('task repository setup', () => {
   expect(prompt().value).toBe('已有项目继续开发')
   fireEvent.click(screen.getByRole('button', { name: '不启动' }))
   fireEvent.click(start())
-  await waitFor(() => expect(requests('/worktree-sessions')).toHaveLength(1))
-  expect(requests('/sessions')).toHaveLength(0)
+  await waitFor(() => expect(creations(true)).toHaveLength(1))
+  expect(creations(false)).toHaveLength(0)
  })
 
  it('repairs an unborn repository and keeps input after failure', async () => {
@@ -124,9 +125,9 @@ describe('task repository setup', () => {
   fireEvent.change(prompt(), { target: { value: '普通目录任务' } })
   fireEvent.click(screen.getByRole('button', { name: '不启动' }))
   fireEvent.click(start())
-  await waitFor(() => expect(requests('/sessions')).toHaveLength(1))
-  expect(JSON.parse(requests('/sessions')[0][1].body)).toMatchObject({ dir: '/project' })
-  expect(requests('/worktree-sessions')).toHaveLength(0)
+  await waitFor(() => expect(creations(false)).toHaveLength(1))
+  expect(JSON.parse(creations(false)[0][1].body).intent).toMatchObject({ dir: '/project' })
+  expect(creations(true)).toHaveLength(0)
   expect(requests('/git/initialize')).toHaveLength(0)
  })
 
@@ -139,13 +140,15 @@ describe('task repository setup', () => {
   expect(screen.queryByText('新建 worktree')).toBeNull()
   if (submit === 'Enter') fireEvent.keyDown(prompt(), { key: 'Enter' })
   else fireEvent.click(start())
-  await waitFor(() => expect(requests('/tasks/_/send')).toHaveLength(1))
-  expect(JSON.parse(requests('/sessions')[0][1].body)).toMatchObject({ dir: '/project' })
-  const message = JSON.parse(requests('/tasks/_/send')[0][1].body).msg
+  await waitFor(() => expect(creations(false)).toHaveLength(1))
+  expect(JSON.parse(creations(false)[0][1].body).intent).toMatchObject({ dir: '/project' })
+  const launch = JSON.parse(creations(false)[0][1].body).intent.launch
+  const message = launch.task + launch.preamble
   expect(message).toContain('继续普通目录任务')
-  expect(message).toContain('/project')
+  expect(JSON.parse(creations(false)[0][1].body).intent.dir).toBe('/project')
+  expect(message).toContain('{{PATH}}')
   expect(message).not.toContain('git branch -m')
-  expect(requests('/worktree-sessions')).toHaveLength(0)
+  expect(creations(true)).toHaveLength(0)
   expect(requests('/git/initialize')).toHaveLength(0)
  })
 
@@ -161,8 +164,8 @@ describe('task repository setup', () => {
   expect(prompt().value).toBe('重试检查')
   fireEvent.click(screen.getByRole('button', { name: '不启动' }))
   fireEvent.click(start())
-  await waitFor(() => expect(requests('/worktree-sessions')).toHaveLength(1))
-  expect(requests('/sessions')).toHaveLength(0)
+  await waitFor(() => expect(creations(true)).toHaveLength(1))
+  expect(creations(false)).toHaveLength(0)
  })
 
  it('ignores a late response from a previously selected directory', async () => {

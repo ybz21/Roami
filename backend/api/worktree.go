@@ -16,6 +16,7 @@ import (
 	"github.com/ybz21/Roami/backend/project"
 	"github.com/ybz21/Roami/backend/ttmux"
 	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/sessionlifecycle"
 )
 
 func wtCtx(c *gin.Context) (context.Context, context.CancelFunc) {
@@ -238,13 +239,22 @@ func (a *API) SessionWorktreeStatus(c *gin.Context) {
 	name := a.sessionTarget(c)
 	ctx, cancel := wtCtx(c)
 	defer cancel()
+	identity, identityErr := lifecycleRuntime(ctx).SessionIdentity(name)
+	if identityErr != nil {
+		wtErr(c, identityErr)
+		return
+	}
 	ann := a.WT.Annotations(ctx)[name]
 	if ann == nil || ann.Primary == nil || !ann.Primary.Linked {
-		c.JSON(http.StatusOK, gin.H{"data": gin.H{"inWorktree": false}})
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"inWorktree": false, "sessionIdentity": identity}})
 		return
 	}
 	hit := ann.Primary
 	res := gin.H{"inWorktree": true, "path": hit.Worktree, "branch": hit.Branch, "repo": hit.Repo}
+	res["sessionIdentity"] = identity
+	if snapshot, err := a.WT.Snapshot(ctx, hit.Worktree); err == nil {
+		res["snapshot"] = snapshot
+	}
 	if list, err := a.WT.List(ctx, hit.Worktree); err == nil {
 		for _, w := range list {
 			if w.Path == hit.Worktree {
@@ -334,40 +344,11 @@ func (a *API) WorktreeSessionCreate(c *gin.Context) {
 		Remote   string `json:"remote"`
 		Existing bool   `json:"existing"`
 	}
-	if err := c.ShouldBindJSON(&b); err != nil || b.Name == "" || strings.TrimSpace(b.Dir) == "" {
+	if c.ShouldBindJSON(&b) != nil || b.Name == "" || strings.TrimSpace(b.Dir) == "" || (b.Existing && b.Branch == "") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
-	if b.Existing && strings.TrimSpace(b.Branch) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "existing requires branch"}})
-		return
-	}
-	label := strings.TrimSpace(b.Name)
-	ctx, cancel := wtCtx(c)
-	defer cancel()
-	// 会话叫 id，b.Name 只是展示名；分支占位名仍按展示名派生（否则分支会变成一串 id）
-	sess, err := a.newSession(label, b.Dir)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "SESSION_FAILED", "message": err.Error()}})
-		return
-	}
-	a.WT.BindSessionHome(sess, b.Dir) // 先钉在仓库上；worktree 建成后 cdInto 会改钉到 worktree
-	branch := strings.TrimSpace(b.Branch)
-	if branch == "" {
-		branch = autoBranch(label)
-	}
-	wt, err := a.WT.Create(ctx, worktree.CreateReq{Dir: b.Dir, Branch: branch, Base: b.Base, Remote: b.Remote, Dirname: sess, Existing: b.Existing})
-	if err != nil {
-		_, _ = a.TT.Run("kill", sess, "--yes")
-		wtErr(c, err)
-		return
-	}
-	if err = a.cdInto(sess, wt.Path); err != nil {
-		a.rollbackPreparedSession(sess, wt, !b.Existing)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "WORKSPACE_NOT_READY", "message": err.Error()}})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"session": sess, "label": label, "path": wt.Path, "branch": wt.Branch, "base": wt.Base}, "name": sess})
+	a.waitWorktreeCreate(c, "", b.Name, b.Dir, b.Branch, b.Base, b.Remote, b.Existing)
 }
 
 // SessionFork POST /sessions/:name/fork {child, dir?}
@@ -407,69 +388,25 @@ func (a *API) SessionFork(c *gin.Context) {
 // 编排（先 subSession 后 worktree）：roami session fork（cwd=父仓库目录，meta 记 parent）→
 // 建 worktree（分支缺省自动占位）→ 子会话内注入 cd；失败反向补偿 kill 子会话。
 func (a *API) SessionForkWorktree(c *gin.Context) {
-	parent := a.sessionTarget(c)
 	var b struct {
 		Child    string `json:"child"`
+		Dir      string `json:"dir"`
 		Branch   string `json:"branch"`
 		Base     string `json:"base"`
 		Remote   string `json:"remote"`
-		Dir      string `json:"dir"`
-		Existing bool   `json:"existing"` // branch 是已有本地分支：检出它，不新建
+		Existing bool   `json:"existing"`
 	}
-	if err := c.ShouldBindJSON(&b); err != nil || b.Child == "" {
+	if c.ShouldBindJSON(&b) != nil || strings.TrimSpace(b.Child) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
-	// existing 缺 branch 在 fork 之前拦：fork 之后再返回会漏下一个空子会话
-	if b.Existing && strings.TrimSpace(b.Branch) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "existing requires branch"}})
-		return
+	parent := a.sessionTarget(c)
+	if b.Dir == "" {
+		b.Dir = a.WT.SessionHome(parent)
 	}
-	label := strings.TrimSpace(b.Child)
-	ctx, cancel := wtCtx(c)
-	defer cancel()
-	dir := strings.TrimSpace(b.Dir)
-	if dir == "" {
-		if out, err := a.TT.Run("list-panes", "-t", "="+parent, "-F", "#{pane_active}\t#{pane_current_path}"); err == nil {
-			for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-				active, cwd, ok := strings.Cut(line, "\t")
-				if ok && (dir == "" || active == "1") {
-					dir = cwd
-				}
-			}
-		}
-	}
-	if dir == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "NO_DIR", "message": "cannot resolve parent cwd; pass dir explicitly"}})
-		return
-	}
-	out, err := a.TT.Run("fork", parent, label, "--dir", dir, "--detach", "--json")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "FORK_FAILED", "message": ttmux.StripANSI(out)}})
-		return
-	}
-	child := forkedSession(out, label)
-	a.WT.BindSessionHome(child, dir) // 先钉父仓库，下面 cdInto 改钉到新 worktree
-	branch := strings.TrimSpace(b.Branch)
-	if branch == "" {
-		branch = autoBranch(label) // 分支占位名按展示名派生，别派生出一串 id
-	}
-	wt, err := a.WT.Create(ctx, worktree.CreateReq{Dir: dir, Branch: branch, Base: b.Base, Remote: b.Remote, Dirname: child, Existing: b.Existing})
-	if err != nil {
-		_, _ = a.TT.Run("kill", child, "--yes")
-		wtErr(c, err)
-		return
-	}
-	if err = a.cdInto(child, wt.Path); err != nil {
-		a.rollbackPreparedSession(child, wt, !b.Existing)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "WORKSPACE_NOT_READY", "message": err.Error()}})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"session": child, "label": label, "parent": parent, "path": wt.Path, "branch": wt.Branch, "base": wt.Base}, "name": child})
+	a.waitWorktreeCreate(c, parent, b.Child, b.Dir, b.Branch, b.Base, b.Remote, b.Existing)
 }
 
-// forkedSession 从 `roami session fork --json` 的输出里取子会话名(= 会话 id)；
-// 解析不出来（老版本 CLI / 输出异常）退回展示名，让调用方至少还能按名字操作。
 func forkedSession(out, fallback string) string {
 	var res struct {
 		Session string `json:"session"`
@@ -484,176 +421,49 @@ func forkedSession(out, fallback string) string {
 // {mode: keep|merge|discard, path?, strategy?, expectedHead?}
 // W7 三选一状态机：每步失败即停、返回已完成阶段（可恢复）。
 func (a *API) SessionCloseWithWorktree(c *gin.Context) {
-	name := a.sessionTarget(c)
 	var b struct {
 		Mode         string `json:"mode"`
 		Path         string `json:"path"`
 		Strategy     string `json:"strategy"`
 		ExpectedHead string `json:"expectedHead"`
 	}
-	if err := c.ShouldBindJSON(&b); err != nil {
+	if c.ShouldBindJSON(&b) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
-	// Once accepted, closing must finish even if navigation or a phone disconnects.
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 60*time.Second)
-	defer cancel()
-
-	stages := []string{}
-	fail := func(stage string, err error) {
-		if we, ok := err.(*worktree.Err); ok {
-			body := gin.H{"code": we.Code, "message": we.Message, "stage": stage, "done": stages}
-			for k, v := range we.Extra {
-				body[k] = v
-			}
-			c.JSON(http.StatusConflict, gin.H{"error": body})
-			return
-		}
-		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "STAGE_FAILED", "message": err.Error(), "stage": stage, "done": stages}})
+	if b.Mode == "" {
+		b.Mode = "keep"
 	}
-	// merge / discard 会删 worktree：里面还有别的会话在跑就拒绝——之前 IgnoreSessions 一路放行，
-	// 关掉一个会话把同 worktree 的另外两个会话的目录一起删了（分支也没了）。
-	// 收尾整个任务（前端 finishTask）是先结束其余会话再关最后一个，走到这里时 others 已经空了
-	if (b.Mode == "merge" || b.Mode == "discard") && b.Path != "" {
-		path, err := filepath.EvalSymlinks(b.Path)
-		if err != nil {
-			fail("inspect", err)
-			return
-		}
-		b.Path = filepath.Clean(path)
-		list, err := a.WT.List(ctx, b.Path)
-		if err != nil {
-			fail("inspect", err)
-			return
-		}
-		found := false
-		for _, w := range list {
-			if w.Path == b.Path {
-				found = true
-				if w.IsMain {
-					fail("inspect", &worktree.Err{Code: "MAIN_WORKTREE", Message: "refusing to remove the main worktree"})
-					return
-				}
-				if others := otherSessions(w, name); len(others) > 0 {
-					c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "WORKTREE_IN_USE", "message": "worktree 里还有别的会话", "sessions": others}})
-					return
-				}
-			}
-		}
-		if !found {
-			fail("inspect", &worktree.Err{Code: "BAD_PATH", Message: "path is not a registered linked worktree"})
-			return
-		}
-	}
-	kill := func() error {
-		out, err := a.TT.RunCtx(ctx, "kill", name, "--yes")
-		if err != nil {
-			// A previous attempt may have closed the session before removal failed.
-			// Only a successful live snapshot can prove it is safe to resume cleanup.
-			if b.Mode == "merge" || b.Mode == "discard" {
-				snapshot, observeErr := a.TT.RunCtx(ctx, "ls", "--live", "--json")
-				var live []struct {
-					Name string `json:"name"`
-				}
-				if observeErr == nil && strings.HasPrefix(strings.TrimSpace(snapshot), "[") && json.Unmarshal([]byte(snapshot), &live) == nil {
-					absent := true
-					for _, session := range live {
-						if session.Name == "" || session.Name == name {
-							absent = false
-						}
-					}
-					if absent {
-						return nil
-					}
-				}
-			}
-			msg := strings.TrimSpace(ttmux.StripANSI(out))
-			if msg == "" {
-				msg = err.Error()
-			}
-			return &worktree.Err{Code: "KILL_FAILED", Message: msg}
-		}
-		return nil
-	}
-
-	switch b.Mode {
-	case "keep", "":
-		if err := kill(); err != nil {
-			fail("kill", err)
-			return
-		}
-		stages = append(stages, "kill")
-	case "merge":
-		if b.Path == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "path required for merge mode"}})
-			return
-		}
-		strategy := b.Strategy
-		if strategy == "" {
-			strategy = "squash"
-		}
-		// 未提交改动先落一笔 wip，再合并
-		if err := a.WT.CommitAll(ctx, b.Path, "wip: auto-commit before merge (roam close)"); err != nil {
-			fail("wip-commit", err)
-			return
-		}
-		stages = append(stages, "wip-commit")
-		if _, err := a.WT.Merge(ctx, worktree.MergeReq{Path: b.Path, Strategy: strategy, ExpectedHead: b.ExpectedHead}); err != nil {
-			fail("merge", err)
-			return
-		}
-		stages = append(stages, "merge")
-		if err := kill(); err != nil {
-			fail("kill", err)
-			return
-		}
-		stages = append(stages, "kill")
-		if err := a.WT.Remove(ctx, worktree.RemoveReq{Path: b.Path, DeleteBranch: true, ForceDeleteBranch: strategy == "squash", IgnoreSessions: true}); err != nil {
-			fail("remove", err)
-			return
-		}
-		stages = append(stages, "remove")
-	case "discard":
-		if b.Path == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "path required for discard mode"}})
-			return
-		}
-		// 留痕素材趁 worktree 还在时先取：已合入的丢弃 = cleaned（零损失），否则 discarded
-		var gone *worktree.Worktree
-		if list, err := a.WT.List(ctx, b.Path); err == nil {
-			for i := range list {
-				if list[i].Path == b.Path {
-					gone = &list[i]
-				}
-			}
-		}
-		if err := kill(); err != nil {
-			fail("kill", err)
-			return
-		}
-		stages = append(stages, "kill")
-		if err := a.WT.Remove(ctx, worktree.RemoveReq{Path: b.Path, ForceWorktree: true, ForceDeleteBranch: true, DeleteBranch: true, IgnoreSessions: true}); err != nil {
-			fail("remove", err)
-			return
-		}
-		stages = append(stages, "remove")
-		if gone != nil {
-			if repo, err := a.WT.ResolveRepo(ctx, filepath.Dir(b.Path)); err == nil {
-				action := "discarded"
-				if gone.MergedInto != "" {
-					action = "cleaned"
-				}
-				a.Projects.Trace(project.TraceEntry{
-					Repo: repo.Root, Branch: gone.Branch, HeadOid: gone.Head, Base: gone.Base,
-					Action: action, MergedInto: gone.MergedInto, MergedKind: gone.MergedKind,
-				})
-			}
-		}
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_MODE", "message": b.Mode}})
+	if b.Mode != "keep" && b.Mode != "merge" && b.Mode != "discard" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_MODE"}})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"done": stages}})
+	ctx, cancel := wtCtx(c)
+	defer cancel()
+	name := a.sessionTarget(c)
+	identity, err := lifecycleRuntime(ctx).SessionIdentity(name)
+	if err != nil {
+		lifecycleError(c, err)
+		return
+	}
+	intent := sessionlifecycle.Intent{Mode: b.Mode, Path: b.Path, Strategy: b.Strategy, SessionIdentity: identity}
+	if b.Mode != "keep" {
+		intent.Snapshot, err = a.WT.Snapshot(ctx, b.Path)
+		if err != nil {
+			wtErr(c, err)
+			return
+		}
+		if b.ExpectedHead != "" {
+			head, e := a.WT.Head(ctx, b.Path)
+			if e != nil || head != b.ExpectedHead {
+				c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "HEAD_MOVED"}})
+				return
+			}
+		}
+	}
+	if o, ok := a.waitSessionLifecycle(c, "close", name, intent); ok {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"operationId": o.ID, "done": lifecycleDoneStages(o)}})
+	}
 }
 
 // WorktreeFinish POST /git/worktree/finish

@@ -97,6 +97,9 @@ func ReviveDormant(rt runtime.Runtime, meta *sessmeta.Store, name string) (Resul
 // 重开的是**壳**不是现场：pane 里的进程死了就是死了。旧行保持 dead、新会话是新 id，
 // 「谁是谁的重开」由 restored_from 记着——历史不被改写，也不会重复恢复同一行。
 func Revive(rt runtime.Runtime, meta *sessmeta.Store, name string) (Result, error) {
+	if err := rt.CheckLifecycle(name, ""); err != nil {
+		return Result{}, err
+	}
 	mu := lockFor(name)
 	mu.Lock()
 	defer mu.Unlock()

@@ -23,7 +23,31 @@ var mainSteps = []Step{
 	{Version: 8, Name: "session-memory", Fn: addSessionMemory},
 	{Version: 9, Name: "session-oom", Fn: addSessionOOM},
 	{Version: 10, Name: "session-mem-alert", Fn: addSessionMemAlert},
+	{Version: 11, Name: "session-lifecycle", SQL: sessionLifecycleTables},
 }
+
+const sessionLifecycleTables = `
+CREATE TABLE session_lifecycle_operations (
+ id TEXT PRIMARY KEY, request_key TEXT NOT NULL UNIQUE, digest TEXT NOT NULL,
+ resource_id TEXT NOT NULL, kind TEXT NOT NULL, intent TEXT NOT NULL, original_intent TEXT NOT NULL,
+ state TEXT NOT NULL, stage TEXT NOT NULL DEFAULT 'accepted', revision INTEGER NOT NULL DEFAULT 1,
+ epoch INTEGER NOT NULL DEFAULT 0, cancel_requested INTEGER NOT NULL DEFAULT 0,
+ receipts TEXT NOT NULL DEFAULT '{}', error_code TEXT NOT NULL DEFAULT '', error_detail TEXT NOT NULL DEFAULT '',
+ accepted_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+);
+CREATE INDEX session_lifecycle_resource ON session_lifecycle_operations(resource_id, accepted_at);
+CREATE UNIQUE INDEX session_lifecycle_created_resource ON session_lifecycle_operations(resource_id) WHERE kind='create';
+CREATE INDEX session_lifecycle_accepted ON session_lifecycle_operations(accepted_at);
+CREATE INDEX session_lifecycle_active ON session_lifecycle_operations(resource_id) WHERE state NOT IN ('succeeded','cancelled');
+CREATE INDEX session_lifecycle_pending ON session_lifecycle_operations(state, kind);
+CREATE TABLE session_lifecycle_events (
+ cursor INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL,
+ revision INTEGER NOT NULL, state TEXT NOT NULL, stage TEXT NOT NULL, at INTEGER NOT NULL, summary TEXT NOT NULL
+);
+CREATE TABLE session_lifecycle_actions (
+ request_key TEXT PRIMARY KEY, operation_id TEXT NOT NULL, digest TEXT NOT NULL
+);
+`
 
 // addSessionMemAlert 记「已经就这个会话的内存提醒过什么」，用来只提醒一次。
 //
