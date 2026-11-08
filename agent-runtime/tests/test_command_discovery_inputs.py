@@ -8,7 +8,110 @@ from test_foundations import call
 from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
+from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
+
+
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        "cd /tmp && {command}",
+        "cd /tmp;{command}",
+        "pwd\n{command}",
+        "{command} | head -10",
+        "{command}>/tmp/result.json",
+        "env EXAMPLE=value {command}",
+        "command {command}",
+        "bash -c {quoted}",
+    ],
+)
+async def test_managed_command_wrappers_do_not_run_shell_or_drop_binding(store, wrapper):
+    from dataclasses import replace
+
+    runtime, received = Runtime(store, ConversationModel()), []
+
+    async def shell(args, binding):
+        raise AssertionError("Wrapped registered operation reached native shell")
+
+    async def lookup(args, binding):
+        received.append((args, binding))
+        return args
+
+    runtime.tools.registry["shell"] = replace(runtime.tools.registry["shell"], handler=shell)
+    runtime.tools.registry["task_status"] = replace(
+        runtime.tools.registry["task_status"], handler=lookup
+    )
+    command = 'roami agent task status --input \'{"taskId":"original-task"}\''
+    binding = {"owner": "alice", "conversation": "original-main", "turnId": "original-turn"}
+    try:
+        args = {"command": wrapper.format(command=command, quoted=shlex.quote(command))}
+        with pytest.raises(DomainError, match="INVALID_CLI_ARGUMENTS"):
+            await runtime.tools.invoke(call("bash", args), "main", binding)
+        assert not received
+        hint = runtime.tools.directory.command_hint(args, "main")
+        assert hint["expectedCommand"]["command"] == "roami agent task status"
+        assert "taskId" in hint["expectedCommand"]["inputSchema"]["properties"]
+        assert await runtime.tools.invoke(call("bash", {"command": command}), "main", binding) == {
+            "taskId": "original-task"
+        }
+        assert received[0][1]["conversation"] == "original-main"
+        assert received[0][1]["turnId"] == "original-turn"
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "printf '%s' 'roami agent task status'",
+        "echo roami agent task status",
+        "printf '%s' '|' roami agent task status",
+        "printf '%s' '&&' roami agent task status",
+        "cat <<'EOF'\nroami agent task status\nEOF",
+        "python3 collector.py && printf done",
+        "roami adb -s example devices",
+        "roami chrome text --target example --no-start",
+    ],
+)
+async def test_registered_wrapper_detection_preserves_native_workflows(store, command):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        assert runtime.tools.directory.wrapped_command({"command": command}) is None
+    finally:
+        await runtime.close()
+
+
+async def test_wrapped_registered_command_returns_bound_gateway_recovery(store):
+    from test_cli_arguments import claimed_turn
+
+    from roami_agent.storage.transcript_repository import message
+
+    runtime = Runtime(store, ConversationModel())
+    try:
+        turn = await claimed_turn(runtime)
+        invocation = call(
+            "bash", {"command": "cd /tmp && roami agent reminder cancel --id private | head"}
+        )
+        mid = await store.call(
+            lambda db: message(
+                db,
+                turn["conversation_id"],
+                turn["branch_id"],
+                "assistant",
+                {"text": "", "tool_calls": [invocation]},
+                turn_id=turn["id"],
+            ),
+            write=True,
+        )
+        result = await runtime.gateway.invoke(turn, mid, invocation, "main", {"owner": "alice"})
+        assert result["error"] == "INVALID_CLI_ARGUMENTS"
+        assert result["executionStarted"] is False
+        assert "command alone" in result["recovery"]
+        assert "do not invent" in result["recovery"]
+        assert result["expectedCommand"]["command"] == "roami agent reminder cancel --id id"
+        assert "private" not in json.dumps(result)
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.parametrize("role", ["main", "worker"])

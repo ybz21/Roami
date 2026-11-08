@@ -448,6 +448,9 @@ class ToolDirectory:
         return None
 
     def command_hint(self, args, role):
+        wrapped = self.wrapped_command(args)
+        if wrapped:
+            args = {"argv": wrapped}
         try:
             argv = self.argv(args)
         except (DomainError, KeyError):
@@ -462,6 +465,63 @@ class ToolDirectory:
                 if command["argv"][1 : len(path) + 1] == path:
                     return {"expectedCommand": command_strings(command)}
         return {}
+
+    def wrapped_command(self, args, depth=0):
+        if "command" not in args or depth > 3:
+            return None
+        try:
+            if self.operation(self.argv(args)) is not None:
+                return None
+        except DomainError:
+            pass
+        try:
+            lexer = shlex.shlex(args["command"], posix=False, punctuation_chars=";&|<>()\n")
+            lexer.whitespace = " \t\r"
+            tokens = list(lexer)
+        except ValueError:
+            return None
+        # A heredoc body is data; this recovery hint is not a general shell parser.
+        if any(token.startswith("<<") for token in tokens):
+            return None
+        boundaries = {";", "&&", "||", "|", "&", "\n", "("}
+        for start in range(len(tokens)):
+            if start and tokens[start - 1] not in boundaries:
+                continue
+            end = next(
+                (
+                    i
+                    for i in range(start, len(tokens))
+                    if tokens[i] in boundaries | {">", ">>", "<", ")"}
+                ),
+                len(tokens),
+            )
+            segment = [
+                shlex.split(token)[0] if token.startswith(("'", '"')) else token
+                for token in tokens[start:end]
+            ]
+            offset = 0
+            while offset < len(segment) and (
+                re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*=.*", segment[offset])
+                or segment[offset] in {"env", "command", "exec"}
+            ):
+                offset += 1
+            candidate = segment[offset:]
+            if (
+                len(candidate) >= 3
+                and PurePath(candidate[0]).name in {"sh", "bash"}
+                and candidate[1] in {"-c", "-lc"}
+            ):
+                nested = self.wrapped_command({"command": "env " + candidate[2]}, depth + 1)
+                if nested:
+                    return nested
+            if not candidate or candidate[0] not in {"roami", self.settings.cli_bin}:
+                continue
+            paths = [*COMMANDS.values(), ["agent", "capability", "call"]]
+            if any(candidate[1 : len(path) + 1] == path for path in paths) and (
+                start or offset or end != len(tokens)
+            ):
+                return candidate
+        return None
 
     def resolve(self, tool, args, role):
         if tool.name == "read":
@@ -509,6 +569,8 @@ class ToolDirectory:
                 self.registry.registry[name], main=True, model_schema=tool.model_schema
             ), args
         elif tool.name == "bash":
+            if self.wrapped_command(args):
+                raise DomainError("INVALID_CLI_ARGUMENTS")
             argv = self.argv(args)
             if argv and argv[0] in {"roami", self.settings.cli_bin}:
                 args = {key: value for key, value in args.items() if key not in {"scope", "cwd"}}
