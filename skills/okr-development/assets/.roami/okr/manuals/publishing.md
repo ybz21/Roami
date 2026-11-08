@@ -12,7 +12,7 @@ Main 独立审核当前版本后，在已授权账号与自动模式范围内续
 
 ## 宿主准备清单：准确格式与顺序
 
-制作任务的通用物料 manifest 不能直接当作发布准备清单。宿主要求顶层 `identity` 对象，包含来自当前真实任务的 `taskId`、整数 `revision`、`runId`；`files` 每一项也带同样身份以及 `path`、正整数 `bytes`、完整小写 SHA256。不要从旧轮次猜身份，也不把顶层三个字段当成 `identity` 对象。
+制作任务的通用物料 manifest 不能直接当作发布准备清单。宿主要求顶层 `identity` 对象，包含来自当前真实任务的 `taskId`、整数 `revision`、`runId`；`files` 每一项直接包含这三个身份字段以及 `path`、正整数 `bytes`、完整小写 SHA256，仅有每项嵌套的 identity 不够。不要从旧轮次猜身份，也不把顶层三个字段当成 `identity` 对象。
 
 清单与待冻结的正文、图片放在同一主题目录。`files[].path` 相对 **manifest.json 所在目录**，不是项目根或执行目录。例如 manifest 在 `publication-input/manifest.json`、正文在同目录时，path 为 `01-post.en.txt`，不能再加 `publication-input/`。清单字段可按以下 Python 结构生成；`scope` 必须来自宿主当前任务，`root` 是实际清单目录：
 
@@ -36,5 +36,7 @@ manifest = {"identity": identity, "files": files}
 Main 的顺序是：读取当前任务与真实完成回执 → 通过 `read artifact://ID`（实际为 `artifact_read`）完整读取所选的宿主留存文本产物，再读取正文/ALT及当前图片（图片需实际视觉输入）→ 用 `swarm_verify` 验收制作/输入任务 → `swarm_publication_prepare` 冻结 → 读取返回的冻结内容 → `swarm_publication_review`。只看旧轮次图片、成员报告或 hash 字符串不足以通过 `SWARM_ARTIFACT_REVIEW_REQUIRED`。制作验收与发布审批分开，验收制作绝不等于已发布。
 
 prepare 的 `manifest.id` 必须是本轮结果中宿主留存的 artifact ID，不是文件名；`content.body`/`content.images` 必须逐字等于清单的相对 path。业务键对应真实计划发布条目，跨修正与重试保留。`PUBLICATION_AUTHOR_NOT_CURRENT` 先核对是否已验收、是否仍为当前任务及运行；`INVALID_PUBLICATION_MANIFEST` 核对上述结构和路径，均不能改称账号授权失败。
+
+`accountIdentity` 是有独立证据的平台数字账号 ID 字符串，不是 `@账号名`、昵称或主页网址。例如格式为 `"123456789"`，这里只示范格式，不能把示例 ID 用于真实账号。遇到 `INVALID_PUBLICATION_ACCOUNT_ID` 时保留原业务键、账号及已验收作者，从可信证据核对数字 ID；无法核对就如实停在该缺口，不猜 ID、不换账号。历史账号 ID 只说明身份对应，不能证明当前登录、投稿权限或发布成功；冻结版本也不授予发布权限。
 
 验收所选文本产物必须逐份通过 `read artifact://ID` 读取完整、不截断的留存字节；大文件按工具返回的分页继续读完，并在后续 assistant 消息调用 verify。`file_read /磁盘路径`、artifact 的元数据、状态汇总或另外一份同 SHA 文件，都不替代这份宿主留存读取回执。不要清空 artifactIds 尝试绕过验收。
