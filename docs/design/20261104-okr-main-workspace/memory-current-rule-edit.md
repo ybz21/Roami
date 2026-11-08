@@ -1,6 +1,6 @@
 # 当前团队约定的局部修改
 
-状态：设计，尚未实现。关联 #822、#656、#761。
+状态：核心、迁移与 Main 工具已实现，正在检查；尚未部署。关联 #822、#656、#761。
 
 ## 产品设计与用户故事
 
@@ -69,3 +69,5 @@ Go 原项目 memory 接口增加 `mode: "edit"`，字段为 `expectedSha256`、`
 5. 原 Main 实际更正项目顶部旧规则，回读原文、结果、history 与 SHA；核对原团队/任务/其他事实保留，以及下一轮实际目录。Main 自述不能代替文件核验。
 
 数值看板已确认、复盘已保存、下一轮已续派属于另行验证的业务事实；本设计不据此声称局部记忆编辑已经完成或自动目标已经全部达成。
+
+普通 Main 与协调 Main 均须通过真实 Foundation 命令目录发现并执行编辑：project_okr_memory_edit 对应 roami project okr memory edit；swarm_memory_edit 对应 roami swarm memory edit。只注册 Python handler 而漏掉 commands.json 不算可用入口。回归直接经过 tool_list 与 bash 的注册命令路由，不以 handler 调用代替。

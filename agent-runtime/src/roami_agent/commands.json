@@ -165,5 +165,11 @@
     "project",
     "okr",
     "update"
+  ],
+  "project_okr_memory_edit": [
+    "project",
+    "okr",
+    "memory",
+    "edit"
   ]
 }

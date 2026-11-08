@@ -44,7 +44,7 @@ def response(project_id, key):
     }
 
 
-async def test_bound_main_edit_has_compact_receipt_and_cannot_select_another_project(
+async def test_bound_main_discovers_and_executes_edit_cli_without_selecting_another_project(
     project_runtime, monkeypatch
 ):
     runtime, _, _ = project_runtime
@@ -62,7 +62,12 @@ async def test_bound_main_edit_has_compact_receipt_and_cannot_select_another_pro
     args = arguments()
     tool.validate(args)
     binding = {"owner": "alice", "conversation": cid, "role": "main", "turnId": "original-turn"}
-    result = await tool.handler(args, binding)
+    listed = await invoke(
+        runtime, binding, "tool_list", {"kind": "cli", "query": "project_okr_memory_edit"}
+    )
+    assert listed["items"][0]["name"] == "project_okr_memory_edit"
+    command = shlex.join(["roami", "project", "okr", "memory", "edit", "--input", json.dumps(args)])
+    result = await invoke(runtime, binding, "bash", {"command": command})
     assert result["sha256"] == "d" * 64
     assert result["operationReceipt"]["resultSha256"] == "c" * 64
     assert "content" not in result and "projectFiles" not in result
