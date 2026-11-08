@@ -25,11 +25,18 @@ type memoryAppendIntent struct {
 	ResultSHA256   string `json:"resultSha256"`
 }
 
+type memoryEditIntent struct {
+	Result         string `json:"result"`
+	PreviousSHA256 string `json:"previousSha256"`
+	ResultSHA256   string `json:"resultSha256"`
+}
+
 type projectOperationIntent struct {
 	Revision    int64               `json:"revision"`
 	Review      *Review             `json:"review,omitempty"`
 	Observation *Observation        `json:"observation,omitempty"`
 	Memory      *memoryAppendIntent `json:"memory,omitempty"`
+	MemoryEdit  *memoryEditIntent   `json:"memoryEdit,omitempty"`
 }
 
 type projectOperation struct {
@@ -120,6 +127,10 @@ func (s *Store) finishOperation(projectID string, op *projectOperation) (*Worksp
 	if op.Intent.Memory != nil {
 		receipt.PreviousSHA256 = op.Intent.Memory.PreviousSHA256
 		receipt.ResultSHA256 = op.Intent.Memory.ResultSHA256
+	}
+	if op.Intent.MemoryEdit != nil {
+		receipt.PreviousSHA256 = op.Intent.MemoryEdit.PreviousSHA256
+		receipt.ResultSHA256 = op.Intent.MemoryEdit.ResultSHA256
 	}
 	body, err := json.Marshal(receipt)
 	if err != nil {

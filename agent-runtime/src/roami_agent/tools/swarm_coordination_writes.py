@@ -14,6 +14,8 @@ def project_write(db, value, name, args, binding):
     prefix = "coordination:" + value["id"] + ":"
     if name == "swarm_memory_write":
         return args, {**binding, "coordinationMemoryKey": prefix + "memory"}
+    if name == "swarm_memory_edit":
+        return args, {**binding, "coordinationMemoryEditKey": prefix + "memory_edit"}
     if name != "swarm_project_update":
         return args, binding
     payload = args["payload"]

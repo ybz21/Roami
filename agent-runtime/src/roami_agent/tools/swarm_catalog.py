@@ -2,6 +2,11 @@
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.tools.project_memory_edit import (
+    memory_edit_fields,
+    memory_edit_payload,
+    memory_edit_receipt,
+)
 
 
 def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
@@ -107,6 +112,30 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
                 key: result[key] for key in ("available", "sha256", "source", "operationReceipt")
             }
         return result
+
+    async def memory_edit(args, binding):
+        info = await main(binding, args["swarmId"])
+        if info["archived"]:
+            raise DomainError("SWARM_ARCHIVED", 409)
+        from roami_agent.storage.swarm_memory import project_context
+        from roami_agent.storage.swarm_repository import changed, group
+
+        workspace = await project_context(swarms, binding["owner"], args["swarmId"])
+        if (
+            not workspace
+            or (workspace.get("projectFiles") or {}).get("memoryEditsSupported") is not True
+        ):
+            raise DomainError("PROJECT_MEMORY_EDIT_UNAVAILABLE", 409)
+        payload = memory_edit_payload(args, binding)
+        result = await project_context(swarms, binding["owner"], args["swarmId"], memory=payload)
+        receipt = memory_edit_receipt(result, workspace["projectId"], payload["operationKey"])
+        await swarms.db.call(
+            lambda db: changed(
+                db, group(db, binding["owner"], args["swarmId"]), "swarm.memory_changed"
+            ),
+            write=True,
+        )
+        return receipt
 
     async def project_read(args, binding):
         await status(args, binding)
@@ -273,6 +302,22 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
                 ["swarmId", "content", "expectedSha256"],
             ),
             memory_write,
+            True,
+            "write",
+        ),
+        (
+            "swarm_memory_edit",
+            (
+                "Project Main edits exact unique team-memory fragments with the last read SHA. "
+                "Read swarm_memory_read first. Supply oldText/newText edits, not the full document. "
+                "All edits match the original once each and cannot overlap. The host preserves "
+                "history and retry identity; read back actual memory before claiming a rule changed. "
+                "Append adds knowledge and does not edit earlier rules. No paths or secrets."
+            ),
+            object_schema(
+                {"swarmId": string, **memory_edit_fields()}, ["swarmId", "expectedSha256", "edits"]
+            ),
+            memory_edit,
             True,
             "write",
         ),

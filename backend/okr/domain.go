@@ -98,6 +98,7 @@ type TeamDefinition struct {
 
 type ProjectFiles struct {
 	OperationReceiptsSupported bool                     `json:"operationReceiptsSupported,omitempty"`
+	MemoryEditsSupported       bool                     `json:"memoryEditsSupported,omitempty"`
 	OperationReceipt           *ProjectOperationReceipt `json:"operationReceipt,omitempty"`
 	ConnectorBatchProtocol     string                   `json:"connectorBatchProtocol,omitempty"`
 	ConnectorSkillBatches      bool                     `json:"connectorSkillBatches,omitempty"`

@@ -44,3 +44,13 @@ Main 每次更新前读取完整文件和当前 SHA/版本。team.md 使用当�
 - 协调批次团队记忆：先 swarm_memory_read，再用返回的 sha256 作为 expectedSha256 调 swarm_memory_write，只追加已核验的新知识；宿主保留批次去重身份。不能自己换 operationKey 绕过去重。
 - 普通用户 Main 回合可按当前目录使用 project_okr_context/project_okr_update/project_okr_memory_append；这些普通项目写入口在协调批次不开放。缺少通用 file_write 不代表没有上述记忆或复盘入口。
 - 协调 Main 不运行任意 shell；文件、任务和留存产物用已登记的读取工具。原生 Codex/Claude 成员按本轮授权使用其真实 CLI/Skill，两者的目录不能互相代替。读文件、讨论投递与实际写回/验收分别留证。
+
+## 更正当前规则：局部修改，不用追加冒充替换
+
+追加只新增知识，不能让顶部旧规则自动失效。需要改现行规则时，先读取真实 team.md 全文与最新 SHA，定位唯一的旧片段；普通 Main 使用 `project_okr_memory_edit`，协调 Main 使用 `swarm_memory_edit`。先检查项目上下文的 `projectFiles.memoryEditsSupported=true`；旧宿主不支持时如实报告，不能假称修改成功。
+
+提交 `expectedSha256` 与 `edits` 数组，每项包含精确的 `oldText` 和 `newText`。最多 16 项，旧片段必须各自唯一且互不重叠；不要上传全文、路径、正则或 SQL。新规则注明来源和日期，必要时在同一替换片段内保留旧规则的“已替代”说明。宿主保存原文件历史，历史事实与失败证据不得抹掉。
+
+宿主固定操作身份：普通 Main 按原回合与修改内容生成，协调 Main 按原批次生成。超时后保持同一修改内容对账，不通过新键重放；CAS 冲突先重读，确认其他人修改后再决定如何合并。同键重试会返回原回执，不能据此断言当前文件仍是原结果。
+
+写后必须再次读取真实文件，核对目标段落已改、无关知识保留，并记录当前 SHA 与操作回执。若后来有合法追加，当前 SHA 可以不同于回执 resultSha256；不得回滚这些新知识。只收到回执或在末尾补说明，都不等于原位置已更正。
