@@ -4622,6 +4622,7 @@ const zhCN = {
   'agent.task.finishedAt': '结束：{time}',
   'agent.task.outcomeUnknown': '执行结果未知。请先核对已有工作，不要直接重复执行。',
   'agent.task.outputsUnavailable': '部分结果文件无法留存，可能已删除、超出大小限制或不在任务工作区内。',
+  'agent.task.outputDetails': '查看详情',
   'agent.task.failure.retrieval': '缺少本次检索的有效来源，结果未通过验收。',
   'agent.task.failure.browser': '浏览器连接失败，检查浏览器服务后可继续任务。',
   'agent.task.failure.toolProgress': '工具调用未能修正，任务已停止。',

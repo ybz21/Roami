@@ -6,6 +6,7 @@ import { nodeApi } from '../cluster/node-url'
 import { canPreviewArtifact } from './TaskOutput'
 import { TaskArtifactLink, TaskArtifactMobilePreview } from './TaskArtifactLink'
 import type { TaskArtifact, TaskDetail } from './agent-task-protocol'
+import TaskOutputWarning from './TaskOutputWarning'
 import { taskFailureKey } from './task-failure'
 import { taskOutcome, taskReportLinks } from './task-outcome'
 
@@ -30,7 +31,7 @@ export default function NativeSessionArtifacts({ detail, artifacts, failed, retr
     {summary && <section className="native-artifact-result"><h3>{t('agent.task.result')}</h3><p>{summary}</p></section>}
     {!!links.length && <div className="agent-task-actions">{links.map(href => <a className="tt-act" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</div>}
     {failed && <p role="alert">{t('agent.task.artifactsUnavailable')} <button type="button" className="tt-act" onClick={retry}>{t('agent.retry')}</button></p>}
-    {!!detail.delivery?.unavailable.length && <p className="agent-task-note" role="status">{t('agent.task.outputsUnavailable')}<small>{detail.delivery.unavailable.map(item => item.sourcePath).join(' · ')}</small></p>}
+    <TaskOutputWarning key={detail.task.id} unavailable={detail.delivery?.unavailable} />
     {groups.filter(group => group.files.length).map(group => <section key={group.key} className="native-artifact-group"><h3>{group.label}</h3>{group.files.map(file => {
       const run = detail.attempts.find(attempt => attempt.id === file.metadata?.runId)
       return <div className="native-artifact-row" key={file.id}>

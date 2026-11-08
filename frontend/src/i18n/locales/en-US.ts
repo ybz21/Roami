@@ -4613,6 +4613,7 @@ const enUS = {
   'agent.task.finishedAt': 'Finished: {time}',
   'agent.task.outcomeUnknown': 'Outcome unknown. Inspect existing work before retrying.',
   'agent.task.outputsUnavailable': 'Some outputs could not be retained: they may be missing, oversized, or outside the task workspace.',
+  'agent.task.outputDetails': 'View details',
   'agent.task.failure.retrieval': 'No valid sources from this attempt. The result did not pass verification.',
   'agent.task.failure.browser': 'Browser connection failed. Check the browser service before continuing.',
   'agent.task.failure.toolProgress': 'The tool call could not be corrected. The task has stopped.',
