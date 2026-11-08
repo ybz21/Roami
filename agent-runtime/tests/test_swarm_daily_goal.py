@@ -14,7 +14,14 @@ from roami_agent.storage.swarm_daily_goal import advance, queue
 from roami_agent.tools.swarm_coordination_policy import SwarmCoordinationPolicy
 
 delegated_team = delegated_team_fixture
-DAY = datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=9, minute=0, second=0, microsecond=0)
+DAY = None
+
+
+@pytest.fixture(autouse=True)
+def current_test_day(monkeypatch):
+    # Collection and execution can fall on opposite sides of local midnight.
+    day = datetime.now(ZoneInfo("Asia/Shanghai")).replace(hour=9, minute=0, second=0, microsecond=0)
+    monkeypatch.setattr(__name__ + ".DAY", day)
 
 
 async def test_daily_guidance_names_only_tools_in_the_real_batch_catalog(delegated_team):

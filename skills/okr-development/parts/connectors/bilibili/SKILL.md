@@ -43,3 +43,33 @@ prepare 离线复核来源、原始字节、字段、单位、日期与确认包
 
 复用原 Main、原数据成员与原任务，失败先对账，不开替代实例。日更须另有用户确认时间、
 真实调度安装/nextDue 和运行记录；本 Skill 不启用定时，不写确认文件或运行时数据库。
+
+## 项目稿件集合
+
+需要每条新稿自动参与取数时，保留已有单稿来源和历史，另建项目集合来源。复制本包时
+声明三个文件 `SKILL.md`、`scripts/bilibili.py`、`scripts/bilibili_project.py`。身份为
+`bilibili:<确认MID>:project:<真实项目ID>`，service 仍为 bilibili、window 为 snapshot。
+新增明确命名的“本项目已核验稿件累计”指标，不把它改称全账号总量或日增量。
+
+原 Main 审核实际公开事实后，按完整模板的 collection-store Skill 登记稿件。SQLite
+登记库在项目 data/，属于可变数据，不加入 Connector 代码包；新增稿件不会改变包摘要。
+登记中的 Main 回执和摘要只是索引，不能替代 Main 独立读取真实公开证据。
+
+```bash
+python3 scripts/bilibili_project.py fetch --project "$PROJECT_ROOT" --project-id "$PROJECT_ID" \
+  --owner-mid "$CONFIRMED_MID" --timezone "$CONFIRMED_TIMEZONE" > "$CANDIDATE_FILE"
+python3 scripts/bilibili_project.py prepare --project "$PROJECT_ROOT" \
+  --workspace "$WORKSPACE_FILE" --candidate "$CANDIDATE_FILE" --connector "$CONNECTOR_ID" \
+  --batch-id "$PERSISTED_BATCH_KEY" --evidence "$DELIVERY_DIR/project-evidence.json" \
+  --output "$DELIVERY_DIR/project-batch.json"
+```
+
+读取只在本项目库上以 query_only 执行，检查项目 ID、schema、登记摘要、账号与 BVID，
+随后逐稿匿名 GET 并复用单稿原始字节验证。候选固定完整覆盖集合及其摘要。任一稿件
+失败不输出残缺合计；任一稿件缺失的字段在整体中保持未知，明确的零参与求和。4 MiB
+证据或 4096 稿件上限触发明确失败，需先由 Main 设计分段口径，不能静默截断集合。
+
+prepare 离线重算每稿的原始响应、集合和合计，检查真实项目、来源、时区与指标映射。
+snapshot 批次窗口起止相同，逐稿实际采集时间保留在证据，不能声称平台同时实时统计。
+Main 确认后仍须核对实际页面。不同覆盖集合的快照不能相减声称当天增长；采集失败
+保留宿主上次已确认事实。此处不新增 HTML 直读 SQLite 或宿主数据库写入权限。
