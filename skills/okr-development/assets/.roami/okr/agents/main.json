@@ -5,6 +5,7 @@
   "skills": [
     "skills/okr-planning/SKILL.md",
     "skills/metric-collection/SKILL.md",
-    "skills/swarm-execution/SKILL.md"
+    "skills/swarm-execution/SKILL.md",
+    "skills/daily-operations/SKILL.md"
   ]
 }

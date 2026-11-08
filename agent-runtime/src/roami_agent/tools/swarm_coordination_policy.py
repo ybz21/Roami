@@ -202,6 +202,8 @@ class SwarmCoordinationPolicy:
         if value is None:
             return args, binding
         args = await self.db.call(lambda db: self.scope(db, value, tool.name, args))
+        if tool.name == "project_okr_context":
+            binding = {**binding, "coordinationProjectId": value["delegation"]["projectId"]}
         if tool.name == "file_read":
             workspace = await self.targets.project_workspace(value["delegation"]["projectId"])
             if after and binding.get("workspace") != workspace:

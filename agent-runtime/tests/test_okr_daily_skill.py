@@ -1,7 +1,9 @@
 import runpy
-from datetime import UTC, datetime
+import subprocess
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -10,46 +12,7 @@ SCRIPT = (
     / "skills/okr-development/assets/.roami/okr/skills/daily-operations/scripts/wake_main.py"
 )
 waker = SimpleNamespace(**runpy.run_path(str(SCRIPT)))
-
-
-class MainCLI:
-    def __init__(self):
-        self.calls = []
-        self.identity = {
-            "kind": "project_main",
-            "projectId": "project",
-            "conversationId": "main",
-            "activeBranchId": "branch",
-        }
-        self.history = {
-            "conversation": {"id": "main"},
-            "branchId": "branch",
-            "messages": [],
-            "turns": [],
-        }
-        self.supported = True
-        self.receipts = {}
-        self.failure = None
-
-    def __call__(self, args, text=None):
-        self.calls.append((args, text))
-        if args[0] == "status":
-            return {"projectMainWake": self.supported}
-        if args[0] == "identity":
-            return self.identity
-        if args[0] == "history":
-            return self.history
-        assert args[0] == "wake" and "send" not in args
-        assert args[args.index("--conversation") + 1] == "main"
-        assert args[args.index("--project") + 1] == "project"
-        assert args[-2:] == ["--file", "-"]
-        if self.failure:
-            raise waker.CommandFailure(self.failure)
-        key = args[args.index("--key") + 1]
-        if key in self.receipts and self.receipts[key] != text:
-            raise waker.CommandFailure("REQUEST_KEY_CONFLICT")
-        self.receipts[key] = text
-        return {"kind": "message", "messageId": "message", "turnId": "turn"}
+CommandFailure, run_cli, wake = waker.CommandFailure, waker.run_cli, waker.wake
 
 
 @pytest.fixture(autouse=True)
@@ -58,31 +21,72 @@ def external_trigger(monkeypatch):
     monkeypatch.delenv("ROAMI_AGENT_TURN_ID", raising=False)
 
 
-def wake(cli, **kwargs):
-    return waker.wake(
-        "project",
-        "main",
+class Host:
+    def __init__(self, *, supported=True, identity=None, final=None):
+        self.calls = []
+        self.supported, self.identity, self.final = supported, identity or {}, final
+
+    def __call__(self, args):
+        self.calls.append(args)
+        if args == ["agent", "status"]:
+            return {"projectGoalDailyWake": self.supported, "projectMainWake": True}
+        if args[:2] == ["agent", "identity"]:
+            return {
+                "kind": "project_main",
+                "projectId": "project-a",
+                "conversationId": "original-main",
+                "activeBranchId": "branch",
+                **self.identity,
+            }
+        assert args[:3] == ["swarm", "daily", "original-swarm"]
+        if isinstance(self.final, Exception):
+            raise self.final
+        return self.final or {
+            "state": "prepared" if "--dry-run" in args else "accepted",
+            "delivered": "--dry-run" not in args,
+            "jobId": "same-notification",
+            "swarmId": "original-swarm",
+            "dailySlot": {
+                "delegationId": "original-goal",
+                "timezone": "Asia/Shanghai",
+                "date": "2026-11-08",
+                "slot": "morning",
+            },
+        }
+
+
+def invoke(host, **kwargs):
+    return wake(
+        "project-a",
+        "original-main",
+        "original-swarm",
+        "original-goal",
         "Asia/Shanghai",
-        "kickoff",
-        kwargs.pop("prompt", "Continue the existing team"),
-        now=kwargs.pop("now", datetime(2026, 11, 5, 17, 30, tzinfo=UTC)),
-        cli=cli,
+        "morning",
+        clock=datetime(2026, 11, 8, 9, tzinfo=ZoneInfo("Asia/Shanghai")),
+        cli=host,
         **kwargs,
     )
 
 
-def test_same_day_slot_replays_one_message_and_prompt_edits_do_not_bypass_key():
-    cli = MainCLI()
-    first = wake(cli)
-    assert first["state"] == "accepted" and first["date"] == "2026-11-06"
-    assert wake(cli)["requestKey"] == first["requestKey"]
-    assert len(cli.receipts) == 1
-    changed = wake(cli, prompt="Change today's existing work")
-    assert changed["state"] == "blocked" and changed["reason"] == "REQUEST_KEY_CONFLICT"
-    assert len(cli.receipts) == 1
-    following_day = wake(cli, now=datetime(2026, 11, 6, 17, 30, tzinfo=UTC))
-    assert following_day["requestKey"] != first["requestKey"] and len(cli.receipts) == 2
-    assert "不是账号或发布批准" in next(iter(cli.receipts.values()))
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_skill_uses_original_goal_host_command_without_user_text_or_new_session(
+    dry_run,
+):
+    host = Host()
+    result = invoke(host, dry_run=dry_run)
+    assert result["state"] == ("prepared" if dry_run else "accepted")
+    assert result["delivered"] is not dry_run
+    command = host.calls[-1]
+    assert command[command.index("--date") + 1] == "2026-11-08"
+    assert command[command.index("--delegation") + 1] == "original-goal"
+    assert not any(word in command for word in ["wake", "send", "new", "--file", "--prompt"])
+
+
+def test_old_message_wake_capability_cannot_substitute_for_goal_entry():
+    host = Host(supported=False)
+    assert invoke(host, dry_run=True)["reason"] == "GOAL_DAILY_NOT_SUPPORTED"
+    assert len(host.calls) == 1
 
 
 @pytest.mark.parametrize(
@@ -91,60 +95,87 @@ def test_same_day_slot_replays_one_message_and_prompt_edits_do_not_bypass_key():
         {"kind": "home_main"},
         {"kind": "member"},
         {"projectId": "other"},
-        {"conversationId": "another"},
+        {"conversationId": "other"},
+        {"activeBranchId": ""},
     ],
 )
-def test_never_wakes_a_home_member_or_other_project(changed):
-    cli = MainCLI()
-    cli.identity.update(changed)
-    assert wake(cli)["state"] == "blocked"
-    assert not cli.receipts
-    assert not any(args[0] == "wake" for args, _ in cli.calls)
+def test_wrong_main_stops_before_any_notification(changed):
+    host = Host(identity=changed)
+    assert invoke(host)["reason"] == "PROJECT_MAIN_IDENTITY_MISMATCH"
+    assert len(host.calls) == 2
 
 
-@pytest.mark.parametrize("state", ["queued", "running", "question"])
-def test_running_or_waiting_main_is_not_interrupted(state):
-    cli = MainCLI()
-    if state == "question":
-        cli.history["messages"] = [
-            {"role": "assistant", "content": {"question": {"prompt": "Which account?"}}}
-        ]
-    else:
-        cli.history["turns"] = [{"state": state}]
-    assert wake(cli)["state"] == "deferred"
-    assert not any(args[0] == "wake" for args, _ in cli.calls)
+@pytest.mark.parametrize("error", [CommandFailure(), subprocess.TimeoutExpired("roami", 45)])
+def test_unknown_delivery_keeps_original_date_identity_and_does_not_retry(error):
+    host = Host(final=error)
+    result = invoke(host)
+    assert result["state"] == "unknown" and result["delivered"] is None
+    assert result["date"] == "2026-11-08" and result["delegationId"] == "original-goal"
+    assert len(host.calls) == 3
 
 
-def test_busy_race_is_known_deferred_and_transport_failure_retains_same_key():
-    cli = MainCLI()
-    cli.failure = "MAIN_BUSY"
-    assert wake(cli)["state"] == "deferred"
-    cli.failure = "CLI_REQUEST_FAILED"
-    unknown = wake(cli)
-    assert unknown["state"] == "unknown" and unknown["delivered"] is None
-    cli.failure = None
-    accepted = wake(cli)
-    assert accepted["requestKey"] == unknown["requestKey"] and len(cli.receipts) == 1
+@pytest.mark.parametrize(
+    "code",
+    [
+        "SWARM_DAILY_DATE_EXPIRED",
+        "SWARM_DELEGATION_SOURCE_STOPPED",
+        "SWARM_DELEGATION_SOURCE_FORGOTTEN",
+    ],
+)
+def test_terminal_host_refusal_is_not_publication_or_a_successful_wakeup(code):
+    result = invoke(Host(final=CommandFailure(code)))
+    assert result["state"] == "blocked" and result["reason"] == code
+    assert result["delivered"] is False
 
 
-def test_old_runtime_supports_readonly_preparation_without_falling_back_to_send():
-    cli = MainCLI()
-    cli.supported = False
-    prepared = wake(cli, dry_run=True)
-    assert prepared["state"] == "prepared"
-    assert prepared["supported"] is False and prepared["delivered"] is False
-    blocked = wake(cli)
-    assert blocked["state"] == "blocked" and blocked["reason"] == "MAIN_WAKE_NOT_SUPPORTED"
-    assert not cli.receipts
+def test_wrong_receipt_is_unknown_even_if_transport_succeeded():
+    host = Host(
+        final={
+            "state": "accepted",
+            "delivered": True,
+            "jobId": "other",
+            "swarmId": "another-project",
+        }
+    )
+    assert invoke(host)["state"] == "unknown"
 
 
-def test_native_main_cannot_use_the_external_waker_to_wake_itself(monkeypatch):
-    cli = MainCLI()
-    monkeypatch.setenv("ROAMI_AGENT_CALLER_ROLE", "main")
-    assert wake(cli)["reason"] == "EXTERNAL_TRIGGER_REQUIRED"
-    assert not cli.calls
+def test_recovery_keeps_explicit_old_date_instead_of_rolling_to_today():
+    host = Host(final=CommandFailure("SWARM_DAILY_DATE_EXPIRED"))
+    result = invoke(host, date="2026-11-07")
+    assert result["date"] == "2026-11-07"
+    args = host.calls[-1]
+    assert args[args.index("--date") + 1] == "2026-11-07"
 
 
-def test_invalid_timezone_is_not_silently_replaced_by_machine_timezone():
+def test_agent_context_cannot_turn_its_own_output_into_a_daily_trigger(monkeypatch):
+    monkeypatch.setenv("ROAMI_AGENT_TURN_ID", "member-turn")
+    host = Host()
+    assert invoke(host)["reason"] == "EXTERNAL_TRIGGER_REQUIRED"
+    assert host.calls == []
+
+
+def test_actual_cli_text_refusal_retains_only_its_bounded_code(monkeypatch):
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **kw: subprocess.CompletedProcess(
+            a[0], 1, "", "SWARM_DAILY_DATE_EXPIRED (HTTP 409) private-path-or-account"
+        ),
+    )
+    with pytest.raises(CommandFailure) as raised:
+        run_cli(["swarm", "daily", "original-swarm"])
+    assert str(raised.value) == "SWARM_DAILY_DATE_EXPIRED"
+
+
+def test_invalid_timezone_is_not_replaced_with_machine_timezone():
     with pytest.raises(ValueError, match="IANA timezone"):
-        waker.wake("project", "main", "Invalid/Zone", "kickoff", "Continue", cli=MainCLI())
+        wake(
+            "project-a",
+            "original-main",
+            "original-swarm",
+            "original-goal",
+            "Invalid/Zone",
+            "morning",
+            cli=Host(),
+        )

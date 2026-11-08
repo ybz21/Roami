@@ -27,11 +27,11 @@ const Script = `_roami_complete() {
                     return ;;
             esac
             case "${COMP_WORDS[2]}" in
-                swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive help" ;;
+                swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive daily help" ;;
                 db) words="status migrate backup history restore revive set-home link-agent" ;;
                 env) words="set rm clear push" ;;
             esac ;;
-        swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive help" ;;
+        swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive daily help" ;;
         chrome) words="tabs goto click fill text eval screenshot record setup help" ;;
         adb) words="devices shell exec-out push pull install uninstall logcat forward reverse connect disconnect pair version help" ;;
         agent) words="setup init serve status conversations new send history report notify execution" ;;

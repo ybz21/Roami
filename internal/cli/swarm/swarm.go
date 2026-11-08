@@ -74,6 +74,9 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		switchFlags = "follow"
 	case "inbox":
 		valueFlags = "member before limit task run task-revision"
+	case "daily":
+		valueFlags = "delegation project main-conversation timezone date slot"
+		switchFlags = "dry-run"
 	case "plan", "control":
 		valueFlags = "file"
 	case "member-register":
@@ -148,6 +151,9 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 	path, err := swarmPath(options.args[0])
 	if err != nil {
 		return err
+	}
+	if command == "daily" {
+		return wakeDaily(ctx, rt, path, options, w, jsonOutput)
 	}
 	if isMutation(command) {
 		return mutateSwarm(ctx, rt, command, path, options, w, input, jsonOutput)

@@ -87,9 +87,10 @@ Main 查看执行记录、产物和停止证明；保留草稿，不自动重发
 ## 定时唤醒和催办
 
 先查询本机插件/命令的实际能力。现有 cron 的 action=agent 每次会创建会话，不适合长期Main。
-action=exec 可执行模板内 daily-operations Skill 的有界脚本：先核对原项目 Main，再按本地日期/时段
-复用幂等键。project-scoped wake 在事务内拒绝忙碌或等待用户回答的 Main，不中断用户对话，
-由 Main 读取本日计划、当前任务并续派原成员；不要定时启动替代 Agent。普通 reminder
+action=exec 执行 daily-operations Skill 的有界脚本：先核对 projectGoalDailyWake、原项目 Main
+和仍有效的 delegationId，再通过 roami swarm daily 提交原目标的本地日期槽，不写新用户消息。
+忙碌或等待用户回答时保留同一通知，不中断用户对话；日期槽和未开始的协调回合跨日后不补跑。
+Main 读取本日计划、当前任务并续派原成员；不要定时启动替代 Agent。普通 reminder
 只产生提醒，不证明模型已执行 Connector；autoCollect 也不是任意Skill的日更调度器。
 
 启用前确认时间与时区、目标身份、命令、权限、下一次触发及运行者；使用已有插件调度，
