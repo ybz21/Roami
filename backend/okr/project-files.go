@@ -571,7 +571,7 @@ func (s *Store) decorateConfirmed(root *os.Root, w *Workspace, dashboardDigest s
 	if err := s.seedWorkflow(root, w.ProjectID); err != nil {
 		return err
 	}
-	metadata := &ProjectFiles{OperationReceiptsSupported: true, ConnectorBatchProtocol: connectorBatchProtocol, ConnectorSkillBatches: true, TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
+	metadata := &ProjectFiles{OperationReceiptsSupported: true, MemoryEditsSupported: true, ConnectorBatchProtocol: connectorBatchProtocol, ConnectorSkillBatches: true, TeamRoleBindings: true, Root: bundleRoot, SchemaVersion: 1, Revision: w.Revision, MainInstructionsFile: "agents/main.md", TeamMemoryFile: "memory/team.md"}
 	workflow, err := readFile(root, "AGENTS.md", maxMemory)
 	if err != nil {
 		return err

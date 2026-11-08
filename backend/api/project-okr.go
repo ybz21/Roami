@@ -351,15 +351,16 @@ func (a *API) ProjectOKRMemory(c *gin.Context) {
 		return
 	}
 	var body struct {
-		OperationKey   *string `json:"operationKey,omitempty"`
-		Content        *string `json:"content"`
-		ExpectedSha256 string  `json:"expectedSha256"`
-		Revision       *int64  `json:"revision,omitempty"`
-		Mode           string  `json:"mode,omitempty"`
+		OperationKey   *string          `json:"operationKey,omitempty"`
+		Content        *string          `json:"content"`
+		ExpectedSha256 string           `json:"expectedSha256"`
+		Revision       *int64           `json:"revision,omitempty"`
+		Mode           string           `json:"mode,omitempty"`
+		Edits          []okr.MemoryEdit `json:"edits,omitempty"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&body) != nil || body.Content == nil || decoder.Decode(new(any)) != io.EOF {
+	if decoder.Decode(&body) != nil || decoder.Decode(new(any)) != io.EOF {
 		okrError(c, okr.ErrInvalid)
 		return
 	}
@@ -367,22 +368,38 @@ func (a *API) ProjectOKRMemory(c *gin.Context) {
 	var err error
 	switch body.Mode {
 	case "", "replace":
-		if body.OperationKey != nil {
+		if body.OperationKey != nil || body.Content == nil || body.Edits != nil {
 			err = okr.ErrInvalid
 		} else {
 			w, err = a.ProjectOKR.WriteMemory(projectID, *body.Content, body.ExpectedSha256)
 		}
 	case "append":
-		if body.OperationKey != nil {
+		if body.Content == nil || body.Edits != nil {
+			err = okr.ErrInvalid
+		} else if body.OperationKey != nil {
 			w, err = a.ProjectOKR.AppendMemoryOnce(projectID, *body.OperationKey, *body.Content, body.ExpectedSha256)
 		} else {
 			w, err = a.ProjectOKR.AppendMemory(projectID, *body.Content, body.ExpectedSha256)
+		}
+	case "edit":
+		if body.OperationKey == nil || body.Content != nil || body.Edits == nil {
+			err = okr.ErrInvalid
+		} else {
+			w, err = a.ProjectOKR.EditMemoryOnce(projectID, *body.OperationKey, body.ExpectedSha256, body.Edits)
 		}
 	default:
 		err = okr.ErrInvalid
 	}
 	if err != nil {
 		okrError(c, err)
+		return
+	}
+	if body.Mode == "edit" {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"projectId": projectID, "projectFiles": gin.H{
+			"memoryEditsSupported": true,
+			"teamMemorySha256":     w.ProjectFiles.TeamMemorySha256,
+			"operationReceipt":     w.ProjectFiles.OperationReceipt,
+		}}})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": w})

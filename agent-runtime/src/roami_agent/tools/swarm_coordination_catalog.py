@@ -13,6 +13,7 @@ SWARM_READS = {
 SWARM_WRITES = {
     "swarm_post",
     "swarm_memory_write",
+    "swarm_memory_edit",
     "swarm_project_update",
     "swarm_verify",
     "swarm_publication_prepare",
@@ -56,6 +57,14 @@ def operation(tool):
             "swarm_memory_read first; pass its sha256 as expectedSha256. Supply the new paragraph only; "
             "never copy or replace the existing document. The host preserves one stable append "
             "receipt per batch, so a new call or CAS cannot repeat it. Changed content conflicts."
+        )
+    elif tool.name == "swarm_memory_edit":
+        description = (
+            "Edit exact unique fragments of this batch's bound project team memory. Read "
+            "swarm_memory_read first and pass its current sha256. Supply oldText/newText edits "
+            "that do not overlap. The host pins one stable edit identity per batch; same-key "
+            "retries return the original receipt and changed edits conflict. Do not supply a "
+            "path or operation key. Verify actual memory before claiming the rule changed."
         )
     elif tool.name == "task_steer":
         description = (

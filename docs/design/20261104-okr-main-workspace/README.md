@@ -12,6 +12,8 @@
 
 [日更 Skill：外部定时唤醒原 Main](daily-main-wakeup.md)。
 
+[当前团队约定的局部修改](memory-current-rule-edit.md)：针对“只追加却报告已修改原规则”的真实问题，先定义 CAS、精确编辑、历史与重试契约，再实现 #822。
+
 [原团队的素材冻结、独立审核与发布边界](publication-review.md)。
 
 [读取任务详情时保留精简历史](task-result-context.md)（#698）。

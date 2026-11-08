@@ -47,7 +47,7 @@ END;
 CREATE TRIGGER project_operation_applied BEFORE UPDATE ON project_operations WHEN OLD.state='applied' BEGIN
  SELECT RAISE(ABORT,'PROJECT_OPERATION_IMMUTABLE');
 END;
-`}}, storage.Options{})
+`}, {Version: 4, Name: "project memory edits", SQL: memoryEditSchema}}, storage.Options{})
 	if err != nil {
 		return nil, err
 	}

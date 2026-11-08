@@ -7,6 +7,10 @@ from roami_agent.protocol.tools import Tool, object_schema
 
 
 def register_project_okr_tools(registry, database, settings):
+    from roami_agent.tools.project_memory_edit import register_project_memory_edit
+
+    register_project_memory_edit(registry, database, settings)
+
     async def context(args, binding):
         pid = await bound_project(database, binding)
         workspace = await operation(settings, pid, "show")

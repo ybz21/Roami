@@ -141,6 +141,11 @@
     "memory",
     "put"
   ],
+  "swarm_memory_edit": [
+    "swarm",
+    "memory",
+    "edit"
+  ],
   "swarm_project_context": [
     "swarm",
     "project",

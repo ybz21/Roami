@@ -23,18 +23,18 @@ func appendedMemory(previous []byte, content string) []byte {
 	return []byte(string(previous) + separator + content)
 }
 
-func memoryAppendApplied(root *os.Root, current []byte, intent *memoryAppendIntent) (bool, error) {
-	if hashText(current) == intent.ResultSHA256 {
+func memoryVersionApplied(root *os.Root, current []byte, resultSHA256 string) (bool, error) {
+	if hashText(current) == resultSHA256 {
 		return true, nil
 	}
-	historical, err := readFile(root, "memory/history/"+intent.ResultSHA256+".md", maxMemory)
+	historical, err := readFile(root, "memory/history/"+resultSHA256+".md", maxMemory)
 	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	if hashText(historical) != intent.ResultSHA256 {
+	if hashText(historical) != resultSHA256 {
 		return false, ErrInvalid
 	}
 	return true, nil
@@ -81,7 +81,7 @@ func (s *Store) AppendMemoryOnce(projectID, key, content, expectedSHA256 string)
 	if intent == nil {
 		return nil, ErrInvalid
 	}
-	applied, err := memoryAppendApplied(root, current, intent)
+	applied, err := memoryVersionApplied(root, current, intent.ResultSHA256)
 	if err != nil {
 		return nil, err
 	}

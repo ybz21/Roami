@@ -25,6 +25,9 @@ Read the confirmed connectors first. Day windows are [start,end); snapshot windo
 Read 'roami project okr show PROJECT --json' first. Append real new knowledge with:
 {"mode":"append","content":"New verified knowledge","expectedSha256":"CURRENT_MEMORY_SHA256"}
 Full replacement uses mode=replace. Prior bytes are retained in memory/history/<sha256>.md.
+On hosts advertising projectFiles.memoryEditsSupported, edit exact unique fragments with:
+{"mode":"edit","operationKey":"PERSISTENT_EDIT_KEY","expectedSha256":"CURRENT_MEMORY_SHA256","edits":[{"oldText":"Exact current paragraph","newText":"Corrected paragraph"}]}
+Keep the original key and edits after an unknown result. Edits match the original document once each, cannot overlap, and commit together. The response contains current/result hashes and the durable receipt, not the whole document.
 Never probe a live write endpoint to discover its schema. A conflict requires rereading.`)
 		return 0
 	}
