@@ -32,7 +32,7 @@ Main 读实际本轮 artifact，并核对仓库 ID、字段、指标单位、指
 
 ## 日索引
 
-Main 的 manifest 明确 pathBase，项目根相对路径包含 YYYY/YYYYMM/YYYYMMDD。
+Main 的日索引 manifest 明确 pathBase，新物料的项目根相对路径为 materials/YYYY-MM-DD/<渠道或工作类型>/<简短主题>/，任务与运行身份写进清单。这是日索引路径；发布准备清单的 files[].path 则相对发布清单所在目录，不能混用。
 producedAt 来自真实产物证据，不用复盘保存或验收时刻代替。素材批次、源指标日、
 文件生成、采集、平台发布与确认写入分开记录；跨午夜运行保留原目录并链接，不挪旧件。
 

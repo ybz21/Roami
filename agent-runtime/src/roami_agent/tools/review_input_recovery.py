@@ -22,7 +22,8 @@ RECOVERY = {
     ),
     "INVALID_PUBLICATION_MANIFEST": (
         "Use a manifest with nested identity {taskId, revision: integer, runId}, and files[] "
-        "entries with that same identity plus path, positive bytes and full sha256. "
+        "entries with taskId/revision/runId directly on each entry, plus path, positive bytes "
+        "and full sha256; a nested per-file identity alone is insufficient. "
         "A flat top-level taskId/revision/runId is not identity. Paths are relative to the "
         "manifest file's directory: for publication-input/manifest.json and a sibling post.txt, "
         "declare post.txt, not publication-input/post.txt. Correct the manifest through its "
@@ -32,6 +33,13 @@ RECOVERY = {
         "Use the exact manifest.files[].path for content.body and each content.images entry. "
         "These are file paths relative to the manifest's directory, not literal post text or "
         "project/run prefixes. Preserve the planned publication's businessKey when correcting."
+    ),
+    "INVALID_PUBLICATION_ACCOUNT_ID": (
+        "accountIdentity is the platform's numeric account ID as a decimal string, not an "
+        "@handle, display name or profile URL. Use independently verified account evidence; "
+        "never guess an ID or switch accounts to pass validation. Keep the same businessKey "
+        "and current accepted author. Historical account identity does not prove current login "
+        "or posting access; freezing is not approval or publication."
     ),
     "PUBLICATION_ARTIFACT_NOT_CURRENT": (
         "Use a retained, non-provisional artifact from the original author's accepted current "

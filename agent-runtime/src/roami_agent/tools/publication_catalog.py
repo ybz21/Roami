@@ -111,7 +111,7 @@ def register_publication_tools(registry, database, artifacts, reviewer):
     registry.add(
         Tool(
             "swarm_publication_prepare",
-            "Freeze selected files from an original member's current completed run and retained manifest. The manifest JSON requires a nested identity object {taskId, revision: integer, runId}, not flat top-level identity fields; files entries carry the same identity plus path/bytes/sha256. File paths are relative to the manifest file's own directory, not the project or run root. content maps body/title/tags/images/video/audio/subtitles to these exact paths. Use one stable businessKey per real planned publication through revisions and retries. First independently verify the artifact task with swarm_verify. Returns immutable artifacts to read before review; this does not approve or publish anything.",
+            "Freeze selected files from an original member's current completed run and retained manifest. The manifest JSON requires a nested identity object {taskId, revision: integer, runId}, not flat top-level identity fields; Each files entry directly carries taskId/revision/runId plus path/bytes/sha256; a nested per-file identity alone is insufficient. File paths are relative to the manifest file's own directory, not the project or run root. content maps body/title/tags/images/video/audio/subtitles to these exact paths. Use one stable businessKey per real planned publication through revisions and retries. First independently verify the artifact task with swarm_verify. Returns immutable artifacts to read before review; this does not approve or publish anything.",
             object_schema(
                 {
                     **scope,
@@ -119,7 +119,10 @@ def register_publication_tools(registry, database, artifacts, reviewer):
                     "channel": {"type": "string", "enum": ["x", "bilibili"]},
                     "manifest": reference,
                     "content": content,
-                    "accountIdentity": string,
+                    "accountIdentity": {
+                        **string,
+                        "description": "Verified numeric platform account ID as a decimal string, never an @handle, display name or URL. Historical identity does not establish current login or posting access.",
+                    },
                 },
                 [*scope, "businessKey", "channel", "manifest", "content"],
             ),

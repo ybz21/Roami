@@ -49,7 +49,7 @@ async def invoke(runtime, binding, args):
     )
 
 
-@pytest.mark.parametrize("fault", ["flat_identity", "literal_body"])
+@pytest.mark.parametrize("fault", ["flat_identity", "literal_body", "account_handle"])
 async def test_rejected_main_input_explains_correction_without_freezing_or_duplicating(
     coordination, tmp_path, fault
 ):
@@ -81,12 +81,16 @@ async def test_rejected_main_input_explains_correction_without_freezing_or_dupli
         )
         wrong["manifest"] = {"id": invalid["id"], "sha256": invalid["sha256"]}
         error, instruction = "INVALID_PUBLICATION_MANIFEST", "nested identity"
-    else:
+    elif fault == "literal_body":
         wrong["content"] = {"body": "Frozen post"}
         error, instruction = (
             "PUBLICATION_CONTENT_USE_RELATIVE_MANIFEST_FILE_PATH",
             "exact manifest.files[].path",
         )
+    else:
+        wrong["accountIdentity"] = "@test-account"
+        args["accountIdentity"] = "123456789"
+        error, instruction = "INVALID_PUBLICATION_ACCOUNT_ID", "numeric account ID"
 
     rejected = await invoke(runtime, binding, wrong)
     assert rejected["error"] == error and instruction in rejected["recovery"]
@@ -98,6 +102,13 @@ async def test_rejected_main_input_explains_correction_without_freezing_or_dupli
     )
     corrected = await invoke(runtime, binding, args)
     assert corrected["state"] == "frozen" and corrected["publicationAuthorized"] is False
+    if fault == "account_handle":
+        account = await runtime.db.call(
+            lambda db: db.execute(
+                "SELECT account_identity FROM swarm_publication_versions"
+            ).fetchone()[0]
+        )
+        assert account == "123456789"
     assert (
         await runtime.db.call(
             lambda db: db.execute("SELECT count(*) FROM swarm_publication_items").fetchone()[0]
