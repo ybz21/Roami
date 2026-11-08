@@ -416,11 +416,19 @@ class ToolDirectory:
             main=True,
         ), {}
 
-    @staticmethod
-    def argv(args):
+    def argv(self, args):
         if "argv" in args:
             return args["argv"]
         try:
+            lexer = shlex.shlex(args["command"], posix=True)
+            lexer.whitespace_split = True
+            lexer.commenters = ""
+            first = next(lexer, None)
+            if first is None:
+                return []
+            # Shell programs and heredoc bodies are not CLI argument lists.
+            if first not in {"roami", self.settings.cli_bin}:
+                return [first]
             return shlex.split(args["command"])
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
@@ -469,6 +477,7 @@ class ToolDirectory:
     def wrapped_command(self, args, depth=0):
         if "command" not in args or depth > 3:
             return None
+        paths = [*COMMANDS.values(), ["agent", "capability", "call"]]
         try:
             if self.operation(self.argv(args)) is not None:
                 return None
@@ -477,11 +486,22 @@ class ToolDirectory:
         try:
             lexer = shlex.shlex(args["command"], posix=False, punctuation_chars=";&|<>()\n")
             lexer.whitespace = " \t\r"
-            tokens = list(lexer)
+            tokens = []
+            for token in lexer:
+                # Stop before parsing heredoc data as shell words.
+                if token.startswith("<<"):
+                    return None
+                tokens.append(token)
         except ValueError:
-            return None
-        # A heredoc body is data; this recovery hint is not a general shell parser.
-        if any(token.startswith("<<") for token in tokens):
+            try:
+                words = shlex.split(args["command"])
+            except ValueError:
+                return None
+            for offset, word in enumerate(words):
+                if word in {"roami", self.settings.cli_bin} and any(
+                    words[offset + 1 : offset + len(path) + 1] == path for path in paths
+                ):
+                    return words[offset:]
             return None
         boundaries = {";", "&&", "||", "|", "&", "\n", "("}
         for start in range(len(tokens)):
@@ -495,10 +515,24 @@ class ToolDirectory:
                 ),
                 len(tokens),
             )
-            segment = [
-                shlex.split(token)[0] if token.startswith(("'", '"')) else token
-                for token in tokens[start:end]
-            ]
+            segment, opaque = [], False
+            for token in tokens[start:end]:
+                try:
+                    if token.startswith(("'", '"')):
+                        word = shlex.split(token)[0]
+                    else:
+                        word = token
+                        opaque = opaque or any(char in token for char in "'\"\\")
+                except ValueError:
+                    word, opaque = token, True
+                segment.append(word)
+            if opaque:
+                # Quoted shell data can span lexer tokens; ambiguous managed calls stay rejected.
+                for offset, word in enumerate(segment):
+                    if word in {"roami", self.settings.cli_bin} and any(
+                        segment[offset + 1 : offset + len(path) + 1] == path for path in paths
+                    ):
+                        return segment[offset:]
             offset = 0
             while offset < len(segment) and (
                 re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*=.*", segment[offset])
@@ -516,7 +550,6 @@ class ToolDirectory:
                     return nested
             if not candidate or candidate[0] not in {"roami", self.settings.cli_bin}:
                 continue
-            paths = [*COMMANDS.values(), ["agent", "capability", "call"]]
             if any(candidate[1 : len(path) + 1] == path for path in paths) and (
                 start or offset or end != len(tokens)
             ):

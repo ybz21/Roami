@@ -21,6 +21,7 @@ from roami_agent.protocol.tools import Tool, object_schema
         "{command} | head -10",
         "{command}>/tmp/result.json",
         "env EXAMPLE=value {command}",
+        r'env LABEL="a\"b" {command}',
         "command {command}",
         "bash -c {quoted}",
     ],
