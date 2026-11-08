@@ -1,0 +1,7 @@
+.task-output-warning p { margin:0; }
+.task-output-warning-toggle { position:relative; height:var(--ctl-h); margin-top:var(--sp-1); padding:0 var(--sp-2); border-color:transparent; }
+.task-output-warning-toggle[aria-expanded="true"] > svg { transform:rotate(90deg); }
+.task-output-warning-list { margin:var(--sp-2) 0 0; padding-inline-start:var(--sp-4); font-size:var(--fs-meta); }
+.task-output-warning-list li + li { margin-top:var(--sp-1); }
+.task-output-warning-list code { white-space:pre-wrap; overflow-wrap:anywhere; }
+html[data-pointer="coarse"] .task-output-warning-toggle::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:max(100%, var(--tap)); transform:translateY(-50%); }

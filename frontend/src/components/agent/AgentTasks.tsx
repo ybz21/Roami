@@ -9,6 +9,7 @@ import type { AgentTask } from './agent-protocol'
 import { taskExecutor, taskGoal, taskExecutionUnconfirmed, currentTaskArtifacts } from './agent-task-protocol'
 import AgentTaskRecord from './AgentTaskRecord'
 import TaskDescription from './TaskDescription'
+import TaskOutputWarning from './TaskOutputWarning'
 import TaskDispatch from './TaskDispatch'
 import { taskTopic } from './task-topic'
 import { taskOutcome, taskReportLinks, taskReportSummary } from './task-outcome'
@@ -220,7 +221,7 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
           {(artifacts.length > 0 || snapshot.artifacts.failed || !!detail?.delivery?.unavailable.length) && <section className="agent-task-section"><h4>{t('agent.task.artifacts')}{artifacts.length > 0 && <small className="agent-task-count">{artifacts.length}</small>}</h4>
             {snapshot.artifacts.failed && <p role="alert">{t('agent.task.artifactsUnavailable')}</p>}
             {!snapshot.artifacts.value && !snapshot.artifacts.failed && <Spin size="small" />}
-            {!!detail?.delivery?.unavailable.length && <p className="agent-task-note" role="status">{t('agent.task.outputsUnavailable')}<small>{detail.delivery.unavailable.map(item => item.sourcePath).join(' · ')}</small></p>}
+            <TaskOutputWarning key={task.id} unavailable={detail?.delivery?.unavailable} />
             <div className="agent-task-artifact-list">
               {artifacts.map((artifact) => <div className="agent-task-artifact" id={'task-artifact-' + artifact.id} key={artifact.id}>
                 <span className="agent-task-file-icon" aria-hidden="true"><FileTypeIcon name={artifact.name} /></span>
