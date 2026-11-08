@@ -1,5 +1,9 @@
 """Current batch identity and original user delegation, independent of trigger names."""
 
+import json
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_delegations import current_delegation
@@ -28,6 +32,22 @@ def batch_context(db, owner, turn_id, *, lease_epoch=None):
     ):
         raise DomainError("SWARM_COORDINATION_NOT_CURRENT", 409)
     delegation = current_delegation(db, owner, value["swarm_id"], value["delegation_id"])
+    if value["state"] == "queued":
+        job = row(
+            db,
+            "SELECT json_extract(payload_json,'$.dailySlot') AS slot FROM jobs "
+            "WHERE kind='turn.run' AND aggregate_id=?",
+            (turn_id,),
+        )
+        if job and job["slot"]:
+            try:
+                slot = json.loads(job["slot"])
+                current_date = datetime.now(ZoneInfo(slot["timezone"])).date().isoformat()
+                valid = slot["delegationId"] == delegation["id"] and slot["date"] == current_date
+            except (ValueError, TypeError, KeyError, ZoneInfoNotFoundError):
+                valid = False
+            if not valid:
+                raise DomainError("SWARM_DAILY_DATE_EXPIRED", 409)
     return {**value, "delegation": delegation}
 
 

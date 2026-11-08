@@ -74,7 +74,7 @@ OKR 操作手册：`.roami/okr/manuals/README.md`；按当前任务选择看板�
 
 - 定时计划保存在 `.roami/okr/schedules/daily.json`；执行入口使用项目 `skills/daily-operations/`。由操作者通过当前已安装调度插件登记，不能把提案、`autoCollect`、提醒或常驻空闲成员当成通用 Skill 定时器。
 - 启用前明确项目和原 Main、时间/IANA 时区、开工/取数/复盘 slot、工作范围、账号与权限、错过执行的处理及重试规则。缺少时间或宿主能力就保留 `enabled=false`，不猜用户时间。
-- 优先用既有 cron 的 `exec` 调用 `daily-operations/scripts/wake_main.py`，先 `--dry-run` 检查 projectMainWake，再登记禁用计划、核对后启用；实际命令以 CLI/plugin help 为准。调度器只唤醒本 OKR 原 Main，由 Main 读取计划并续派原成员，不用每次新建对话的 agent action。
+- 优先用既有 cron 的 `exec` 调用 `daily-operations/scripts/wake_main.py`，先 `--dry-run` 核对 projectGoalDailyWake 和原 delegationId，再登记禁用计划、核对后启用；实际命令以 CLI/plugin help 为准。调度器只提交原持续目标的日期槽，不写新用户消息；Main 忙时保留通知，由原 Main 读取计划并续派原成员，不用每次新建对话的 agent action。
 - 调度进程只运行明确选定的本项目日程。核对持久任务 ID、实际执行命令、时区、enabled、下一次触发时间、运行者和常驻服务；不因新增本项目任务启动其他项目全部日程，也不临时加个人 crontab。
 - 同项目/Main/当地日期/slot 沿用同一请求 key；Main 忙或等用户时推迟，结果未知先查原请求。不得换 key、换成员或绕过 busy 重放；受控触发后核对 Main turn、成员当前轮次、实际证据、看板和验收，再检查下一次真正定时记录。
 - 每轮按“计划 → 执行 → 取数 → 核验 → 复盘 → 改进 → 下一轮”闭环。开工选一个有证据可验证的改进点，写假设、指标、观察窗口与停止条件；收工比较结果与基线、记录未知，决定保留/调整/停止。不能从产量直接推断增长归因。

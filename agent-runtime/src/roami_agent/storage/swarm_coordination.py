@@ -14,7 +14,7 @@ from roami_agent.storage.swarm_delegations import current_delegation
 from roami_agent.storage.swarm_repository import changed, group
 
 
-def enqueue(db, owner, swarm_id, *, limit=20, initial_goal_id=None):
+def enqueue(db, owner, swarm_id, *, limit=20, initial_goal_id=None, daily_slot=None):
     if type(limit) is not int or not 1 <= limit <= 100:
         raise DomainError("INVALID_SWARM_COORDINATION")
     delegation = current_delegation(db, owner, swarm_id)
@@ -43,7 +43,7 @@ def enqueue(db, owner, swarm_id, *, limit=20, initial_goal_id=None):
         "ORDER BY i.id LIMIT ?",
         (conversation["id"], swarm_id, encoded(members), limit - len(results)),
     )
-    if not items and not results and initial_goal_id is None:
+    if not items and not results and initial_goal_id is None and daily_slot is None:
         return None
     batch_id, turn_id, stamp = identity(), identity(), now_ms()
     db.execute(
@@ -72,6 +72,7 @@ def enqueue(db, owner, swarm_id, *, limit=20, initial_goal_id=None):
                 {
                     "coordinationBatchId": batch_id,
                     **({"initialGoalId": initial_goal_id} if initial_goal_id else {}),
+                    **({"dailySlot": daily_slot} if daily_slot is not None else {}),
                 }
             ),
             stamp,
@@ -106,12 +107,19 @@ def admitted_batch(db, owner, turn_id, *, lease_epoch=None):
         "AND json_extract(payload_json,'$.initialGoalId')=?",
         (turn_id, value["delegation_id"]),
     )
+    tick = row(
+        db,
+        "SELECT json_extract(payload_json,'$.dailySlot') AS slot FROM jobs "
+        "WHERE kind='turn.run' AND aggregate_id=?",
+        (turn_id,),
+    )
     return {
         **value,
         "delegation": value["delegation"],
         "inputs": [json.loads(i["payload_json"]) for i in items],
         "results": frozen(db, value["id"]),
         **({"initialGoal": True} if start else {}),
+        **({"dailySlot": json.loads(tick["slot"])} if tick and tick["slot"] else {}),
     }
 
 
@@ -137,6 +145,7 @@ def evidence(value):
             item["executionReceipt"]["receiptId"] for item in value.get("results", [])
         ],
         **({"initialGoal": True} if value.get("initialGoal") else {}),
+        **({"dailySlot": value["dailySlot"]} if "dailySlot" in value else {}),
     }
 
 

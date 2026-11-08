@@ -675,6 +675,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "okrMessageContext": True,
                 "conversationIdentity": True,
                 "projectMainWake": True,
+                "projectGoalDailyWake": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,

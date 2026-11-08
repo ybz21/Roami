@@ -33,6 +33,8 @@ func showHelp(w io.Writer, topics []string) error {
   chat <群ID> [--limit 50] [--follow] [--json]
   inbox <群ID> [--member 成员ID] [--before N] [--limit 20] [--json]
   inbox <群ID> --task TASK --run RUN --task-revision N [--json]
+  daily <群ID> --delegation ID --project ID --main-conversation ID
+    --timezone IANA --date YYYY-MM-DD --slot NAME [--dry-run] [--json]
   say <群ID> "消息" --key KEY [--to 成员 --task-revision N] [--json]
   member add <群ID> <成员名> --executor codex|claude|roami|opencode|pi
     --goal TEXT --acceptance TEXT --key KEY --revision N
@@ -63,6 +65,8 @@ member inspect 按成员ID查看轮次；登记不会创建运行中的实例。
 --json 为结构化输出；--follow 持续读取 SSE，断线退避重连，Ctrl-C 退出。
 chat 是最近讨论与结果的快照；--follow 不保证补齐超出服务快照窗口的历史。
 inbox 的普通查看不冒充Main已读；绑定成员读取仅记录获取，不表示已解决或任务完成。
+daily 供已配置的外部日程唤醒原持续目标；同日本地时段去重，不发送新用户消息。
+它不登记日程、不授权发布，accepted 只表示通知已保存；先用 --dry-run 核对目标。
 question/blocker/handoff持久等待原Main处理；不会自动唤醒模型或注入终端。
 --file 包含完整请求；--file - 从 stdin 读 JSON。不与业务选项混用。
 roami session swarm 访问同一实现。三维动画在 Web 的「协作」Tab 查看。

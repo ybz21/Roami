@@ -63,6 +63,9 @@ async def bound_project(database, binding):
         )
         if not value:
             raise DomainError("PROJECT_OKR_CONTEXT_REQUIRED", 403)
+        expected = binding.get("coordinationProjectId")
+        if expected is not None and value["project_id"] != expected:
+            raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
         return value["project_id"]
 
     return await database.call(read)

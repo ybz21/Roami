@@ -233,3 +233,7 @@
 - [持续目标与提问唤醒](goal-activation.md)：真实用户入口、原成员首批与收件箱事件；[HTML 机制原型](goal-activation.html)。
 
 - [持续接续的实际缺口](runtime-continuation.md)：原 Main 的入口指引与 Native 启动前拒绝诊断（#744、#785）。
+
+- [协调回合读取项目](coordination-project-context.md)：复用项目只读入口并绑定原目标范围。
+
+- [原目标每日唤醒](daily-goal-slots.md)：Skill、外部 CLI 与本地日期槽，保留原 Main 和团队。

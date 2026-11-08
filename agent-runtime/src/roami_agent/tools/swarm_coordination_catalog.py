@@ -22,6 +22,7 @@ COORDINATION_OPERATIONS = (
         "artifact_read",
         "task_status",
         "task_steer",
+        "project_okr_context",
         "reply",
         "ask_user",
     }
