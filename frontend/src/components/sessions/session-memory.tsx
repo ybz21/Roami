@@ -14,7 +14,7 @@ export function memPercent(m?: SessionMem | null): number {
 
 /** 超过警示线才值得在信息密度已经很高的地方占位置。 */
 export function memNoteworthy(m?: SessionMem | null): boolean {
-  return !!(m?.paused || m?.warning || m?.pauseError || m?.relief) || memPercent(m) >= WARN_AT
+  return !!(m?.paused || m?.warning || m?.pauseError) || memPercent(m) >= WARN_AT
 }
 
 export function humanBytes(n: number): string {
