@@ -1,6 +1,7 @@
 package agentexecution
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -9,6 +10,55 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestNativeHoldPersistsPreStartWorkspaceClaimFailure(t *testing.T) {
+	for _, tc := range []struct{ name, result, reason string }{
+		{"missing", "", "WORKSPACE_PRIOR_RESULT_MISSING"},
+		{"unreadable", "private invalid result", "WORKSPACE_PRIOR_RESULT_UNREADABLE"},
+		{"active", `{"state":"running"}`, "WORKSPACE_PRIOR_RESULT_NOT_TERMINAL"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testService(t)
+			directory := t.TempDir()
+			prior := seedBlockedWriter(t, s, directory)
+			if tc.result != "" {
+				if err := os.WriteFile(filepath.Join(prior, "result.json"), []byte(tc.result), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var output bytes.Buffer
+			spec := Spec{Key: "blocked-native", Executor: "native", Directory: directory}
+			err := s.HoldNative(context.Background(), spec, json.NewDecoder(strings.NewReader("")), &output)
+			if err == nil || err.Error() != "WORKSPACE_OUTCOME_UNKNOWN" {
+				t.Fatalf("missing refusal: %v", err)
+			}
+			var frame Result
+			if err := json.Unmarshal(output.Bytes(), &frame); err != nil {
+				t.Fatal(err)
+			}
+			status, err := s.Status(spec.Key)
+			if err != nil || status.State != "failed" || status.Result == nil {
+				t.Fatalf("lost durable rejection: %+v %v", status, err)
+			}
+			stored, _ := json.Marshal(status.Result)
+			wire, _ := json.Marshal(frame)
+			if !bytes.Equal(stored, wire) || frame.ExecutionStarted == nil || *frame.ExecutionStarted || frame.ExitCodeSource != "not_started" || frame.Failure == nil || frame.Failure.ReasonCode != tc.reason || frame.Failure.BlockingExecutionID != filepath.Base(prior) || frame.Failure.BlockingSessionID != "prior-session" {
+				t.Fatalf("lost safe pre-start facts: %s", wire)
+			}
+			launch, _ := s.directory(spec.Key)
+			if _, err := os.Stat(filepath.Join(launch, "started")); !os.IsNotExist(err) {
+				t.Fatal("blocked native execution started")
+			}
+			lease := filepath.Join(s.Runtime.DataDir, "agents", "workspace-leases", workspaceHash(directory), "writer.json")
+			var writer struct {
+				Key string `json:"key"`
+			}
+			if readJSON(lease, &writer) != nil || writer.Key != "prior-writer" || strings.Contains(output.String(), "private") {
+				t.Fatal("prior fence changed or raw diagnostics escaped")
+			}
+		})
+	}
+}
 
 func seedBlockedWriter(t *testing.T, s Service, directory string) string {
 	t.Helper()

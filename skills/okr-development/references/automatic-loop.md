@@ -102,6 +102,8 @@ offline replay. A compacted summary does not replace fresh host task/receipt sta
 
 成员后续工作走原 task_steer，检查最新 revision/run 后再接续；不能用 legacy session_send 给受管成员另起一条独立工作流。旧直接消息 callback 只是独立回传，`verified=false` 保持不变；不凭该回传完成新任务。路由 guard、完成恢复与独立验收是不同宿主能力，按当前部署实测，不凭仓库文档假设已经上线。
 
+不同 workspaceId 不保证目录隔离，先核对实际目录，共享目录写任务串行。Native 启动前的工作区拒绝只描述新执行没有开始；前一 writer 的停止和结果仍需独立确认。按实际 failure 阶段与阻塞引用对账，不清锁、改 busy、换业务键或复制角色。没有完整启动前证明的未知结果继续保留未知。
+
 ## 持续目标与成员提问
 
 先核对宿主目录是否实际提供 `roami swarm goal status/enable/revoke`；缺少时报告入口未接通，不猜命令或新建替代 Main。已有 active 目标直接接续。需要启用新目标时，先读真实版本与项目已确认的分工，按 memberId 选择当前职责；保留的历史成员不因同名加入本轮。引用当次用户的完整目标，按实际 schema 传 `expectedDelegationRevision` 和 `memberIds`。没有当前任务的角色先在真实用户回合完成分工；协调回合不新建替代任务。启用回执、首次唤醒、真实工作完成与每日排期是不同事实。

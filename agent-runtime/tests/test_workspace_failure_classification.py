@@ -66,3 +66,90 @@ async def test_workspace_failure_release_and_unknown_protection(tmp_path, kind, 
         assert caught.value.__context__ is error
         assert not released.exists()
     assert observed == ([True] if stop_evidence is not None else [])
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "none",
+        "legacy",
+        "started",
+        "string_false",
+        "phase",
+        "reason",
+        "exit_source",
+        "exit_code",
+        "missing_exit",
+    ],
+)
+async def test_native_claim_rejection_keeps_only_proven_new_execution_facts(tmp_path, fault):
+    from roami_agent.dispatch.runner import execution_failure
+    from roami_agent.executors.workspace import NativeWorkspaceRejected
+
+    receipt = {
+        "state": "failed",
+        "errorCode": "WORKSPACE_OUTCOME_UNKNOWN",
+        "executionStarted": False,
+        "exitCode": -1,
+        "exitCodeSource": "not_started",
+        "summary": "private raw diagnostics",
+        "stderr": "private password",
+        "failure": {
+            "phase": "workspace_claim",
+            "reasonCode": "WORKSPACE_PRIOR_RESULT_MISSING",
+            "blockingExecutionId": "a" * 64,
+            "blockingSessionId": "prior-session",
+            "raw": "private filesystem path",
+        },
+    }
+    if fault == "legacy":
+        receipt = {"state": "failed", "errorCode": "WORKSPACE_OUTCOME_UNKNOWN"}
+    elif fault == "started":
+        receipt["executionStarted"] = True
+    elif fault == "string_false":
+        receipt["executionStarted"] = "false"
+    elif fault == "phase":
+        receipt["failure"]["phase"] = "tool_execution"
+    elif fault == "reason":
+        receipt["failure"]["reasonCode"] = "private message"
+    elif fault == "exit_source":
+        receipt["exitCodeSource"] = "executor"
+    elif fault == "exit_code":
+        receipt["exitCode"] = 0
+    elif fault == "missing_exit":
+        receipt.pop("exitCode")
+    cli = tmp_path / "roami"
+    cli.write_text(
+        f"#!{sys.executable}\nimport json,sys\nsys.stdin.readline()\nprint({json.dumps(receipt)!r},flush=True)\n"
+    )
+    cli.chmod(0o700)
+    settings = SimpleNamespace(cli_bin=str(cli), provider_key_environments=lambda: set())
+    task = {
+        "intent_json": json.dumps({"target": {"kind": "project", "projectId": "p"}}),
+        "budget_json": "{}",
+    }
+    entered = False
+    stop_checks = []
+
+    async def stopped():
+        stop_checks.append(True)
+        return True
+
+    with pytest.raises(DomainError) as caught:
+        async with hold_workspace(
+            settings, task, {"launch_id": "new-blocked-native"}, stopped=stopped
+        ):
+            entered = True
+    assert not entered and not stop_checks
+    result = execution_failure(caught.value)
+    assert "private" not in json.dumps(result)
+    if fault == "none":
+        assert isinstance(caught.value, NativeWorkspaceRejected)
+        assert result["executionStarted"] is False and result["exitCodeSource"] == "not_started"
+        assert result["summary"] == "WORKSPACE_PRIOR_RESULT_MISSING"
+        assert result["failure"]["blockingExecutionId"] == "a" * 64
+        assert result["failure"]["blockingSessionId"] == "prior-session"
+        assert "outcomeKnown" not in result and "inputStopped" not in result
+    else:
+        assert type(caught.value) is DomainError
+        assert "executionStarted" not in result

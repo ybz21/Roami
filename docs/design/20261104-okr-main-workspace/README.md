@@ -231,3 +231,5 @@
 - [报告里的输入引用与交付文件](delivery-input-references.md)：避免配置路径被误报为缺失产物，保留真实交付和安全检查。
 
 - [持续目标与提问唤醒](goal-activation.md)：真实用户入口、原成员首批与收件箱事件；[HTML 机制原型](goal-activation.html)。
+
+- [持续接续的实际缺口](runtime-continuation.md)：原 Main 的入口指引与 Native 启动前拒绝诊断（#744、#785）。
