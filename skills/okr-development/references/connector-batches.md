@@ -64,7 +64,7 @@ For the GitHub part, run fetch_github.py with the confirmed repository ID. Expor
 the current workspace, then use `scripts/prepare_batch.py` with --workspace,
 --candidate, --connector, --project, --evidence, --output and one persisted
 --batch-id (32 lowercase hex). These output paths are project-relative, normally
-inside this member's actual date/task/revision/run delivery folder. The batch key
+inside this member's assigned dated topic directory; task/revision/run belong in the manifest metadata. The batch key
 is caller-generated; never pretend it is a host task/run identity. The script
 writes exact raw bytes and a request file; it publishes nothing. Existing differing
 outputs stop instead of being overwritten. Never rerun preparation with another

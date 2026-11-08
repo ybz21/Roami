@@ -29,7 +29,7 @@ PROJECT/
     evidence/                        original review evidence
     state/current.json               atomic confirmed-version pointer
     state/confirmed-revisions/       immutable confirmed snapshots
-  YYYY/YYYYMM/YYYYMMDD/               deliverables and acceptance evidence
+  materials/YYYY-MM-DD/             readable topic deliverables and acceptance evidence
 ```
 
 `save` creates the core bundle. Member notes and dated deliverables are created

@@ -5,7 +5,8 @@ Team memory: .roami/okr/memory/team.md.
 Important decisions: .roami/okr/memory/decisions.md.
 Member notes: .roami/okr/memory/members/<stable-member-id>/memory.md.
 Keep the original project Main and member/provider conversations across rounds.
-Deliverables and reviews go under YYYY/YYYYMM/YYYYMMDD/; evidence is not memory.
+Deliverables and reviews go under materials/YYYY-MM-DD/<channel>/<short-topic>/.
+Keep execution IDs in manifests; evidence is not memory.
 Keep existing project rules when merging this entry into an existing project.
 
 For dashboard or data changes, follow the dashboard update and publication steps
@@ -50,11 +51,11 @@ OKR 操作手册：`.roami/okr/manuals/README.md`；按当前任务选择看板�
 
 ### 5. 按日、周、月、年组织产物与记忆
 
-采用项目约定的 IANA 时区；日期来自真实发生时间。日目录按 `YYYY/YYYYMM/YYYYMMDD/` 组织，任务产物在 `<方法>/<taskId>/r<revision>/<runId>/`；Main 维护当日 `README.md` 和 `manifest.json`，成员只写各自目录。跨午夜继续原运行目录，次日索引引用；旧文件保留原日期，不搬到今天冒充新产物。
+新物料用 `materials/YYYY-MM-DD/<渠道或工作类型>/<简短主题>/`。目录名不用任务或运行 UID；taskId/revision/runId 写入 manifest 和宿主回执。修改使用版本化文件名，不按每轮执行再套一层目录，不覆盖已交付字节。Main 负责每日 README 与清单，无直接写权限时交原数据成员整理再核对。采用项目时区和真实产出日期；已分派任务沿原路径完成，历史文件按原日期保留并通过索引引用。
 
 | 层次 | 位置 | 写什么、谁维护 |
 | --- | --- | --- |
-| 日交付与日复盘 | `YYYY/YYYYMM/YYYYMMDD/`，复盘在 `reflection/` | 成员交本轮文件和原始证据；Main 写当日结果、未知、阻塞、验收和下一实验 |
+| 日交付与日复盘 | `materials/YYYY-MM-DD/`，复盘在 `reflection/` | 成员交本轮文件和原始证据；Main 写当日结果、未知、阻塞、验收和下一实验 |
 | 周记忆 | `YYYY/reflection/weeks/YYYY-Www.md` | Main 按 ISO 周年/周号聚合实际日期与来源链接；跨月周不重复算，跨年周放对应 ISO 周年 |
 | 月记忆 | `YYYY/YYYYMM/reflection/month.md` | Main 汇总本月已验证结果、趋势、实验、失败与下月选择 |
 | 年记忆 | `YYYY/reflection/year.md` | Main 汇总全年目标变化、有效方法、长期结论与下一年建议 |

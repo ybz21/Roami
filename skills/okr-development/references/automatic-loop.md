@@ -59,7 +59,29 @@ approved review still does not mean a publisher/account is connected or a post
 is public. Video/audio approval requires a supported linked-media review path;
 do not substitute a gallery, filename, subtitles alone or the author's claim.
 
+### Correct prepare inputs before advancing the author
+
+`content` selects files; it does not contain the post text. For example,
+`{"body":"01-post.en.txt","images":["01-card.png"]}` selects those exact
+`manifest.files[].path` values. Do not add the project/date directory prefix.
+`manifest.id` is the retained host artifact ID, never `manifest.json` or a disk path.
+
+Freeze and independently review the whole batch before steering its original
+producer into a publishing revision. A prepare error has not produced a frozen
+version. Correct input errors using the same businessKey; do not report an
+unverified account failure or bypass the missing receipt with a manual claim of
+"frozen". Preserve old attempts if the member already advanced; use the current
+supported recovery workflow rather than rewriting its history.
+
 ## Publish and reconcile
+
+Before replacing a publisher, inspect the project's previously verified route
+and retained receipts. A browser or phone workflow is not disproved by an empty
+API/MCP directory. Keep the user's actual device/account boundaries; a one-time
+read-only acceptance window must not silently become a permanent operating ban.
+Record the chosen route and recovery in the project's publishing manual.
+
+
 
 Continue the original publishing member with a bounded assignment and frozen
 candidate. A revision-only task does not gain publishing duties. The supported

@@ -239,3 +239,7 @@
 - [协调回合读取项目](coordination-project-context.md)：复用项目只读入口并绑定原目标范围。
 
 - [原目标每日唤醒](daily-goal-slots.md)：Skill、外部 CLI 与本地日期槽，保留原 Main 和团队。
+
+- [发布执行协议与回执对账](publication-execution.md)：独立审核、原执行身份和持久事实；真实通道仍需接通。
+
+- [可读物料与既有发布流程](material-workflow.md)：去掉物料路径中的执行 UID，复用已验证通道并核对限制范围。

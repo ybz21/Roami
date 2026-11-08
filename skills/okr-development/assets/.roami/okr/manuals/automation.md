@@ -29,3 +29,10 @@
 - `roami swarm post --input '<JSON>'`：Main 具名回告使用原 Swarm 与稳定 `messageKey`，普通状态用 `kind="progress"`。公共 CLI `swarm say` 是人的入口，不能用来冒充 Main 自我唤醒。
 
 成员后续工作走原 task_steer，检查最新 revision/run 后再接续；不能用 legacy session_send 给受管成员另起一条独立工作流。旧直接消息 callback 只是独立回传，`verified=false` 保持不变；不凭该回传完成新任务。路由 guard、完成恢复与独立验收是不同宿主能力，按当前部署实测，不凭仓库文档假设已经上线。
+
+
+## 素材冻结的输入与顺序
+
+`content.body` 填清单内相对文件名（如 `01-post.en.txt`），图片填清单内相对路径数组；正文原文不是路径，不加项目日期目录前缀。`manifest.id` 使用宿主保留的 artifact ID，不是清单文件名或磁盘路径。以实际工具 schema 为准。
+
+先把原成员整批素材冻结并逐条独立审核，再续派该成员到发布轮次。prepare 失败没有产生冻结版本；保持原 businessKey 修正输入，按实际错误处理，不把参数错误改称账号未核验，也不以手工“已冻结”声明代替宿主回执。原成员已推进时保留旧历史，使用当前受支持的恢复流程。
