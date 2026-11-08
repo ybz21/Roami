@@ -90,6 +90,23 @@ async def invoke(runtime, binding, args):
     )
 
 
+@pytest.mark.parametrize("wrong_body", ["Frozen post", "project/run/post.txt"])
+async def test_content_path_error_allows_original_main_to_correct_same_business_item(
+    coordination, tmp_path, wrong_body
+):
+    runtime, binding, args = await prepared_command(coordination, tmp_path)
+    with pytest.raises(DomainError, match="PUBLICATION_CONTENT_USE_RELATIVE_MANIFEST_FILE_PATH"):
+        await invoke(runtime, binding, {**args, "content": {"body": wrong_body}})
+    result = await invoke(runtime, {**binding, "toolCallId": "correct-path"}, args)
+    assert result["state"] == "frozen"
+    assert (
+        await runtime.db.call(
+            lambda db: db.execute("SELECT count(*) FROM swarm_publication_items").fetchone()[0]
+        )
+        == 1
+    )
+
+
 async def test_original_coordinated_main_can_freeze_via_registered_cli_without_publishing(
     coordination, tmp_path
 ):
