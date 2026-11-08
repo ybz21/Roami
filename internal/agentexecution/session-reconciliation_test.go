@@ -198,3 +198,46 @@ func TestSessionChangedInputReconciliationRequiresObservedCommandCompletion(t *t
 		t.Fatalf("command stop proof: %+v %v", status, err)
 	}
 }
+
+func TestSessionChangedInputReconciliationDistinguishesForeignCodexCallbacks(t *testing.T) {
+	for _, kind := range []string{"child-completion", "foreign-tool"} {
+		t.Run(kind, func(t *testing.T) {
+			s, binding, spec, records := changedInputFixture(t)
+			event := SessionEvent{Type: "agent-turn-complete", ThreadID: "child-provider", NotificationTurn: "child-turn", Inputs: []string{"internal work"}, LastAssistant: "internal result"}
+			if kind == "foreign-tool" {
+				event = SessionEvent{Hook: "PreToolUse", ProviderID: "foreign-provider", TurnID: "foreign-turn", ToolID: "foreign-tool"}
+			}
+			if err := s.applySessionEvent("codex", binding, event); err != nil {
+				t.Fatal(err)
+			}
+			saveCompletionRecords(t, os.Getenv("CODEX_HOME"), records)
+			before, err := s.Status(spec.Key)
+			if err != nil || before.State != "unknown" || before.Result != nil {
+				t.Fatalf("ordinary status must remain strict: %+v %v", before, err)
+			}
+			path, _ := s.lifecycleFile(binding)
+			var old sessionLifecycle
+			if err = readJSON(path, &old); err != nil || old.ProviderConflict == nil {
+				t.Fatal("missing real callback diagnostic", err)
+			}
+			status, err := s.ReconcileSession(context.Background(), spec.Key)
+			if kind == "foreign-tool" {
+				if err == nil {
+					t.Fatal("actual foreign activity accepted", status)
+				}
+				var after sessionLifecycle
+				if err = readJSON(path, &after); err != nil || after.State != "unknown" || after.Binding.ProviderID != binding.ProviderID {
+					t.Fatal("foreign activity changed binding", err)
+				}
+				return
+			}
+			if err != nil || status.State != "failed" || status.Result == nil || status.Result.Summary != "SESSION_SCOPE_CHANGED_STOPPED" {
+				t.Fatalf("ignored child completion poisoned root stop: %+v %v", status, err)
+			}
+			var after sessionLifecycle
+			if err = readJSON(path, &after); err != nil || after.State != "idle" || after.Binding.ProviderID != binding.ProviderID || after.ProviderConflict == nil || *after.ProviderConflict != *old.ProviderConflict {
+				t.Fatal("lost original identity or diagnostic history", err)
+			}
+		})
+	}
+}

@@ -58,7 +58,10 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 		receipt.State = "failed"
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
-	if state.Executor != "codex" || state.State != "unknown" || state.UnknownReason != "SESSION_PROMPT_MISMATCH" || state.LaunchKey != key || state.ProviderConflict != nil || state.Binding.ProviderID != receipt.Binding.ProviderID || state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || state.PromptHash != workspaceHash(sessionPrompt(dir, spec)) {
+	// Child completion notifications are retained diagnostics, not root identity changes.
+	conflict := state.ProviderConflict
+	foreignActivity := conflict != nil && (conflict.Executor != "codex" || conflict.Hook != "" || conflict.Type != "agent-turn-complete")
+	if state.Executor != "codex" || state.State != "unknown" || state.UnknownReason != "SESSION_PROMPT_MISMATCH" || state.LaunchKey != key || foreignActivity || state.Binding.ProviderID != receipt.Binding.ProviderID || state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || state.PromptHash != workspaceHash(sessionPrompt(dir, spec)) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
 	}
 	if err = ctx.Err(); err != nil {

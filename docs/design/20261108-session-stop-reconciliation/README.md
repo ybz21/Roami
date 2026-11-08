@@ -21,3 +21,7 @@ OutcomeKnown=true 仅表示宿主已确定原执行因范围变化而失败；�
 ## Acceptance
 
 覆盖原未知保护、同 turn 追加、失败回执和原成员下一轮、同目录下一角色、重复对账、不完整/额外 turn/错误身份/活动工具/证据冲突。实际生产恢复与平台回读分别记录，测试不能代替。
+
+### 内部线程通知的现场边界
+
+首次生产对账返回 SESSION_RECONCILIATION_SCOPE_REQUIRED，未改动原会话：该长期实例保留一条 Codex 内部线程 agent-turn-complete 诊断。现有 applySessionEvent 明确只留存此类完成通知而不改变根 turn 的身份；新入口对所有 ProviderConflict 一概拒绝，误把这一诊断当成活动 provider 变更。补充真实回调回归后，仅忽略同 executor、无 Hook 的 agent-turn-complete 诊断；外部 PreToolUse/UserPromptSubmit 等仍拒绝。原诊断原样保留，仍必须核对根转录与工具/进程停止。
