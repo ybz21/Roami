@@ -95,7 +95,8 @@ class Tools:
                     if role in self.shell_disabled_roles
                     else (
                         "Execute a shell command. The host supplies the working directory and execution context. "
-                        "Use registered Roami commands for managed resources."
+                        "Submit each registered Roami command alone for managed resources, without cd, "
+                        "pipes, redirections or shell wrappers; read the structured result directly."
                     )
                 )
             elif role != "main" and self.directory and tool.name == "bash":

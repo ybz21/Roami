@@ -2,6 +2,12 @@
 
 Before OKR work read .roami/okr/AGENTS.md and the current confirmed project context.
 Team memory: .roami/okr/memory/team.md.
+
+Main 调用受管 CLI 时使用 tool_list/help 的准确命令与 schema，作为单独一次 bash 调用，
+不加 cd、管道、重定向、env 或 shell 包装；宿主提供真实 turn/call，不能猜填。原成员追加任务
+使用 task_steer 或支持的 swarm say，不直接 session send。Main 当前目录不等于原成员机器
+能力；Chrome/ADB 等入口按实际安装和最新授权核对。时间取实际时钟/事件，发布未知先对账
+同一对象，不换键重发。详见 [日常运行](.roami/okr/manuals/daily.md)。
 Important decisions: .roami/okr/memory/decisions.md.
 Member notes: .roami/okr/memory/members/<stable-member-id>/memory.md.
 Keep the original project Main and member/provider conversations across rounds.

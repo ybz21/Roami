@@ -393,10 +393,20 @@ class ToolGateway:
             if (
                 self.tools.directory
                 and call["function"]["name"] == "bash"
-                and value["error"] in {"INVALID_CLI_ARGUMENTS", "INVALID_TOOL_ARGUMENTS"}
+                and value["error"]
+                in {
+                    "INVALID_CLI_ARGUMENTS",
+                    "INVALID_TOOL_ARGUMENTS",
+                }
             ):
                 value.update(self.tools.directory.command_hint(args, role))
-                if value.get("expectedCommand"):
+                if self.tools.directory.wrapped_command(args):
+                    value["recovery"] = (
+                        "Rejected before execution: submit the registered command alone, without cd, "
+                        "pipes, redirections, chaining, env or shell wrappers. Read its structured result "
+                        "directly. The host supplies the real turn/call identity; do not invent those flags."
+                    )
+                elif value.get("expectedCommand"):
                     value["recovery"] = (
                         "This registered command was rejected before execution because its arguments "
                         "do not match its usage. Use expectedCommand and its options/inputSchema. "
