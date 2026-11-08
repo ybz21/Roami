@@ -1,6 +1,6 @@
 a20f81dd03302514d1248516018357405fcf204f35a32a3b4552326bc90b2a0f  README.md
 8da2501c23d2af77ca672a9705751ba934861c6e6c915d35330435e654f05352  SKILL.md
-61cc0d01a126e28fe51c6d9faad6894815b85bafc8914c1af79d090dc3be657a  assets/.roami/okr/AGENTS.md
+0acc25f1f6e274983358c7d5903606c436abd9d387ebdc48001cb87b0bd9216b  assets/.roami/okr/AGENTS.md
 d4703f2c9176be2dba427248322f7e5291bb715c2c696b540f2e27376b9fb08d  assets/.roami/okr/README.md
 78f423bace6cb44511cf9d49afe54e51c9fd96edb2ba52cbf9036f5569671e67  assets/.roami/okr/agents/main.json
 810c7941f55c4787fdbfb383235282849b9466d46211847019b56c9fb3d5bba5  assets/.roami/okr/agents/main.md
@@ -21,8 +21,8 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/
 3cea053988e1643b1b16f4de072fa7b0975ed7798f16b068761cfa08d175160f  assets/.roami/okr/manuals/daily.md
 1518dfddc48dca60599019334dd0b1d4411f9794ee1c1cdf8edaf429f5c60a2d  assets/.roami/okr/manuals/dashboard.md
 6f7e8d14f8cb079a2a5d9ef0721658b23fa18e458fc1a6cd3554dd0bbd34dbab  assets/.roami/okr/manuals/data.md
-c415bc476bf9d7e3bb28fc2593c16a51b26eec0c39ebb1686de3884865e973e3  assets/.roami/okr/manuals/memory.md
-d156976f039adc958ba239e7bdca4290ba12fc4342310ae0ce9ccf4317e450b8  assets/.roami/okr/manuals/publishing.md
+2927b33c69a6f137a4ebc563306bfe43e242ef080d0a468fdafa424bd5133e9e  assets/.roami/okr/manuals/memory.md
+3c6f5f85250d93c6ceb43a64b53203a1770cf24ba04153530e890eafac934d0e  assets/.roami/okr/manuals/publishing.md
 4ad10b9ecf80654540ca91a58945b9c92453071b88f69d281af93d60ca7114be  assets/.roami/okr/manuals/skills.md
 2c93762d2d48b37908ab96a01258bc198f2cd72125530019ca56365a8d678797  assets/.roami/okr/manuals/team.md
 0ea065ee26b7bc9ea460a09b706bd3c12e746f8d715d10fffc594df4ffbcd3b5  assets/.roami/okr/memory/decisions.md
@@ -38,7 +38,7 @@ dc26c98342033ba7ad2a768792a5ea3b7eb39fd49b91dcb26167790d8d3a89bc  assets/.roami/
 d92c62d3b31885163368e3f412bb49f5d1bec00ecbcda35cd01d55d56df46e5e  assets/.roami/okr/skills/okr-planning/SKILL.md
 1fe0938d28f2cd918d72c57601c57d9c3c2a026adaf8dc3524e6f84026f830ba  assets/.roami/okr/skills/swarm-execution/SKILL.md
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/okr/state/.gitkeep
-18135fc66b608652d76562dae845da58f3a784184e8250d40bf8a5e41e042e62  assets/AGENTS.md
+82cb8933307c2b20371e786181a5bcfa950bdccdf4917b4b1e2e2aa1a11dd66c  assets/AGENTS.md
 03751a7fb5b05a06f08cff938368d3fdeb8d8e29140ce98374b754c04662e2d7  assets/README.md
 fb76b25b9cbeb2337cca8e47c9bc2034c7be5810e0238b1091b931e1283c753e  assets/materials/README.md
 59ffe2c46847e61b0cf01937f69258d1572dd09839fed0c21f58a68baabefdf2  examples/content-growth/config.json

@@ -45,3 +45,13 @@ prepare 的 `manifest.id` 必须是本轮结果中宿主留存的 artifact ID，
 ## 图片 ALT 与批准版本
 
 支持 imageAlts 的宿主上，prepare 的 content.imageAlts 是相对清单目录的 ALT 文本文件路径数组，按相同位置对应 content.images；每张图片恰好一个 ALT。例如 images=["card.png"]、imageAlts=["card-alt.txt"]，两份文件都在清单 files 内，不把 ALT 原文直接填进路径。Main 完整读取返回的冻结正文及 ALT，并实际查看对应图片后再 review。改变 ALT 必须重新 prepare 和 review，沿用原业务键；旧版本不包含的侧车文本不能假称已获批准。宿主尚未声明该字段时只保留候选，不探测生产写入口。冻结和内容审核仍不等于发送权限或平台发布。
+
+## Main 工具与原生成员能力
+
+Main 的 prepare/review 目录只描述 Main 当前回合可调用的发布管理操作，不代表 Codex、Claude 等原生成员的全部 CLI 能力。先核对原项目历史成功回执、当前本轮任务范围，以及成员实际可用的 Skill/CLI；不能仅因没有专用发送工具，就认定必须新增 OAuth/API 或重新制作内容。
+
+- 原任务是“只改清单、不发布”时，成员必须停在该范围。审核完成后，Main 通过受管 task_steer 给同一成员、同一任务追加有边界的发布工作，并核对真实新 revision/run 和原 provider 会话。不要把制作轮次直接当发布轮次。
+- 发布前读原通道 Skill，核对实际账号、当前内容/媒体/ALT 字节与稳定业务键。命令存在、历史成功和公开作者身份均不证明当前设备、登录或权限可用。
+- prepare/review 返回 publicationAuthorized=false 表示这项管理操作没有授予发送权限；用户原有的明确执行授权需要单独核对，不能把该字段当成所有原生通道均不存在。现行手机、人工账号页限制和宿主要求的检查仍有效，禁止借 CLI 绕过。
+- 只在已明确允许的资源与账号范围内按原 Skill 单次执行。先保存本次意图与业务身份，已有未知尝试先对账；保持真实上传、提交和公开状态分开。没有平台回执就如实报告未确认。
+- 原生 CLI 操作成功不等于宿主已接受平台事实。当前 swarm_verify 拒绝通用 external_action；自动验收需要专用的可信平台核验接线，不能自报 consent 或修改任务状态绕过。该缺口与“没有执行命令”分别报告。

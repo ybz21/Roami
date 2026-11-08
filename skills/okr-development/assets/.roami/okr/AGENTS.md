@@ -142,3 +142,12 @@ Main 负责把这些步骤落实到确认回执和实际结果，不能只转发
 用户的长期目标及明确边界持续有效。单次验收的动作范围只约束该次验收；当前宿主缺少某项能力时记录具体缺口，不据此给自动模式添加永久的逐项人工审批要求。
 
 发布准备与制作验收前，先读 `.roami/okr/manuals/publishing.md`：区分文件读取与宿主留存产物读取，按当前宿主要求使用准确清单结构、路径基准和验收顺序；不能用成员声明、同 SHA 的另一文件或旧轮次内容代替当前回执。
+
+## 协调回合的工具入口
+
+普通用户直接发起的 Main 回合与定时唤醒、成员回调产生的协调批次有不同的工具目录；以当前 tool_list/help 为准，不能把普通项目写工具硬套进协调批次。
+
+- 协调批次复盘：先 swarm_project_context，使用当前 revision 调 swarm_project_update（operation=review），并回读实际复盘回执。
+- 协调批次团队记忆：先 swarm_memory_read，再用返回的 sha256 作为 expectedSha256 调 swarm_memory_write，只追加已核验的新知识；宿主保留批次去重身份。不能自己换 operationKey 绕过去重。
+- 普通用户 Main 回合可按当前目录使用 project_okr_context/project_okr_update/project_okr_memory_append；这些普通项目写入口在协调批次不开放。缺少通用 file_write 不代表没有上述记忆或复盘入口。
+- 协调 Main 不运行任意 shell；文件、任务和留存产物用已登记的读取工具。原生 Codex/Claude 成员按本轮授权使用其真实 CLI/Skill，两者的目录不能互相代替。读文件、讨论投递与实际写回/验收分别留证。

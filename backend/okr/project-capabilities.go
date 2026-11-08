@@ -172,7 +172,8 @@ Store important decisions and unresolved matters in .roami/okr/memory/decisions.
 including date, source and current status. Each long-lived member keeps its own
 notes in .roami/okr/memory/members/<stable-member-id>/memory.md. Reuse the same
 member, task and native conversation for later rounds; do not create r2/r3 members.
-Keep deliverables and reviews in YYYY/YYYYMM/YYYYMMDD/, separate from memory.
+Keep new deliverables in materials/YYYY-MM-DD/<channel-or-method>/<short-topic>/,
+separate from memory. Keep task/revision/run identities in manifests, not folder names.
 Keep this file's existing project rules when extending it.
 `
 
@@ -189,18 +190,18 @@ Instructions and plans never prove execution, verification or publication.
 ## Daily artifacts
 
 Use the project's local timezone (Asia/Shanghai unless explicitly configured).
-Place new deliverables under project-relative YYYY/YYYYMM/YYYYMMDD/, for example
-2026/202611/20261104/. The month segment must agree with the day; 202610/20261104
-is invalid. Never move an old output into today and claim it was produced today.
-
-Within the day use x-content/, bili-video/, data/, reflection/ or a short method
-ID appropriate to this project. Each worker writes its own task/revision/run
-subdirectory: <method>/<task-id>/r<revision>/<run-id>/. Preserve original filenames
-and use new versions instead of overwriting another worker's output. A task that
-crosses midnight keeps its run directory; the next day's index links to it.
+Place new deliverables under project-relative materials/YYYY-MM-DD/<channel-or-method>/<short-topic>/,
+for example materials/2026-11-04/x/short-topic/. Use readable topic names and keep
+taskId, revision and runId in manifests, not directory names. This applies to later
+rounds of the same long-lived task too. Preserve historical and currently executing
+paths; link old outputs rather than moving them or claiming they were produced today.
+Use file versions instead of overwriting delivered bytes. Work crossing midnight
+keeps its original directory; the next day's index links to it.
 
 Keep README.md and manifest.json at the day root. Main owns these two shared
-indexes; workers report candidates in the group chat. Each manifest entry records
+indexes; without direct file writing it assigns one original member to update them
+and independently checks the result. Other workers report candidates in the group chat.
+Each manifest entry records
 relative path, KR/method, owner, taskId, revision, runId, producedAt with timezone,
 bytes, SHA256, upstream evidence and verification status. Data also records asOf
 and source/account; collection time and metric date are different. A migrated
