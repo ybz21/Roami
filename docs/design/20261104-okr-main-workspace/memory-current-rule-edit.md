@@ -70,4 +70,4 @@ Go 原项目 memory 接口增加 `mode: "edit"`，字段为 `expectedSha256`、`
 
 数值看板已确认、复盘已保存、下一轮已续派属于另行验证的业务事实；本设计不据此声称局部记忆编辑已经完成或自动目标已经全部达成。
 
-普通 Main 与协调 Main 均须通过真实 Foundation 命令目录发现并执行编辑：project_okr_memory_edit 对应 roami project okr memory edit；swarm_memory_edit 对应 roami swarm memory edit。只注册 Python handler 而漏掉 commands.json 不算可用入口。回归直接经过 tool_list 与 bash 的注册命令路由，不以 handler 调用代替。
+普通 Main 与协调 Main 均须通过真实 Foundation 命令目录发现并执行编辑：project_okr_memory_edit 对应 roami project okr memory edit；swarm_memory_edit 对应 roami swarm memory edit。未映射专用命令的 handler 仍可由目录中的通用 agent capability call 入口调用；新增专用映射统一项目与团队的记忆编辑用法，不能把缺少专用别名误报为整个能力不可用。回归直接经过 tool_list 与 bash 的注册命令路由，不以 handler 调用代替。
