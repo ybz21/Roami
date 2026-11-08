@@ -10,7 +10,7 @@
 // 地方。daemon 侧还挂了看门狗（单条命令处理超时就把整个 daemon 进程杀掉重来，见
 // handleConnection）——防的是 CDP 连接在 Chrome 被内存压力杀掉/重启期间可能陷入不带退避的
 // 忙等死循环（不依赖出问题的那段代码自己配合退出，直接从外面强杀更可靠）。
-import { writeFile, mkdir, mkdtemp, rm, copyFile, rename } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, mkdtemp, rm, copyFile, rename } from 'node:fs/promises'
 import { existsSync, unlinkSync, writeFileSync, openSync, realpathSync } from 'node:fs'
 import { spawn, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -342,7 +342,8 @@ async function executeVerb(browser, verb, flags, pos, timeoutMs, io, browserId) 
           await input.waitFor({ state: 'attached', timeout: to })
           if (await input.count() !== 1 || !await input.evaluate(element => element.tagName === 'INPUT' && element.type === 'file' && !element.webkitdirectory && !element.disabled)) throw new Error('invalid input')
         } catch { throw new ChromeError('CHROME_UPLOAD_INPUT_INVALID') }
-        await input.setInputFiles(snapshot, { timeout: to })
+        // Pages can read the File after this call's temporary snapshot is removed.
+        await input.setInputFiles({ name: file.name, buffer: await readFile(snapshot) }, { timeout: to })
         return { selected: true, needsVerification: true, file }
       })
       io.log(result)
