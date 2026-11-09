@@ -4,6 +4,7 @@ from roami_agent.dispatch.publication_manifest import PublicationManifest
 from roami_agent.dispatch.publication_review import PublicationReview
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.publication.releases import PublicationReleases
 from roami_agent.storage.publication_reviews import current_version
 from roami_agent.storage.publication_versions import create_item, freeze_version
 
@@ -70,6 +71,11 @@ def register_publication_tools(registry, database, artifacts, reviewer):
             raise DomainError("PUBLICATION_PROJECT_SCOPE_CONFLICT", 403)
         return await PublicationReview(database, artifacts, reviewer()).decide(
             binding, args["versionId"], args["decision"], args["feedback"]
+        )
+
+    async def release(args, binding):
+        return await PublicationReleases(database, artifacts, reviewer()).prepare(
+            binding, args, args["versionId"], args["reviewId"], args["channel"], args["accountId"]
         )
 
     string = {"type": "string", "minLength": 1}
@@ -152,6 +158,38 @@ def register_publication_tools(registry, database, artifacts, reviewer):
                 ["swarmId", "versionId", "decision", "feedback"],
             ),
             review,
+            main=True,
+            effect="write",
+        )
+    )
+    registry.add(
+        Tool(
+            "swarm_publication_release",
+            "Create an immutable handoff of an independently approved frozen version to its original member. Rechecks the current user goal, automatic-mode proof, account and retained assets. Does not send, grant resource access or prove publication. The original worker still needs current host admission and a durable single-submit intent.",
+            object_schema(
+                {
+                    **{
+                        key: string
+                        for key in ("projectId", "swarmId", "delegationId", "memberId", "taskId")
+                    },
+                    "versionId": string,
+                    "reviewId": string,
+                    "channel": {"type": "string", "enum": ["x", "bilibili"]},
+                    "accountId": {"type": "string", "pattern": "^[1-9][0-9]{0,29}$"},
+                },
+                [
+                    "projectId",
+                    "swarmId",
+                    "delegationId",
+                    "memberId",
+                    "taskId",
+                    "versionId",
+                    "reviewId",
+                    "channel",
+                    "accountId",
+                ],
+            ),
+            release,
             main=True,
             effect="write",
         )
