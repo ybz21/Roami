@@ -7,6 +7,16 @@ description: 初始化本项目的 SQLite 发布登记，供 Connector 发现已
 
 只登记 Main 已独立审核的实际公开稿件。发布者的自述、发送按钮点击和上传成功都不能代替公开证据。此库是项目采集目录，不是宿主已确认的 OKR 数据库；写入后仍须取数、Main record 与真实看板验收。
 
+## 审核与执行分工
+
+Main 负责独立核对公开事实、实际账号和真实审核回执，再通过受管 task_steer 续派原有、已获准执行项目脚本的数据成员；“Main 负责登记”不表示协调 Main 可以运行任意 shell。交接给出下述全部登记字段、原始证据位置与 SHA，以及本轮范围；不得让成员编造 mainReviewReceipt、将内容审核当作公开确认或自审未核验稿件。
+
+原成员在同一轮先创建登记 JSON，执行 register-publication 并回读同账号集合，确认新对象确已包含后再运行原 Connector 的 fetch/prepare。结果未知先核对原业务键；回读缺项或冲突时报告具体阻塞，不换键、重发稿件或悄悄只采旧集合。候选交 Main 独立核验，随后 record 并回读看板。没有具备相应权限的原成员时如实说明缺项，不创建替身绕过权限。
+
+publication prepare/media/review/release 管理冻结版本、审核和发布资格，不会自动写本项目 collection.sqlite3，不能替代这里的稿件登记。模板、交接消息与登记成功也不等于平台公开或看板已更新。
+
+## 初始化与登记
+
 脚本只使用 Python 标准库。复制完整模板后，以项目真实根目录和 ID 初始化，不使用示例 ID：
 
 ```bash
@@ -15,7 +25,7 @@ python3 .roami/okr/skills/collection-store/scripts/collection_store.py --project
 
 初始化创建 `.roami/okr/data/collection.sqlite3`，自动建立 metadata 与 publications 表。不要复制其他项目的数据库；不要把生成的数据库提交进通用模板。重复初始化保留记录，其他项目 ID 会被拒绝。
 
-Main 审核公开事实后，将以下字段写成 UTF-8 JSON：businessKey、platform、accountId、objectId、url、publishedAt、mainReviewReceipt、evidenceSha256。全部为非空字符串；时间使用带时区的 ISO 时间；摘要是实际原始证据文件的 SHA-256，回执来自真实 Main 验收。不得编造回执以通过校验。脚本验证存储结构，不能证明平台公开状态或回执真实性，Connector 和 Main 仍须独立核验。
+执行成员按 Main 已核验的输入将以下字段写成 UTF-8 JSON：businessKey、platform、accountId、objectId、url、publishedAt、mainReviewReceipt、evidenceSha256。全部为非空字符串；时间使用带时区的 ISO 时间；摘要是实际原始证据文件的 SHA-256，回执来自真实 Main 验收。不得编造回执以通过校验。脚本验证存储结构，不能证明平台公开状态或回执真实性，Connector 和 Main 仍须独立核验。
 
 ```bash
 python3 .roami/okr/skills/collection-store/scripts/collection_store.py --project "$PROJECT_ROOT" --project-id "$PROJECT_ID" register-publication --file "$REVIEWED_PUBLICATION_JSON"
