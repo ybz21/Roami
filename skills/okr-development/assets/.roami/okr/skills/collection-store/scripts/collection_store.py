@@ -5,8 +5,9 @@ import argparse
 import hashlib
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 def encoded(value):
@@ -58,8 +59,12 @@ def initialize(connection, project_id):
     connection.execute(
         "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
     )
-    connection.execute("INSERT OR IGNORE INTO metadata VALUES ('projectId', ?)", (project_id,))
-    stored = connection.execute("SELECT value FROM metadata WHERE key='projectId'").fetchone()[0]
+    connection.execute(
+        "INSERT OR IGNORE INTO metadata VALUES ('projectId', ?)", (project_id,)
+    )
+    stored = connection.execute(
+        "SELECT value FROM metadata WHERE key='projectId'"
+    ).fetchone()[0]
     if stored != project_id:
         raise ValueError("Database belongs to another project")
     connection.execute("""CREATE TABLE IF NOT EXISTS publications (
@@ -68,9 +73,9 @@ def initialize(connection, project_id):
         content TEXT NOT NULL, sha256 TEXT NOT NULL,
         UNIQUE(platform, account_id, object_id))""")
     connection.execute("INSERT OR IGNORE INTO metadata VALUES ('schemaVersion', '1')")
-    version = connection.execute("SELECT value FROM metadata WHERE key='schemaVersion'").fetchone()[
-        0
-    ]
+    version = connection.execute(
+        "SELECT value FROM metadata WHERE key='schemaVersion'"
+    ).fetchone()[0]
     if version != "1":
         raise ValueError("Unsupported collection schema")
     connection.execute("""CREATE TABLE IF NOT EXISTS publication_versions (
@@ -90,7 +95,10 @@ def register(connection, value, expected_sha256=None):
         return {"changed": False, "sha256": sha}
     if previous:
         old = json.loads(previous[0])
-        if any(old[field] != value[field] for field in ("platform", "accountId", "objectId")):
+        if any(
+            old[field] != value[field]
+            for field in ("platform", "accountId", "objectId")
+        ):
             raise ValueError("Publication identity is immutable")
         if expected_sha256 != previous[1]:
             raise ValueError("Publication changed; reread and provide expected SHA-256")
@@ -123,6 +131,42 @@ def register(connection, value, expected_sha256=None):
     return {"changed": True, "sha256": sha}
 
 
+def publications_on(rows, published_on, timezone_name):
+    try:
+        day = date.fromisoformat(published_on)
+        zone = ZoneInfo(timezone_name)
+    except (ValueError, TypeError, ZoneInfoNotFoundError):
+        raise ValueError("Use YYYY-MM-DD and a valid IANA timezone") from None
+    if day.isoformat() != published_on:
+        raise ValueError("Use YYYY-MM-DD")
+    selected, identities = [], {}
+    for item in rows:
+        value = item["publication"]
+        validate_publication(value)
+        if digest(value) != item["sha256"]:
+            raise ValueError("Publication source digest does not match")
+        identity = (value["platform"], value["accountId"], value["objectId"])
+        instant = datetime.fromisoformat(value["publishedAt"])
+        if identity in identities and identities[identity] != instant:
+            raise ValueError("Conflicting platform publication timestamps")
+        identities[identity] = instant
+        if instant.astimezone(zone).date() == day:
+            selected.append(item)
+    return {
+        "publications": selected,
+        "coverageSha256": digest(selected),
+        "publishedOn": published_on,
+        "timezone": timezone_name,
+        "registeredCount": len(rows),
+        "publishedCount": sum(
+            instant.astimezone(zone).date() == day for instant in identities.values()
+        ),
+        "candidateOnly": True,
+        "scope": "registered-project-publications",
+        "accountDailyCountKnown": False,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, required=True)
@@ -135,9 +179,15 @@ def main():
     listing = sub.add_parser("list-publications")
     listing.add_argument("--platform", required=True)
     listing.add_argument("--account-id", required=True)
+    listing.add_argument("--published-on")
+    listing.add_argument("--timezone")
     history = sub.add_parser("publication-history")
     history.add_argument("--business-key", required=True)
     args = parser.parse_args()
+    if args.operation == "list-publications" and bool(args.published_on) != bool(
+        args.timezone
+    ):
+        parser.error("--published-on and --timezone must be supplied together")
     if not args.project_id.strip() or "{{" in args.project_id:
         parser.error("Use the real project ID")
     try:
@@ -157,10 +207,15 @@ def main():
                 ).fetchall()
                 result = {
                     "publications": [
-                        {"publication": json.loads(row[0]), "sha256": row[1]} for row in rows
+                        {"publication": json.loads(row[0]), "sha256": row[1]}
+                        for row in rows
                     ]
                 }
                 result["coverageSha256"] = digest(result["publications"])
+                if args.published_on is not None:
+                    result = publications_on(
+                        result["publications"], args.published_on, args.timezone
+                    )
             elif args.operation == "publication-history":
                 rows = connection.execute(
                     "SELECT version, content, sha256 FROM publication_versions WHERE business_key=? ORDER BY version",
@@ -168,7 +223,11 @@ def main():
                 ).fetchall()
                 result = {
                     "versions": [
-                        {"version": row[0], "publication": json.loads(row[1]), "sha256": row[2]}
+                        {
+                            "version": row[0],
+                            "publication": json.loads(row[1]),
+                            "sha256": row[2],
+                        }
                         for row in rows
                     ]
                 }

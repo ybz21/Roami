@@ -260,3 +260,5 @@
 - [团队记忆容量与历史归档](team-memory-capacity.md)：长期运行中的容量错误、CAS 摘要恢复及原文保留。
 
 - [长项目上下文与证据分页](artifact-pagination.md)：长行恢复、UTF-8 边界与完整读取证明。
+
+- [日发布量与登记集合](publication-date-counts.md)：按平台时间和项目时区筛选，区分累计覆盖与日发布数。

@@ -29,3 +29,15 @@ python3 .roami/okr/skills/collection-store/scripts/collection_store.py --project
 Connector 按确认账号过滤，逐项调用公开来源验证对象身份。保留返回的 coverageSha256 及完整覆盖集合；登记数据不是采集结果。聚合口径必须叫本项目已核验稿件集合，不是全账号。缺失值保持未知，不能以零代替。脚本目前只提供发布登记；候选批次与指标仍按已有 Connector batch 协议生成和确认，没有新增任意 SQL 入口。
 
 扩展表结构时先在项目 Skill 中设计字段、唯一键、迁移和回滚，增加显式操作与参数化 SQL，保持 schemaVersion 兼容检查。不要让模型直接对宿主 project-okr.db、模型账目库或确认导出执行 SQL。数据库不存登录态、令牌或视频文件。
+
+## 日发布量
+
+按项目时区和平台实际 `publishedAt` 统计，不能把登记集合覆盖数、采样日期或素材目录日期当作今天发布量。使用配对参数：
+
+```bash
+python3 .roami/okr/skills/collection-store/scripts/collection_store.py --project "$PROJECT_ROOT" --project-id "$PROJECT_ID" list-publications --platform bilibili --account-id "$CONFIRMED_UID" --published-on "$PROJECT_DATE" --timezone "$PROJECT_TIMEZONE"
+```
+
+`registeredCount` 是账号集合覆盖数，`publishedCount` 是该时区该自然日的去重对象数；每条 `publishedAt`、来源证据摘要和筛选集合摘要保持可查。默认不加日期参数仍返回原全部集合，Connector 口径不变。未知、无时区、摘要不符或冲突时间须先核对来源，不能改成0。查询结果仍是候选，不自动发布确认观测，也不授予新发布权限。只登记了 B站时不能声称自动覆盖 X；其他渠道需要其真实公开回执和已审核登记。
+
+`scope=registered-project-publications` 明确只统计本项目已登记集合，`accountDailyCountKnown=false` 表示它不能证明全账号当天总量。空集合中的0不证明账号未发布；尚未登记的渠道须先核对其真实回执，不能据此重新发布。
