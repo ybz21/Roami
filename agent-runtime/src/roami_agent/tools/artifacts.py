@@ -1,5 +1,7 @@
 """Owner-scoped, bounded text evidence retrieval for Workers."""
 
+import base64
+
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.storage.database import row
@@ -40,16 +42,37 @@ def register_artifact_tools(registry, artifacts):
                 "textAvailable": page["encoding"] == "utf-8",
                 "text": page["data"],
                 **{key: value for key, value in page.items() if key != "data"},
+                "paginationUnit": "lines",
+                "hasMore": page["truncated"] or page["nextOffset"] is not None,
+                "nextRead": {"offset": 0, "limit": 16000}
+                if page["truncated"]
+                else {"offset": page["nextOffset"], "limit": args.get("limit", 2000)}
+                if page["nextOffset"] is not None
+                else None,
             }
         offset, limit = args.get("offset", 0), args.get("limit", 8000)
         reference, excerpt = await artifacts.read_page(owner, aid, offset, limit)
         size = reference["sizeBytes"]
+        try:
+            text, encoding = excerpt.decode("utf-8"), "utf-8"
+        except UnicodeDecodeError as exc:
+            if exc.reason == "unexpected end of data" and exc.end == len(excerpt):
+                if exc.start == 0:
+                    raise DomainError("ARTIFACT_TEXT_LIMIT_TOO_SMALL", 400) from None
+                excerpt = excerpt[: exc.start]
+                text, encoding = excerpt.decode("utf-8"), "utf-8"
+            else:
+                text, encoding = base64.b64encode(excerpt).decode(), "base64"
+        following = min(size, offset + len(excerpt))
         return {
             "artifact": reference,
-            "textAvailable": True,
-            "text": excerpt.decode("utf-8", errors="replace"),
+            "textAvailable": encoding == "utf-8",
+            "text": text,
+            "encoding": encoding,
+            "paginationUnit": "bytes",
+            "nextRead": {"offset": following, "limit": 16000} if following < size else None,
             "offset": offset,
-            "nextOffset": min(size, offset + len(excerpt)),
+            "nextOffset": following,
             "hasMore": offset + len(excerpt) < size,
         }
 

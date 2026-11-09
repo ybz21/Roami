@@ -256,3 +256,7 @@
 
 - [日期槽与真实复盘](daily-review-workflow.md)：读取已声明阶段流程，区分群聊回告与复盘、记忆回执。
 - [验收后的持续接续](coordination-follow-through.md) 与 [机制原型](coordination-follow-through.html)：验收后必须留下真实下一步、等待或具体阻塞（#826，设计候选）。
+
+- [团队记忆容量与历史归档](team-memory-capacity.md)：长期运行中的容量错误、CAS 摘要恢复及原文保留。
+
+- [长项目上下文与证据分页](artifact-pagination.md)：长行恢复、UTF-8 边界与完整读取证明。

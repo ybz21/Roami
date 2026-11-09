@@ -45,7 +45,7 @@ func editedMemory(current []byte, edits []MemoryEdit) ([]byte, error) {
 		resultSize += len(edit.NewText) - len(edit.OldText)
 	}
 	if resultSize > maxMemory {
-		return nil, ErrInvalid
+		return nil, memoryCapacity(len(current), resultSize)
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].start < changes[j].start })
 	for i := 1; i < len(changes); i++ {

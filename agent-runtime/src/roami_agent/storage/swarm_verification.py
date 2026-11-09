@@ -1,9 +1,7 @@
 """Main review of current Swarm artifacts through the existing task confirmation gate."""
 
-import hashlib
-import json
-
 from roami_agent.protocol.errors import DomainError
+from roami_agent.storage.artifact_text_coverage import text_coverage
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.swarm_evidence import evidence, requirements
@@ -67,7 +65,7 @@ def fully_read(db, item, binding):
         raise DomainError("ARTIFACT_SOURCE_UNAVAILABLE", 409)
     receipts = rows(
         db,
-        "SELECT m.content_json FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
+        "SELECT x.id AS call_id,m.id AS result_id,m.content_json FROM tool_calls x JOIN messages m ON m.id=x.result_message_id "
         "JOIN messages current ON current.id=? WHERE x.turn_id=? AND x.tool_name='artifact_read' "
         "AND json_extract(x.arguments_json,'$.id')=? AND x.state='succeeded' "
         "AND x.assistant_message_id!=current.id AND m.seq<current.seq "
@@ -81,57 +79,13 @@ def fully_read(db, item, binding):
             binding["conversation"],
         ),
     )
-    pages = {}
-    for receipt in receipts:
-        try:
-            value = json.loads(json.loads(receipt["content_json"])["text"])
-        except (ValueError, KeyError, TypeError):
-            continue
-        reference = value.get("artifact") if isinstance(value, dict) else None
-        if (
-            not isinstance(reference, dict)
-            or reference.get("sha256") != item["sha256"]
-            or value.get("textAvailable") is not True
-            or not isinstance(value.get("text"), str)
-        ):
-            continue
-        text = value["text"]
-        try:
-            body = text.encode()
-        except UnicodeError:
-            continue
-        complete = (
-            type(value["offsetLines"]) is int
-            and value["offsetLines"] == 1
-            and value.get("nextOffset") is None
-            if "offsetLines" in value
-            else value.get("offset") == 0 and value.get("nextOffset") == item["sizeBytes"]
+    return (
+        text_coverage(
+            receipts,
+            {"id": item["id"], "sha256": item["sha256"], "size_bytes": item["sizeBytes"]},
         )
-        if (
-            complete
-            and not value.get("hasMore")
-            and not value.get("truncated")
-            and hashlib.sha256(body).hexdigest() == item["sha256"]
-        ):
-            return True
-        offset, following = value.get("offsetLines"), value.get("nextOffset")
-        if (
-            type(offset) is int
-            and offset > 0
-            and not value.get("truncated")
-            and (following is None or type(following) is int and following > offset)
-            and (offset not in pages or len(body) > len(pages[offset][0]))
-        ):
-            pages[offset] = (body, following)
-    offset, visited, digest = 1, set(), hashlib.sha256()
-    while offset in pages and offset not in visited:
-        visited.add(offset)
-        body, following = pages[offset]
-        digest.update(body)
-        if following is None:
-            return digest.hexdigest() == item["sha256"]
-        offset = following
-    return False
+        is not None
+    )
 
 
 async def verify(swarms, confirm, artifacts, args, binding):

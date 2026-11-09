@@ -326,7 +326,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_memory_write",
-            "Main updates shared team knowledge using the last read expectedSha256. Preserve source provenance, decisions and unresolved claims; do not call claims verified without evidence. Project swarms write the canonical .roami/okr/memory/team.md through the registered project service. Write real knowledge only; never probe a live write with placeholder or test content. Read help/schema instead. Never store secrets.",
+            "Main updates shared team knowledge using the last read expectedSha256. Preserve source provenance, decisions and unresolved claims; do not call claims verified without evidence. Project swarms write the canonical .roami/okr/memory/team.md through the registered project service. Write real knowledge only; never probe a live write with placeholder or test content. Read help/schema instead. Never store secrets. OKR_MEMORY_CAPACITY means the 65536-byte project summary is full: reread it and condense older execution details through swarm_memory_edit before appending; preserve active rules, unresolved claims, source links and the host-retained memory/history/<sha256>.md original.",
             object_schema(
                 {
                     "swarmId": string,

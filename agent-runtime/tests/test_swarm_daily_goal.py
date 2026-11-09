@@ -45,6 +45,10 @@ async def test_daily_guidance_names_only_tools_in_the_real_batch_catalog(delegat
     ]
     assert len(coordination) == 1
     instructions = coordination[0].split("Trusted batch metadata and quoted source data:", 1)[0]
+    for phase in ("kickoff", "review"):
+        assert f".roami/okr/skills/daily-operations/prompts/{phase}.md" in instructions
+    assert "directory containing SKILL.md" in instructions
+    assert "a phase prompt does not replace the Skill body" in instructions
     named = {
         name
         for name in runtime.tools.registry

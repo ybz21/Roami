@@ -14,6 +14,8 @@
 
 ## 调度与验收
 
+项目 Skill 按 `agents/main.json` 声明的项目文件路径读取；`skill://` 只用于当前全局目录实际注册的名称。先读 Skill 正文，再读阶段提示。包内相对路径以 `SKILL.md` 所在目录为基准，例如 `.roami/okr/skills/daily-operations/prompts/review.md`，不能拼成 `.roami/okr/prompts/review.md`。读取失败时核对声明路径，不另建日程或实例。
+
 按[daily.md](daily.md)配置明确时间/时区和项目范围日程，只唤醒原Main。完成回调、普通群聊和日槽是不同输入，需要分别核验实际关联的Main turn、当前轮次、原实例和处理回执；不拿人的“继续”伪装自动调度。
 
 至少两轮真实闭环后再称自动运行：当前版本审核、实际平台回执、Connector确认、看板变化和下一轮任务均有证据。设计HTML、禁用计划、投递成功或一次手动采集不替代它。平台凭证不写进项目文件、记忆或交付。

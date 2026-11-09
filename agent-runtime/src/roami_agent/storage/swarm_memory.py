@@ -94,6 +94,8 @@ def from_project(workspace):
         "content": content,
         "sha256": sha,
         "source": ".roami/okr/memory/team.md",
+        "sizeBytes": len(content.encode()),
+        "limitBytes": 65536,
         "available": True,
     }
     if files.get("operationReceiptsSupported") is True:

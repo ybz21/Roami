@@ -975,7 +975,7 @@ func (s *Store) updateMemory(projectID, content, expectedSha256 string, appendCo
 			content = string(b)
 		}
 		if len(content) > maxMemory {
-			err = ErrInvalid
+			err = memoryCapacity(len(b), len(content))
 		} else if !bytes.Equal(b, []byte(content)) {
 			// Retain the exact prior bytes before replacing the current memory.
 			err = atomicFile(root, "memory/history/"+hashText(b)+".md", b)
