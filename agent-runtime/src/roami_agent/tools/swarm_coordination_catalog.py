@@ -12,6 +12,7 @@ SWARM_READS = {
     "swarm_connector_batch",
 }
 SWARM_WRITES = {
+    "swarm_goal_wait",
     "swarm_goal_checkpoint",
     "swarm_post",
     "swarm_memory_write",

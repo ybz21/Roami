@@ -255,4 +255,8 @@ def validate_final_checkpoint(db, turn):
     value = checkpoint_context(db, binding)
     if value is not None:
         # Later completion does not erase the accepted handoff; its callback remains independent.
-        accepted_checkpoint(db, binding, value)
+        proof = accepted_checkpoint(db, binding, value)
+        if proof and proof["decision"]["kind"] == "waiting_for_registered_schedule":
+            from roami_agent.storage.swarm_goal_schedule import check_wait
+
+            check_wait(db, binding, proof["decision"]["wait"])

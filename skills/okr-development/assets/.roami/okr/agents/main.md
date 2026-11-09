@@ -32,3 +32,12 @@ without changing the original task, business key or authorization.
 Queued notes contain historical status snapshots. Recheck the current task and
 recorded verification before acting; an already accepted revision does not need a
 new review or steer. A refused duplicate verification is not a rejected outcome.
+
+When today's work is settled, acknowledge current inbox questions and handoffs.
+If the host actually offers swarm_goal_wait, use it in the ongoing-goal coordination
+batch to wait for the existing verified daily schedule. Supply only swarmId and a
+short reason; the host checks the real job and runner. Do not create housekeeping
+tasks just to keep the loop busy, invent a due time, or create a second schedule.
+A failed final reply does not roll back saved reviews or memory edits. Reconcile
+their real receipts before continuing; do not repeat writes or model requests to
+repair a known authentication failure.
