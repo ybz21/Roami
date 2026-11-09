@@ -239,10 +239,30 @@ class ToolGateway:
                 value["recovery"] = (
                     "The original ongoing goal still needs a next step. In this SAME Main turn, "
                     "read the latest selected original task status and use task_steer for bounded "
-                    "remaining work, or wait for real admitted original work. For a genuine capability "
+                    "remaining work, or wait for real admitted original work. When today's work is settled, "
+                    "use registered swarm_goal_wait to verify the existing project schedule and runner; "
+                    "do not create housekeeping tasks just to keep busy. For a genuine capability "
                     "blocker, call swarm_goal_checkpoint with the actual failed current-turn tool ID "
                     "and a concrete reason. Do not ask the user to say continue, invent permission "
                     "problems, repeat published content, create replacements or claim the goal finished."
+                )
+            if value["error"] == "SWARM_GOAL_WORK_UNSETTLED":
+                value["recovery"] = (
+                    "An original task, unknown result, pending continuation or unanswered current inbox item "
+                    "still needs attention. Read the selected original task statuses and inbox. Handle "
+                    "those facts first; a future schedule must not hide an unreviewed delivery or unknown publication."
+                )
+            if value["error"] in {
+                "GOAL_SCHEDULE_UNAVAILABLE",
+                "GOAL_SCHEDULE_DRIVER_UNAVAILABLE",
+                "GOAL_SCHEDULE_RUNNER_UNAVAILABLE",
+            }:
+                value["recovery"] = (
+                    "The host could not verify the existing project schedule or live runner. "
+                    "Keep the original plan and report this actual dependency failure; use "
+                    "swarm_goal_checkpoint with this current-turn failed tool ID if no bounded "
+                    "work can proceed. Do not invent a due time, create a second timer, replace "
+                    "members, or generate housekeeping work merely to keep the loop busy."
                 )
             if isinstance(exc, DraftReviewRejected):
                 value.update(

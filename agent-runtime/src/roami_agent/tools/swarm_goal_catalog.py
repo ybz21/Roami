@@ -11,8 +11,29 @@ from roami_agent.storage.swarm_repository import group
 from roami_agent.storage.swarm_scopes import require_scope
 
 
-def register_swarm_goal_tools(registry, database, wakeup):
+def register_swarm_goal_tools(registry, database, wakeup, *, schedule=None):
     goals = SwarmDelegations(database)
+    if schedule is not None:
+        registry.add(
+            Tool(
+                "swarm_goal_wait",
+                "Wait for this original Main goal's existing daily schedule in the current coordination batch. "
+                "All selected original tasks must be settled and current inbox questions/handoffs answered. "
+                "The host reads the bound project plan, real cron job, exact wakeup identity and live runner. "
+                "Supply only the current swarmId and a short reason; do not invent a time, job, path or receipt. "
+                "This records waiting only: no new schedule, task, instance, posting permission or completed goal.",
+                object_schema(
+                    {
+                        "swarmId": {"type": "string", "minLength": 1},
+                        "reason": {"type": "string", "minLength": 1, "maxLength": 1200},
+                    },
+                    ["swarmId", "reason"],
+                ),
+                schedule.wait,
+                main=True,
+                effect="write",
+            )
+        )
 
     async def status(args, binding):
         def read(db):

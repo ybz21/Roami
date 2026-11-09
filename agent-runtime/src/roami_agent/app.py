@@ -32,6 +32,7 @@ from roami_agent.dispatch.routing import TaskRouter
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.swarm_goal_continuation import GoalContinuation
+from roami_agent.dispatch.swarm_goal_schedule import GoalSchedule
 from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.dispatch.tasks import Tasks
@@ -39,6 +40,7 @@ from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
 from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
+from roami_agent.executors.project_goal_schedule import ProjectGoalSchedule
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.improvement.domain.policy import BOUNDS
@@ -207,6 +209,9 @@ class Runtime:
             database, self.settings, artifacts=self.artifacts
         )
         targets = TargetDirectory(self.settings, self.session_dispatches)
+        goal_schedule = GoalSchedule(
+            database, ProjectGoalSchedule(self.settings, targets, self.files, self.tools)
+        )
         coordination = SwarmCoordinationPolicy(database, targets)
         self.tools.admission = ProjectFileScope(database, targets, coordination).admit
         self.tools.turn_scope = coordination.tool_names
@@ -221,7 +226,10 @@ class Runtime:
             TaskRouter(database, targets, self.settings, self.memory),
             reply_reviewer=self.reply_review,
             goal_continuation=GoalContinuation(
-                database, lambda: self.reply_review, self.settings.memory_timezone
+                database,
+                lambda: self.reply_review,
+                self.settings.memory_timezone,
+                schedule=goal_schedule,
             ),
         )
         register_reminder_tools(
@@ -262,7 +270,7 @@ class Runtime:
             artifacts=self.artifacts,
         )
         register_project_okr_tools(self.tools, database, self.settings)
-        register_swarm_goal_tools(self.tools, database, self.wakeup)
+        register_swarm_goal_tools(self.tools, database, self.wakeup, schedule=goal_schedule)
         register_publication_tools(self.tools, database, self.artifacts, lambda: self.reply_review)
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)

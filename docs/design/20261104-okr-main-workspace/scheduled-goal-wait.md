@@ -2,7 +2,7 @@
 
 关联 #841、#826。[可交互机制原型](scheduled-goal-wait.html)。
 
-设计草案，尚未实现或部署。不改变现有发布窗口，不触手机或账号页，不创建新团队。原项目每天09:00的既有插件日程保持。
+设计与本地实现候选，尚未部署。不改变现有发布窗口，不触手机或账号页，不创建新团队。原项目每天09:00的既有插件日程保持。
 
 ## Product Design
 
@@ -45,3 +45,15 @@
 ## 原型验证（2026-11-09）
 
 使用独立 QA Chrome 页实际点击，六种场景及重复模拟到期均通过；JavaScript解析通过。原型不连接生产、不创建计划或任务，也不证明实际到期唤醒。验证记录 `/tmp/okr-scheduled-wait-design-20261109/prototype-checks.json`。
+
+## 本地实现候选
+
+`executors/project_goal_schedule.py` 只读原项目日程、限定归属的 cron:list 和当前注册项目；固定模板唤醒脚本与 builtin Skill 摘要相符，显式绝对 PATH 必须解析到节点既有 roami，字面命令由 shlex.join 构造。项目/Main/Swarm/goal、时区和日槽逐项匹配，下一次时间必须是真实未来日槽。
+
+`executors/systemd_cron_runner.py` 通过 busctl 的类型化 systemd D-Bus 属性核验活动的每分钟 timer、它的实际 service 和有效 ExecStart；不解析 systemctl 人读日志，不启动/启用服务，拒绝全局 tick 或其他 job。当前支持既有 Linux 单日槽 exec；其他运行器保持明确不可用，不自动迁移计划。
+
+`dispatch/swarm_goal_schedule.py` 与 `storage/swarm_goal_schedule.py` 只保存显式等待：当前原任务均成功、无未知结果/待续派，当前问题与交接均已答复。等待绑定原批次/目标版本/来源摘要/lease和原任务身份。现场探测后、最终回复前及最终完成事务再次核验；变更、过期、撤销、暂停与遗忘都不能复用旧决定。重试保留原账本身份，不产生新 job、任务或实例。
+
+Main 注册目录新增 `swarm_goal_wait`，Foundation 为 `roami swarm goal wait --input JSON`，只接收 swarmId/reason。原接续门禁允许已核验排期等待，继续保留真实执行与具体阻塞路径；用户输入不能提供时间、路径、job或证明。
+
+已完成107项隔离回归（含目录/协调/接续及完整Skill包），另通过真实节点只读探测原09:00计划、原唤醒脚本与实际systemd runner；证据 `/tmp/okr-scheduled-wait-design-20261109/{final-targeted-tests.log,actual-node-readonly-proof.json}`。这些结果不代表生产工具已注册、Main已选择等待或未来日槽已执行；完整门禁与线上验收仍待完成。
