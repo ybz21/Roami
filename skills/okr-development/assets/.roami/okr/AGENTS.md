@@ -152,6 +152,10 @@ Main 负责把这些步骤落实到确认回执和实际结果，不能只转发
 - 普通用户 Main 回合可按当前目录使用 project_okr_context/project_okr_update/project_okr_memory_append；这些普通项目写入口在协调批次不开放。缺少通用 file_write 不代表没有上述记忆或复盘入口。
 - 协调 Main 不运行任意 shell；文件、任务和留存产物用已登记的读取工具。原生 Codex/Claude 成员按本轮授权使用其真实 CLI/Skill，两者的目录不能互相代替。读文件、讨论投递与实际写回/验收分别留证。
 
+### 交付文件
+
+向用户交付文件时遵守项目根 [AGENTS.md](../../AGENTS.md) 的“交付文件的可访问链接”；展示链接与工具输入路径分开，远端产物保留原节点身份。
+
 ### 项目 SQLite 发布登记
 
 结构化采集明细使用 [dashboard-storage Skill](skills/dashboard-storage/SKILL.md) 的空库初始化、业务 schema 建表、事务写入、只读查询/导出与一致性备份。源行按项目、来源、账号、日期与不可变版本保存，候选经 Main 核验和宿主确认后才进入看板；完整步骤见 [取数手册](manuals/data.md)。
