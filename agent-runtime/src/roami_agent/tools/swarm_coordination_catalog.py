@@ -19,6 +19,7 @@ SWARM_WRITES = {
     "swarm_project_update",
     "swarm_verify",
     "swarm_publication_prepare",
+    "swarm_publication_media",
     "swarm_publication_review",
     "swarm_publication_release",
 }

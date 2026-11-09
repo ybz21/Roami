@@ -262,3 +262,5 @@
 - [长项目上下文与证据分页](artifact-pagination.md)：长行恢复、UTF-8 边界与完整读取证明。
 
 - [日发布量与登记集合](publication-date-counts.md)：按平台时间和项目时区筛选，区分累计覆盖与日发布数。
+
+- [冻结音视频的关联审核](publication-media-review.md) 与 [机制原型](publication-media-review.html)：宿主生成画面与音轨资料，绑定 Main 的真实模型输入；实现前设计。

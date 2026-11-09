@@ -3,10 +3,15 @@
 import json
 
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.publication_media_reads import media_tool_artifact
 from roami_agent.tools.swarm_coordination_catalog import COORDINATION_OPERATIONS
 
 
 def current_tool_artifact(db, value, artifact_id):
+    if media_tool_artifact(
+        db, value["owner_id"], value["conversation_id"], value["turn_id"], artifact_id
+    ):
+        return True
     artifact = row(
         db,
         "SELECT a.* FROM artifacts a JOIN messages m ON m.id=a.message_id "

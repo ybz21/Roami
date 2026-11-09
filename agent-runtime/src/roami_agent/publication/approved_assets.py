@@ -6,6 +6,7 @@ import json
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
+from roami_agent.storage.publication_media_sources import retained_review_media
 from roami_agent.storage.swarm_delegations import current_delegation, visible_source
 
 
@@ -77,6 +78,7 @@ def approved_assets(db, owner, scope, version_id, review_id, channel, account):
         )
         if not available:
             raise DomainError("PUBLICATION_ARTIFACT_UNAVAILABLE", 409)
+    media = retained_review_media(db, owner, version_id, manifest, json.loads(review["proof_json"]))
     return {
         "itemId": version["item_id"],
         "businessKey": version["business_key"],
@@ -85,4 +87,5 @@ def approved_assets(db, owner, scope, version_id, review_id, channel, account):
         "manifestSha256": version["manifest_sha256"],
         "manifest": manifest,
         "publicationAuthorized": False,
+        **({"reviewMediaArtifacts": media} if media else {}),
     }
