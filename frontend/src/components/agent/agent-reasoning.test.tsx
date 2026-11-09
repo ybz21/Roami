@@ -4,6 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import AgentComposerPlus from './AgentComposerPlus'
 import { useAgentModels } from './useAgentModels'
 import { api } from '../../api'
+import { clearAgentDataCache } from './agent-data-cache'
+import { MODEL_CATALOG_CHANGED } from '../capabilities/model-hub-api'
 
 const layout = vi.hoisted(() => ({ phone: false }))
 vi.mock('../../layout', () => ({ useLayout: () => layout }))
@@ -11,7 +13,7 @@ vi.mock('../MobileSubPage', () => ({ default: ({ title, children, onBack, action
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('antd', async () => { const { forwardRef } = await import('react'); return { Modal: ({ open, children, title }: any) => open ? <div role="dialog">{title}{children}</div> : null, Input: forwardRef(({ prefix: _prefix, allowClear: _clear, ...props }: any, ref: any) => <input ref={ref} {...props} />), Spin: () => null } })
-afterEach(() => { cleanup(); layout.phone = false; vi.resetAllMocks() })
+afterEach(() => { cleanup(); clearAgentDataCache(); layout.phone = false; vi.resetAllMocks() })
 const role = { model: 'glm-5.3-flash', baseUrl: '', keyConfigured: true, images: false, reasoningEffort: 'low', reasoningEfforts: ['low', 'high', 'max'], reasoningSupport: 'supported' as const }
 function Composer({ onSkill }: { onSkill?: (name: string) => void }) {
   const models = useAgentModels(null)
@@ -217,4 +219,54 @@ it('hides the effort trigger for a model explicitly without reasoning support', 
   render(<Composer />)
   await waitFor(() => expect(screen.getByRole('button', { name: 'agent.models.trigger' }).textContent).toContain(role.model))
   expect(screen.queryByRole('button', { name: 'agent.reasoning.picker' })).toBeNull()
+})
+
+
+it.each([false, true])('shows and searches gateway names while saving stable model IDs (phone=%s)', async phone => {
+  layout.phone = phone
+  const current = '20345b7f-81a6-4612-8ad1-7545cfd73151', next = '38714c13-ca2f-4b57-8a83-52e3b9e7c9a6'
+  let selected = { ...role, model: current, baseUrl: 'http://127.0.0.1:19999/v1' }
+  let nextName = 'k3.1-pro-highspeed'
+  vi.mocked(api).mockImplementation(async (method, path, data) => {
+    if (path === '/agent/model-gateway/catalog') return { data: { baseUrl: 'http://127.0.0.1:19999', models: [{ id: current, name: 'k3.1-pro' }, { id: next, name: nextName }] } }
+    if (path === '/agent/models') return { data: { models: [current, next] } }
+    if (method === 'PUT') selected = { ...selected, model: data.main.model }
+    return { data: { main: selected, worker: role } }
+  })
+  render(<Composer />)
+  await screen.findByText('k3.1-pro')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  const search = await screen.findByRole('textbox', { name: 'agent.models.search' })
+  fireEvent.change(search, { target: { value: 'highspeed' } })
+  fireEvent.click(await screen.findByRole('option', { name: 'k3.1-pro-highspeed' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { main: { model: next, reasoningEffort: null } }))
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+  await screen.findByText('k3.1-pro-highspeed')
+  nextName = 'Kimi Pro Fast'
+  act(() => window.dispatchEvent(new Event(MODEL_CATALOG_CHANGED)))
+  await screen.findByText('Kimi Pro Fast')
+})
+
+it('does not use a local gateway label for a matching ID at a different provider', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-gateway/catalog') return { data: { baseUrl: 'http://127.0.0.1:19999', models: [{ id: 'same-id', name: 'local-model' }] } }
+    return { data: { main: { ...role, model: 'same-id', baseUrl: 'https://provider.example/v1' }, worker: role } }
+  })
+  render(<Composer />)
+  await screen.findByText('same-id')
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/catalog', undefined, expect.anything()))
+  expect(screen.queryByText('local-model')).toBeNull()
+})
+
+it('keeps model selection usable when the optional gateway names cannot be read', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-gateway/catalog') throw new Error('catalog unavailable')
+    if (path === '/agent/models') return { data: { models: ['provider-model'] } }
+    return { data: { main: { ...role, model: 'provider-model', baseUrl: 'https://provider.example/v1' }, worker: role } }
+  })
+  render(<Composer />)
+  await screen.findByText('provider-model')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  await screen.findByRole('option', { name: 'provider-model' })
+  expect(screen.queryByRole('alert')).toBeNull()
 })

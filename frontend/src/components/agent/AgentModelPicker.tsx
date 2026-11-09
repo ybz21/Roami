@@ -62,7 +62,8 @@ export default function AgentModelPicker({ models, disabled, node }: {
   }
   const chooseModel = (name: string) => { void choose({ model: name, effort: name === model ? effort : 'default' }) }
   const settings = () => { if (!phone) close(); location.hash = agentSettingsRoute }
-  const names = [...new Set([model, ...models.models].filter(Boolean))].filter(name => name.toLowerCase().includes(query.trim().toLowerCase()))
+  const displayName = (id: string) => models.modelNames?.[id] || id
+  const names = [...new Set([model, ...models.models].filter(Boolean))].filter(name => [name, displayName(name)].some(value => value.toLowerCase().includes(query.trim().toLowerCase())))
   const title = t(open === 'reasoning' ? 'agent.reasoning.title' : 'agent.composer.model')
   const move = (event: KeyboardEvent<HTMLElement>) => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
@@ -88,7 +89,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
     <div ref={choices} className="agent-model-picker-list" role={open === 'model' ? 'listbox' : 'menu'} aria-label={title} onKeyDown={move}>
       {open === 'model' ? <>
         {names.map(name => <button type="button" role="option" aria-selected={name === model} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
-          <span>{name}</span>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
+          <span>{displayName(name)}</span>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
         </button>)}
         {!names.length && !!query.trim() && <button type="button" role="option" aria-selected={false} disabled={models.busy || !role} onClick={() => chooseModel(query.trim())}><span>{t('agent.models.use', { name: query.trim() })}</span>{pending && <Spin size="small" />}</button>}
         {!names.length && !query.trim() && !models.loading && !models.error && <p className="agent-menu-note">{t('agent.models.manual')}</p>}
@@ -98,7 +99,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
     </div>
   </div>
   return <>
-    <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: model || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{model || t('agent.composer.model')}</span><ChevronDown size={14} /></button>
+    <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: displayName(model) || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{displayName(model) || t('agent.composer.model')}</span><ChevronDown size={14} /></button>
     {role && (role.reasoningSupport !== 'unsupported' || effort !== 'default') && <button type="button" ref={effortTrigger} className="tt-pill agent-thinking-trigger" disabled={disabled || models.busy} aria-label={t('agent.reasoning.picker', { effort: t(reasoningLabel(effort)) })} aria-haspopup="dialog" aria-expanded={open === 'reasoning'} onClick={() => show('reasoning')}><span>{t(reasoningLabel(effort))}</span></button>}
     {phone && open === 'model' ? <MobileSubPage title={title} dialogLabel={title} onBack={close} search={false} action={{ label: t('agent.models.settings'), icon: <GearIcon size={20} />, onClick: settings }}>
       <section className="agent-model-picker-page" aria-label={title}>{content}</section>
