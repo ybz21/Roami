@@ -62,7 +62,11 @@ def operation(tool):
             "Append only new verified knowledge to this batch's project team memory. Read "
             "swarm_memory_read first; pass its sha256 as expectedSha256. Supply the new paragraph only; "
             "never copy or replace the existing document. The host preserves one stable append "
-            "receipt per batch, so a new call or CAS cannot repeat it. Changed content conflicts."
+            "receipt per batch, so a new call or CAS cannot repeat it. Changed content conflicts. "
+            "OKR_MEMORY_CAPACITY means the 65536-byte current summary is full: read it again, "
+            "use swarm_memory_edit to condense older dated execution details into sourced summaries "
+            "while retaining active rules, unresolved claims and evidence links, then append. "
+            "The host retains the exact prior document in memory/history/<sha256>.md; do not delete history."
         )
     elif tool.name == "swarm_memory_edit":
         description = (

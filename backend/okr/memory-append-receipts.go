@@ -70,7 +70,7 @@ func (s *Store) AppendMemoryOnce(projectID, key, content, expectedSHA256 string)
 		}
 		result := appendedMemory(current, content)
 		if len(result) > maxMemory {
-			return nil, ErrInvalid
+			return nil, memoryCapacity(len(current), len(result))
 		}
 		op = &projectOperation{Key: key, Kind: "memory_append", RequestSHA256: digest, Intent: projectOperationIntent{Memory: &memoryAppendIntent{Content: content, PreviousSHA256: expectedSHA256, ResultSHA256: hashText(result)}}}
 		if err := s.prepareOperation(projectID, op); err != nil {

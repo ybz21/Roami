@@ -38,6 +38,11 @@ func openProjectOKR(dataDir string, projects *project.Store) *okr.Store {
 }
 
 func okrError(c *gin.Context, err error) {
+	var capacity *okr.MemoryCapacityError
+	if errors.As(err, &capacity) {
+		c.JSON(http.StatusConflict, gin.H{"error": "OKR_MEMORY_CAPACITY", "currentBytes": capacity.CurrentBytes, "requestedBytes": capacity.RequestedBytes, "limitBytes": capacity.LimitBytes})
+		return
+	}
 	status, code := http.StatusInternalServerError, "OKR_STORAGE_FAILED"
 	switch {
 	case errors.Is(err, okr.ErrInvalid):
