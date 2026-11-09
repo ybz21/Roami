@@ -28,7 +28,8 @@ function changedPaths() {
   return [
     ...paths(git('diff', '--name-only', '--no-renames', '-z', base, 'HEAD')),
     ...paths(git('diff', '--name-only', '--no-renames', '-z', 'HEAD')),
-    ...paths(git('ls-files', '--others', '--exclude-standard', '-z')),
+    // Runtime tests create bytecode outside ignored directories; it is not new source.
+    ...paths(git('ls-files', '--others', '--exclude-standard', '-z')).filter(path => !path.endsWith('.pyc') && !path.endsWith('.pyo')),
   ]
 }
 
