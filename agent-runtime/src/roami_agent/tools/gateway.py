@@ -12,6 +12,7 @@ from jsonschema import ValidationError
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.protocol.errors import (
     DomainError,
+    TaskVerificationRecorded,
     ToolCancellation,
     ToolFinalizationRequired,
     ToolPreflightError,
@@ -422,11 +423,25 @@ class ToolGateway:
                     value["recovery"] = (
                         "This registered command was rejected before execution because its arguments "
                         "do not match its usage. Use expectedCommand and its options/inputSchema. "
-                        "Ordinary scalar flags and --input JSON are supported; no arguments means an "
-                        "empty input object. The host supplies conversation and request identity. "
+                        "Ordinary scalar flags and --input JSON are supported. Pass the entire JSON "
+                        "object as ONE argument: wrap it in single quotes in command, or use argv "
+                        "with the serialized JSON in one array element. Do not pass unquoted JSON "
+                        "after --input. No arguments means an empty input object. "
+                        "The host supplies conversation and request identity. "
                         "Submit this command alone, without shell pipes, redirections or chaining. "
                         "Correct the original call; do not probe writes with test content."
                     )
+            if isinstance(exc, TaskVerificationRecorded):
+                value.update(
+                    executionStarted=False,
+                    verificationAlreadyRecorded=True,
+                    recordedVerification=exc.verification,
+                    recovery="This exact current task revision/run already has the recorded Main decision. "
+                    "This repeated request made no new decision and did not overwrite the original. "
+                    "Use recordedVerification; do not report an earlier acceptance as missing or rejected, "
+                    "repeat the review, or steer another check merely because this call was refused. "
+                    "Task verification does not approve new material or prove platform publication.",
+                )
             if value["error"] == "TASK_ALREADY_HANDED_OFF":
                 value.update(
                     executionStarted=False,

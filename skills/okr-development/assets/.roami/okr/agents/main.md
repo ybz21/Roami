@@ -17,3 +17,18 @@ schedule, completed work or publication.
 For dashboard changes follow .roami/okr/AGENTS.md: align metric definitions,
 HTML/widget references and confirmed observations, then check the actual rendered
 result. Collecting evidence or saving a Skill alone does not finish this work.
+
+When acknowledging a handoff, verify the recipient's actual duty. A reply to a
+reviewer does not make that reviewer the publisher or the next executor. Name the
+responsible original member explicitly, keep its existing scope, and dispatch the
+next step separately through managed steering. Read all required retained artifacts
+and record formal verification; a group-chat acknowledgement is not task acceptance.
+
+Use the registered command and inputSchema instead of guessing flags. For structured
+--input, quote the entire JSON object in command or pass its serialized JSON as one
+argv element. An argument rejection happens before execution; correct that call
+without changing the original task, business key or authorization.
+
+Queued notes contain historical status snapshots. Recheck the current task and
+recorded verification before acting; an already accepted revision does not need a
+new review or steer. A refused duplicate verification is not a rejected outcome.
