@@ -83,6 +83,8 @@ X 沿用原成员的 Android ADB Skill，B站沿用原成员的 Chrome Skill。�
 
 ### Main 交接入口
 
+真实后续帖子 `2119579388375425486` 暴露来源 HTML 编码差异：公开正文的 `Capabilities &gt; Agents` 对应冻结正文 `Capabilities > Agents`。核验器现在在 UTF-16 截取后仅解码来源正文一次，再展开链接；不改变冻结原文、ALT 或 URL。新增 4 项回归覆盖普通实体、字面量实体、URL 查询保留及严格拒绝，修复前 2 失败、2 通过，修复后合计 14 项通过。原四帖未重发，修复后均通过独立公开回读。与主线记忆编辑、协调和目录的组合回归 372 项通过；上述仍是候选实现证据，不代表已部署或补造宿主提交账本。
+
 候选目录注册 `swarm_publication_release`，Foundation CLI 对应 `roami swarm publication release --input JSON`，协调批次只允许当前项目、目标和所选原成员范围。参数关联 projectId/swarmId/delegationId/memberId/taskId、versionId/reviewId、channel/accountId；审核证明和实际原任务身份由宿主读取，不接受自报审核结果。该入口复用 `PublicationReleases.prepare`，返回 publicationAuthorized=false；原生成员最终动作仍需单独接线。
 
 22 项交接专项通过，其中新增 5 项经实际 Foundation CLI 调用，覆盖当前 Main 成功、跨项目/成员/任务与账号拒绝。没有因此放宽 `swarm_verify` 对通用外部动作的限制，也未向原生成员开放 Main 的管理工具。

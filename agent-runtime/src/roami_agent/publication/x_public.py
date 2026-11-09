@@ -1,6 +1,7 @@
 """Read native X posts and compare public photo pixels with frozen images."""
 
 import hashlib
+import html
 import io
 import math
 import re
@@ -69,7 +70,7 @@ class XPublic:
                 or not 0 <= start <= end <= len(body) // 2
             ):
                 raise ValueError("invalid display range")
-            observed = body[start * 2 : end * 2].decode("utf-16-le")
+            observed = html.unescape(body[start * 2 : end * 2].decode("utf-16-le"))
             for url in value["entities"].get("urls", []):
                 observed = observed.replace(url["url"], url["expanded_url"])
             media = value.get("mediaDetails", [])
