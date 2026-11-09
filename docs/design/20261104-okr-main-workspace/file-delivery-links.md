@@ -33,3 +33,14 @@ Main、群聊和成员对话沿用共享 Markdown 与文件预览。旧消息的
 证据：/tmp/okr-file-links-qa-20261109/preview-after.png、
 /tmp/okr-file-links-targeted-20261109.log、/tmp/okr-file-links-frontend-full-20261109.log。
 普通浏览器预览并非 Android 真机验收；真机与最终生产验收尚未完成，不据此关闭 issue。
+
+## 群聊快照的节点边界补充（#658）
+
+文件地址必须与同一节点的数据绑定。原 useSwarmSnapshot 只在 passive effect 清空旧状态，
+节点切换的首次提交仍能把旧群聊快照/404/错误交给新节点的子组件，旧资源可能按新节点寻址。
+新增回归用子组件 layout effect 观察真实提交，旧实现三个场景均失败；修复将 data/error/missing
+与请求 scope 一起保存，渲染时同步拒绝不匹配状态，不等待 passive cleanup。
+
+修复后79项专项通过，覆盖新节点数据正常到达、旧GET晚回和同节点失败时保留已确认数据。
+不新增轮询，不清历史，不把网络错误或未知状态改成成功。完整前端218文件/1608项与typecheck/i18n/hover/build已通过，新一轮提交/完整门禁与CI仍待完成；
+10bd06c2是前一个验收候选，不是本补充的最终提交，Android仍未验收。
