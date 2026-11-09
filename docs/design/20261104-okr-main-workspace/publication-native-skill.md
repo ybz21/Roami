@@ -35,6 +35,14 @@
 6. **独立确认。** 节点只读回查该已知对象，匹配实际账号、正文/媒体关联和冻结版本，再写 public fact。平台转码、正文末尾 LF 等允许规范化须显式验证。上传、提交、审核中和公开分别记录，不能互相替代。
 7. **完成回调。** 可信 public fact 用于这一项具体发布的受管验收，不能放开任意 external_action 或成员自审。随后仍由原 Main 受管续派原数据成员，确认 Connector 批次和真实卡片，保存复盘/记忆并接下一轮或原日槽。
 
+### 原 Codex／Claude 会话的入口
+
+原生成员的 task_attempts.native_branch_id 可以为空；现有 `tools/cli_commands.py` 要求正在运行的 Python turn/toolCallId。因此只给 Python Worker 注册工具，不能宣称原 Codex/Claude TUI 已能执行，也不能为此换成一个新的 Roami Worker。
+
+接入层应复用 Go `internal/agentexecution/session-lifecycle.go`、`internal/agentlifecycle/session-provider.go` 的原生会话/当前执行与停止证明，核验原 providerConversationId、当前 task/revision/run 及有效 launch identity，再通过内部受认证请求形成发布 binding。调用者的环境变量、显示名、任意 --task/--run 参数或本地 JSON 不能单独作为授权。当前原生工具与旧执行确实停止后，才允许推进同一成员下一轮；不重新实现一套进程清理或手改 busy。
+
+这座原生调用桥尚未实现。隔离验收必须包含 native_branch_id 为空的真实原生成员路径，以及错 provider、旧 launch/run、暂停/停止和重复命令拒绝；不能只用 Python 模型 Worker 的模拟绑定证明原 Codex 接通。
+
 ### 模块与边界
 
 运行时组装负责注册已有 journal/reconciliation 与新的原生 adapter；工具目录负责绑定当前工作者，不给 Main 任意设备 shell。平台 adapter 负责复用已有 CLI/driver 的账号与最终动作观察，不接管制作流程。公开回读继续独立且零发布写请求。项目 Skill 只教原成员如何调用真实注册入口、恢复原尝试；不把流程文字当权限凭证。
