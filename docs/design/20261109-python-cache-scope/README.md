@@ -23,5 +23,5 @@ scripts/dev/quality/python-check-plan.mjs 仅在收集 git ls-files --others 的
 
 修改前新增场景产生3项失败；修改后42项范围选择回归全部通过。
 记录 /tmp/okr-python-cache-scope-before-20261109.log 与
-/tmp/okr-python-cache-scope-fixed-20261109.log。正常 quick/full 和CI尚待完成。
+/tmp/okr-python-cache-scope-fixed-20261109.log。正常 quick/full 已通过：runtime 4763项/48跳过/6个subtest；四组Skill共248项，Go与前端检查/构建通过。CI及合入尚待完成。
 本次不缩小真实 OKR 模板资源改动的既有完整检查，不声称整体CPU或内存下降。
