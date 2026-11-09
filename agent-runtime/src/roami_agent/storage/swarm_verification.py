@@ -1,6 +1,8 @@
 """Main review of current Swarm artifacts through the existing task confirmation gate."""
 
-from roami_agent.protocol.errors import DomainError
+import json
+
+from roami_agent.protocol.errors import DomainError, TaskVerificationRecorded
 from roami_agent.storage.artifact_text_coverage import text_coverage
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
@@ -52,6 +54,40 @@ def admission(db, args, binding):
     if any(item["kind"] == "external_action" for item in required):
         raise DomainError("SWARM_EXTERNAL_ACTION_USER_REQUIRED", 409)
     if task["state"] != "waiting_user":
+        recorded = row(
+            db,
+            "SELECT id,payload_json FROM events WHERE kind='swarm.verification_recorded' "
+            "AND task_id=? AND conversation_id=? "
+            "AND json_extract(payload_json,'$.swarmId')=? "
+            "AND json_extract(payload_json,'$.taskId')=? "
+            "AND json_extract(payload_json,'$.revision')=? "
+            "AND json_extract(payload_json,'$.runId')=? "
+            "AND json_extract(payload_json,'$.reviewer')='main' "
+            "AND json_extract(payload_json,'$.mainConversationId')=conversation_id "
+            "AND json_extract(payload_json,'$.mainTurnId')=turn_id ORDER BY id DESC LIMIT 1",
+            (
+                task["id"],
+                binding["conversation"],
+                args["swarmId"],
+                task["id"],
+                task["revision"],
+                run["id"],
+            ),
+        )
+        fact = json.loads(recorded["payload_json"]) if recorded else {}
+        accepted = fact.get("accepted")
+        if type(accepted) is bool and task["state"] == ("succeeded" if accepted else "failed"):
+            raise TaskVerificationRecorded(
+                {
+                    "eventId": recorded["id"],
+                    "swarmId": args["swarmId"],
+                    "taskId": task["id"],
+                    "revision": task["revision"],
+                    "runId": run["id"],
+                    "accepted": accepted,
+                    "taskState": task["state"],
+                }
+            )
         raise DomainError("TASK_NOT_WAITING_VERIFICATION", 409)
     return task, run, required
 

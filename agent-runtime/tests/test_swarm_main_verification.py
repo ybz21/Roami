@@ -482,3 +482,61 @@ async def test_malformed_or_non_text_read_receipts_cannot_authorize_acceptance(
         write=True,
     )
     assert (await verify(runtime, turn, binding, args))["error"] == "SWARM_ARTIFACT_REVIEW_REQUIRED"
+
+
+@pytest.mark.parametrize("accepted", [True, False])
+async def test_repeated_decision_recovers_original_fact_without_overwriting(review_case, accepted):
+    runtime, turn, binding, args, artifact = review_case
+    await read(runtime, turn, binding, artifact)
+    original = {**args, "accepted": accepted, "checks": "Private original verification note"}
+    await verify(runtime, turn, binding, original)
+    before = await runtime.db.call(
+        lambda db: [
+            dict(r)
+            for r in db.execute(
+                "SELECT id,payload_json FROM events WHERE kind='swarm.verification_recorded' AND task_id=?",
+                (args["taskId"],),
+            )
+        ]
+    )
+    repeated = await verify(runtime, turn, binding, {**args, "checks": "A different request"})
+    assert repeated["error"] == "TASK_NOT_WAITING_VERIFICATION"
+    assert repeated["executionStarted"] is False and repeated["verificationAlreadyRecorded"] is True
+    assert repeated["recordedVerification"] == {
+        "eventId": before[0]["id"],
+        "swarmId": args["swarmId"],
+        "taskId": args["taskId"],
+        "revision": args["revision"],
+        "runId": args["runId"],
+        "accepted": accepted,
+        "taskState": "succeeded" if accepted else "failed",
+    }
+    assert "Private original" not in json.dumps(repeated)
+    after = await runtime.db.call(
+        lambda db: [
+            dict(r)
+            for r in db.execute(
+                "SELECT id,payload_json FROM events WHERE kind='swarm.verification_recorded' AND task_id=?",
+                (args["taskId"],),
+            )
+        ]
+    )
+    assert before == after and len(after) == 1
+    stale = await verify(runtime, turn, binding, {**args, "runId": "superseded-run"})
+    assert "recordedVerification" not in stale
+
+
+async def test_terminal_state_without_a_main_audit_is_not_verification_proof(review_case):
+    runtime, turn, binding, args, artifact = review_case
+    await read(runtime, turn, binding, artifact)
+    await verify(runtime, turn, binding, args)
+    await runtime.db.call(
+        lambda db: db.execute(
+            "DELETE FROM events WHERE kind='swarm.verification_recorded' AND task_id=?",
+            (args["taskId"],),
+        ),
+        write=True,
+    )
+    repeated = await verify(runtime, turn, binding, args)
+    assert repeated["error"] == "TASK_NOT_WAITING_VERIFICATION"
+    assert "recordedVerification" not in repeated

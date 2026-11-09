@@ -220,3 +220,72 @@ async def test_named_builtin_discovery_keeps_disabled_and_worker_only_operations
         assert "task_steer" not in [entry["name"] for entry in result["items"]]
     finally:
         await runtime.close()
+
+
+@pytest.mark.parametrize("encoding", ["quoted-command", "argv"])
+async def test_structured_json_recovery_preserves_input_and_current_binding(store, encoding):
+    from dataclasses import replace
+
+    from test_cli_arguments import claimed_turn
+
+    from roami_agent.storage.transcript_repository import message
+
+    runtime, received = Runtime(store, ConversationModel()), []
+    payload = {
+        "swarmId": "private-team",
+        "taskId": "private-task",
+        "revision": 43,
+        "runId": "private-run",
+        "accepted": True,
+        "checks": "中文核验，完整读取本轮三件产物",
+        "artifactIds": ["private-first", "private-second"],
+    }
+
+    async def verify(args, binding):
+        received.append((args, binding))
+        return {"received": args}
+
+    runtime.tools.registry["swarm_verify"] = replace(
+        runtime.tools.registry["swarm_verify"], handler=verify
+    )
+    try:
+        turn = await claimed_turn(runtime)
+
+        async def invoke(arguments, ident):
+            invocation = call("bash", arguments)
+            invocation["id"] = ident
+            mid = await store.call(
+                lambda db: message(
+                    db,
+                    turn["conversation_id"],
+                    turn["branch_id"],
+                    "assistant",
+                    {"text": "", "tool_calls": [invocation]},
+                    turn_id=turn["id"],
+                ),
+                write=True,
+            )
+            return await runtime.gateway.invoke(
+                turn,
+                mid,
+                invocation,
+                "main",
+                {"owner": "alice", "conversation": turn["conversation_id"], "turnId": turn["id"]},
+            )
+
+        raw = json.dumps(payload, ensure_ascii=False)
+        rejected = await invoke({"command": "roami swarm verify --input " + raw}, "invalid-json")
+        assert rejected["error"] == "INVALID_CLI_ARGUMENTS"
+        assert rejected["executionStarted"] is False and not received
+        assert "single quotes" in rejected["recovery"] and "argv" in rejected["recovery"]
+        assert "private" not in json.dumps(rejected)
+        argv = ["roami", "swarm", "verify", "--input", raw]
+        arguments = (
+            {"command": shlex.join(argv)} if encoding == "quoted-command" else {"argv": argv}
+        )
+        accepted = await invoke(arguments, "corrected-json")
+        assert accepted["received"] == payload and len(received) == 1
+        assert received[0][1]["conversation"] == turn["conversation_id"]
+        assert received[0][1]["turnId"] == turn["id"]
+    finally:
+        await runtime.close()

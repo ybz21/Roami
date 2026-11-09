@@ -8,6 +8,12 @@ class DomainError(Exception):
         super().__init__(code)
 
 
+class TaskVerificationRecorded(DomainError):
+    def __init__(self, verification):
+        self.verification = verification
+        super().__init__("TASK_NOT_WAITING_VERIFICATION", 409)
+
+
 class ModelAdmissionRejected(DomainError):
     """The trusted model transport rejected admission before sending a request."""
 
