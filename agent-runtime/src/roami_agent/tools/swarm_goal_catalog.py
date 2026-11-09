@@ -6,6 +6,7 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.storage.database import row
 from roami_agent.storage.request_quotes import MAX_QUOTE_LENGTH
 from roami_agent.storage.swarm_delegations import current_delegation
+from roami_agent.storage.swarm_goal_checkpoint import record_blocker
 from roami_agent.storage.swarm_repository import group
 from roami_agent.storage.swarm_scopes import require_scope
 
@@ -84,8 +85,32 @@ def register_swarm_goal_tools(registry, database, wakeup):
         wakeup.set()
         return result
 
+    async def checkpoint(args, binding):
+        return await database.call(lambda db: record_blocker(db, binding, args), write=True)
+
     string = {"type": "string", "minLength": 1}
     for name, description, schema, handler, effect in [
+        (
+            "swarm_goal_checkpoint",
+            (
+                "Record a concrete blocker in this original Main's current ongoing-goal batch. "
+                "First prefer bounded continuation of a selected original task or actual running work. "
+                "failedToolCallId is the real current-turn tool call ID with a capability, login, resource "
+                "or unknown-outcome failure; malformed calls, guessed tools and prohibited operations "
+                "do not establish blockers. Preserve that error and explain the needed recovery briefly. "
+                "This does not complete the goal, grant publication permissions or create another Main."
+            ),
+            object_schema(
+                {
+                    "swarmId": string,
+                    "reason": {**string, "maxLength": 1200},
+                    "failedToolCallId": {**string, "maxLength": 200},
+                },
+                ["swarmId", "reason", "failedToolCallId"],
+            ),
+            checkpoint,
+            "write",
+        ),
         (
             "swarm_goal_status",
             (

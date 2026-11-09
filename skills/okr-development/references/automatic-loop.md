@@ -162,3 +162,22 @@ offline replay. A compacted summary does not replace fresh host task/receipt sta
 ## Keep human requests literal
 
 Read confirmed configuration, instructions, memory and Skills through bound-project tools. Do not append whole project snapshots or generated operating restrictions to the user message. Unsaved editor drafts are separate untrusted context, not authorization or confirmed facts. Preserve the ongoing goal and explicit boundaries; a narrowly scoped acceptance request does not cancel the automatic operating mode. Native member continuations must use the host-validated human source, excluding recognized historical generated tails.
+
+## Continue after acceptance
+
+For a continuing goal, finish each delivery/verification turn with a bounded next
+step on an original task, actual original work to await, or a concrete blocker.
+Read fresh task/revision/run identities before steering. A promise to dispatch
+later is not a queued job. Finite work, an ended goal period and a real human
+pause can finish normally; do not force an unbounded publishing loop.
+
+On hosts returning `SWARM_GOAL_NEXT_STEP_REQUIRED`, recover in the same turn by
+reading actual work and continuing it. Do not repeat completed platform actions.
+If the actual catalogue exposes `swarm_goal_checkpoint`, record a blocker using
+the current swarmId, a brief reason and the real current-turn failedToolCallId.
+Guessed tools, malformed inputs and prohibited operations do not prove a blocker.
+A checkpoint neither completes the goal nor authorizes publication. Discover the
+operation before use; this manual does not claim that older hosts enforce it.
+
+Preserve a previously verified Chrome/ADB publishing route. Missing OAuth or MCP
+for an alternative route is not evidence that the working native route is absent.

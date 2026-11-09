@@ -242,7 +242,9 @@ class AgentLoop:
                     invalid_reply = (
                         role == "main"
                         and text.strip()
-                        and await self.gateway.reply_error(turn, text)
+                        and await self.gateway.reply_error(
+                            {**turn, "finalReplyCandidate": not calls}, text
+                        )
                     )
                     if (
                         role == "main"
