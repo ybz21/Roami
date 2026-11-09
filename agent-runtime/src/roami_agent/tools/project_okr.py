@@ -10,6 +10,9 @@ def register_project_okr_tools(registry, database, settings):
     from roami_agent.tools.project_memory_edit import register_project_memory_edit
 
     register_project_memory_edit(registry, database, settings)
+    from roami_agent.tools.project_review import checked_review, register_project_review
+
+    register_project_review(registry, database, settings)
 
     async def context(args, binding):
         pid = await bound_project(database, binding)
@@ -18,6 +21,8 @@ def register_project_okr_tools(registry, database, settings):
 
     async def update(args, binding):
         pid = await bound_project(database, binding)
+        if args["operation"] == "review":
+            args = {**args, "payload": checked_review(args["payload"])}
         if args["operation"] == "save" and args["payload"].get("swarm"):
             team = await database.call(
                 lambda db: project_team(db, binding["owner"], pid, args["payload"]["swarm"])

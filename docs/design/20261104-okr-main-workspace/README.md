@@ -12,6 +12,8 @@
 
 [日更 Skill：外部定时唤醒原 Main](daily-main-wakeup.md)。
 
+[复盘写入契约与失败恢复](review-input-contract.md)（#843）：准确字段、原请求身份和已保存结果对账。
+
 [等待已核验的原日程](scheduled-goal-wait.md)（#841）：先设计真实排期等待，避免用零碎任务代替接续。
 
 [当前团队约定的局部修改](memory-current-rule-edit.md)：针对“只追加却报告已修改原规则”的真实问题，先定义 CAS、精确编辑、历史与重试契约，再实现 #822。

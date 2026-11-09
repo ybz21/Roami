@@ -13,6 +13,7 @@ SWARM_READS = {
 }
 SWARM_WRITES = {
     "swarm_goal_wait",
+    "swarm_project_review",
     "swarm_goal_checkpoint",
     "swarm_post",
     "swarm_memory_write",

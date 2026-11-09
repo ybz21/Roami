@@ -155,6 +155,7 @@
     "project",
     "show"
   ],
+  "swarm_project_review": ["swarm", "project", "review"],
   "swarm_project_update": [
     "swarm",
     "project",
@@ -166,6 +167,7 @@
     "context"
   ],
   "swarm_connector_batch": ["swarm", "connector", "batch"],
+  "project_okr_review": ["project", "okr", "review"],
   "project_okr_update": [
     "project",
     "okr",

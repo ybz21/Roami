@@ -8,6 +8,12 @@ from roami_agent.tools.project_memory_edit import (
     memory_edit_payload,
     memory_edit_receipt,
 )
+from roami_agent.tools.project_review import (
+    checked_review,
+    review_fields,
+    review_payload,
+    review_receipt,
+)
 
 
 def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
@@ -151,6 +157,8 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         info = await main(binding, args["swarmId"])
         if info["archived"]:
             raise DomainError("SWARM_ARCHIVED", 409)
+        if args["operation"] == "review":
+            args = {**args, "payload": checked_review(args["payload"])}
         expected = binding.get("coordinationProjectWrite")
         if (
             expected
@@ -196,6 +204,44 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
 
             return project_receipt(workspace, binding["coordinationProjectWrite"])
         return workspace
+
+    async def project_review(args, binding):
+        if binding.get("role") == "worker":
+            raise DomainError("SWARM_MAIN_REQUIRED", 403)
+        info = await main(binding, args["swarmId"])
+        if info["archived"]:
+            raise DomainError("SWARM_ARCHIVED", 409)
+        if (info.get("teamMemory") or {}).get("operationReceiptsSupported") is not True:
+            raise DomainError("PROJECT_REVIEW_RECEIPTS_UNAVAILABLE", 503)
+        project_id = (info.get("scope") or {}).get("projectId")
+        if not project_id:
+            raise DomainError("SWARM_PROJECT_REQUIRED", 409)
+        payload = review_payload(
+            {key: value for key, value in args.items() if key != "swarmId"}, binding
+        )
+        from roami_agent.storage.swarm_memory import project_context
+
+        workspace = await project_context(
+            swarms, binding["owner"], args["swarmId"], operation="review", payload=payload
+        )
+        return review_receipt(workspace, project_id, payload)
+
+    registry.add(
+        Tool(
+            "swarm_project_review",
+            "Save an evidence-based review in this original Main's project Swarm. Read the current project "
+            "context first; pass its actual revision, real summary and optional actions. The host preserves "
+            "the existing batch/request review identity and returns the saved review receipt. Do not probe "
+            "fields with test writes or mistake a saved review for publication or goal completion.",
+            object_schema(
+                {"swarmId": {"type": "string", "minLength": 1}, **review_fields()},
+                ["swarmId", "revision", "summary"],
+            ),
+            project_review,
+            main=True,
+            effect="write",
+        )
+    )
 
     async def project_batch(args, binding):
         info = await main(binding, args["swarmId"])
