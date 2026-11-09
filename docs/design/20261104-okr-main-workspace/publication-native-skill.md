@@ -58,3 +58,9 @@
 ## 本次状态（2026-11-09）
 
 本次只补接线设计，未新增工具、未操作设备、未接通最终 adapter，也未声称两轮闭环完成。已部署版本仍为 #842 / okr-runtime-7c492a91。#843 的复盘修复在独立源码跑完整门禁，不修改它的冻结源码。后续实现须按本契约补真实资源桥和隔离测试，再走正常 PR/合入/部署。
+
+## 原生上下文只读观察：本地候选
+
+`agent execution context` 从调用进程和当前 pane 提示出发，复用真实 pane/宿主/目录证明、原生生命周期、当前 launch 的 spec/receipt 与进程启动 token；调用者不能提供 PID、session、launch 或 provider 参数。读取前后核对文件与物理身份，拒绝未知、已结束或冲突执行，不创建会话、锁、工作区或完成记录。当前实现针对 Codex/Claude shell 调用，其他 provider 保持明确不支持，不能用模拟绑定宣称全部原生模式已接通。
+
+输出 `observationOnly=true`、`publicationAuthorized=false`。摘要只是本次观察的指纹，不是签名或可移交的执行凭证；未来内部发布桥必须再次在宿主核验真实调用方、当前 task/run 与资源准入，不能凭该 JSON 放行。此候选尚未合入/部署，尚未接通最终提交 adapter。
