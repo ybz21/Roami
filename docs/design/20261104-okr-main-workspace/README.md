@@ -244,6 +244,7 @@
 
 - [发布执行协议与回执对账](publication-execution.md)：独立审核、原执行身份和持久事实；真实通道仍需接通。
 - [已确认批次的读取与恢复](confirmed-batch-recovery.md)：紧凑回执、准确冲突与历史事实保留。
+- [原成员发布交接契约](publication-release-contract.md)：沿用 Chrome/ADB，绑定冻结内容、单次提交与只读公开核验。
 
 - [可读物料与既有发布流程](material-workflow.md)：去掉物料路径中的执行 UID，复用已验证通道并核对限制范围。
 

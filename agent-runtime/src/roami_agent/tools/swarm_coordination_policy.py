@@ -132,7 +132,7 @@ class SwarmCoordinationPolicy:
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
         elif name not in COORDINATION_OPERATIONS:
             raise DomainError("SWARM_COORDINATION_OPERATION_UNAVAILABLE", 403)
-        if name == "swarm_publication_prepare" and (
+        if name in {"swarm_publication_prepare", "swarm_publication_release"} and (
             args.get("delegationId") != delegation["id"]
             or args.get("projectId") != delegation["projectId"]
         ):
