@@ -1,13 +1,15 @@
 // 对话文本的 Markdown 渲染实现（Claude / Codex 共用）。深色主题、紧凑边距以贴合气泡。
 // 工具输出/命令仍按原样 <pre> 显示，不走这里。入口在 Markdown.tsx（懒加载壳），业务代码勿直接引本文件。
 import { Spin } from 'antd'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import type { CSSProperties, MouseEvent } from 'react'
 import { Suspense, useState } from 'react'
 import { useLayout } from '../../layout'
-import { nodeApi } from '../cluster/node-url'
+import { nodeApi, useCurrentNodeId } from '../cluster/node-url'
+import { agentResourceUrl } from '../agent/agent-resource-url'
+import { localFileUrlPath } from './local-file-url'
 import { fileLink, type FileLink } from './file-link'
 import { CodeBox } from '../chat/blocks'
 import { useI18n } from '../../i18n'
@@ -49,10 +51,13 @@ export default function Markdown({
 }) {
   const { t } = useI18n()
   const { phone } = useLayout()
+  const node = useCurrentNodeId()
+  const resolveResource = (href: string, kind: 'link' | 'image') => resolveHref ? (resolveHref(href, kind) || href) : agentResourceUrl(href, node)
   const [preview, setPreview] = useState<FileLink | null>(null)
   return (
     <div style={{ fontSize: 13.5, lineHeight: 1.55, wordBreak: 'break-word', height: fill ? '100%' : undefined }}>
       <ReactMarkdown
+        urlTransform={url => defaultUrlTransform(localFileUrlPath(url) ?? url)}
         disallowedElements={allowImages ? undefined : ['img']}
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
@@ -67,7 +72,7 @@ export default function Markdown({
           h3: ({ children }) => <h3 style={{ fontSize: 14.5, margin: '6px 0 4px', fontWeight: 600 }}>{children}</h3>,
           h4: ({ children }) => <h4 style={{ fontSize: 13.5, margin: '6px 0 4px', fontWeight: 600 }}>{children}</h4>,
           a: ({ children, href }) => {
-            const resolved = href ? (resolveHref?.(href, 'link') || href) : undefined
+            const resolved = href ? resolveResource(href, 'link') : undefined
             return <a href={resolved} target="_blank" rel="noreferrer" onClick={(e) => {
               if (href) onLinkClick?.(href, e)
               if (e.defaultPrevented || !phone || !resolved || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
@@ -94,7 +99,7 @@ export default function Markdown({
           table: ({ children }) => <table style={{ borderCollapse: 'collapse', margin: '6px 0', fontSize: 12.5 }}>{children}</table>,
           th: ({ children }) => <th style={{ border: '1px solid var(--border)', padding: '3px 8px', textAlign: 'left', background: 'var(--bg-container)' }}>{children}</th>,
           td: ({ children }) => <td style={{ border: '1px solid var(--border)', padding: '3px 8px' }}>{children}</td>,
-          img: ({ src, alt }) => <img src={src ? (resolveHref?.(src, 'image') || src) : src} alt={alt} style={{ maxWidth: '100%', borderRadius: 6 }} />,
+          img: ({ src, alt }) => <img src={src ? resolveResource(src, 'image') : src} alt={alt} style={{ maxWidth: '100%', borderRadius: 6 }} />,
         }}
       >
         {children}

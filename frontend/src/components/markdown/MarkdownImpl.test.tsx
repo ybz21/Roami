@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n'
 import Markdown from './MarkdownImpl'
+import { setCurrentNode } from '../cluster/node-url'
 import { resetStack, stackSize } from '../shell/useBackDismiss'
 
 const device = vi.hoisted(() => ({ phone: true }))
@@ -11,7 +12,7 @@ vi.mock('../files/fileview/FileView', () => ({ FileView: ({ path }: { path: stri
 vi.mock('../documents/DocumentPreview', async importOriginal => ({ ...await importOriginal<any>(), default: ({ src, name }: { src: string; name: string }) => <div data-testid="document-preview" data-src={src}>{name}</div> }))
 
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, headers: new Headers() }))) })
-afterEach(() => { cleanup(); resetStack(); device.phone = true; vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); resetStack(); device.phone = true; setCurrentNode(null); vi.unstubAllGlobals() })
 
 const show = (href = '/api/file/serve/tmp/demo.html', onLinkClick?: (href: string, event: React.MouseEvent<HTMLAnchorElement>) => void) => render(
   <I18nProvider><Markdown onLinkClick={onLinkClick}>{`[demo](${href})`}</Markdown></I18nProvider>,
@@ -99,5 +100,30 @@ describe('Markdown mobile file navigation', () => {
     show(undefined, (_, event) => event.preventDefault())
     fireEvent.click(screen.getByRole('link', { name: 'demo' }))
     expect(screen.queryByTitle('demo.html')).toBeNull()
+  })
+})
+
+
+describe('local file deliveries', () => {
+  it('keeps a historical Main file URI clickable on the originating node', () => {
+    device.phone = false
+    setCurrentNode('project-node')
+    show('file:///home/ai/codes/roami-promotion/materials/2026-11-09/reflection/main-review.md')
+    expect(screen.getByText('demo').getAttribute('href')).toBe('/n/project-node/api/file/home/ai/codes/roami-promotion/materials/2026-11-09/reflection/main-review.md')
+  })
+
+  it('uses the existing phone preview for file URI deliveries', async () => {
+    show('file:///tmp/report.html')
+    fireEvent.click(screen.getByRole('link', { name: 'demo' }))
+    expect((await screen.findByTitle('report.html')).getAttribute('src')).toContain('/api/file/tmp/report.html')
+    expect(stackSize()).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: /返回|Back/ }))
+    await waitFor(() => expect(screen.queryByTitle('report.html')).toBeNull())
+    expect(stackSize()).toBe(0)
+  })
+
+  it.each(['file://other-node/tmp/report.html', 'file:///tmp/%00report', 'javascript:alert(1)', 'data:text/html,private'])('does not activate unsupported or unsafe URI: %s', href => {
+    show(href)
+    expect(screen.getByText('demo').getAttribute('href')).toBeFalsy()
   })
 })
