@@ -13,6 +13,7 @@ from pathlib import Path
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.publication_media_sources import retained_media_source
 
 
 class ArtifactStore:
@@ -278,6 +279,8 @@ class ArtifactStore:
 
             def register(db):
                 self._scope(db, owner, task_id, message_id)
+                if (metadata or {}).get("kind") == "publication_media":
+                    retained_media_source(db, owner, metadata)
                 if (metadata or {}).get("kind") == "deliverable" and row(
                     db,
                     "SELECT id FROM artifacts WHERE owner_id=? AND task_id IS ? "
@@ -314,16 +317,30 @@ class ArtifactStore:
             return await self.db.call(register, write=True)
 
     async def _owned(self, owner, artifact_id):
-        item = await self.db.call(
-            lambda db: row(
+        def read(db):
+            item = row(
                 db,
                 "SELECT * FROM artifacts WHERE id=? AND owner_id=? AND deleted_ms IS NULL",
                 (artifact_id, owner),
             )
-        )
-        if not item:
-            raise DomainError("ARTIFACT_NOT_FOUND", 404)
-        return item
+            if not item:
+                raise DomainError("ARTIFACT_NOT_FOUND", 404)
+            metadata = json.loads(item["metadata_json"])
+            if metadata.get("kind") == "publication_media":
+                if item["purged_ms"] is not None or row(
+                    db,
+                    "SELECT 1 FROM memory_tombstones WHERE owner_id=? AND source_fingerprint=?",
+                    (owner, item["sha256"]),
+                ):
+                    raise DomainError("PUBLICATION_MEDIA_SOURCE_UNAVAILABLE", 409)
+                retained_media_source(db, owner, metadata)
+            return item
+
+        return await self.db.call(read)
+
+    async def _recheck_media(self, owner, item):
+        if json.loads(item["metadata_json"]).get("kind") == "publication_media":
+            await self._owned(owner, item["id"])
 
     async def get(self, owner, artifact_id):
         return self.reference(await self._owned(owner, artifact_id))
@@ -335,6 +352,7 @@ class ArtifactStore:
             body = await self._io(self._read, item["sha256"], item["size_bytes"])
         except OSError as exc:
             raise DomainError("ARTIFACT_FILE_MISSING", 503) from exc
+        await self._recheck_media(owner, item)
         return self.reference(item), body
 
     async def read_page(self, owner, artifact_id, offset, limit):
@@ -346,6 +364,7 @@ class ArtifactStore:
             )
         except OSError as exc:
             raise DomainError("ARTIFACT_FILE_MISSING", 503) from exc
+        await self._recheck_media(owner, item)
         return self.reference(item), body
 
     @staticmethod
@@ -361,6 +380,7 @@ class ArtifactStore:
             path = await self._io(self._read, item["sha256"], item["size_bytes"], False)
         except OSError as exc:
             raise DomainError("ARTIFACT_FILE_MISSING", 503) from exc
+        await self._recheck_media(owner, item)
         return self.reference(item), path
 
     async def list(self, owner, *, task_id=None, message_id=None, limit=50):

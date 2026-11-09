@@ -1,6 +1,7 @@
 """An independent Main decision requires the frozen content in its real model input."""
 
 from roami_agent.dispatch.publication_image_review import PublicationImageReview
+from roami_agent.dispatch.publication_media_review import PublicationMediaReview
 from roami_agent.dispatch.publication_prompt_review import PublicationPromptReview
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.publication_reviews import current_version, save_review
@@ -15,13 +16,11 @@ class PublicationReview:
         proof = {}
         if decision == "approved":
             content = manifest["content"]
-            if any(name in content for name in ("video", "audio")):
-                raise DomainError("PUBLICATION_MEDIA_REVIEW_UNAVAILABLE", 409)
             by_id = {item["id"]: item for item in manifest["artifacts"]}
             text_ids = [
                 ident
                 for name, value in content.items()
-                if name != "images"
+                if name not in {"images", "video", "audio"}
                 for ident in (value if isinstance(value, list) else [value])
             ]
             text = [by_id[ident] for ident in dict.fromkeys(text_ids)]
@@ -32,6 +31,11 @@ class PublicationReview:
                 proof["images"] = await PublicationImageReview(self.db, self.artifacts).inspect(
                     binding, [by_id[ident] for ident in content["images"]]
                 )
+            media = [by_id[content[name]] for name in ("video", "audio") if name in content]
+            if media:
+                proof["media"] = await PublicationMediaReview(
+                    self.db, self.artifacts, self.reviewer
+                ).inspect(binding, version_id, media)
             for artifact in manifest["artifacts"]:
                 await self.artifacts.verified_path(binding["owner"], artifact["id"])
             # Recheck text after image I/O so interruption or context replacement cannot slip through.

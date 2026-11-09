@@ -32,7 +32,7 @@ def current_version(db, binding, version_id):
 
 
 def save_review(db, binding, version_id, decision, feedback, proof):
-    version, _ = current_version(db, binding, version_id)
+    version, manifest = current_version(db, binding, version_id)
     if (
         decision not in {"approved", "rejected"}
         or not isinstance(feedback, str)
@@ -49,6 +49,31 @@ def save_review(db, binding, version_id, decision, feedback, proof):
         )
         if current_images != proof["images"]:
             raise DomainError("PUBLICATION_IMAGE_REVIEW_CHANGED", 409)
+    media_ids = [
+        manifest["content"][name] for name in ("video", "audio") if name in manifest["content"]
+    ]
+    if decision == "approved" and media_ids:
+        from roami_agent.storage.publication_media_evidence import (
+            media_snapshot,
+            reviewed_media_images,
+        )
+        from roami_agent.storage.publication_text_evidence import reviewed_text
+
+        by_id = {item["id"]: item for item in manifest["artifacts"]}
+        current_media = media_snapshot(
+            db, binding, version_id, [by_id[ident] for ident in media_ids]
+        )
+        media_proof = proof.get("media") or {}
+        text = [
+            ref for item in current_media for ref in (item["report"], item["transcript"]) if ref
+        ]
+        if (
+            current_media != media_proof.get("snapshot")
+            or reviewed_media_images(db, binding, version_id, current_media)
+            != media_proof.get("images")
+            or reviewed_text(db, binding, text) != media_proof.get("text")
+        ):
+            raise DomainError("PUBLICATION_MEDIA_REVIEW_CHANGED", 409)
     payload = {**proof, "manifestSha256": version["manifest_sha256"]}
     previous = row(
         db,

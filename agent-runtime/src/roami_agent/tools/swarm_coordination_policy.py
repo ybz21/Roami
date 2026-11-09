@@ -137,7 +137,7 @@ class SwarmCoordinationPolicy:
             or args.get("projectId") != delegation["projectId"]
         ):
             raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
-        if name == "swarm_publication_review":
+        if name in {"swarm_publication_review", "swarm_publication_media"}:
             publication = row(
                 db,
                 "SELECT p.delegation_id FROM swarm_publication_versions v JOIN swarm_publication_items p ON p.id=v.item_id WHERE v.id=? AND p.swarm_id=? AND p.owner_id=?",

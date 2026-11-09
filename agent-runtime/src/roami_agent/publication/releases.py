@@ -35,7 +35,7 @@ class PublicationReleases:
             return assets
 
         assets = await self.db.call(inspect)
-        for artifact in assets["manifest"]["artifacts"]:
+        for artifact in [*assets["manifest"]["artifacts"], *assets.get("reviewMediaArtifacts", [])]:
             await self.artifacts.verified_path(binding["owner"], artifact["id"])
         payload = {
             "scope": {

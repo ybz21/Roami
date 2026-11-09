@@ -7,9 +7,12 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.publication.releases import PublicationReleases
 from roami_agent.storage.publication_reviews import current_version
 from roami_agent.storage.publication_versions import create_item, freeze_version
+from roami_agent.tools.publication_media_catalog import register_publication_media_tools
 
 
-def register_publication_tools(registry, database, artifacts, reviewer):
+def register_publication_tools(registry, database, artifacts, reviewer, media=None):
+    register_publication_media_tools(registry, database, artifacts, media)
+
     async def prepare(args, binding):
         scope = {
             key: args[key]
@@ -147,7 +150,7 @@ def register_publication_tools(registry, database, artifacts, reviewer):
     registry.add(
         Tool(
             "swarm_publication_review",
-            "Independently approve or reject an exact frozen version. Approval requires full current-turn artifact text reads in the actual Main model input and image file reads with actual image input evidence; execution summaries and author claims cannot substitute. Video/audio approval is unavailable until linked media review is supported. State feedback briefly. This records an immutable host review, never permission or proof of publication.",
+            "Independently approve or reject an exact frozen version. Approval requires full current-turn artifact text reads in the actual Main model input and image reads with actual image input evidence; author claims cannot substitute. For video/audio first use publication media inspect, fully read the returned report and transcript, and use media image on every returned contact sheet. The host verifies final-track speech receipts and sampled frame inputs; sampling is not continuous playback. Missing dependencies or evidence block approval. State feedback briefly. This records an immutable host review, never permission or proof of publication.",
             object_schema(
                 {
                     "swarmId": string,
