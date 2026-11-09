@@ -91,6 +91,15 @@ Verify the actual platform receipt, account, text and media. Uploaded, submitted
 unknown and public are different states. Unknown results require reconciliation
 of the original attempt before retry, rather than another post with a new key.
 
+Classify verification failures from the actual error and current original attempt.
+A still-running member, an already accepted task or incomplete retained-artifact
+reads do not prove that the host rejects all publication tasks. Reconcile the
+same task/revision/run and process its real completion callback; do not resend
+the post or invent an exception to bypass verification. Correct project manuals
+that contradict later verified receipts, preserving the earlier failure evidence.
+Task acceptance, independent content review, a host publication intent and the
+platform's public fact remain separate records.
+
 ## Collect, reflect and continue
 
 Give the confirmed platform object to the original data member. Read its Connector
