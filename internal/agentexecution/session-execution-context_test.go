@@ -119,6 +119,32 @@ func TestNativeContextRetainsClaudeProviderAndCurrentPrompt(t *testing.T) {
 	}
 }
 
+func TestNativeContextRejectsLifecycleAdvanceDuringFinalPaneObservation(t *testing.T) {
+	s, binding := sessionFixture(t)
+	seedSession(t, s, binding)
+	startSessionTask(t, s, binding, "context-advance")
+	path, _ := s.lifecycleFile(binding)
+	var changed sessionLifecycle
+	if err := readJSON(path, &changed); err != nil {
+		t.Fatal(err)
+	}
+	changed.LaunchKey = "next-launch"
+	changedPath := filepath.Join(s.Runtime.DataDir, "advanced-state.json")
+	if err := writeJSON(changedPath, changed); err != nil {
+		t.Fatal(err)
+	}
+	counter := filepath.Join(s.Runtime.DataDir, "context-observations")
+	delegate := s.Runtime.TmuxBin
+	s.Runtime.TmuxBin = filepath.Join(s.Runtime.DataDir, "context-tmux")
+	script := "#!/bin/sh\nif [ \"$1\" = display-message ]; then\n context_count=0\n if [ -f " + quote(counter) + " ]; then context_count=$(cat " + quote(counter) + "); fi\n context_count=$((context_count+1))\n printf '%s' \"$context_count\" > " + quote(counter) + "\n if [ \"$context_count\" = 2 ]; then cp " + quote(changedPath) + " " + quote(path) + "; fi\nfi\nexec " + quote(delegate) + " \"$@\"\n"
+	if err := os.WriteFile(s.Runtime.TmuxBin, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CurrentNativeContext(binding.Pane, os.Getpid()); err == nil {
+		t.Fatal("a launch changed during the final pane observation was returned as current")
+	}
+}
+
 func TestNativeCallerRequiresLiveSameSessionAncestry(t *testing.T) {
 	binding := SessionBinding{PID: 10, Processes: map[int]string{10: "root"}}
 	snapshot := map[int]paneProcess{10: {Parent: 1, Token: "root"}, 20: {Parent: 10, Token: "child"}, 30: {Parent: 20, Token: "caller"}, 40: {Parent: 1, Token: "sibling"}}

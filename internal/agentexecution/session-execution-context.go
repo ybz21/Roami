@@ -96,12 +96,6 @@ func (s Service) CurrentNativeContext(pane string, caller int) (NativeExecutionC
 	if _, err := os.Stat(filepath.Join(dir, "result.json")); !errors.Is(err, os.ErrNotExist) {
 		return empty, fmt.Errorf("NATIVE_EXECUTION_CONTEXT_ENDED")
 	}
-	for name, before := range map[string][]byte{path: raw, specPath: specRaw, receiptPath: receiptRaw} {
-		after, err := os.ReadFile(name)
-		if err != nil || !bytes.Equal(before, after) {
-			return empty, fmt.Errorf("NATIVE_EXECUTION_CONTEXT_CHANGED")
-		}
-	}
 	again, err := s.paneBinding(pane, true)
 	if err != nil || !reflect.DeepEqual(again, binding) {
 		return empty, fmt.Errorf("SESSION_PROVIDER_IDENTITY_CHANGED")
@@ -112,6 +106,12 @@ func (s Service) CurrentNativeContext(pane string, caller int) (NativeExecutionC
 	}
 	if current, err := nativeCallerToken(latest, state.Binding, caller); err != nil || current != token {
 		return empty, fmt.Errorf("SESSION_PROCESS_IDENTITY_CHANGED")
+	}
+	for name, before := range map[string][]byte{path: raw, specPath: specRaw, receiptPath: receiptRaw} {
+		after, err := os.ReadFile(name)
+		if err != nil || !bytes.Equal(before, after) {
+			return empty, fmt.Errorf("NATIVE_EXECUTION_CONTEXT_CHANGED")
+		}
 	}
 	digest := sha256.New()
 	for _, data := range [][]byte{raw, specRaw, receiptRaw, []byte(token)} {
