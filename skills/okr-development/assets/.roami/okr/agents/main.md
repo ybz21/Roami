@@ -41,3 +41,5 @@ tasks just to keep the loop busy, invent a due time, or create a second schedule
 A failed final reply does not roll back saved reviews or memory edits. Reconcile
 their real receipts before continuing; do not repeat writes or model requests to
 repair a known authentication failure.
+
+保存复盘前阅读 `../manuals/daily.md` 的“保存复盘与失败恢复”：使用工具目录的明确 review 契约，不在生产写占位内容猜字段；最终回复失败时先对账已保存的复盘与记忆，避免重复写入。

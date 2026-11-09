@@ -14,6 +14,11 @@ class TaskVerificationRecorded(DomainError):
         super().__init__("TASK_NOT_WAITING_VERIFICATION", 409)
 
 
+class ProjectReviewInputError(DomainError):
+    def __init__(self):
+        super().__init__("OKR_REVIEW_INPUT_INVALID", 400)
+
+
 class ModelAdmissionRejected(DomainError):
     """The trusted model transport rejected admission before sending a request."""
 

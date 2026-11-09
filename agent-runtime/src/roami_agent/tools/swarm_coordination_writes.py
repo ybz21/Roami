@@ -11,6 +11,19 @@ from roami_agent.storage.database import rows
 
 
 def project_write(db, value, name, args, binding):
+    if name == "swarm_project_review":
+        _, scoped = project_write(
+            db,
+            value,
+            "swarm_project_update",
+            {
+                "swarmId": args["swarmId"],
+                "operation": "review",
+                "payload": {"revision": args["revision"]},
+            },
+            binding,
+        )
+        return args, scoped
     prefix = "coordination:" + value["id"] + ":"
     if name == "swarm_memory_write":
         return args, {**binding, "coordinationMemoryKey": prefix + "memory"}
