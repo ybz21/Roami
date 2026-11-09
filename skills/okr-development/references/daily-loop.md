@@ -122,6 +122,20 @@ cron.add 创建提案显式使用 enabled=false 和 IANA timezone；编辑不重
 
 Use [durable team bindings](team-bindings.md) when reconciling current roles or an interrupted configuration save. Current/history presentation does not change old host task states.
 
+## 发布窗口与原任务接续
+
+原通道已经跑通时，先检查它在本轮的真实登录、账号、能力与任务范围，不因为 Main 缺少
+专用发布 API 改建另一条通道。原成员保留原 provider 会话，后续仍用受管 task_steer。
+
+未到计划日期而结束的只读预检，可能留下 waiting_user；该标签不等于用户撤销已授权的
+自动模式，也不等于再次逐条报批。到期由原 Main 核对本地时间、原日程、当前任务修订、
+冻结版本、实际账号与原业务键回执，再续派原成员执行。未到期保留原计划，不提前上传、
+不重复派相同预检。真正缺少授权或登录失效时保留具体阻塞，不能用这条接续规则绕过。
+
+预检发现不是宿主验收，内容通过不是平台提交，成员执行成功也不是公开确认。平台结果
+未知先对账同一业务键，已公开不重发；之后由原数据成员取数，Main 确认看板、复盘和记忆。
+至少核对一次原定时触发后的实际接续，不能用 Root 提醒、普通群聊投递或维护复盘代替。
+
 ## 已确认的运行态交互
 
 团队页左侧选择 Main、群聊或原成员，中间保留该对话，右侧工作区切换协作与任务列表。
