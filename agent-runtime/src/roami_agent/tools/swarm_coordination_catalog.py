@@ -9,6 +9,7 @@ SWARM_READS = {
     "swarm_inbox_read",
     "swarm_memory_read",
     "swarm_project_context",
+    "swarm_connector_batch",
 }
 SWARM_WRITES = {
     "swarm_post",
@@ -48,7 +49,10 @@ def operation(tool):
             "its current revision and validated payload. Read swarm_project_context first. "
             "The host keeps one review or one manual observation per metric/date in this batch; "
             "retries return the original receipt and changed content conflicts. Connector retries "
-            "keep the original source/window request, batch ID and revision. Do not supply operationKey. "
+            "keep the complete original request including note, source/window, batch ID and revision. "
+            "Read swarm_connector_batch first: confirmed is already committed even after revision advances. "
+            "CONNECTOR_BATCH_ALREADY_CONFIRMED_REQUEST_CONFLICT rejects this request, not the old fact; "
+            "read the original receipt and never describe it as discarded. Do not supply operationKey. "
             "Saving definitions, collection, sync and publication are unavailable in this batch."
         )
     elif tool.name == "swarm_memory_write":

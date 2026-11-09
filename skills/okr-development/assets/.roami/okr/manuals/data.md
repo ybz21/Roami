@@ -11,6 +11,8 @@
 Main 先独立读取实际证据，核对语义、对象和窗口，再读取当前项目 revision。先完成缺失的 [指标与看板定义](dashboard.md)，然后使用宿主支持的 record 协议：
 
 - 已绑定 Connector Skill：使用确认包摘要、来源身份、固定批次 id、窗口、values 和 evidence 的批次请求；读取宿主实际 connectorBatchProtocol，不猜字段。不确定上次是否成功时，按同一批次 id 查已有回执，不换 key 重复发布。
+
+支持 `swarm_connector_batch` 的宿主上，Main 可用 `roami swarm connector batch --input '{"swarmId":"实际团队ID","batchId":"实际批次ID"}'` 直接读取确认回执；当前修订与原回执修订分别保留。旧宿主读取完整 project context 留存文件，不能只看截断预览。`confirmed` 表示已经入库；同键改 note、刷新 CAS 或改变窗口仍会冲突，但不撤销旧事实。新作品扩充集合后另做真实新采集，不把旧快照叫作“作废”。回执 requestSha256 是宿主类型化请求摘要，不等于 batch-request.json 的文件 SHA 或自行排序后的 JSON 摘要；证据文件摘要仍须与真实字节核对。
 - 未绑定 manual 指标：开发 CLI 的单条格式为 `{"revision":CURRENT_REVISION,"metricId":"CONFIRMED_METRIC_ID","date":"YYYY-MM-DD","value":OBSERVED_NUMBER,"note":"SOURCE_AND_EVIDENCE"}`；将占位符换成真实值和正确 JSON 类型。Main 也可用项目操作的同一 record。每次写入后取返回的新 revision，不能沿用旧值连写。
 
 开发终端命令：`roami project okr record <PROJECT_ID> --file <REQUEST_JSON> --json`。Connector/collect 的参数以已安装 `roami project okr help` 和当前上下文为准；不要试写生产端点来猜协议。不要直接修改 observations.jsonl、current.json、确认快照或运行时数据库。

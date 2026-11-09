@@ -161,6 +161,7 @@
     "okr",
     "context"
   ],
+  "swarm_connector_batch": ["swarm", "connector", "batch"],
   "project_okr_update": [
     "project",
     "okr",
