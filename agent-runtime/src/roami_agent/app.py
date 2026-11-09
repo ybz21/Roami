@@ -31,6 +31,7 @@ from roami_agent.dispatch.resource_leases import ResourceLeases
 from roami_agent.dispatch.routing import TaskRouter
 from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
+from roami_agent.dispatch.swarm_goal_continuation import GoalContinuation
 from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.dispatch.tasks import Tasks
@@ -219,6 +220,9 @@ class Runtime:
             targets,
             TaskRouter(database, targets, self.settings, self.memory),
             reply_reviewer=self.reply_review,
+            goal_continuation=GoalContinuation(
+                database, lambda: self.reply_review, self.settings.memory_timezone
+            ),
         )
         register_reminder_tools(
             self.tools,

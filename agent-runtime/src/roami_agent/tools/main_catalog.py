@@ -21,7 +21,9 @@ from roami_agent.storage.task_handoff import accepted_handoffs
 from roami_agent.storage.task_request import task_user_request
 
 
-def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_reviewer=None):
+def register_main_tools(
+    registry, tasks, memory, targets, router=None, *, reply_reviewer=None, goal_continuation=None
+):
     async def coverage(args, binding, *, handoff=False):
         if "requestCoverage" not in args and registry.registry["reply"].model_schema is not None:
             return None
@@ -66,6 +68,10 @@ def register_main_tools(registry, tasks, memory, targets, router=None, *, reply_
         )
         if reply_reviewer is not None:
             await reply_reviewer.check_reply(args, binding)
+        if goal_continuation is not None and (
+            binding.get("toolCallId") or binding.get("finalReplyCandidate")
+        ):
+            await goal_continuation.prepare(binding)
         result = {"reply": text}
         await record(binding, outcomes)
         return result

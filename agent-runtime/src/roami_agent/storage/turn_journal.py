@@ -11,6 +11,7 @@ from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.reply_previews import assert_preview_current, clear_reply_previews
 from roami_agent.storage.swarm_coordination import origin as coordination_origin
+from roami_agent.storage.swarm_goal_checkpoint import validate_final_checkpoint
 from roami_agent.storage.transcript_repository import message
 
 
@@ -217,6 +218,7 @@ class TurnJournal:
             assert_context_admitted(db, turn)
             delivery = text
             if final:
+                validate_final_checkpoint(db, turn)
                 delivery = deliverable_links(text, completion_artifacts(db, turn, completion))
             previous = row(db, "SELECT content_json FROM messages WHERE id=?", (mid,))
             preview = json.loads(previous["content_json"]).get("replyPreview") if previous else None

@@ -43,6 +43,9 @@ class ToolGateway:
                     "owner": turn["owner_id"],
                     "conversation": turn["conversation_id"],
                     "turnId": turn["id"],
+                    "leaseEpoch": turn.get("lease_epoch"),
+                    "role": "main",
+                    "finalReplyCandidate": turn.get("finalReplyCandidate", False),
                 },
             )
         except DomainError as exc:
@@ -231,6 +234,15 @@ class ToolGateway:
             value = {"error": exc.code if isinstance(exc, DomainError) else "TOOL_FAILED"}
             if recovery := review_input_recovery(value["error"]):
                 value["recovery"] = recovery
+            if value["error"] == "SWARM_GOAL_NEXT_STEP_REQUIRED":
+                value["recovery"] = (
+                    "The original ongoing goal still needs a next step. In this SAME Main turn, "
+                    "read the latest selected original task status and use task_steer for bounded "
+                    "remaining work, or wait for real admitted original work. For a genuine capability "
+                    "blocker, call swarm_goal_checkpoint with the actual failed current-turn tool ID "
+                    "and a concrete reason. Do not ask the user to say continue, invent permission "
+                    "problems, repeat published content, create replacements or claim the goal finished."
+                )
             if isinstance(exc, DraftReviewRejected):
                 value.update(
                     executionStarted=False, failurePhase="validation", feedback=exc.feedback
