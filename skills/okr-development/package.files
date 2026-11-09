@@ -31,8 +31,8 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/
 003048ebc48be0f00ac65d54b724a46da10c5caea8499142f97c11a27fae6222  assets/.roami/okr/memory/team.md
 653e56da8a90ebb6c627ed89415938f6ffed977b3fb32bf2a4efa9d3623f4443  assets/.roami/okr/okr.json
 092f1c26f987cd0ba948ced6faf5dfe62412eada49220d3666705095c200c420  assets/.roami/okr/schedules/daily.json
-4bdbb1c6a384f0b688df4194a403a9bc315c16c7adc4777ceeedf9b7f3b07fb6  assets/.roami/okr/skills/collection-store/SKILL.md
-6248e10ed0541bf33bef9ddac2d2983e13880737ace74ce01bc3228bc64c79fd  assets/.roami/okr/skills/collection-store/scripts/collection_store.py
+8498b9c78a1ca4c67372a61135897052df828a7afc005111b7848f3676480825  assets/.roami/okr/skills/collection-store/SKILL.md
+e175b20f3475dc2ec44f981df5643b9b11ce1ee235811090e3623c0d2e565010  assets/.roami/okr/skills/collection-store/scripts/collection_store.py
 782f6a024ec963e6c5238520a522227c5bf2bfb92dc85c414c6a31af0be0aa73  assets/.roami/okr/skills/daily-operations/SKILL.md
 e43b9ca5a7a3380c1e56f0dfa6d29d7aff82b8985378e7aeb5b8781420906ca9  assets/.roami/okr/skills/daily-operations/prompts/kickoff.md
 3ee477b9e9731fa9c196a99666d8ca455e1e90b7500efc043fad92b10d728f75  assets/.roami/okr/skills/daily-operations/prompts/review.md
