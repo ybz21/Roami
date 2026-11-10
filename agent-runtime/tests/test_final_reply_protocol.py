@@ -29,25 +29,20 @@ class ReplyModel:
         yield ModelEvent("usage", {"input_tokens": 7, "output_tokens": 3})
 
 
-async def test_unsubmitted_markup_is_rejected_before_model_submits_typed_json(store):
-    value = {"label": "exact original text", "enabled": False, "count": 2, "extra": None}
-    model = ReplyModel(["<reply>" + json.dumps(value) + "</reply>", ("reply", {"json": value})])
+@pytest.mark.parametrize("text", ["Ordinary final answer", '<reply>{"enabled": false}</reply>'])
+async def test_plain_final_is_delivered_through_reply_without_transport_rejection(store, text):
+    model = ReplyModel([text])
     runtime = Runtime(store, model, require_final_tool=True)
     try:
         turn = await claimed_turn(runtime)
-        answer = await runtime.loop.run(turn, "main")
-        assert json.loads(answer) == value and model.calls == 2
+        assert await runtime.loop.run(turn, "main") == text
+        assert model.calls == 1
         events = await runtime.conversations.events("alice", turn["conversation_id"])
-        completed = [e for e in events if e["kind"] == "message.completed"]
-        assert len(completed) == 1
-        deltas = [e["payload"]["text"] for e in events if e["kind"] == "message.delta"]
-        assert deltas == [answer]
-        rejected = await store.call(
-            lambda db: rows(
-                db, "SELECT state,result_message_id FROM tool_calls WHERE turn_id=?", (turn["id"],)
-            )
+        assert [e["payload"]["text"] for e in events if e["kind"] == "message.delta"] == [text]
+        receipts = await store.call(
+            lambda db: rows(db, "SELECT state FROM tool_calls WHERE turn_id=?", (turn["id"],))
         )
-        assert [item["state"] for item in rejected] == ["failed", "succeeded"]
+        assert [item["state"] for item in receipts] == ["succeeded"]
     finally:
         await runtime.close()
 
@@ -63,8 +58,8 @@ async def test_explicit_text_submission_keeps_requested_markup_unchanged(store):
         await runtime.close()
 
 
-async def test_unchanged_missing_tool_submission_stops_existing_argument_repair(store):
-    model = ReplyModel(["unsubmitted answer", "unsubmitted answer"])
+async def test_invalid_plain_final_still_uses_existing_argument_repair(store):
+    model = ReplyModel(["Let me know if you need help", "Let me know if you need help"])
     runtime = Runtime(store, model, require_final_tool=True)
     try:
         turn = await claimed_turn(runtime)
@@ -126,7 +121,7 @@ async def test_question_still_ends_the_turn_without_a_reply(store):
         await runtime.close()
 
 
-async def test_accepting_reviewer_cannot_publish_unsubmitted_markup(store):
+async def test_plain_final_still_passes_content_review(store):
     from roami_agent.replies.source_review import REVIEW_INSTRUCTIONS
 
     value = {"label": "original text", "enabled": False}
@@ -153,11 +148,11 @@ async def test_accepting_reviewer_cannot_publish_unsubmitted_markup(store):
     runtime = Runtime(store, model, review_replies=True, require_final_tool=True)
     try:
         turn = await claimed_turn(runtime)
-        assert json.loads(await runtime.loop.run(turn, "main")) == value
-        assert model.calls == 2 and model.reviews == model.readings == 1
+        assert await runtime.loop.run(turn, "main") == "<reply>invalid transport</reply>"
+        assert model.calls == 1 and model.reviews == 1 and model.readings == 0
         events = await runtime.conversations.events("alice", turn["conversation_id"])
         assert [e["payload"]["text"] for e in events if e["kind"] == "message.delta"] == [
-            json.dumps(value, ensure_ascii=False)
+            "<reply>invalid transport</reply>"
         ]
     finally:
         await runtime.close()

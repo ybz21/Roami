@@ -191,10 +191,6 @@ async def test_background_roles_share_workspace_and_registered_cli_rules(store):
                 cli("session_send", {"sessionId": "x", "text": "x"}), role
             )
             assert tool.name == "session_send"
-        with pytest.raises(DomainError, match="USE_REGISTERED_CLI_CAPABILITY"):
-            await runtime.tools.invoke(
-                call("bash", {"argv": ["roami", "session", "kill-session"]}), "main", {}
-            )
     finally:
         await runtime.close()
 
@@ -513,3 +509,45 @@ def test_main_catalog_does_not_advertise_an_implicit_shell_workspace():
     worker = registry.catalog("worker")[0]["function"]["description"]
     assert "host supplies the working directory" in main and "scope=host" not in main
     assert worker == "Shell in a prepared workspace"
+
+
+@pytest.mark.parametrize("use_argv", [False, True])
+@pytest.mark.parametrize("role", ["main", "worker", "research"])
+async def test_unregistered_roami_command_runs_in_shell(store, tmp_path, use_argv, role):
+    probe = tmp_path / "roami"
+    probe.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\nexit 7\n')
+    probe.chmod(0o700)
+    runtime = Runtime(
+        store, ConversationModel(), settings=Settings(cli_bin=str(probe), shell_roots=(tmp_path,))
+    )
+    arguments = [str(probe), "task", "status", "--task-id", "fixture", "--include-result"]
+    try:
+        result = await runtime.tools.invoke(
+            call("bash", {"argv": arguments} if use_argv else {"command": " ".join(arguments)}),
+            role,
+            {"owner": "alice", "workspace": {"directory": str(tmp_path)}},
+        )
+        assert result["exitCode"] == 7
+        assert result["stdout"].splitlines() == arguments[1:]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("role", ["main", "worker", "research"])
+async def test_unregistered_roami_command_preserves_explicit_cwd(store, tmp_path, role):
+    probe = tmp_path / "roami"
+    probe.write_text("#!/bin/sh\npwd\n")
+    probe.chmod(0o700)
+    runtime = Runtime(
+        store, ConversationModel(), settings=Settings(cli_bin=str(probe), shell_roots=(tmp_path,))
+    )
+    try:
+        result = await runtime.tools.invoke(
+            call("bash", {"argv": [str(probe), "probe"], "cwd": str(tmp_path)}),
+            role,
+            {"owner": "alice"},
+        )
+        assert result["exitCode"] == 0
+        assert result["stdout"].strip() == str(tmp_path)
+    finally:
+        await runtime.close()

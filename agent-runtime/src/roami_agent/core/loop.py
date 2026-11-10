@@ -8,7 +8,7 @@ from itertools import count
 
 from roami_agent.protocol.errors import DomainError, ToolPreflightError
 from roami_agent.protocol.identity import identity, now_ms
-from roami_agent.protocol.model_tool_selection import final_reply_choice, select_final_reply
+from roami_agent.protocol.model_tool_selection import select_final_reply
 from roami_agent.protocol.models import Model
 from roami_agent.protocol.ports import (
     ContextBuilder,
@@ -130,7 +130,6 @@ class AgentLoop:
                 seen_rejections = set()
                 finalizing = False
                 finalization_error = None
-                force_reply = False
                 for step in count(offset):
                     if role == "main" and self.reply_reviewer is not None:
                         self.reply_reviewer.observe_context(
@@ -148,11 +147,9 @@ class AgentLoop:
                         and not finalizing
                         and any(tool["function"]["name"] == "reply" for tool in catalog)
                     )
-                    required_reply = force_reply and tool_final
                     wire_hash = hashlib.sha256(
                         encoded(
                             [provider_key, model.model, "chat-v1", settings_hash, prompt, catalog]
-                            + ([final_reply_choice()] if required_reply else [])
                         ).encode()
                     ).hexdigest()
                     await self.manifests.record(
@@ -168,7 +165,6 @@ class AgentLoop:
                                 "modelTimeoutSeconds": self.settings.timeout_for(role),
                                 "executionTimeoutSeconds": turn.get("executionTimeoutSeconds"),
                             },
-                            **({"requiredTool": "reply"} if required_reply else {}),
                         ),
                         catalog,
                         role,
@@ -191,7 +187,7 @@ class AgentLoop:
                             timing,
                             model_started,
                         ),
-                        select_final_reply(required_reply),
+                        select_final_reply(False),
                     ):
                         async for part in model.stream(prompt, catalog):
                             elapsed = (self.clock() - model_started) * 1000
@@ -241,6 +237,7 @@ class AgentLoop:
                     phase = "tools"
                     invalid_reply = (
                         role == "main"
+                        and not tool_final
                         and text.strip()
                         and await self.gateway.reply_error(
                             {**turn, "finalReplyCandidate": not calls}, text
@@ -255,21 +252,7 @@ class AgentLoop:
                         and not tool_final
                     ):
                         invalid_reply = await self.reply_reviewer.final_error(turn, text)
-                    missing_final_tool = tool_final and (
-                        (bool(text.strip()) and not calls)
-                        or (
-                            required_reply
-                            and bool(calls)
-                            and (
-                                len(calls) != 1
-                                or calls[0].get("function", {}).get("name") != "reply"
-                            )
-                        )
-                    )
-                    force_reply = missing_final_tool
-                    if missing_final_tool:
-                        invalid_reply = "MAIN_FINAL_TOOL_REQUIRED"
-                    if invalid_reply and not calls:
+                    if not calls and text.strip() and (invalid_reply or tool_final):
                         calls = [
                             {
                                 "id": "call_" + identity()[:24],
@@ -337,10 +320,6 @@ class AgentLoop:
                                 turn, mid, call, role, binding, "QUESTION_MUST_BE_ONLY_TOOL"
                             )
                             if rejected_batch
-                            else await self.gateway.reject(
-                                turn, mid, call, role, binding, "MAIN_FINAL_TOOL_REQUIRED"
-                            )
-                            if missing_final_tool
                             else await self.gateway.invoke(turn, mid, call, role, binding)
                         )
                         if (

@@ -68,7 +68,7 @@ roami db migrate --layout --dry-run
 
 | 现象 | 下一步 |
 | --- | --- |
-| USE_REGISTERED_CLI_CAPABILITY | 搜索受管能力或交给具备完整 CLI 环境的专业 Agent；不套 Shell 绕过 |
+| USE_REGISTERED_CLI_CAPABILITY | 旧版命令准入拒绝；核对 CLI 帮助和已注册入口。未注册命令由 bash 执行，按真实退出码处理 |
 | WORKSPACE_REQUIRED | 与项目无关的授权本机操作用 bash 命令字符串；代码任务复用工作区；网页研究用 resourceOnly |
 | TOOL_UNAVAILABLE / 能力空目录 | 核对角色、节点配置和真正已注册的入口，不反复猜工具名 |
 | 目标歧义 | 查询完整归属，用选择题列候选，选定后直接执行 |

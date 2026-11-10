@@ -72,7 +72,7 @@ async def test_validation_rejection_keeps_source_and_never_starts_handler(store,
 
 
 @pytest.mark.parametrize("repeat", [False, True])
-async def test_unregistered_command_has_guided_repair_and_only_stalls_without_progress(
+async def test_legacy_command_rejection_has_guided_repair_and_only_stalls_without_progress(
     store, monkeypatch, repeat
 ):
     wrong = "roami task_status --input '{}'"
@@ -110,6 +110,11 @@ async def test_unregistered_command_has_guided_repair_and_only_stalls_without_pr
     monkeypatch.setattr("roami_agent.tools.foundations.execute", never_execute)
     model = Main()
     runtime = Runtime(store, model)
+
+    async def legacy_rejection(args, binding):
+        raise DomainError("USE_REGISTERED_CLI_CAPABILITY")
+
+    monkeypatch.setattr(runtime.tools.registry["shell"], "handler", legacy_rejection)
     try:
         turn = await claimed_turn(runtime)
         if repeat:
