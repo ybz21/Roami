@@ -3,10 +3,12 @@ package worktree
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -57,7 +59,13 @@ func (s *Service) SnapshotState(ctx context.Context, path string) (state Lifecyc
 		}
 	}
 	for _, args := range [][]string{{"rev-parse", "--absolute-git-dir"}, {"rev-parse", "HEAD"}, {"symbolic-ref", "HEAD"}, {"diff", "--binary", "HEAD", "--"}, {"status", "--porcelain=v1", "-z", "--untracked-files=all"}} {
-		out, err := git(ctx, path, args...)
+		var out string
+		var err error
+		if args[0] == "symbolic-ref" {
+			out, err = lifecycleBranch(ctx, path)
+		} else {
+			out, err = git(ctx, path, args...)
+		}
 		if err != nil {
 			return state, err
 		}
@@ -182,10 +190,11 @@ func (s *Service) LifecycleDetails(ctx context.Context, path string) (Worktree, 
 		return Worktree{}, errf("LIFECYCLE_WORKSPACE_PROTECTED", "not a linked worktree")
 	}
 	w := Worktree{Path: canonical(path)}
-	w.Branch, err = git(ctx, path, "symbolic-ref", "--short", "HEAD")
+	w.Branch, err = lifecycleBranch(ctx, path)
 	if err != nil {
 		return w, err
 	}
+	w.Branch = strings.TrimPrefix(w.Branch, "refs/heads/")
 	w.Head, err = s.Head(ctx, path)
 	if err != nil {
 		return w, err
@@ -196,6 +205,15 @@ func (s *Service) LifecycleDetails(ctx context.Context, path string) (Worktree, 
 	w.Adopted = strings.TrimSpace(adopted) == "1"
 	w.External = w.CreatedBy != "roam"
 	return w, nil
+}
+
+func lifecycleBranch(ctx context.Context, path string) (string, error) {
+	branch, err := git(ctx, path, "symbolic-ref", "--quiet", "HEAD")
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return "", nil
+	}
+	return branch, err
 }
 
 func (s *Service) LifecycleOwner(ctx context.Context, path string) (string, error) {

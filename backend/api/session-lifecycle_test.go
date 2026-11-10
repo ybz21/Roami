@@ -224,6 +224,32 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 		_ = json.Unmarshal(r.Body.Bytes(), &response)
 		return response.Data
 	}
+	detached := newFixture("detached-fixture", nil)
+	detachedWorkspace, _ := life.Result[lifecycleWorkspace](detached, "workspace")
+	detach := exec.Command("git", "-C", detachedWorkspace.Path, "checkout", "--detach", "HEAD")
+	detach.Env = gitcontext.ForDirectory(os.Environ())
+	if out, e := detach.CombinedOutput(); e != nil {
+		t.Fatalf("detach fixture: %v %s", e, out)
+	}
+	detachedStatus := call("GET", "/sessions/"+detached.ResourceID+"/worktree-status", nil)
+	st.Data.Snapshot, st.Data.SessionIdentity = "", ""
+	if e := json.Unmarshal(detachedStatus.Body.Bytes(), &st); e != nil || st.Data.Snapshot == "" || st.Data.SessionIdentity == "" {
+		t.Fatalf("detached confirmation missing: %s %v", detachedStatus.Body.String(), e)
+	}
+	detachedClose := closeFixture(detached, "discard")
+	if e := worker.RunOne(ctx, detachedClose.ID); e != nil {
+		t.Fatal(e)
+	}
+	detachedResult, e := h.Lifecycle.Get(detachedClose.ID)
+	if e != nil || detachedResult.State != "succeeded" || !detachedResult.Has("remove") {
+		t.Fatalf("detached close: %+v %v", detachedResult, e)
+	}
+	if _, e := os.Stat(detachedWorkspace.Path); !os.IsNotExist(e) {
+		t.Fatalf("detached worktree survived cleanup: %v", e)
+	}
+	if git("show-ref", "--verify", "refs/heads/"+detachedWorkspace.Branch) == "" {
+		t.Fatal("detached cleanup deleted the original branch")
+	}
 	// Content written after confirmation survives; retention resumes without reviving the executor.
 	changed := newFixture("changed-fixture", nil)
 	changedWorkspace, _ := life.Result[lifecycleWorkspace](changed, "workspace")

@@ -201,7 +201,17 @@ class TaskSessions:
                 and not pending
             ):
                 raise DomainError("TASK_SESSION_CLOSING", 409)
-            if task["state"] not in STABLE or not run["finished_ms"]:
+            if task["state"] not in STABLE:
+                raise DomainError("TASK_SESSION_BUSY", 409)
+            evidence = json.loads(run["result_json"]) if run["result_json"] else {}
+            native_archive = run["executor_kind"] == "native"
+            if (
+                evidence.get("inputStopped") is False
+                or not native_archive
+                and (run["state"] == "unknown" or evidence.get("outcomeKnown") is False)
+            ):
+                raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
+            if not native_archive and not run["finished_ms"]:
                 raise DomainError("TASK_SESSION_BUSY", 409)
             tree = "WITH RECURSIVE tree(id) AS (SELECT ? UNION SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) "
             if row(
@@ -218,17 +228,25 @@ class TaskSessions:
                 (task_id, task_id),
             ):
                 raise DomainError("TASK_SESSION_BUSY", 409)
+            # Archival retains native unknown outcomes; it never settles or replays them.
             if row(
                 db,
                 tree
-                + "SELECT 1 FROM turns u JOIN task_attempts a ON a.native_branch_id=u.branch_id WHERE a.task_id IN (SELECT id FROM tree) AND u.state IN ('queued','running') UNION ALL SELECT 1 FROM tool_calls x JOIN turns u ON u.id=x.turn_id JOIN task_attempts a ON a.native_branch_id=u.branch_id WHERE a.task_id IN (SELECT id FROM tree) AND x.state IN ('planned','running','unknown') LIMIT 1",
+                + "SELECT 1 FROM tool_calls x JOIN turns u ON u.id=x.turn_id JOIN task_attempts a ON a.native_branch_id=u.branch_id WHERE a.task_id IN (SELECT id FROM tree) AND x.state='unknown' AND NOT (a.executor_kind='native' AND ((a.task_id=? AND ?) OR EXISTS(SELECT 1 FROM task_session_closures c WHERE c.task_id=a.task_id AND c.state='closed'))) LIMIT 1",
+                (task_id, task_id, native_archive),
+            ):
+                raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
+            if row(
+                db,
+                tree
+                + "SELECT 1 FROM turns u JOIN task_attempts a ON a.native_branch_id=u.branch_id WHERE a.task_id IN (SELECT id FROM tree) AND u.state IN ('queued','running') UNION ALL SELECT 1 FROM tool_calls x JOIN turns u ON u.id=x.turn_id JOIN task_attempts a ON a.native_branch_id=u.branch_id WHERE a.task_id IN (SELECT id FROM tree) AND x.state IN ('planned','running') LIMIT 1",
                 (task_id,),
             ):
                 raise DomainError("TASK_SESSION_BUSY", 409)
             if row(
                 db,
                 tree
-                + "SELECT 1 FROM task_attempts a JOIN tasks c ON c.id=a.task_id WHERE a.task_id IN (SELECT id FROM tree) AND a.task_id!=? AND a.task_revision=c.revision AND a.attempt_no=(SELECT MAX(z.attempt_no) FROM task_attempts z WHERE z.task_id=c.id) AND (a.finished_ms IS NULL OR a.state='unknown' OR json_extract(a.result_json,'$.inputStopped')=0 OR json_extract(a.result_json,'$.outcomeKnown')=0) LIMIT 1",
+                + "SELECT 1 FROM task_attempts a JOIN tasks c ON c.id=a.task_id WHERE a.task_id IN (SELECT id FROM tree) AND a.task_id!=? AND a.task_revision=c.revision AND a.attempt_no=(SELECT MAX(z.attempt_no) FROM task_attempts z WHERE z.task_id=c.id) AND NOT EXISTS(SELECT 1 FROM task_session_closures z WHERE z.task_id=c.id AND z.state='closed') AND (a.finished_ms IS NULL OR a.state='unknown' OR json_extract(a.result_json,'$.inputStopped')=0 OR json_extract(a.result_json,'$.outcomeKnown')=0) LIMIT 1",
                 (task_id, task_id),
             ):
                 raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
@@ -241,13 +259,6 @@ class TaskSessions:
                 run["session_id"] = native["id"]
             elif run["executor_kind"] != "cli" or not run["session_id"] or not self.executor:
                 raise DomainError("TASK_SESSION_UNAVAILABLE", 409)
-            evidence = json.loads(run["result_json"]) if run["result_json"] else {}
-            if (
-                run["state"] == "unknown"
-                or evidence.get("outcomeKnown") is False
-                or evidence.get("inputStopped") is False
-            ):
-                raise DomainError("TASK_OUTCOME_UNRESOLVED", 409)
             if row(
                 db,
                 tree
