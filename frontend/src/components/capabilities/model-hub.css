@@ -124,3 +124,7 @@ html[data-pointer="coarse"] .tt-model-plugin-options .ant-checkbox-wrapper { min
 html[data-pointer="coarse"] :is(.tt-model-plugin-settings,.tt-model-plugin-import,.tt-gateway-key-dialog) .ant-btn { position:relative; }
 html[data-pointer="coarse"] :is(.tt-model-plugin-settings,.tt-model-plugin-import,.tt-gateway-key-dialog) .ant-btn::after,
 html[data-pointer="coarse"] .tt-gateway-key-dialog .ant-modal-close::after { content:''; position:absolute; inset:calc(var(--sp-1) * -1); min-height:var(--tap); }
+
+html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-nav-list { width:100%; }
+html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab { flex:1; min-width:0; justify-content:center; margin:0; padding-inline:var(--sp-1); }
+html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab-btn { white-space:normal; text-align:center; font-size:var(--fs-sm); }

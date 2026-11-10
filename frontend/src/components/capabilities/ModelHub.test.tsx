@@ -340,3 +340,13 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(await screen.findByText(catalog.baseUrl + '/v1')).toBeTruthy()
   expect(screen.queryByRole('region', { name: 'Saved source' })).toBeNull()
 })
+
+it('keeps creation and import choices inside one New menu', async () => {
+  const navigate = vi.fn()
+  mount('', navigate)
+  const toolbar = (await screen.findByRole('button', { name: 'common.create' })).closest('.tt-model-hub-actions')!
+  expect(within(toolbar as HTMLElement).getAllByRole('button')).toHaveLength(1)
+  fireEvent.click(within(toolbar as HTMLElement).getByRole('button'))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
+})
