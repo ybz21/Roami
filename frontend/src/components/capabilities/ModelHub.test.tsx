@@ -11,7 +11,7 @@ vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }) }))
 vi.mock('../settings/model-usage-chart', () => ({ ModelUsageChart: () => null }))
-const catalog = { revision: 'revision-1', sources: [{ id: 'upstream', name: 'Saved source', baseUrl: 'https://models.example/v1', protocol: 'openai-responses', authMode: 'api_key', hasKey: true }], models: [{ id: 'coding', name: 'Coding', protocol: 'openai-responses', strategy: 'fixed', candidates: [{ sourceId: 'upstream', model: 'priced-model' }] }], drafts: [], baseUrl: 'http://127.0.0.1:19000', uses: {} }
+const catalog = { revision: 'revision-1', sources: [{ id: 'upstream', name: 'Saved source', baseUrl: 'http://192.168.120.56:3425/v1', protocol: 'openai-responses', authMode: 'api_key', hasKey: true }], models: [{ id: 'coding', name: 'Coding', protocol: 'openai-responses', strategy: 'fixed', candidates: [{ sourceId: 'upstream', model: 'priced-model' }] }], drafts: [], baseUrl: 'http://127.0.0.1:19000', uses: {} }
 const settings = { currency: 'CNY', timezone: 'Asia/Shanghai', dailyLimit: 3, pricing: { default: { input_per_million: 1, output_per_million: 2, cache_read_per_million: 0.5 }, models: { 'priced-model': { input_per_million: 4, output_per_million: 8, cache_read_per_million: 2 } } } }
 beforeEach(() => {
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
@@ -89,15 +89,15 @@ it('shows connections and their models together and accepts old source-page link
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })
 
-it('adds a source and a deduplicated manual batch in one save without confirmation', async () => {
+it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
-  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
   fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'first-model\nsecond-model\nfirst-model\n' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
-    sources: expect.arrayContaining([expect.objectContaining({ name: 'new.example', baseUrl: 'https://new.example/v1', apiKey: 'test-key' })]),
+    sources: expect.arrayContaining([expect.objectContaining({ name: '192.168.120.56:3425', baseUrl: 'http://192.168.120.56:3425/v1', apiKey: 'test-key' })]),
     models: expect.arrayContaining([expect.objectContaining({ name: 'first-model' }), expect.objectContaining({ name: 'second-model' })]),
   })))
   expect(screen.queryByRole('dialog')).toBeNull()
@@ -111,7 +111,7 @@ it('fetches an unsaved source, selects all matches and keeps selection across se
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? { data: { models: ['alpha', 'beta', 'gamma'] } } : original(method, path, body, options))
   mount('catalog/source/new')
-  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'draft-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
   await screen.findByRole('checkbox', { name: 'alpha' })
@@ -170,7 +170,7 @@ it('preserves inputs after authentication errors and allows manual recovery', as
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => { if (path.endsWith('/discover')) throw { apiError: { code: 'MODEL_LIST_UNAUTHORIZED' } }; return original(method, path, body, options) })
   mount('catalog/source/new')
-  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   fireEvent.change(screen.getByLabelText('agent.models.apiKey'), { target: { value: 'draft-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
   await screen.findByText('hub.directory.unauthorized')
@@ -187,7 +187,7 @@ it('discards discovery responses after editing the endpoint', async () => {
   mount('catalog/source/new')
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://old.example/v1' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
-  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://new.example/v1' } })
+  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   finish({ data: { models: ['obsolete'] } })
   await waitFor(() => expect((screen.getByRole('button', { name: 'hub.directory.fetch' }) as HTMLButtonElement).disabled).toBe(false))
   expect(screen.queryByRole('checkbox', { name: 'obsolete' })).toBeNull()
@@ -285,4 +285,18 @@ it('keeps failed speech reads non-editable and offers a retry', async () => {
   vi.mocked(api).mockResolvedValue({ data: {} })
   fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
   expect(await screen.findByRole('combobox', { name: 'settings.speechProvider' })).toBeTruthy()
+})
+
+it('updates an existing source without fetching models and retains its stored key', async () => {
+  const navigate = vi.fn(), page = mount('', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.configureSource' }))
+  page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
+  fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'Renamed source' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '' })], models: catalog.models,
+  })))
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
 })

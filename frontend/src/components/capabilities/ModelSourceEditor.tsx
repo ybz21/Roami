@@ -42,7 +42,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }
   const normalizedURL = source.baseUrl.trim().replace(/\/+$/, '')
   let validURL = false
-  try { const url = new URL(normalizedURL); validURL = normalizedURL.length <= 2000 && !url.username && !url.password && !url.search && !url.hash && (url.protocol === 'https:' || url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) } catch { /* Validated before reading or saving. */ }
+  try { const url = new URL(normalizedURL); validURL = normalizedURL.length <= 2000 && !url.username && !url.password && !url.search && !url.hash && (url.protocol === 'https:' || url.protocol === 'http:' && (['localhost', '[::1]'].includes(url.hostname) || /^(127|10)\.\d+\.\d+\.\d+$|^192\.168\.\d+\.\d+$|^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$|^\[f[cd][\da-f]{2}:/i.test(url.hostname))) } catch { /* Validated before reading or saving. */ }
   const needsKey = !!existing?.hasKey && normalizedURL !== existing.baseUrl && !source.apiKey
   const validConnection = validURL && !needsKey
   const attached = catalog.models.filter(model => model.candidates[0].sourceId === source.id)
