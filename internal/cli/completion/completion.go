@@ -18,7 +18,7 @@ const Script = `_roami_complete() {
     local words="session swarm chrome adb speech project agent db server auth plugin help version completion"
     case "${COMP_WORDS[1]}" in
         session)
-            words="ls new attach detach kill rename pause resume reclaim compact memory-status memory-setup-script send keys capture fork children parent swarm env info nw lw kw sp split kp db help"
+            words="ls new attach detach kill rename processes process-stop pause resume reclaim compact memory-status memory-setup-script send keys capture fork children parent swarm env info nw lw kw sp split kp db help"
             case "$prev" in
                 attach|detach|kill|rename|pause|resume|reclaim|compact|send|keys|capture|children)
                     local sessions

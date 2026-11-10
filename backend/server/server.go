@@ -251,6 +251,8 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/sessions/:name/restore", h.SessionRestore) // 按台账重开一个壳
 		g.POST("/sessions", h.NewSession)
 		g.PATCH("/sessions/:name", h.RenameSession)
+		g.GET("/sessions/:name/processes", h.SessionProcesses)
+		g.POST("/sessions/:name/processes/:pid/stop", h.SessionProcessStop)
 		g.POST("/sessions/:name/pause", h.SessionPause)
 		g.POST("/sessions/:name/reclaim", h.SessionReclaim)
 		g.POST("/sessions/:name/compact", h.SessionCompact)
