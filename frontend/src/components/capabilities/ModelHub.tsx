@@ -14,7 +14,7 @@ import { useModelCatalog, type ModelSource, type CatalogModel } from './model-hu
 import '../settings/agent-settings.css'
 import './model-hub.css'
 
-const tabs = ['catalog', 'usage', 'prices', 'gateway']
+const tabs = ['catalog', 'usage', 'prices', 'gateway', 'speech']
 const newID = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36)
 export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: string; onNav: (path: string) => void; embedded?: boolean }) {
   const { t, locale } = useI18n(), { message, modal } = App.useApp(), layout = useLayout()
@@ -22,7 +22,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const value = loaded || { revision: '', sources: [], models: [], drafts: [], baseUrl: '', uses: {} }
   const [requested, detail, id] = sub.split('/')
   const legacy = getHashParams().get('modelTab')
-  const tab = requested === 'sources' || requested === 'speech' ? 'catalog' : tabs.includes(requested) ? requested : legacy === 'prices' ? 'prices' : legacy === 'proxy' ? 'usage' : 'catalog'
+  const tab = requested === 'sources' ? 'catalog' : tabs.includes(requested) ? requested : legacy === 'prices' ? 'prices' : legacy === 'proxy' ? 'usage' : 'catalog'
   const billing = useGatewaySettings(tab === 'usage' || tab === 'prices')
   const [newSourceId, setNewSourceId] = useState(newID), [newModelId, setNewModelId] = useState(newID)
   const [sourceDrafts, setSourceDrafts] = useState<Record<string, SourceDraft>>({}), [modelDrafts, setModelDrafts] = useState<Record<string, CatalogModel>>({})
@@ -119,12 +119,12 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
     {draftNotice}
     {(!detail || !layout.phone) && <div className="tt-model-hub-scroll">
-      {error}
+      {tab !== 'speech' && error}
       <Tabs activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key) }))} />
-      {tab === 'gateway' ? <section className="tt-model-hub-entry" aria-label={t('hub.tab.gateway')}><p>{t('hub.entryHint')}</p><code>{value.baseUrl}</code><p>{t('hub.continuationHint')}</p></section> : tab === 'usage' || tab === 'prices' ? <><GatewaySettingsForm controller={billing} mode={tab === 'usage' ? 'proxy' : 'prices'} active models={priceModels} /><GatewayReconciliation controller={billing} /></>
+      {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><SpeechSettings /></section> : tab === 'gateway' ? <section className="tt-model-hub-entry" aria-label={t('hub.tab.gateway')}><p>{t('hub.entryHint')}</p><code>{value.baseUrl}</code><p>{t('hub.continuationHint')}</p></section> : tab === 'usage' || tab === 'prices' ? <><GatewaySettingsForm controller={billing} mode={tab === 'usage' ? 'proxy' : 'prices'} active models={priceModels} /><GatewayReconciliation controller={billing} /></>
         : <>{loaded ? <><div className="tt-model-hub-actions"><Button type="primary" icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button><Button onClick={() => navigate('catalog/local')}>{t('hub.local.title')}</Button></div>{rows.length || inlineSource ? <div className="tt-model-connections">{inlineSource && !sources.some(source => source.id === id) && <section className="tt-model-connection tt-model-source-inline is-expanded"><div className="tt-model-hub-row"><div><strong>{editorTitle}</strong></div><Button onClick={back}>{t('common.back')}</Button></div>{sourceEditor}</section>}{rows}</div> : <p>{t('hub.empty.connections')}</p>}
         {!!consumers.length && <section className="tt-model-hub-consumers"><div className="tt-model-hub-actions"><h3>{t('hub.consumers')}</h3></div>{consumers.map(([model, users]) => <div className="tt-model-hub-row" key={model}><div><strong>{models.find(row => row.id === model)?.name || model}</strong><small>{[...new Set(users)].join(', ')}</small></div><Button onClick={() => onNav('capabilities/agents/' + users[0] + '/models')}>{t('hub.configure')}</Button></div>)}</section>}</> : !error && <Spin />}
-        {!embedded && <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><h3>{t('hub.speechTitle')}</h3><SpeechSettings /></section>}</>}
+        </>}
     </div>}
     {detail && !inlineSource && (layout.phone ? <MobileSubPage title={editorTitle} search={false} onBack={back} manageHistory={false} keepBottomNav>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><h3>{editorTitle}</h3><Button onClick={back}>{t('common.back')}</Button></div>{editor}</aside>)}
   </div>
