@@ -32,12 +32,12 @@ export default function GatewayAccessKeys({ onChanged, value, onChange }: { onCh
     finally { writing.current = false; setBusy(false) }
   }
   const confirm = (row: KeyRow, action: 'rotate' | 'delete' | 'disable') => modal.confirm({
-    title: t(`hub.gateway.${action}Key`), content: t(`hub.gateway.${action}Hint`), okText: t(`hub.gateway.${action}Key`), cancelText: t('common.cancel'),
+    className: 'tt-gateway-key-dialog', title: t(`hub.gateway.${action}Key`), content: t(`hub.gateway.${action}Hint`), okText: t(`hub.gateway.${action}Key`), cancelText: t('common.cancel'),
     onOk: async () => { if (!await change(action === 'rotate' ? 'POST' : action === 'delete' ? 'DELETE' : 'PATCH', '/' + row.id + (action === 'rotate' ? '/rotate' : ''), action === 'disable' ? { disabled: true } : {})) throw new Error('save failed') },
   })
   const rename = (row: KeyRow) => {
     let next = row.name
-    modal.confirm({ title: t('hub.gateway.renameKey'), content: <Input aria-label={t('hub.gateway.keyName')} defaultValue={next} maxLength={80} onChange={event => { next = event.target.value }} />, okText: t('settings.save'), cancelText: t('common.cancel'), onOk: async () => { if (!next.trim() || !await change('PATCH', '/' + row.id, { name: next.trim() })) throw new Error('save failed') } })
+    modal.confirm({ className: 'tt-gateway-key-dialog', title: t('hub.gateway.renameKey'), content: <Input aria-label={t('hub.gateway.keyName')} defaultValue={next} maxLength={80} onChange={event => { next = event.target.value }} />, okText: t('settings.save'), cancelText: t('common.cancel'), onOk: async () => { if (!next.trim() || !await change('PATCH', '/' + row.id, { name: next.trim() })) throw new Error('save failed') } })
   }
   return <section className="tt-gateway-keys" aria-label={t('hub.gateway.keys')}>
     <h3>{t('hub.gateway.keys')}</h3>
@@ -58,7 +58,7 @@ export default function GatewayAccessKeys({ onChanged, value, onChange }: { onCh
       </article>)}</div> : <p className="agent-settings-hint">{t('hub.gateway.noKeys')}</p>}
     </>}
     <details><summary>{t('hub.gateway.manualKey')}</summary><GatewayAccessKey value={value} onChange={onChange} onChanged={() => { setVersion(previous => previous + 1); onChanged() }} /></details>
-    <Modal destroyOnHidden open={!!issued} title={t('hub.gateway.generatedKey')} footer={<Button type="primary" onClick={() => setIssued('')}>{t('common.close')}</Button>} onCancel={() => setIssued('')} maskClosable={false}>
+    <Modal className="tt-gateway-key-dialog" destroyOnHidden open={!!issued} title={t('hub.gateway.generatedKey')} footer={<Button type="primary" onClick={() => setIssued('')}>{t('common.close')}</Button>} onCancel={() => setIssued('')} maskClosable={false}>
       <p>{t('hub.gateway.onceHint')}</p>
       <Input aria-label={t('hub.gateway.generatedKey')} value={issued} readOnly onFocus={event => event.target.select()} />
       <Button icon={<CopyIcon />} onClick={async () => { try { await navigator.clipboard.writeText(issued); message.success(t('common.copied')) } catch { message.error(t('hub.gateway.copyFailed')) } }}>{t('common.copy')}</Button>
