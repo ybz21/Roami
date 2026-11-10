@@ -5018,6 +5018,7 @@ const zhCN = {
   'hub.gateway.key': '网关调用 Key',
   'hub.gateway.keyHint': '用于其他客户端调用本机网关。请保存好原 Key，保存后仅显示末尾。',
   'hub.gateway.keyConfigured': '已配置，末尾 {suffix}',
+  'hub.gateway.reservedKey': '请设置独立的调用 Key，不要使用智能体内部密钥。',
   'hub.gateway.invalidKey': '使用 16–512 个英文字母、数字或符号，不含空格。',
   'hub.gateway.disableKey': '停用调用 Key',
   'hub.gateway.disableHint': '使用这把 Key 的客户端将无法继续调用。',

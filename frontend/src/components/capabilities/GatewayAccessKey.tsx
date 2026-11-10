@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n'
 import { catalogFailure } from './model-hub-api'
 
 type AccessKeyView = { revision: string; hasKey: boolean; suffix: string }
-const failure = (cause: any) => cause?.apiError?.code === 'INVALID_MODEL_GATEWAY_KEY' ? 'hub.gateway.invalidKey' : catalogFailure(cause)
+const failure = (cause: any) => cause?.apiError?.code === 'MODEL_GATEWAY_KEY_RESERVED' ? 'hub.gateway.reservedKey' : cause?.apiError?.code === 'INVALID_MODEL_GATEWAY_KEY' ? 'hub.gateway.invalidKey' : catalogFailure(cause)
 
 export default function GatewayAccessKey({ onChanged, value: key, onChange: setKey }: { onChanged: () => void; value: string; onChange: (value: string) => void }) {
   const { t } = useI18n(), { message, modal } = App.useApp()

@@ -330,11 +330,11 @@ it('opens a saved source directory from its card and saves additions and removal
 it('keeps the gateway information in its own tab and omits the duplicate agent configuration entry', async () => {
   const navigate = vi.fn(), page = mount('', navigate)
   await screen.findByRole('region', { name: 'Saved source' })
-  expect(screen.queryByText(catalog.baseUrl)).toBeNull()
+  expect(screen.queryByText(catalog.baseUrl + '/v1')).toBeNull()
   expect(screen.queryByRole('button', { name: 'hub.configureAgents' })).toBeNull()
   fireEvent.click(screen.getByRole('tab', { name: 'hub.tab.gateway' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/gateway')
   page.rerender(<App><ModelHub sub="gateway" onNav={navigate} /></App>)
-  expect(await screen.findByText(catalog.baseUrl)).toBeTruthy()
+  expect(await screen.findByText(catalog.baseUrl + '/v1')).toBeTruthy()
   expect(screen.queryByRole('region', { name: 'Saved source' })).toBeNull()
 })

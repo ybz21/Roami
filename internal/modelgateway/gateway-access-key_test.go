@@ -96,8 +96,14 @@ func TestGatewayAccessKeyPersistsWithoutExposingOrChangingAgentCredentials(t *te
 
 func TestGatewayAccessKeyRejectsInvalidStaleAndAgentKeys(t *testing.T) {
 	h := catalogHandler(t, "https://upstream.example/v1", "openai-completions")
+	if w := setAccessKey(t, h, "PUT", h.Catalog.credential("opencode"), h.Catalog.value.Revision); w.Code != 400 {
+		t.Fatal("agent key accepted as client key")
+	}
+	if w := keyAction(t, h, "opencode", "disable"); w.Code != 200 {
+		t.Fatal(w.Body)
+	}
 	before := h.Catalog.value.Revision
-	for _, key := range []string{"short", strings.Repeat("a", 513), "fixture-gateway-key\n", "fixture gateway key", h.Catalog.credential("opencode")} {
+	for _, key := range []string{"short", strings.Repeat("a", 513), "fixture-gateway-key\n", "fixture gateway key", h.Catalog.credential("opencode"), h.Catalog.value.Token} {
 		if w := setAccessKey(t, h, "PUT", key, before); w.Code != 400 {
 			t.Fatalf("invalid key: %d", w.Code)
 		}

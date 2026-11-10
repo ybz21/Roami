@@ -2,6 +2,7 @@ package modelgateway
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"net/http"
 )
@@ -23,6 +24,20 @@ func validGatewayAccessKey(key string) bool {
 		}
 	}
 	return true
+}
+
+func (s *CatalogStore) reservedAgentCredential(key string) bool {
+	if subtle.ConstantTimeCompare([]byte(key), []byte(s.value.Token)) == 1 {
+		return true
+	}
+	for _, kind := range gatewayAgentKinds {
+		for _, reserved := range []string{s.credential(kind), s.deriveCredential(kind, ""), s.deriveCredential(kind, s.value.AgentKeys[kind].Previous)} {
+			if subtle.ConstantTimeCompare([]byte(key), []byte(reserved)) == 1 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func validStoredGatewayAccessKey(key gatewayAccessKey) bool {
@@ -79,9 +94,12 @@ func (h *Handler) accessKeyManagement(w http.ResponseWriter, r *http.Request) bo
 	if r.Method == "DELETE" {
 		next.AccessKey = gatewayAccessKey{}
 	} else {
-		kind, _ := s.authenticate(input.APIKey)
-		if !validGatewayAccessKey(input.APIKey) || kind != "" && kind != "external" {
+		if !validGatewayAccessKey(input.APIKey) {
 			reject(w, 400, "INVALID_MODEL_GATEWAY_KEY")
+			return true
+		}
+		if s.reservedAgentCredential(input.APIKey) {
+			reject(w, 400, "MODEL_GATEWAY_KEY_RESERVED")
 			return true
 		}
 		id, err := randomCatalogID()

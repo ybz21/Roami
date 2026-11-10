@@ -5009,6 +5009,7 @@ const enUS = {
   'hub.gateway.key': 'Gateway API key',
   'hub.gateway.keyHint': 'For other clients calling the local gateway. Keep your key; only its suffix is shown after saving.',
   'hub.gateway.keyConfigured': 'Configured, ending in {suffix}',
+  'hub.gateway.reservedKey': 'Set a separate client key instead of using an internal agent credential.',
   'hub.gateway.invalidKey': 'Use 16–512 English letters, digits or symbols without spaces.',
   'hub.gateway.disableKey': 'Disable API key',
   'hub.gateway.disableHint': 'Clients using this key will no longer be able to call the gateway.',
