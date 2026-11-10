@@ -1,0 +1,14 @@
+.tt-session-processes { flex: 1; min-height: 0; overflow: auto; background: var(--bg-base); font-size: var(--fs-body); }
+.tt-process-note, .tt-process-error { padding: var(--sp-4); margin: 0; color: var(--text-dim); }
+.tt-process-error { color: var(--danger); }
+.tt-process-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border-subtle); border-inline-start: 1px solid var(--border-subtle); }
+.tt-process-identity, .tt-process-memory { display: flex; flex-direction: column; min-width: 0; }
+.tt-process-identity strong { overflow-wrap: anywhere; }
+.tt-process-identity span, .tt-process-memory, .tt-process-actions > span, .tt-process-row details { color: var(--text-dim); font-size: var(--fs-meta); }
+.tt-process-actions { display: flex; align-items: center; gap: var(--sp-2); }
+.tt-process-row details { grid-column: 1 / -1; min-width: 0; }
+.tt-process-row summary { cursor: pointer; padding-block: var(--sp-1); }
+.tt-process-row pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-meta); margin-block: var(--sp-2); }
+html[data-size="compact"] .tt-process-row, html[data-size="medium"] .tt-process-row { grid-template-columns: minmax(0, 1fr) auto; }
+html[data-size="compact"] .tt-process-actions, html[data-size="medium"] .tt-process-actions { grid-column: 1 / -1; justify-content: flex-end; }
+html[data-pointer="coarse"] .tt-process-actions button, html[data-pointer="coarse"] .tt-process-row summary { min-height: var(--tap); }

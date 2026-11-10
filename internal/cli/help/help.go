@@ -31,6 +31,8 @@ func Show(version string, w io.Writer) {
 	fmt.Fprintf(w, "    %s %s  暂停 / 继续会话（保留进程与终端）\n\n", g("pause | resume"), d("<会话> [--json]"))
 
 	fmt.Fprintln(w, "    reclaim | compact <会话> [--json]  回收内存 / 整理空闲 Agent 上下文")
+	fmt.Fprintln(w, "    processes <会话> --json  进程树与内存快照")
+	fmt.Fprintln(w, "    process-stop <会话> <pid> <start> [--force]  结束指定进程")
 	fmt.Fprintln(w, "    memory-status | memory-setup-script  压缩交换区状态 / 管理员启用脚本")
 	fmt.Fprintf(w, "  %s %s\n", b("子会话"), m("(subSession — 平坦 tmux 会话 + parent 关系)"))
 	fmt.Fprintf(w, "    %s %s  从父会话派生子会话(继承 cwd/env)\n", g("fork"), d("[<父>] <子> [--dir <目录>] [--detach] [--json]"))

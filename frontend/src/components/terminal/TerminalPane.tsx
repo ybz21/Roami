@@ -1,3 +1,4 @@
+import { SessionProcesses } from '../sessions/SessionProcesses'
 import { TBtn, TI } from './terminal-toolbar'
 import { SessionMemoryBanner } from '../sessions/SessionMemoryControl'
 import { atPath, atPaths } from '../../agent-paths'
@@ -358,6 +359,7 @@ export default function TerminalPane(props: {
   }, [])
   const [switchOpen, setSwitchOpen] = useState(false)
   const [moreSheet, setMoreSheet] = useState(false)
+  const [processSession, setProcessSession] = useState<string | null>(null)
   const [recoveryOpen, setRecoveryOpen] = useState(false)
   const [recoverySession, setRecoverySession] = useState('')
   const [recoveryScreen, setRecoveryScreen] = useState('')
@@ -1017,6 +1019,7 @@ export default function TerminalPane(props: {
         {active && agentKinds[active] === 'pi' && <SheetRow icon={<AgentLogo kind="pi" size={20} />} title={agentName('pi')}
           desc={t(showPiChat(active) ? 'chat.switchToTerminal' : 'chat.switchToRendered', { name: 'Pi' })}
           onClick={() => { setMoreSheet(false); setPiView(v => ({ ...v, [active]: !showPiChat(active) })) }} />}
+        {active && !nativeSessionId(active) && <SheetRow icon={TI.tmux} title={t('session.process.title')} onClick={() => { setMoreSheet(false); setProcessSession(active) }} />}
         <SheetRow icon={TI.rename} title={t('session.rename')} onClick={() => { setMoreSheet(false); active && setRenameSession(active) }} />
         <SheetRow icon={TI.newTab} title={t('terminal.newTab')}
           onClick={() => { setMoreSheet(false); active && window.open(`/#/term/${encodeURIComponent(active)}`, '_blank') }} />
@@ -1093,6 +1096,7 @@ export default function TerminalPane(props: {
       </Dropdown>
       {/* 「新标签」进了标签右键菜单（标签条上已有「新建」）；文件 / Git 归右栏活动条；
           语音归 composer——22 设计 §3.3 去掉的四枚。独立页（左停靠）没有右栏，文件 / Git 仍在这 */}
+      {active && <TBtn icon={TI.tmux} label={t('session.process.title')} onClick={() => setProcessSession(active)} />}
       {active && <TBtn icon={TI.rename} label={t('session.rename')} title={t('session.renameTitle')} onClick={() => setRenameSession(active)} />}
       {/* 终端视图的话筒：识别结果填到命令行上，回车才发（同 /type 的约定）。对话视图的话筒在 composer 里，不重复。
           不看 showVoiceButton：那个开关管的是手机上的悬浮圆钮；工具条这枚和 composer 里那枚一样常在 */}
@@ -1314,6 +1318,7 @@ export default function TerminalPane(props: {
           {t('terminal.pasteHelp')}
         </div>
       </Modal>
+      {processSession && <SessionProcesses key={processSession} name={processSession} onClose={() => setProcessSession(null)} />}
       <RenameSessionModal session={renameSession} onClose={() => setRenameSession(null)} onDone={onRename} />
       <Dropdown
         open={!!ctx}
