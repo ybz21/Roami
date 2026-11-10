@@ -501,7 +501,7 @@ async def test_closing_parent_checks_pending_work_in_descendants(store, pending)
 
     closer = TaskSessions(store, None)
     expected = {
-        "tool": "TASK_SESSION_BUSY",
+        "tool": "TASK_OUTCOME_UNRESOLVED",
         "steering": "TASK_STEER_PENDING",
         "professional_outcome": "TASK_OUTCOME_UNRESOLVED",
     }[pending]

@@ -127,3 +127,35 @@ func TestLifecycleSnapshotDetectsContentEvenWhenSizeAndTimestampArePreserved(t *
 		t.Fatalf("content-only change was missed: %v", err)
 	}
 }
+
+func TestLifecycleSnapshotAndDetailsSupportDetachedHead(t *testing.T) {
+	service := New("", nil)
+	ctx := context.Background()
+	repo := mkRepo(t)
+	wt, err := service.Create(ctx, CreateReq{Dir: repo, Branch: "detached-cleanup"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attached, err := service.Snapshot(ctx, wt.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, err := git(ctx, wt.Path, "checkout", "--detach", "HEAD"); err != nil {
+		t.Fatalf("detach: %v %s", err, out)
+	}
+	state, err := service.SnapshotState(ctx, wt.Path)
+	if err != nil || state.Fingerprint == "" || state.Fingerprint == attached || state.Branch != "" || !state.Clean {
+		t.Fatalf("detached confirmation: %+v %v", state, err)
+	}
+	details, err := service.LifecycleDetails(ctx, wt.Path)
+	if err != nil || details.Branch != "" || details.Head != state.Head || details.External {
+		t.Fatalf("detached identity: %+v %v", details, err)
+	}
+	if err := os.WriteFile(filepath.Join(wt.Path, "late-file"), []byte("retained"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	after, err := service.Snapshot(ctx, wt.Path)
+	if err != nil || after == state.Fingerprint {
+		t.Fatalf("detached write was missed: %v", err)
+	}
+}
