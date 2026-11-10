@@ -10,6 +10,7 @@ from test_swarm_coordination_policy import delegated_team as delegated_team_fixt
 from test_swarm_coordination_policy import invoke
 from test_swarm_goal_continuation import idle_delivery as idle_delivery_fixture
 from test_swarm_goal_continuation import reply
+from test_swarm_goal_continuity import Reviewer
 from test_swarm_goal_continuity import delivery as delivery_fixture
 
 from roami_agent.protocol.errors import DomainError
@@ -24,9 +25,20 @@ delivery = delivery_fixture
 idle_delivery = idle_delivery_fixture
 
 
+class ScheduleReviewer(Reviewer):
+    pending_today = False
+
+    async def request(self, *args):
+        result = await super().request(*args)
+        if self.calls[-1].get("requestedScheduledWait"):
+            result["accepted"] = self.pending_today
+        return result
+
+
 @pytest.fixture
 async def wait_case(idle_delivery, monkeypatch):
     runtime, binding, actor = idle_delivery
+    runtime.reply_review = ScheduleReviewer()
     value = await runtime.db.call(lambda db: checkpoint_context(db, binding))
     proof = {
         "kind": "registered_goal_schedule",
@@ -261,3 +273,33 @@ async def test_model_cannot_supply_a_local_schedule_receipt_or_future_time(wait_
     with pytest.raises(DomainError):
         await wait(wait_case, nextDueMs=9999999999999, schedule={"enabled": True})
     assert not calls
+
+
+async def test_successful_tasks_do_not_hide_undispatched_work_in_a_schedule(wait_case):
+    runtime, binding, _, _, _, _ = wait_case
+    await acknowledge(wait_case)
+    runtime.reply_review.pending_today = True
+    proposed = await wait(wait_case, reason="B站已完成，X三条还未发布，等待明天")
+    with pytest.raises(DomainError, match="SWARM_GOAL_NEXT_STEP_REQUIRED"):
+        await reply(runtime, binding)
+    payload = runtime.reply_review.calls[-1]
+    assert payload["requestedScheduledWait"] == proposed
+    assert all(task["state"] == "succeeded" for task in payload["currentOriginalTasks"])
+    stored = await runtime.db.call(
+        lambda db: row(
+            db, "SELECT receipt_json FROM swarm_commands WHERE command_key LIKE 'goal-checkpoint:%'"
+        )
+    )
+    assert stored is None
+
+
+async def test_schedule_proposal_gets_a_fresh_review_after_ordinary_goal_policy(wait_case):
+    runtime, binding, _, _, _, _ = wait_case
+    await acknowledge(wait_case)
+    with pytest.raises(DomainError, match="SWARM_GOAL_NEXT_STEP_REQUIRED"):
+        await reply(runtime, binding)
+    assert runtime.reply_review.calls[-1]["requestedScheduledWait"] is None
+    await wait(wait_case)
+    assert "reply" in await reply(runtime, binding)
+    assert len(runtime.reply_review.calls) == 2
+    assert runtime.reply_review.calls[-1]["requestedScheduledWait"]["goalComplete"] is False

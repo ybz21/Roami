@@ -68,19 +68,19 @@ class GoalContinuation:
                 actual = cached_policy(db, binding, payload) if payload else None
                 if not policy or actual != policy:
                     raise DomainError("SWARM_GOAL_CHECKPOINT_CHANGED", 409)
+                if scheduled and not policy["requiresNextStep"]:
+                    self.schedule.check(db, binding, scheduled)
+                    return save_checkpoint(
+                        db,
+                        binding,
+                        {"kind": "waiting_for_registered_schedule", "wait": scheduled},
+                    )
                 if not policy["requiresNextStep"]:
                     decision = {
                         "kind": "reviewed_no_next_step",
                         "policyFingerprint": policy["sourceFingerprint"],
                     }
                 else:
-                    if scheduled:
-                        self.schedule.check(db, binding, scheduled)
-                        return save_checkpoint(
-                            db,
-                            binding,
-                            {"kind": "waiting_for_registered_schedule", "wait": scheduled},
-                        )
                     blocker = current_blocker(db, binding, latest)
                     if blocker is None:
                         raise DomainError("SWARM_GOAL_NEXT_STEP_REQUIRED", 409)
