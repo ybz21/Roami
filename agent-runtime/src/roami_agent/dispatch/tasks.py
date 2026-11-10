@@ -752,6 +752,7 @@ class Tasks:
     async def report(self, owner, task_id, run_id, revision, result):
         if result.get("state") not in {"succeeded", "failed", "cancelled"}:
             raise DomainError("INVALID_TASK_RESULT")
+        unconfirmed = result.get("outcomeKnown") is False or result.get("inputStopped") is False
 
         def write(db):
             task = row(db, "SELECT * FROM tasks WHERE id=? AND owner_id=?", (task_id, owner))
@@ -768,8 +769,11 @@ class Tasks:
                     return task
                 if (
                     run["state"] != "unknown"
-                    or previous.get("outcomeKnown") is not False
-                    or result.get("outcomeKnown") is False
+                    or not (
+                        previous.get("outcomeKnown") is False
+                        or previous.get("inputStopped") is False
+                    )
+                    or unconfirmed
                 ):
                     raise DomainError("TASK_RESULT_CONFLICT", 409)
                 event(
@@ -782,7 +786,7 @@ class Tasks:
                 )
             db.execute(
                 "UPDATE task_attempts SET state=?,result_json=?,finished_ms=? WHERE id=?",
-                (result["state"], encoded(result), now_ms(), run_id),
+                ("unknown" if unconfirmed else result["state"], encoded(result), now_ms(), run_id),
             )
             record_execution_result(db, task_id, run_id)
             # A late old revision is evidence, never authority over the current task.

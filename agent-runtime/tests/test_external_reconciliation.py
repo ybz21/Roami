@@ -51,13 +51,36 @@ async def prepare_expired(database):
     return conversations, tasks, conversation, task
 
 
-async def test_expired_unknown_execution_frees_slot_and_late_result_stays_historical(store):
+@pytest.mark.parametrize("missing", [False, True])
+async def test_expired_unknown_execution_frees_slot_and_late_result_stays_historical(
+    store, missing
+):
     from test_runtime import until
 
     conversations, tasks, conversation, task = await prepare_expired(store)
     executor = CodingExecutor(store, Settings(workers=1))
     observed = []
     receipt = {"state": "unknown"}
+    if missing:
+        await store.call(
+            lambda db: db.execute(
+                "UPDATE tasks SET budget_json=? WHERE id=?",
+                (json.dumps({"deadlineMs": now_ms() + 600_000}), task["id"]),
+            ),
+            write=True,
+        )
+        receipt = {
+            "state": "unknown",
+            "observationErrorCode": "SESSION_EXECUTION_MISSING",
+            "result": {
+                "state": "failed",
+                "errorCode": "SESSION_EXECUTION_MISSING",
+                "summary": "SESSION_EXECUTION_MISSING",
+                "outcomeKnown": False,
+                "inputStopped": False,
+                "finishedMs": 0,
+            },
+        }
 
     async def command(sub, *args, **kwargs):
         observed.append(sub)
@@ -78,7 +101,10 @@ async def test_expired_unknown_execution_frees_slot_and_late_result_stays_histor
         )
         assert attempt["state"] == "unknown"
         assert json.loads(attempt["result_json"])["outcomeKnown"] is False
-        assert "launch" not in observed and "cancel" in observed
+        assert "launch" not in observed
+        assert ("cancel" in observed) is (not missing)
+        if missing:
+            assert json.loads(attempt["result_json"])["inputStopped"] is False
         other = await tasks.create(
             "alice",
             conversation["id"],
@@ -152,3 +178,75 @@ async def test_known_result_wins_over_stale_deadline_observation(store):
     )
     current = (await tasks.list("alice"))[0]
     assert current["state"] == "verifying" and current["latestAttempt"]["state"] == "succeeded"
+
+
+@pytest.mark.parametrize("state", ["running", "cancelling"])
+async def test_missing_execution_releases_original_queued_cli_job(store, tmp_path, state):
+    import asyncio
+
+    _, tasks, conversation, task = await prepare_expired(store)
+    await store.call(
+        lambda db: db.execute(
+            "UPDATE tasks SET state=?,budget_json=? WHERE id=?",
+            (state, json.dumps({"deadlineMs": now_ms() + 600_000}), task["id"]),
+        ),
+        write=True,
+    )
+    queued = await tasks.create(
+        "alice",
+        conversation["id"],
+        "Original queued request",
+        key="waiting",
+        executor="codex",
+        target={"kind": "new_session", "directory": str(tmp_path)},
+        record_intent=True,
+    )
+    original = await store.call(
+        lambda db: row(db, "SELECT * FROM jobs WHERE aggregate_id=?", (queued["id"],))
+    )
+    executor = CodingExecutor(store, Settings(workers=1))
+    observed = []
+
+    async def command(sub, *args, **kwargs):
+        observed.append(sub)
+        return {
+            "state": "unknown",
+            "observationErrorCode": "SESSION_EXECUTION_MISSING",
+            "result": {
+                "state": "failed",
+                "summary": "SESSION_EXECUTION_MISSING",
+                "outcomeKnown": False,
+                "inputStopped": False,
+            },
+        }
+
+    executor.command = command
+    runtime = Runtime(store, Model(), settings=Settings(workers=1), executor=executor)
+    started = []
+
+    async def capture(job):
+        started.append(job["id"])
+
+    runtime.scheduler._job = capture
+    await runtime.scheduler._scan()
+    await asyncio.sleep(0)
+    assert original["id"] not in started
+    await executor.poll(tasks)
+    verification = await store.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE aggregate_id=? AND kind='task.verify'", (task["id"],)
+        )
+    )
+    await runtime.dispatch.verify(verification)
+    current = next(item for item in await tasks.list("alice") if item["id"] == task["id"])
+    assert current["state"] == "interrupted"
+    assert current["latestAttempt"]["state"] == "unknown"
+    await runtime.scheduler._scan()
+    await asyncio.sleep(0)
+    assert started.count(original["id"]) == 1
+    unchanged = await store.call(
+        lambda db: row(db, "SELECT * FROM jobs WHERE id=?", (original["id"],))
+    )
+    assert unchanged["payload_json"] == original["payload_json"]
+    assert "launch" not in observed
+    await asyncio.gather(*(item["handle"] for item in runtime.active.values()))
