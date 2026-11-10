@@ -33,10 +33,17 @@ html[data-pointer="coarse"] .tt-model-binding-mode .ant-radio-button-wrapper { m
 
 .tt-model-binding-field { display:flex; flex-direction:column; gap:var(--sp-2); }
 
-.tt-model-connections { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5) * 20)),1fr)); gap:var(--sp-4); align-items:start; }
+.tt-model-connections { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(var(--sp-5) * 18)),1fr)); gap:var(--sp-4); align-items:start; }
 .tt-model-connection { min-width:0; padding:var(--sp-4); background:var(--bg-container); border:1px solid var(--border-subtle); border-radius:var(--r-card); }
-.tt-model-connection > .tt-model-hub-row { flex-wrap:wrap; padding-top:0; }
-.tt-model-connection > .tt-model-hub-row > div { flex-basis:calc(var(--sp-5) * 8); }
+.tt-model-connection.is-expanded { grid-column:1 / -1; }
+.tt-model-connection-head { display:flex; align-items:center; gap:var(--sp-3); margin-bottom:var(--sp-4); }
+.tt-model-connection-head > div { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--sp-1); }
+.tt-model-connection-head strong { font-size:var(--fs-body); overflow-wrap:anywhere; }
+.tt-model-connection-head small { color:var(--text-dim); font-size:var(--fs-meta); overflow-wrap:anywhere; }
+.tt-model-connection-icon { display:flex; align-items:center; justify-content:center; width:var(--tap); height:var(--tap); flex-shrink:0; border-radius:var(--r-sm); background:var(--accent-soft); color:var(--accent); }
+.tt-model-connection-preview { margin-block:var(--sp-4); font-size:var(--fs-meta); color:var(--text-dim); }
+.tt-model-connection-preview p { margin:var(--sp-2) 0 0; font-size:var(--fs-sm); color:var(--text-bright); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.tt-model-connection-footer { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); margin-top:var(--sp-4); }
 .tt-model-connection-settings { display:flex; flex-wrap:wrap; gap:var(--sp-3) var(--sp-5); margin:0 0 var(--sp-3); font-size:var(--fs-meta); }
 .tt-model-connection-settings > div { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
 .tt-model-connection-settings dt { color:var(--text-dim); }
