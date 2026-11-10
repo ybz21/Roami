@@ -96,12 +96,12 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
   const { t, locale } = useI18n()
   const operations = useSessionLifecycle()
   const native = useNativeSessionList(true, true)
-  const nativeClosures = native.value.filter(record => record.lifecycle !== 'closed' && (record.lifecycle === 'closing' || record.closureError))
+  const nativeClosures = native.value.filter(record => record.lifecycle !== 'closed' && !!record.closureError)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
-  const op = operations.value.find(o => o.operationId === selected)
-  const active = operations.value.filter(o => !lifecycleEnded(o))
-  const pendingCount = active.length + nativeClosures.filter(record => record.lifecycle === 'closing').length
+  const op = operations.value.find(o => o.operationId === selected && (o.kind === 'create' || o.state === 'attention'))
+  const active = operations.value.filter(o => !lifecycleEnded(o) && (o.kind === 'create' || o.state === 'attention'))
+  const pendingCount = active.length + nativeClosures.length
   const show = () => { if (!phone) revealInspector(); setOpen(true) }
   const close = () => { if (selected) setSelected(null); else setOpen(false) }
   return <>
@@ -126,7 +126,7 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
 export function PendingSessionLifecycle({ name }: { name: string }) {
   const { value } = useSessionLifecycle()
   const op = blockingLifecycle(value, name)
-  return op ? <div className="tt-lifecycle-guard"><LifecycleOperationView key={op.operationId} op={op} /></div> : null
+  return op?.kind === 'create' ? <div className="tt-lifecycle-guard"><LifecycleOperationView key={op.operationId} op={op} /></div> : null
 }
 
 export function SessionLifecycleDraftNotice({ name }: { name: string }) {

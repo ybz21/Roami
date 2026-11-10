@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import MobileSessions from './MobileSessions'
 import { api } from '../../api'
 import { closeSession, renameSession, stopSession } from '../sessions/session-actions'
 import { refreshSessionLists } from '../sessions/native-session-list'
 import { setSessionLabels } from '../sessions/session-label'
+
+const scope = vi.hoisted(() => ({ node: 0 }))
+vi.mock('../cluster/node-url', () => ({ currentNodeId: () => String(scope.node), useCurrentNodeId: () => String(scope.node), nodeApi: (path: string) => '/test-node-' + scope.node + path }))
+beforeEach(() => { scope.node++ })
 
 const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
@@ -73,6 +77,7 @@ it.each([true, false])('honors the worktree deletion checkbox on mobile (delete=
   expect(api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'close', resourceId: 'codex', intent: { name: 'Codex chat', mode: remove ? 'discard' : 'keep', path: worktree.path, snapshot: worktree.snapshot, sessionIdentity: worktree.sessionIdentity } }))
   expect(closeSession).not.toHaveBeenCalled()
   expect(refreshSessionLists).toHaveBeenCalled()
+  await waitFor(() => expect(screen.queryByRole('button', { name: /Codex chat/ })).toBeNull())
 })
 
 it('offers unfinished worktree choices before closing a mobile session', async () => {

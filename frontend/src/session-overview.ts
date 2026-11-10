@@ -15,11 +15,12 @@ export type OverviewItem = {
 const useOverview = createSessionPoll<OverviewItem[]>('/sessions/overview', 5000, [], response => response?.data?.items || [])
 export function useSessionOverview(enabled = true) {
   const snapshot = useOverview(enabled), operations = useSessionLifecycle(enabled)
+  const closingNames = useMemo(() => new Set(operations.value.filter(op => op.kind === 'close' && op.state !== 'cancelled').map(op => op.resourceId)), [operations.value])
   const value = useMemo(() => {
     const result = [...snapshot.value]
     for (const op of [...operations.value].reverse()) {
       const index = result.findIndex(item => item.name === op.resourceId)
-      if (op.kind === 'close' && (op.receipts.stop || op.state === 'succeeded')) { if (index >= 0) result.splice(index, 1); continue }
+      if (op.kind === 'close' && op.state !== 'cancelled') { if (index >= 0) result.splice(index, 1); continue }
       if (lifecycleEnded(op)) continue
       const lifecycle = op.state === 'attention' ? 'attention' : op.kind === 'create' ? 'preparing' : 'closing'
       if (index >= 0) result[index] = { ...result[index], lifecycle }
@@ -27,5 +28,5 @@ export function useSessionOverview(enabled = true) {
     }
     return operations.value.length ? result : snapshot.value
   }, [snapshot.value, operations.value])
-  return { ...snapshot, value }
+  return { ...snapshot, value, closingNames }
 }

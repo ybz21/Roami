@@ -87,6 +87,7 @@ it('hides completed history while keeping unresolved operations and native closu
   state.operations = [
     { ...op, operationId: 'done', state: 'succeeded', intent: { name: 'Already cleaned' } },
     { ...op, operationId: 'cancelled', state: 'cancelled', intent: { name: 'Already cancelled' } },
+    { ...op, operationId: 'closing', kind: 'close', state: 'running', intent: { name: 'Closing CLI' } },
     { ...op, state: 'attention', intent: { name: 'Needs recovery' } },
   ]
   state.native = [
@@ -98,8 +99,9 @@ it('hides completed history while keeping unresolved operations and native closu
   expect(screen.queryByText('Already cleaned')).toBeNull()
   expect(screen.queryByText('Already cancelled')).toBeNull()
   expect(screen.queryByText('Closed native')).toBeNull()
+  expect(screen.queryByText('Closing CLI')).toBeNull()
   expect(screen.getByRole('button', { name: /Needs recovery/ })).toBeTruthy()
-  expect(screen.getByRole('button', { name: /Closing native/ })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /Closing native/ })).toBeNull()
 })
 
 it('keeps the selected detail and draft when the operation completes', () => {

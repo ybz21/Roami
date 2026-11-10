@@ -8,7 +8,7 @@ const useNativeRecords = createSessionPoll<NativeSessionRecord[]>(
 
 export function useNativeSessionList(enabled = true, includeClosed = false) {
   const snapshot = useNativeRecords(enabled)
-  const value = useMemo(() => includeClosed ? snapshot.value : snapshot.value.filter(session => session.lifecycle !== 'closed'), [snapshot.value, includeClosed])
+  const value = useMemo(() => includeClosed ? snapshot.value : snapshot.value.filter(session => session.lifecycle !== 'closed' && session.lifecycle !== 'closing'), [snapshot.value, includeClosed])
   return { ...snapshot, value }
 }
 

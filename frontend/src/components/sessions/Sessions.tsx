@@ -38,7 +38,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const [cliList, setList] = useState<any[]>([])
   const native = useNativeSessionList()
   const overview = useSessionOverview()
-  const list = useMemo(() => [...overview.value.filter(item => item.lifecycle && !cliList.some(session => session.name === item.name)).map(item => ({ ...item, created: item.lastActivity })), ...cliList.map(item => ({ ...item, lifecycle: overview.value.find(session => session.name === item.name)?.lifecycle })), ...native.value.map(record => ({ ...nativeSessionRecord(record), last_activity: record.lastActivity, created: Date.parse(record.createdAt || '') / 1000 }))], [cliList, native.value, overview.value])
+  const list = useMemo(() => [...overview.value.filter(item => item.lifecycle && !cliList.some(session => session.name === item.name)).map(item => ({ ...item, created: item.lastActivity })), ...cliList.filter(item => !overview.closingNames?.has(item.name)).map(item => ({ ...item, lifecycle: overview.value.find(session => session.name === item.name)?.lifecycle })), ...native.value.map(record => ({ ...nativeSessionRecord(record), last_activity: record.lastActivity, created: Date.parse(record.createdAt || '') / 1000 }))], [cliList, native.value, overview.value, overview.closingNames])
   const agentKinds = useAgentKinds()
   const needsInput = useMemo(() => Object.fromEntries(overview.value.map(item => [item.name, item.waiting])), [overview.value])
   const [swarmMap, setSwarmMap] = useState<Record<string, SwarmSessionMember>>({})
