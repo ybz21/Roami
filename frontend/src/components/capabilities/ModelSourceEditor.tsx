@@ -96,7 +96,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
-        {draft.editing ? <>
+        {source.pluginSourceId ? <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} onChange={event => updateSource({ name: event.target.value })} /></label> : draft.editing ? <>
           <label className="agent-settings-field">{t('agent.models.baseUrl')}<Input aria-label={t('agent.models.baseUrl')} type="url" value={source.baseUrl} maxLength={2000} placeholder="https://api.example.com/v1" onChange={event => updateSource({ baseUrl: event.target.value })} /></label>
           <label className="agent-settings-field">{t('agent.models.apiKey')}<Input.Password aria-label={t('agent.models.apiKey')} autoComplete="new-password" visibilityToggle={false} value={source.apiKey} maxLength={8192} placeholder={t(source.hasKey ? 'agent.models.keyKept' : 'agent.models.keyPlaceholder')} onChange={event => updateSource({ apiKey: event.target.value })} /></label>
           {needsKey && <p className="tt-model-source-warning" role="alert">{t('agent.models.newEndpointKey')}</p>}
@@ -120,10 +120,10 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         })}</div>
         {!visible.length && <p className="agent-settings-hint">{t(draft.directory.length ? 'hub.directory.noMatches' : 'hub.directory.empty')}</p>}
       </section>}
-      <section className="tt-model-source-manual">
+      {!source.pluginSourceId && <section className="tt-model-source-manual">
         <button type="button" className="tt-act" aria-expanded={draft.manualOpen} onClick={() => patch({ manualOpen: !draft.manualOpen })}><PlusIcon />{t('hub.directory.manual')}</button>
         {draft.manualOpen && <label className="agent-settings-field">{t('hub.directory.manualHint')}<Input.TextArea aria-label={t('hub.directory.manual')} rows={4} value={draft.manual} onChange={event => patch({ manual: event.target.value })} />{invalidManual && <span className="tt-model-source-warning" role="alert">{t('hub.directory.invalidManual')}</span>}</label>}
-      </section>
+      </section>}
       {overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
       {!!attached.length && <p className="agent-settings-hint">{t('hub.directory.kept', { count: number(attached.length - removedCount) })}</p>}
     </div>

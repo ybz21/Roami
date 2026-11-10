@@ -56,7 +56,12 @@ func (s *CatalogStore) credential(kind string) string {
 }
 func (s *CatalogStore) keyAllowed(kind, id string) bool {
 	if kind == "external" {
-		return s.value.AccessKey.Hash != "" && s.value.AccessKey.ID == id
+		for _, key := range s.externalKeys() {
+			if !key.Disabled && key.Hash != "" && externalKeyGeneration(key) == id {
+				return true
+			}
+		}
+		return false
 	}
 	state := s.value.AgentKeys[kind]
 	return !state.Disabled && (id == keyID(state.ID) || id == keyID(state.Previous) && state.PreviousUntil > s.ledger.now().UnixMilli())
@@ -80,12 +85,13 @@ func (s *CatalogStore) authenticate(key string) (string, string) {
 			return kind, keyID(state.Previous)
 		}
 	}
-	if s.value.AccessKey.Hash != "" {
-		sum := sha256.Sum256([]byte(key))
-		if subtle.ConstantTimeCompare([]byte(hex.EncodeToString(sum[:])), []byte(s.value.AccessKey.Hash)) == 1 {
-			return "external", s.value.AccessKey.ID
+	sum := sha256.Sum256([]byte(key))
+	for _, accessKey := range s.externalKeys() {
+		if !accessKey.Disabled && accessKey.Hash != "" && subtle.ConstantTimeCompare([]byte(hex.EncodeToString(sum[:])), []byte(accessKey.Hash)) == 1 {
+			return "external", externalKeyGeneration(accessKey)
 		}
 	}
+
 	return "", ""
 }
 func gatewayEndpoint(base, endpoint string) bool { return endpoint == base || endpoint == base+"/v1" }

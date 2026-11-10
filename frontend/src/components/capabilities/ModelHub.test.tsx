@@ -21,6 +21,8 @@ beforeEach(() => {
       if (method === 'PUT') saved = { ...body, revision: 'revision-2', baseUrl: catalog.baseUrl, uses: {} }
       return { data: structuredClone(saved) }
     }
+    if (path === '/agent/model-gateway/access-keys') return { data: { revision: saved.revision, keys: [] } }
+    if (path === '/agent/model-gateway/access-key') return { data: { revision: saved.revision, hasKey: false, suffix: '' } }
     if (path === '/agent/model-gateway/settings') return { data: structuredClone(settings) }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { day: '2026-10-31', from: '2026-10-25', to: '2026-10-31', days: 7, timezone: 'Asia/Shanghai', today: [], groups: [], hourly: [], recent: [] } }
     return { data: {} }

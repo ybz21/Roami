@@ -29,6 +29,8 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 	for _, route := range []struct{ method, path string }{
+		{"GET", "/agent/model-gateway/plugins/packages"}, {"POST", "/agent/model-gateway/plugins/import"}, {"POST", "/agent/model-gateway/plugins/inspect"}, {"POST", "/agent/model-gateway/plugins/sources"}, {"GET", "/agent/model-gateway/plugins/sources/:source/info"}, {"POST", "/agent/model-gateway/plugins/sources/:source/options"}, {"POST", "/agent/model-gateway/plugins/sources/:source/auth"}, {"GET", "/agent/model-gateway/plugins/sources/:source/auth-jobs/:job"}, {"DELETE", "/agent/model-gateway/plugins/sources/:source/auth-jobs/:job"},
+		{"GET", "/agent/model-gateway/access-keys"}, {"POST", "/agent/model-gateway/access-keys"}, {"PATCH", "/agent/model-gateway/access-keys/:id"}, {"DELETE", "/agent/model-gateway/access-keys/:id"}, {"POST", "/agent/model-gateway/access-keys/:id/rotate"},
 		{"GET", "/agent/model-gateway/access-key"}, {"PUT", "/agent/model-gateway/access-key"}, {"DELETE", "/agent/model-gateway/access-key"},
 		{"GET", "/agent/model-gateway/settings"}, {"PUT", "/agent/model-gateway/settings"},
 		{"GET", "/agent/model-gateway/catalog"}, {"PUT", "/agent/model-gateway/catalog"}, {"POST", "/agent/model-gateway/catalog/apply"},

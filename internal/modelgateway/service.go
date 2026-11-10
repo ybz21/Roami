@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ybz21/Roami/internal/modelplugins"
 	metadb "github.com/ybz21/Roami/internal/storage"
 	"golang.org/x/sys/unix"
 )
@@ -87,6 +88,15 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 		listener.Close()
 		return nil, err
 	}
+	plugins, err := modelplugins.NewManager(filepath.Join(paths.Data, "model-plugins"))
+	if err != nil {
+		public.Close()
+		listener.Close()
+		return nil, err
+	}
+	plugins.AuthChanged = handler.pluginAuthChanged
+	handler.Plugins = plugins
+	catalog.plugins = plugins
 	handler.Catalog = catalog
 	publicServer := &http.Server{Handler: http.HandlerFunc(handler.publicModels), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	publicDone := make(chan struct{})
@@ -125,6 +135,7 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 			<-done
 			// Close cancels requests; wait for their deferred ledger writes before unlocking.
 			handler.wait.Wait()
+			plugins.Close()
 			handler.Client.Transport.(*http.Transport).CloseIdleConnections()
 			_ = unix.Flock(fd, unix.LOCK_UN)
 			_ = unix.Close(fd)

@@ -20,7 +20,7 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		routes := []route{}
 		for _, candidate := range model.Candidates {
 			source := sources[candidate.SourceID]
-			routes = append(routes, route{source.BaseURL, source.Protocol, source.AuthMode, source.APIKey, candidate.Model})
+			routes = append(routes, route{source.BaseURL, source.Protocol, source.AuthMode, source.APIKey + source.PluginRevision, candidate.Model})
 		}
 		raw, err := json.Marshal(struct {
 			Protocol, Strategy string

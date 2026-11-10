@@ -5,6 +5,7 @@
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
 | 会话关闭阻塞 | [20261110-native-close-blockers](20261110-native-close-blockers/README.md) | 原生会话保留未知历史归档，分离 HEAD 工作区支持确认和清理 |
+| Magpie 插件模型源 | [20261110-magpie-model-sources](20261110-magpie-model-sources/README.md) | WorkBuddy、豆包工作导入、隔离运行与网关 Key 管理 |
 | 长期会话增量整理 | [20261109-incremental-context](20261109-incremental-context/README.md) | 复用有效摘要、保留完整来源与记忆版本校验 |
 | OKR 发布后的动态取数 | [20261108-okr-publication-data](20261108-okr-publication-data/README.md) | 项目 SQLite 发布登记、稳定集合来源与 Main 确认边界 |
 | 语音识别模型配置 | [20261107-speech-model-settings](20261107-speech-model-settings/README.md) | 能力中心入口、旧链接兼容与桌面/真机验收 |

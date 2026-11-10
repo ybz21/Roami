@@ -8,10 +8,14 @@ import (
 )
 
 type gatewayAccessKey struct {
-	Hash    string `json:"hash,omitempty"`
-	ID      string `json:"id,omitempty"`
-	Suffix  string `json:"suffix,omitempty"`
-	Updated int64  `json:"updatedMs,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Disabled   bool   `json:"disabled,omitempty"`
+	Generation string `json:"generation,omitempty"`
+	Created    int64  `json:"createdMs,omitempty"`
+	Hash       string `json:"hash,omitempty"`
+	ID         string `json:"id,omitempty"`
+	Suffix     string `json:"suffix,omitempty"`
+	Updated    int64  `json:"updatedMs,omitempty"`
 }
 
 func validGatewayAccessKey(key string) bool {

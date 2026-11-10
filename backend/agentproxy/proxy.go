@@ -32,6 +32,8 @@ func Proxy(socket string) http.Handler {
 	target := &url.URL{Scheme: "http", Host: "roami-agent"}
 	marketplace := agentruntime.Transport(socket)
 	marketplace.ResponseHeaderTimeout = 100 * time.Second
+	models := agentruntime.Transport(modelgateway.Socket(socket))
+	models.ResponseHeaderTimeout = 100 * time.Second
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(target)
@@ -43,7 +45,7 @@ func Proxy(socket string) http.Handler {
 			// Roami's current login is single-user; never accept identity from browser headers.
 			r.Out.Header.Set("X-Roami-Owner", "local")
 		},
-		Transport: capabilityTransport{agentruntime.Transport(socket), marketplace, agentruntime.Transport(modelgateway.Socket(socket))}, FlushInterval: -1,
+		Transport: capabilityTransport{agentruntime.Transport(socket), marketplace, models}, FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

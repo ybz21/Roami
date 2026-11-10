@@ -14,16 +14,21 @@ import (
 	"sync"
 
 	"github.com/ybz21/Roami/internal/agentproviders"
+	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 type ModelSource struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	BaseURL  string `json:"baseUrl"`
-	Protocol string `json:"protocol"`
-	AuthMode string `json:"authMode"`
-	APIKey   string `json:"apiKey,omitempty"`
-	HasKey   bool   `json:"hasKey,omitempty"`
+	ID                       string `json:"id"`
+	PluginSourceID           string `json:"pluginSourceId,omitempty"`
+	PluginRevision           string `json:"pluginRevision,omitempty"`
+	PluginDesktop            bool   `json:"pluginDesktop,omitempty"`
+	PluginDesktopUnavailable bool   `json:"pluginDesktopUnavailable,omitempty"`
+	Name                     string `json:"name"`
+	BaseURL                  string `json:"baseUrl"`
+	Protocol                 string `json:"protocol"`
+	AuthMode                 string `json:"authMode"`
+	APIKey                   string `json:"apiKey,omitempty"`
+	HasKey                   bool   `json:"hasKey,omitempty"`
 }
 type ModelCandidate struct {
 	SourceID string `json:"sourceId"`
@@ -46,6 +51,7 @@ type ModelCatalog struct {
 	Port            int                      `json:"-"`
 	Token           string                   `json:"-"`
 	AccessKey       gatewayAccessKey         `json:"-"`
+	AccessKeys      []gatewayAccessKey       `json:"-"`
 	RolesBackup     map[string]any           `json:"-"`
 	AgentKeys       map[string]agentKeyState `json:"-"`
 	CanRestoreRoami bool                     `json:"canRestoreRoami"`
@@ -56,6 +62,7 @@ type catalogDisk struct {
 	Port        int                      `json:"port"`
 	Token       string                   `json:"token"`
 	AccessKey   gatewayAccessKey         `json:"accessKey,omitempty"`
+	AccessKeys  []gatewayAccessKey       `json:"accessKeys,omitempty"`
 	RolesBackup map[string]any           `json:"rolesBackup,omitempty"`
 	AgentKeys   map[string]agentKeyState `json:"agentKeys,omitempty"`
 }
@@ -67,6 +74,7 @@ type CatalogStore struct {
 	agents      *agentproviders.Store
 	applying    bool
 	agentSocket string
+	plugins     *modelplugins.Manager
 }
 
 var catalogID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$`)
@@ -85,13 +93,14 @@ func openCatalog(l *Ledger) (*CatalogStore, error) {
 	err := l.db.QueryRow(`SELECT value FROM gateway_catalog WHERE id=1`).Scan(&raw)
 	if err == nil {
 		var d catalogDisk
-		if json.Unmarshal([]byte(raw), &d) != nil || len(d.Token) != 48 || d.Port < 0 || d.Port > 65535 || !validStoredGatewayAccessKey(d.AccessKey) {
+		if json.Unmarshal([]byte(raw), &d) != nil || len(d.Token) != 48 || d.Port < 0 || d.Port > 65535 || !validStoredGatewayAccessKey(d.AccessKey) || !validStoredGatewayAccessKeys(d.AccessKeys) {
 			return nil, catalogError()
 		}
 		s.value = d.Catalog
 		s.value.Port = d.Port
 		s.value.Token = d.Token
 		s.value.AccessKey = d.AccessKey
+		s.value.AccessKeys = d.AccessKeys
 		s.value.RolesBackup = d.RolesBackup
 		s.value.AgentKeys = d.AgentKeys
 	} else if err == sql.ErrNoRows {
@@ -122,7 +131,7 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 	if err := writeCatalogVerificationRevision(s.ledger.paths.Data, ModelCatalog{}); err != nil {
 		return err
 	}
-	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys, AccessKey: value.AccessKey})
+	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys, AccessKey: value.AccessKey, AccessKeys: value.AccessKeys})
 	if err != nil {
 		return err
 	}
@@ -142,6 +151,7 @@ func (s *CatalogStore) snapshot() ModelCatalog {
 	_ = json.Unmarshal(raw, &v)
 	v.Token = s.value.Token
 	v.AccessKey = s.value.AccessKey
+	v.AccessKeys = append([]gatewayAccessKey(nil), s.value.AccessKeys...)
 	v.Port = s.value.Port
 	v.RolesBackup = s.value.RolesBackup
 	v.AgentKeys = map[string]agentKeyState{}
@@ -206,11 +216,36 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	for i := range v.Sources {
 		v.Sources[i].HasKey = v.Sources[i].APIKey != ""
 		v.Sources[i].APIKey = ""
+		if v.Sources[i].PluginSourceID != "" && s.plugins != nil {
+			if source, err := s.plugins.ReadSource(v.Sources[i].PluginSourceID); err == nil {
+				v.Sources[i].PluginDesktop = source.ProviderID == "doubao-work"
+				v.Sources[i].PluginDesktopUnavailable = modelplugins.DesktopUnavailable(source.ProviderID)
+				if provider, err := s.plugins.CachedProvider(source); err == nil {
+					v.Sources[i].HasKey = provider.SignedIn
+				}
+			}
+		}
 	}
 	v.Token = ""
 	return v
 }
 func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (ModelSource, error) {
+	if p.PluginSourceID != "" {
+		if s.plugins == nil || p.ID != p.PluginSourceID || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || strings.ContainsAny(p.Name, "\r\n\x00") {
+			return ModelSource{}, catalogError()
+		}
+		if _, err := s.plugins.ReadSource(p.PluginSourceID); err != nil {
+			return ModelSource{}, catalogError()
+		}
+		if previous.ID != "" && previous.PluginSourceID != p.PluginSourceID {
+			return ModelSource{}, catalogError()
+		}
+		return ModelSource{ID: p.ID, PluginSourceID: p.PluginSourceID, PluginRevision: previous.PluginRevision, Name: strings.TrimSpace(p.Name), BaseURL: "https://magpie.invalid/" + p.ID, Protocol: "openai-completions", AuthMode: "plugin"}, nil
+	}
+	if previous.PluginSourceID != "" {
+		return ModelSource{}, catalogError()
+	}
+
 	p.BaseURL = strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
 	u, err := url.Parse(p.BaseURL)
 	if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
@@ -311,6 +346,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	v.Port = s.value.Port
 	v.Token = s.value.Token
 	v.AccessKey = s.value.AccessKey
+	v.AccessKeys = append([]gatewayAccessKey(nil), s.value.AccessKeys...)
 	v.RolesBackup = s.value.RolesBackup
 	v.AgentKeys = map[string]agentKeyState{}
 	for kind, key := range s.value.AgentKeys {
@@ -318,7 +354,17 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	}
 	v.BaseURL = ""
 	v.Uses = nil
-	return s.persist(v)
+	if err := s.persist(v); err != nil {
+		return err
+	}
+	if s.plugins != nil {
+		for id, source := range previous {
+			if _, retained := sources[id]; !retained && source.PluginSourceID != "" {
+				s.plugins.Remove(source.PluginSourceID)
+			}
+		}
+	}
+	return nil
 }
 
 func allowedModelSourceURL(u *url.URL) bool {
