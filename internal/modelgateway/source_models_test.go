@@ -116,3 +116,14 @@ func TestCatalogAcceptsFullDiscoveredDirectory(t *testing.T) {
 		t.Fatalf("full directory rejected: %v", err)
 	}
 }
+
+func TestCatalogAllowsPrivateHTTPModelSources(t *testing.T) {
+	h := catalogHandler(t, "https://saved.example/v1", "openai-completions")
+	source := h.Catalog.view(context.Background()).Sources[0]
+	for _, endpoint := range []string{"http://192.168.120.56:3425/v1", "http://10.0.0.1/v1", "http://172.16.0.1/v1", "http://[fd00::1]/v1"} {
+		source.BaseURL = endpoint
+		if _, err := h.Catalog.validatedSource(source, ModelSource{}); err != nil {
+			t.Errorf("private endpoint %s: %v", endpoint, err)
+		}
+	}
+}

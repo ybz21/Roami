@@ -155,7 +155,7 @@ func readNodeModels(paths metadb.Paths, role string) (nodeModelRoute, error) {
 			return nodeModelRoute{}, invalidNodeRoute()
 		}
 	}
-	if target.Scheme != "https" && !(target.Scheme == "http" && containsField([]string{"localhost", "127.0.0.1", "::1"}, target.Hostname())) {
+	if !allowedModelSourceURL(target) {
 		return nodeModelRoute{}, invalidNodeRoute()
 	}
 	if secret == "" {
