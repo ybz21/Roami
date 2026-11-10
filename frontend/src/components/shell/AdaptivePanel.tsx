@@ -17,7 +17,7 @@ import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
 import { claimInspector, releaseInspector, useInspectorSlot } from './inspector'
 
-export default function AdaptivePanel({ open, title, onClose, layer, children }: {
+export default function AdaptivePanel({ open, title, onClose, layer, children, desktopHeader }: {
   open: boolean
   /** 手机二级页的页头标题；桌面由面板自己的头承担 */
   title: ReactNode
@@ -25,6 +25,7 @@ export default function AdaptivePanel({ open, title, onClose, layer, children }:
   /** 'session' = 从会话全屏覆盖层里唤起，手机档要换更高的层 */
   layer?: 'page' | 'session'
   children: ReactNode
+  desktopHeader?: ReactNode
 }) {
   const { phone } = useLayout()
 
@@ -57,6 +58,7 @@ export default function AdaptivePanel({ open, title, onClose, layer, children }:
       flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'column',
       display: isTop ? 'flex' : 'none',
     }}>
+      {desktopHeader}
       {children}
     </div>,
     slot,

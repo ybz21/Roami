@@ -4,7 +4,7 @@ import { currentNodeId, useCurrentNodeId } from './components/cluster/node-url'
 import { pollWhileVisible } from './visible-poll'
 
 /** Consumers on the same machine share a request and an unchanged snapshot. */
-export function createSessionPoll<T>(path: string, interval: number, initial: T, read: (response: any) => T) {
+export function createSessionPoll<T>(path: string, interval: number, initial: T, read: (response: any) => T, shouldPoll: (value: T) => boolean = () => true) {
   const empty = { value: initial, failed: false, loaded: false }
   let current: { node: string | null; store: ReturnType<typeof createStore> } | undefined
   const idleSubscribe = () => () => {}
@@ -40,7 +40,7 @@ export function createSessionPoll<T>(path: string, interval: number, initial: T,
         listeners.add(listener)
         if (listeners.size === 1) {
           if (snapshot.loaded) snapshot = { ...snapshot, loaded: false }
-          poll = pollWhileVisible(load, interval)
+          poll = pollWhileVisible(load, interval, () => !snapshot.loaded || snapshot.failed || shouldPoll(snapshot.value))
           window.addEventListener('roami:sessions-changed', refresh)
         }
         return () => {

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>任务异步处理 · Roami 交互方案</title>
+<link rel="stylesheet" href="proposal.css">
+<script src="assets/layout.js" defer></script><script src="simulation.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <header class="dochead tt-pagehead">
+    <img src="assets/roami-logo.svg" alt="Roami" class="brand">
+    <div class="heading"><h1>任务异步处理</h1><span>交互方案 v1 · 本地模拟</span></div>
+    <div class="head-actions"><button type="button" id="show-controls" class="quiet"><i class="icon controls-icon"></i><span>演示控制</span></button><button type="button" id="theme" class="quiet">浅色</button></div>
+  </header>
+  <nav class="docnav" aria-label="方案章节">
+    <button type="button" data-page="demo" aria-current="page">交互演示</button>
+    <button type="button" data-page="decisions">产品决策</button>
+    <button type="button" data-page="architecture">技术方案</button>
+  </nav>
+  <main class="workspace" id="workspace">
+    <section class="demo-grid page" id="page-demo">
+      <aside class="control-rail" id="control-host"><div id="controls">
+        <h2>演示控制</h2><p class="muted">不执行真实命令，时长为演示设定。</p>
+        <label class="field">接下来模拟<select id="scenario"><option value="normal">正常处理</option><option value="slow">创建较慢</option><option value="prepare-fail">准备失败</option><option value="cleanup-fail">清理失败</option><option value="merge-conflict">合并冲突</option></select></label>
+        <label class="check"><input id="autoplay" type="checkbox" checked>自动推进后台步骤</label>
+        <button type="button" id="next-step">下一步</button>
+        <div class="control-actions"><button type="button" id="disconnect">模拟断线</button><button type="button" id="restart">模拟服务重启</button><button type="button" id="repeat">重发上次请求</button><button type="button" id="reset" class="quiet">重置演示</button></div>
+        <p id="control-status" class="muted" role="status">试试新建会话，或关闭正在运行的会话。</p>
+        <div class="principle"><h3>只等待“接收确认”</h3><p>创建：记录已保存后，就能离开。真正就绪前，保留草稿。</p><p>关闭：先标记，再确认停止；目录清理继续在后台做。</p><p>轮转：执行器停止后，下一个排队任务即可运行。</p></div>
+        <details><summary>本地恢复演示</summary><p class="muted">刷新页面会读取本地保存的步骤。真实服务应使用数据库、租约和实际资源核对；此原型不证明后端已实现。</p></details>
+      </div></aside>
+      <section class="demo-main">
+        <div class="demo-toolbar"><div><span class="muted">Roami</span><b>开发工作区</b></div><span class="spacer"></span><button type="button" id="toggle-detail" class="icon-button" aria-label="收起详情" aria-pressed="true"><i class="icon panel-icon"></i></button><button type="button" id="new-task" class="primary"><i class="icon plus-icon"></i>新建会话</button></div>
+        <div id="connection" class="connection" hidden>连接已断开。后台继续执行，重连后同步。</div>
+        <div class="demo-work" id="demo-work">
+          <section class="task-pane"><nav class="list-tabs" aria-label="工作区内容"><button type="button" id="tab-live" aria-current="page">会话 <span id="live-count"></span></button><button type="button" id="tab-records">收尾 <span id="record-count"></span></button></nav><div class="scroll task-list" id="task-list"></div><div class="list-foot muted">状态来自后台结果，关闭不会验收任务。</div></section>
+          <section class="detail" id="detail" aria-label="会话详情"></section>
+        </div>
+        <nav class="mobile-bottom" aria-label="主导航"><button type="button" data-mobile-nav="home"><i class="icon home-icon"></i>首页</button><button type="button" data-mobile-nav="projects" aria-current="page"><i class="icon project-icon"></i>项目</button><button type="button" data-mobile-nav="tools"><i class="icon terminal-icon"></i>工具</button><button type="button" data-mobile-nav="settings"><i class="icon controls-icon"></i>设置</button></nav>
+      </section>
+    </section>
+    <section class="page document-page" id="page-decisions" hidden>
+      <div class="decision-intro"><span class="eyebrow">建议方案</span><h2>创建和关闭都快速确认，后台完成耗时步骤</h2><p>保留一个很短的同步边界：服务端先可靠保存请求与操作标记，再告诉用户“已接收”。耗时的 Git、会话启动、停止和清理不占住页面。</p><span class="note">响应目标：接收确认 P95 小于 500 ms。属于待验证目标，并非实测结论。</span></div>
+      <div class="decision-grid">
+        <article><div class="section-title"><i class="icon plus-icon"></i><h3>创建：先占位，后就绪</h3></div><p>提交后立即出现“准备中”的会话条目；可以切去别处，也可以先写草稿。工作区和执行器没有就绪，不发送开工指令。</p><ol><li>同步校验权限、参数、请求键并保存意图。</li><li>后台准备工作区、创建会话、绑定目录。</li><li>核对实际就绪，按原调度和额度规则开始执行。</li></ol><div class="note">提交失败保留表单；准备失败在原条目重试，复用资源身份。</div></article>
+        <article><div class="section-title"><i class="icon close-icon"></i><h3>关闭：先标记，后台收尾</h3></div><p>确认保留、合并或丢弃后，条目标为“关闭中”，确认框退出，可以继续处理其他会话。</p><ol><li>保存关闭意图，阻止新消息、续派和工作区新占用。</li><li>停止执行器及关联写入，确认停止再释放执行槽位。</li><li>目录清理独立进行，失败留在“收尾”中可恢复。</li></ol><div class="note">“会话已关闭”和“工作区已清理”分别记录；关闭不等于任务通过验收。</div></article>
+        <article><div class="section-title"><i class="icon clock-icon"></i><h3>轮转：不等磁盘清理</h3></div><p>确认上个执行器已停止，原队列中的下一个任务可进入执行；尚未清理的工作区仍被占用标记保护。</p><p>同一 Git 仓库的写操作沿用仓库锁。清理和创建可以排队，不让无关仓库或主界面一起等待。</p><div class="note">轮转不凭点击立即释放资源，不绕过现有 Go gateway 的额度与准入规则。</div></article>
+        <article><div class="section-title"><i class="icon archive-icon"></i><h3>失败：从出错的步骤继续</h3></div><p>临时故障有限重试；权限、占用、内容变化和合并冲突需要用户处理。不能因为进入后台就无限重试删除。</p><p>刷新、手机断线或服务重启，都从同一份持久记录恢复。已经完成的合并不重复执行，启动结果未知时先核对，不直接重发开工指令。</p><div class="note">用户选择“保留工作区”是新的明确决定，不能把它当作原删除操作成功。</div></article>
+      </div>
+      <section class="comparison"><h3>三种方式的取舍</h3><div class="table-scroll"><table><thead><tr><th>方式</th><th>页面反馈</th><th>断线或重启</th><th>建议</th></tr></thead><tbody><tr><td>整个请求同步等待</td><td>创建／关闭按钮一直忙</td><td>恢复结果依赖各接口实现</td><td>保留兼容入口，逐步收敛</td></tr><tr><td>返回后启动临时后台线程</td><td>看起来很快</td><td>服务退出后可能丢失操作</td><td>不作为最终实现</td></tr><tr class="recommended"><td>持久化意图 + 后台工作流</td><td>已接收、准备中、清理中可区分</td><td>可核对、重试、恢复</td><td>推荐</td></tr></tbody></table></div></section>
+      <section class="prose"><h3>现有代码已经做了什么</h3><p>普通会话的 <code>NewSessionModal</code> 依次等待能力读取、工作区／会话创建、发送开工指令与跟踪登记；Go 的 worktree 创建和关闭接口也在请求内完成组合步骤。原生任务的创建与 <code>task.close_session</code> 已经有持久化作业，因此应复用它们，不能把所有任务再包一层新的调度器。</p><p>目前没有逐阶段耗时数据。异步解决的是页面等待和恢复方式，仍需记录真实阶段时延，定位 Git、远端同步或启动过程中的慢点。</p></section>
+    </section>
+    <section class="page document-page" id="page-architecture" hidden>
+      <div class="decision-intro"><span class="eyebrow">技术方案</span><h2>一个持久操作标记，一份执行事实</h2><p>前端统一展示生命周期进度；普通会话资源操作由 Go 负责，原生任务继续使用已有 jobs 和关闭记录。统一读模型，不建立两个互相竞争的状态源。</p></div>
+      <div class="architecture-flow"><article><span class="eyebrow">短同步</span><h3>接收意图</h3><p>权限与版本校验、去重、预留身份、保存请求与事件；事务提交后返回 202。</p></article><article><span class="eyebrow">持久工作流</span><h3>后台执行</h3><p>领取租约、资源核对、分步回执；按仓库串行写入，超时后重新观察。</p></article><article><span class="eyebrow">共享事件</span><h3>更新原位置</h3><p>会话树、任务详情与收尾记录共用状态流；断线后补快照，不逐会话轮询。</p></article></div>
+      <div class="architecture-columns">
+        <article><h3>操作记录的最小字段</h3><pre>operationId / requestKey / kind
+owner + node + project
+resourceId + incarnation + revision
+intent + approvedWorkspaceSnapshot
+state + stage + stageReceipts
+leaseEpoch / attempt / retryAt
+errorCode / createdAt / updatedAt</pre><p class="muted">资源身份与展示名分开。每次副作用写回时检查租约代次；跨数据库通道使用可重放的投递记录，不假设跨库原子事务。</p></article>
+        <article><h3>三条状态轴分别保存</h3><dl><dt>任务</dt><dd>排队、执行、待核验、已核验、失败／停止。</dd><dt>会话</dt><dd>准备中、就绪、关闭中、已关闭。</dd><dt>工作区收尾</dt><dd>待处理、清理中、已清理、已保留、需要处理。</dd></dl><p class="note">原型中的清理完成不会把“待核验”改成“已核验”，也不会根据 Agent 自述宣告成功。</p></article>
+      </div>
+      <section class="comparison"><h3>创建与关闭的阶段顺序</h3><div class="table-scroll"><table><thead><tr><th>操作</th><th>后台阶段</th><th>完成条件</th></tr></thead><tbody><tr><td>创建</td><td>准备工作区；创建／恢复会话；核对目录；派发开工；观察回执</td><td>工作区和会话已就绪；开工按既有调度受理</td></tr><tr><td>关闭并保留</td><td>冻结入口；停止并核对；关闭会话；保留资源；留痕</td><td>会话确已停止，工作区明确保留</td></tr><tr><td>关闭并删除</td><td>冻结入口；停止并核对；关闭会话；复查资源；可选提交与合并；删除；留痕</td><td>停止、合并（若选择）与清理分别有实际结果</td></tr><tr><td>取消创建</td><td>记录取消；等待安全中断点；停止已启动部分；回收本操作独占资源</td><td>确认停止和补偿完成后，才标为已取消</td></tr></tbody></table></div></section>
+      <div class="decision-grid architecture-rules"><article><h3>重启和重复提交</h3><p>同一请求键返回同一操作。阶段先落意图，后记录实际结果；服务重启后观察会话、Git 注册和启动回执，再决定继续或补偿。未知不等于不存在，也不等于可安全重放。</p></article><article><h3>删除前再次核对</h3><p>核对工作区身份、所属仓库、会话代次、其他占用与用户确认的内容快照。新写入、HEAD 变化或新占用会转为需要处理；不让延迟执行删除用户后来新增的内容。</p></article><article><h3>避免请求风暴</h3><p>复用当前共享会话概览与事件机制。列表只显示当前阶段；详情按需加载执行记录。无订阅时后台照常执行，结束状态不持续轮询。</p></article><article><h3>分阶段落地</h3><p>先补阶段耗时与持久操作记录，再迁移关闭清理，最后迁移普通会话创建与开工投递。CLI 若需要同步结果，用同一工作流的 wait 模式，不保留另一套实现。</p></article></div>
+      <details class="technical-detail"><summary>建议接口与代码边界</summary><pre>POST /session-lifecycle/operations
+  { kind, requestKey, expectedRevision, target, intent }
+202 { operationId, resourceId, revision, state }
+GET  /session-lifecycle/operations/:id
+POST /session-lifecycle/operations/:id/retry
+POST /session-lifecycle/operations/:id/cancel
+
+Go: operation store + worker + existing worktree/session services
+Native: adapter to existing task.run / task.close_session jobs
+Frontend: lifecycle projection + existing shared events/overview</pre><p>以上均为提案，不是当前已提供的接口。完整约束、代码入口与验收标准见 <a href="README.md">设计文档</a>。</p></details>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<dialog id="create-dialog"><form id="create-form"><div class="dialog-heading"><h2>新建会话</h2><button type="button" data-dismiss="create-dialog" class="icon-button" aria-label="取消新建"><i class="icon close-icon"></i></button></div><label class="field">名称<input id="create-name" name="name" required maxlength="60" value="修复文件预览"></label><label class="field">任务说明<textarea id="create-goal" name="goal" rows="3">修复手机上的文件预览，并检查返回导航。</textarea></label><div class="choice-summary"><i class="icon project-icon"></i><span>独立工作区 · 基于 main</span></div><p class="muted">提交后可以离开，准备进度会显示在会话列表中。</p><div class="dialog-actions"><button type="button" data-dismiss="create-dialog">取消</button><button type="submit" id="create-submit" class="primary">创建</button></div></form></dialog>
+<dialog id="close-dialog"><form id="close-form"><div class="dialog-heading"><h2 id="close-title">关闭会话</h2><button type="button" data-dismiss="close-dialog" class="icon-button" aria-label="取消关闭"><i class="icon close-icon"></i></button></div><p id="close-summary" class="muted"></p><label class="choice"><input type="radio" name="mode" value="keep" checked><span>保留工作区<small>关闭会话，文件与分支保留。</small></span></label><label class="choice"><input type="radio" name="mode" value="merge"><span>合并后删除<small>确认停止后，后台合并和清理。</small></span></label><label class="choice"><input type="radio" name="mode" value="discard"><span>丢弃并删除<small>删除该工作区的未合并内容。</small></span></label><label class="check"><input id="delete-branch" type="checkbox" checked>同时删除本操作创建的本地分支</label><p class="muted">提交后显示“关闭中”，可以继续处理其他会话。</p><div class="dialog-actions"><button type="button" data-dismiss="close-dialog">取消</button><button type="submit" id="close-submit" class="primary">提交关闭</button></div></form></dialog>
+<dialog id="controls-dialog"><div class="dialog-heading"><h2>演示设置</h2><button type="button" data-dismiss="controls-dialog" class="icon-button" aria-label="返回演示"><i class="icon close-icon"></i></button></div><div id="mobile-controls-host"></div></dialog>
+<dialog id="conflict-dialog"><div class="dialog-heading"><h2>合并需要处理</h2><button type="button" data-dismiss="conflict-dialog" class="icon-button" aria-label="返回"><i class="icon close-icon"></i></button></div><p>会话已经关闭。工作区和分支仍保留，处理冲突后可继续收尾。</p><pre>冲突文件：src/preview.ts
+目标分支：main
+当前状态：未合并、未删除</pre><p class="muted">演示中点击下方按钮代表冲突已处理；真实服务需要重新核对 Git 状态。</p><div class="dialog-actions"><button type="button" data-dismiss="conflict-dialog">稍后处理</button><button type="button" id="resolve-conflict" class="primary">模拟已解决，继续</button></div></dialog>
+</body></html>

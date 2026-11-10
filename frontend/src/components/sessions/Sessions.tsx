@@ -1,4 +1,5 @@
 import SessionLocation from './SessionLocation'
+import { SessionLifecycleInbox } from './SessionLifecyclePanel'
 import { SessionPauseButton } from './SessionMemoryControl'
 import { useNativeSessionList } from './native-session-list'
 import { nativeSessionRecord } from './session-record'
@@ -36,9 +37,9 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const { phone: isPhone } = useLayout()
   const [cliList, setList] = useState<any[]>([])
   const native = useNativeSessionList()
-  const list = useMemo(() => [...cliList, ...native.value.map(record => ({ ...nativeSessionRecord(record), last_activity: record.lastActivity, created: Date.parse(record.createdAt || '') / 1000 }))], [cliList, native.value])
-  const agentKinds = useAgentKinds()
   const overview = useSessionOverview()
+  const list = useMemo(() => [...overview.value.filter(item => item.lifecycle && !cliList.some(session => session.name === item.name)).map(item => ({ ...item, created: item.lastActivity })), ...cliList.map(item => ({ ...item, lifecycle: overview.value.find(session => session.name === item.name)?.lifecycle })), ...native.value.map(record => ({ ...nativeSessionRecord(record), last_activity: record.lastActivity, created: Date.parse(record.createdAt || '') / 1000 }))], [cliList, native.value, overview.value])
+  const agentKinds = useAgentKinds()
   const needsInput = useMemo(() => Object.fromEntries(overview.value.map(item => [item.name, item.waiting])), [overview.value])
   const [swarmMap, setSwarmMap] = useState<Record<string, SwarmSessionMember>>({})
   const [newOpen, setNewOpen] = useState(false)
@@ -257,6 +258,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
           <Input allowClear value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('session.searchPlaceholder')}
             style={{ flex: 1, minWidth: 0 }}
             prefix={<SearchIcon size={15} />} />
+          <SessionLifecycleInbox onOpen={openTerm} />
           <Select value={sortBy} onChange={(v) => setSortBy(v)} title={t('session.sortBy')}
             style={{ width: 120, flex: '0 0 auto' }} options={[
               { label: t('session.sortActivity'), value: 'activity' },
@@ -406,6 +408,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
                       )
                     })()}
                     <span className="tags">
+                      {s.lifecycle && <Tag>{t('session.lifecycle.' + s.lifecycle)}</Tag>}
                       <MemBar mem={s.mem} compact={!wide} />
                       {(() => { // 窄档只留一枚 ⎇ 图标（桌面由位置列接管）；外部 worktree 加 ⧉
                         const ann = wtAnn[s.name]

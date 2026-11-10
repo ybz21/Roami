@@ -19,5 +19,6 @@ export function nativeSessionRecord(session: NativeSessionRecord) {
     lastActivity: session.lastActivity || Date.parse(session.createdAt || '') / 1000 || 0,
     running: ['queued', 'preparing', 'running', 'verifying', 'cancelling'].includes(session.taskState),
     waiting: false, dormant: false, state: 'live' as const,
+    lifecycle: session.closureError ? 'attention' as const : session.lifecycle === 'closing' ? 'closing' as const : undefined,
   }
 }

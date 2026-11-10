@@ -141,6 +141,12 @@ func (a *API) FileSave(c *gin.Context) {
 		return
 	}
 	p := filepath.Clean(req.Path)
+	unlock, leaseErr := lifecycleRuntime(c.Request.Context()).WorkspaceLease(filepath.Dir(p))
+	if leaseErr != nil {
+		lifecycleError(c, leaseErr)
+		return
+	}
+	defer unlock()
 	if p == "" || !filepath.IsAbs(p) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_PATH"}})
 		return

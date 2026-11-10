@@ -5,7 +5,7 @@ import {
   Select
 } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { agentCommand } from '../agent-command'
+import { submitLifecycle, lifecycleLaunchIntent } from '../components/sessions/session-lifecycle'
 import { useAgentKinds, type AgentKind } from '../agent-kind'
 import { api } from '../api'
 import { nativeSessionId } from '../components/sessions/session-record'
@@ -127,14 +127,11 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
     try {
       const candidate = parentArg || tree.projects.flatMap(project => project.tasks).find(task => task.path === dir)?.sessions.find(session => !session.dormant)?.name
       const parent = candidate && !nativeSessionId(candidate) ? candidate : undefined
-      const res = parent
-        ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork`, { child: name, ...(dir ? { dir } : {}) })
-        : await api('POST', '/sessions', dir ? { name, dir } : { name })
-      const actual = res?.name || name
-      if (kind !== 'shell') {
-        const cmd = agentCommand(kind, prefs)
-        await api('POST', '/tasks/_/send', { sess: actual, msg: cmd })
-      }
+      const op = await submitLifecycle('create', {
+        name, dir, parent,
+        launch: lifecycleLaunchIntent(kind === 'shell' ? 'none' : kind, prefs, '', 'plain', false, t),
+      })
+      const actual = op.resourceId
       openTerm(actual, key)
     } catch (e: any) { antMessage.error(e.message) }
   }

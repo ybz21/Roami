@@ -44,14 +44,16 @@ export function useSessionDirectory() {
   const sessIds = useMemo(() => {
     if (!cliIds) return null
     const byId = { ...cliIds.byId }, byName = { ...cliIds.byName }
+    for (const name of overview.value.map(item => item.name)) { byId[name] = name; byName[name] = name }
     for (const name of nativeNames.split('\n').filter(Boolean)) { byId[name] = name; byName[name] = name }
     return { byId, byName }
-  }, [cliIds, nativeNames])
+  }, [cliIds, nativeNames, overview.value])
   const sessList = useMemo(() => {
     const locations = new Map(overview.value.map(session => [session.name, session]))
-    return [...cliSessions.map(session => {
+    const pending = overview.value.filter(item => item.lifecycle && !cliSessions.some(session => session.name === item.name)).map(item => ({ ...item, agent: item.agent || undefined }))
+    return [...pending, ...cliSessions.map(session => {
       const location = locations.get(session.name)
-      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch }
+      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch, lifecycle: location?.lifecycle }
     }), ...native.value.map(nativeSessionRecord)]
   }, [cliSessions, native.value, overview.value])
   useEffect(() => { setSessionLabels(Object.fromEntries(sessList.map(session => [session.name, session.label || session.name]))) }, [sessList])

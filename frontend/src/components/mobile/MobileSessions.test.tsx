@@ -5,9 +5,11 @@ import MobileSessions from './MobileSessions'
 import { api } from '../../api'
 import { closeSession, renameSession, stopSession } from '../sessions/session-actions'
 import { refreshSessionLists } from '../sessions/native-session-list'
+import { setSessionLabels } from '../sessions/session-label'
 
 const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
+vi.mock('../sessions/SessionLifecyclePanel', () => ({ SessionLifecycleInbox: () => null }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../sessions/session-actions', () => ({ closeSession: vi.fn(), renameSession: vi.fn(), stopSession: vi.fn() }))
 vi.mock('../sessions/native-session-list', () => ({ refreshSessionLists: vi.fn(), useNativeSessionList: () => ({ failed: false, value: [{ nativeSessionId: 'native', taskId: 'task', title: 'Roami chat', taskState: 'running', lastActivity: 200, projectId: 'project' }] }) }))
@@ -23,10 +25,11 @@ vi.mock('antd', () => ({
   Spin: () => null,
   Modal: ({ open, title, children, onOk, okText }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button></div> : null,
 }))
-afterEach(() => { cleanup(); localStorage.clear(); vi.resetAllMocks(); vi.useRealTimers() })
+afterEach(() => { cleanup(); setSessionLabels({}); localStorage.clear(); vi.resetAllMocks(); vi.useRealTimers() })
 
 const mount = (worktreeStatus?: Record<string, unknown>) => {
-  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/worktree-status') ? worktreeStatus : path === '/projects' ? { projects: [{ key: 'project', name: 'Project', dir: '/work', unfinished: 0 }] } : { items: [{ name: 'codex', label: 'Codex chat', agent: 'codex', lastActivity: 100, running: true, waiting: false, dormant: false, projectKey: 'project', project: 'Project', projectDir: '/work' }] } }))
+  setSessionLabels({ codex: 'Codex chat' })
+  vi.mocked(api).mockImplementation(async (_method, path, body) => ({ data: path === '/session-lifecycle/operations' ? (_method === 'POST' ? { operationId: crypto.randomUUID(), resourceId: 'codex', kind: 'close', state: 'queued', receipts: {}, intent: body.intent } : []) : path.endsWith('/worktree-status') ? worktreeStatus : path === '/projects' ? { projects: [{ key: 'project', name: 'Project', dir: '/work', unfinished: 0 }] } : { items: [{ name: 'codex', label: 'Codex chat', agent: 'codex', lastActivity: 100, running: true, waiting: false, dormant: false, projectKey: 'project', project: 'Project', projectDir: '/work' }] } }))
   return render(<MobileSessions onOpen={vi.fn()} onNewTask={vi.fn()} onNewInWorktree={vi.fn()} />)
 }
 
@@ -51,7 +54,7 @@ it('uses the same rows, ordering, navigation and menu for Roami and Codex', asyn
   expect(closeSession).toHaveBeenCalledWith('codex')
 })
 
-const worktree = { inWorktree: true, path: '/work/.worktrees/task', base: 'main', external: false, others: 0 }
+const worktree = { inWorktree: true, path: '/work/.worktrees/task', base: 'main', external: false, others: 0, snapshot: 'confirmed-snapshot', sessionIdentity: 'confirmed-session' }
 const beginCodexClose = async () => {
   fireEvent.contextMenu(await screen.findByRole('button', { name: /Codex chat/ }))
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'session.close' }))
@@ -67,7 +70,7 @@ it.each([true, false])('honors the worktree deletion checkbox on mobile (delete=
   expect(checkbox.checked).toBe(true)
   if (!remove) fireEvent.click(checkbox)
   await act(async () => { await confirm.onOk() })
-  expect(api).toHaveBeenCalledWith('POST', '/sessions/codex/close-with-worktree', { mode: remove ? 'discard' : 'keep', path: worktree.path })
+  expect(api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'close', resourceId: 'codex', intent: { name: 'Codex chat', mode: remove ? 'discard' : 'keep', path: worktree.path, snapshot: worktree.snapshot, sessionIdentity: worktree.sessionIdentity } }))
   expect(closeSession).not.toHaveBeenCalled()
   expect(refreshSessionLists).toHaveBeenCalled()
 })
@@ -79,7 +82,7 @@ it('offers unfinished worktree choices before closing a mobile session', async (
   expect(dialog.getByRole('radio', { name: 'worktree.close.keep' })).toBeTruthy()
   fireEvent.click(dialog.getByRole('radio', { name: 'worktree.close.discard' }))
   fireEvent.click(dialog.getByRole('button', { name: 'session.close' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/sessions/codex/close-with-worktree', { mode: 'discard', path: worktree.path }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'close', resourceId: 'codex', intent: { name: 'Codex chat', mode: 'discard', path: worktree.path, snapshot: worktree.snapshot, sessionIdentity: worktree.sessionIdentity } })))
   expect(closeSession).not.toHaveBeenCalled()
 })
 

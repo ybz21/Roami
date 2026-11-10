@@ -6,7 +6,7 @@
 // 真正带着用户宽度的那一跑被 early-return 挡掉。表现是宽度一直在写进
 // preferences.json，界面却每次刷新都把分隔条挪回默认位。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 
 const SAVED = 1100
 const VIEWPORT = 1920
@@ -121,4 +121,16 @@ describe('右栏：第一次进来收着，拉开过就记住', () => {
     await m.loadPreferences()
     await waitFor(() => expect(result.current.inspectorCollapsed).toBe(false))
   })
+  it('explicitly opening a panel reveals a collapsed inspector without changing its width', async () => {
+    localStorage.setItem('ttmux.workspace', JSON.stringify({ inspectorWidth: SAVED, inspectorCollapsed: true, navCollapsed: true }))
+    const m = await freshModules()
+    const { result } = renderHook(() => m.useWorkspaceLayout(true))
+    const width = result.current.inspectorWidth
+    expect(result.current.inspectorCollapsed).toBe(true)
+    const { revealInspector } = await import('./inspector')
+    act(() => revealInspector())
+    expect(result.current.inspectorCollapsed).toBe(false)
+    expect(result.current.inspectorWidth).toBe(width)
+  })
+
 })

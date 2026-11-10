@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"github.com/ybz21/Roami/internal/gitcontext"
 	"github.com/ybz21/Roami/internal/metadb"
+	"github.com/ybz21/Roami/internal/sessionlifecycle"
+	"github.com/ybz21/Roami/internal/tmuxruntime"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,10 +49,11 @@ func errf(code, format string, a ...any) *Err {
 // ── 服务与仓库解析 ────────────────────────────────────────
 
 type Service struct {
-	mu     sync.Mutex
-	cache  map[string]listCache   // key: commonDir
-	remote map[string]remoteState // key: commonDir（Sync 的远端观测，进程内缓存）
-	homes  *homeStore             // session → 钉死的归属目录（见 sessionhome.go）
+	lifecycle *sessionlifecycle.Store
+	mu        sync.Mutex
+	cache     map[string]listCache   // key: commonDir
+	remote    map[string]remoteState // key: commonDir（Sync 的远端观测，进程内缓存）
+	homes     *homeStore             // session → 钉死的归属目录（见 sessionhome.go）
 }
 
 type listCache struct {
@@ -69,7 +72,11 @@ type remoteState struct {
 // New 建服务；db 直连可用时会话归属走 session_homes 表，否则退回 JSON，
 // dataDir 也为空则纯内存（测试用）。生产由 api.New 传入。
 func New(dataDir string, db *metadb.DB) *Service {
-	return &Service{cache: map[string]listCache{}, remote: map[string]remoteState{}, homes: newHomeStore(dataDir, db)}
+	var lifecycle *sessionlifecycle.Store
+	if db.OK() {
+		lifecycle = sessionlifecycle.New(db, db.Info().Path)
+	}
+	return &Service{cache: map[string]listCache{}, remote: map[string]remoteState{}, homes: newHomeStore(dataDir, db), lifecycle: lifecycle}
 }
 
 const listCacheTTL = 3 * time.Second
@@ -163,15 +170,29 @@ func WorktreeRoot(ctx context.Context, directory string) (string, error) {
 }
 
 // lock 持仓库级 flock；返回解锁函数。
-func (s *Service) lock(repo Repo) (func(), error) {
+func (s *Service) lock(ctx context.Context, repo Repo) (func(), error) {
 	path := filepath.Join(repo.CommonDir, "roam-worktree.lock")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, errf("LOCK_FAILED", "%v", err)
 	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		f.Close()
-		return nil, errf("LOCK_FAILED", "%v", err)
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			break
+		}
+		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
+			f.Close()
+			return nil, errf("LOCK_FAILED", "%v", err)
+		}
+		select {
+		case <-ctx.Done():
+			f.Close()
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
 	}
 	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
 }
@@ -227,10 +248,12 @@ type Worktree struct {
 // ── Create ───────────────────────────────────────────────
 
 type CreateReq struct {
-	Dir    string `json:"dir"`
-	Branch string `json:"branch"` // 空 = 旧时间戳行为（兼容）
-	Base   string `json:"base"`   // 空 = 仓库默认分支
-	Remote string `json:"remote"` // 非空则先 fetch remote base
+	ExpectedPath string `json:"-"`
+	OperationID  string `json:"-"`
+	Dir          string `json:"dir"`
+	Branch       string `json:"branch"` // 空 = 旧时间戳行为（兼容）
+	Base         string `json:"base"`   // 空 = 仓库默认分支
+	Remote       string `json:"remote"` // 非空则先 fetch remote base
 	// Dirname 指定 .worktrees/ 下的目录名，编排层一律传会话 id。
 	// 分支名派生自展示名，中文标题会被 autoBranch 清成空、兜底成字面量 "task"——
 	// 于是每个中文任务都叫 task/task-2/task-3，且 task 被收尾释放后原地复用同一路径，
@@ -282,6 +305,11 @@ func (s *Service) Create(ctx context.Context, req CreateReq) (CreateResp, error)
 }
 
 func (s *Service) create(ctx context.Context, req CreateReq, prepared *PreparedBase) (CreateResp, error) {
+	if s.lifecycle != nil {
+		if err := s.lifecycle.Check(ctx, "", req.Dir); err != nil {
+			return CreateResp{}, err
+		}
+	}
 	repo, err := s.ResolveRepo(ctx, req.Dir)
 	if err != nil {
 		return CreateResp{}, err
@@ -297,12 +325,34 @@ func (s *Service) create(ctx context.Context, req CreateReq, prepared *PreparedB
 			return CreateResp{}, errf("BASE_UNRESOLVED", "cannot determine existing branch base")
 		}
 	}
-	unlock, err := s.lock(repo)
+	unlock, err := s.lock(ctx, repo)
 	if err != nil {
 		return CreateResp{}, err
 	}
 	defer unlock()
 	defer s.invalidate(repo)
+	if req.ExpectedPath != "" && canonical(req.ExpectedPath) != canonical(filepath.Join(repo.Root, ".worktrees", pathSlug(req.Dirname))) {
+		return CreateResp{}, errf("LIFECYCLE_IDENTITY_CHANGED", "reserved workspace moved")
+	}
+	if req.OperationID != "" {
+		path := filepath.Join(repo.Root, ".worktrees", pathSlug(req.Dirname))
+		if pathExists(path) {
+			owner, e := git(ctx, path, "config", "--worktree", "--get", "roam.lifecycle-operation")
+			if e != nil || strings.TrimSpace(owner) != req.OperationID {
+				return CreateResp{}, errf("LIFECYCLE_IDENTITY_CHANGED", "reserved worktree path is already occupied")
+			}
+			branch, e := git(ctx, path, "symbolic-ref", "--short", "HEAD")
+			if e != nil {
+				return CreateResp{}, e
+			}
+			base, _ := git(ctx, path, "config", "--worktree", "--get", "roam.baseref")
+			start, _ := git(ctx, path, "config", "--worktree", "--get", "roam.startoid")
+			if base == "" || start == "" {
+				return CreateResp{}, errf("LIFECYCLE_RESULT_UNKNOWN", "worktree preparation was interrupted")
+			}
+			return CreateResp{Path: path, Branch: strings.TrimSpace(branch), Base: strings.TrimSpace(base), StartOid: strings.TrimSpace(start)}, nil
+		}
+	}
 	var startOid string
 	var chosen PreparedBase
 	if !req.Existing {
@@ -377,6 +427,9 @@ func (s *Service) create(ctx context.Context, req CreateReq, prepared *PreparedB
 	}
 	path := filepath.Join(wtDir, slug)
 	for i := 2; pathExists(path) && i < 100; i++ {
+		if req.OperationID != "" {
+			return CreateResp{}, errf("LIFECYCLE_IDENTITY_CHANGED", "reserved worktree path is occupied")
+		}
 		path = filepath.Join(wtDir, fmt.Sprintf("%s-%d", slug, i))
 	}
 
@@ -394,6 +447,9 @@ func (s *Service) create(ctx context.Context, req CreateReq, prepared *PreparedB
 		"roam.startoid":  startOid,
 		"roam.createdby": "roam",
 		"roam.createdat": time.Now().Format(time.RFC3339),
+	}
+	if req.OperationID != "" {
+		ident["roam.lifecycle-operation"] = req.OperationID
 	}
 	if !req.Existing {
 		ident["roam.baseremote"] = chosen.remote
@@ -1005,6 +1061,7 @@ type MergeReq struct {
 }
 
 type MergeResp struct {
+	SourceOid string `json:"sourceOid"`
 	Strategy  string `json:"strategy"`
 	Base      string `json:"base"`
 	MergedOid string `json:"mergedOid"`
@@ -1067,6 +1124,11 @@ func (s *Service) baseSite(ctx context.Context, repo Repo, base string) (string,
 }
 
 func (s *Service) Merge(ctx context.Context, req MergeReq) (MergeResp, error) {
+	if s.lifecycle != nil {
+		if err := s.lifecycle.Check(ctx, "", req.Path); err != nil {
+			return MergeResp{}, err
+		}
+	}
 	path := canonical(req.Path)
 	repo, err := s.ResolveRepo(ctx, path)
 	if err != nil {
@@ -1082,7 +1144,7 @@ func (s *Service) Merge(ctx context.Context, req MergeReq) (MergeResp, error) {
 		return MergeResp{}, errf("DETACHED_HEAD", "source worktree is not on a branch")
 	}
 
-	unlock, err := s.lock(repo)
+	unlock, err := s.lock(ctx, repo)
 	if err != nil {
 		return MergeResp{}, err
 	}
@@ -1154,12 +1216,17 @@ func (s *Service) Merge(ctx context.Context, req MergeReq) (MergeResp, error) {
 		return MergeResp{}, errf("BAD_STRATEGY", "unknown strategy %q (merge|squash|rebase)", req.Strategy)
 	}
 	merged, _ := git(ctx, site, "rev-parse", "HEAD")
-	return MergeResp{Strategy: req.Strategy, Base: base, MergedOid: strings.TrimSpace(merged)}, nil
+	sourceOid, e := git(ctx, path, "rev-parse", "HEAD")
+	if e != nil {
+		return MergeResp{}, errf("LIFECYCLE_RESULT_UNKNOWN", "cannot confirm source after merge")
+	}
+	return MergeResp{Strategy: req.Strategy, Base: base, MergedOid: strings.TrimSpace(merged), SourceOid: strings.TrimSpace(sourceOid)}, nil
 }
 
 // ── Remove / Prune ───────────────────────────────────────
 
 type RemoveReq struct {
+	ExpectedSnapshot  string `json:"-"`
 	Path              string `json:"path"`
 	ForceWorktree     bool   `json:"forceWorktree"`     // 脏也删
 	DeleteBranch      bool   `json:"deleteBranch"`      // git branch -d
@@ -1168,6 +1235,11 @@ type RemoveReq struct {
 }
 
 func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
+	if s.lifecycle != nil {
+		if err := s.lifecycle.Check(ctx, "", req.Path); err != nil {
+			return err
+		}
+	}
 	path := canonical(req.Path)
 	repo, err := s.ResolveRepo(ctx, path)
 	if err != nil {
@@ -1183,12 +1255,26 @@ func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
 	if path == repo.Root {
 		return errf("MAIN_WORKTREE", "refusing to remove the main worktree")
 	}
-	unlock, err := s.lock(repo)
+	unlock, err := s.lock(ctx, repo)
 	if err != nil {
 		return err
 	}
 	defer unlock()
 	defer s.invalidate(repo)
+	if req.ExpectedSnapshot != "" {
+		actual, e := s.Snapshot(ctx, path)
+		if e != nil {
+			return e
+		}
+		if actual != req.ExpectedSnapshot {
+			return errf("LIFECYCLE_WORKSPACE_CHANGED", "worktree changed after confirmation")
+		}
+		rt := runtime.New()
+		rt.Context = ctx
+		if _, e := rt.ObserveSessionRows(); e != nil {
+			return errf("LIFECYCLE_STOP_UNCONFIRMED", "cannot observe live sessions")
+		}
+	}
 
 	// 占用检查：还有 session/pane 在里面默认禁止删
 	if !req.IgnoreSessions {
@@ -1269,7 +1355,7 @@ func (s *Service) Prune(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	unlock, err := s.lock(repo)
+	unlock, err := s.lock(ctx, repo)
 	if err != nil {
 		return err
 	}
@@ -1284,7 +1370,21 @@ func (s *Service) Prune(ctx context.Context, dir string) error {
 // CommitAll 把 worktree 里全部改动（含未跟踪）提交为一笔；无改动时为 no-op。
 // 供 close-with-worktree 的「合并并删除」先落一笔 wip 用。
 func (s *Service) CommitAll(ctx context.Context, path, msg string) error {
+	if s.lifecycle != nil {
+		if err := s.lifecycle.Check(ctx, "", path); err != nil {
+			return err
+		}
+	}
 	path = canonical(path)
+	repo, err := s.ResolveRepo(ctx, path)
+	if err != nil {
+		return err
+	}
+	unlock, err := s.lock(ctx, repo)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if isClean(ctx, path) {
 		return nil
 	}

@@ -89,6 +89,14 @@ func Fork(rt runtime.Runtime, meta *sessmeta.Store, args []string, w io.Writer) 
 	if !rt.HasSession(parent) {
 		return fmt.Errorf("parent session not found: %s", parent)
 	}
+	release, leaseErr := rt.InputLease("=" + parent)
+	if leaseErr != nil {
+		return leaseErr
+	}
+	defer release()
+	if err := rt.CheckLifecycle(parent, dir); err != nil {
+		return err
+	}
 	if dir == "" {
 		dir = paneCwd(rt, parent)
 	}

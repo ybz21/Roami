@@ -17,7 +17,7 @@ func (s *Service) PrepareBase(ctx context.Context, dir, base, remote string) (Pr
 	if e != nil {
 		return PreparedBase{}, e
 	}
-	release, e := s.lock(repo)
+	release, e := s.lock(ctx, repo)
 	if e != nil {
 		return PreparedBase{}, e
 	}

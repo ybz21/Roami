@@ -257,7 +257,13 @@ func RecordedScopeProcesses(directory string) ([]int, error) {
 	} else if !info.IsDir() {
 		return nil, fmt.Errorf("invalid recorded pane scope")
 	}
-	return scopeProcesses(directory)
+	processes, err := scopeProcesses(directory)
+	if os.IsNotExist(err) {
+		if _, check := os.Stat(directory); os.IsNotExist(check) {
+			return nil, nil
+		}
+	}
+	return processes, err
 }
 
 func scopeProcesses(directory string) ([]int, error) {

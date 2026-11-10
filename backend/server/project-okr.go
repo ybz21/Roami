@@ -22,15 +22,23 @@ func startProjectOKRCollector(engine *gin.Engine, handler *api.API, parent conte
 	ctx, cancel := context.WithCancel(parent)
 	worker := &projectOKRLifecycle{cancel: cancel, done: make(chan struct{})}
 	projectOKRCollectors.Store(engine, worker)
+	stopSessions := handler.StartSessionLifecycle(ctx)
+	collectorDone := make(chan struct{})
 	go func() {
-		defer close(worker.done)
-		defer projectOKRCollectors.Delete(engine)
-		defer cancel()
+		defer close(collectorDone)
 		handler.ProjectOKRCollector(ctx)
+	}()
+	go func() {
+		<-ctx.Done()
+		cancel()
+		stopSessions()
+		<-collectorDone
+		close(worker.done)
+		projectOKRCollectors.Delete(engine)
 	}()
 }
 
-// Close cancels and joins background collection for this engine. Managed SQLite connections
+// Close cancels and joins collection and session operations for this engine. Managed SQLite connections
 // remain owned by the platform pool, which may also serve another engine in this process.
 func Close(engine *gin.Engine) {
 	if value, ok := projectOKRCollectors.LoadAndDelete(engine); ok {

@@ -1,6 +1,7 @@
 import { taskSessionError } from '../agent/task-session-error'
 import { refreshTask } from '../agent/agent-task-events'
 import { api } from '../../api'
+import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
 import { nodeApi } from '../cluster/node-url'
 import type { TaskDetail } from '../agent/agent-task-protocol'
 import { nativeSessionId } from './session-record'
@@ -24,7 +25,10 @@ async function nativeTask(name: string) {
 }
 
 export async function closeSession(name: string) {
-  if (!nativeSessionId(name)) return api('DELETE', '/sessions/' + encodeURIComponent(name))
+  if (!nativeSessionId(name)) {
+    const st = (await api('GET', '/sessions/' + encodeURIComponent(name) + '/worktree-status')).data
+    return submitLifecycle('close', { mode: 'keep', path: st.path, sessionIdentity: st.sessionIdentity }, name)
+  }
   const { path, detail } = await nativeTask(name)
   if (detail.sessionClosure?.state !== 'closed') await api('POST', path + '/close-session', { revision: detail.task.revision, runId: detail.attempts[0]?.id })
   refreshTask(detail.task.id)
@@ -41,6 +45,7 @@ export async function stopSession(name: string) {
 
 
 export function sessionActionError(error: any, t: (key: string) => string) {
+  if ((error?.apiError?.code || error?.message || '').startsWith('LIFECYCLE_')) return lifecycleRequestError(error, t)
   return error?.apiError?.code ? taskSessionError(error.apiError.code, t) : error?.message || t('agent.requestFailed')
 }
 

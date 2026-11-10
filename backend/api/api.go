@@ -25,6 +25,7 @@ import (
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/id"
 	"github.com/ybz21/Roami/internal/metadb"
+	"github.com/ybz21/Roami/internal/sessionlifecycle"
 )
 
 // labelOption 会话展示名所在的 tmux 用户选项（与 CLI 侧 runtime.LabelOption 同名，
@@ -33,6 +34,8 @@ import (
 const labelOption = "@roam_name"
 
 type API struct {
+	lifecycleContext  context.Context
+	Lifecycle         *sessionlifecycle.Store
 	AgentVerification *AgentVerificationStore
 	AgentProviders    *agentproviders.Store
 	GitFootprints     *GitFootprintStore
@@ -70,6 +73,10 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 		}
 	}()
 	projects := project.NewStore(dataDir, meta)
+	var lifecycle *sessionlifecycle.Store
+	if meta.OK() {
+		lifecycle = sessionlifecycle.New(meta, meta.Info().Path)
+	}
 	return &API{GitFootprints: NewGitFootprintStore(dataDir), Footprints: NewAIFootprintStore(dataDir), TT: tt, WT: worktree.New(dataDir, meta), BrowserHome: browserHome,
 		Football: NewFootballStore(), Speech: NewSpeechStore(dataDir), AgentProviders: agentproviders.NewStore(dataDir),
 		AgentVerification: NewAgentVerificationStore(dataDir), Prefs: NewPreferencesStore(dataDir), Workspace: NewWorkspaceStore(dataDir), Races: race.NewStore(dataDir, meta),
@@ -79,7 +86,7 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 			}
 			return nil
 		}),
-		Projects: projects, ProjectOKR: openProjectOKR(dataDir, projects), FileIndex: search.NewFileIndex(), Meta: meta,
+		Projects: projects, ProjectOKR: openProjectOKR(dataDir, projects), FileIndex: search.NewFileIndex(), Meta: meta, Lifecycle: lifecycle,
 		agentLink: newAgentLinker()}
 }
 
@@ -362,6 +369,12 @@ func (a *API) Capture(c *gin.Context) {
 // 而 Claude/Codex 的权限确认/选项菜单需要这些键来选择。
 func (a *API) Keys(c *gin.Context) {
 	name := a.sessionTarget(c)
+	unlock, leaseErr := lifecycleRuntime(c.Request.Context()).InputLease("=" + name)
+	if leaseErr != nil {
+		lifecycleError(c, leaseErr)
+		return
+	}
+	defer unlock()
 	var b struct {
 		Keys []string `json:"keys"`
 	}
@@ -432,6 +445,12 @@ func (a *API) Send(c *gin.Context) {
 		return
 	}
 	b.Sess = SanitizeSessionName(b.Sess)
+	unlock, leaseErr := lifecycleRuntime(c.Request.Context()).InputLease("=" + b.Sess)
+	if leaseErr != nil {
+		lifecycleError(c, leaseErr)
+		return
+	}
+	defer unlock()
 	// 分两步注入：先字面文本(-l，不解释按键名)，停顿一下，再单独回车。
 	// 否则像 Codex 这类 TUI 会把「文本+回车」当成一次粘贴，把回车并进去变成换行而非提交。
 	if _, err := a.TT.Run("send-keys", "-t", b.Sess, "-l", b.Msg); err != nil {

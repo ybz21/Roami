@@ -114,6 +114,11 @@ func (r Runtime) EnsureDirs() error {
 }
 
 func (r Runtime) Tmux(args ...string) error {
+	unlock, err := r.mutationLease(args)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	ctx := r.Context
 	if ctx == nil {
 		ctx = context.Background()
@@ -130,6 +135,11 @@ func (r Runtime) Tmux(args ...string) error {
 }
 
 func (r Runtime) TmuxOutput(args ...string) (string, error) {
+	unlock, err := r.mutationLease(args)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	var out bytes.Buffer
 	ctx := r.Context
 	if ctx == nil {
@@ -138,7 +148,7 @@ func (r Runtime) TmuxOutput(args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, r.TmuxBin, args...)
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	err := cmd.Run()
+	err = cmd.Run()
 	return out.String(), err
 }
 
@@ -279,6 +289,11 @@ func (r Runtime) PasteInput(target, message string) error {
 
 // SendShellCommand submits once so a following TUI never receives an extra confirmation.
 func (r Runtime) SendShellCommand(target, command string) error {
+	unlock, err := r.InputLease(target)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if err := r.PasteInput(target, command); err != nil {
 		return err
 	}
@@ -294,6 +309,11 @@ func (r Runtime) SendShellCommand(target, command string) error {
 // the paste. Mirrors the swarm sendPromptSubmit / _tmux_send_prompt_submit.
 // Set TTMUX_FORCE_PROMPT_SUBMIT=0 to skip the second Enter (e.g. plain shells).
 func (r Runtime) SendPromptSubmit(target, message string) error {
+	unlock, err := r.InputLease(target)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if err := r.PasteInput(target, message); err != nil {
 		return err
 	}

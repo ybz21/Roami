@@ -7,7 +7,6 @@ import { nativeSessionId } from './session-record'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
-import { agentLaunch } from '../../agent-command'
 import type { AgentKind } from '../../agent-kind'
 import { sessionLabel } from './session-label'
 import { AutoComplete, Button, Checkbox, Input, Modal, Radio, Segmented, Select, Space, Tag, Tooltip, App as AntApp } from 'antd'
@@ -15,7 +14,7 @@ import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { relTime } from '../../time-format'
-import { kickoffBrief, loadAgentCapabilities, type BriefWhere } from './kickoff-brief'
+import { submitLifecycle, lifecycleLaunchIntent, lifecycleRequestError } from './session-lifecycle'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
 // 由 prompt 首句推会话名：派活时用户只写了要干什么，名字不该再问一遍。
@@ -140,78 +139,23 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     }
     try {
       setCreating(true)
-      const capabilities = agent !== 'none' && prompt.trim() ? await loadAgentCapabilities() : ''
-      let sessionDir = dir.trim()
-      let actual: string
-      let wtBranch = ''   // 新建 worktree 时后端给的占位分支
-      let wtBase = ''     // 从哪个分支切出来的
-      // 简报按**真正走的那条分支**选，不看 Segmented 显示成什么：非 git 目录时界面只是
-      // 把它画成 repo，wtMode 仍是 'new'，于是会发一份「你已经在独立 worktree、去 git branch -m」
-      // 的简报给一个连 .git 都没有的目录——agent 照做就是一串报错。
+      const sessionDir = (wtMode === 'existing' ? pickedWtPath(existing) : '') || dir.trim()
       const madeWt = wtMode === 'new' && isGitRepo && !!sessionDir
-      // 「已有」选的是分支：也走建 worktree 那条编排，只是分支已经有了（existing=true，检出不新建）
       const adopt = wtMode === 'existing' && isGitRepo ? pickedBranch(existing) : ''
-      if (madeWt || adopt) {
-        // 组合 API（先会话后 worktree）：分支不传——后端按会话名占位，Agent 开工后语义化；
-        // 派生模式走 fork-worktree（同编排 + meta 记父子）
-        let baseReq: { base?: string; remote?: string } = base ? { base } : {}
-        if (base.startsWith('remote:')) {
-          const rest = base.slice('remote:'.length)
-          const sep = rest.indexOf(':')
-          baseReq = { base: rest.slice(sep + 1), remote: rest.slice(0, sep) }
-        }
-        const wtReq = adopt ? { branch: adopt, existing: true } : baseReq
-        const res = parent && !nativeSessionId(parent)
-          ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork-worktree`, {
-            child: finalName, dir: sessionDir, ...wtReq,
-          })
-          : await api('POST', '/worktree-sessions', {
-            name: finalName, dir: sessionDir, ...wtReq,
-          })
-        actual = res.name || res.data?.session || finalName
-        sessionDir = res.data?.path || sessionDir
-        wtBranch = res.data?.branch || ''
-        wtBase = res.data?.base || (adopt ? defBranch : base || defBranch)
-      } else {
-        // 主仓库直接用所选目录；「已有 worktree」= 会话 cwd 指进该 worktree；
-        // 派生模式走 fork（dir 留空则继承父 cwd）
-        if (wtMode === 'existing' && pickedWtPath(existing)) sessionDir = pickedWtPath(existing)
-        const res = parent && !nativeSessionId(parent)
-          ? await api('POST', `/sessions/${encodeURIComponent(parent)}/fork`, {
-            child: finalName, ...(sessionDir ? { dir: sessionDir } : {}),
-          })
-          : await api('POST', '/sessions', { name: finalName, dir: sessionDir })
-        actual = res.name || finalName
+      let baseReq: { base?: string; remote?: string } = base ? { base } : {}
+      if (base.startsWith('remote:')) {
+        const rest = base.slice('remote:'.length), sep = rest.indexOf(':')
+        baseReq = { base: rest.slice(sep + 1), remote: rest.slice(0, sep) }
       }
-      if (agent !== 'none') {
-        let launch = agentLaunch(agent, prefs)
-        if (prompt.trim()) {
-          // 开工简报按**这张表单真正选的**拼：在哪个目录、从哪个分支切的、占位分支叫什么、
-          // 会话现在叫什么（见 TaskComposer 里同一段注释）
-          const existingWt = existingWts.find((w: any) => w.path === sessionDir)
-          const where: BriefWhere = madeWt
-            ? { kind: 'new', path: sessionDir, base: wtBase || defBranch || 'main', branch: wtBranch || finalName }
-            : adopt
-              ? { kind: 'adopt', path: sessionDir, branch: wtBranch || adopt, base: wtBase || defBranch || 'main' }
-              : isGitRepo
-                ? { kind: 'repo', path: sessionDir || dir, branch: existingWt?.branch || defBranch || 'main' }
-                : { kind: 'plain', path: sessionDir || dir }
-          launch = agentLaunch(agent, prefs, kickoffBrief(where, actual, autoReview, prompt, t, capabilities))
-        }
-        await api('POST', '/tasks/_/send', { sess: actual, msg: launch, activity: prompt.trim() ? 'task' : undefined })
-        if (autoReview && !sessionDir) {
-          message.warning(t('session.autoReviewNeedsDir'))
-        } else if (autoReview && sessionDir) {
-          // track 会登记跟踪并拉起 review-<会话> 监控会话:对话空闲即互审,意见回灌
-          await api('POST', '/plugin/track', {
-            session: actual,
-            labels: { 'review:auto': 'true', role: 'author', workdir: sessionDir },
-          }).catch((e: any) => message.warning(t('session.autoReviewTrackFailed') + ': ' + e.message))
-        }
-      }
-      pushRecentDir(dir); message.success(t(parent ? 'session.fork.created' : 'session.created')); onClose(); onDone(actual)
+      const op = await submitLifecycle('create', {
+        name: finalName, task: prompt, dir: sessionDir, parent: parent && !nativeSessionId(parent) ? parent : undefined,
+        worktree: !!(madeWt || adopt), ...(adopt ? { branch: adopt, existing: true } : baseReq),
+        launch: lifecycleLaunchIntent(agent, prefs, prompt, madeWt ? 'new' : adopt ? 'adopt' : isGitRepo ? 'repo' : 'plain', autoReview, t),
+      })
+      pushRecentDir(dir); message.success(t('session.lifecycle.accepted')); onClose(); onDone(op.resourceId)
+
     }
-    catch (e: any) { message.error(e.apiError?.code === 'CAPABILITIES_READ_ERROR' ? t('session.capabilitiesReadFailed') : e.message) }
+    catch (e: any) { message.error(lifecycleRequestError(e, t)) }
     finally { setCreating(false) }
   }
   return (

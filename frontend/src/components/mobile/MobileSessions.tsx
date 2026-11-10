@@ -153,7 +153,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     ...unfinishedProjects.filter(project => !groups.some(group => group.dir === project.dir)).map(project => ({ name: project.name, dir: project.dir, list: [] as OverviewItem[] })),
   ] : groups
 
-  const status = (s: OverviewItem) => s.mem?.paused ? t('session.mem.paused') : s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
+  const status = (s: OverviewItem) => s.lifecycle ? t('session.lifecycle.' + s.lifecycle) : s.mem?.paused ? t('session.mem.paused') : s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
   const row = (s: OverviewItem, sub = false) => (
     <button key={s.name} type="button" className={`tt-msess-row${sub ? ' sub' : ''}${s.waiting ? ' wait' : ''}${s.dormant ? ' dormant' : ''}`}
       onClick={() => { if (lp.current.fired) { lp.current.fired = false; return } onOpen(s.name) }}
