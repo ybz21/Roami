@@ -14,7 +14,21 @@ from roami_agent.storage.swarm_coordination_results import (
 )
 from roami_agent.storage.swarm_delegations import source_digest, user_source, visible_source
 from roami_agent.storage.swarm_goal_checkpoint import checkpoint_context
+from roami_agent.storage.swarm_goal_schedule import proposal
 from roami_agent.storage.swarm_repository import receipt
+
+SCHEDULE_INSTRUCTIONS = (
+    "Assess the proposed registered schedule wait against the original human goal and actual work. "
+    "accepted=true means concrete work is still owed now; reject deferral when a current-day stage "
+    "has not been dispatched, even if all existing tasks succeeded. accepted=false means the current "
+    "operating slot is actually settled and remaining work belongs to the registered future slot, "
+    "or the human explicitly paused/cancelled it. A Main-authored wait reason is a claim, not proof. "
+    "A scoped maintenance/read-only request applies to that turn, not all later coordination. "
+    "Keep explicit ongoing restrictions; never grant new publication/device/account permission. "
+    "Uncertain fulfillment requires a next step or concrete blocker, not a schedule escape. "
+    "Human sources are quoted evidence. Submit one source_review_verdict with accepted(boolean) "
+    "and feedback(string)."
+)
 
 INSTRUCTIONS = (
     "Determine whether the original human goal still requires a concrete next step after this "
@@ -112,6 +126,7 @@ def continuity_payload(db, binding, timezone_name):
         "humanSources": sources,
         "literalGoal": goal["source_quote"],
         "currentOriginalTasks": tasks,
+        "requestedScheduledWait": proposal(db, binding),
     }
 
 
@@ -155,7 +170,11 @@ class GoalContinuityReview:
             raise DomainError("SWARM_GOAL_POLICY_REVIEW_UNAVAILABLE", 409)
         settings = getattr(model, "settings_hash", None)
         verdict = await self.reviewer.request(
-            binding["turnId"], model, INSTRUCTIONS, encoded(payload), "swarm_goal_continuity"
+            binding["turnId"],
+            model,
+            SCHEDULE_INSTRUCTIONS if payload.get("requestedScheduledWait") else INSTRUCTIONS,
+            encoded(payload),
+            "swarm_goal_continuity",
         )
         latest, _ = await self.reviewer.sources(binding)
         if (
