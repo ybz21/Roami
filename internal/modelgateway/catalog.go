@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -211,7 +212,7 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 	if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
 		return ModelSource{}, catalogError()
 	}
-	if u.Scheme != "https" && !(u.Scheme == "http" && containsField([]string{"127.0.0.1", "localhost", "::1"}, u.Hostname())) {
+	if !allowedModelSourceURL(u) {
 		return ModelSource{}, catalogError()
 	}
 	if s.isGatewaySource(p.BaseURL) {
@@ -313,4 +314,9 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	v.BaseURL = ""
 	v.Uses = nil
 	return s.persist(v)
+}
+
+func allowedModelSourceURL(u *url.URL) bool {
+	ip := net.ParseIP(u.Hostname())
+	return u.Scheme == "https" || u.Scheme == "http" && (u.Hostname() == "localhost" || ip != nil && (ip.IsLoopback() || ip.IsPrivate()))
 }
