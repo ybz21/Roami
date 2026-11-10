@@ -7,15 +7,15 @@ import { LifecycleOperationView, SessionLifecycleInbox } from './SessionLifecycl
 import { lifecycleAction, type LifecycleOperation } from './session-lifecycle'
 import { sendSessionPrompt } from './session-actions'
 
-const state = vi.hoisted(() => ({ operations: [] as any[] }))
+const state = vi.hoisted(() => ({ operations: [] as any[], native: [] as any[] }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: true }) }))
-vi.mock('./native-session-list', () => ({ useNativeSessionList: () => ({ value: [] }) }))
+vi.mock('./native-session-list', () => ({ useNativeSessionList: () => ({ value: state.native }) }))
 vi.mock('./session-lifecycle', () => ({ lifecycleAction: vi.fn(), useSessionLifecycle: () => ({ value: state.operations, loaded: true }), blockingLifecycle: () => undefined, lifecycleEnded: (op: LifecycleOperation) => ['succeeded', 'cancelled'].includes(op.state) }))
 vi.mock('../../preferences', () => { const prefs = { locale: 'en-US' }; return { usePreferences: () => [prefs], savePreferences: vi.fn() } })
 vi.mock('./session-actions', () => ({ sendSessionPrompt: vi.fn() }))
 const op: LifecycleOperation = { operationId: 'operation', resourceId: 'session', requestKey: 'key', kind: 'create', intent: { name: 'My task', launch: { command: 'codex', agent: 'codex', task: 'Original request', preamble: '', taskHeading: '', setupHeading: '', fileBase: '/api/file', autoReview: false } }, state: 'queued', stage: 'workspace', revision: 7, cancelRequested: false, receipts: {}, acceptedAt: 100, updatedAt: 100 }
 const content = (value: LifecycleOperation) => <I18nProvider><AntApp><LifecycleOperationView op={value} /></AntApp></I18nProvider>
-beforeEach(() => { state.operations = []; localStorage.clear(); localStorage.setItem('ttmux-locale', 'en-US'); vi.mocked(lifecycleAction).mockReset(); vi.mocked(sendSessionPrompt).mockReset(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); vi.stubGlobal('matchMedia', () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} })) })
+beforeEach(() => { state.operations = []; state.native = []; localStorage.clear(); localStorage.setItem('ttmux-locale', 'en-US'); vi.mocked(lifecycleAction).mockReset(); vi.mocked(sendSessionPrompt).mockReset(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); vi.stubGlobal('matchMedia', () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} })) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 it('saves drafts across navigation and never sends while preparing', async () => {
@@ -75,4 +75,46 @@ it('keeps simultaneous pending and inspector drafts synchronized without duplica
  expect(fields[1].value).toBe('Shared draft')
  fireEvent.change(fields[1], { target: { value: 'Updated from inspector' } })
  expect(fields[0].value).toBe('Updated from inspector')
+})
+
+
+it('hides completed history while keeping unresolved operations and native closures', () => {
+  state.operations = [
+    { ...op, operationId: 'done', state: 'succeeded', intent: { name: 'Already cleaned' } },
+    { ...op, operationId: 'cancelled', state: 'cancelled', intent: { name: 'Already cancelled' } },
+    { ...op, state: 'attention', intent: { name: 'Needs recovery' } },
+  ]
+  state.native = [
+    { nativeSessionId: 'closed', title: 'Closed native', lifecycle: 'closed', closureError: 'old error' },
+    { nativeSessionId: 'closing', title: 'Closing native', lifecycle: 'closing' },
+  ]
+  render(<I18nProvider><AntApp><SessionLifecycleInbox onOpen={() => {}} /></AntApp></I18nProvider>)
+  fireEvent.click(screen.getByRole('button', { name: /Background work/ }))
+  expect(screen.queryByText('Already cleaned')).toBeNull()
+  expect(screen.queryByText('Already cancelled')).toBeNull()
+  expect(screen.queryByText('Closed native')).toBeNull()
+  expect(screen.getByRole('button', { name: /Needs recovery/ })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /Closing native/ })).toBeTruthy()
+})
+
+it('keeps the selected detail and draft when the operation completes', () => {
+  state.operations = [op]
+  const content = <I18nProvider><AntApp><SessionLifecycleInbox onOpen={() => {}} /></AntApp></I18nProvider>
+  const view = render(content)
+  fireEvent.click(screen.getByRole('button', { name: /Background work/ }))
+  fireEvent.click(screen.getByRole('button', { name: /My task/ }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep this follow-up' } })
+  state.operations = [{ ...op, state: 'succeeded' }]
+  view.rerender(<I18nProvider><AntApp><SessionLifecycleInbox onOpen={() => {}} /></AntApp></I18nProvider>)
+  expect(screen.getByRole('status').textContent).toContain('Ready')
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Keep this follow-up')
+  expect(screen.getByRole('button', { name: 'Send follow-up' })).toBeTruthy()
+})
+
+it('shows an empty pending inbox without deleting completed history', () => {
+  state.operations = [{ ...op, state: 'succeeded' }]
+  render(<I18nProvider><AntApp><SessionLifecycleInbox onOpen={() => {}} /></AntApp></I18nProvider>)
+  fireEvent.click(screen.getByRole('button', { name: /Background work/ }))
+  expect(screen.getByText('No pending operations')).toBeTruthy()
+  expect(state.operations).toHaveLength(1)
 })

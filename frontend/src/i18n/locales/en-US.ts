@@ -44,7 +44,7 @@ const enUS = {
   'session.lifecycle.operation': "Operation ID",
   'session.lifecycle.errorDetail': "Error details",
   'session.lifecycle.loadFailed': "Progress is unavailable. Try again shortly.",
-  'session.lifecycle.empty': "No background operations",
+  'session.lifecycle.empty': "No pending operations",
   'session.lifecycle.error.generic': "This step did not finish. Retry or keep the resources.",
   'session.lifecycle.error.LIFECYCLE_RESULT_UNKNOWN': "The result could not be confirmed. Inspect the session and workspace before repeating a launch or merge.",
   'session.lifecycle.error.LIFECYCLE_WORKSPACE_CHANGED': "The workspace changed. Deletion is paused. Keep it and inspect the files.",

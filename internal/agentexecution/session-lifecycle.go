@@ -482,8 +482,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 func (s Service) sessionExecutionStatus(key string, status Status) (Status, error) {
 	binding, err := s.paneBinding(status.Binding.Name, false)
 	if err != nil || binding.resourceID() != status.Binding.resourceID() {
+		original := status.Receipt
 		status.State, status.ObservationErrorCode = "unknown", "SESSION_BINDING_UNAVAILABLE"
-		return status, nil
+		return s.missingSessionStatus(key, status, original)
 	}
 	path, err := s.lifecycleFile(binding)
 	if err != nil {

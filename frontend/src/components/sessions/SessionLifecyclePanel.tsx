@@ -76,7 +76,7 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
   const { t, locale } = useI18n()
   const operations = useSessionLifecycle()
   const native = useNativeSessionList(true, true)
-  const nativeClosures = native.value.filter(record => record.lifecycle === 'closing' || record.lifecycle === 'closed' || record.closureError)
+  const nativeClosures = native.value.filter(record => record.lifecycle !== 'closed' && (record.lifecycle === 'closing' || record.closureError))
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const op = operations.value.find(o => o.operationId === selected)
@@ -91,7 +91,7 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
       <div className="tt-lifecycle-panel">
         <div className="tt-lifecycle-scroll">
           {operations.failed && <p role="alert">{t('session.lifecycle.loadFailed')}</p>}
-          {op ? <LifecycleOperationView key={op.operationId} op={op} onOpen={name => { setOpen(false); setSelected(null); onOpen(name) }} /> : operations.value.length === 0 && nativeClosures.length === 0 ? <p>{t('session.lifecycle.empty')}</p> : operations.value.map(o => <button type="button" className="tt-lifecycle-row" key={o.operationId} onClick={() => setSelected(o.operationId)}>
+          {op ? <LifecycleOperationView key={op.operationId} op={op} onOpen={name => { setOpen(false); setSelected(null); onOpen(name) }} /> : active.length === 0 && nativeClosures.length === 0 ? <p>{t('session.lifecycle.empty')}</p> : active.map(o => <button type="button" className="tt-lifecycle-row" key={o.operationId} onClick={() => setSelected(o.operationId)}>
             <strong>{o.intent.name || o.resourceId}</strong><span>{lifecycleStatus(o, t)}</span>
           </button>)}
           {!op && nativeClosures.map(record => <button type="button" className="tt-lifecycle-row" key={record.nativeSessionId} onClick={() => { setOpen(false); onOpen(nativeSessionName(record.nativeSessionId)) }}>

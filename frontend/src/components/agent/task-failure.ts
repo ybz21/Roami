@@ -12,6 +12,7 @@ const reasons: Record<string, string> = {
   INVALID_PROJECT_DIRECTORY: 'workspace', INVALID_WORKSPACE_TARGET: 'workspace',
   INVALID_EXECUTION_DIRECTORY: 'directory', EXECUTION_DIRECTORY_UNAVAILABLE: 'directory',
   WORKSPACE_BUSY: 'workspaceBusy',
+  SESSION_EXECUTION_MISSING: 'unknown',
 }
 
 export function taskFailureKey(code: unknown): string | undefined {

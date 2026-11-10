@@ -44,7 +44,7 @@ const zhCN = {
   'session.lifecycle.operation': "操作标识",
   'session.lifecycle.errorDetail': "错误详情",
   'session.lifecycle.loadFailed': "进度暂不可用，请稍后重试。",
-  'session.lifecycle.empty': "暂无后台操作",
+  'session.lifecycle.empty': "暂无待处理事项",
   'session.lifecycle.error.generic': "此步骤未完成，可重试或保留资源。",
   'session.lifecycle.error.LIFECYCLE_RESULT_UNKNOWN': "执行结果未能确认。请先核对会话和工作区，避免重复开工或合并。",
   'session.lifecycle.error.LIFECYCLE_WORKSPACE_CHANGED': "工作区有新变化，已暂停删除；请保留并检查文件。",
