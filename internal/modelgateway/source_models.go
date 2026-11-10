@@ -1,9 +1,11 @@
 package modelgateway
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/ybz21/Roami/internal/agentproviders"
+	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 func catalogProtocol(kind, protocol string) bool {
@@ -77,7 +79,24 @@ func (h *Handler) discoverModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, source ModelSource, revision string) {
-	models, err := agentproviders.ReadSourceModels(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+	var models []string
+	var err error
+	if source.PluginSourceID != "" && h.Plugins != nil {
+		var saved modelplugins.Source
+		saved, err = h.Plugins.ReadSource(source.PluginSourceID)
+		if err == nil {
+			var provider modelplugins.Provider
+			provider, err = h.Plugins.Provider(r.Context(), saved)
+			if provider.FellBack {
+				err = errors.New("MODEL_LIST_FAILED")
+			}
+			for _, model := range provider.Models {
+				models = append(models, model.ID)
+			}
+		}
+	} else {
+		models, err = agentproviders.ReadSourceModels(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+	}
 	s := h.Catalog
 	s.mu.Lock()
 	changed := revision != s.value.Revision

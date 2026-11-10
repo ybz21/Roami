@@ -21,6 +21,8 @@ beforeEach(() => {
       if (method === 'PUT') saved = { ...body, revision: 'revision-2', baseUrl: catalog.baseUrl, uses: {} }
       return { data: structuredClone(saved) }
     }
+    if (path === '/agent/model-gateway/access-keys') return { data: { revision: saved.revision, keys: [] } }
+    if (path === '/agent/model-gateway/access-key') return { data: { revision: saved.revision, hasKey: false, suffix: '' } }
     if (path === '/agent/model-gateway/settings') return { data: structuredClone(settings) }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { day: '2026-10-31', from: '2026-10-25', to: '2026-10-31', days: 7, timezone: 'Asia/Shanghai', today: [], groups: [], hourly: [], recent: [] } }
     return { data: {} }
@@ -84,7 +86,9 @@ it('shows connections and their models together and accepts old source-page link
   const connection = await screen.findByRole('region', { name: 'Saved source' })
   expect(connection.textContent).toContain('Coding')
   expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
-  expect(screen.getAllByRole('tab')).toHaveLength(3)
+  expect(screen.getAllByRole('tab')).toHaveLength(5)
+  expect(screen.getAllByRole('tab')[4].textContent).toBe('hub.tab.speech')
+  expect(screen.queryByRole('combobox', { name: 'settings.speechProvider' })).toBeNull()
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })
@@ -132,9 +136,9 @@ it('keeps existing IDs, credentials and failover candidates while adding discove
   vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
   mount('catalog/source/upstream')
   fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
-  expect((await screen.findByRole('checkbox', { name: 'priced-model' }) as HTMLInputElement).disabled).toBe(true)
+  expect((await screen.findByRole('checkbox', { name: 'priced-model' }) as HTMLInputElement).disabled).toBe(false)
   fireEvent.click(screen.getByRole('checkbox', { name: 'hub.directory.selectAll' }))
-  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.applyModels' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
     sources: expect.arrayContaining([expect.objectContaining({ id: 'upstream', hasKey: true, apiKey: '' })]),
     models: [saved.models[0], expect.objectContaining({ name: 'new-model' })],
@@ -204,10 +208,10 @@ it('keeps selected models after save fails and retries without a new discovery r
   mount('catalog/source/upstream')
   fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
   fireEvent.click(await screen.findByRole('checkbox', { name: 'recoverable-model' }))
-  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.applyModels' }))
   await waitFor(() => expect(screen.getAllByText('hub.error.failed').length).toBeGreaterThan(0))
   expect((screen.getByRole('checkbox', { name: 'recoverable-model' }) as HTMLInputElement).checked).toBe(true)
-  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.applyModels' }))
   await waitFor(() => expect(attempts).toBe(2))
   expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
 })
@@ -234,11 +238,11 @@ it('blocks stale source configuration after rereading a conflicting catalog', as
   mount('catalog/source/upstream')
   fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
   fireEvent.click(await screen.findByRole('checkbox', { name: 'selected-model' }))
-  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.applyModels' }))
   await waitFor(() => expect(screen.getAllByText('hub.error.changed').length).toBeGreaterThan(0))
   fireEvent.click(screen.getAllByRole('button', { name: 'capabilities.models.reread' }).slice(-1)[0])
   await screen.findByText('hub.directory.sourceChanged')
-  expect((screen.getByRole('button', { name: 'hub.directory.saveModels' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: 'hub.directory.applyModels' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.useLatest' }))
   expect((screen.getByLabelText('agent.models.baseUrl') as HTMLInputElement).value).toBe('https://changed.example/v1')
   expect(screen.queryByRole('checkbox', { name: 'selected-model' })).toBeNull()
@@ -253,7 +257,7 @@ it('loads and saves speech models even when the independent language model catal
   mount('speech')
   const model = await screen.findByLabelText('settings.speechModel') as HTMLInputElement
   expect(model.value).toBe('saved-asr')
-  expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByRole('tab', { name: 'hub.tab.speech' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByText('hub.entry')).toBeNull()
   fireEvent.change(model, { target: { value: 'new-asr' } })
   fireEvent.click(screen.getByRole('button', { name: 'settings.save' }))
@@ -261,14 +265,14 @@ it('loads and saves speech models even when the independent language model catal
 })
 
 it('recovers unsaved speech edits after switching model tabs', async () => {
-  const navigate = vi.fn(), page = mount('catalog', navigate)
+  const navigate = vi.fn(), page = mount('speech', navigate)
   fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'settings.speechProvider' }))
   fireEvent.click(await screen.findByText('OpenAI'))
   fireEvent.change(await screen.findByLabelText('settings.speechModel'), { target: { value: 'draft-asr' } })
   fireEvent.click(screen.getByRole('tab', { name: 'hub.tab.prices' }))
   expect(navigate).toHaveBeenCalledWith('capabilities/models/prices')
   page.rerender(<App><ModelHub sub="prices" onNav={navigate} /></App>)
-  page.rerender(<App><ModelHub sub="catalog" onNav={navigate} /></App>)
+  page.rerender(<App><ModelHub sub="speech" onNav={navigate} /></App>)
   await waitFor(() => expect((screen.getByLabelText('settings.speechModel') as HTMLInputElement).value).toBe('draft-asr'))
   fireEvent.click(screen.getByRole('button', { name: 'settings.save' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/speech/config', expect.objectContaining({ openai: expect.objectContaining({ model: 'draft-asr' }) })))
@@ -299,4 +303,50 @@ it('updates an existing source without fetching models and retains its stored ke
     sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '' })], models: catalog.models,
   })))
   expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})
+
+
+it('opens a saved source directory from its card and saves additions and removals without losing other sources', async () => {
+  const other = { ...catalog.sources[0], id: 'other', name: 'Other source' }
+  const unrelated = { ...catalog.models[0], id: 'other-model', name: 'Other model', candidates: [{ sourceId: 'other', model: 'unrelated' }] }
+  const saved = { ...catalog, sources: [...catalog.sources, other], models: [...catalog.models, unrelated] }
+  vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
+  const navigate = vi.fn(), page = mount('', navigate)
+  const card = await screen.findByRole('region', { name: 'Saved source' })
+  fireEvent.click(within(card).getByRole('button', { name: 'hub.directory.updateModels' }))
+  page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
+  const current = await screen.findByRole('checkbox', { name: 'priced-model' }) as HTMLInputElement
+  expect(current.checked).toBe(true)
+  expect(current.disabled).toBe(false)
+  fireEvent.click(current)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'new-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.applyModels' }))
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ id: 'upstream', apiKey: '' }), other]),
+    models: [unrelated, expect.objectContaining({ name: 'new-model' })],
+  })))
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
+})
+
+it('keeps the gateway information in its own tab and omits the duplicate agent configuration entry', async () => {
+  const navigate = vi.fn(), page = mount('', navigate)
+  await screen.findByRole('region', { name: 'Saved source' })
+  expect(screen.queryByText(catalog.baseUrl + '/v1')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'hub.configureAgents' })).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'hub.tab.gateway' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/gateway')
+  page.rerender(<App><ModelHub sub="gateway" onNav={navigate} /></App>)
+  expect(await screen.findByText(catalog.baseUrl + '/v1')).toBeTruthy()
+  expect(screen.queryByRole('region', { name: 'Saved source' })).toBeNull()
+})
+
+it('keeps creation and import choices inside one New menu', async () => {
+  const navigate = vi.fn()
+  mount('', navigate)
+  const toolbar = (await screen.findByRole('button', { name: 'common.create' })).closest('.tt-model-hub-actions')!
+  expect(within(toolbar as HTMLElement).getAllByRole('button')).toHaveLength(1)
+  fireEvent.click(within(toolbar as HTMLElement).getByRole('button'))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
 })

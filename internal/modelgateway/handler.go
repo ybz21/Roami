@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ybz21/Roami/internal/modelplugins"
 	"io"
 	"log"
 	"net"
@@ -16,6 +17,7 @@ import (
 )
 
 type Handler struct {
+	Plugins        *modelplugins.Manager
 	Catalog        *CatalogStore
 	Ledger         *Ledger
 	Client         *http.Client
@@ -65,7 +67,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {

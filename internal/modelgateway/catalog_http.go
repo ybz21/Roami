@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ybz21/Roami/internal/agentproviders"
+	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool {
@@ -279,11 +280,65 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			reject(w, 400, "MODEL_NOT_CONFIGURED")
 			return
 		}
+
+		var pluginSource modelplugins.Source
+		var pluginProvider modelplugins.Provider
+		var pluginModel modelplugins.Model
+		upstreamModel := candidate.Model
+		if source.PluginSourceID != "" {
+			if h.Plugins == nil {
+				reject(w, 503, "MODEL_PLUGIN_UNAVAILABLE")
+				return
+			}
+			pluginSource, err = h.Plugins.ReadSource(source.PluginSourceID)
+			if err != nil {
+				reject(w, 503, "MODEL_PLUGIN_UNAVAILABLE")
+				return
+			}
+			pluginProvider, err = h.Plugins.CachedProvider(pluginSource)
+			if err != nil {
+				reject(w, 503, "MODEL_PLUGIN_MODELS_REQUIRED")
+				return
+			}
+			found := false
+			for _, m := range pluginProvider.Models {
+				if m.ID == candidate.Model {
+					pluginModel = m
+					found = true
+					break
+				}
+			}
+			if !found {
+				reject(w, 400, "MODEL_NOT_CONFIGURED")
+				return
+			}
+			if modelplugins.DesktopUnavailable(pluginSource.ProviderID) {
+				reject(w, 503, "MODEL_PLUGIN_DESKTOP_UNAVAILABLE")
+				return
+			}
+			if modelplugins.DesktopAppMissing(pluginSource.ProviderID) {
+				reject(w, 503, "MODEL_PLUGIN_DESKTOP_APP_MISSING")
+				return
+			}
+			if !pluginProvider.SignedIn {
+				reject(w, 401, "MODEL_PLUGIN_SIGN_IN_REQUIRED")
+				return
+			}
+			source.Protocol = modelplugins.ModelProtocol(pluginModel, pluginProvider)
+			source.BaseURL = pluginModel.URL
+			if source.BaseURL == "" {
+				source.BaseURL = pluginProvider.API
+			}
+			source.BaseURL = strings.TrimRight(source.BaseURL, "/")
+			if pluginModel.APIID != "" {
+				upstreamModel = pluginModel.APIID
+			}
+		}
 		if r.URL.Path == "/v1/responses/compact" && source.Protocol != protocol {
 			reject(w, 400, "MODEL_GATEWAY_COMPACTION_UNSUPPORTED")
 			return
 		}
-		upstreamBody, bridge, conversionError := prepareProtocolBridge(body, protocol, source.Protocol, candidate.Model)
+		upstreamBody, bridge, conversionError := prepareProtocolBridge(body, protocol, source.Protocol, upstreamModel)
 		if conversionError != nil {
 			reject(w, 400, protocolCode(conversionError))
 			return
@@ -359,7 +414,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			if bridge != nil {
 				suffix = map[string]string{"openai-completions": "/v1/chat/completions", "openai-responses": "/v1/responses", "anthropic-messages": "/v1/messages"}[source.Protocol]
 			}
-			if strings.HasSuffix(source.BaseURL, "/v1") {
+			if source.PluginSourceID != "" || strings.HasSuffix(source.BaseURL, "/v1") {
 				suffix = strings.TrimPrefix(suffix, "/v1")
 			}
 			out, e := http.NewRequestWithContext(r.Context(), "POST", source.BaseURL+suffix, bytes.NewReader(upstreamBody))
@@ -390,7 +445,12 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			if source.Protocol == "anthropic-messages" && out.Header.Get("Anthropic-Version") == "" {
 				out.Header.Set("Anthropic-Version", "2023-06-01")
 			}
-			response, e := h.Client.Do(out)
+			var response *http.Response
+			if source.PluginSourceID != "" {
+				response, e = h.Plugins.Fetch(r.Context(), pluginSource, pluginModel, pluginProvider, out, upstreamBody)
+			} else {
+				response, e = h.Client.Do(out)
+			}
 			if e != nil {
 				var op *net.OpError
 				notSent = errors.As(e, &op) && op.Op == "dial"

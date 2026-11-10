@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 
-export type ModelSource = { id: string; name: string; baseUrl: string; protocol: string; authMode: string; hasKey?: boolean; apiKey?: string }
+export type ModelSource = { pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; id: string; name: string; baseUrl: string; protocol: string; authMode: string; hasKey?: boolean; apiKey?: string }
 export type ModelCandidate = { sourceId: string; model: string }
 export type CatalogModel = { id: string; name: string; protocol: string; strategy: 'fixed' | 'failover'; candidates: ModelCandidate[] }
 export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string> }
