@@ -97,7 +97,7 @@ func (l *Ledger) StatisticsForCalls(days int, selected, source, agent, recentSta
 	if recentState != "" && recentState != "unknown" {
 		return result, fmt.Errorf("INVALID_MODEL_USAGE_STATE")
 	}
-	if agent != "" && !containsField(gatewayAgentKinds, agent) {
+	if agent != "" && agent != "external" && !containsField(gatewayAgentKinds, agent) {
 		return result, fmt.Errorf("INVALID_AGENT_KIND")
 	}
 	if source != "" && source != "rsi" && source != "other" {

@@ -45,6 +45,7 @@ type ModelCatalog struct {
 	Uses            map[string][]string      `json:"uses"`
 	Port            int                      `json:"-"`
 	Token           string                   `json:"-"`
+	AccessKey       gatewayAccessKey         `json:"-"`
 	RolesBackup     map[string]any           `json:"-"`
 	AgentKeys       map[string]agentKeyState `json:"-"`
 	CanRestoreRoami bool                     `json:"canRestoreRoami"`
@@ -54,6 +55,7 @@ type catalogDisk struct {
 	Catalog     ModelCatalog             `json:"catalog"`
 	Port        int                      `json:"port"`
 	Token       string                   `json:"token"`
+	AccessKey   gatewayAccessKey         `json:"accessKey,omitempty"`
 	RolesBackup map[string]any           `json:"rolesBackup,omitempty"`
 	AgentKeys   map[string]agentKeyState `json:"agentKeys,omitempty"`
 }
@@ -83,12 +85,13 @@ func openCatalog(l *Ledger) (*CatalogStore, error) {
 	err := l.db.QueryRow(`SELECT value FROM gateway_catalog WHERE id=1`).Scan(&raw)
 	if err == nil {
 		var d catalogDisk
-		if json.Unmarshal([]byte(raw), &d) != nil || len(d.Token) != 48 || d.Port < 0 || d.Port > 65535 {
+		if json.Unmarshal([]byte(raw), &d) != nil || len(d.Token) != 48 || d.Port < 0 || d.Port > 65535 || !validStoredGatewayAccessKey(d.AccessKey) {
 			return nil, catalogError()
 		}
 		s.value = d.Catalog
 		s.value.Port = d.Port
 		s.value.Token = d.Token
+		s.value.AccessKey = d.AccessKey
 		s.value.RolesBackup = d.RolesBackup
 		s.value.AgentKeys = d.AgentKeys
 	} else if err == sql.ErrNoRows {
@@ -119,7 +122,7 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 	if err := writeCatalogVerificationRevision(s.ledger.paths.Data, ModelCatalog{}); err != nil {
 		return err
 	}
-	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys})
+	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys, AccessKey: value.AccessKey})
 	if err != nil {
 		return err
 	}
@@ -138,6 +141,7 @@ func (s *CatalogStore) snapshot() ModelCatalog {
 	var v ModelCatalog
 	_ = json.Unmarshal(raw, &v)
 	v.Token = s.value.Token
+	v.AccessKey = s.value.AccessKey
 	v.Port = s.value.Port
 	v.RolesBackup = s.value.RolesBackup
 	v.AgentKeys = map[string]agentKeyState{}
@@ -306,6 +310,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	}
 	v.Port = s.value.Port
 	v.Token = s.value.Token
+	v.AccessKey = s.value.AccessKey
 	v.RolesBackup = s.value.RolesBackup
 	v.AgentKeys = map[string]agentKeyState{}
 	for kind, key := range s.value.AgentKeys {

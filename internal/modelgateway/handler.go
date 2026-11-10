@@ -65,7 +65,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {

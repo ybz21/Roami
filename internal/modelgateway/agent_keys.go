@@ -55,6 +55,9 @@ func (s *CatalogStore) credential(kind string) string {
 	return s.deriveCredential(kind, s.value.AgentKeys[kind].ID)
 }
 func (s *CatalogStore) keyAllowed(kind, id string) bool {
+	if kind == "external" {
+		return s.value.AccessKey.Hash != "" && s.value.AccessKey.ID == id
+	}
 	state := s.value.AgentKeys[kind]
 	return !state.Disabled && (id == keyID(state.ID) || id == keyID(state.Previous) && state.PreviousUntil > s.ledger.now().UnixMilli())
 }
@@ -75,6 +78,12 @@ func (s *CatalogStore) authenticate(key string) (string, string) {
 		}
 		if state.PreviousUntil > s.ledger.now().UnixMilli() && subtle.ConstantTimeCompare([]byte(key), []byte(s.deriveCredential(kind, state.Previous))) == 1 {
 			return kind, keyID(state.Previous)
+		}
+	}
+	if s.value.AccessKey.Hash != "" {
+		sum := sha256.Sum256([]byte(key))
+		if subtle.ConstantTimeCompare([]byte(hex.EncodeToString(sum[:])), []byte(s.value.AccessKey.Hash)) == 1 {
+			return "external", s.value.AccessKey.ID
 		}
 	}
 	return "", ""

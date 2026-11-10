@@ -29,6 +29,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 	for _, route := range []struct{ method, path string }{
+		{"GET", "/agent/model-gateway/access-key"}, {"PUT", "/agent/model-gateway/access-key"}, {"DELETE", "/agent/model-gateway/access-key"},
 		{"GET", "/agent/model-gateway/settings"}, {"PUT", "/agent/model-gateway/settings"},
 		{"GET", "/agent/model-gateway/catalog"}, {"PUT", "/agent/model-gateway/catalog"}, {"POST", "/agent/model-gateway/catalog/apply"},
 		{"POST", "/agent/model-gateway/catalog/discover"}, {"POST", "/agent/model-gateway/catalog/roles"}, {"POST", "/agent/model-gateway/catalog/source-models"},
