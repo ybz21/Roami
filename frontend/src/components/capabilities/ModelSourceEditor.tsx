@@ -13,6 +13,8 @@ export type SourceDraft = {
   selected: string[]
   query: string
   manual: string
+  removed?: string[]
+  fetchRequested?: boolean
   manualOpen: boolean
 }
 export const initialSourceDraft = (source: ModelSource, existing: boolean): SourceDraft => ({ source: { ...source, apiKey: '' }, original: source, editing: !existing, directory: null, selected: [], query: '', manual: '', manualOpen: false })
@@ -37,7 +39,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const patch = (next: Partial<SourceDraft>) => onChange({ ...draft, ...next })
   const updateSource = (next: Partial<ModelSource>) => {
     const updated = { ...source, ...next }
-    if (connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null }) }
+    if (connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, fetchRequested: false }) }
     else patch({ source: updated })
   }
   const normalizedURL = source.baseUrl.trim().replace(/\/+$/, '')
@@ -51,35 +53,42 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const invalidManual = manual.some(value => new TextEncoder().encode(value).length > 200 || /[\r\n\x00]/.test(value))
   const selected = draft.directory ? draft.selected.filter(value => draft.directory!.includes(value)) : []
   const additions = [...new Set([...selected, ...manual])].filter(value => !added.has(value))
+  const removed = new Set((draft.removed || []).filter(value => added.has(value) && !manual.includes(value)))
+  const removedCount = attached.filter(model => removed.has(model.candidates[0].model)).length
   const sourceConflict = !!existing && (connectionKey(existing) !== connectionKey(draft.original) || existing.name !== draft.original.name)
   const changedConnection = !!existing && (connectionKey({ ...existing, apiKey: '' }) !== key || source.name.trim() !== existing.name)
-  const overLimit = catalog.models.length + additions.length > 1000
-  const canSave = !sourceConflict && validConnection && !invalidManual && !overLimit && (additions.length > 0 || changedConnection) && !busy && !loading
+  const overLimit = catalog.models.length - removedCount + additions.length > 1000
+  const canSave = !sourceConflict && validConnection && !invalidManual && !overLimit && (additions.length > 0 || removedCount > 0 || changedConnection) && !busy && !loading
   const number = (value: number) => new Intl.NumberFormat(locale).format(value)
-  const visible = (draft.directory || []).filter(value => value.toLowerCase().includes(draft.query.toLowerCase()))
-  const selectable = visible.filter(value => !added.has(value))
-  const selectedVisible = selectable.filter(value => draft.selected.includes(value))
+  const visible = (draft.directory === null ? [] : [...new Set([...draft.directory, ...added])]).filter(value => value.toLowerCase().includes(draft.query.toLowerCase()))
+  const selectable = visible
+  const checked = (value: string) => added.has(value) ? !removed.has(value) : draft.selected.includes(value)
+  const selectedVisible = selectable.filter(checked)
+  const selectModels = (values: string[], enabled: boolean) => patch({ selected: enabled ? [...new Set([...draft.selected, ...values.filter(value => !added.has(value))])] : draft.selected.filter(value => !values.includes(value)), removed: enabled ? [...removed].filter(value => !values.includes(value)) : [...new Set([...removed, ...values.filter(value => added.has(value))])] })
   const read = async () => {
     if (!validConnection || request.current || busy) return
     const abort = new AbortController(); request.current = abort
     setLoading(true); setReadError('')
     try {
       const { data } = await api('POST', '/agent/model-gateway/catalog/discover', { revision: catalog.revision, source: { ...source, baseUrl: normalizedURL } }, { signal: abort.signal })
-      if (!abort.signal.aborted) onChange({ ...current.current, directory: data.models, editing: false, selected: current.current.selected.filter(value => data.models.includes(value)) })
+      if (!abort.signal.aborted) onChange({ ...current.current, directory: data.models, editing: false, fetchRequested: false, selected: current.current.selected.filter(value => data.models.includes(value)) })
     } catch (cause: any) {
-      if (!abort.signal.aborted) setReadError(cause?.apiError?.code === 'MODEL_LIST_UNAUTHORIZED' ? 'hub.directory.unauthorized' : cause?.apiError?.code === 'MODEL_LIST_UNSUPPORTED' ? 'hub.directory.unsupported' : cause?.apiError?.code === 'MODEL_LIST_FAILED' ? 'hub.directory.failed' : catalogFailure(cause))
+      if (!abort.signal.aborted) { onChange({ ...current.current, fetchRequested: false }); setReadError(cause?.apiError?.code === 'MODEL_LIST_UNAUTHORIZED' ? 'hub.directory.unauthorized' : cause?.apiError?.code === 'MODEL_LIST_UNSUPPORTED' ? 'hub.directory.unsupported' : cause?.apiError?.code === 'MODEL_LIST_FAILED' ? 'hub.directory.failed' : catalogFailure(cause)) }
     } finally { if (request.current === abort) { request.current = null; setLoading(false) } }
   }
+  useEffect(() => {
+    if (draft.fetchRequested && validConnection && !busy) void read()
+  }, [draft.fetchRequested, validConnection, busy])
   const save = async () => {
     if (!canSave) return
     const nextSource = { ...source, name: sourceName(source), baseUrl: normalizedURL }
-    const nextModels = catalog.models.map(model => model.candidates[0].sourceId === source.id ? { ...model, protocol: source.protocol } : model)
+    const nextModels = catalog.models.filter(model => model.candidates[0].sourceId !== source.id || !removed.has(model.candidates[0].model)).map(model => model.candidates[0].sourceId === source.id ? { ...model, protocol: source.protocol } : model)
     for (const model of additions) nextModels.push({ id: globalThis.crypto?.randomUUID?.() || 'model-' + Math.random().toString(36).slice(2), name: model, protocol: source.protocol, strategy: 'fixed', candidates: [{ sourceId: source.id, model }] })
     if (await onSave({ ...catalog, sources: existing ? catalog.sources.map(row => row.id === source.id ? nextSource : row) : [...catalog.sources, nextSource], models: nextModels })) { message.success(t('agent.models.saved')); onBack() }
   }
   const submit = () => {
     if (!canSave) return
-    if (changedConnection) modal.confirm({ className: 'tt-model-connection-confirm', title: t('hub.sourceApply'), content: t('hub.sourceImpact'), okText: t('agent.models.save'), cancelText: t('common.cancel'), onOk: save })
+    if (changedConnection || removedCount > 0) modal.confirm({ className: 'tt-model-connection-confirm', title: t(removedCount ? 'hub.directory.applyModels' : 'hub.sourceApply'), content: t(removedCount ? 'hub.directory.removeImpact' : 'hub.sourceImpact'), okText: t('agent.models.save'), cancelText: t('common.cancel'), onOk: save })
     else void save()
   }
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
@@ -103,11 +112,11 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       {draft.directory !== null && <section className="tt-model-directory" aria-label={t('hub.directory.title')} aria-busy={loading}>
         <div className="tt-model-directory-heading"><h3>{t('hub.directory.title')}</h3>{draft.directory.length > 0 && <span role="status">{t('hub.directory.total', { count: number(draft.directory.length) })}</span>}</div>
         {!!draft.directory.length && <><Input aria-label={t('hub.directory.search')} placeholder={t('hub.directory.search')} prefix={<SearchIcon />} allowClear value={draft.query} onChange={event => patch({ query: event.target.value })} />
-          <div className="tt-model-directory-selection"><Checkbox checked={!!selectable.length && selectedVisible.length === selectable.length} indeterminate={selectedVisible.length > 0 && selectedVisible.length < selectable.length} disabled={!selectable.length} onChange={event => patch({ selected: event.target.checked ? [...new Set([...draft.selected, ...selectable])] : draft.selected.filter(value => !selectable.includes(value)) })}>{t(draft.query ? 'hub.directory.selectMatches' : 'hub.directory.selectAll')}</Checkbox>{!!selected.length && <button type="button" className="tt-act" onClick={() => patch({ selected: [] })}>{t('hub.directory.clear')}</button>}</div>
+          <div className="tt-model-directory-selection"><Checkbox checked={!!selectable.length && selectedVisible.length === selectable.length} indeterminate={selectedVisible.length > 0 && selectedVisible.length < selectable.length} disabled={!selectable.length} onChange={event => selectModels(selectable, event.target.checked)}>{t(draft.query ? 'hub.directory.selectMatches' : 'hub.directory.selectAll')}</Checkbox>{!!selected.length && <button type="button" className="tt-act" onClick={() => patch({ selected: [] })}>{t('hub.directory.clear')}</button>}</div>
         </>}
         <div className="tt-model-directory-list">{visible.map(model => {
           const saved = attached.filter(row => row.candidates[0].model === model)
-          return <div className="tt-model-directory-row" key={model}><Checkbox checked={added.has(model) || draft.selected.includes(model)} disabled={added.has(model)} onChange={event => patch({ selected: event.target.checked ? [...draft.selected, model] : draft.selected.filter(value => value !== model) })}><span>{model}</span></Checkbox>{!!saved.length && <div className="tt-model-directory-actions"><span className="tt-model-directory-added"><CheckIcon />{t('hub.directory.added')}</span>{saved.map(row => <button key={row.id} type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>)}</div>}</div>
+          return <div className="tt-model-directory-row" key={model}><Checkbox checked={checked(model)} onChange={event => selectModels([model], event.target.checked)}><span>{model}</span></Checkbox>{!!saved.length && <div className="tt-model-directory-actions"><span className="tt-model-directory-added"><CheckIcon />{t(draft.directory!.includes(model) ? 'hub.directory.added' : 'hub.directory.notListed')}</span>{saved.map(row => <button key={row.id} type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>)}</div>}</div>
         })}</div>
         {!visible.length && <p className="agent-settings-hint">{t(draft.directory.length ? 'hub.directory.noMatches' : 'hub.directory.empty')}</p>}
       </section>}
@@ -116,8 +125,8 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         {draft.manualOpen && <label className="agent-settings-field">{t('hub.directory.manualHint')}<Input.TextArea aria-label={t('hub.directory.manual')} rows={4} value={draft.manual} onChange={event => patch({ manual: event.target.value })} />{invalidManual && <span className="tt-model-source-warning" role="alert">{t('hub.directory.invalidManual')}</span>}</label>}
       </section>
       {overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
-      {!!attached.length && <p className="agent-settings-hint">{t('hub.directory.kept', { count: number(attached.length) })}</p>}
+      {!!attached.length && <p className="agent-settings-hint">{t('hub.directory.kept', { count: number(attached.length - removedCount) })}</p>}
     </div>
-    <footer className="tt-model-source-footer"><span role="status">{t(additions.length ? 'hub.directory.selected' : 'hub.directory.choose', { count: number(additions.length) })}</span><Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></footer>
+    <footer className="tt-model-source-footer"><span role="status">{t(removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing && draft.directory !== null ? 'hub.directory.unchanged' : 'hub.directory.choose', { count: number(additions.length), removed: number(removedCount) })}</span><Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></footer>
   </form>
 }
