@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { App as AntApp, Button, Input } from 'antd'
+import { App as AntApp, Button, Input, Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { revealInspector } from '../shell/inspector'
@@ -39,6 +39,26 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
   }
   const stageKey = 'session.lifecycle.stage.' + op.stage
   const errorKey = 'session.lifecycle.error.' + op.errorCode
+  const preparing = op.kind === 'create' && !lifecycleEnded(op) && op.state !== 'attention'
+  if (preparing) return <div className="tt-lifecycle-wait">
+    <div className="tt-lifecycle-wait-content">
+      <div className="tt-lifecycle-wait-status" role="status" aria-live="polite">
+        <Spin size="large" />
+        <strong>{lifecycleStatus(op, t)}</strong>
+        <span>{t(stageKey)}</span>
+      </div>
+      <span className="tt-lifecycle-wait-name">{op.intent.name || op.resourceId}</span>
+      {!op.cancelRequested && <Button loading={busy} onClick={() => void act('cancel')}>{t('session.lifecycle.cancel')}</Button>}
+      <details className="tt-lifecycle-wait-draft">
+        <summary>{t('session.lifecycle.draft')}</summary>
+        <div className="tt-lifecycle-draft">
+          <label htmlFor={draftId}>{t('session.lifecycle.draft')}</label>
+          <Input.TextArea id={draftId} value={draft} autoSize={{ minRows: 3, maxRows: 8 }} onChange={e => setDraft(e.target.value)} />
+          <span>{t('session.lifecycle.draftHint')}</span>
+        </div>
+      </details>
+    </div>
+  </div>
   return <div className="tt-lifecycle-detail">
     <div className="tt-lifecycle-summary">
       <strong>{op.intent.name || op.resourceId}</strong>
