@@ -3,11 +3,38 @@ package worktree
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
+
+func TestSnapshotFileReaderStopsBeforeReadingAfterCancellation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "content")
+	if err := os.WriteFile(path, []byte("remaining content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reader := snapshotFileReader{ctx: ctx, file: file}
+	buffer := make([]byte, 2)
+	if n, err := reader.Read(buffer); n != 2 || err != nil {
+		t.Fatalf("first chunk: %d %v", n, err)
+	}
+	cancel()
+	if n, err := reader.Read(buffer); n != 0 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled read consumed data: %d %v", n, err)
+	}
+	if offset, err := file.Seek(0, io.SeekCurrent); offset != 2 || err != nil {
+		t.Fatalf("file advanced after cancellation: %d %v", offset, err)
+	}
+}
 
 func TestLifecycleCreateRecoversOwnedDirectoryWithoutAllocatingAnother(t *testing.T) {
 	s := New("", nil)

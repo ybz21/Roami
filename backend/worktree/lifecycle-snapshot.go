@@ -28,12 +28,26 @@ func (s *Service) Snapshot(ctx context.Context, path string) (string, error) {
 	return state.Fingerprint, err
 }
 
+type snapshotFileReader struct {
+	ctx  context.Context
+	file *os.File
+}
+
+func (r snapshotFileReader) Read(buffer []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.file.Read(buffer)
+}
+
 // Snapshot includes ignored files too: a late writer must not disappear under a force removal.
 func (s *Service) SnapshotState(ctx context.Context, path string) (state LifecycleSnapshot, failure error) {
 	path = canonical(path)
 	hash := sha256.New()
 	filesHash := sha256.New()
 	untrackedHash := sha256.New()
+	content := sha256.New()
+	buffer := make([]byte, 32*1024)
 	trackedOutput, err := git(ctx, path, "ls-files", "-z")
 	if err != nil {
 		return state, err
@@ -133,8 +147,9 @@ func (s *Service) SnapshotState(ctx context.Context, path string) (state Lifecyc
 			if e != nil {
 				return e
 			}
-			content := sha256.New()
-			_, readErr := io.Copy(content, file)
+			content.Reset()
+			// Hide File.WriteTo so CopyBuffer reuses one buffer for the entire tree.
+			_, readErr := io.CopyBuffer(content, snapshotFileReader{ctx: ctx, file: file}, buffer)
 			after, statErr := file.Stat()
 			_ = file.Close()
 			if readErr != nil {
