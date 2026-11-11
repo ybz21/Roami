@@ -19,22 +19,23 @@ import (
 )
 
 type SessionBinding struct {
-	Name              string         `json:"name"`
-	ID                string         `json:"id"`
-	TmuxID            string         `json:"tmuxId"`
-	Created           string         `json:"created"`
-	Server            string         `json:"server"`
-	Pane              string         `json:"pane"`
-	PID               int            `json:"pid"`
-	Directory         string         `json:"directory"`
-	ProviderID        string         `json:"providerConversationId"`
-	HostProof         string         `json:"hostProof,omitempty"`
-	DirectoryProof    string         `json:"directoryProof,omitempty"`
-	ProviderHome      string         `json:"providerHome,omitempty"`
-	ProviderHomeProof string         `json:"providerHomeProof,omitempty"`
-	Processes         map[int]string `json:"processes,omitempty"`
-	Scope             string         `json:"scope,omitempty"`
-	ForeignProcesses  map[int]string `json:"foreignProcesses,omitempty"`
+	Name                 string         `json:"name"`
+	ID                   string         `json:"id"`
+	TmuxID               string         `json:"tmuxId"`
+	Created              string         `json:"created"`
+	Server               string         `json:"server"`
+	Pane                 string         `json:"pane"`
+	PID                  int            `json:"pid"`
+	Directory            string         `json:"directory"`
+	ProviderID           string         `json:"providerConversationId"`
+	HostProof            string         `json:"hostProof,omitempty"`
+	DirectoryProof       string         `json:"directoryProof,omitempty"`
+	ProviderHome         string         `json:"providerHome,omitempty"`
+	ProviderHomeProof    string         `json:"providerHomeProof,omitempty"`
+	ProviderHomeExplicit *bool          `json:"providerHomeExplicit,omitempty"`
+	Processes            map[int]string `json:"processes,omitempty"`
+	Scope                string         `json:"scope,omitempty"`
+	ForeignProcesses     map[int]string `json:"foreignProcesses,omitempty"`
 }
 
 type sessionLifecycle struct {
@@ -430,6 +431,7 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	}
 	binding.ProviderID = state.Binding.ProviderID
 	binding.ProviderHome, binding.ProviderHomeProof = state.Binding.ProviderHome, state.Binding.ProviderHomeProof
+	binding.ProviderHomeExplicit = state.Binding.ProviderHomeExplicit
 	var workspace Workspace
 	if state.Workspace != nil {
 		workspace, err = s.recoveryWorkspace(ctx, *state.Workspace)

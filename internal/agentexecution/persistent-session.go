@@ -37,12 +37,9 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 		ac.SessionUUID = spec.ResumeProvider
 		binding.ProviderID = spec.ResumeProvider
 		binding.ProviderHome, binding.ProviderHomeProof = source.Receipt.Binding.ProviderHome, source.Receipt.Binding.ProviderHomeProof
-		key := "CODEX_HOME"
-		if spec.Executor == "claude" {
-			key = "CLAUDE_CONFIG_DIR"
-		}
+		binding.ProviderHomeExplicit = source.Receipt.Binding.ProviderHomeExplicit
 		// Run is a dedicated process that becomes this provider; retain its original profile.
-		if err := os.Setenv(key, binding.ProviderHome); err != nil {
+		if err := restoreProviderHome(spec.Executor, binding); err != nil {
 			return s.failPersistent(dir, err)
 		}
 	}
@@ -105,6 +102,8 @@ func (s Service) bindInitialSession(dir string, state *sessionLifecycle, binding
 	}
 	binding.ProviderHome = providerHome(state.Executor)
 	binding.ProviderHomeProof = sessionDirectoryProof(binding.ProviderHome)
+	explicit := os.Getenv(providerHomeKey(state.Executor)) != ""
+	binding.ProviderHomeExplicit = &explicit
 	if state.Resuming && (binding.ProviderHome == "" || binding.ProviderHome != state.Binding.ProviderHome || binding.ProviderHomeProof != state.Binding.ProviderHomeProof) {
 		return fmt.Errorf("SESSION_BINDING_CONFLICT")
 	}
