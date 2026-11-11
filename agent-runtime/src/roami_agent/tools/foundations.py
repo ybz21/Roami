@@ -605,18 +605,6 @@ class ToolDirectory:
             if self.wrapped_command(args):
                 raise DomainError("INVALID_CLI_ARGUMENTS")
             argv = self.argv(args)
-            if argv and argv[0] in {"roami", self.settings.cli_bin}:
-                args = {key: value for key, value in args.items() if key not in {"scope", "cwd"}}
-            if args.get("scope") == "host":
-                if role in self.registry.shell_disabled_roles:
-                    raise DomainError("TOOL_UNAVAILABLE")
-                if role != "main":
-                    raise DomainError("HOST_SCOPE_UNAVAILABLE")
-                if "cwd" in args:
-                    raise DomainError("HOST_SCOPE_CWD_NOT_ALLOWED")
-                if argv and argv[0] in {"roami", self.settings.cli_bin}:
-                    raise DomainError("HOST_SCOPE_REGISTERED_COMMAND")
-                return tool, args
             if (
                 argv
                 and argv[0] in {"roami", self.settings.cli_bin}
@@ -628,6 +616,16 @@ class ToolDirectory:
             ):
                 return self.help_tool(argv, role)
             operation = self.operation(argv)
+            if operation is not None:
+                args = {key: value for key, value in args.items() if key not in {"scope", "cwd"}}
+            if args.get("scope") == "host":
+                if role in self.registry.shell_disabled_roles:
+                    raise DomainError("TOOL_UNAVAILABLE")
+                if role != "main":
+                    raise DomainError("HOST_SCOPE_UNAVAILABLE")
+                if "cwd" in args:
+                    raise DomainError("HOST_SCOPE_CWD_NOT_ALLOWED")
+                return tool, args
             if operation is None:
                 if role in self.registry.shell_disabled_roles:
                     raise DomainError("TOOL_UNAVAILABLE")
@@ -694,20 +692,19 @@ def register_foundations(registry, settings):
                 ("session", "resolve"),
             }
             help_only = argv[1:] in (["--help"], ["help"], ["agent", "capability", "--help"])
-            if tuple(argv[1:3]) not in allowed and not help_only:
-                raise DomainError("USE_REGISTERED_CLI_CAPABILITY")
-            result = await execute(
-                [settings.cli_bin, *argv[1:]],
-                timeout=args.get("timeout") or None,
-                excluded_env=settings.provider_key_environments(),
-            )
-            return result
+            if tuple(argv[1:3]) in allowed or help_only:
+                return await execute(
+                    [settings.cli_bin, *argv[1:]],
+                    timeout=args.get("timeout") or None,
+                    excluded_env=settings.provider_key_environments(),
+                )
         if "shell" in registry.disabled_tools:
             raise DomainError("TOOL_DISABLED")
         shell_args = {key: value for key, value in args.items() if key != "command"}
         shell_args["argv"] = ["bash", "-c", args["command"]] if "command" in args else argv
         if (
             "scope" not in shell_args
+            and "cwd" not in shell_args
             and binding.get("role") == "main"
             and not binding.get("workspace")
             and not binding.get("taskId")

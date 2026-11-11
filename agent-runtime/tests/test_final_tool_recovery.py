@@ -1,4 +1,4 @@
-"""A rejected text draft must recover through an actual provider tool call."""
+"""Final delivery accepts provider text and preserves explicit tool selection support."""
 
 import json
 
@@ -23,7 +23,7 @@ def response(delta):
     )
 
 
-async def test_repeated_plain_final_recovers_via_provider_tool_selection(store):
+async def test_plain_final_needs_no_provider_tool_selection(store):
     value = {"label": "exact user wording", "enabled": False, "count": 2, "extra": None}
     requests = []
 
@@ -51,10 +51,9 @@ async def test_repeated_plain_final_recovers_via_provider_tool_selection(store):
         try:
             turn = await claimed_turn(runtime)
             answer = await runtime.loop.run(turn, "main")
-            assert json.loads(answer) == value
-            assert len(requests) == 2
+            assert answer == "<reply>" + json.dumps(value) + "</reply>"
+            assert len(requests) == 1
             assert "tool_choice" not in requests[0]
-            assert requests[1]["tool_choice"] == CHOICE
             events = await runtime.conversations.events("alice", turn["conversation_id"])
             assert [e["payload"]["text"] for e in events if e["kind"] == "message.delta"] == [
                 answer
@@ -114,7 +113,7 @@ async def test_content_rejection_releases_required_selection_for_a_question(stor
             events = await runtime.conversations.events("alice", turn["conversation_id"])
             completed = [event for event in events if event["kind"] == "message.completed"]
             assert completed[-1]["payload"]["question"]["prompt"] == "May I proceed?"
-            assert [body.get("tool_choice") for body in main_requests] == [None, CHOICE, None]
+            assert [body.get("tool_choice") for body in main_requests] == [None, None, None]
             assert review_requests and all("tool_choice" not in body for body in review_requests)
         finally:
             await runtime.close()
@@ -306,7 +305,7 @@ async def test_old_actor_cannot_claim_final_submission_recovery(monkeypatch):
     assert (await executor.preflight())["image_id"] == "candidate"
 
 
-async def test_provider_ignoring_selection_cannot_execute_a_different_tool(store):
+async def test_plain_final_does_not_trigger_an_extra_write_request(store):
     from roami_agent.protocol.tools import Tool, object_schema
 
     requests, writes = [], []
@@ -345,18 +344,16 @@ async def test_provider_ignoring_selection_cannot_execute_a_different_tool(store
             )
         )
         try:
-            assert await runtime.loop.run(await claimed_turn(runtime), "main") == "Safe answer"
+            assert (
+                await runtime.loop.run(await claimed_turn(runtime), "main") == "Unsubmitted answer"
+            )
             assert writes == []
-            assert [body.get("tool_choice") for body in requests] == [None, CHOICE, CHOICE]
+            assert [body.get("tool_choice") for body in requests] == [None]
         finally:
             await runtime.close()
 
 
-async def test_provider_rejecting_selection_preserves_failure_without_auto_fallback(store):
-    import pytest
-
-    from roami_agent.protocol.errors import DomainError
-
+async def test_plain_final_works_with_provider_without_forced_tool_support(store):
     requests = []
 
     def serve(request):
@@ -373,12 +370,9 @@ async def test_provider_rejecting_selection_preserves_failure_without_auto_fallb
         runtime = Runtime(store, model, require_final_tool=True)
         try:
             turn = await claimed_turn(runtime)
-            with pytest.raises(DomainError, match="MODEL_HTTP_400"):
-                await runtime.loop.run(turn, "main")
-            assert len(requests) == 2 and requests[1]["tool_choice"] == CHOICE
+            assert await runtime.loop.run(turn, "main") == "Unsubmitted answer"
+            assert len(requests) == 1 and "tool_choice" not in requests[0]
             events = await runtime.conversations.events("alice", turn["conversation_id"])
-            assert not any(
-                event["kind"] in {"message.delta", "message.completed"} for event in events
-            )
+            assert sum(event["kind"] == "message.completed" for event in events) == 1
         finally:
             await runtime.close()
