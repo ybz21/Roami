@@ -3,21 +3,29 @@
 //   worktree 里有未收尾内容（脏、未跟踪、领先 base）→ CloseWorktreeModal 三选一（保留 / 合并 / 丢弃）；
 //   干净 worktree → 确认框附「随会话删除」勾选。
 // 左树的右键菜单和会话页都要这一套，抽出来共用；会话页那份先不动。
-import { useRef, useState } from 'react'
-import { App as AntApp, Checkbox } from 'antd'
+import { useEffect, useRef, useState } from 'react'
+import { App as AntApp, Checkbox, Modal } from 'antd'
 import { api } from '../../api'
 import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
 import { closeSession, sessionActionError } from './session-actions'
 import { nativeSessionId } from './session-record'
 import { useI18n } from '../../i18n'
-import { sessionDisplay } from './session-label'
+import { sessionDisplay, sessionLabel } from './session-label'
 import { CloseWorktreeModal } from './CloseWorktreeModal'
 
 export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: () => void) {
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const [closing, setClosing] = useState<{ name: string; st: any } | null>(null)
-  const checking = useRef(new Set<string>())
+  const [checkingName, setCheckingName] = useState<string | null>(null)
+  const checking = useRef<AbortController | null>(null)
+  const cancelCheck = () => {
+    const request = checking.current
+    checking.current = null
+    setCheckingName(null)
+    request?.abort()
+  }
+  useEffect(() => () => { checking.current?.abort(); checking.current = null }, [])
   const done = (n: string) => { message.success(t('session.lifecycle.closeAccepted')); closeTerm(n); afterClose?.() }
   const kill = async (n: string) => {
     try { await closeSession(n); done(n) } catch (e: any) { message.error(sessionActionError(e, t)) }
@@ -33,19 +41,23 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
     }
   }
   const beginClose = async (n: string) => {
-    if (checking.current.has(n)) return
+    if (checking.current) return
     let st: any = null
     if (!nativeSessionId(n)) {
-      checking.current.add(n)
-      const hide = message.loading({ content: t('session.closeChecking'), duration: 0 })
+      const request = new AbortController()
+      checking.current = request
+      setCheckingName(n)
       try {
-        st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data
+        st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`, undefined, { signal: request.signal }))?.data
+        if (checking.current !== request) return
       } catch {
-        message.error(t('session.closeCheckFailed'))
+        if (checking.current === request) message.error(t('session.closeCheckFailed'))
         return
       } finally {
-        hide()
-        checking.current.delete(n)
+        if (checking.current === request) {
+          checking.current = null
+          setCheckingName(null)
+        }
       }
     }
     const unfinished = (st?.dirty || 0) > 0 || (st?.untracked || 0) > 0 || (st?.committedAhead || 0) > 0
@@ -77,6 +89,12 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
       onOk: () => closeWith(n, removeToo.current ? 'discard' : 'keep', st),
     })
   }
-  const node = <CloseWorktreeModal info={closing} onClose={() => setClosing(null)} onDone={(name) => { closeTerm(name); afterClose?.() }} />
+  const node = <>
+    <Modal open={checkingName !== null} centered title={t('session.closeConfirm', { name: sessionLabel(checkingName || '') })}
+      okText={t('session.close')} okButtonProps={{ disabled: true, danger: true }} cancelText={t('common.cancel')} onCancel={cancelCheck}>
+      <p role="status" aria-live="polite" style={{ fontSize: 'var(--fs-lg)', color: 'var(--text-bright)' }}>{t('session.closeChecking')}</p>
+    </Modal>
+    <CloseWorktreeModal info={closing} onClose={() => setClosing(null)} onDone={(name) => { closeTerm(name); afterClose?.() }} />
+  </>
   return { beginClose, kill, node }
 }

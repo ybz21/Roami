@@ -9,9 +9,9 @@ import { setSessionLabels } from '../sessions/session-label'
 
 const scope = vi.hoisted(() => ({ node: 0 }))
 vi.mock('../cluster/node-url', () => ({ currentNodeId: () => String(scope.node), useCurrentNodeId: () => String(scope.node), nodeApi: (path: string) => '/test-node-' + scope.node + path }))
-beforeEach(() => { scope.node++; ui.loading.mockImplementation(() => vi.fn()) })
+beforeEach(() => { scope.node++ })
 
-const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn(), loading: vi.fn(() => vi.fn()) }))
+const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../sessions/SessionLifecyclePanel', () => ({ SessionLifecycleInbox: () => null }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -83,7 +83,7 @@ it.each([true, false])('honors the worktree deletion checkbox on mobile (delete=
 it('offers unfinished worktree choices before closing a mobile session', async () => {
   mount({ ...worktree, dirty: 1 })
   await beginCodexClose()
-  const dialog = within(await screen.findByRole('dialog'))
+  const dialog = within((await screen.findByRole('radio', { name: 'worktree.close.keep' })).closest('[role="dialog"]') as HTMLElement)
   expect(dialog.getByRole('radio', { name: 'worktree.close.keep' })).toBeTruthy()
   fireEvent.click(dialog.getByRole('radio', { name: 'worktree.close.discard' }))
   fireEvent.click(dialog.getByRole('button', { name: 'session.close' }))
