@@ -146,3 +146,11 @@ html[data-pointer="coarse"] .tt-model-hub-tabs.ant-tabs-left > .ant-tabs-nav .an
 .tt-model-source-rename { position:relative; flex-shrink:0; min-width:var(--ctl-h); min-height:var(--ctl-h); }
 html[data-pointer="coarse"] .tt-model-source-rename::after { content:''; position:absolute; inset:calc(var(--sp-1) * -1); min-width:var(--tap); min-height:var(--tap); }
 html[data-pointer="coarse"] .tt-model-source-name-dialog .ant-input { min-height:var(--tap); }
+
+.tt-model-plugin-package { min-width:0; }
+.tt-model-plugin-package h3 { margin:0; font-size:var(--fs-body); overflow-wrap:anywhere; }
+
+.tt-model-plugin-import li { overflow-wrap:anywhere; }
+
+html[data-pointer="coarse"] .tt-model-plugin-import .ant-select,
+html[data-pointer="coarse"] .tt-model-plugin-import .ant-select-selector { min-height:var(--tap); }

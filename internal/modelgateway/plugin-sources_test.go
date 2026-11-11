@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http/httptest"
@@ -163,5 +164,34 @@ func TestPluginSourceUsesNativeProtocolAndPrivateCredential(t *testing.T) {
 	_ = h.Ledger.db.QueryRow(`SELECT value FROM gateway_catalog WHERE id=1`).Scan(&disk)
 	if strings.Contains(disk, "fixture-vendor-private") {
 		t.Fatal("plugin credential leaked into catalog")
+	}
+}
+
+func TestPluginImportEndpointDiscoversRepositoryCollection(t *testing.T) {
+	h := pluginTestHandler(t)
+	files := map[string]string{"package.json": `{"name":"workspace","workspaces":["packages/*"]}`, "packages/one/package.json": `{"name":"first-plugin","main":"index.mjs"}`, "packages/one/index.mjs": "export const Plugin=async()=>({})", "packages/two/package.json": `{"name":"second-plugin","main":"index.mjs"}`, "packages/two/index.mjs": "export const Plugin=async()=>({})", ".git/config": "not imported", ".env": "not imported"}
+	for _, zipped := range []bool{false, true} {
+		response := pluginUpload(t, h, files, zipped)
+		if response.Code != 200 {
+			t.Fatalf("collection %v: %d %s", zipped, response.Code, response.Body)
+		}
+		var result struct {
+			Data modelplugins.Collection `json:"data"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil || len(result.Data.Packages) != 2 {
+			t.Fatalf("collection result: %s %v", response.Body, err)
+		}
+	}
+}
+
+func TestPluginFolderImportSupportsMoreThanDefaultMultipartPartLimit(t *testing.T) {
+	h := pluginTestHandler(t)
+	files := map[string]string{"package.json": `{"name":"plugin","main":"index.mjs"}`, "index.mjs": "export const Plugin=async()=>({})"}
+	for i := 0; i < 510; i++ {
+		files[fmt.Sprintf("docs/file-%d.txt", i)] = "documentation"
+	}
+	response := pluginUpload(t, h, files, false)
+	if response.Code != 200 {
+		t.Fatalf("multipart collection: %d %s", response.Code, response.Body)
 	}
 }

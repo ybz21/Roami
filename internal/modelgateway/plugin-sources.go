@@ -1,6 +1,7 @@
 package modelgateway
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
@@ -197,55 +198,34 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 }
 func (h *Handler) importModelPlugin(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, modelplugins.MaxExpandedBytes+(8<<20))
-	if r.ParseMultipartForm(4<<20) != nil {
-		reject(w, 400, "INVALID_MODEL_PLUGIN_PACKAGE")
+	files, paths, err := pluginUploadParts(r)
+	if err != nil {
+		pluginFailure(w, err)
 		return
 	}
-	defer r.MultipartForm.RemoveAll()
-	files := r.MultipartForm.File["files"]
-	paths := r.MultipartForm.Value["paths"]
-	if len(files) == 0 || len(files) > modelplugins.MaxFiles {
-		reject(w, 400, "INVALID_MODEL_PLUGIN_PACKAGE")
-		return
-	}
-	var pkg modelplugins.Package
-	var err error
-	if len(files) == 1 && strings.HasSuffix(strings.ToLower(files[0].Filename), ".zip") && (len(paths) == 0 || len(paths) == 1 && paths[0] == "") {
-		reader, openErr := files[0].Open()
-		if openErr != nil {
-			pluginFailure(w, modelplugins.ErrInvalidPackage)
-			return
-		}
-		defer reader.Close()
-		pkg, err = modelplugins.ImportZIP(h.Plugins.PackagesRoot(), reader, files[0].Size)
+	var imported modelplugins.Collection
+	if len(files) == 1 && strings.HasSuffix(strings.ToLower(files[0].name), ".zip") && (len(paths) == 0 || len(paths) == 1 && paths[0] == "") {
+		imported, err = modelplugins.ImportCollectionZIP(h.Plugins.PackagesRoot(), bytes.NewReader(files[0].data), int64(len(files[0].data)))
 	} else {
 		if len(paths) != len(files) {
 			reject(w, 400, "INVALID_MODEL_PLUGIN_PACKAGE")
 			return
 		}
 		uploads := []modelplugins.Upload{}
-		readers := []io.Closer{}
-		defer func() {
-			for _, reader := range readers {
-				_ = reader.Close()
-			}
-		}()
 		for i, file := range files {
-			reader, openErr := file.Open()
-			if openErr != nil {
-				pluginFailure(w, modelplugins.ErrInvalidPackage)
-				return
-			}
-			readers = append(readers, reader)
-			uploads = append(uploads, modelplugins.Upload{Path: paths[i], Reader: reader})
+			uploads = append(uploads, modelplugins.Upload{Path: paths[i], Reader: bytes.NewReader(file.data)})
 		}
-		pkg, err = modelplugins.ImportFolder(h.Plugins.PackagesRoot(), uploads)
+		imported, err = modelplugins.ImportCollectionFolder(h.Plugins.PackagesRoot(), uploads)
 	}
 	if err != nil {
 		pluginFailure(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"data": pkg})
+	if len(imported.Packages) == 1 && len(imported.Skipped) == 0 {
+		writeJSON(w, 200, map[string]any{"data": imported.Packages[0]})
+	} else {
+		writeJSON(w, 200, map[string]any{"data": imported})
+	}
 }
 
 func (h *Handler) pluginAuthChanged(id string) error {
@@ -264,4 +244,60 @@ func (h *Handler) pluginAuthChanged(id string) error {
 		}
 	}
 	return nil
+}
+
+type pluginUploadFile struct {
+	name string
+	data []byte
+}
+
+// Streaming parts preserves the advertised file limit beyond ReadForm's 1,000-part default.
+func pluginUploadParts(r *http.Request) ([]pluginUploadFile, []string, error) {
+	reader, err := r.MultipartReader()
+	if err != nil {
+		return nil, nil, modelplugins.ErrInvalidPackage
+	}
+	files, paths := []pluginUploadFile{}, []string{}
+	total := 0
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, nil, modelplugins.ErrInvalidPackage
+		}
+		limit := int64(1024)
+		if part.FormName() == "files" {
+			limit = modelplugins.MaxFileBytes
+			if strings.HasSuffix(strings.ToLower(part.FileName()), ".zip") {
+				limit = modelplugins.MaxArchiveBytes
+			}
+			if part.FileName() == "" || len(files) >= modelplugins.MaxFiles {
+				part.Close()
+				return nil, nil, modelplugins.ErrInvalidPackage
+			}
+		} else if part.FormName() != "paths" || len(paths) >= modelplugins.MaxFiles {
+			part.Close()
+			return nil, nil, modelplugins.ErrInvalidPackage
+		}
+		data, err := io.ReadAll(io.LimitReader(part, limit+1))
+		_ = part.Close()
+		if err != nil || int64(len(data)) > limit {
+			return nil, nil, modelplugins.ErrInvalidPackage
+		}
+		if part.FormName() == "files" {
+			total += len(data)
+			if total > modelplugins.MaxExpandedBytes {
+				return nil, nil, modelplugins.ErrInvalidPackage
+			}
+			files = append(files, pluginUploadFile{name: part.FileName(), data: data})
+		} else {
+			paths = append(paths, string(data))
+		}
+	}
+	if len(files) == 0 {
+		return nil, nil, modelplugins.ErrInvalidPackage
+	}
+	return files, paths, nil
 }

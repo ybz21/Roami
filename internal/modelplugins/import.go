@@ -46,9 +46,16 @@ type manifest struct {
 	} `json:"magpie"`
 }
 
-func relativeName(name string) (string, error) {
+func cleanRelativeName(name string) (string, error) {
 	if name == "" || len(name) > 1024 || strings.ContainsAny(name, "\\\x00:") || strings.HasPrefix(name, "/") || path.Clean(name) != name || name == "." || name == ".." || strings.HasPrefix(name, "../") {
 		return "", ErrInvalidPackage
+	}
+	return name, nil
+}
+
+func relativeName(name string) (string, error) {
+	if _, err := cleanRelativeName(name); err != nil {
+		return "", err
 	}
 	for _, part := range strings.Split(name, "/") {
 		if part == ".git" || part == ".env" || strings.HasPrefix(part, ".env.") {
@@ -60,15 +67,26 @@ func relativeName(name string) (string, error) {
 
 // ImportZIP and ImportFolder share validation and the same content-addressed layout.
 func ImportZIP(root string, input io.ReaderAt, size int64) (Package, error) {
+	result, err := importZIP(root, input, size, false)
+	if err != nil {
+		return Package{}, err
+	}
+	return result.Packages[0], nil
+}
+func ImportCollectionZIP(root string, input io.ReaderAt, size int64) (Collection, error) {
+	return importZIP(root, input, size, true)
+}
+
+func importZIP(root string, input io.ReaderAt, size int64, collection bool) (Collection, error) {
 	if size <= 0 || size > MaxArchiveBytes {
-		return Package{}, ErrInvalidPackage
+		return Collection{}, ErrInvalidPackage
 	}
 	z, err := zip.NewReader(input, size)
 	if err != nil {
-		return Package{}, ErrInvalidPackage
+		return Collection{}, ErrInvalidPackage
 	}
 	if len(z.File) > MaxFiles {
-		return Package{}, ErrInvalidPackage
+		return Collection{}, ErrInvalidPackage
 	}
 	uploads := make([]Upload, 0, len(z.File))
 	readers := []io.Closer{}
@@ -79,61 +97,83 @@ func ImportZIP(root string, input io.ReaderAt, size int64) (Package, error) {
 	}()
 	for _, f := range z.File {
 		if f.Mode()&(fs.ModeSymlink|fs.ModeDevice|fs.ModeNamedPipe|fs.ModeSocket) != 0 || f.Flags&1 != 0 {
-			return Package{}, ErrInvalidPackage
+			return Collection{}, ErrInvalidPackage
 		}
 		name := strings.TrimSuffix(f.Name, "/")
-		if _, err := relativeName(name); err != nil {
-			return Package{}, err
+		if _, err := cleanRelativeName(name); err != nil {
+			return Collection{}, err
 		}
-		if archiveMetadata(name) {
+		if archiveMetadata(name) || collection && collectionMetadata(name) {
 			continue
 		}
 		if f.FileInfo().IsDir() {
 			continue
 		}
 		if f.UncompressedSize64 > MaxFileBytes {
-			return Package{}, ErrInvalidPackage
+			return Collection{}, ErrInvalidPackage
 		}
 		r, err := f.Open()
 		if err != nil {
-			return Package{}, ErrInvalidPackage
+			return Collection{}, ErrInvalidPackage
 		}
 		readers = append(readers, r)
 		uploads = append(uploads, Upload{name, r})
 	}
-	return ImportFolder(root, uploads)
+	if collection {
+		return ImportCollectionFolder(root, uploads)
+	}
+	pkg, err := ImportFolder(root, uploads)
+	return Collection{Packages: []Package{pkg}}, err
 }
 
-func ImportFolder(root string, uploads []Upload) (Package, error) {
+func readUploadFiles(uploads []Upload, collection bool) (map[string][]byte, error) {
 	if len(uploads) == 0 || len(uploads) > MaxFiles {
-		return Package{}, ErrInvalidPackage
+		return nil, ErrInvalidPackage
 	}
 	files := make(map[string][]byte, len(uploads))
 	total := 0
 	for _, file := range uploads {
-		name, err := relativeName(file.Path)
+		name, err := cleanRelativeName(file.Path)
+		if err == nil && collection && collectionMetadata(name) {
+			continue
+		}
+		if err == nil {
+			_, err = relativeName(name)
+		}
 		if err != nil || file.Reader == nil {
-			return Package{}, ErrInvalidPackage
+			return nil, ErrInvalidPackage
 		}
 		if archiveMetadata(name) {
 			continue
 		}
 		if name == ".roami-package.json" || strings.HasSuffix(name, "/.roami-package.json") {
-			return Package{}, ErrInvalidPackage
+			return nil, ErrInvalidPackage
 		}
 		if _, exists := files[name]; exists {
-			return Package{}, ErrInvalidPackage
+			return nil, ErrInvalidPackage
 		}
 		data, err := io.ReadAll(io.LimitReader(file.Reader, MaxFileBytes+1))
 		if err != nil || len(data) > MaxFileBytes {
-			return Package{}, ErrInvalidPackage
+			return nil, ErrInvalidPackage
 		}
 		total += len(data)
 		if total > MaxExpandedBytes {
-			return Package{}, ErrInvalidPackage
+			return nil, ErrInvalidPackage
 		}
 		files[name] = data
 	}
+	return files, nil
+}
+
+func ImportFolder(root string, uploads []Upload) (Package, error) {
+	files, err := readUploadFiles(uploads, false)
+	if err != nil {
+		return Package{}, err
+	}
+	return importPackageFiles(root, files)
+}
+
+func importPackageFiles(root string, files map[string][]byte) (Package, error) {
 	// A selected folder and a ZIP may contain their single enclosing directory.
 	if _, ok := files["package.json"]; !ok {
 		prefix := ""
