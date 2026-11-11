@@ -96,7 +96,9 @@ def activity_summaries(db, cid, transcript):
     facts = rows(
         db,
         "SELECT json_extract(json_remove(payload_json,'$.activity.preview','$.activity.routingDecision'),'$.activity') AS activity_json "
-        "FROM events WHERE id IN (SELECT MAX(id) FROM events WHERE conversation_id=? AND json_extract(payload_json,'$.activity.anchorMessageId') IN ("
+        "FROM events WHERE id IN (SELECT MAX(id) FROM events WHERE conversation_id=? "
+        "AND json_type(payload_json,'$.activity')='object' "
+        "AND json_extract(payload_json,'$.activity.anchorMessageId') IN ("
         + placeholders
         + ") GROUP BY json_extract(payload_json,'$.activity.id') ORDER BY MAX(id) DESC LIMIT 400) ORDER BY id DESC",
         (cid, *mids),
