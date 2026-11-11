@@ -5,6 +5,7 @@
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
 | 会话关闭首次点击反馈 | [20261111-session-close-feedback](20261111-session-close-feedback/README.md) | 检查状态即时反馈、等待请求去重、失败重试 |
+| 热门技能与本机 Agent 安装 | [20261111-popular-skills](20261111-popular-skills/README.md) | skills.sh 热门榜、固定版本审核、本机与全部 Agent 安装 |
 | 会话关闭阻塞 | [20261110-native-close-blockers](20261110-native-close-blockers/README.md) | 原生会话保留未知历史归档，分离 HEAD 工作区支持确认和清理 |
 | Magpie 插件模型源 | [20261110-magpie-model-sources](20261110-magpie-model-sources/README.md) | WorkBuddy、豆包工作导入、隔离运行与网关 Key 管理 |
 | 长期会话增量整理 | [20261109-incremental-context](20261109-incremental-context/README.md) | 复用有效摘要、保留完整来源与记忆版本校验 |

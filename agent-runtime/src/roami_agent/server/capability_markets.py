@@ -148,7 +148,8 @@ class CapabilityMarkets:
         source = self.source(owner, source_id)
         if (
             not isinstance(query, str)
-            or not 1 <= len(query.strip()) <= 200
+            or len(query.strip()) > 200
+            or (not query.strip() and source["provider"] != "skills_sh")
             or not isinstance(cursor, str)
             or len(cursor) > 1000
         ):

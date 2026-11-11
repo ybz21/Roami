@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import re
+from html.parser import HTMLParser
 from urllib.parse import quote, urlsplit
 
 import httpx
@@ -84,10 +85,64 @@ def local_name(name, limit=64):
     return (("cap-" if not name or not name[0].isalpha() else "") + name)[:limit]
 
 
+class SkillLeaderboard(HTMLParser):
+    """Read the homepage's structured leaderboard without executing upstream JavaScript."""
+
+    def __init__(self):
+        super().__init__()
+        self.in_script = False
+        self.chunks = []
+
+    def handle_starttag(self, tag, attrs):
+        self.in_script = tag == "script"
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            self.in_script = False
+
+    def handle_data(self, data):
+        if self.in_script and data.startswith("self.__next_f.push("):
+            chunk = json.loads(data[len("self.__next_f.push(") : -1])
+            if len(chunk) == 2 and chunk[0] == 1 and isinstance(chunk[1], str):
+                self.chunks.append(chunk[1])
+
+
+async def popular_skills(source):
+    base = source["url"]
+    url = "https://www.skills.sh/" if base == "https://skills.sh" else base + "/"
+    document = await fetch(url, raw=True, maximum=2_000_000)
+    parser = SkillLeaderboard()
+    parser.feed(document.decode())
+    payload = "".join(parser.chunks)
+    marker = '"initialSkills":'
+    if marker not in payload:
+        raise DomainError("MARKET_UNAVAILABLE", 502)
+    skills, _ = json.JSONDecoder().raw_decode(payload.split(marker, 1)[1].lstrip())
+    rows = []
+    for item in skills[:20]:
+        identifier = item["source"] + "/" + item["skillId"]
+        # Only repository-backed skills can enter our pinned review/install flow.
+        if not re.fullmatch(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.:-]+", identifier):
+            continue
+        rows.append(
+            {
+                "id": identifier,
+                "name": item["name"],
+                "description": item["source"],
+                "url": base + "/" + quote(identifier, safe="/"),
+                "version": "",
+                "installs": item["installs"],
+            }
+        )
+    return {"items": rows, "nextCursor": ""}
+
+
 async def search(source, query, cursor=""):
     base, provider = source["url"], source["provider"]
     rows, next_cursor = [], ""
     if provider == "skills_sh":
+        if not query:
+            return await popular_skills(source)
         data = await fetch(base + "/api/search", params={"q": query, "limit": 20})
         for item in data["skills"][:20]:
             rows.append(

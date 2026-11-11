@@ -349,3 +349,166 @@ async def test_skill_frontmatter_name_can_differ_from_repository_folder(monkeypa
     monkeypatch.setattr(market_catalogs, "download_archive", archived)
     entry, commit = await market_catalogs.skill_entry("publisher/repository/publisher-react")
     assert entry["name"] == "publisher-react" and commit == "b" * 40
+
+
+async def test_popular_skills_reads_structured_live_leaderboard(monkeypatch):
+    skills = [{"source": "owner/repo", "skillId": "workflow", "name": "workflow", "installs": 1200}]
+    chunk = "42:" + json.dumps({"initialSkills": skills})
+    document = "<html><script>self.__next_f.push(" + json.dumps([1, chunk]) + ")</script></html>"
+
+    async def fetch(url, **kwargs):
+        assert url == "https://www.skills.sh/"
+        assert kwargs["raw"] is True
+        return document.encode()
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    result = await market_catalogs.search(market_catalogs.DEFAULT_SOURCES[0], "")
+    assert result["items"][0]["id"] == "owner/repo/workflow"
+    assert result["items"][0]["installs"] == 1200
+    assert result["nextCursor"] == ""
+
+
+async def test_popular_skills_rejects_changed_upstream_markup(monkeypatch):
+    async def fetch(*args, **kwargs):
+        return b"<html>upstream unavailable</html>"
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    with pytest.raises(DomainError, match="MARKET_UNAVAILABLE"):
+        await market_catalogs.search(market_catalogs.DEFAULT_SOURCES[0], "")
+
+
+async def test_blank_query_only_browses_skill_markets(store, monkeypatch):
+    markets = Runtime(store, ConversationModel()).capability_markets
+
+    async def search(*args):
+        return {"items": [], "nextCursor": ""}
+
+    monkeypatch.setattr(market_catalogs, "search", search)
+    assert await markets.search("local", "skills-sh", "") == {"items": [], "nextCursor": ""}
+    with pytest.raises(DomainError, match="INVALID_MARKET_QUERY"):
+        await markets.search("local", "npm", "")
+
+
+async def test_install_skill_to_agents_retains_assets_is_repeatable_and_never_overwrites(
+    store, tmp_path, monkeypatch
+):
+    from roami_agent.server import skill_agent_installation
+
+    roots = {key: tmp_path / key / "skills" for key in ("local", "claude", "opencode")}
+    monkeypatch.setattr(skill_agent_installation, "skill_directories", lambda: roots)
+    runtime = Runtime(store, ConversationModel())
+    entry = {
+        "name": "market-workflow",
+        "text": "# Instructions",
+        "files": {"scripts/check.py": base64.b64encode(b"print('ok')").decode()},
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/workflow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+    targets = ["local", "claude", "opencode", "roami"]
+    result = await skill_agent_installation.install_skill(runtime, "local", entry, targets)
+    assert result["targets"] == targets
+    for root in roots.values():
+        assert (root / entry["name"] / "SKILL.md").read_text() == entry["text"]
+        assert (root / entry["name"] / "scripts/check.py").read_bytes() == b"print('ok')"
+    assert entry["name"] in runtime.tools.skills
+    assert await skill_agent_installation.install_skill(runtime, "local", entry, targets) == result
+    # A changed revision must not silently replace any previous installation.
+    with pytest.raises(DomainError, match="SKILL_TARGET_EXISTS"):
+        await skill_agent_installation.install_skill(
+            runtime, "local", {**entry, "text": "Changed"}, ["local"]
+        )
+    assert (roots["local"] / entry["name"] / "SKILL.md").read_text() == entry["text"]
+
+
+async def test_agent_install_failure_rolls_back_only_new_links(store, tmp_path, monkeypatch):
+    from roami_agent.server import skill_agent_installation
+
+    roots = {key: tmp_path / key for key in ("local", "claude", "opencode")}
+    monkeypatch.setattr(skill_agent_installation, "skill_directories", lambda: roots)
+    runtime = Runtime(store, ConversationModel())
+    entry = {
+        "name": "market-workflow",
+        "text": "Instructions",
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/workflow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+    await skill_agent_installation.install_skill(runtime, "local", entry, ["local"])
+
+    async def fail(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(runtime.capability_imports, "save", fail)
+    with pytest.raises(DomainError, match="SKILL_INSTALL_FAILED"):
+        await skill_agent_installation.install_skill(
+            runtime, "local", entry, ["local", "claude", "roami"]
+        )
+    assert (roots["local"] / entry["name"]).is_symlink()
+    assert not (roots["claude"] / entry["name"]).is_symlink()
+
+
+@pytest.mark.parametrize("targets", [[], ["../escape"], ["local", "local"], "all", [None]])
+async def test_agent_install_rejects_invalid_targets_before_writing(store, targets):
+    from roami_agent.server.skill_agent_installation import install_skill
+
+    runtime = Runtime(store, ConversationModel())
+    with pytest.raises(DomainError, match="INVALID_SKILL_TARGET"):
+        await install_skill(runtime, "local", {"name": "workflow"}, targets)
+
+
+async def test_http_prepared_skill_installs_to_selected_local_agents(store, tmp_path, monkeypatch):
+    from roami_agent.server import skill_agent_installation
+
+    roots = {key: tmp_path / key for key in ("local", "claude", "opencode")}
+    monkeypatch.setattr(skill_agent_installation, "skill_directories", lambda: roots)
+    entry = {
+        "name": "market-flow",
+        "text": "---\nname: market-flow\ndescription: Workflow\n---\nInstructions",
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/market-flow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+
+    async def preview(*args):
+        return {"kind": "skills", "options": [{"label": "market-flow", "entry": entry}]}
+
+    monkeypatch.setattr(market_catalogs, "preview", preview)
+    runtime = Runtime(store, ConversationModel())
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+        base_url="http://test",
+        headers={"X-Roami-Owner": "local"},
+    ) as client:
+        prepared = await client.post(
+            "/v1/capability-markets/prepare",
+            json={"source": "skills-sh", "id": "owner/repo/market-flow", "version": ""},
+        )
+        assert prepared.status_code == 200
+        payload = {
+            "previewId": prepared.json()["data"]["previewId"],
+            "option": 0,
+            "targets": ["local", "claude", "opencode", "roami"],
+        }
+        response = await client.post("/v1/capability-markets/install", json=payload)
+        assert response.status_code == 200
+        assert response.json()["data"]["targets"] == payload["targets"]
+        assert entry["name"] in runtime.tools.skills
+        for root in roots.values():
+            assert (root / entry["name"] / "SKILL.md").read_text() == entry["text"]
+        assert (
+            await client.post("/v1/capability-markets/install", json=payload)
+        ).json() == response.json()
+        expired = await client.post(
+            "/v1/capability-markets/install", json={**payload, "previewId": "expired"}
+        )
+        assert expired.status_code == 409

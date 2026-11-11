@@ -7,6 +7,7 @@ import time
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.model_settings import ModelSettings
+from roami_agent.server.skill_agent_installation import install_skill
 
 
 class MarketInstallations:
@@ -63,7 +64,7 @@ class MarketInstallations:
         ModelSettings.owner(owner)
         if (
             not isinstance(payload, dict)
-            or set(payload) - {"previewId", "option", "name"}
+            or set(payload) - {"previewId", "option", "name", "targets"}
             or not isinstance(payload.get("previewId"), str)
             or len(payload["previewId"]) > 64
             or type(payload.get("option")) is not int
@@ -84,6 +85,10 @@ class MarketInstallations:
             entry = copy.deepcopy(preview["options"][index]["entry"])
             entry["name"] = payload.get("name", entry["name"])
             entry = self.markets.runtime.capability_imports.validate(preview["kind"], entry)
+            if "targets" in payload:
+                if preview["kind"] != "skills":
+                    raise DomainError("INVALID_SKILL_TARGET")
+                return await install_skill(self.markets.runtime, owner, entry, payload["targets"])
             key = (index, entry["name"])
             if key in receipt["installed"]:
                 saved = self.markets.runtime.capability_imports.saved[preview["kind"]].get(

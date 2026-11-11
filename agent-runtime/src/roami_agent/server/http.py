@@ -164,7 +164,7 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def search_market(
         source: str,
         owner: Owner,
-        query: str = Query(min_length=1, max_length=200),
+        query: str = Query(default="", max_length=200),
         cursor: str = Query(default="", max_length=1000),
     ):
         return {"data": await runtime.capability_markets.search(owner, source, query, cursor)}
