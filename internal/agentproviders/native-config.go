@@ -390,6 +390,10 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 		fields = append(fields, field{Document: doc, Path: path, Value: raw})
 	}
 	provider := providerID(profile)
+	modelName := profile.ModelName
+	if modelName == "" {
+		modelName = profile.Model
+	}
 	switch kind {
 	case "claude":
 		add("settings", profile.Model, "model")
@@ -431,10 +435,6 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 			return nil, fmt.Errorf("OPENCODE_CONFIG_VERSION_UNKNOWN")
 		}
 		add("config", provider+"/"+profile.Model, "model")
-		modelName := profile.ModelName
-		if modelName == "" {
-			modelName = profile.Model
-		}
 		models := map[string]any{profile.Model: map[string]any{"name": modelName}}
 		settings := map[string]any{"baseURL": profile.BaseURL, "apiKey": key}
 		packages := map[string]string{"openai-responses": "@opencode/ai/providers/openai-compatible/responses", "openai-completions": "@opencode/ai/providers/openai-compatible", "anthropic-messages": "@opencode/ai/providers/anthropic-compatible"}
@@ -447,7 +447,7 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 	case "pi":
 		add("settings", provider, "defaultProvider")
 		add("settings", profile.Model, "defaultModel")
-		add("models", map[string]any{"name": profile.Name, "baseUrl": profile.BaseURL, "apiKey": key, "api": profile.Protocol, "models": []any{map[string]any{"id": profile.Model, "name": profile.Model}}}, "providers", provider)
+		add("models", map[string]any{"name": profile.Name, "baseUrl": profile.BaseURL, "apiKey": key, "api": profile.Protocol, "models": []any{map[string]any{"id": profile.Model, "name": modelName}}}, "providers", provider)
 	}
 	return fields, nil
 }

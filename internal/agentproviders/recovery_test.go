@@ -126,3 +126,40 @@ func TestModelDisplayNameSurvivesCredentialEditsButNotModelChanges(t *testing.T)
 		}
 	}
 }
+
+func TestPiModelDisplayNameKeepsRoutingID(t *testing.T) {
+	for _, name := range []string{"Qwen Display", ""} {
+		t.Run(name, func(t *testing.T) {
+			p := Profile{ID: "12345678901234567890123456789012", Name: "Fixture", BaseURL: "https://example.test/v1", Model: "gateway-route-id", ModelName: name, Protocol: "openai-responses", APIKey: "fixture-key"}
+			fields, err := profileFields("pi", p, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			config := nativeConfig{Documents: []document{{Name: "settings", Data: []byte(`{"unrelated":true}`)}, {Name: "models", Data: []byte(`{}`)}}}
+			rendered, err := config.render(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			settings, err := rendered.Documents[0].values()
+			if err != nil {
+				t.Fatal(err)
+			}
+			models, err := rendered.Documents[1].values()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if textAt(settings, "defaultModel") != p.Model || textAt(settings, "defaultProvider") != providerID(p) || settings["unrelated"] != true {
+				t.Fatal("Pi model routing or unrelated settings changed")
+			}
+			provider := models["providers"].(map[string]any)[providerID(p)].(map[string]any)
+			model := provider["models"].([]any)[0].(map[string]any)
+			expected := name
+			if expected == "" {
+				expected = p.Model
+			}
+			if model["id"] != p.Model || model["name"] != expected {
+				t.Fatalf("unexpected Pi model: %+v", model)
+			}
+		})
+	}
+}
