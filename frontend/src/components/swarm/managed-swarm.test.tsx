@@ -466,31 +466,47 @@ it('does not open a recorded CLI session missing from the shared live-session ov
 })
 
 
-it('shows only confirmed live instances in the scene and keeps historical and planned work in the roster', () => {
+it('keeps scene and directory aligned before a session is available', () => {
   test.data!.work[0].attempt!.sessionId = 'real-session'
   test.data!.work.push({ ...test.data!.work[0], id: 'gone', member_name: 'old-role', attempt: { ...test.data!.work[0].attempt!, sessionId: 'gone-session' } }, { ...test.data!.work[0], id: 'planned', member_name: 'future-role', task_id: null, attempt: null })
   render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
   showScene()
-  expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main,work')
+  expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main,work,gone,planned')
   expect(screen.getByRole('button', { name: 'old-role', pressed: false })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'future-role', pressed: false })).toBeTruthy()
   expect(screen.queryAllByRole('combobox')).toHaveLength(0)
 })
 
 
-it.each([
-  ['open', 1, 'main,work'],
-  ['closed', 1, 'main'],
-  ['closing', 1, 'main'],
-  ['open', 0, 'main'],
-] as const)('requires an open native instance at the current revision (%s, %s)', (lifecycle, revision, nodes) => {
-  test.data!.work[0].executor = 'native'
-  test.nativeSessions = [{ taskId: 'task', revision, lifecycle }]
-  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+it('keeps planned current roles selectable and excludes retired roles from the scene', () => {
+  registeredTeam()
+  test.data!.target = { projectId: 'project' }
+  test.data!.members!.push(
+    { id: 'analyst', swarm_id: 'sw-one', name: 'analysis-code', executor: 'claude', dutyPreview: 'Analyze', workId: null, taskId: null, taskRevision: null, state: 'unassigned', memoryPath: '', roundCount: 0 },
+    { id: 'operator', swarm_id: 'sw-one', name: 'operations-code', executor: 'codex', dutyPreview: 'Reply', workId: null, taskId: null, taskRevision: null, state: 'queued', memoryPath: '', roundCount: 0 },
+    { id: 'retired', swarm_id: 'sw-one', name: 'Retired data', executor: 'native', dutyPreview: 'Old', workId: null, taskId: null, taskRevision: null, state: 'closed', memoryPath: '', roundCount: 2 },
+  )
+  const roles = [
+    { id: 'writer', memberId: 'role', name: 'Content', executor: 'codex', duty: 'Write' },
+    { id: 'analysis', memberId: 'analyst', name: 'Analysis', executor: 'claude', duty: 'Analyze' },
+    { id: 'operations', memberId: 'operator', name: 'Comments', executor: 'codex', duty: 'Reply' },
+  ]
+  const terminal = vi.fn()
+  render(<ManagedSwarm id="sw-one" projectId="project" roles={roles} onBack={vi.fn()} openTerm={terminal} />)
   showScene()
-  expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe(nodes)
+  expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main,role,analyst,operator')
+  expect(screen.queryByRole('button', { name: 'scene retired' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'scene analyst' }))
+  expect(screen.getByRole('button', { name: 'Analysis', pressed: true })).toBeTruthy()
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('analyst')
+  expect(screen.getByTestId('studio-selection').textContent).toContain('analyst')
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(terminal).not.toHaveBeenCalled()
+  expect(test.api).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Comments', pressed: false }))
+  expect(document.querySelector('.swarm-conversation-pane')?.getAttribute('data-recipient')).toBe('operator')
+  expect(screen.getByTestId('studio-selection').textContent).toContain('operator')
 })
-
 
 it('keeps a missing historical recipient draft out of Main without deleting it', () => {
   const saved = JSON.stringify({ draft: 'Keep this request', scope: 'gone', recipient: 'gone' })
@@ -593,13 +609,18 @@ it.each(['executor', 'project', 'unknown closure'])('keeps a %s mismatch on task
   expect(terminal).not.toHaveBeenCalled()
 })
 
-it('does not animate a CLI session whose live executor differs from the member', () => {
+it('retains the role without opening a live session belonging to another executor', async () => {
   test.data!.work[0].attempt!.sessionId = 'real-session'
   test.data!.work[0].executor = 'claude'
-  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  const terminal = vi.fn()
+  render(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={terminal} />)
   showScene()
-  expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main')
-  expect(screen.getByRole('button', { name: 'frontend', pressed: false })).toBeTruthy()
+  expect(screen.getByTestId('studio-selection').getAttribute('data-nodes')).toBe('main,work')
+  fireEvent.click(screen.getByRole('button', { name: 'scene work' }))
+  expect(screen.getByRole('button', { name: 'frontend', pressed: true })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.managed.openSession' }))
+  await waitFor(() => expect(test.openTask).toHaveBeenCalledWith('tasks', 'task'))
+  expect(terminal).not.toHaveBeenCalled()
 })
 
 
