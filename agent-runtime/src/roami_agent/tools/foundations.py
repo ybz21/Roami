@@ -46,6 +46,18 @@ WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 
 
+def is_help_argv(argv):
+    return (
+        len(argv) >= 2
+        and argv[0] == "roami"
+        and argv[-1] in {"help", "--help"}
+        and (
+            argv[1:-1] in ([], ["chrome"])
+            or any(path[: len(argv) - 2] == argv[1:-1] for path in COMMANDS.values())
+        )
+    )
+
+
 def command_strings(entry):
     entry = deepcopy(entry)
     if entry.get("argv"):
@@ -370,7 +382,7 @@ class ToolDirectory:
                 )
         return [{"name": "commands", "commands": entries}]
 
-    def help_tool(self, argv, role):
+    def help_command(self, argv, role):
         family = "roami chrome" if argv[1:2] == ["chrome"] else "roami"
         entries = [entry for entry in self.command_entries(role) if entry["name"] == family]
         if not entries:
@@ -408,13 +420,9 @@ class ToolDirectory:
                 }
             )
 
-        return Tool(
-            "command_help",
-            "Show admitted command usage.",
-            object_schema({}),
-            help_command,
-            main=True,
-        ), {}
+        return replace(self.registry.registry["bash"], handler=help_command, effect="read"), {
+            "argv": ["roami", *argv[1:]]
+        }
 
     def argv(self, args):
         if "argv" in args:
@@ -608,13 +616,9 @@ class ToolDirectory:
             if (
                 argv
                 and argv[0] in {"roami", self.settings.cli_bin}
-                and argv[-1] in {"help", "--help"}
-                and (
-                    argv[1:-1] in ([], ["chrome"])
-                    or any(path[: len(argv) - 2] == argv[1:-1] for path in COMMANDS.values())
-                )
+                and is_help_argv(["roami", *argv[1:]])
             ):
-                return self.help_tool(argv, role)
+                return self.help_command(argv, role)
             operation = self.operation(argv)
             if operation is not None:
                 args = {key: value for key, value in args.items() if key not in {"scope", "cwd"}}

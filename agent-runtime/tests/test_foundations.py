@@ -138,7 +138,15 @@ async def test_main_foundations_preserve_file_hashes(store, tmp_path, create_has
     await runtime.files.close()
 
 
-async def test_bash_cli_records_actual_read_effect_and_timeline(store):
+@pytest.mark.parametrize(
+    "command, recorded_name",
+    [
+        (cli("memory_search", {"query": "fixture"}), "memory_search"),
+        (call("bash", {"command": "roami help"}), "bash"),
+        (call("bash", {"argv": ["roami", "swarm", "--help"]}), "bash"),
+    ],
+)
+async def test_bash_cli_records_actual_read_effect_and_timeline(store, command, recorded_name):
     class Model:
         model = "foundation-fixture"
 
@@ -146,7 +154,7 @@ async def test_bash_cli_records_actual_read_effect_and_timeline(store):
             yield (
                 ModelEvent("text", "Done")
                 if messages[-1]["role"] == "tool"
-                else ModelEvent("tool", cli("memory_search", {"query": "fixture"}))
+                else ModelEvent("tool", command)
             )
 
     runtime = Runtime(store, Model())
@@ -164,14 +172,14 @@ async def test_bash_cli_records_actual_read_effect_and_timeline(store):
             lambda db: row(db, "SELECT * FROM tool_calls WHERE turn_id=?", (receipt["turnId"],))
         )
         assert (tool["tool_name"], tool["effect"], tool["state"]) == (
-            "memory_search",
+            recorded_name,
             "read",
             "succeeded",
         )
         view = await runtime.conversations.messages("alice", c["id"])
         assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])
-        assert any(e["payload"].get("activity", {}).get("name") == "memory_search" for e in events)
+        assert any(e["payload"].get("activity", {}).get("name") == recorded_name for e in events)
     finally:
         await runtime.close()
 

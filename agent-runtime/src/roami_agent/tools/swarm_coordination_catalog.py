@@ -30,7 +30,6 @@ COORDINATION_OPERATIONS = (
     | SWARM_WRITES
     | {
         "tool_list",
-        "command_help",
         "skill_read",
         "file_read",
         "artifact_read",

@@ -257,13 +257,24 @@ func RecordedScopeProcesses(directory string) ([]int, error) {
 	} else if !info.IsDir() {
 		return nil, fmt.Errorf("invalid recorded pane scope")
 	}
-	processes, err := scopeProcesses(directory)
-	if os.IsNotExist(err) {
-		if _, check := os.Stat(directory); os.IsNotExist(check) {
+	return recordedScopeProcesses(directory, scopeProcesses)
+}
+
+func recordedScopeProcesses(directory string, observe func(string) ([]int, error)) ([]int, error) {
+	for attempt := 0; ; attempt++ {
+		processes, err := observe(directory)
+		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, syscall.ENODEV) {
+			return processes, err
+		}
+		if _, check := os.Stat(directory); errors.Is(check, os.ErrNotExist) {
 			return nil, nil
 		}
+		// A removed cgroup can return ENODEV before its directory disappears.
+		if !errors.Is(err, syscall.ENODEV) || attempt == 5 {
+			return nil, err
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-	return processes, err
 }
 
 func scopeProcesses(directory string) ([]int, error) {

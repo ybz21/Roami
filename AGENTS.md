@@ -227,6 +227,9 @@ the existing helpers instead of shelling out fresh:
 
 ## Session CLI and Test Isolation
 
+Keep the capability surface minimal. Command-line help stays in the existing CLI / `bash` path;
+do not introduce a separate tool for behavior the CLI already provides.
+
 Use `roami session` for session operations, `roami swarm` for collaboration (`roami session swarm` uses the same implementation), and `roami chrome` for browser automation. The old
 `ttmux` entry is retired. Public session commands do not forward native tmux commands or expose
 global shutdown. Close only the explicitly identified session or task resources.
