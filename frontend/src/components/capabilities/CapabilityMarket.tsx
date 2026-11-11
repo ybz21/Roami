@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Tabs, Spin } from 'antd'
-import { api } from '../../api'
+import { api, streamMarketPreview } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { SearchIcon, GearIcon } from '../../icons'
@@ -37,6 +37,7 @@ export default function CapabilityMarket() {
   const [listing, setListing] = useState<Listing | null>(null)
   const opener = useRef<HTMLElement | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
+  const [pending, setPending] = useState({ document: false, files: false, images: false })
   const [option, setOption] = useState(0)
   const [editing, setEditing] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -73,16 +74,33 @@ export default function CapabilityMarket() {
     if (identifier) return view({ id: identifier, name: identifier.split('/').pop() || '', description: identifier.split('/').slice(0, 2).join('/'), url: 'https://skills.sh/' + identifier, version: '' })
     return load(source, cursor ? lastQuery.current : submitted, cursor, popular ? ranking.current : 'all-time')
   }
-  const closePreview = () => { setPreview(null); requestAnimationFrame(() => opener.current?.focus()) }
+  const closePreview = () => { request.current?.abort(); setPreview(null); setFailure(null); setBusy(false); requestAnimationFrame(() => opener.current?.focus()) }
   const view = async (item: Listing, sourceId = source, rememberOpener = true) => {
     if (rememberOpener) opener.current = document.activeElement as HTMLElement | null
     request.current?.abort()
     const abort = new AbortController(); request.current = abort
-    setBusy(true); setFailure(null); setSuccess(''); setInstallError(''); setPreviewId('')
+    const skill = sources?.find(row => row.id === sourceId)?.provider === 'skills_sh'
+    setBusy(!skill); setFailure(null); setSuccess(''); setInstallError(''); setPreviewId('')
+    if (skill) {
+      setListing(item); setOption(0)
+      if (rememberOpener) { setPreview({ previewId: '', kind: 'skills', options: [{ label: item.name, entry: { name: item.name, description: item.description } }] }); setTargets(['local', 'claude', 'opencode', 'roami']) }
+      setPending({ document: rememberOpener || !preview?.options[0]?.entry.text, files: rememberOpener || !preview?.options[0]?.entry.files, images: rememberOpener || !preview?.options[0]?.images })
+    }
     try {
-      const { data } = await api('POST', '/agent/capability-markets/preview', { source: sourceId, id: item.id, version: item.version }, { signal: abort.signal })
-      if (!abort.signal.aborted) { setPreviewId(data.previewId || ''); setListing(item); setPreview(data); setOption(0); setTargets(['local', 'claude', 'opencode', 'roami']) }
-    } catch (caught: unknown) { if (!abort.signal.aborted) setFailure({ ...marketError(caught, 'previewFailed', t), recovery: { kind: 'preview', source: sourceId, item } }) } finally { if (!abort.signal.aborted) setBusy(false) }
+      const payload = { source: sourceId, id: item.id, version: item.version }
+      if (skill) await streamMarketPreview(payload, event => {
+        if (abort.signal.aborted) return
+        if (event.type === 'ready') { setPreviewId(event.data.previewId || ''); setPreview(event.data); setPending({ document: false, files: false, images: false }) }
+        else if (['document', 'files', 'images'].includes(event.type)) {
+          setPreview(current => current && ({ ...current, options: current.options.map((value, index) => index ? value : { ...value, entry: event.entry ? { ...value.entry, ...event.entry } : value.entry, images: event.images ?? value.images }) }))
+          setPending(values => ({ ...values, [event.type]: false }))
+        }
+      }, abort.signal)
+      else {
+        const { data } = await api('POST', '/agent/capability-markets/preview', payload, { signal: abort.signal })
+        if (!abort.signal.aborted) { setPreviewId(data.previewId || ''); setListing(item); setPreview(data); setOption(0); setTargets(['local', 'claude', 'opencode', 'roami']) }
+      }
+    } catch (caught: unknown) { if (!abort.signal.aborted) { setPending({ document: false, files: false, images: false }); setFailure({ ...marketError(caught, 'previewFailed', t), recovery: { kind: 'preview', source: sourceId, item } }) } } finally { if (!abort.signal.aborted) setBusy(false) }
   }
   const retryFailed = () => {
     const recovery = failure?.recovery
@@ -102,7 +120,7 @@ export default function CapabilityMarket() {
   const selected = preview?.options[option]
   const variant = preview && preview.options.length > 1 && <Form.Item label={t('capabilities.market.variant')}><Select popupClassName="tt-capability-select-popup" aria-label={t('capabilities.market.variant')} value={option} onChange={setOption} options={preview.options.map((item, value) => ({ value, label: item.label }))} /></Form.Item>
   const skillPreview = preview?.kind === 'skills' && selected
-  const skillDetail = skillPreview && <SkillMarketDetail key={selected.entry.name} entry={selected.entry} images={selected.images} marketUrl={listing?.url} repository={(listing?.id || '').split('/').slice(0, 2).join('/')} installs={listing?.installs === undefined ? undefined : t('capabilities.market.installs.' + resultRanking, { count: new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(listing.installs) })} phone={phone} busy={busy} targets={targets} onTargets={setTargets} installError={installError} canInstall={Boolean(previewId)} onInstall={() => { void install() }} onBack={closePreview} variant={variant} />
+  const skillDetail = skillPreview && <SkillMarketDetail key={listing?.id} entry={selected.entry} loading={pending} loadError={failure?.message} loadDiagnostic={failure?.diagnostic} onRetry={retryFailed} images={selected.images} marketUrl={listing?.url} repository={(listing?.id || '').split('/').slice(0, 2).join('/')} installs={listing?.installs === undefined ? undefined : t('capabilities.market.installs.' + resultRanking, { count: new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(listing.installs) })} phone={phone} busy={busy} targets={targets} onTargets={setTargets} installError={installError} canInstall={Boolean(previewId)} onInstall={() => { void install() }} onBack={closePreview} variant={variant} />
   const detail = selected && <div className="tt-market-preview">
     {variant}
     <p>{t('capabilities.market.reviewHint')}</p>
@@ -119,7 +137,7 @@ export default function CapabilityMarket() {
       <Button type="primary" htmlType="submit" loading={busy} disabled={!source || (!query.trim() && !popular)}>{t('capabilities.market.search')}</Button>
       <Button icon={<GearIcon size={16} />} disabled={!sources || busy} onClick={() => setConfiguring(true)}>{t('capabilities.market.sources')}</Button>
     </Form>
-    {failure && <Alert className="tt-capability-alert" type="error" message={failure.message} description={failure.diagnostic && <details className="tt-market-error-details"><summary>{t('capabilities.market.errorDetails')}</summary><code>{failure.diagnostic}</code></details>} action={<Button onClick={retryFailed}>{t('agent.retry')}</Button>} />}
+    {failure && !skillPreview && <Alert className="tt-capability-alert" type="error" message={failure.message} description={failure.diagnostic && <details className="tt-market-error-details"><summary>{t('capabilities.market.errorDetails')}</summary><code>{failure.diagnostic}</code></details>} action={<Button onClick={retryFailed}>{t('agent.retry')}</Button>} />}
     {success && <Alert className="tt-capability-alert" type="success" message={success} />}
     {popular && <>
       <div className="tt-market-heading">{searched && <BackButton label={t('capabilities.market.backPopular')} onClick={() => { setQuery(''); void load(source, '', '', ranking.current) }} disabled={busy} />}<h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3>{!searched && <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>

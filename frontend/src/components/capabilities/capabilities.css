@@ -159,6 +159,8 @@ html[data-pointer="coarse"] .tt-capability-select-popup .ant-select-item-option 
 .tt-skill-hero.tt-pagehead p { max-width:var(--content-form); font-size:var(--fs-body); line-height:1.8; color:var(--text); }
 .tt-skill-columns { display:grid; grid-template-columns:minmax(0,1fr) calc(var(--sp-5) * 14); gap:var(--sp-5); padding:0 var(--pad-page) var(--sp-5); align-items:start; }
 .tt-skill-content { min-width:0; }
+.tt-market-detail-error { margin-bottom:var(--sp-4); }
+.tt-skill-image-loading { display:flex; align-items:center; justify-content:center; min-height:calc(var(--sp-5) * 6); margin-block:var(--sp-3); background:var(--bg-container); color:var(--text-dim); border-radius:var(--r-sm); }
 .tt-skill-tabs { margin-bottom:var(--sp-5); }
 .tt-skill-tabs .ant-segmented-item-label { display:flex; align-items:center; justify-content:center; gap:var(--sp-1); }
 .tt-skill-tabs .ant-segmented-item-icon { display:flex; }

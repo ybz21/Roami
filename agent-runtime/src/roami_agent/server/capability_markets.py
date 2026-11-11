@@ -23,6 +23,7 @@ class CapabilityMarkets:
         self.lock = asyncio.Lock()
         self.requests = asyncio.Semaphore(4)
         self.cache, self.inflight = {}, {}
+        self.progress, self.listeners = {}, {}
         self.installations = MarketInstallations(self)
         self.sources = copy.deepcopy(market_catalogs.DEFAULT_SOURCES)
         if self.path.exists() or self.path.is_symlink():
@@ -109,7 +110,7 @@ class CapabilityMarkets:
             raise DomainError("MARKET_SOURCE_DISABLED", 409)
         return dict(source)
 
-    async def _request(self, key, operation):
+    async def _request(self, key, operation, *, ttl=60, on_progress=None):
         cached = self.cache.get(key)
         if cached and cached[0] > time.monotonic():
             return copy.deepcopy(cached[1])
@@ -118,11 +119,19 @@ class CapabilityMarkets:
                 raise DomainError("MARKET_RATE_LIMITED", 429)
 
             async def run():
+                def publish(event):
+                    self.progress.setdefault(key, {})[event["type"]] = event
+                    for listener in tuple(self.listeners.get(key, ())):
+                        listener(copy.deepcopy(event))
+
+                token = market_catalogs.progress.set(publish)
                 try:
-                    async with self.requests, asyncio.timeout(90):
+                    async with self.requests, asyncio.timeout(90), market_catalogs.connection():
                         return await operation()
                 except (TimeoutError, KeyError, IndexError, TypeError, ValueError, AttributeError):
                     raise DomainError("MARKET_UNAVAILABLE", 502) from None
+                finally:
+                    market_catalogs.progress.reset(token)
 
             self.inflight[key] = asyncio.create_task(run())
 
@@ -131,16 +140,26 @@ class CapabilityMarkets:
                     task.exception()
                 if self.inflight.get(key) is task:
                     self.inflight.pop(key, None)
+                self.progress.pop(key, None)
 
             self.inflight[key].add_done_callback(settled)
         task = self.inflight[key]
+        if on_progress:
+            self.listeners.setdefault(key, set()).add(on_progress)
+            for event in self.progress.get(key, {}).values():
+                on_progress(copy.deepcopy(event))
         try:
             result = await asyncio.shield(task)
             if len(self.cache) >= 32:
                 self.cache.pop(next(iter(self.cache)))
-            self.cache[key] = (time.monotonic() + 60, result)
+            self.cache[key] = (time.monotonic() + ttl, result)
             return copy.deepcopy(result)
         finally:
+            if on_progress:
+                listeners = self.listeners.get(key, set())
+                listeners.discard(on_progress)
+                if not listeners:
+                    self.listeners.pop(key, None)
             if task.done() and self.inflight.get(key) is task:
                 self.inflight.pop(key, None)
 
@@ -171,7 +190,7 @@ class CapabilityMarkets:
             ),
         )
 
-    async def preview(self, owner, payload):
+    async def preview(self, owner, payload, *, on_progress=None):
         if (
             not isinstance(payload, dict)
             or set(payload) != {"source", "id", "version"}
@@ -182,7 +201,10 @@ class CapabilityMarkets:
         source = self.source(owner, payload["source"])
         key = (json.dumps(source, sort_keys=True), "preview", payload["id"], payload["version"])
         return await self._request(
-            key, lambda: market_catalogs.preview(source, payload["id"], payload["version"])
+            key,
+            lambda: market_catalogs.preview(source, payload["id"], payload["version"]),
+            ttl=600,
+            on_progress=on_progress,
         )
 
     async def close(self):
@@ -191,4 +213,6 @@ class CapabilityMarkets:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self.inflight.clear()
+        self.progress.clear()
+        self.listeners.clear()
         self.installations.receipts.clear()

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeAll, expect, it, vi } from 'vitest'
-import { api } from '../../api'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { api, streamMarketPreview } from '../../api'
 import CapabilityMarket from './CapabilityMarket'
 import CapabilityEditor from './CapabilityEditor'
 import MarketSources from './MarketSources'
 
-vi.mock('../../api', () => ({ api: vi.fn() }))
+vi.mock('../../api', () => ({ api: vi.fn(), streamMarketPreview: vi.fn() }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../../i18n', () => { const t = (key: string) => key; return { useI18n: () => ({ t, locale: 'en-US' }) } })
 beforeAll(() => {
@@ -14,7 +14,8 @@ beforeAll(() => {
   window.getComputedStyle = element => style(element)
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
-afterEach(() => { cleanup(); vi.mocked(api).mockReset() })
+beforeEach(() => { vi.mocked(streamMarketPreview).mockImplementation(async (body, onEvent, signal) => { const { data } = await api('POST', '/agent/capability-markets/preview', body, { signal }); onEvent({ type: 'ready', data }) }) })
+afterEach(() => { cleanup(); vi.mocked(api).mockReset(); vi.mocked(streamMarketPreview).mockReset() })
 const sources = [{ id: 'skills-sh', name: 'skills.sh', provider: 'skills_sh' as const, url: 'https://skills.sh', enabled: true }]
 const item = { id: 'owner/repo/workflow', name: 'workflow', description: 'Example', version: '', url: 'https://skills.sh/owner/repo/workflow' }
 const entry = { name: 'workflow', text: '# Original instructions', files: { 'scripts/check.py': 'cHJpbnQoMSk=' }, origin: { source: 'skills-sh', id: item.id, version: 'abc123', url: 'https://github.com/owner/repo/tree/abc123' } }
@@ -274,4 +275,59 @@ it('reloads sources before loading the ranking when source discovery fails', asy
   fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
   await screen.findByRole('button', { name: 'workflow' })
   expect(vi.mocked(api).mock.calls.map(call => call[1])).toEqual(['/agent/capability-markets', '/agent/capability-markets', '/agent/capability-markets/skills-sh/search?query='])
+})
+
+it('opens immediately and renders instructions, files and images independently while preserving choices', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } })
+  let emit!: (event: any) => void
+  let finish!: () => void
+  vi.mocked(streamMarketPreview).mockImplementation((_body, onEvent) => { emit = onEvent; return new Promise(resolve => { finish = resolve }) })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  expect(screen.getByRole('button', { name: 'capabilities.market.backResults' }).hasAttribute('disabled')).toBe(false)
+  expect(screen.getByRole('status', { name: 'capabilities.market.documentLoading' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: /capabilities.market.preparing/ }).hasAttribute('disabled')).toBe(true)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'capabilities.market.target.claude' }))
+  act(() => emit({ type: 'document', entry: { ...entry, files: undefined, text: entry.text + '\n\n![Effect](https://raw.githubusercontent.com/o/r/main/a.png)' } }))
+  expect(screen.getByRole('heading', { name: 'Original instructions' })).toBeTruthy()
+  expect(screen.getByRole('status', { name: 'capabilities.market.imageLoading' })).toBeTruthy()
+  fireEvent.click(screen.getByText('capabilities.market.filesPending'))
+  expect(screen.getByRole('status', { name: 'capabilities.market.filesLoading' })).toBeTruthy()
+  act(() => emit({ type: 'files', entry: { ...entry, text: entry.text + '\n\n![Effect](https://raw.githubusercontent.com/o/r/main/a.png)' } }))
+  expect(screen.getByLabelText('SKILL.md')).toBeTruthy()
+  fireEvent.click(screen.getByText('capabilities.market.overview'))
+  act(() => emit({ type: 'images', images: { 'https://raw.githubusercontent.com/o/r/main/a.png': 'data:image/png;base64,iVBORw0KGgo=' } }))
+  expect(screen.getByRole('img', { name: 'Effect' }).getAttribute('src')).toContain('data:image/png')
+  act(() => { emit({ type: 'ready', data: { previewId: 'ready', kind: 'skills', options: [{ label: item.name, entry }] } }); finish() })
+  expect(screen.getByRole('button', { name: 'capabilities.market.install' }).hasAttribute('disabled')).toBe(false)
+  expect((screen.getByRole('checkbox', { name: 'capabilities.market.target.claude' }) as HTMLInputElement).checked).toBe(false)
+})
+
+it('aborts a loading detail on return and ignores late module responses', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } })
+  let emit!: (event: any) => void
+  let signal!: AbortSignal
+  vi.mocked(streamMarketPreview).mockImplementation((_body, onEvent, abort) => { emit = onEvent; signal = abort; return new Promise(() => {}) })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.backResults' }))
+  expect(signal.aborted).toBe(true)
+  act(() => emit({ type: 'ready', data: { previewId: 'late', kind: 'skills', options: [{ label: item.name, entry }] } }))
+  expect(screen.queryByRole('button', { name: 'capabilities.market.backResults' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'workflow' })).toBeTruthy()
+})
+
+it('keeps readable instructions after a later module fails and retries without resetting install choices', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } })
+  let reject!: (error: Error) => void
+  vi.mocked(streamMarketPreview).mockImplementationOnce((_body, emit) => { emit({ type: 'document', entry }); return new Promise((_resolve, fail) => { reject = fail }) }).mockImplementationOnce(async (_body, emit) => { emit({ type: 'ready', data: { previewId: 'retried', kind: 'skills', options: [{ label: item.name, entry }] } }) })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'capabilities.market.target.claude' }))
+  await act(async () => reject(new Error('MARKET_UNAVAILABLE')))
+  expect(screen.getByRole('heading', { name: 'Original instructions' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByRole('button', { name: 'capabilities.market.install' })
+  expect((screen.getByRole('checkbox', { name: 'capabilities.market.target.claude' }) as HTMLInputElement).checked).toBe(false)
+  expect(streamMarketPreview).toHaveBeenCalledTimes(2)
 })

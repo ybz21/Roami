@@ -36,6 +36,7 @@ from roami_agent.protocol.http import (
     WakeProject,
 )
 from roami_agent.server.installation import Installation
+from roami_agent.server.market_preview_stream import preview_stream
 from roami_agent.server.model_settings import ModelSettings
 from roami_agent.server.swarm_routes import mount_swarm_routes
 
@@ -173,9 +174,16 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.post("/v1/capability-markets/preview")
     async def preview_market(owner: Owner, request: Request):
         ModelSettings.owner(owner)
+        payload = await capability_payload(request)
+        if "application/x-ndjson" in request.headers.get("accept", ""):
+            return StreamingResponse(
+                preview_stream(runtime.capability_markets, owner, payload),
+                media_type="application/x-ndjson",
+                headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+            )
         return {
             "data": await runtime.capability_markets.installations.prepare(
-                owner, await capability_payload(request), include_content=True
+                owner, payload, include_content=True
             )
         }
 

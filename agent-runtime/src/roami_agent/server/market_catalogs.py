@@ -5,6 +5,8 @@ import base64
 import binascii
 import json
 import re
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from urllib.parse import quote, urlsplit
 
 import httpx
@@ -39,6 +41,31 @@ DEFAULT_SOURCES = [
     },
 ]
 PROVIDER_KINDS = {"skills_sh": "skills", "mcp_registry": "mcp", "npm": "cli"}
+_connection = ContextVar("market_connection", default=None)
+progress = ContextVar("market_preview_progress", default=None)
+
+
+def report(stage, **data):
+    if callback := progress.get():
+        callback({"type": stage, **data})
+
+
+@asynccontextmanager
+async def connection():
+    existing = _connection.get()
+    if existing is not None:
+        yield existing
+        return
+    async with httpx.AsyncClient(
+        timeout=20,
+        follow_redirects=False,
+        headers={"User-Agent": "Roami-Capability-Center", "Accept": "application/json"},
+    ) as client:
+        token = _connection.set(client)
+        try:
+            yield client
+        finally:
+            _connection.reset(token)
 
 
 def public_url(url):
@@ -60,16 +87,8 @@ def public_url(url):
 async def fetch(url, *, params=None, raw=False, maximum=None, headers=None):
     try:
         async with (
-            httpx.AsyncClient(
-                timeout=20,
-                follow_redirects=False,
-                headers={
-                    "User-Agent": "Roami-Capability-Center",
-                    "Accept": "application/json",
-                    **(headers or {}),
-                },
-            ) as client,
-            client.stream("GET", url, params=params) as response,
+            connection() as client,
+            client.stream("GET", url, params=params, headers=headers) as response,
         ):
             if response.status_code == 401:
                 raise DomainError("MARKET_AUTH_REQUIRED", 503)
@@ -147,7 +166,7 @@ async def search(source, query, cursor="", view="all-time"):
     return {"items": rows, "nextCursor": next_cursor}
 
 
-async def skill_entry(identifier):
+async def skill_entry(identifier, *, on_document=None):
     if not re.fullmatch(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.:-]+", identifier):
         raise DomainError("MARKET_ITEM_NOT_FOUND", 404)
     owner, repo, skill = identifier.split("/")
@@ -232,9 +251,22 @@ async def skill_entry(identifier):
                         raise DomainError("INVALID_SKILL_PACKAGE") from None
                 if len(raw) > MAX_PACKAGE_BYTES:
                     raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
+                if path == prefix + "SKILL.md" and on_document:
+                    try:
+                        text = raw.decode("utf-8")
+                    except UnicodeDecodeError:
+                        raise DomainError("INVALID_SKILL_PACKAGE") from None
+                    on_document({"name": local_name(skill), "text": text}, commit)
                 return path.removeprefix(prefix) if path.startswith(prefix) else path, raw
 
-        contents = dict(await asyncio.gather(*(download(item) for item in selected)))
+        tasks = [asyncio.create_task(download(item)) for item in selected]
+        try:
+            contents = dict(await asyncio.gather(*tasks))
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
         if sum(map(len, contents.values())) > MAX_PACKAGE_BYTES:
             raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
         try:
@@ -322,18 +354,62 @@ async def preview(source, identifier, version):
     provider, base = source["provider"], source["url"]
     kind = PROVIDER_KINDS[provider]
     if provider == "skills_sh":
-        snapshot = await skills_sh_api.snapshot(source, identifier, fetch)
-        if snapshot:
-            text, files, version = snapshot
-            entry = {"name": local_name(identifier.split("/")[-1]), "text": text, "files": files}
-            url = base + "/" + quote(identifier, safe="/")
-        else:
-            entry, version = await skill_entry(identifier)
-            url = "https://github.com/" + "/".join(identifier.split("/")[:2]) + "/tree/" + version
-        options = [{"label": entry["name"], "entry": entry}]
-        images = await preview_images(entry["text"], fetch)
-        if images:
-            options[0]["images"] = images
+        image_task = None
+
+        async def illustrations(text):
+            images = await preview_images(text, fetch)
+            report("images", images=images)
+            return images
+
+        def document(entry, revision):
+            nonlocal image_task
+            url = (
+                base + "/" + quote(identifier, safe="/")
+                if revision.startswith("sha256:")
+                else "https://github.com/"
+                + "/".join(identifier.split("/")[:2])
+                + "/tree/"
+                + revision
+            )
+            entry = {
+                **entry,
+                "origin": {
+                    "source": source["id"],
+                    "id": identifier,
+                    "version": revision,
+                    "url": url,
+                },
+            }
+            if image_task is None:
+                report(
+                    "document", entry={key: value for key, value in entry.items() if key != "files"}
+                )
+                image_task = asyncio.create_task(illustrations(entry["text"]))
+            return entry
+
+        try:
+            snapshot = await skills_sh_api.snapshot(source, identifier, fetch)
+            if snapshot:
+                text, files, version = snapshot
+                entry = {
+                    "name": local_name(identifier.split("/")[-1]),
+                    "text": text,
+                    "files": files,
+                }
+            else:
+                entry, version = await skill_entry(identifier, on_document=document)
+            entry = document(entry, version)
+            url = entry["origin"]["url"]
+            report("files", entry=entry)
+            options = [{"label": entry["name"], "entry": entry}]
+            images = await image_task
+            if images:
+                options[0]["images"] = images
+        finally:
+            if image_task is not None:
+                if not image_task.done():
+                    image_task.cancel()
+                await asyncio.gather(image_task, return_exceptions=True)
     elif provider == "mcp_registry":
         url = (
             base
