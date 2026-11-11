@@ -2,14 +2,15 @@
 
 import asyncio
 import base64
+import binascii
 import json
 import re
-from html.parser import HTMLParser
 from urllib.parse import quote, urlsplit
 
 import httpx
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.server import skills_sh_api
 from roami_agent.server.skill_market_archive import download_archive
 from roami_agent.server.skill_package import MAX_PACKAGE_BYTES
 
@@ -55,16 +56,22 @@ def public_url(url):
     return url.rstrip("/")
 
 
-async def fetch(url, *, params=None, raw=False, maximum=None):
+async def fetch(url, *, params=None, raw=False, maximum=None, headers=None):
     try:
         async with (
             httpx.AsyncClient(
                 timeout=20,
                 follow_redirects=False,
-                headers={"User-Agent": "Roami-Capability-Center", "Accept": "application/json"},
+                headers={
+                    "User-Agent": "Roami-Capability-Center",
+                    "Accept": "application/json",
+                    **(headers or {}),
+                },
             ) as client,
             client.stream("GET", url, params=params) as response,
         ):
+            if response.status_code == 401:
+                raise DomainError("MARKET_AUTH_REQUIRED", 503)
             if response.status_code == 429:
                 raise DomainError("MARKET_RATE_LIMITED", 429)
             if response.status_code == 404:
@@ -85,75 +92,11 @@ def local_name(name, limit=64):
     return (("cap-" if not name or not name[0].isalpha() else "") + name)[:limit]
 
 
-class SkillLeaderboard(HTMLParser):
-    """Read the homepage's structured leaderboard without executing upstream JavaScript."""
-
-    def __init__(self):
-        super().__init__()
-        self.in_script = False
-        self.chunks = []
-
-    def handle_starttag(self, tag, attrs):
-        self.in_script = tag == "script"
-
-    def handle_endtag(self, tag):
-        if tag == "script":
-            self.in_script = False
-
-    def handle_data(self, data):
-        if self.in_script and data.startswith("self.__next_f.push("):
-            chunk = json.loads(data[len("self.__next_f.push(") : -1])
-            if len(chunk) == 2 and chunk[0] == 1 and isinstance(chunk[1], str):
-                self.chunks.append(chunk[1])
-
-
-async def popular_skills(source):
-    base = source["url"]
-    url = "https://www.skills.sh/" if base == "https://skills.sh" else base + "/"
-    document = await fetch(url, raw=True, maximum=2_000_000)
-    parser = SkillLeaderboard()
-    parser.feed(document.decode())
-    payload = "".join(parser.chunks)
-    marker = '"initialSkills":'
-    if marker not in payload:
-        raise DomainError("MARKET_UNAVAILABLE", 502)
-    skills, _ = json.JSONDecoder().raw_decode(payload.split(marker, 1)[1].lstrip())
-    rows = []
-    for item in skills[:20]:
-        identifier = item["source"] + "/" + item["skillId"]
-        # Only repository-backed skills can enter our pinned review/install flow.
-        if not re.fullmatch(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.:-]+", identifier):
-            continue
-        rows.append(
-            {
-                "id": identifier,
-                "name": item["name"],
-                "description": item["source"],
-                "url": base + "/" + quote(identifier, safe="/"),
-                "version": "",
-                "installs": item["installs"],
-            }
-        )
-    return {"items": rows, "nextCursor": ""}
-
-
-async def search(source, query, cursor=""):
+async def search(source, query, cursor="", view="all-time"):
     base, provider = source["url"], source["provider"]
     rows, next_cursor = [], ""
     if provider == "skills_sh":
-        if not query:
-            return await popular_skills(source)
-        data = await fetch(base + "/api/search", params={"q": query, "limit": 20})
-        for item in data["skills"][:20]:
-            rows.append(
-                {
-                    "id": item["id"],
-                    "name": item["name"],
-                    "description": item.get("source", ""),
-                    "url": base + "/" + quote(item["id"], safe="/"),
-                    "version": "",
-                }
-            )
+        return await skills_sh_api.search(source, query, cursor, view, fetch)
     elif provider == "mcp_registry":
         params = {"search": query, "limit": 20, "version": "latest"}
         if cursor:
@@ -208,8 +151,10 @@ async def skill_entry(identifier):
         raise DomainError("MARKET_ITEM_NOT_FOUND", 404)
     owner, repo, skill = identifier.split("/")
 
-    async def archived():
-        text, files, commit = await download_archive(owner, repo, skill, fetch)
+    async def archived(commit=""):
+        text, files, commit = await download_archive(
+            owner, repo, skill, fetch, **({"commit": commit} if commit else {})
+        )
         match = re.search(r"(?m)^description:\s*(.+)$", text)
         return {
             "name": local_name(skill),
@@ -227,64 +172,89 @@ async def skill_entry(identifier):
         return await archived()
     if not re.fullmatch(r"[a-f0-9]{40}", commit):
         raise DomainError("MARKET_UNAVAILABLE", 502)
-    tree = await fetch(api + "/git/trees/" + commit, params={"recursive": "1"})
-    if tree.get("truncated"):
-        raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
-    candidates = [
-        item["path"]
-        for item in tree["tree"]
-        if item.get("type") == "blob"
-        and (item["path"] == "SKILL.md" or item["path"].endswith("/SKILL.md"))
-        and (item["path"] == "SKILL.md" or item["path"].split("/")[-2] == skill)
-    ]
-    if len(candidates) != 1:
-        return await archived()
-    prefix = candidates[0].removesuffix("SKILL.md")
-    selected = [
-        item
-        for item in tree["tree"]
-        if item["path"].startswith(prefix) and item.get("type") == "blob"
-    ]
-    # Preserve repository licensing when it lives outside the skill folder.
-    selected += [
-        item
-        for item in tree["tree"]
-        if prefix
-        and item["path"] in {"LICENSE", "LICENSE.md", "LICENSE.txt"}
-        and not any(row["path"] == prefix + item["path"] for row in selected)
-    ]
-    if (
-        len(selected) > 100
-        or sum(item.get("size", 0) for item in selected) > MAX_PACKAGE_BYTES
-        or any(item.get("mode") not in {"100644", "100755"} for item in selected)
-    ):
-        raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
-    semaphore = asyncio.Semaphore(5)
-
-    async def download(item):
-        async with semaphore:
-            path = item["path"]
-            raw = await fetch(
-                f"https://raw.githubusercontent.com/{owner}/{repo}/{commit}/"
-                + quote(path, safe="/"),
-                raw=True,
-            )
-            return path.removeprefix(prefix) if path.startswith(prefix) else path, raw
-
-    contents = dict(await asyncio.gather(*(download(item) for item in selected)))
-    if sum(map(len, contents.values())) > MAX_PACKAGE_BYTES:
-        raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
     try:
-        text = contents["SKILL.md"].decode("utf-8")
-    except (KeyError, UnicodeDecodeError):
-        raise DomainError("INVALID_SKILL_PACKAGE") from None
-    match = re.search(r"(?m)^description:\s*(.+)$", text)
-    return {
-        "name": local_name(skill),
-        "description": match[1].strip("\"'") if match else skill,
-        "text": text,
-        "files": {name: base64.b64encode(raw).decode() for name, raw in contents.items()},
-    }, commit
+        tree = await fetch(api + "/git/trees/" + commit, params={"recursive": "1"})
+        if tree.get("truncated"):
+            raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
+        candidates = [
+            item["path"]
+            for item in tree["tree"]
+            if item.get("type") == "blob"
+            and (item["path"] == "SKILL.md" or item["path"].endswith("/SKILL.md"))
+            and (item["path"] == "SKILL.md" or item["path"].split("/")[-2] == skill)
+        ]
+        if len(candidates) != 1:
+            raise DomainError("MARKET_SKILL_PATH_REQUIRED", 409)
+        prefix = candidates[0].removesuffix("SKILL.md")
+        selected = [
+            item
+            for item in tree["tree"]
+            if item["path"].startswith(prefix) and item.get("type") == "blob"
+        ]
+        # Preserve repository licensing when it lives outside the skill folder.
+        selected += [
+            item
+            for item in tree["tree"]
+            if prefix
+            and item["path"] in {"LICENSE", "LICENSE.md", "LICENSE.txt"}
+            and not any(row["path"] == prefix + item["path"] for row in selected)
+        ]
+        if (
+            len(selected) > 100
+            or sum(item.get("size", 0) for item in selected) > MAX_PACKAGE_BYTES
+            or any(item.get("mode") not in {"100644", "100755"} for item in selected)
+        ):
+            raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
+        semaphore = asyncio.Semaphore(5)
+
+        async def download(item):
+            async with semaphore:
+                path = item["path"]
+                try:
+                    raw = await fetch(
+                        f"https://raw.githubusercontent.com/{owner}/{repo}/{commit}/"
+                        + quote(path, safe="/"),
+                        raw=True,
+                    )
+                except DomainError as exc:
+                    if exc.code not in {
+                        "MARKET_UNAVAILABLE",
+                        "MARKET_RATE_LIMITED",
+                    } or not re.fullmatch(r"[a-f0-9]{40}", item.get("sha", "")):
+                        raise
+                    blob = await fetch(api + "/git/blobs/" + item["sha"])
+                    if blob.get("encoding") != "base64" or blob.get("sha") != item["sha"]:
+                        raise DomainError("INVALID_SKILL_PACKAGE")
+                    try:
+                        raw = base64.b64decode("".join(blob["content"].split()), validate=True)
+                    except (ValueError, binascii.Error):
+                        raise DomainError("INVALID_SKILL_PACKAGE") from None
+                if len(raw) > MAX_PACKAGE_BYTES:
+                    raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
+                return path.removeprefix(prefix) if path.startswith(prefix) else path, raw
+
+        contents = dict(await asyncio.gather(*(download(item) for item in selected)))
+        if sum(map(len, contents.values())) > MAX_PACKAGE_BYTES:
+            raise DomainError("MARKET_PACKAGE_TOO_LARGE", 413)
+        try:
+            text = contents["SKILL.md"].decode("utf-8")
+        except (KeyError, UnicodeDecodeError):
+            raise DomainError("INVALID_SKILL_PACKAGE") from None
+        match = re.search(r"(?m)^description:\s*(.+)$", text)
+        return {
+            "name": local_name(skill),
+            "description": match[1].strip("\"'") if match else skill,
+            "text": text,
+            "files": {name: base64.b64encode(raw).decode() for name, raw in contents.items()},
+        }, commit
+    except DomainError as exc:
+        if exc.code not in {
+            "MARKET_UNAVAILABLE",
+            "MARKET_RATE_LIMITED",
+            "MARKET_SKILL_PATH_REQUIRED",
+        }:
+            raise
+        return await archived(commit)
 
 
 def mcp_options(server):
@@ -351,9 +321,15 @@ async def preview(source, identifier, version):
     provider, base = source["provider"], source["url"]
     kind = PROVIDER_KINDS[provider]
     if provider == "skills_sh":
-        entry, version = await skill_entry(identifier)
+        snapshot = await skills_sh_api.snapshot(source, identifier, fetch)
+        if snapshot:
+            text, files, version = snapshot
+            entry = {"name": local_name(identifier.split("/")[-1]), "text": text, "files": files}
+            url = base + "/" + quote(identifier, safe="/")
+        else:
+            entry, version = await skill_entry(identifier)
+            url = "https://github.com/" + "/".join(identifier.split("/")[:2]) + "/tree/" + version
         options = [{"label": entry["name"], "entry": entry}]
-        url = "https://github.com/" + "/".join(identifier.split("/")[:2]) + "/tree/" + version
     elif provider == "mcp_registry":
         url = (
             base

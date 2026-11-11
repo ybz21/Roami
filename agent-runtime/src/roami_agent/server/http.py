@@ -166,15 +166,16 @@ def create_app(runtime, *, manage_lifecycle=True):
         owner: Owner,
         query: str = Query(default="", max_length=200),
         cursor: str = Query(default="", max_length=1000),
+        view: Literal["all-time", "trending", "hot"] = "all-time",
     ):
-        return {"data": await runtime.capability_markets.search(owner, source, query, cursor)}
+        return {"data": await runtime.capability_markets.search(owner, source, query, cursor, view)}
 
     @app.post("/v1/capability-markets/preview")
     async def preview_market(owner: Owner, request: Request):
         ModelSettings.owner(owner)
         return {
-            "data": await runtime.capability_markets.preview(
-                owner, await capability_payload(request)
+            "data": await runtime.capability_markets.installations.prepare(
+                owner, await capability_payload(request), include_content=True
             )
         }
 

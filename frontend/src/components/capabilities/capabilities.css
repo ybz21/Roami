@@ -110,6 +110,8 @@ html[data-pointer="coarse"] .tt-capability-writing-head .ant-segmented-item-labe
 .tt-market-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--sp-3); margin-bottom:var(--sp-4); }
 .tt-market-heading h3 { margin:0; font-size:var(--fs-lg); color:var(--text-bright); }
 .tt-market-heading > span { font-size:var(--fs-meta); color:var(--text-dim); }
+.tt-market-ranking { max-width:100%; }
+html[data-pointer="coarse"] .tt-market-ranking .ant-segmented-item-label { min-height:var(--tap); display:flex; align-items:center; }
 .tt-market-targets { display:flex; flex-direction:column; gap:var(--sp-2); margin-bottom:var(--sp-3); }
 html[data-pointer="coarse"] .tt-market-targets .ant-checkbox-wrapper { min-height:var(--tap); align-items:center; }
 html[data-pointer="coarse"] .tt-market .tt-capability-open { min-height:var(--tap); }

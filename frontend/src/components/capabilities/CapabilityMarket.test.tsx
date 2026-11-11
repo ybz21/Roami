@@ -20,7 +20,7 @@ const item = { id: 'owner/repo/workflow', name: 'workflow', description: 'Exampl
 const entry = { name: 'workflow', text: '# Original instructions', files: { 'scripts/check.py': 'cHJpbnQoMSk=' }, origin: { source: 'skills-sh', id: item.id, version: 'abc123', url: 'https://github.com/owner/repo/tree/abc123' } }
 
 it('loads popular skills on entry and installs the reviewed bundle to all targets', async () => {
-  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 12500 }], nextCursor: '' } }).mockResolvedValueOnce({ data: { kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview' } }).mockResolvedValueOnce({ data: {} })
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 12500 }], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockResolvedValueOnce({ data: {} })
   render(<CapabilityMarket />)
   expect(await screen.findByText('capabilities.market.popular')).toBeTruthy()
   await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=', undefined, expect.anything()))
@@ -70,7 +70,7 @@ it('reloads popular skills after saving changes to the selected source', async (
 })
 
 it('keeps the selected install targets and pinned preview after installation fails', async () => {
-  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview' } }).mockRejectedValueOnce(new Error('SKILL_TARGET_EXISTS'))
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockRejectedValueOnce(new Error('SKILL_TARGET_EXISTS'))
   render(<CapabilityMarket />)
   fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
   fireEvent.click(await screen.findByRole('checkbox', { name: 'capabilities.market.target.claude' }))
@@ -79,6 +79,39 @@ it('keeps the selected install targets and pinned preview after installation fai
   expect((screen.getByRole('checkbox', { name: 'capabilities.market.target.claude' }) as HTMLInputElement).checked).toBe(false)
   expect(api).toHaveBeenLastCalledWith('POST', '/agent/capability-markets/install', { previewId: 'pinned-preview', option: 0, targets: ['local', 'opencode', 'roami'] })
   expect(screen.getByRole('button', { name: 'capabilities.market.install' }).hasAttribute('disabled')).toBe(false)
+})
+
+it('loads trending and hot JSON rankings and uses the correct install period', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 100 }], nextCursor: '' } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 5 }], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  fireEvent.click(screen.getByText('capabilities.market.ranking.trending'))
+  await screen.findByText('capabilities.market.installs.trending')
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=&view=trending', undefined, expect.anything())
+  fireEvent.click(screen.getByText('capabilities.market.ranking.hot'))
+  await screen.findByText('capabilities.market.installs.hot')
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=&view=hot', undefined, expect.anything())
+})
+
+it('keeps the previous ranking and query draft when switching rankings fails', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 1000 }], nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE'))
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  const input = screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: 'draft' } })
+  fireEvent.click(screen.getByText('capabilities.market.ranking.hot'))
+  await screen.findByRole('alert')
+  expect(input.value).toBe('draft')
+  expect(screen.getByText('capabilities.market.installs.all-time')).toBeTruthy()
+})
+
+it('opens full skill details and a usable install action from a single preview request', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  expect(await screen.findByText('# Original instructions')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'capabilities.market.install' }).hasAttribute('disabled')).toBe(false)
+  expect(api).toHaveBeenCalledTimes(3)
 })
 
 it('preserves edited sources when persistence fails', async () => {

@@ -18,3 +18,14 @@
 `scripts/dev/quality/check.sh quick` 已通过：Go 全量测试、Python lint / format、4,799 项 Python 测试（48 项跳过、6 项子测试通过）、前端审计 / 类型检查、secret scan 与文件策略均通过。新增 HTTP 回归另以最终代码重跑市场与 Agent 命令共 45 项通过。
 
 本次测试 Web / Agent / Chrome 进程、手机测试标签与 ADB 转发已关闭，隔离 tmux 服务仅通过同一启动入口的 `--stop` 回收。
+
+
+## 详情下载与榜单 API 修订
+
+用户现场复现：运行节点能够读取 GitHub commit / tree，但对 `raw.githubusercontent.com` 的文件请求返回 `MARKET_UNAVAILABLE`，旧下载链路直接结束。使用同一节点环境验证修复版，两个文件均经 Git blob API 读取成功，保留原 commit，详情完整返回。
+
+正式 v1 榜单、搜索、详情的匿名实测均为 401；当前节点未配置 OIDC。公开 JSON 三种榜单均返回 200，仓库型结果分别为 172 / 171 / 199 项，均有后续分页。正式 API 使用模拟授权响应验证身份头、完整文件与内容摘要；自定义镜像不接收节点令牌。
+
+新增回归覆盖：GitHub tree 限流、raw 文件失败、固定 commit 归档、精确 blob 读取、正式 API 快照、授权失效不注销 Roami、单次 HTTP 详情请求携带完整内容与安装回执、三种榜单切换、失败后保留原榜单与搜索草稿。
+
+本次前端全量 Vitest 为 227 个文件、1,636 项通过；`GOFLAGS=-p=1` 下的 full 门禁通过，相关 Python 回归 95 项通过。未配置 OIDC 的真实公开接口，三种榜单、一次详情请求、展开完整正文、安装到隔离 Roami 节点均通过独立 Chromium 验收。桌面四种宽度、侧栏开关、英文模式均通过。

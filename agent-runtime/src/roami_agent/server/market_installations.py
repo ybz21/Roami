@@ -16,7 +16,7 @@ class MarketInstallations:
         self.receipts = {}
         self.lock = asyncio.Lock()
 
-    async def prepare(self, owner, payload):
+    async def prepare(self, owner, payload, *, include_content=False):
         source = self.markets.source(
             owner, payload.get("source") if isinstance(payload, dict) else None
         )
@@ -57,7 +57,7 @@ class MarketInstallations:
             "previewId": identifier,
             "expiresAt": int(time.time() * 1000) + 600_000,
             "kind": preview["kind"],
-            "options": options,
+            "options": copy.deepcopy(preview["options"]) if include_content else options,
         }
 
     async def install(self, owner, payload):
