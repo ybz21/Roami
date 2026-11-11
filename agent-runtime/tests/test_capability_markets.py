@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -14,7 +15,7 @@ from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
-from roami_agent.server import market_catalogs
+from roami_agent.server import capability_markets, market_catalogs
 from roami_agent.server.capability_imports import CapabilityImports
 from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
@@ -94,6 +95,39 @@ async def test_search_merges_inflight_caches_and_rechecks_disabled_source(store,
     await markets.save("local", {"sources": sources})
     with pytest.raises(DomainError, match="MARKET_SOURCE_DISABLED"):
         await markets.search("local", "npm", "format")
+
+
+async def test_preview_cache_outlives_rankings_but_expires_and_rechecks_source(store, monkeypatch):
+    markets = Runtime(store, ConversationModel()).capability_markets
+    clock, calls = [0], []
+    monkeypatch.setattr(capability_markets, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+
+    async def search(*args):
+        calls.append("search")
+        return {"items": [], "nextCursor": ""}
+
+    async def preview(*args):
+        calls.append("preview")
+        return {"options": [{"entry": {"text": "Original"}}]}
+
+    monkeypatch.setattr(market_catalogs, "search", search)
+    monkeypatch.setattr(market_catalogs, "preview", preview)
+    payload = {"source": "skills-sh", "id": "owner/repo/workflow", "version": ""}
+    first = await markets.preview("local", payload)
+    await markets.search("local", "skills-sh", "")
+    clock[0] = 120
+    first["options"].clear()
+    assert (await markets.preview("local", payload))["options"]
+    await markets.search("local", "skills-sh", "")
+    assert calls == ["preview", "search", "search"]
+    clock[0] = 601
+    await markets.preview("local", payload)
+    assert calls[-1] == "preview" and calls.count("preview") == 2
+    sources = markets.view("local")["sources"]
+    sources[0]["enabled"] = False
+    await markets.save("local", {"sources": sources})
+    with pytest.raises(DomainError, match="MARKET_SOURCE_DISABLED"):
+        await markets.preview("local", payload)
 
 
 async def test_registry_pagination_status_and_transport_options(monkeypatch):

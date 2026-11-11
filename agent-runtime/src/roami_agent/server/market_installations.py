@@ -16,11 +16,13 @@ class MarketInstallations:
         self.receipts = {}
         self.lock = asyncio.Lock()
 
-    async def prepare(self, owner, payload, *, include_content=False):
+    async def prepare(self, owner, payload, *, include_content=False, on_progress=None):
         source = self.markets.source(
             owner, payload.get("source") if isinstance(payload, dict) else None
         )
-        preview = await self.markets.preview(owner, payload)
+        preview = await self.markets.preview(
+            owner, payload, **({"on_progress": on_progress} if on_progress else {})
+        )
         if source != self.markets.source(owner, payload["source"]):
             raise DomainError("MARKET_SOURCE_CHANGED", 409)
         self.receipts = {

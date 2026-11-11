@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 技能市场失败恢复 | [20261111-skill-market-recovery](20261111-skill-market-recovery/README.md) | 原请求重试、错误原因与桌面/手机验收 |
 | 设置智能体入口整理 | [20261111-settings-agent-navigation](20261111-settings-agent-navigation/README.md) | 去掉旧模型入口、统一记忆迁入 Roami、旧链接兼容与桌面/真机验收 |
 | 简洁返回按钮 | [20261111-back-navigation](20261111-back-navigation/README.md) | 统一左向 Chevron、无文字按钮、辅助技术名称与触控命中区 |
 | 会话关闭首次点击反馈 | [20261111-session-close-feedback](20261111-session-close-feedback/README.md) | 检查状态即时反馈、等待请求去重、失败重试 |

@@ -19,6 +19,14 @@ export async function api(method: string, path: string, body?: any, opts?: { sig
     // 轮询的 /file/stat 一直拿到旧 mtime → 不刷新。强制不走缓存，每次真打网络。
     cache: 'no-store',
   })
+  const data = await readApiResponse(r)
+  if (method === 'POST' && (body?.activity || (path === '/tasks' && body?.type === 'agent'))) {
+    window.dispatchEvent(new Event('roam:footprints-updated'))
+  }
+  return data
+}
+
+async function readApiResponse(r: Response): Promise<any> {
   if (r.status === 401) {
     onUnauth()
     throw new Error('UNAUTHORIZED')
@@ -33,10 +41,41 @@ export async function api(method: string, path: string, body?: any, opts?: { sig
     err.status = r.status
     throw err
   }
-  if (method === 'POST' && (body?.activity || (path === '/tasks' && body?.type === 'agent'))) {
-    window.dispatchEvent(new Event('roam:footprints-updated'))
-  }
   return data
+}
+
+export async function streamMarketPreview(body: { source: string; id: string; version: string }, onEvent: (event: any) => void, signal: AbortSignal) {
+  const response = await fetch(nodeApi('/agent/capability-markets/preview'), {
+    method: 'POST', signal, cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }, body: JSON.stringify(body),
+  })
+  if (!response.ok) await readApiResponse(response)
+  if (!response.headers.get('content-type')?.includes('application/x-ndjson')) {
+    onEvent({ type: 'ready', data: (await readApiResponse(response)).data })
+    return
+  }
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('MARKET_UNAVAILABLE')
+  const decoder = new TextDecoder()
+  let buffer = '', completed = false
+  const consume = (line: string) => {
+    if (!line.trim()) return
+    const event = JSON.parse(line)
+    if (event.type === 'error') throw Object.assign(new Error(event.error?.code || 'MARKET_UNAVAILABLE'), { apiError: event.error })
+    if (event.type === 'ready') completed = true
+    if (!signal.aborted) onEvent(event)
+  }
+  try {
+    while (!completed) {
+      const { value, done } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+      if (buffer.length > 4_000_000) throw new Error('MARKET_PACKAGE_TOO_LARGE')
+      let newline: number
+      while ((newline = buffer.indexOf('\n')) >= 0) { consume(buffer.slice(0, newline)); buffer = buffer.slice(newline + 1) }
+      if (done) { if (buffer.trim()) consume(buffer); break }
+    }
+    if (!completed && !signal.aborted) throw new Error('MARKET_UNAVAILABLE')
+  } finally { await reader.cancel().catch(() => {}) }
 }
 
 // 上传文件到指定目录（multipart）。返回 { dir, saved: 绝对路径[] }。

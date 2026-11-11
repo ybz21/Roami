@@ -107,10 +107,14 @@ html[data-pointer="coarse"] .tt-capability-writing-head .ant-segmented-item-labe
 
 .tt-market .tt-capability-toolbar > .ant-select { min-width:calc(var(--sp-5) * 7); max-width:100%; }
 .tt-market .tt-capability-toolbar,.tt-market .tt-capability-list { max-width:none; }
-.tt-market-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--sp-3); margin-bottom:var(--sp-4); }
+.tt-market-heading { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-3); margin-bottom:var(--sp-4); }
 .tt-market-heading h3 { margin:0; font-size:var(--fs-lg); color:var(--text-bright); }
-.tt-market-heading > span { font-size:var(--fs-meta); color:var(--text-dim); }
+.tt-market-heading > span { margin-left:auto; font-size:var(--fs-meta); color:var(--text-dim); }
 .tt-market-ranking { max-width:100%; }
+.tt-market-error-details summary { min-height:var(--tap); align-content:center; cursor:pointer; }
+.tt-market-error-details code { overflow-wrap:anywhere; }
+html[data-pointer="coarse"] .tt-market .tt-capability-alert .ant-btn { position:relative; }
+html[data-pointer="coarse"] .tt-market .tt-capability-alert .ant-btn::after { content:''; position:absolute; inset-inline:calc(-1 * var(--sp-1)); top:50%; height:max(100%,var(--tap)); transform:translateY(-50%); }
 .tt-market-ranking > .ant-tabs-nav { margin-bottom:var(--sp-5); }
 .tt-market-ranking .ant-tabs-tab { min-height:var(--tap); padding:var(--sp-3) var(--sp-1); }
 .tt-market-rank-count { display:block; margin-top:var(--sp-1); color:var(--text-dim); font-size:var(--fs-meta); font-variant-numeric:tabular-nums; }
@@ -155,6 +159,8 @@ html[data-pointer="coarse"] .tt-capability-select-popup .ant-select-item-option 
 .tt-skill-hero.tt-pagehead p { max-width:var(--content-form); font-size:var(--fs-body); line-height:1.8; color:var(--text); }
 .tt-skill-columns { display:grid; grid-template-columns:minmax(0,1fr) calc(var(--sp-5) * 14); gap:var(--sp-5); padding:0 var(--pad-page) var(--sp-5); align-items:start; }
 .tt-skill-content { min-width:0; }
+.tt-market-detail-error { margin-bottom:var(--sp-4); }
+.tt-skill-image-loading { display:flex; align-items:center; justify-content:center; min-height:calc(var(--sp-5) * 6); margin-block:var(--sp-3); background:var(--bg-container); color:var(--text-dim); border-radius:var(--r-sm); }
 .tt-skill-tabs { margin-bottom:var(--sp-5); }
 .tt-skill-tabs .ant-segmented-item-label { display:flex; align-items:center; justify-content:center; gap:var(--sp-1); }
 .tt-skill-tabs .ant-segmented-item-icon { display:flex; }

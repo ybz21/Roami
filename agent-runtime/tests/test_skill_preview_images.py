@@ -1,8 +1,10 @@
+import asyncio
 import base64
 
 import pytest
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.server import skill_preview_images
 from roami_agent.server.skill_preview_images import MAX_IMAGE_BYTES, preview_images
 
 URL = "https://raw.githubusercontent.com/publisher/skills/main/assets/hero.png"
@@ -89,3 +91,37 @@ async def test_preview_image_count_and_total_size_are_bounded():
     )
     images = await preview_images(text, fetch)
     assert len(seen) == 3 and len(images) == 2
+
+
+async def test_illustrations_load_concurrently():
+    started, all_started = [], asyncio.Event()
+
+    async def fetch(url, **kwargs):
+        started.append(url)
+        if len(started) == 3:
+            all_started.set()
+        await all_started.wait()
+        return image_response(PNG)
+
+    text = "\n".join(
+        f"![Effect](https://raw.githubusercontent.com/o/r/main/{index}.png)" for index in range(3)
+    )
+    images = await asyncio.wait_for(preview_images(text, fetch), timeout=1)
+    assert len(images) == 3
+
+
+async def test_image_deadline_preserves_completed_images_and_cancels_pending(monkeypatch):
+    cancelled = asyncio.Event()
+    monkeypatch.setattr(skill_preview_images, "PREVIEW_TIMEOUT", 0.01)
+
+    async def fetch(url, **kwargs):
+        if url.endswith("slow.png"):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        return image_response(PNG)
+
+    slow = "https://raw.githubusercontent.com/o/r/main/slow.png"
+    images = await preview_images(f"![Slow]({slow})\n![Effect]({URL})", fetch)
+    assert set(images) == {URL} and cancelled.is_set()
