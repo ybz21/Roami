@@ -111,6 +111,9 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     const fresh = (thread.view?.messages || []).filter(item => item.role === 'assistant' && item.status === 'completed' && !completed.current.has(item.id))
     if (fresh.length) { fresh.forEach(item => completed.current.add(item.id)); project?.onUpdated?.() }
   }, [thread.view?.messages, project?.onUpdated])
+  useEffect(() => {
+    if (!inactive && !inboxOpen && cid === mainCID && inbox?.cursor && thread.view && inbox.cursor > thread.view.snapshotCursor) thread.refresh()
+  }, [inactive, inboxOpen, cid, mainCID, inbox?.cursor, thread.view?.snapshotCursor, thread.refresh])
   const historical = !!thread.view && (thread.view.branchId !== thread.view.conversation.active_branch_id || (!!mainCID && cid !== mainCID))
   const readOnly = historical || (!project && !mainCID)
   const running = thread.view?.turns.some((item) => item.state === 'running' || item.state === 'queued') || false

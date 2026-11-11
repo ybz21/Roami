@@ -24,9 +24,14 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
     let stopped = false, view: AgentSnapshot | null = cached(), connected = false
     let timer: ReturnType<typeof setTimeout> | undefined, retryTimer: ReturnType<typeof setTimeout> | undefined
     let loading = false, again = false, loadingOlder = false, olderFailed = false
-    let olderAbort: AbortController | undefined
-    const visibility = () => { if (document.hidden) olderAbort?.abort() }
+    let olderAbort: AbortController | undefined, streamAbort: AbortController | undefined
+    const visibility = () => {
+      if (document.hidden) { olderAbort?.abort(); return }
+      invalidateAgentData(scope); schedule()
+      streamAbort?.abort()
+    }
     document.addEventListener('visibilitychange', visibility)
+    window.addEventListener('pageshow', visibility)
     const publish = () => { if (!stopped && owner === agentCacheEpoch() && scope === agentDataKey(messages)) setState({ scope, view, loading: !view, connected, failed: false, loadingOlder, olderFailed }) }
     const snapshot = async (freshFor = 0) => {
       if (loading) { again = true; return }
@@ -94,10 +99,14 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
       finally { clearTimeout(timeout); abort.signal.removeEventListener('abort', cancel); if (olderAbort === controller) olderAbort = undefined; loadingOlder = false; if (!stopped) publish() }
     }
     const connect = async () => {
+      const controller = new AbortController()
+      streamAbort = controller
+      const cancel = () => controller.abort()
+      abort.signal.addEventListener('abort', cancel, { once: true })
       try {
         if (!view) await snapshot(5000)
         if (stopped || !view) return
-        const response = await openEventStream(path + '/events?after=' + view.snapshotCursor + '&summaries=true', abort.signal)
+        const response = await openEventStream(path + '/events?after=' + view.snapshotCursor + '&summaries=true', controller.signal)
         connected = true; publish()
         void snapshot(5000).catch(() => {})
         for await (const event of agentEvents(response)) {
@@ -115,6 +124,8 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
       } catch {
         if (!stopped) setState({ scope, view, loading: false, connected: false, failed: true })
       } finally {
+        abort.signal.removeEventListener('abort', cancel)
+        if (streamAbort === controller) streamAbort = undefined
         connected = false
         if (!stopped) {
           setState({ scope, view, loading: false, connected: false, failed: true })
@@ -123,7 +134,7 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
       }
     }
     void connect()
-    return () => { olderRef.current = async () => {}; if (view) storeAgentData(scope, view, owner); stopped = true; abort.abort(); olderAbort?.abort(); document.removeEventListener('visibilitychange', visibility); clearTimeout(timer); clearTimeout(retryTimer) }
+    return () => { olderRef.current = async () => {}; if (view) storeAgentData(scope, view, owner); stopped = true; abort.abort(); olderAbort?.abort(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility); clearTimeout(timer); clearTimeout(retryTimer) }
   }, [cid, branch, node, scope, focus])
   return { ...(state.scope === scope ? state : { view: cached(), loading: !!cid && !cached(), connected: false, failed: false, loadingOlder: false, olderFailed: false }), loadOlder: useCallback(() => olderRef.current(), []), refresh: useCallback(() => refreshRef.current(), []), accepted: useCallback((receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => acceptedRef.current(receipt, text, context), []) }
 }

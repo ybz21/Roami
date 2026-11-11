@@ -152,3 +152,16 @@ it('withdraws a failed candidate and ignores its late preview event', async () =
   expect(screen.queryByText('Late candidate')).toBeNull()
   expect(screen.queryByRole('button', { name: 'agent.remember' })).toBeNull()
 })
+
+it('recovers a phone reply announced by notifications when the chat stream misses completion', async () => {
+  state.phone = true
+  const props = { cid: 'home', branch: '', node: null, inboxOpen: false, select: vi.fn(), notifications: vi.fn(), projects: [], onSession: vi.fn(), onOverview: vi.fn() }
+  const inbox = { conversations: [{ id: 'home' }], refresh: vi.fn(), cursor: 0 } as any
+  const view = render(<App><AgentChat {...props} inbox={inbox} /></App>)
+  await waitFor(() => expect(state.streams.has('home')).toBe(true))
+  const completed = { ...snapshot('home'), snapshotCursor: 4, messages: [{ id: 'answer', branch_id: 'branch', role: 'assistant', status: 'completed', seq: 1, content: { text: 'Reply already delivered' } }] }
+  state.snapshots.set('home', completed)
+  view.rerender(<App><AgentChat {...props} inbox={{ ...inbox, cursor: 4 }} /></App>)
+  await screen.findByText('Reply already delivered')
+  expect(screen.queryByLabelText('agent.responding')).toBeNull()
+})
