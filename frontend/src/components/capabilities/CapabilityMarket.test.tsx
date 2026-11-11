@@ -19,25 +19,21 @@ const sources = [{ id: 'skills-sh', name: 'skills.sh', provider: 'skills_sh' as 
 const item = { id: 'owner/repo/workflow', name: 'workflow', description: 'Example', version: '', url: 'https://skills.sh/owner/repo/workflow' }
 const entry = { name: 'workflow', text: '# Original instructions', files: { 'scripts/check.py': 'cHJpbnQoMSk=' }, origin: { source: 'skills-sh', id: item.id, version: 'abc123', url: 'https://github.com/owner/repo/tree/abc123' } }
 
-it('searches only on submit and reviews a bundle before importing it', async () => {
-  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockResolvedValueOnce({ data: {} })
+it('loads popular skills on entry and installs the reviewed bundle to all targets', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 12500 }], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockResolvedValueOnce({ data: {} })
   render(<CapabilityMarket />)
-  await waitFor(() => expect(screen.getByRole('button', { name: 'capabilities.market.sources' }).hasAttribute('disabled')).toBe(false))
-  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.market.query' }), { target: { value: 'workflow' } })
-  expect(api).toHaveBeenCalledTimes(1)
-  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.search' }))
+  expect(await screen.findByText('capabilities.market.popular')).toBeTruthy()
+  await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=', undefined, expect.anything()))
   fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.reviewImport' }))
-  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.instructions' }), { target: { value: '# Reviewed instructions' } })
-  fireEvent.click(screen.getByRole('button', { name: 'capabilities.createAction.skills' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/capability-imports/skills', { ...entry, description: '', text: '# Reviewed instructions' }))
-  expect(await screen.findByText('capabilities.market.imported')).toBeTruthy()
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.install' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/capability-markets/install', { previewId: 'pinned-preview', option: 0, targets: ['local', 'claude', 'opencode', 'roami'] }))
+  expect(await screen.findByText('capabilities.market.installed')).toBeTruthy()
 })
 
 it('keeps the previous results and query when a subsequent search fails', async () => {
-  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE'))
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [], nextCursor: '' } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE'))
   render(<CapabilityMarket />)
-  await waitFor(() => expect(api).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
   const input = screen.getByRole('textbox', { name: 'capabilities.market.query' })
   fireEvent.change(input, { target: { value: 'workflow' } })
   fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.search' }))
@@ -47,6 +43,98 @@ it('keeps the previous results and query when a subsequent search fails', async 
   await screen.findByRole('alert')
   expect((input as HTMLInputElement).value).toBe('new query')
   expect(screen.getByRole('button', { name: 'workflow' })).toBeTruthy()
+})
+
+it('returns from search results to the popular list without another search term', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValue({ data: { items: [item], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.market.query' }), { target: { value: 'workflow' } })
+  expect(api).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.search' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.backPopular' }))
+  await waitFor(() => expect((screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement).value).toBe(''))
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=', undefined, expect.anything())
+})
+
+it('reloads popular skills after saving changes to the selected source', async () => {
+  const changed = [{ ...sources[0], url: 'https://mirror.example.test' }]
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { sources: changed } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.sources' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.market.sourceUrl 1' }), { target: { value: changed[0].url } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.saveChanges' }))
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(4))
+  expect(await screen.findByRole('button', { name: 'workflow' })).toBeTruthy()
+})
+
+it('keeps the selected install targets and pinned preview after installation fails', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } }).mockRejectedValueOnce(new Error('SKILL_TARGET_EXISTS'))
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'capabilities.market.target.claude' }))
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.install' }))
+  await screen.findByRole('alert')
+  expect((screen.getByRole('checkbox', { name: 'capabilities.market.target.claude' }) as HTMLInputElement).checked).toBe(false)
+  expect(api).toHaveBeenLastCalledWith('POST', '/agent/capability-markets/install', { previewId: 'pinned-preview', option: 0, targets: ['local', 'opencode', 'roami'] })
+  expect(screen.getByRole('button', { name: 'capabilities.market.install' }).hasAttribute('disabled')).toBe(false)
+})
+
+it('loads trending and hot JSON rankings and uses the correct install period', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 100 }], nextCursor: '' } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 5 }], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  fireEvent.click(screen.getByText('capabilities.market.ranking.trending'))
+  await screen.findByText('capabilities.market.installs.trending')
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=&view=trending', undefined, expect.anything())
+  fireEvent.click(screen.getByText('capabilities.market.ranking.hot'))
+  await screen.findByText('capabilities.market.installs.hot')
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=&view=hot', undefined, expect.anything())
+})
+
+it('keeps the previous ranking and query draft when switching rankings fails', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 1000 }], nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE'))
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  const input = screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: 'draft' } })
+  fireEvent.click(screen.getByText('capabilities.market.ranking.hot'))
+  await screen.findByRole('alert')
+  expect(input.value).toBe('draft')
+  expect(screen.getByText('capabilities.market.installs.all-time')).toBeTruthy()
+})
+
+it('opens full skill details and a usable install action from a single preview request', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  expect(await screen.findByRole('heading', { name: 'Original instructions' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'capabilities.market.install' }).hasAttribute('disabled')).toBe(false)
+  expect(api).toHaveBeenCalledTimes(3)
+})
+
+it('renders the skill purpose and examples before exposing the original bundle', async () => {
+  const text = '---\nname: workflow\ndescription: >\n  Build polished pages.\n  Preview the result.\n---\n\n# Workflow\n\n## Examples\n\n**Before and after**\n\n[Read reference](references/example.md)\n\n![Result](assets/result.png)\n\n![Remote result](https://raw.githubusercontent.com/o/r/main/hero.png)\n\n<script>window.bad = true</script>'
+  const rich = { ...entry, text, files: { 'references/example.md': btoa('# Reference example'), 'assets/result.png': 'iVBORw0KGgo=' } }
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry: rich, images: { 'https://raw.githubusercontent.com/o/r/main/hero.png': 'data:image/png;base64,iVBORw0KGgo=' } }] } })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  expect(await screen.findByText('Build polished pages. Preview the result.')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Examples' })).toBeTruthy()
+  expect(screen.queryByText(/name: workflow/)).toBeNull()
+  expect(document.querySelector('.tt-skill-document script')).toBeNull()
+  expect(screen.getByRole('img', { name: 'Result' }).getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
+  expect(screen.getByRole('img', { name: 'Remote result' }).getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
+  fireEvent.click(screen.getByRole('button', { name: 'Read reference' }))
+  expect(await screen.findByLabelText('references/example.md')).toBeTruthy()
+  expect(screen.getByText('# Reference example')).toBeTruthy()
+  fireEvent.click(screen.getByText('capabilities.market.overview'))
+  fireEvent.click(screen.getByText('capabilities.market.files'))
+  expect(screen.getByText('# Reference example')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.backResults' }))
+  expect(await screen.findByRole('button', { name: 'workflow' })).toBeTruthy()
+  expect(api).toHaveBeenCalledTimes(3)
 })
 
 it('preserves edited sources when persistence fails', async () => {
@@ -92,4 +180,35 @@ it('rejects conflicting MCP transport aliases before showing an editable configu
   await screen.findByRole('alert')
   expect(screen.queryByRole('textbox', { name: 'capabilities.url' })).toBeNull()
   expect(api).not.toHaveBeenCalled()
+})
+
+
+it('opens an official skill URL directly and keeps the current results', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], total: 9902, nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  expect(screen.getByText('9,902')).toBeTruthy()
+  const url = 'https://skills.sh/owner/repo/workflow'
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.market.query' }), { target: { value: url } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.search' }))
+  expect(await screen.findByRole('heading', { name: 'Original instructions' })).toBeTruthy()
+  expect(api).toHaveBeenLastCalledWith('POST', '/agent/capability-markets/preview', { source: 'skills-sh', id: item.id, version: '' }, expect.anything())
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.backResults' }))
+  expect((screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement).value).toBe(url)
+  expect(screen.getByText('9,902')).toBeTruthy()
+  expect(api).toHaveBeenCalledTimes(3)
+})
+
+it('shows only authoritative ranking counts and retains the successful tab on failure', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], total: 9902, nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE')).mockResolvedValueOnce({ data: { items: [item], total: 3349, nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByText('9,902')
+  expect(screen.queryByText('1')).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'capabilities.market.ranking.hot' }))
+  await screen.findByRole('alert')
+  expect(screen.getByRole('tab', { name: /capabilities.market.ranking.all-time/ }).getAttribute('aria-selected')).toBe('true')
+  fireEvent.click(screen.getByRole('tab', { name: 'capabilities.market.ranking.hot' }))
+  await screen.findByText('3,349')
+  expect(screen.getByText('9,902')).toBeTruthy()
+  expect(screen.getByRole('tab', { name: /capabilities.market.ranking.hot/ }).getAttribute('aria-selected')).toBe('true')
 })

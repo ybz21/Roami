@@ -1,8 +1,9 @@
+import BackButton from '../BackButton'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Select } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { ChevronLeft, GearIcon, MoreIcon, OpenInIcon, SearchIcon } from '../../icons'
+import { GearIcon, MoreIcon, OpenInIcon, SearchIcon } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
 import { api } from '../../api'
 import { useAgentData } from './useAgentData'
@@ -115,6 +116,6 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
     </section>
   </div>
   if (phone && fullPage && onBack) return <>{record?.state === 'active' && !missing && <Dropdown open={mobileMenu} onOpenChange={setMobileMenu} menu={menu} trigger={['click']}><span className="memory-mobile-menu-anchor" /></Dropdown>}<MobileSubPage title={route.id ? t(record?.day_key ? 'agent.memoryBrowse.activityDetail' : 'agent.memoryBrowse.detail') : t('agent.memory')} manageHistory={false} keepBottomNav search={false} onBack={route.id ? navigation.back : onBack} action={record?.state === 'active' && !missing ? { label: t('agent.memoryMore', { title: record.title }), icon: <MoreIcon size={20} />, onClick: () => setMobileMenu(value => !value) } : undefined}>{body}</MobileSubPage></>
-  if (fullPage) return <section className="memory-page">{!embedded && <header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><button type="button" className="tt-act" onClick={onBack}><ChevronLeft size={18} />{t('common.back')}</button></div>}</header>}{body}</section>
+  if (fullPage) return <section className="memory-page">{!embedded && <header className="tt-pagehead"><div className="ttl"><h2>{t('agent.memory')}</h2></div>{onBack && <div className="acts"><BackButton onClick={onBack} /></div>}</header>}{body}</section>
   return <div className={compact ? 'memory-panel' : 'memory-dialog'}>{body}</div>
 }

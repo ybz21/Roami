@@ -20,6 +20,11 @@ from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
 
 
+@pytest.fixture(autouse=True)
+def market_api_credentials(monkeypatch):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+
+
 async def test_source_configuration_restart_isolation_and_failed_write(store, monkeypatch):
     runtime = Runtime(store, ConversationModel())
     markets = runtime.capability_markets
@@ -337,15 +342,359 @@ async def test_skill_frontmatter_name_can_differ_from_repository_folder(monkeypa
             return {"sha": "a" * 40}
         return {"tree": [{"path": "skills/react/SKILL.md", "type": "blob"}]}
 
-    async def archived(owner, repo, name, fetch):
+    async def archived(owner, repo, name, fetch, *, commit=""):
+        assert commit == "a" * 40
         assert (owner, repo, name) == ("publisher", "repository", "publisher-react")
         return (
             "---\nname: publisher-react\n---\nInstructions",
             {"SKILL.md": "SW5zdHJ1Y3Rpb25z"},
-            "b" * 40,
+            commit,
         )
 
     monkeypatch.setattr(market_catalogs, "fetch", fetch)
     monkeypatch.setattr(market_catalogs, "download_archive", archived)
     entry, commit = await market_catalogs.skill_entry("publisher/repository/publisher-react")
-    assert entry["name"] == "publisher-react" and commit == "b" * 40
+    assert entry["name"] == "publisher-react" and commit == "a" * 40
+
+
+@pytest.mark.parametrize("view", ["all-time", "trending", "hot"])
+async def test_public_skills_uses_json_leaderboards_with_complete_pagination(monkeypatch, view):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    skills = [{"source": "owner/repo", "skillId": "workflow", "name": "workflow", "installs": 1200}]
+
+    async def fetch(url, **kwargs):
+        assert url == "https://skills.sh/api/skills/" + view + "/2"
+        return {"skills": skills, "hasMore": True, "total": 9902}
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    result = await market_catalogs.search(market_catalogs.DEFAULT_SOURCES[0], "", "2", view)
+    assert result["items"][0]["id"] == "owner/repo/workflow"
+    assert result["items"][0]["installs"] == 1200
+    assert result["nextCursor"] == "3"
+    assert result["total"] == 9902
+
+
+async def test_blank_query_only_browses_skill_markets(store, monkeypatch):
+    markets = Runtime(store, ConversationModel()).capability_markets
+
+    async def search(*args):
+        return {"items": [], "nextCursor": ""}
+
+    monkeypatch.setattr(market_catalogs, "search", search)
+    assert await markets.search("local", "skills-sh", "") == {"items": [], "nextCursor": ""}
+    with pytest.raises(DomainError, match="INVALID_MARKET_QUERY"):
+        await markets.search("local", "npm", "")
+
+
+async def test_install_skill_to_agents_retains_assets_is_repeatable_and_never_overwrites(
+    store, tmp_path, monkeypatch
+):
+    from roami_agent.server import skill_agent_installation
+
+    roots = {key: tmp_path / key / "skills" for key in ("local", "claude", "opencode")}
+    monkeypatch.setattr(skill_agent_installation, "skill_directories", lambda: roots)
+    runtime = Runtime(store, ConversationModel())
+    entry = {
+        "name": "market-workflow",
+        "text": "# Instructions",
+        "files": {"scripts/check.py": base64.b64encode(b"print('ok')").decode()},
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/workflow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+    targets = ["local", "claude", "opencode", "roami"]
+    result = await skill_agent_installation.install_skill(runtime, "local", entry, targets)
+    assert result["targets"] == targets
+    for root in roots.values():
+        assert (root / entry["name"] / "SKILL.md").read_text() == entry["text"]
+        assert (root / entry["name"] / "scripts/check.py").read_bytes() == b"print('ok')"
+    assert entry["name"] in runtime.tools.skills
+    assert await skill_agent_installation.install_skill(runtime, "local", entry, targets) == result
+    # A changed revision must not silently replace any previous installation.
+    with pytest.raises(DomainError, match="SKILL_TARGET_EXISTS"):
+        await skill_agent_installation.install_skill(
+            runtime, "local", {**entry, "text": "Changed"}, ["local"]
+        )
+    assert (roots["local"] / entry["name"] / "SKILL.md").read_text() == entry["text"]
+
+
+async def test_agent_install_failure_rolls_back_only_new_links(store, tmp_path, monkeypatch):
+    from roami_agent.server import skill_agent_installation
+
+    roots = {key: tmp_path / key for key in ("local", "claude", "opencode")}
+    monkeypatch.setattr(skill_agent_installation, "skill_directories", lambda: roots)
+    runtime = Runtime(store, ConversationModel())
+    entry = {
+        "name": "market-workflow",
+        "text": "Instructions",
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/workflow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+    await skill_agent_installation.install_skill(runtime, "local", entry, ["local"])
+
+    async def fail(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(runtime.capability_imports, "save", fail)
+    with pytest.raises(DomainError, match="SKILL_INSTALL_FAILED"):
+        await skill_agent_installation.install_skill(
+            runtime, "local", entry, ["local", "claude", "roami"]
+        )
+    assert (roots["local"] / entry["name"]).is_symlink()
+    assert not (roots["claude"] / entry["name"]).is_symlink()
+
+
+@pytest.mark.parametrize("targets", [[], ["../escape"], ["local", "local"], "all", [None]])
+async def test_agent_install_rejects_invalid_targets_before_writing(store, targets):
+    from roami_agent.server.skill_agent_installation import install_skill
+
+    runtime = Runtime(store, ConversationModel())
+    with pytest.raises(DomainError, match="INVALID_SKILL_TARGET"):
+        await install_skill(runtime, "local", {"name": "workflow"}, targets)
+
+
+async def test_http_prepared_skill_installs_to_selected_local_agents(store, tmp_path, monkeypatch):
+    from roami_agent.server import skill_agent_installation
+
+    roots = {key: tmp_path / key for key in ("local", "claude", "opencode")}
+    monkeypatch.setattr(skill_agent_installation, "skill_directories", lambda: roots)
+    entry = {
+        "name": "market-flow",
+        "text": "---\nname: market-flow\ndescription: Workflow\n---\nInstructions",
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/market-flow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+
+    async def preview(*args):
+        return {"kind": "skills", "options": [{"label": "market-flow", "entry": entry}]}
+
+    monkeypatch.setattr(market_catalogs, "preview", preview)
+    runtime = Runtime(store, ConversationModel())
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+        base_url="http://test",
+        headers={"X-Roami-Owner": "local"},
+    ) as client:
+        prepared = await client.post(
+            "/v1/capability-markets/prepare",
+            json={"source": "skills-sh", "id": "owner/repo/market-flow", "version": ""},
+        )
+        assert prepared.status_code == 200
+        payload = {
+            "previewId": prepared.json()["data"]["previewId"],
+            "option": 0,
+            "targets": ["local", "claude", "opencode", "roami"],
+        }
+        response = await client.post("/v1/capability-markets/install", json=payload)
+        assert response.status_code == 200
+        assert response.json()["data"]["targets"] == payload["targets"]
+        assert entry["name"] in runtime.tools.skills
+        for root in roots.values():
+            assert (root / entry["name"] / "SKILL.md").read_text() == entry["text"]
+        assert (
+            await client.post("/v1/capability-markets/install", json=payload)
+        ).json() == response.json()
+        expired = await client.post(
+            "/v1/capability-markets/install", json={**payload, "previewId": "expired"}
+        )
+        assert expired.status_code == 409
+
+
+@pytest.mark.parametrize("stage", ["tree", "file"])
+async def test_skill_preview_falls_back_after_later_github_failures_without_changing_commit(
+    monkeypatch, stage
+):
+    commit = "a" * 40
+
+    async def fetch(url, **kwargs):
+        if url.endswith("/commits/HEAD"):
+            return {"sha": commit}
+        if "/git/trees/" in url:
+            if stage == "tree":
+                raise DomainError("MARKET_RATE_LIMITED", 429)
+            return {
+                "tree": [
+                    {
+                        "path": "skills/workflow/SKILL.md",
+                        "type": "blob",
+                        "mode": "100644",
+                        "size": 20,
+                    }
+                ]
+            }
+        raise DomainError("MARKET_UNAVAILABLE", 502)
+
+    async def archive(owner, repo, skill, fetch, **kwargs):
+        assert kwargs == {"commit": commit}
+        return "# Instructions", {}, commit
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    monkeypatch.setattr(market_catalogs, "download_archive", archive)
+    entry, version = await market_catalogs.skill_entry("owner/repo/workflow")
+    assert entry["text"] == "# Instructions" and version == commit
+
+
+async def test_authorized_skills_api_handles_rankings_and_preserves_snapshot(store, monkeypatch):
+    monkeypatch.setenv("VERCEL_OIDC_TOKEN", "test-oidc-value")
+    seen = []
+    text = "---\nname: workflow\n---\nInstructions"
+
+    async def fetch(url, **kwargs):
+        assert kwargs["headers"] == {"Authorization": "Bearer test-oidc-value"}
+        seen.append((url, kwargs))
+        if url.endswith("/api/v1/skills"):
+            assert kwargs["params"] == {"view": "hot", "page": 0, "per_page": 20}
+            return {
+                "data": [
+                    {
+                        "id": "owner/repo/workflow",
+                        "name": "workflow",
+                        "source": "owner/repo",
+                        "installs": 10,
+                    }
+                ],
+                "pagination": {"hasMore": True, "total": 3349},
+            }
+        assert url.endswith("/api/v1/skills/owner/repo/workflow")
+        return {
+            "id": "owner/repo/workflow",
+            "files": [
+                {"path": "SKILL.md", "contents": text},
+                {"path": "scripts/check.py", "contents": "print('ok')"},
+            ],
+        }
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    runtime = Runtime(store, ConversationModel())
+    markets = runtime.capability_markets
+    result = await markets.search("local", "skills-sh", "", view="hot")
+    assert result["nextCursor"] == "1"
+    assert result["total"] == 3349
+    preview = await markets.preview(
+        "local", {"source": "skills-sh", "id": "owner/repo/workflow", "version": ""}
+    )
+    entry = preview["options"][0]["entry"]
+    assert entry["text"] == text
+    assert base64.b64decode(entry["files"]["scripts/check.py"]) == b"print('ok')"
+    assert entry["origin"]["version"].startswith("sha256:")
+    assert entry["origin"]["url"] == "https://skills.sh/owner/repo/workflow"
+    assert len(seen) == 2
+
+
+async def test_vercel_authorization_is_never_sent_to_a_custom_mirror(monkeypatch):
+    monkeypatch.setenv("VERCEL_OIDC_TOKEN", "test-oidc-value")
+
+    async def fetch(url, **kwargs):
+        assert url == "https://mirror.example.test/api/skills/all-time/0"
+        assert "headers" not in kwargs
+        return {"skills": [], "hasMore": False}
+
+    source = {**market_catalogs.DEFAULT_SOURCES[0], "url": "https://mirror.example.test"}
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    assert await market_catalogs.search(source, "") == {"items": [], "nextCursor": ""}
+
+
+async def test_browser_preview_returns_full_content_and_receipt_in_one_response(store, monkeypatch):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    entry = {
+        "name": "workflow",
+        "text": "Instructions" * 1000,
+        "files": {"scripts/check.py": "cHJpbnQoMSk="},
+        "origin": {
+            "source": "skills-sh",
+            "id": "owner/repo/workflow",
+            "version": "a" * 40,
+            "url": "https://github.com/owner/repo",
+        },
+    }
+
+    async def preview(*args):
+        return {"kind": "skills", "options": [{"label": "workflow", "entry": entry}]}
+
+    monkeypatch.setattr(market_catalogs, "preview", preview)
+    runtime = Runtime(store, ConversationModel())
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+        base_url="http://test",
+        headers={"X-Roami-Owner": "local"},
+    ) as client:
+        response = await client.post(
+            "/v1/capability-markets/preview",
+            json={"source": "skills-sh", "id": "owner/repo/workflow", "version": ""},
+        )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["options"][0]["entry"] == entry
+    assert data["previewId"] in runtime.capability_markets.installations.receipts
+
+
+async def test_raw_github_blocked_uses_the_exact_tree_blob_instead(monkeypatch):
+    commit, blob_sha = "a" * 40, "b" * 40
+    instructions = b"---\nname: workflow\n---\nInstructions"
+    seen = []
+
+    async def fetch(url, **kwargs):
+        seen.append(url)
+        if url.endswith("/commits/HEAD"):
+            return {"sha": commit}
+        if "/git/trees/" in url:
+            return {
+                "tree": [
+                    {
+                        "path": "skills/workflow/SKILL.md",
+                        "sha": blob_sha,
+                        "type": "blob",
+                        "mode": "100644",
+                        "size": len(instructions),
+                    }
+                ]
+            }
+        if "raw.githubusercontent.com" in url:
+            raise DomainError("MARKET_UNAVAILABLE", 502)
+        assert url.endswith("/git/blobs/" + blob_sha)
+        return {
+            "sha": blob_sha,
+            "encoding": "base64",
+            "content": base64.b64encode(instructions).decode() + "\n",
+        }
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    entry, version = await market_catalogs.skill_entry("owner/repo/workflow")
+    assert entry["text"] == instructions.decode() and version == commit
+    assert len(seen) == 4
+
+
+async def test_upstream_api_authorization_error_does_not_log_out_roami(monkeypatch):
+    client = httpx.AsyncClient
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(401, json={"error": "authentication_required"})
+    )
+    monkeypatch.setattr(
+        httpx, "AsyncClient", lambda **kwargs: client(**kwargs, transport=transport)
+    )
+    with pytest.raises(DomainError, match="MARKET_AUTH_REQUIRED") as caught:
+        await market_catalogs.fetch("https://skills.sh/api/v1/skills")
+    assert caught.value.status == 503
+
+
+@pytest.mark.parametrize("total", [None, -1, True, "9902"])
+async def test_skill_rankings_omit_unusable_total_counts(monkeypatch, total):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+
+    async def fetch(url, **kwargs):
+        return {"skills": [], "hasMore": False, "total": total}
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    result = await market_catalogs.search(market_catalogs.DEFAULT_SOURCES[0], "")
+    assert "total" not in result

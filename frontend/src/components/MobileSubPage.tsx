@@ -1,3 +1,4 @@
+import BackButton from './BackButton'
 // 移动端二级页：Android Fragment 式全屏覆盖层——列表页点某项后，详情在上层整页展开。
 // 传 title 则带「← 返回 + 标题」顶栏；不传则无顶栏（内容自带返回入口，如 FileView 的 onBack）。
 //
@@ -17,7 +18,7 @@ import { useI18n } from '../i18n'
 import { useEdgeSwipe } from './shell/edge-swipe'
 import { useBackDismiss } from './shell/useBackDismiss'
 import { openPalette } from './shell/palette'
-import { ChevronLeft, SearchIcon } from '../icons'
+import { SearchIcon } from '../icons'
 
 export default function MobileSubPage({ title, onBack, action, search, dialogLabel, manageHistory = true, layer = 'page', keepBottomNav = false, children }: {
   title?: ReactNode
@@ -64,9 +65,7 @@ export default function MobileSubPage({ title, onBack, action, search, dialogLab
     }}>
       {title !== undefined && (
         <div className="tt-mobile-subpage-head">
-          <button type="button" onClick={onBack} aria-label={t('common.back')}>
-            <ChevronLeft size={20} />
-          </button>
+          <BackButton onClick={onBack} />
           <strong>{title}</strong>
           {action && (action.href !== undefined
             ? <a href={action.href} download={action.download} aria-label={action.label}>{action.icon}</a>

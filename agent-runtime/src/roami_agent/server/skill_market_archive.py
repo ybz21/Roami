@@ -68,7 +68,7 @@ def unpack_skill(archive, skill):
         raise DomainError("INVALID_SKILL_PACKAGE") from None
 
 
-async def download_archive(owner, repo, skill, fetch):
+async def download_archive(owner, repo, skill, fetch, *, commit=""):
     env = {
         key: value
         for key, value in os.environ.items()
@@ -89,22 +89,25 @@ async def download_archive(owner, repo, skill, fetch):
     }
     env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0")
     try:
-        with TemporaryDirectory(prefix="roami-skill-source-") as directory:
-            result = await execute(
-                [
-                    "git",
-                    "-c",
-                    "credential.helper=",
-                    "ls-remote",
-                    f"https://github.com/{owner}/{repo}.git",
-                    "HEAD",
-                ],
-                cwd=directory,
-                env=env,
-                timeout=20,
-                max_bytes=4096,
+        if not commit:
+            with TemporaryDirectory(prefix="roami-skill-source-") as directory:
+                result = await execute(
+                    [
+                        "git",
+                        "-c",
+                        "credential.helper=",
+                        "ls-remote",
+                        f"https://github.com/{owner}/{repo}.git",
+                        "HEAD",
+                    ],
+                    cwd=directory,
+                    env=env,
+                    timeout=20,
+                    max_bytes=4096,
+                )
+            commit = (
+                result["stdout"].split()[0] if result["exitCode"] == 0 and result["stdout"] else ""
             )
-        commit = result["stdout"].split()[0] if result["exitCode"] == 0 and result["stdout"] else ""
         if not re.fullmatch(r"[a-f0-9]{40}", commit):
             raise DomainError("MARKET_UNAVAILABLE", 502)
         archive = await fetch(

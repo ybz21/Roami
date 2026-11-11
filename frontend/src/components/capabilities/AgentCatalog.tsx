@@ -1,3 +1,4 @@
+import BackButton from '../BackButton'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Input, Modal, Popconfirm, Select, Spin, message } from 'antd'
 import { AgentLogo, RoamiLogo, GearIcon, SearchIcon } from '../../icons'
@@ -128,7 +129,7 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
   </div>
   const models = current && <AgentModels key={current} kind={current} installed={selected?.installed === true} setup={<div className="tt-agent-model-toolbar"><span>{installation(selected)}{selected?.version && ' · ' + selected.version}</span><div className="tt-agent-detail-actions">{installAction(current, selected)}{onLaunch && <Button disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}</div></div>} />
   const filtered = kinds.filter(kind => `${names[kind]} ${t('capabilities.agents.description.' + kind)}`.toLowerCase().includes(query.trim().toLowerCase()))
-  if (embedded && current) return <section className="onboarding-agent-detail">{!phone && <button type="button" className="tt-act" onClick={close}>{t('common.back')}</button>}{modelsOpen ? models : detail}</section>
+  if (embedded && current) return <section className="onboarding-agent-detail">{!phone && <BackButton onClick={close} />}{modelsOpen ? models : detail}</section>
   return <section className="tt-capability-catalog" data-kind="agents">
     <div className="tt-capability-toolbar"><Input prefix={<SearchIcon size={16} />} aria-label={t('capabilities.agents.search')} placeholder={t('capabilities.agents.search')} value={query} onChange={event => setQuery(event.target.value)} allowClear /></div>
     {failed && <Alert type="error" className="tt-capability-alert" showIcon message={t('agent.professional.loadFailed')} action={<Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button>} />}

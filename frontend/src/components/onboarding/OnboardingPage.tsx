@@ -1,3 +1,4 @@
+import BackButton from '../BackButton'
 import { useEffect, useState } from 'react'
 import { Alert, App, Button, Select, Spin } from 'antd'
 import { useI18n } from '../../i18n'
@@ -52,7 +53,7 @@ export default function OnboardingPage({ sub, onNav, onLaunch, onSession }: { su
         </>}
       </div>}
     </div>
-    <footer className="onboarding-footer"><Button onClick={() => onNav(tour && selected ? 'onboarding/tour' : step === 'agents' && selected ? 'onboarding/agents' : 'home')}>{t(tour && selected ? 'onboarding.guide.back' : step === 'agents' && selected ? 'common.back' : 'onboarding.back')}</Button>
+    <footer className="onboarding-footer"><BackButton onClick={() => onNav(tour && selected ? 'onboarding/tour' : step === 'agents' && selected ? 'onboarding/agents' : 'home')} label={t(tour && selected ? 'onboarding.guide.back' : step === 'agents' && selected ? 'common.back' : 'onboarding.back')} />
       {!tour && <Button type="text" onClick={() => onNav('onboarding/tour')}>{t('onboarding.readTour')}</Button>}
       {tour ? <Button type="primary" onClick={continueSetup}>{t(state.progress.started ? 'onboarding.continue' : 'onboarding.begin')}</Button> : step && step !== 'task' ? <><Button onClick={step === 'agents' ? () => navigate('project') : leave}>{t('onboarding.skip')}</Button><Button type="primary" disabled={!done[steps.indexOf(step)]} onClick={() => navigate(steps[steps.indexOf(step) + 1])}>{t('onboarding.next')}</Button></> : null}
     </footer>

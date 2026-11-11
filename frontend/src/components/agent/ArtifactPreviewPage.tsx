@@ -1,8 +1,8 @@
+import { BackLink } from '../BackButton'
 import { useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { ChevronLeft } from '../../icons'
 import { DownloadIcon, FileTypeIcon } from '../files/file-icons'
 import { nodePath } from '../cluster/node-url'
 import { TaskArtifactPreview, canPreviewArtifact } from './TaskOutput'
@@ -34,7 +34,7 @@ export default function ArtifactPreviewPage({ route }: { route: NonNullable<Retu
   }, [artifact])
   return <main className="task-artifact-page">
     <header className="tt-pagehead task-artifact-page-head">
-      <a className="tt-act" href={route.from} aria-label={t('common.back')}><ChevronLeft />{t('common.back')}</a>
+      <BackLink href={route.from} />
       <div className="task-artifact-page-title">{artifact && <span aria-hidden="true"><FileTypeIcon name={artifact.name} /></span>}<h2 title={artifact?.name}>{artifact?.name || t('agent.task.preview')}</h2></div>
       <div className="acts"><a className="tt-act" href={contentUrl + '?dl=1'} download={artifact?.name}><DownloadIcon />{t('agent.task.download')}</a></div>
     </header>

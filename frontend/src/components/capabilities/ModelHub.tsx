@@ -1,3 +1,4 @@
+import BackButton from '../BackButton'
 import { useState } from 'react'
 import { Alert, App, Button, Dropdown, Input, Modal, Popconfirm, Select, Spin, Tabs } from 'antd'
 import { useI18n } from '../../i18n'
@@ -87,7 +88,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <p className="agent-settings-hint">{t('hub.failoverHint')}</p>
     </details>
     <p className="agent-settings-hint">{t('hub.availableHint')}</p>
-    <div className="agent-settings-save"><Button onClick={back}>{t('common.back')}</Button><Button type="primary" htmlType="submit" disabled={!validModel || controller.busy} loading={controller.busy}>{t('agent.models.save')}</Button></div>
+    <div className="agent-settings-save"><BackButton onClick={back} /><Button type="primary" htmlType="submit" disabled={!validModel || controller.busy} loading={controller.busy}>{t('agent.models.save')}</Button></div>
   </form>
   const editor = detail === 'import' ? <MagpiePluginImport onRetry={controller.retry} revision={value.revision} onImported={() => { controller.retry(); back() }} /> : detail === 'local' ? <LocalModelSources onImported={() => { controller.retry(); back() }} /> : detail === 'source' ? sourceEditor : <div className="tt-model-hub-scroll">{error}{modelEditor}</div>
   const editorTitle = t(detail === 'import' ? 'hub.plugin.import' : detail === 'local' ? 'hub.local.title' : detail === 'source' ? id === 'new' ? 'hub.addSource' : 'hub.editSource' : 'hub.editModel')
@@ -101,7 +102,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     try { if (!label || label === source.baseUrl) label = new URL(source.baseUrl).host } catch { /* Keep the saved source name. */ }
     return <section className={'tt-model-connection' + (expanded ? ' is-expanded' : '')} key={source.id} aria-label={source.name}>
       <div className="tt-model-connection-head"><span className="tt-model-connection-icon"><LinkIcon size={24} /></span><div><div className="tt-model-connection-title"><strong>{label}</strong><button type="button" className="tt-act tt-model-source-rename" disabled={controller.busy} aria-label={t('hub.renameSource')} onClick={() => setRenaming({ id: source.id, name: source.name })}><PencilIcon /></button></div><small>{source.pluginSourceId ? t('hub.plugin.source') : source.baseUrl}</small></div>
-        <Button onClick={() => { if (expanded) { back(); return } setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), editing: true } })); navigate('catalog/source/' + source.id) }}>{t(expanded ? 'common.back' : 'hub.directory.configureSource')}</Button>
+        {expanded ? <BackButton onClick={back} /> : <Button onClick={() => { setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), editing: true } })); navigate('catalog/source/' + source.id) }}>{t('hub.directory.configureSource')}</Button>}
       </div>
       {expanded && <div className="tt-model-source-inline">{sourceEditor}</div>}
       {!expanded && <dl className="tt-model-connection-settings">
@@ -141,10 +142,10 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <div className="tt-model-hub-scroll">
       {tab !== 'speech' && error}
       {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><SpeechSettings /></section> : tab === 'gateway' ? <section className="tt-model-hub-entry" aria-label={t('hub.tab.gateway')}><p>{t('hub.entryHint')}</p>{value.baseUrl && <div className="agent-settings-field"><span>{t('agent.models.baseUrl')}</span><code>{value.baseUrl + '/v1'}</code></div>}<p>{t('hub.continuationHint')}</p><GatewayAccessKey onChanged={controller.retry} value={gatewayKeyDraft} onChange={setGatewayKeyDraft} /></section> : tab === 'usage' || tab === 'prices' ? <><GatewaySettingsForm controller={billing} mode={tab === 'usage' ? 'proxy' : 'prices'} active models={priceModels} /><GatewayReconciliation controller={billing} /></>
-        : <>{loaded ? <><div className="tt-model-hub-actions"><Dropdown trigger={['click']} menu={{ items: [{ key: 'source/new', label: t('hub.addSource') }, { key: 'import', label: t('hub.plugin.import') }, { key: 'local', label: t('hub.local.title') }], onClick: ({ key }) => navigate('catalog/' + key) }}><Button type="primary" icon={<PlusIcon />}>{t('common.create')}</Button></Dropdown></div>{rows.length || inlineSource ? <div className="tt-model-connections">{inlineSource && !sources.some(source => source.id === id) && <section className="tt-model-connection tt-model-source-inline is-expanded"><div className="tt-model-hub-row"><div><strong>{editorTitle}</strong></div><Button onClick={back}>{t('common.back')}</Button></div>{sourceEditor}</section>}{rows}</div> : <p>{t('hub.empty.connections')}</p>}
+        : <>{loaded ? <><div className="tt-model-hub-actions"><Dropdown trigger={['click']} menu={{ items: [{ key: 'source/new', label: t('hub.addSource') }, { key: 'import', label: t('hub.plugin.import') }, { key: 'local', label: t('hub.local.title') }], onClick: ({ key }) => navigate('catalog/' + key) }}><Button type="primary" icon={<PlusIcon />}>{t('common.create')}</Button></Dropdown></div>{rows.length || inlineSource ? <div className="tt-model-connections">{inlineSource && !sources.some(source => source.id === id) && <section className="tt-model-connection tt-model-source-inline is-expanded"><div className="tt-model-hub-row"><div><strong>{editorTitle}</strong></div><BackButton onClick={back} /></div>{sourceEditor}</section>}{rows}</div> : <p>{t('hub.empty.connections')}</p>}
         {!!consumers.length && <section className="tt-model-hub-consumers"><div className="tt-model-hub-actions"><h3>{t('hub.consumers')}</h3></div>{consumers.map(([model, users]) => <div className="tt-model-hub-row" key={model}><div><strong>{models.find(row => row.id === model)?.name || model}</strong><small>{[...new Set(users)].join(', ')}</small></div><Button onClick={() => onNav('capabilities/agents/' + users[0] + '/models')}>{t('hub.configure')}</Button></div>)}</section>}</> : !error && <Spin />}
         </>}
     </div></div>}
-    {detail && !inlineSource && (layout.phone ? <MobileSubPage title={editorTitle} search={false} onBack={back} manageHistory={false} keepBottomNav>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><h3>{editorTitle}</h3><Button onClick={back}>{t('common.back')}</Button></div>{editor}</aside>)}
+    {detail && !inlineSource && (layout.phone ? <MobileSubPage title={editorTitle} search={false} onBack={back} manageHistory={false} keepBottomNav>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><h3>{editorTitle}</h3><BackButton onClick={back} /></div>{editor}</aside>)}
   </div>
 }

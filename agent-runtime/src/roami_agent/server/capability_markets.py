@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.server import market_catalogs
+from roami_agent.server import market_catalogs, skills_sh_api
 from roami_agent.server.market_installations import MarketInstallations
 from roami_agent.server.model_settings import ModelSettings
 
@@ -144,20 +144,31 @@ class CapabilityMarkets:
             if task.done() and self.inflight.get(key) is task:
                 self.inflight.pop(key, None)
 
-    async def search(self, owner, source_id, query, cursor=""):
+    async def search(self, owner, source_id, query, cursor="", view="all-time"):
         source = self.source(owner, source_id)
         if (
             not isinstance(query, str)
-            or not 1 <= len(query.strip()) <= 200
+            or len(query.strip()) > 200
+            or (not query.strip() and source["provider"] != "skills_sh")
             or not isinstance(cursor, str)
             or len(cursor) > 1000
+            or not isinstance(view, str)
+            or view not in skills_sh_api.VIEWS
+            or (source["provider"] != "skills_sh" and view != "all-time")
         ):
             raise DomainError("INVALID_MARKET_QUERY")
-        if source["provider"] == "npm" and cursor and (not cursor.isdigit() or int(cursor) > 10000):
+        if (
+            source["provider"] in {"npm", "skills_sh"}
+            and cursor
+            and (not cursor.isdigit() or int(cursor) > 10000)
+        ):
             raise DomainError("INVALID_MARKET_QUERY")
-        key = (json.dumps(source, sort_keys=True), "search", query.strip(), cursor)
+        key = (json.dumps(source, sort_keys=True), "search", query.strip(), cursor, view)
         return await self._request(
-            key, lambda: market_catalogs.search(source, query.strip(), cursor)
+            key,
+            lambda: market_catalogs.search(
+                source, query.strip(), cursor, **({"view": view} if view != "all-time" else {})
+            ),
         )
 
     async def preview(self, owner, payload):

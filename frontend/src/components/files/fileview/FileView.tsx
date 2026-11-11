@@ -1,3 +1,4 @@
+import BackButton from '../../BackButton'
 // 文件展示组件（容器）——页面统一引用它来「展示一个文件」。
 // 职责：按路径取内容、活重载轮询、脏/保存、源码⇄渲染切换、标题栏与外壳（inline/modal）；
 // 正文本身按类型分发给 fileview/ 下的子组件（Image/Pdf/Html/Markdown/Csv/Code/Office）。
@@ -179,9 +180,7 @@ export function FileView({
   const titleNode = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingRight: inline ? 0 : 28, minWidth: 0, flexWrap: onBack ? 'wrap' : undefined, rowGap: onBack ? 6 : undefined }}>
       {onBack && (
-        <IconButton title={t('common.back')} onClick={onBack}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-        </IconButton>
+        <BackButton onClick={onBack} />
       )}
       {!tabbed && (
         <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

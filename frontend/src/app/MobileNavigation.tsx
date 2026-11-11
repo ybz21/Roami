@@ -1,9 +1,10 @@
+import BackButton from '../components/BackButton'
 import { SessionLifecycleInbox } from '../components/sessions/SessionLifecyclePanel'
 import { onboardingTitle, onboardingBack } from '../components/onboarding/onboarding-route'
 import { ICONS } from '../components/nav-icons'
 import { openPalette } from '../components/shell/palette'
 import { useI18n } from '../i18n'
-import { BellIcon, ChevronLeft, PlusIcon, SearchIcon, TargetIcon } from '../icons'
+import { BellIcon, PlusIcon, SearchIcon, TargetIcon } from '../icons'
 
 import { MOBILE_NAV_KEYS, NAV, mobileNavRoot } from './navigation'
 type MobileNavigationProps = {
@@ -31,10 +32,7 @@ export function MobileTopBar({ tab, route = tab, go, unread, notifications, newT
   return (
     <header className="tt-mobile-topbar">
       <nav aria-label={t('mobile.nav.top')}>
-        <button type="button" className="tt-mobile-topbar-icon" aria-label={t(mobilePrimary ? 'nav.home' : 'common.back')}
-          onClick={() => go(mobilePrimary ? 'home' : mobileBack)}>
-          {mobilePrimary ? <img src="/logo-mark.svg" alt="" /> : <ChevronLeft size={20} />}
-        </button>
+        {mobilePrimary ? <button type="button" className="tt-mobile-topbar-icon" aria-label={t('nav.home')} onClick={() => go('home')}><img src="/logo-mark.svg" alt="" /></button> : <BackButton className="tt-mobile-topbar-icon" onClick={() => go(mobileBack)} />}
         <strong className="tt-mobile-topbar-title">{mobileTitle}</strong>
         <span className="tt-mobile-topbar-actions">
           {tab === 'home' && <span ref={setMobileActionsHost} className="tt-mobile-page-actions" />}

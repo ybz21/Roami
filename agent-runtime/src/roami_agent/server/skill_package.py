@@ -49,8 +49,8 @@ def package_files(value):
     return result
 
 
-def materialize_package(root, value):
-    if not value.get("files"):
+def materialize_package(root, value, *, force=False):
+    if not value.get("files") and not force:
         return None
     files = {**package_files(value), "SKILL.md": value["text"].encode()}
     digest = hashlib.sha256(encoded(value).encode()).hexdigest()
