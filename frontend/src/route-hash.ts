@@ -8,6 +8,7 @@ export function normalizeRoute(raw: string): string {
   if (route === 'capabilities/models/sources' || route.startsWith('capabilities/models/sources/')) return route.replace('capabilities/models/sources', 'capabilities/models/catalog')
   if (route === 'capabilities/models/roles') return 'capabilities/agents/roami'
   if (route === 'settings/node/speech') return 'capabilities/models/speech'
+  if (route === 'settings/agent/memory') return 'capabilities/agents/roami/memory'
   if (route === 'settings/agent/runtime') {
     const tab = new URLSearchParams(raw.split('?')[1] || '').get('modelTab')
     return 'capabilities/models/' + (tab === 'proxy' ? 'usage' : tab === 'prices' ? 'prices' : 'catalog')

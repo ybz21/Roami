@@ -49,6 +49,11 @@ it('moves professional agent links into capabilities and preserves the selected 
   expect(normalizeRoute('settings/agent/bin/codex')).toBe('capabilities/agents/codex')
 })
 
+it('moves unified memory links to the Roami agent', () => {
+  expect(normalizeRoute('settings/agent/memory?node=n1&memoryView=review&memoryId=one')).toBe('capabilities/agents/roami/memory')
+  expect(normalizeRoute('env/agent/memory')).toBe('capabilities/agents/roami/memory')
+})
+
 it('moves legacy model pricing and usage links to their matching capability section', () => {
   expect(normalizeRoute('settings/agent/runtime?node=n1&modelTab=prices')).toBe('capabilities/models/prices')
   expect(normalizeRoute('settings/agent/runtime?modelTab=proxy')).toBe('capabilities/models/usage')

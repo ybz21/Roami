@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Input, Modal, Popconfirm, Select, Spin, message } from 'antd'
 import { AgentLogo, RoamiLogo, GearIcon, SearchIcon } from '../../icons'
 import RoamiAgentModels from './RoamiAgentModels'
+import RoamiAgentMemory from './RoamiAgentMemory'
 import { type AgentKind, isAgentKind } from '../../agent-kind'
 import { checkAgent, discoverAgents, installAgent, upgradeAgent, verifyAgent, type RegisteredAgent } from '../../agent-registry'
 import { useI18n } from '../../i18n'
@@ -23,7 +24,10 @@ const commandKey = (kind: AgentKind) => `${kind}Command` as 'claudeCommand' | 'c
 
 type AgentCatalogProps = { embedded?: boolean; mainVerified?: boolean; initialKind?: string; initialSection?: string; onSelect: (kind: string) => void; onLaunch?: (kind: AgentKind) => Promise<void> }
 export function AgentCatalog(props: AgentCatalogProps) {
-  return props.initialKind === 'roami' ? <RoamiAgentModels onBack={() => props.onSelect('')} /> : <ProfessionalAgentCatalog {...props} />
+  if (props.initialKind === 'roami') return props.initialSection === 'memory'
+    ? <RoamiAgentMemory onBack={() => props.onSelect('roami')} />
+    : <RoamiAgentModels onBack={() => props.onSelect('')} onMemory={() => props.onSelect('roami/memory')} />
+  return <ProfessionalAgentCatalog {...props} />
 }
 function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLaunch, embedded = false, mainVerified }: AgentCatalogProps) {
   const { t } = useI18n(), { phone } = useLayout()

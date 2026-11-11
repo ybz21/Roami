@@ -186,7 +186,7 @@ Claude 与 Codex 对话的操作强调色统一为蓝色，绿色不作为 Codex
   空态只留一句短消息与必要动作；零结果计数隐藏，只有一页时不显示分页。保留失败原因与恢复入口。
 - **按钮语义**：动作默认使用 `<button type="button">`，真正导航才用 `<a href>`。
   行尾操作复用 `.tt-act`，危险和确认动作使用 `.danger` / `.ok`；禁用状态与键盘焦点必须可辨。
-- **层级返回**：统一使用单个左向 Chevron 图标按钮，不附加「返回」「返回列表」等可见文字。复用 `BackButton` / `BackLink`，用本地化 aria-label 保留目标名称；详情标题可与箭头同排，但不放进按钮；默认无描边，手机命中区至少 44px。真正导航保留 href，表单内返回使用 type=button。
+- **层级返回**：位置和样式遵循 [AGENTS.md 的标题栏返回规范](../../AGENTS.md#back-navigation-starts-the-title-bar)：返回箭头在标题栏左侧、紧邻标题之前。复用 `BackButton` / `BackLink`，保持单个左向 Chevron、无可见返回文字、本地化 aria-label、无描边及手机至少 44px 命中区；标题独立于按钮。真正导航保留 href，表单内返回使用 type=button。
 - **文案**：产品新增文字统一走 [i18n](./i18n.md)，包括 aria-label、错误、空态、提示和按钮；
   不在翻译中夹带图标。开发者设计文档可使用中文。
 

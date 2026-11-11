@@ -12,9 +12,7 @@ import { QuickCommandsSettings } from './quick-commands'
 import { ChangePasswordSettings, TwoFactorSettings, CertDownloadButton } from './security-settings'
 import { AboutSettings } from './about-settings'
 import { ClusterSettings } from '../cluster/ClusterSettings'
-import { AgentMemorySettings } from './agent-memory-settings'
 import { AgentMessageSettings } from './agent-message-settings'
-import { modelSettingsHref } from './model-settings-route'
 import { FullscreenAction, LogoutAction, fullscreenSupported } from './account-actions'
 import AgentImprovement from '../agent/AgentImprovement'
 
@@ -96,7 +94,6 @@ export function buildSettings(deps: {
   onBrowserReady?: (run: (() => Promise<void>) | null) => void
   onBrowserRestart: () => void
   onEnvPush: () => void
-  onMemoryBack?: () => void
   onInstall?: () => void
   fullscreen?: { active: boolean; toggle: () => void }
 }): SettingsModel {
@@ -148,8 +145,6 @@ export function buildSettings(deps: {
   const pages: SettingsPageDef[] = [
     ...(deps.developmentRsi ? [{ id: 'experiments.rsi', name: t('set.pageImprovement'), scope: 'node' as const, items: [{ id: 'rsiWorkflow', label: t('agent.experiment.title'), bare: true, control: { kind: 'custom' as const, node: <AgentImprovement key={deps.nodeId} node={deps.nodeId || null} workflow runId={deps.experimentRunId} onRun={deps.onExperimentRun} /> }, keywords: 'RSI workflow pipeline experiment 流水线 实验 每日 复盘 Issue Codex' }] }] : []),
     { id: 'agent.messages', name: t('set.pageNotifications'), scope: 'node', items: [{ id: 'agentMessages', label: t('agent.notification.settings'), bare: true, control: { kind: 'custom', node: <AgentMessageSettings /> }, keywords: 'notifications reminders delivery quiet hours 通知 消息 免打扰 提醒 投递' }, pushItem] },
-    { id: 'agent.runtime', name: t('agent.models.settings'), scope: 'node', note: '', items: [{ id: 'agentRuntime', label: t('agent.models.settings'), bare: true, control: { kind: 'custom', node: <a href={modelSettingsHref('models')}>{t('hub.moved')}</a> }, keywords: 'Agent Main Worker Base URL API Key model 智能体 模型 密钥' }] },
-    { id: 'agent.memory', name: t('agent.memoryCenter'), scope: 'node', note: '', items: [{ id: 'agentMemory', label: t('agent.memoryCenter'), bare: true, control: { kind: 'custom', node: <AgentMemorySettings onBack={deps.onMemoryBack} /> }, keywords: 'Agent memory memories 记忆 偏好 对话 项目 任务 来源 忘记' }] },
     {
       id: 'ui.look', name: t('set.pageLook'), scope: 'mine',
       items: [
@@ -284,7 +279,7 @@ export function buildSettings(deps: {
 
   const groups: SettingsGroup[] = [
     { title: t('set.groupPreferences'), pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
-    { title: t('set.groupAgent'), pages: ['agent.runtime', 'agent.memory', ...(deps.developmentRsi ? ['experiments.rsi'] : [])] },
+    ...(deps.developmentRsi ? [{ title: t('set.groupAgent'), pages: ['experiments.rsi'] }] : []),
     { title: t('set.groupNotifications'), pages: ['agent.messages'] },
     { title: t('set.groupDevices'), pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
     { title: t('set.groupSystem'), pages: ['node.env', 'sec', 'about'] },

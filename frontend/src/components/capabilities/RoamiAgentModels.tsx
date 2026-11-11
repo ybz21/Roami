@@ -10,7 +10,7 @@ import { useSettingsDraft } from '../settings/settings-draft'
 import { catalogFailure, useModelCatalog } from './model-hub-api'
 import './model-hub.css'
 
-export default function RoamiAgentModels({ onBack, inline = false, onSelectionChange }: { onBack: () => void; inline?: boolean; onSelectionChange?: (applied: boolean) => void }) {
+export default function RoamiAgentModels({ onBack, onMemory, inline = false, onSelectionChange }: { onBack: () => void; onMemory?: () => void; inline?: boolean; onSelectionChange?: (applied: boolean) => void }) {
   const { t } = useI18n(), { phone } = useLayout()
   const { modal, message } = App.useApp(), catalog = useModelCatalog()
   const [main, setMain] = useState(''), [worker, setWorker] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [advanced, setAdvanced] = useState(false)
@@ -32,6 +32,7 @@ export default function RoamiAgentModels({ onBack, inline = false, onSelectionCh
     } catch (cause) { setError(catalogFailure(cause)) } finally { setBusy(false) }
   }
   const body = <div className={inline ? 'onboarding-model-binding' : 'tt-model-hub-scroll'}><div className="agent-settings-form">
+    {onMemory && <div><Button onClick={onMemory}>{t('agent.memoryCenter')}</Button></div>}
     {draftNotice}
     {(error || catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={catalog.retry}>{t('capabilities.models.reread')}</Button>} />}
     {!catalog.value && !catalog.error ? <Spin /> : <>
@@ -44,5 +45,5 @@ export default function RoamiAgentModels({ onBack, inline = false, onSelectionCh
     <details open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}><summary>{t('agent.models.advanced')}</summary>{advanced && <AgentSettingsForm key={catalog.value?.revision} onModelNames={() => {}} />}</details>
   </div></div>
   if (inline) return body
-  return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><h3>{t('hub.roamiModels')}</h3><BackButton onClick={onBack} /></div>{body}</div>
+  return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><BackButton onClick={onBack} /><h3>{t('hub.roamiModels')}</h3></div>{body}</div>
 }

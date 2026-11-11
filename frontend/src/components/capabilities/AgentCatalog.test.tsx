@@ -11,7 +11,8 @@ const state = vi.hoisted(() => ({
   loaded: true, phone: false, save: vi.fn(), polls: [] as Array<(signal: AbortSignal) => Promise<unknown>>, stop: vi.fn(),
 }))
 vi.mock('./AgentModels', () => ({ default: ({ setup }: { setup?: import('react').ReactNode }) => <div>{setup}</div> }))
-vi.mock('./RoamiAgentModels', () => ({ default: () => <div>roami-models</div> }))
+vi.mock('./RoamiAgentModels', () => ({ default: ({ onMemory }: { onMemory?: () => void }) => <div>roami-models<button onClick={onMemory}>memory</button></div> }))
+vi.mock('./RoamiAgentMemory', () => ({ default: ({ onBack }: { onBack: () => void }) => <button onClick={onBack}>memory-back</button> }))
 vi.mock('../../agent-registry', () => ({ discoverAgents: vi.fn(), installAgent: vi.fn(), checkAgent: vi.fn(), upgradeAgent: vi.fn() }))
 vi.mock('../../preferences', () => ({ usePreferences: () => [state.prefs, state.save], preferencesLoaded: () => state.loaded }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: state.phone }) }))
@@ -36,6 +37,17 @@ it('keeps Roami model configuration separate from professional agent polling', (
   expect(screen.getByText('roami-models')).toBeTruthy()
   expect(discoverAgents).not.toHaveBeenCalled()
   expect(state.polls).toHaveLength(0)
+})
+
+it('opens unified memory under Roami and returns to Roami configuration', () => {
+  const select = vi.fn()
+  const view = render(<AgentCatalog initialKind="roami" onSelect={select} />)
+  fireEvent.click(screen.getByRole('button', { name: 'memory' }))
+  expect(select).toHaveBeenLastCalledWith('roami/memory')
+  view.rerender(<AgentCatalog initialKind="roami" initialSection="memory" onSelect={select} />)
+  fireEvent.click(screen.getByRole('button', { name: 'memory-back' }))
+  expect(select).toHaveBeenLastCalledWith('roami')
+  expect(discoverAgents).not.toHaveBeenCalled()
 })
 
 it('embeds the full agent catalog without hiding executors or existing controls', async () => {
