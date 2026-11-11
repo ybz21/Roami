@@ -16,6 +16,7 @@ from roami_agent.context.token_estimate import (
 )
 from roami_agent.conversation.attachments import context_attachments
 from roami_agent.conversation.okr_message_context import draft_reference, human_text
+from roami_agent.protocol.delivery_receipts import delivery_receipt
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.improvement import policy_value
@@ -136,6 +137,7 @@ def model_messages(messages):
 
 def model_entries(messages):
     result, paired = [], set()
+    operations = {}
     latest_user = next(
         (m["id"] for m in reversed(messages) if m["role"] == "user" and m["status"] == "completed"),
         None,
@@ -186,10 +188,19 @@ def model_entries(messages):
             if (m["turn_id"], call_id) not in paired:
                 continue
             entry["tool_call_id"] = call_id
+            operation = operations.get((m["turn_id"], call_id))
+            if operation in {"reply", "task_reply", "task_queue_reply", "ask_user"}:
+                try:
+                    entry["content"] = encoded(
+                        delivery_receipt(operation, json.loads(entry["content"]))
+                    )
+                except (ValueError, TypeError):
+                    pass
         calls = content.get("tool_calls", [])
         if calls and all((m["turn_id"], c["id"]) in available for c in calls):
             entry["tool_calls"] = calls
             paired.update((m["turn_id"], c["id"]) for c in calls)
+            operations.update(((m["turn_id"], c["id"]), c["function"]["name"]) for c in calls)
         elif calls:
             entry["content"] += (
                 "\n[Previous tool execution was interrupted; its outcome must be reconciled.]"

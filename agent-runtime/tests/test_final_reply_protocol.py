@@ -7,6 +7,7 @@ from test_argument_repair_progress import claimed_turn
 from test_foundations import call
 
 from roami_agent.app import Runtime
+from roami_agent.conversation.activity_payloads import activity_payload
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.storage.database import rows
@@ -40,9 +41,22 @@ async def test_plain_final_is_delivered_through_reply_without_transport_rejectio
         events = await runtime.conversations.events("alice", turn["conversation_id"])
         assert [e["payload"]["text"] for e in events if e["kind"] == "message.delta"] == [text]
         receipts = await store.call(
-            lambda db: rows(db, "SELECT state FROM tool_calls WHERE turn_id=?", (turn["id"],))
+            lambda db: rows(
+                db,
+                "SELECT x.state,m.content_json FROM tool_calls x JOIN messages m "
+                "ON m.id=x.result_message_id WHERE x.turn_id=?",
+                (turn["id"],),
+            )
         )
         assert [item["state"] for item in receipts] == ["succeeded"]
+        assert json.loads(json.loads(receipts[0]["content_json"])["text"]) == {"accepted": True}
+        snapshot = await runtime.conversations.messages("alice", turn["conversation_id"])
+        activity = next(item for item in snapshot["activities"] if item["name"] == "reply")
+        assert activity["preview"]["output"] is None
+        detail = await store.call(
+            lambda db: activity_payload(db, "alice", turn["conversation_id"], activity["id"])
+        )
+        assert detail["output"] is None
     finally:
         await runtime.close()
 
