@@ -9,9 +9,9 @@ import { setSessionLabels } from '../sessions/session-label'
 
 const scope = vi.hoisted(() => ({ node: 0 }))
 vi.mock('../cluster/node-url', () => ({ currentNodeId: () => String(scope.node), useCurrentNodeId: () => String(scope.node), nodeApi: (path: string) => '/test-node-' + scope.node + path }))
-beforeEach(() => { scope.node++ })
+beforeEach(() => { scope.node++; ui.loading.mockImplementation(() => vi.fn()) })
 
-const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn() }))
+const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn(), loading: vi.fn(() => vi.fn()) }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../sessions/SessionLifecyclePanel', () => ({ SessionLifecycleInbox: () => null }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))

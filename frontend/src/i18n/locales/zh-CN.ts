@@ -2148,6 +2148,8 @@ const zhCN = {
   'session.closeSwarmSessionDesc': '这是蜂群 {swarm} 的{role}。从这里关闭只是 kill 会话，蜂群会据此把它当作「已完成」并解锁下游依赖，可能脱节。建议到蜂群页管理。',
   'session.closeAnyway': '仍要关闭',
   'session.close': '关闭',
+  'session.closeChecking': '正在检查会话…',
+  'session.closeCheckFailed': '无法检查会话，请重试。',
   'session.closeConfirm': '关闭 {name}？',
   'session.closeOthersNote': '这个 worktree 里还有 {n} 个会话在用，只结束这一个，worktree 和分支不动。',
   'dirPicker.title': '选择工作目录',

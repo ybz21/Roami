@@ -2148,6 +2148,8 @@ const enUS = {
   'session.closeSwarmSessionDesc': 'This is the {role} of swarm {swarm}. Closing it here only kills the session; the swarm may treat it as done and unlock downstream dependencies. Manage it from the swarm page when possible.',
   'session.closeAnyway': 'Close anyway',
   'session.close': 'Close',
+  'session.closeChecking': 'Checking session…',
+  'session.closeCheckFailed': 'Could not check the session. Try again.',
   'session.closeOthersNote': '{n} other sessions still use this worktree; only this one ends, the worktree and branch stay.',
   'session.closeConfirm': 'Close {name}?',
   'dirPicker.title': 'Choose working directory',
