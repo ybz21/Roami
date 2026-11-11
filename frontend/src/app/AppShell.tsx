@@ -218,6 +218,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
                 latency: curNode.online ? t('node.latencyMs', { ms: curNode.latencyMs }) : t('node.offline'),
               } : null}
               onToggleRail={() => space.setNavCollapsed(!space.navCollapsed)}
+              fullscreen={fsSupported ? { active: isFs, toggle: toggleFs } : undefined}
             />
             {projectActions.desktopDialogs}
           </Sider>
