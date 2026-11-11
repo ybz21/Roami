@@ -78,7 +78,7 @@ func TestInterruptedApplyRecovery(t *testing.T) {
 
 func TestOpenCodeProviderFormats(t *testing.T) {
 	for _, major := range []int{1, 2} {
-		p := Profile{ID: "12345678901234567890123456789012", Name: "Fixture", BaseURL: "https://example.test/v1", Model: "fixture-model", Protocol: "openai-responses", KeyEnv: "FIXTURE_KEY"}
+		p := Profile{ID: "12345678901234567890123456789012", Name: "Fixture", BaseURL: "https://example.test/v1", Model: "fixture-model", ModelName: "Qwen Display", Protocol: "openai-responses", KeyEnv: "FIXTURE_KEY"}
 		fields, err := profileFields("opencode", p, major)
 		if err != nil {
 			t.Fatal(err)
@@ -93,8 +93,36 @@ func TestOpenCodeProviderFormats(t *testing.T) {
 		if major == 1 {
 			group, packageKey, settingsKey = "provider", "npm", "options"
 		}
+		if textAt(values, group, providerID(p), "models", p.Model, "name") != p.ModelName || textAt(values, "model") != providerID(p)+"/"+p.Model {
+			t.Fatalf("display name changed the routing ID: %s", rendered.Documents[0].Data)
+		}
 		if textAt(values, group, providerID(p), packageKey) == "" || textAt(values, group, providerID(p), settingsKey, "apiKey") != "{env:FIXTURE_KEY}" {
 			t.Fatalf("invalid OpenCode v%d config: %s", major, rendered.Documents[0].Data)
+		}
+	}
+}
+
+func TestModelDisplayNameSurvivesCredentialEditsButNotModelChanges(t *testing.T) {
+	input := modelInput("opencode")
+	input.ModelName = "Qwen Max"
+	first, err := profileFromInput("opencode", "fixture", input, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.ModelName = ""
+	next, err := profileFromInput("opencode", "fixture", input, &first)
+	if err != nil || next.ModelName != "Qwen Max" {
+		t.Fatalf("name lost on edit: %+v %v", next, err)
+	}
+	input.Model = "another-model"
+	next, err = profileFromInput("opencode", "fixture", input, &first)
+	if err != nil || next.ModelName != "" {
+		t.Fatal("new model inherited an unrelated display name")
+	}
+	for _, name := range []string{"line\nbreak", "{env:PRIVATE_KEY}", "{file:/private}"} {
+		input.ModelName = name
+		if _, err := profileFromInput("opencode", "fixture", input, nil); err == nil {
+			t.Fatal("native config expansion accepted in a display name")
 		}
 	}
 }

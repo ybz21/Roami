@@ -165,7 +165,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Kind == "claude" {
 			authMode = "bearer"
 		}
-		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, Protocol: protocol, AuthMode: authMode, APIKey: &key})
+		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key})
 		if e != nil {
 			err = e
 			break

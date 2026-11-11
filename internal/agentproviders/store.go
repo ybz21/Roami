@@ -91,7 +91,7 @@ func makeView(kind string, state *kindState, config nativeConfig) (View, error) 
 	}
 	view.Changed = (state.ActiveID != "" || state.Mode == "official") && !active
 	for _, p := range state.Profiles {
-		view.Profiles = append(view.Profiles, ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, Protocol: p.Protocol,
+		view.Profiles = append(view.Profiles, ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, ModelName: p.ModelName, Protocol: p.Protocol,
 			AuthMode: p.AuthMode, KeyEnv: p.KeyEnv, ReasoningEffort: p.ReasoningEffort, HasKey: p.APIKey != "",
 			Applied: active && state.ActiveID == p.ID && digest(p) == state.ProfileDigest})
 		if view.Current.Provider == providerID(p) || (kind == "claude" && active && p.ID == state.ActiveID) {
@@ -196,7 +196,7 @@ func (s *Store) Save(ctx context.Context, kind, profileID string, input ProfileI
 		if err := s.save(state); err != nil {
 			return err
 		}
-		result = ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, Protocol: p.Protocol, AuthMode: p.AuthMode,
+		result = ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, ModelName: p.ModelName, Protocol: p.Protocol, AuthMode: p.AuthMode,
 			KeyEnv: p.KeyEnv, HasKey: p.APIKey != "", ReasoningEffort: p.ReasoningEffort}
 		return nil
 	})

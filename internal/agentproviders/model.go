@@ -18,6 +18,7 @@ type Profile struct {
 	Name            string `json:"name"`
 	BaseURL         string `json:"baseUrl"`
 	Model           string `json:"model"`
+	ModelName       string `json:"modelName,omitempty"`
 	Protocol        string `json:"protocol"`
 	AuthMode        string `json:"authMode"`
 	KeyEnv          string `json:"keyEnv,omitempty"`
@@ -29,6 +30,7 @@ type ProfileInput struct {
 	Name            string  `json:"name"`
 	BaseURL         string  `json:"baseUrl"`
 	Model           string  `json:"model"`
+	ModelName       string  `json:"modelName,omitempty"`
 	Protocol        string  `json:"protocol"`
 	AuthMode        string  `json:"authMode"`
 	KeyEnv          string  `json:"keyEnv"`
@@ -41,6 +43,7 @@ type ProfileSummary struct {
 	Name            string `json:"name"`
 	BaseURL         string `json:"baseUrl"`
 	Model           string `json:"model"`
+	ModelName       string `json:"modelName,omitempty"`
 	Protocol        string `json:"protocol"`
 	AuthMode        string `json:"authMode"`
 	KeyEnv          string `json:"keyEnv,omitempty"`
@@ -108,10 +111,13 @@ func validateKind(kind string) error {
 }
 
 func profileFromInput(kind, id string, input ProfileInput, previous *Profile) (Profile, error) {
-	p := Profile{ID: id, Name: strings.TrimSpace(input.Name), BaseURL: strings.TrimSpace(input.BaseURL), Model: strings.TrimSpace(input.Model),
+	p := Profile{ID: id, Name: strings.TrimSpace(input.Name), BaseURL: strings.TrimSpace(input.BaseURL), Model: strings.TrimSpace(input.Model), ModelName: strings.TrimSpace(input.ModelName),
 		Protocol: input.Protocol, AuthMode: input.AuthMode, KeyEnv: strings.TrimSpace(input.KeyEnv), ReasoningEffort: input.ReasoningEffort}
 	if previous != nil {
 		p.APIKey = previous.APIKey
+		if p.ModelName == "" && p.Model == previous.Model && p.BaseURL == previous.BaseURL {
+			p.ModelName = previous.ModelName
+		}
 	}
 	if input.APIKey != nil && *input.APIKey != "" {
 		p.APIKey = *input.APIKey
@@ -122,7 +128,7 @@ func profileFromInput(kind, id string, input ProfileInput, previous *Profile) (P
 	u, err := url.Parse(p.BaseURL)
 	if p.Name == "" || utf8.RuneCountInString(p.Name) > 64 || len(p.BaseURL) > 2048 || err != nil ||
 		(u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
-		p.Model == "" || len(p.Model) > 256 || strings.ContainsAny(p.Model+p.Name, "\r\n\x00") || strings.Contains(p.Model+p.Name+p.BaseURL, "{env:") || strings.Contains(p.Model+p.Name+p.BaseURL, "{file:") {
+		p.Model == "" || len(p.Model) > 256 || len(p.ModelName) > 256 || strings.ContainsAny(p.Model+p.Name+p.ModelName, "\r\n\x00") || strings.Contains(p.Model+p.Name+p.ModelName+p.BaseURL, "{env:") || strings.Contains(p.Model+p.Name+p.ModelName+p.BaseURL, "{file:") {
 		return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
 	}
 	p.BaseURL = u.String()

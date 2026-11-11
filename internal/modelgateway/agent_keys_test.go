@@ -68,6 +68,18 @@ func TestAgentKeyRotationNativeConfigAndImmutableBilling(t *testing.T) {
 		t.Fatal("rotation changed wrong agent")
 	}
 	native, _ := os.ReadFile(os.Getenv("OPENCODE_CONFIG"))
+	var nativeConfig map[string]any
+	if err := json.Unmarshal(native, &nativeConfig); err != nil {
+		t.Fatal(err)
+	}
+	provider, modelID, ok := strings.Cut(nativeConfig["model"].(string), "/")
+	if !ok || modelID != "coding-main" {
+		t.Fatal("display name changed the routed model ID")
+	}
+	models := nativeConfig["providers"].(map[string]any)[provider].(map[string]any)["models"].(map[string]any)
+	if models[modelID].(map[string]any)["name"] != "Coding" {
+		t.Fatal("gateway display name lost during apply or key rotation")
+	}
 	if !strings.Contains(string(native), key) || strings.Contains(string(native), "upstream-secret") {
 		t.Fatal("native key was not updated safely")
 	}

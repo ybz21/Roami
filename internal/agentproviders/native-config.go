@@ -431,7 +431,11 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 			return nil, fmt.Errorf("OPENCODE_CONFIG_VERSION_UNKNOWN")
 		}
 		add("config", provider+"/"+profile.Model, "model")
-		models := map[string]any{profile.Model: map[string]any{"name": profile.Model}}
+		modelName := profile.ModelName
+		if modelName == "" {
+			modelName = profile.Model
+		}
+		models := map[string]any{profile.Model: map[string]any{"name": modelName}}
 		settings := map[string]any{"baseURL": profile.BaseURL, "apiKey": key}
 		packages := map[string]string{"openai-responses": "@opencode/ai/providers/openai-compatible/responses", "openai-completions": "@opencode/ai/providers/openai-compatible", "anthropic-messages": "@opencode/ai/providers/anthropic-compatible"}
 		if major == 2 {
