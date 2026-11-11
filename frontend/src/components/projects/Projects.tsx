@@ -1,3 +1,4 @@
+import BackButton, { BackLink } from '../BackButton'
 import SessionLocation from '../sessions/SessionLocation'
 import SessionHierarchy from '../sessions/SessionHierarchy'
 import { nodeApi } from '../cluster/node-url'
@@ -53,7 +54,7 @@ import { SessionActivity, SESSION_ACTIVITY_CSS } from './project-list/session-ac
 import { ProjectCard, CARD_CSS } from './project-list/project-card'
 import { useSwarmProjection, swarmProjectMatches } from './project-list/swarm-projection'
 import FileBrowser from '../files/FileBrowser'
-import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronLeft, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, TargetIcon, WarnIcon, WindowsIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, TargetIcon, WarnIcon, WindowsIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { getHashParams } from '../../route-hash'
 import { projectPath } from './okr/okr-workspace'
@@ -1078,7 +1079,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return (
       <div style={{ padding: 24, color: 'var(--text-dim)' }}>
         {loaded ? t('project.notFound') : <Spin />}
-        <div style={{ marginTop: 12 }}><a onClick={() => { location.hash = '#/projects' }}>‹ {t('project.back')}</a></div>
+        <div style={{ marginTop: 12 }}><BackLink href="#/projects" label={t('project.back')} /></div>
       </div>
     )
   }
@@ -1309,8 +1310,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
         {/* 项目头：面包屑 | 名称 / 路径 · ⎇主干@HEAD | 主操作。sticky（14 §6.2）——
             往下翻任务流时"我在哪个项目、要新建什么"不该跟着滚走。 */}
         <div className="tt-pagehead prj-in prj-head" style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
-          <Button type="text" size="small" icon={<ChevronLeft />} onClick={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }}
-            style={{ color: 'var(--text-dim)', paddingInline: 'var(--sp-2)', flex: '0 0 auto' }}> {t('project.title')}</Button>
+          <BackButton label={t('project.back')} onClick={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }} />
           <span style={{ width: 1, height: 18, background: 'var(--border-subtle)', flex: '0 0 auto' }} />
           <div style={{ minWidth: 0, flex: 1 }}>
             {/* 名称可编辑 = 重命名（displayName 偏好，key/目录不变） */}

@@ -1727,6 +1727,13 @@ html[data-pointer="coarse"] .ant-tooltip { display: none; }
 :where(html[data-pointer="fine"]) .tt-act.ok:hover { color: var(--ok); border-color: var(--ok-border); background: var(--ok-soft); }
 .tt-act:active { background: var(--list-hover); }
 
+/* 层级返回只显示同一支左箭头，名称留给辅助技术。 */
+.tt-back { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; width:var(--ctl-h); height:var(--ctl-h); padding:0; border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-dim); cursor:pointer; text-decoration:none; }
+:where(html[data-pointer="fine"]) .tt-back:hover:not(:disabled) { color:var(--text-bright); background:var(--list-hover); }
+.tt-back:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
+.tt-back:disabled { cursor:default; opacity:.5; }
+html[data-pointer="coarse"] .tt-back { min-width:var(--tap); min-height:var(--tap); }
+
 /* 对话正文里被 @ 引用的图片卡片。整张卡是按钮，hover 只给一点亮度反馈——
    它嵌在句子中间，描重了就成了一颗按钮夹在文字里。 */
 .tt-atimg { transition: background .12s, border-color .12s; }

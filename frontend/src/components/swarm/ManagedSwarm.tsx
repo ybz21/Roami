@@ -1,3 +1,4 @@
+import BackButton from '../BackButton'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { nodeApi, useCurrentNodeId } from '../cluster/node-url'
 import { App, Button, Spin } from 'antd'
@@ -7,7 +8,7 @@ import { useAgentData } from '../agent/useAgentData'
 import { useAgentThread } from '../agent/useAgentThread'
 import { useLayout } from '../../layout'
 import { useI18n } from '../../i18n'
-import { ChevronLeft, CloseIcon, MoreIcon, PanelRightIcon, UserIcon } from '../../icons'
+import { CloseIcon, MoreIcon, PanelRightIcon, UserIcon } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
 import Markdown from '../markdown/Markdown'
 import { taskExecutor, type TaskDetail } from '../agent/agent-task-protocol'
@@ -122,7 +123,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
     </ul>}
   </div>
   return <div className="swarm-managed" data-embedded={embedded} data-team-open={teamOpen}>
-    {!embedded && <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && <button type="button" className="tt-act" onClick={onBack} aria-label={t('common.back')}><ChevronLeft /></button>}<h2>{data.name}</h2>{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts">{controls}</div></header>}
+    {!embedded && <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && <BackButton onClick={onBack} />}<h2>{data.name}</h2>{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts">{controls}</div></header>}
     {error && <div className="swarm-stream-error" role="status">{t('swarm.managed.reconnecting')}</div>}
     {data.archived && <p className="swarm-note">{t('swarm.managed.archived')}</p>}
 

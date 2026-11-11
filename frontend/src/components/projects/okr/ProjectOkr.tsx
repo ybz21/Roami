@@ -1,10 +1,11 @@
+import BackButton from '../../BackButton'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Spin, Tabs } from 'antd'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
 import { useLayout } from '../../../layout'
 import { pollWhileVisible } from '../../../visible-poll'
-import { BotIcon, ChevronLeft, PencilIcon } from '../../../icons'
+import { BotIcon, PencilIcon } from '../../../icons'
 import MobileSubPage from '../../MobileSubPage'
 import { clearOkrMessageReference, readOkrMessageReference } from '../../agent/notification-destination'
 import { getHashParams } from '../../../route-hash'
@@ -172,7 +173,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     setMainPanel(next)
   }
   const content = <div className="okr-detail-layout"><div className="okr-page okr-dashboard" data-view={mainPanel} data-dashboard={workspace?.dashboard?.html ? 'html' : 'widgets'} data-mobile-refresh-scroll>
-    {!phone && <header className="tt-pagehead"><div className="okr-page-identity"><Button icon={<ChevronLeft />} onClick={back}>{t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')}</Button><h2>{title}</h2></div></header>}
+    {!phone && <header className="tt-pagehead"><div className="okr-page-identity"><BackButton label={t(fromOverview ? 'okr.allObjectives' : 'okr.backProject')} onClick={back} /><h2>{title}</h2></div></header>}
     {error && <div className="okr-error" role="alert">
       <p>{t(error)}</p>
       {(conflict || !loaded || error === 'okr.loadFailed') && <Button disabled={busy} onClick={() => void reload()}>{t(conflict ? 'okr.loadLatest' : 'inbox.retry')}</Button>}

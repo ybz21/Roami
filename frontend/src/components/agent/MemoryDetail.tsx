@@ -1,6 +1,7 @@
+import BackButton from '../BackButton'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Button, Skeleton, Spin } from 'antd'
-import { CheckIcon, ChevronLeft, ChevronRight, ClockIcon, NotebookIcon, OpenInIcon } from '../../icons'
+import { CheckIcon, ChevronRight, ClockIcon, NotebookIcon, OpenInIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import Markdown from '../markdown/Markdown'
 import { useAgentData } from './useAgentData'
@@ -19,8 +20,8 @@ export default function MemoryDetail({ id, record, data, loading, failed, missin
   useEffect(() => { if (historyOpen) historyRefresh.current() }, [revision])
   const daily = record && dailyMemory(record), comparing = data?.current && data.current.body !== record?.body
   if (!id) return <div className="memory-empty"><NotebookIcon size={28} /><p>{t('agent.memoryBrowse.choose')}</p></div>
-  const bar = <div className="memory-detailbar">{panel && <button type="button" className="tt-act" onClick={back}><ChevronLeft size={18} />{t('common.back')}</button>}<span>{t(daily ? 'agent.memoryBrowse.activityDetail' : 'agent.memoryBrowse.detail')}</span>{more}</div>
-  if (missing) return <>{bar}<div className="memory-empty" role="alert"><p>{t('agent.memoryBrowse.unavailable')}</p><Button onClick={back}>{t('common.back')}</Button></div></>
+  const bar = <div className="memory-detailbar">{panel && <BackButton onClick={back} />}<span>{t(daily ? 'agent.memoryBrowse.activityDetail' : 'agent.memoryBrowse.detail')}</span>{more}</div>
+  if (missing) return <>{bar}<div className="memory-empty" role="alert"><p>{t('agent.memoryBrowse.unavailable')}</p><BackButton onClick={back} /></div></>
   if (!record) return <>{bar}<div className="memory-loading">{failed ? <p role="alert">{t('agent.requestFailed')} <Button onClick={retry}>{t('agent.retry')}</Button></p> : <Skeleton active />}</div></>
   return <>{bar}<div className="memory-detail-scroll" key={id}><article className="memory-reading">
     <div className="memory-kicker"><span>{t(record.day_key ? 'agent.memoryView.activity' : 'agent.memoryKind.' + (record.kind || 'fact'))}</span><span className={record.state !== 'active' ? 'memory-warning' : ''}>{t(record.state === 'active' ? 'agent.memoryBrowse.saved' : record.state === 'conflict' ? 'agent.memoryBrowse.conflict' : 'agent.memoryBrowse.review')}</span></div>

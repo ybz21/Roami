@@ -5,6 +5,7 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { SearchIcon, GearIcon } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
+import BackButton from '../BackButton'
 import CapabilityEditor, { capabilityError } from './CapabilityEditor'
 import SkillMarketDetail from './SkillMarketDetail'
 import MarketSources, { type MarketSource } from './MarketSources'
@@ -110,7 +111,7 @@ export default function CapabilityMarket() {
     {error && <Alert className="tt-capability-alert" type="error" message={error} action={<Button onClick={() => { if (!sources) setRetry(value => value + 1); else void search() }}>{t('agent.retry')}</Button>} />}
     {success && <Alert className="tt-capability-alert" type="success" message={success} />}
     {popular && <>
-      <div className="tt-market-heading"><h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3>{searched ? <Button onClick={() => { setQuery(''); void load(source, '', '', ranking.current) }} disabled={busy}>{t('capabilities.market.backPopular')}</Button> : <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>
+      <div className="tt-market-heading"><h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3>{searched ? <BackButton label={t('capabilities.market.backPopular')} onClick={() => { setQuery(''); void load(source, '', '', ranking.current) }} disabled={busy} /> : <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>
       <Tabs className="tt-market-ranking" aria-label={t('capabilities.market.ranking')} activeKey={searched ? ranking.current : resultRanking} onChange={value => { ranking.current = value as Ranking; void load(source, '', '', ranking.current) }} items={(['all-time', 'trending', 'hot'] as const).map(value => ({ key: value, label: <span>{t('capabilities.market.ranking.' + value)}{totals[source + ':' + value] !== undefined && <span className="tt-market-rank-count">{new Intl.NumberFormat(locale).format(totals[source + ':' + value])}</span>}</span> }))} />
     </>}
 

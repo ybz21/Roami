@@ -1,9 +1,10 @@
+import BackButton from '../BackButton'
 import { useState, type ReactNode } from 'react'
 import { Alert, Button, Checkbox, Form, Segmented, Select } from 'antd'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useI18n } from '../../i18n'
-import { ChevronLeft, ChevronRight, CodeIcon, FileTextIcon, GithubIcon, OpenInIcon } from '../../icons'
+import { ChevronRight, CodeIcon, FileTextIcon, GithubIcon, OpenInIcon } from '../../icons'
 import type { ManagedEntry } from './capability-format'
 import { skillDocument, skillFileText } from './skill-document'
 
@@ -37,7 +38,7 @@ export default function SkillMarketDetail({ entry, images = {}, marketUrl, repos
     } catch { return null }
   }
   return <div className="tt-skill-detail">
-    {!phone && <div className="tt-skill-return"><Button icon={<ChevronLeft size={16} />} disabled={busy} onClick={onBack} autoFocus>{t('capabilities.market.backResults')}</Button></div>}
+    {!phone && <div className="tt-skill-return"><BackButton label={t('capabilities.market.backResults')} disabled={busy} onClick={onBack} autoFocus /></div>}
     <div className="tt-skill-scroll">
       <header className="tt-pagehead tt-skill-hero"><div className="ttl"><div className="tt-skill-identity"><span>{repository}</span>{installs && <span>{installs}</span>}</div><h2>{entry.displayName || entry.name}</h2>{summary && <p>{summary}</p>}</div></header>
       <div className="tt-skill-columns">

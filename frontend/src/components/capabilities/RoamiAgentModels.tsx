@@ -1,3 +1,4 @@
+import BackButton from '../BackButton'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Select, Spin } from 'antd'
 import { api } from '../../api'
@@ -43,5 +44,5 @@ export default function RoamiAgentModels({ onBack, inline = false, onSelectionCh
     <details open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}><summary>{t('agent.models.advanced')}</summary>{advanced && <AgentSettingsForm key={catalog.value?.revision} onModelNames={() => {}} />}</details>
   </div></div>
   if (inline) return body
-  return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><h3>{t('hub.roamiModels')}</h3><Button onClick={onBack}>{t('common.back')}</Button></div>{body}</div>
+  return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><h3>{t('hub.roamiModels')}</h3><BackButton onClick={onBack} /></div>{body}</div>
 }

@@ -1,9 +1,10 @@
+import BackButton from '../BackButton'
 import { useId, useState } from 'react'
 import { App as AntApp, Button, Input, Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { revealInspector } from '../shell/inspector'
-import { ChevronLeft, CloseIcon, ClockIcon } from '../../icons'
+import { CloseIcon, ClockIcon } from '../../icons'
 import { useLifecycleDraft } from './lifecycle-draft'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { sendSessionPrompt } from './session-actions'
@@ -107,7 +108,7 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
   return <>
     {compact ? <button type="button" className="tt-mobile-topbar-icon" aria-label={t('session.lifecycle.inbox')} onClick={show}><ClockIcon size={20} />{pendingCount > 0 && <span className="bd">{new Intl.NumberFormat(locale).format(pendingCount)}</span>}</button> : <Button onClick={show}>{t('session.lifecycle.inbox')}{pendingCount > 0 ? ` (${new Intl.NumberFormat(locale).format(pendingCount)})` : ''}</Button>}
     <AdaptivePanel key={phone ? selected || 'list' : 'desktop'} open={open} title={t('session.lifecycle.inbox')} onClose={close}
-      desktopHeader={<div className="tt-lifecycle-head">{selected ? <button type="button" className="tt-act" onClick={() => setSelected(null)}><ChevronLeft size={16} />{t('common.back')}</button> : <strong>{t('session.lifecycle.inbox')}</strong>}<button type="button" className="tt-act" aria-label={t('common.close')} onClick={() => { setOpen(false); setSelected(null) }}><CloseIcon size={16} /></button></div>}>
+      desktopHeader={<div className="tt-lifecycle-head">{selected ? <BackButton onClick={() => setSelected(null)} /> : <strong>{t('session.lifecycle.inbox')}</strong>}<button type="button" className="tt-act" aria-label={t('common.close')} onClick={() => { setOpen(false); setSelected(null) }}><CloseIcon size={16} /></button></div>}>
       <div className="tt-lifecycle-panel">
         <div className="tt-lifecycle-scroll">
           {operations.failed && <p role="alert">{t('session.lifecycle.loadFailed')}</p>}
