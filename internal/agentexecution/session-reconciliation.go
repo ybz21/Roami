@@ -24,7 +24,7 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 	defer unlock()
 	var spec Spec
 	var receipt Receipt
-	if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Key != key || spec.Executor != "codex" || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding == nil || receipt.Binding.ProviderID == "" {
+	if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Key != key || (spec.Executor != "codex" && spec.Executor != "claude") || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.Binding == nil || receipt.Binding.ProviderID == "" {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_BINDING_REQUIRED")
 	}
 	var previous Result
@@ -57,6 +57,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 	if hasResult && state.LaunchKey != key {
 		receipt.State = "failed"
 		return Status{Receipt: receipt, Result: &previous}, nil
+	}
+	if spec.Executor == "claude" {
+		return s.reconcileClaudeChangedInput(ctx, key, dir, path, spec, receipt, binding, &state, previous, hasResult)
 	}
 	// Child completion notifications are retained diagnostics, not root identity changes.
 	conflict := state.ProviderConflict

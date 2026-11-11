@@ -511,6 +511,9 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if recovered, ok, problem := s.reconcileCodexCompletion(key, status, &state, path); ok || problem != nil {
 		return recovered, problem
 	}
+	if recovered, ok, problem := s.reconcileClaudeRejection(key, status, &state, path); ok || problem != nil {
+		return recovered, problem
+	}
 	if state.LaunchKey == key && state.Executor == "claude" && state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.resourceID() == binding.resourceID() {
 		status.Progress = claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
 	}

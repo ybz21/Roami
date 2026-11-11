@@ -79,9 +79,9 @@ func reportDirectory(root, value string) (string, bool) {
 	return directory, err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(os.PathSeparator))
 }
 
-func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir string) *ReportedProgress {
-	if !codexThreadID.MatchString(binding.ProviderID) || turn == "" || promptHash == "" {
-		return nil
+func claudeTranscriptPath(binding SessionBinding) (string, os.FileInfo) {
+	if !codexThreadID.MatchString(binding.ProviderID) {
+		return "", nil
 	}
 	home := binding.ProviderHome
 	if home == "" {
@@ -90,31 +90,44 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 	if home == "" {
 		user, err := os.UserHomeDir()
 		if err != nil {
-			return nil
+			return "", nil
 		}
 		home = filepath.Join(user, ".claude")
 	}
 	root, err := filepath.EvalSymlinks(filepath.Join(home, "projects"))
 	if err != nil {
-		return nil
+		return "", nil
 	}
 	paths, err := filepath.Glob(filepath.Join(root, "*", binding.ProviderID+".jsonl"))
 	if err != nil || len(paths) != 1 {
-		return nil
+		return "", nil
 	}
 	path := paths[0]
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil || resolved != path {
-		return nil
+		return "", nil
 	}
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 || info.Size() > 64<<20 {
-		return nil
+		return "", nil
 	}
 	owner, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || int(owner.Uid) != os.Geteuid() {
+		return "", nil
+	}
+	return path, info
+}
+
+func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir string) *ReportedProgress {
+	if turn == "" || promptHash == "" {
 		return nil
 	}
+	path, info := claudeTranscriptPath(binding)
+	if info == nil {
+		return nil
+	}
+	owner := info.Sys().(*syscall.Stat_t)
+
 	snapshot := claudeReportSnapshot{Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
 	cache := filepath.Join(launchDir, "reported-progress.json")
 	var previous claudeReportSnapshot
