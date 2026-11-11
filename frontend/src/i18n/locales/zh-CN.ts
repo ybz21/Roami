@@ -5124,6 +5124,7 @@ const zhCN = {
   'hub.speechHint': '配置语音识别模型，用于会话中的语音输入。',
   'hub.tab.usage': "用量与限额",
   'hub.tab.prices': "模型定价",
+  'hub.renameSource': '编辑模型源名称',
   'hub.name': "名称",
   'hub.source': "模型源",
   'hub.upstreamModel': "模型 ID",

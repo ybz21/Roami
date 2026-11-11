@@ -140,3 +140,9 @@ html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav { margin:0; }
 
 .tt-model-hub-tabs.ant-tabs-left > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab { margin:0; }
 html[data-pointer="coarse"] .tt-model-hub-tabs.ant-tabs-left > .ant-tabs-nav .ant-tabs-tab { min-height:var(--tap); }
+
+.tt-model-connection-title { display:flex; align-items:center; gap:var(--sp-1); min-width:0; }
+.tt-model-connection-title strong { min-width:0; }
+.tt-model-source-rename { position:relative; flex-shrink:0; min-width:var(--ctl-h); min-height:var(--ctl-h); }
+html[data-pointer="coarse"] .tt-model-source-rename::after { content:''; position:absolute; inset:calc(var(--sp-1) * -1); min-width:var(--tap); min-height:var(--tap); }
+html[data-pointer="coarse"] .tt-model-source-name-dialog .ant-input { min-height:var(--tap); }
