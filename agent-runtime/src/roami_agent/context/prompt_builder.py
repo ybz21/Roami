@@ -221,15 +221,7 @@ class PromptBuilder:
                 status_scope
                 and json.loads(status_call["arguments_json"]).get("includeResult") is True
             )
-            history_requested = not turn.get("executionRunId") and await self.db.call(
-                lambda db: row(
-                    db,
-                    "SELECT id FROM tool_calls WHERE turn_id=? AND state='succeeded' AND "
-                    "tool_name='conversation_history' LIMIT 1",
-                    (turn["id"],),
-                )
-            )
-            if not turn.get("executionRunId") and not history_requested:
+            if not turn.get("executionRunId"):
                 historical_ids = [
                     plan["modelSourceMessageIds"][index]
                     for index, message in enumerate(plan["messages"][: plan["currentTurnStart"]])
@@ -253,7 +245,7 @@ class PromptBuilder:
                     else []
                 )
                 plan = main_history(plan, configuration)
-            if status_scope and not include_result and not history_requested:
+            if status_scope and not include_result:
                 visible = plan["messages"][plan["currentTurnStart"] :]
                 current_ids = await self.db.call(
                     lambda db: [
