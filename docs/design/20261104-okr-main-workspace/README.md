@@ -14,6 +14,8 @@
 
 [Claude 自动分类请求的传输适配](classifier-transport.md)。
 
+[Claude 原实例中断后的可信接续](claude-interruption-recovery.md)。
+
 [复盘写入契约与失败恢复](review-input-contract.md)（#843）：准确字段、原请求身份和已保存结果对账。
 
 [等待已核验的原日程](scheduled-goal-wait.md)（#841）：先设计真实排期等待，避免用零碎任务代替接续。

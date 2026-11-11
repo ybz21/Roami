@@ -210,6 +210,12 @@ func (s Service) providerRecovery(ctx context.Context, spec Spec, source provide
 		if result, _ := codexOutcome(binding, state.TurnID, state.PromptHash, result.State == "cancelled"); result == nil {
 			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
 		}
+	} else if result.ErrorCode == "CLAUDE_SESSION_INTERRUPTED" {
+		intent, ok := matchingClaudeInterrupt(dir, binding, state.TurnID, state.PromptHash)
+		terminal, evidence, _ := claudeInterruptedEvidence(binding, state.TurnID, state.PromptHash, intent.CreatedMS)
+		if !ok || terminal == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != evidence || result.FinishedMS != terminal.FinishedMS {
+			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
+		}
 	} else if progress := claudeReportedProgress(binding, state.TurnID, state.PromptHash, dir); progress == nil || progress.Directory != binding.Directory {
 		observed, digest := claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
 		if result.ErrorCode != "CLAUDE_API_REQUEST_FAILED" || observed == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != digest {
