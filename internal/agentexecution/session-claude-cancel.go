@@ -45,11 +45,7 @@ func (s Service) cancelRejectedClaude(key string, status Status) (Status, bool, 
 		return status, false, nil
 	}
 	observe := func() (*Result, string) {
-		result, digest := claudeRejectedResponse(state.Binding, state.TurnID, state.PromptHash)
-		if result == nil {
-			return claudeRejectedWindow(state.Binding, state.TurnID, state.PromptHash, true)
-		}
-		return result, digest
+		return claudeExplicitRejectionEvidence(state.Binding, state.TurnID, state.PromptHash)
 	}
 	result, digest := observe()
 	if result == nil {

@@ -211,7 +211,10 @@ func (s Service) providerRecovery(ctx context.Context, spec Spec, source provide
 			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
 		}
 	} else if progress := claudeReportedProgress(binding, state.TurnID, state.PromptHash, dir); progress == nil || progress.Directory != binding.Directory {
-		return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
+		observed, digest := claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
+		if result.ErrorCode != "CLAUDE_API_REQUEST_FAILED" || observed == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != digest {
+			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
+		}
 	}
 	return s.recoveryWorkspace(ctx, *receipt.Workspace)
 }
