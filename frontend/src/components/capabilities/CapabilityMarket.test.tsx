@@ -109,8 +109,30 @@ it('opens full skill details and a usable install action from a single preview r
   vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } })
   render(<CapabilityMarket />)
   fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
-  expect(await screen.findByText('# Original instructions')).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'Original instructions' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'capabilities.market.install' }).hasAttribute('disabled')).toBe(false)
+  expect(api).toHaveBeenCalledTimes(3)
+})
+
+it('renders the skill purpose and examples before exposing the original bundle', async () => {
+  const text = '---\nname: workflow\ndescription: >\n  Build polished pages.\n  Preview the result.\n---\n\n# Workflow\n\n## Examples\n\n**Before and after**\n\n[Read reference](references/example.md)\n\n![Result](assets/result.png)\n\n<script>window.bad = true</script>'
+  const rich = { ...entry, text, files: { 'references/example.md': btoa('# Reference example'), 'assets/result.png': 'iVBORw0KGgo=' } }
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry: rich }] } })
+  render(<CapabilityMarket />)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
+  expect(await screen.findByText('Build polished pages. Preview the result.')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Examples' })).toBeTruthy()
+  expect(screen.queryByText(/name: workflow/)).toBeNull()
+  expect(document.querySelector('.tt-skill-document script')).toBeNull()
+  expect(screen.getByRole('img', { name: 'Result' }).getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
+  fireEvent.click(screen.getByRole('button', { name: 'Read reference' }))
+  expect(await screen.findByLabelText('references/example.md')).toBeTruthy()
+  expect(screen.getByText('# Reference example')).toBeTruthy()
+  fireEvent.click(screen.getByText('capabilities.market.overview'))
+  fireEvent.click(screen.getByText('capabilities.market.files'))
+  expect(screen.getByText('# Reference example')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.backResults' }))
+  expect(await screen.findByRole('button', { name: 'workflow' })).toBeTruthy()
   expect(api).toHaveBeenCalledTimes(3)
 })
 

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Checkbox, Empty, Form, Input, Modal, Segmented, Select, Spin } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Segmented, Select, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { SearchIcon, GearIcon, ChevronRight } from '../../icons'
+import { SearchIcon, GearIcon } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
 import CapabilityEditor, { capabilityError } from './CapabilityEditor'
+import SkillMarketDetail from './SkillMarketDetail'
 import MarketSources, { type MarketSource } from './MarketSources'
 import type { ManagedEntry, ManagedKind } from './capability-format'
 
@@ -28,6 +29,8 @@ export default function CapabilityMarket() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [configuring, setConfiguring] = useState(false)
+  const [listing, setListing] = useState<Listing | null>(null)
+  const opener = useRef<HTMLElement | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [option, setOption] = useState(0)
   const [editing, setEditing] = useState(false)
@@ -60,34 +63,38 @@ export default function CapabilityMarket() {
     return () => request.current?.abort()
   }, [source, popular, sources, load, ranking])
   const search = (cursor = '') => load(source, cursor ? lastQuery.current : query.trim(), cursor, popular ? ranking : 'all-time')
+  const closePreview = () => { setPreview(null); requestAnimationFrame(() => opener.current?.focus()) }
   const view = async (item: Listing) => {
+    opener.current = document.activeElement as HTMLElement | null
     request.current?.abort()
     const abort = new AbortController(); request.current = abort
     setBusy(true); setError(''); setSuccess(''); setInstallError(''); setPreviewId('')
     try {
       const { data } = await api('POST', '/agent/capability-markets/preview', { source, id: item.id, version: item.version }, { signal: abort.signal })
-      if (!abort.signal.aborted) { setPreviewId(data.previewId || ''); setPreview(data); setOption(0); setTargets(['local', 'claude', 'opencode', 'roami']) }
+      if (!abort.signal.aborted) { setPreviewId(data.previewId || ''); setListing(item); setPreview(data); setOption(0); setTargets(['local', 'claude', 'opencode', 'roami']) }
     } catch (caught: any) { if (!abort.signal.aborted) setError(capabilityError(caught.message, t)) } finally { if (!abort.signal.aborted) setBusy(false) }
   }
   const install = async () => {
     setBusy(true); setInstallError('')
     try {
       await api('POST', '/agent/capability-markets/install', { previewId, option, targets })
-      setPreview(null); setSuccess(t('capabilities.market.installed'))
+      closePreview(); setSuccess(t('capabilities.market.installed'))
     } catch (caught: any) { setInstallError(capabilityError(caught.message, t)) } finally { setBusy(false) }
   }
   const selected = preview?.options[option]
+  const variant = preview && preview.options.length > 1 && <Form.Item label={t('capabilities.market.variant')}><Select popupClassName="tt-capability-select-popup" aria-label={t('capabilities.market.variant')} value={option} onChange={setOption} options={preview.options.map((item, value) => ({ value, label: item.label }))} /></Form.Item>
+  const skillPreview = preview?.kind === 'skills' && selected
+  const skillDetail = skillPreview && <SkillMarketDetail key={selected.entry.name} entry={selected.entry} marketUrl={listing?.url} repository={(listing?.id || '').split('/').slice(0, 2).join('/')} installs={listing?.installs === undefined ? undefined : t('capabilities.market.installs.' + resultRanking, { count: new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(listing.installs) })} phone={phone} busy={busy} targets={targets} onTargets={setTargets} installError={installError} canInstall={Boolean(previewId)} onInstall={() => { void install() }} onBack={closePreview} variant={variant} />
   const detail = selected && <div className="tt-market-preview">
-    {preview.options.length > 1 && <Form.Item label={t('capabilities.market.variant')}><Select aria-label={t('capabilities.market.variant')} value={option} onChange={setOption} options={preview.options.map((item, value) => ({ value, label: item.label }))} /></Form.Item>}
-    {preview.kind !== 'skills' && <p>{t('capabilities.market.reviewHint')}</p>}
+    {variant}
+    <p>{t('capabilities.market.reviewHint')}</p>
     {preview.kind === 'cli' && <Alert type="info" message={t('capabilities.market.cliHint')} />}
-    {preview.kind === 'skills' ? <details><summary><ChevronRight />{t('capabilities.instructions')}</summary><pre>{selected.entry.text}</pre></details> : <pre>{JSON.stringify(selected.entry.config || selected.entry.argv, null, 2)}</pre>}
-    {selected.entry.files && <p>{t('capabilities.market.fileCount', { count: Object.keys(selected.entry.files).length })}</p>}
-    {preview.kind === 'skills' && <Form.Item label={t('capabilities.market.installTargets')}><Checkbox.Group className="tt-market-targets" value={targets} disabled={busy} onChange={setTargets} options={['local', 'claude', 'opencode', 'roami'].map(value => ({ value, label: t('capabilities.market.target.' + value) }))} /><p>{t('capabilities.market.installHint')}</p></Form.Item>}
+    <pre>{JSON.stringify(selected.entry.config || selected.entry.argv, null, 2)}</pre>
     {installError && <Alert type="error" message={installError} />}
-    <div className="tt-capability-actions"><a href={selected.entry.origin?.url} target="_blank" rel="noreferrer">{t('capabilities.market.upstream')}</a>{preview.kind === 'skills' ? <Button type="primary" loading={busy} disabled={!previewId || !targets.length} onClick={() => { void install() }}>{t('capabilities.market.install')}</Button> : <Button type="primary" onClick={() => setEditing(true)}>{t('capabilities.market.reviewImport')}</Button>}</div>
+    <div className="tt-capability-actions"><a href={selected.entry.origin?.url} target="_blank" rel="noreferrer">{t('capabilities.market.upstream')}</a><Button type="primary" onClick={() => setEditing(true)}>{t('capabilities.market.reviewImport')}</Button></div>
   </div>
-  return <section className="tt-capability-catalog tt-market">
+  return <section className={"tt-capability-catalog tt-market" + (skillPreview && !phone ? " tt-market-reader" : "")} >
+    <div className="tt-market-browser" hidden={Boolean(skillPreview && !phone)}>
     <Form className="tt-capability-toolbar" onFinish={() => { void search() }}>
       <Select aria-label={t('capabilities.market.source')} value={source || undefined} onChange={reset} options={(sources || []).filter(item => item.enabled).map(item => ({ value: item.id, label: item.name }))} />
       <Input prefix={<SearchIcon size={16} />} aria-label={t('capabilities.market.query')} placeholder={t('capabilities.market.query')} value={query} onChange={event => setQuery(event.target.value)} allowClear />
@@ -106,7 +113,9 @@ export default function CapabilityMarket() {
       <div className="tt-capability-cardfooter"><span className="tt-capability-source">{item.installs === undefined ? item.version || sources?.find(row => row.id === source)?.name : t('capabilities.market.installs.' + resultRanking, { count: new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(item.installs) })}</span><button type="button" className="tt-act" disabled={busy} onClick={() => { void view(item) }}>{t('capabilities.market.view')}</button></div>
     </article>)}</div>
     {next && <div className="tt-market-more"><Button loading={busy} onClick={() => { void search(next) }}>{t('capabilities.market.more')}</Button></div>}
-    {preview && !editing && (phone ? <MobileSubPage title={selected?.entry.name || ''} search={false} onBack={() => { if (!busy) setPreview(null) }}><div className="tt-capability-detail-scroll">{detail}</div></MobileSubPage> : <Modal open title={selected?.entry.name} footer={null} closable={!busy} maskClosable={!busy} keyboard={!busy} onCancel={() => setPreview(null)} className="tt-capability-modal">{detail}</Modal>)}
+    </div>
+    {skillPreview && (phone ? <MobileSubPage title={t('capabilities.market.details')} search={false} onBack={() => { if (!busy) closePreview() }}>{skillDetail}</MobileSubPage> : skillDetail)}
+    {preview && !skillPreview && !editing && (phone ? <MobileSubPage title={selected?.entry.name || ''} search={false} onBack={() => { if (!busy) setPreview(null) }}><div className="tt-capability-detail-scroll">{detail}</div></MobileSubPage> : <Modal open title={selected?.entry.name} footer={null} closable={!busy} maskClosable={!busy} keyboard={!busy} onCancel={() => setPreview(null)} className="tt-capability-modal">{detail}</Modal>)}
     {preview && editing && <CapabilityEditor kind={preview.kind} draft={selected?.entry} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setPreview(null); setSuccess(t('capabilities.market.imported')) }} />}
     {configuring && sources && <MarketSources sources={sources} onClose={() => setConfiguring(false)} onSaved={rows => { setSources(rows); reset(rows.find(row => row.id === source && row.enabled)?.id || rows.find(row => row.enabled)?.id || ''); setConfiguring(false) }} />}
   </section>

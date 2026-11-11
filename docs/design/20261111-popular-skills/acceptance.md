@@ -29,3 +29,14 @@
 新增回归覆盖：GitHub tree 限流、raw 文件失败、固定 commit 归档、精确 blob 读取、正式 API 快照、授权失效不注销 Roami、单次 HTTP 详情请求携带完整内容与安装回执、三种榜单切换、失败后保留原榜单与搜索草稿。
 
 本次前端全量 Vitest 为 227 个文件、1,636 项通过；`GOFLAGS=-p=1` 下的 full 门禁通过，相关 Python 回归 95 项通过。未配置 OIDC 的真实公开接口，三种榜单、一次详情请求、展开完整正文、安装到隔离 Roami 节点均通过独立 Chromium 验收。桌面四种宽度、侧栏开关、英文模式均通过。
+
+## 面向用途的详情展示修订
+
+参考 [skills.sh 的 find-skills 页面](https://skills.sh/vercel-labs/skills/find-skills)，将窄弹窗中的原始文本改为能力中心内的阅读工作区。用途摘要来自技能原始元数据，场景、示例、表格、代码及效果图沿用发布者内容，不补造效果数据；这些外部文件内容保留原文。文件页能查看完整原始指令、引用文件、脚本及许可证，包内文档链接可切换到对应文件。
+
+- 前端全量 Vitest：228 个文件、1,640 项通过。新增覆盖折行元数据、UTF-8 与二进制识别、默认功能文档、效果图片、包内引用、原始文件切换及不执行 HTML。
+- 独立 Chromium 使用真实公开列表与固定版本内容，验证用途摘要、完整排版、SKILL.md / LICENSE 切换、保留列表返回、仅 Roami 安装及英文浅色模式。1280 / 1920 / 2560 / 3440 CSS px 下，侧栏打开和关闭均无文档横向 / 纵向溢出，阅读区可用高度约 906px。
+- Android Redmi Note 8（392 CSS px、coarse）经 ADB 实际点按打开详情、展开安装位置、取消本机 / Claude / OpenCode、切换文件并选择 LICENSE、点按底部安装。隔离节点记录的 commit 为 `e781cb4d07433dfe1d19e924ed45cc61738c55ec`，保留 SKILL.md 与 LICENSE。滑动使详情 scrollTop 从 0 增至 288，底部按钮保持可见且命中，文档无横向溢出。
+- 所有安装测试仅写入 `/tmp/roami-skills-rich` 的隔离 Roami 节点；未向用户本机 Agent 目录安装测试技能。
+
+截图：`/tmp/skills-rich-desktop.png`、`/tmp/skills-rich-examples-desktop.png`、`/tmp/skills-rich-files-desktop.png`、`/tmp/skills-rich-phone.png`、`/tmp/skills-rich-files-phone.png`、`/tmp/skills-rich-light-en.png`。手机 PR 截图仅包含网页内容。
