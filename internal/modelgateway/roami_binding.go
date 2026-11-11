@@ -60,9 +60,15 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		Worker   string `json:"worker"`
 		Revision string `json:"revision"`
 		Restore  bool   `json:"restore"`
+		Role     string `json:"role"`
+		Model    string `json:"model"`
 	}
 	if decodeBody(w, r, &input) != nil {
 		reject(w, 400, "INVALID_MODEL_CATALOG")
+		return
+	}
+	if input.Role != "" && (input.Role != "main" && input.Role != "worker" || input.Model == "" || input.Main != "" || input.Worker != "" || input.Restore) || input.Role == "" && input.Model != "" {
+		reject(w, 400, "INVALID_MODEL_CONFIG")
 		return
 	}
 	s := h.Catalog
@@ -78,7 +84,11 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !input.Restore {
-		for _, name := range []string{input.Main, input.Worker} {
+		names := []string{input.Main, input.Worker}
+		if input.Role != "" {
+			names = []string{input.Model}
+		}
+		for _, name := range names {
 			valid := false
 			for _, model := range s.value.Models {
 				if model.ID == name {
@@ -100,8 +110,18 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 	}
 	s.applying = true
 	key, base := s.credential("roami"), s.baseURL+"/v1"
+	catalog := s.snapshot()
 	s.mu.Unlock()
 	defer func() { s.mu.Lock(); s.applying = false; s.mu.Unlock() }()
+	var rolePatch map[string]any
+	if input.Role != "" {
+		var err error
+		rolePatch, err = s.roamiRolePatch(r, catalog, input.Role, input.Model)
+		if err != nil {
+			reject(w, 409, err.Error())
+			return
+		}
+	}
 	if !input.Restore && backup == nil {
 		main, e1 := readNodeModels(s.ledger.paths, "main")
 		worker, e2 := readNodeModels(s.ledger.paths, "worker")
@@ -141,6 +161,10 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 	patch := backup
 	if !input.Restore {
 		patch = map[string]any{"connection": map[string]any{"baseUrl": base, "apiKey": key}, "main": map[string]any{"model": input.Main, "images": false, "contextWindow": nil, "reasoningEffort": nil}, "worker": map[string]any{"model": input.Worker, "images": false, "contextWindow": nil, "reasoningEffort": nil}}
+		if rolePatch != nil {
+			rolePatch["connection"] = patch["connection"]
+			patch = rolePatch
+		}
 	}
 	if _, err := s.runtimeModels(r, "PUT", patch); err != nil {
 		reject(w, 503, err.Error())
@@ -155,4 +179,47 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 	view := s.view(r.Context())
 	s.mu.Unlock()
 	writeJSON(w, 200, map[string]any{"data": view})
+}
+
+func (s *CatalogStore) roamiRolePatch(r *http.Request, catalog ModelCatalog, selectedRole, model string) (map[string]any, error) {
+	current, err := s.runtimeModels(r, "GET", nil)
+	if err != nil {
+		return nil, err
+	}
+	patch := map[string]any{selectedRole: map[string]any{"model": model, "images": false, "contextWindow": nil, "reasoningEffort": nil}}
+	other := "worker"
+	if selectedRole == "worker" {
+		other = "main"
+	}
+	route, err := readNodeModels(s.ledger.paths, other)
+	if err != nil {
+		return nil, err
+	}
+	matched := ""
+	for _, candidate := range catalog.Models {
+		if route.endpoint == s.baseURL+"/v1" && route.model == candidate.ID {
+			matched = candidate.ID
+			break
+		}
+		if candidate.Strategy != "fixed" || len(candidate.Candidates) != 1 {
+			continue
+		}
+		upstream := candidate.Candidates[0]
+		for _, source := range catalog.Sources {
+			if source.ID == upstream.SourceID && source.Protocol == "openai-completions" && source.BaseURL == route.endpoint && source.APIKey == route.key && upstream.Model == route.model {
+				matched = candidate.ID
+				break
+			}
+		}
+	}
+	if matched == "" {
+		return nil, errors.New("MODEL_ROLE_REQUIRES_BINDING")
+	}
+	row, ok := current[other].(map[string]any)
+	if !ok {
+		return nil, errors.New("MODEL_GATEWAY_UNAVAILABLE")
+	}
+	// Changing the shared endpoint must not reset the other role's overrides.
+	patch[other] = map[string]any{"model": matched, "images": row["images"], "contextWindow": row["configuredContextWindow"], "reasoningEffort": row["reasoningEffort"]}
+	return patch, nil
 }

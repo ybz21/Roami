@@ -270,3 +270,56 @@ it('keeps model selection usable when the optional gateway names cannot be read'
   await screen.findByRole('option', { name: 'provider-model' })
   expect(screen.queryByRole('alert')).toBeNull()
 })
+
+it.each([false, true])('finds and selects WorkBuddy from a direct provider on mobile=%s', async phone => {
+  layout.phone = phone
+  const baseUrl = 'https://provider.example/v1', gatewayUrl = 'http://127.0.0.1:19999'
+  let selected = { ...role, baseUrl }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (path === '/agent/model-gateway/catalog/roles') {
+      selected = { ...selected, model: 'workbuddy-hy4', baseUrl: gatewayUrl + '/v1' }
+      return { data: {} }
+    }
+    if (path === '/agent/model-gateway/catalog') return { data: { revision: 'catalog-revision', baseUrl: gatewayUrl,
+      sources: [{ id: 'direct', baseUrl }], models: [
+        { id: 'direct-glm', name: role.model, strategy: 'fixed', candidates: [{ sourceId: 'direct', model: role.model }] },
+        { id: 'workbuddy-hy4', name: 'WorkBuddy Hy4', strategy: 'fixed', candidates: [{ sourceId: 'workbuddy', model: 'hy4-preview-f' }] },
+      ] } }
+    if (path === '/agent/models') return { data: { models: [role.model] } }
+    return { data: { main: selected, worker: role } }
+  })
+  render(<Composer />)
+  await screen.findByText('agent.reasoning.low')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  await screen.findByRole('option', { name: 'WorkBuddy Hy4' })
+  await waitFor(() => expect(screen.getAllByRole('option', { name: role.model })).toHaveLength(1))
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.models.search' }), { target: { value: 'hy' } })
+  fireEvent.click(screen.getByRole('option', { name: 'WorkBuddy Hy4' }))
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/roles', { role: 'main', model: 'workbuddy-hy4', revision: 'catalog-revision' })
+  expect(vi.mocked(api).mock.calls.some(([method]) => method === 'PUT')).toBe(false)
+  expect(screen.getByRole('button', { name: 'agent.models.trigger' }).textContent).toContain('WorkBuddy Hy4')
+})
+
+it('keeps the old selection after a failed gateway binding and retries the worker role', async () => {
+  const catalog = { revision: 'revision', baseUrl: 'http://127.0.0.1:19999', models: [{ id: 'hy', name: 'WorkBuddy Hy4' }] }
+  let fail = true
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (path === '/agent/model-gateway/catalog') return { data: catalog }
+    if (method === 'POST') {
+      if (fail) { catalog.revision = 'next-revision'; throw { apiError: { code: 'MODEL_CONFIGURATION_BUSY' } } }
+      return { data: {} }
+    }
+    return { data: { main: role, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null, 'worker'))
+  await waitFor(() => expect(view.result.current.models).toContain('gateway:hy'))
+  await act(async () => { expect(await view.result.current.apply('gateway:hy', 'default')).toBe(false) })
+  expect(view.result.current.settings?.worker.model).toBe(role.model)
+  fail = false
+  await act(async () => { expect(await view.result.current.apply('gateway:hy', 'default')).toBe(true) })
+  const writes = vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')
+  expect(writes).toHaveLength(2)
+  expect(writes[0]).toEqual(['POST', '/agent/model-gateway/catalog/roles', { role: 'worker', model: 'hy', revision: 'revision' }])
+  expect(writes[1]).toEqual(['POST', '/agent/model-gateway/catalog/roles', { role: 'worker', model: 'hy', revision: 'next-revision' }])
+})

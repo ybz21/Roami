@@ -4451,6 +4451,7 @@ const enUS = {
   'agent.models.newEndpointKey': "Enter the new service’s API key when changing its URL.",
   'agent.models.httpsRequired': "Use HTTPS for the model service. Local development addresses may use HTTP.",
   'agent.models.failed': "Could not reach the model service. Check the URL, key and model name.",
+  'agent.models.bindRoles': "Choose models for both the main and worker agents in model settings, then return Home to switch.",
   'agent.models.selectCurrent': 'Switch model (current: {name})',
   'agent.models.current': 'Current model · Full name',
   'agent.models.search': "Search or enter a model name",
