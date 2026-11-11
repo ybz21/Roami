@@ -2,6 +2,8 @@
 
 [可视设计说明](index.html)
 
+[长期 Main 的聊天历史读取](history-loading.md)（#892）。
+
 [每个指标一张趋势卡片](metric-cards.md)（2026-11-05）
 
 [Main 优先的团队对话入口](main-first-conversations.md)（2026-11-05）

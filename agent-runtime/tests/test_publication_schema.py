@@ -9,7 +9,7 @@ from roami_agent.storage import migrations
 from roami_agent.storage.database import Database
 
 
-async def test_schema26_history_is_retained_by_real_schema27_upgrade(tmp_path, monkeypatch):
+async def test_schema26_history_is_retained_by_current_upgrade(tmp_path, monkeypatch):
     data = tmp_path / "data"
     path = data / "runtime.db"
     with monkeypatch.context() as patch:
@@ -42,7 +42,7 @@ async def test_schema26_history_is_retained_by_real_schema27_upgrade(tmp_path, m
             await reopened.call(
                 lambda c: c.execute("SELECT MAX(version) FROM schema_meta").fetchone()[0]
             )
-            == 27
+            == migrations.SCHEMA_VERSION
         )
         assert before == await reopened.call(
             lambda c: [tuple(r) for r in c.execute("SELECT * FROM messages ORDER BY rowid")]
@@ -66,7 +66,10 @@ async def test_schema26_history_is_retained_by_real_schema27_upgrade(tmp_path, m
     finally:
         await reopened.close()
     with sqlite3.connect(path) as db:
-        assert db.execute("SELECT MAX(version) FROM schema_meta").fetchone()[0] == 27
+        assert (
+            db.execute("SELECT MAX(version) FROM schema_meta").fetchone()[0]
+            == migrations.SCHEMA_VERSION
+        )
 
 
 def test_schema27_failure_rolls_back_without_publication_grants(tmp_path, monkeypatch):
@@ -101,4 +104,7 @@ def test_schema27_failure_rolls_back_without_publication_grants(tmp_path, monkey
         migrations.upgrade_schema(db, 26)
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
         assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        assert db.execute("SELECT max(version) FROM schema_meta").fetchone()[0] == 27
+        assert (
+            db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
+            == migrations.SCHEMA_VERSION
+        )
