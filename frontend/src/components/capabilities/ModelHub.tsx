@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Alert, App, Button, Dropdown, Input, Popconfirm, Select, Spin, Tabs } from 'antd'
+import { Alert, App, Button, Dropdown, Input, Modal, Popconfirm, Select, Spin, Tabs } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
-import { PlusIcon, LinkIcon } from '../../icons'
+import { PlusIcon, LinkIcon, PencilIcon } from '../../icons'
 import { useSettingsDraft } from '../settings/settings-draft'
 import { SpeechSettings } from '../settings/speech-settings'
 import MobileSubPage from '../MobileSubPage'
@@ -30,6 +30,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const [newSourceId, setNewSourceId] = useState(newID), [newModelId, setNewModelId] = useState(newID)
   const [sourceDrafts, setSourceDrafts] = useState<Record<string, SourceDraft>>({}), [modelDrafts, setModelDrafts] = useState<Record<string, CatalogModel>>({})
   const [returnSource, setReturnSource] = useState('')
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [gatewayKeyDraft, setGatewayKeyDraft] = useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
@@ -99,7 +100,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     let label = source.name
     try { if (!label || label === source.baseUrl) label = new URL(source.baseUrl).host } catch { /* Keep the saved source name. */ }
     return <section className={'tt-model-connection' + (expanded ? ' is-expanded' : '')} key={source.id} aria-label={source.name}>
-      <div className="tt-model-connection-head"><span className="tt-model-connection-icon"><LinkIcon size={24} /></span><div><strong>{label}</strong><small>{source.pluginSourceId ? t('hub.plugin.source') : source.baseUrl}</small></div>
+      <div className="tt-model-connection-head"><span className="tt-model-connection-icon"><LinkIcon size={24} /></span><div><div className="tt-model-connection-title"><strong>{label}</strong><button type="button" className="tt-act tt-model-source-rename" disabled={controller.busy} aria-label={t('hub.renameSource')} onClick={() => setRenaming({ id: source.id, name: source.name })}><PencilIcon /></button></div><small>{source.pluginSourceId ? t('hub.plugin.source') : source.baseUrl}</small></div>
         <Button onClick={() => { if (expanded) { back(); return } setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), editing: true } })); navigate('catalog/source/' + source.id) }}>{t(expanded ? 'common.back' : 'hub.directory.configureSource')}</Button>
       </div>
       {expanded && <div className="tt-model-source-inline">{sourceEditor}</div>}
@@ -119,10 +120,22 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       </div>
     </section>
   })
+  const saveSourceName = async () => {
+    if (!renaming || controller.busy || !renaming.name.trim() || renaming.name.trim() === sources.find(source => source.id === renaming.id)?.name) return
+    const name = renaming.name.trim(), sourceId = renaming.id
+    if (await controller.save({ ...value, sources: sources.map(source => source.id === sourceId ? { ...source, name } : source) })) {
+      setSourceDrafts(previous => previous[sourceId] ? { ...previous, [sourceId]: { ...previous[sourceId], source: { ...previous[sourceId].source, name }, original: { ...previous[sourceId].original, name } } } : previous)
+      setRenaming(null)
+    }
+  }
   const consumers = Object.entries(value.uses).filter(([, users]) => users.length)
   if (embedded && detail) return <div className="onboarding-model-editor">{draftNotice}{editor}</div>
   return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
     {draftNotice}
+    <Modal className="tt-model-source-name-dialog" title={t('hub.renameSource')} open={!!renaming} destroyOnHidden onCancel={() => { if (!controller.busy) setRenaming(null) }} onOk={() => void saveSourceName()} confirmLoading={controller.busy} okText={t('agent.models.save')} cancelText={t('common.cancel')} okButtonProps={{ disabled: !renaming?.name.trim() || renaming.name.trim() === sources.find(source => source.id === renaming.id)?.name }}>
+      {controller.error && <Alert type="error" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />}
+      <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} autoFocus value={renaming?.name || ''} maxLength={100} disabled={controller.busy} onChange={event => setRenaming(previous => previous && { ...previous, name: event.target.value })} onPressEnter={() => void saveSourceName()} /></label>
+    </Modal>
     {(!detail || !layout.phone) && <div className="tt-model-hub-main">
       <Tabs tabPosition={layout.phone ? 'top' : 'left'} className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone && ['usage', 'prices', 'gateway'].includes(key) ? '.compact' : '')) }))} />
       <div className="tt-model-hub-scroll">

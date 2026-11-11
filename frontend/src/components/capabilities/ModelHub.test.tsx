@@ -350,3 +350,14 @@ it('keeps creation and import choices inside one New menu', async () => {
   fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
 })
+
+it('renames a source directly without discovering models or changing other configuration', async () => {
+  mount('')
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.renameSource' }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.change(within(dialog).getByRole('textbox', { name: 'hub.name' }), { target: { value: '  My cloud  ' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
+  await screen.findByRole('region', { name: 'My cloud' })
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [{ ...catalog.sources[0], name: 'My cloud' }], models: catalog.models, drafts: [] }))
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})

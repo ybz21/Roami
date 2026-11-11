@@ -5115,6 +5115,7 @@ const enUS = {
   'hub.speechHint': 'Configure the speech recognition model for voice input in sessions.',
   'hub.tab.usage': "Usage and limits",
   'hub.tab.prices': "Model pricing",
+  'hub.renameSource': 'Edit source name',
   'hub.name': "Name",
   'hub.source': "Model source",
   'hub.upstreamModel': "Model ID",
