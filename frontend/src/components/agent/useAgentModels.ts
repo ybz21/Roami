@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
+import { MODEL_CATALOG_CHANGED, type ModelCatalog } from '../capabilities/model-hub-api'
+import { useAgentData } from './useAgentData'
 import { MODEL_SETTINGS_CHANGED, saveAgentModels, type AgentModelSettings } from './agent-models'
 
 export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'main') {
@@ -14,6 +16,13 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   const [efforts, setEfforts] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false)
   const [error, setError] = useState<any>(null), [version, setVersion] = useState(0)
+  const endpoint = settings?.[role]?.baseUrl
+  const catalog = useAgentData<Pick<ModelCatalog, 'baseUrl' | 'models'>>(endpoint ? '/agent/model-gateway/catalog' : null, 30_000)
+  const refreshCatalog = catalog.refresh
+  useEffect(() => { window.addEventListener(MODEL_CATALOG_CHANGED, refreshCatalog); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, refreshCatalog) }, [refreshCatalog])
+  // An identical model ID at another provider does not identify this gateway's route.
+  const modelNames = catalog.value?.baseUrl && endpoint?.replace(/\/$/, '') === catalog.value.baseUrl.replace(/\/$/, '') + '/v1'
+    ? Object.fromEntries((catalog.value.models || []).map(model => [model.id, model.name])) : {}
   const refresh = useCallback(() => setVersion(v => v + 1), [])
   useEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
   useEffect(() => {
@@ -42,5 +51,5 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
     catch (e) { if (epoch.current === requestedEpoch) setError(e); return false } finally { if (epoch.current === requestedEpoch) { savingRef.current = false; setBusy(false) } }
   }
   const apply = (model: string, effort: string) => model.trim() ? configure({ model: model.trim(), reasoningEffort: effort === 'default' ? null : effort }) : Promise.resolve(false)
-  return { role, settings, models, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
+  return { role, settings, models, modelNames, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
 }
