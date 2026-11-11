@@ -39,6 +39,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 	}
 	binding, err := s.paneBinding(receipt.Binding.Name, false)
 	if err != nil || binding.resourceID() != receipt.Binding.resourceID() || binding.PID != receipt.Binding.PID || binding.Directory != receipt.Binding.Directory {
+		if spec.Executor == "claude" && s.sessionExecutionMissing(*receipt.Binding) {
+			return s.reconcileMissingClaudeRejection(ctx, key, dir, spec, receipt, previous, hasResult)
+		}
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_BINDING_CHANGED")
 	}
 	path, err := s.lifecycleFile(binding)

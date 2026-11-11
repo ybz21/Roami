@@ -44,6 +44,15 @@ func claudeRejectedResponse(binding SessionBinding, turn, promptHash string) (*R
 	return claudeRejectedWindow(binding, turn, promptHash, false)
 }
 
+// Explicit recovery can inspect a changed-input rejection window without accepting it as success.
+func claudeExplicitRejectionEvidence(binding SessionBinding, turn, promptHash string) (*Result, string) {
+	result, digest := claudeRejectedResponse(binding, turn, promptHash)
+	if result == nil {
+		return claudeRejectedWindow(binding, turn, promptHash, true)
+	}
+	return result, digest
+}
+
 var claudeModelCommand = regexp.MustCompile(`^<command-name>/model</command-name>\s*<command-message>model</command-message>\s*<command-args>[^<]*</command-args>$`)
 
 func claudeRejectedWindow(binding SessionBinding, turn, promptHash string, changedInput bool) (*Result, string) {
@@ -188,7 +197,7 @@ func claudeRejectedWindow(binding SessionBinding, turn, promptHash string, chang
 			if !changedInput {
 				return nil, ""
 			}
-		case "last-prompt", "mode", "permission-mode", "atis-latch":
+		case "last-prompt", "mode", "permission-mode", "atis-latch", "cost-state":
 		default:
 			return nil, ""
 		}

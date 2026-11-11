@@ -24,6 +24,11 @@ func (s Service) cancelSession(key string, status Status) (Status, error) {
 	if err := writeJSON(filepath.Join(dir, "cancel.json"), map[string]bool{"cancel": true}); err != nil {
 		return status, err
 	}
+	if status.State == "unknown" {
+		if cancelled, handled, err := s.cancelRejectedClaude(key, status); handled || err != nil {
+			return cancelled, err
+		}
+	}
 	// An elapsed observation deadline does not make the still-bound turn uninterruptible.
 	expired := status.State == "unknown" && status.ObservationErrorCode == "EXECUTION_DEADLINE"
 	if status.State != "running" && status.State != "cancelling" && !expired {
