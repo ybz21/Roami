@@ -389,9 +389,15 @@ async def test_container_requires_actual_review_support_before_model_execution(m
         assert executor.image_id is None
 
 
-async def test_structured_draft_uses_separate_source_reading_without_rewriting(store):
-    model = ReviewModel([{"name": "源值"}, {"accepted": False, "feedback": "保留字段原文"}])
-    runtime, review, _, binding = await active_review(
+async def test_structured_draft_reuses_source_reading_across_corrections(store):
+    model = ReviewModel(
+        [
+            {"name": "源值"},
+            {"accepted": False, "feedback": "保留字段原文"},
+            {"accepted": True, "feedback": ""},
+        ]
+    )
+    runtime, review, turn, binding = await active_review(
         store, model, "name源值，其他材料含别值。只返回JSON。"
     )
     try:
@@ -403,7 +409,12 @@ async def test_structured_draft_uses_separate_source_reading_without_rewriting(s
         payload = json.loads(model.requests[1][-1]["content"])
         assert json.loads(payload["sourceOnlyReading"]) == {"name": "源值"}
         assert json.loads(payload["proposedReplyText"]) == {"name": "别值"}
-        assert len(model.requests) == 2
+        review.observe_context(turn, [{"role": "assistant", "content": "已修正字段"}])
+        await review.check_reply({"json": {"name": "源值"}}, binding)
+        corrected = json.loads(model.requests[2][-1]["content"])
+        assert corrected["sourceOnlyReading"] == payload["sourceOnlyReading"]
+        assert json.loads(corrected["proposedReplyText"]) == {"name": "源值"}
+        assert len(model.requests) == 3
     finally:
         await runtime.close()
 
@@ -658,12 +669,10 @@ async def test_forgotten_source_cannot_return_reading_feedback_after_model_wait(
         await runtime.close()
 
 
-async def test_proven_field_survives_a_later_inconsistent_reading_and_context_rebuild(store):
+async def test_proven_field_survives_context_rebuild_without_rereading(store):
     model = ReviewModel(
         [
             {"label": "Play together"},
-            {"labelPlay together": True},
-            {"labelPlay together": True},
             {"accepted": True, "feedback": ""},
         ]
     )
@@ -684,7 +693,7 @@ async def test_proven_field_survives_a_later_inconsistent_reading_and_context_re
             await review.check_reply({"json": {"label": "labelPlay together"}}, binding)
         assert "field name" in error.value.feedback
         await review.check_reply({"json": {"label": "Play together"}}, binding)
-        assert len(model.requests) == 4
+        assert len(model.requests) == 2
         review.forget_turn(turn)
         assert not review.contexts and not review.verdicts
     finally:

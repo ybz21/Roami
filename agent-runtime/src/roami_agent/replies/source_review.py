@@ -121,12 +121,12 @@ class SourceReplyReview:
             "messages": deepcopy(prompt),
             "source_ids": frozenset(source_ids) if source_ids is not None else None,
             "trigger": turn.get("trigger_kind", "user"),
-            "literal_readings": {},
+            "source_readings": {},
         }
         if previous and all(
             previous[key] == context[key] for key in ("owner", "conversation", "branch", "epoch")
         ):
-            context["literal_readings"] = previous["literal_readings"]
+            context["source_readings"] = previous["source_readings"]
         self.contexts[turn["id"]] = context
 
     def forget_turn(self, turn):
@@ -224,14 +224,14 @@ class SourceReplyReview:
         verdict = self.verdicts.get(key)
         if verdict is None:
             requests = [m["text"] for m in source["userMessages"]]
-            witness_key = fingerprint(
+            source_key = fingerprint(
                 [
-                    source["userMessages"][-1:] or None,
+                    source["userMessages"],
                     id(model),
                     getattr(model, "settings_hash", None),
                 ]
             )
-            facts = list(context["literal_readings"].get(witness_key, []))
+            facts = []
             reading = None
             if requests:
                 try:
@@ -239,13 +239,17 @@ class SourceReplyReview:
                 except ValueError:
                     structured = False
                 if structured or kind == "question":
-                    reading = await self._request_messages(
-                        binding["turnId"],
-                        model,
-                        [{"role": "user", "content": text} for text in requests],
-                        "source_reading",
-                    )
-                    await assert_current_source()
+                    readings = context["source_readings"]
+                    if source_key not in readings:
+                        reading = await self._request_messages(
+                            binding["turnId"],
+                            model,
+                            [{"role": "user", "content": text} for text in requests],
+                            "source_reading",
+                        )
+                        await assert_current_source()
+                        readings[source_key] = reading
+                    reading = readings[source_key]
                     if kind == "question" or isinstance(json.loads(draft), dict):
                         try:
                             reference = json.loads(reading)
@@ -254,7 +258,6 @@ class SourceReplyReview:
                         for item in literal_reading_fields(reference, requests[-1]):
                             if item not in facts:
                                 facts.append(item)
-                        context["literal_readings"][witness_key] = facts
                         mismatch = (
                             unsupported_literal_rewrite(json.loads(draft), facts, requests)
                             if kind == "answer"

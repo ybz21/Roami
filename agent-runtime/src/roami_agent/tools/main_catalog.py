@@ -247,8 +247,6 @@ def register_main_tools(
         labels = [option["label"].strip() for option in args["options"]]
         if len(set(labels)) != len(labels) or any(not label for label in labels):
             raise DomainError("INVALID_QUESTION_OPTIONS")
-        if reply_reviewer is not None:
-            await reply_reviewer.check_question(args, binding)
         return {"question": args, "state": "waiting_user"}
 
     registry.add(

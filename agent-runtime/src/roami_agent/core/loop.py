@@ -212,6 +212,7 @@ class AgentLoop:
                             if part.kind == "text":
                                 text += part.value
                                 buffer += part.value
+                                await preview.observe_text(text)
                                 if (
                                     first_delta
                                     or len(buffer.encode()) >= 1024
@@ -232,7 +233,7 @@ class AgentLoop:
                                 calls.append(part.value)
                             elif part.kind == "usage":
                                 usage = part.value
-                    await preview.finish(calls)
+                    await preview.finish(calls, text)
                     self.preemptible.discard(tid)
                     phase = "tools"
                     invalid_reply = (

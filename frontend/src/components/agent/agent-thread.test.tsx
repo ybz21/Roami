@@ -93,3 +93,27 @@ it.each([true, false])('keeps an immediate failure visible with a late receipt a
   expect(hook.result.current.view?.activities).toHaveLength(1)
   hook.unmount()
 })
+
+it('recovers a completed reply after a suspended stream returns to the foreground', async () => {
+  let hidden = false
+  vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden)
+  const signals: AbortSignal[] = []
+  vi.mocked(api).mockResolvedValue({ data: snapshot('resume') })
+  vi.mocked(openEventStream).mockImplementation(async (_path, signal) => {
+    signals.push(signal)
+    return new Response(new ReadableStream({ start(controller) { signal.addEventListener('abort', () => controller.close(), { once: true }) } }))
+  })
+  const hook = renderHook(() => useAgentThread('resume'))
+  await waitFor(() => expect(hook.result.current.connected).toBe(true))
+  hidden = true
+  act(() => document.dispatchEvent(new Event('visibilitychange')))
+  const completed = { ...snapshot('resume'), snapshotCursor: 4, messages: [{ id: 'answer', branch_id: 'resume', role: 'assistant', status: 'completed', seq: 1, content: { text: 'Delivered while suspended' } }] }
+  vi.mocked(api).mockResolvedValue({ data: completed })
+  hidden = false
+  act(() => document.dispatchEvent(new Event('visibilitychange')))
+  await waitFor(() => expect(hook.result.current.view?.messages[0].content.text).toBe('Delivered while suspended'))
+  expect(signals[0].aborted).toBe(true)
+  await waitFor(() => expect(signals).toHaveLength(2), { timeout: 3500 })
+  expect(openEventStream).toHaveBeenLastCalledWith('/agent/conversations/resume/events?after=4&summaries=true', expect.anything())
+  hook.unmount()
+})

@@ -1,4 +1,4 @@
-"""Throttle real reply argument deltas without publishing a final answer."""
+"""Throttle reply previews without publishing a final answer."""
 
 from roami_agent.protocol.reply_text_stream import MAX_PREVIEW_CHARS, reply_text_preview
 
@@ -17,6 +17,10 @@ class ReplyStreamPreview:
         self.candidate, self.published, self.clipped = None, None, False
         self.flushed = 0
 
+    async def observe_text(self, text):
+        if self.enabled and self.index is None:
+            await self._publish(text)
+
     async def observe(self, part):
         if not self.enabled:
             return
@@ -30,6 +34,10 @@ class ReplyStreamPreview:
             if not self.multiple and part["name"] == "reply"
             else None
         )
+        await self._publish(value)
+
+    async def _publish(self, value):
+        self.seen = True
         self.clipped = value is not None and len(value) > MAX_PREVIEW_CHARS
         self.candidate = value[:MAX_PREVIEW_CHARS] if value else None
         if self.candidate is None:
@@ -48,13 +56,15 @@ class ReplyStreamPreview:
         await self.emit(self.candidate, "generating", self.clipped)
         self.published, self.flushed = self.candidate, self.clock()
 
-    async def finish(self, calls):
+    async def finish(self, calls, text=""):
         if not self.enabled or not self.seen:
             return
         function = calls[0].get("function", {}) if len(calls) == 1 else {}
         value = (
             reply_text_preview(function.get("arguments"), limit=MAX_PREVIEW_CHARS + 1)
             if function.get("name") == "reply" and not self.multiple
+            else text
+            if not calls
             else None
         )
         if value:

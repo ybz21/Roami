@@ -19,7 +19,8 @@ class StreamingReply:
     model = "reply-stream-fixture"
     settings_hash = "unchanged-fixture-settings"
 
-    def __init__(self):
+    def __init__(self, plain_text=False):
+        self.plain_text = plain_text
         self.first, self.second, self.reviewing = (asyncio.Event() for _ in range(3))
         self.advance, self.finish, self.approve = (asyncio.Event() for _ in range(3))
 
@@ -31,15 +32,24 @@ class StreamingReply:
                 "tool", call("source_review_verdict", {"accepted": True, "feedback": ""})
             )
             return
-        yield ModelEvent("tool_delta", {"index": 0, "name": "reply", "arguments": '{"text":"First'})
+        if self.plain_text:
+            yield ModelEvent("text", "First")
+        else:
+            yield ModelEvent(
+                "tool_delta", {"index": 0, "name": "reply", "arguments": '{"text":"First'}
+            )
         self.first.set()
         await self.advance.wait()
-        yield ModelEvent(
-            "tool_delta", {"index": 0, "name": "reply", "arguments": '{"text":"First second'}
-        )
+        if self.plain_text:
+            yield ModelEvent("text", " second")
+        else:
+            yield ModelEvent(
+                "tool_delta", {"index": 0, "name": "reply", "arguments": '{"text":"First second'}
+            )
         self.second.set()
         await self.finish.wait()
-        yield ModelEvent("tool", call("reply", {"text": "First second"}))
+        if not self.plain_text:
+            yield ModelEvent("tool", call("reply", {"text": "First second"}))
 
 
 async def preview_page(runtime, turn):
@@ -50,8 +60,11 @@ def candidate(page):
     return next((m for m in page["messages"] if m["content"].get("replyPreview")), None)
 
 
-async def test_candidate_streams_before_model_finish_and_review_without_final_messages(store):
-    model = StreamingReply()
+@pytest.mark.parametrize("plain_text", [False, True])
+async def test_candidate_streams_before_model_finish_and_review_without_final_messages(
+    store, plain_text
+):
+    model = StreamingReply(plain_text)
     runtime = Runtime(store, model, require_final_tool=True, review_replies=True)
     run = None
     try:

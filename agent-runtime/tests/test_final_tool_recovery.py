@@ -62,7 +62,7 @@ async def test_plain_final_needs_no_provider_tool_selection(store):
             await runtime.close()
 
 
-async def test_content_rejection_releases_required_selection_for_a_question(store):
+async def test_content_rejection_can_end_with_a_question_without_review(store):
     from roami_agent.replies.source_review import EXTRACTION_INSTRUCTIONS, REVIEW_INSTRUCTIONS
 
     main_requests, review_requests = [], []
@@ -85,11 +85,11 @@ async def test_content_rejection_releases_required_selection_for_a_question(stor
         if first == REVIEW_INSTRUCTIONS:
             review_requests.append(body)
             payload = json.loads(body["messages"][-1]["content"])
-            question = payload["draftKind"] == "question"
+            assert payload["draftKind"] == "answer"
             return response(
                 tool_delta(
                     "source_review_verdict",
-                    {"accepted": question, "feedback": "" if question else "Ask for permission"},
+                    {"accepted": False, "feedback": "Ask for permission"},
                 )
             )
         if not body.get("tools"):
