@@ -9,11 +9,14 @@ import BackButton from '../BackButton'
 import CapabilityEditor, { capabilityError } from './CapabilityEditor'
 import SkillMarketDetail from './SkillMarketDetail'
 import MarketSources, { type MarketSource } from './MarketSources'
+import { marketError } from './market-error'
 import type { ManagedEntry, ManagedKind } from './capability-format'
 
 type Listing = { id: string; name: string; description: string; version: string; url: string; installs?: number }
 type Preview = { previewId: string; kind: ManagedKind; options: { label: string; entry: ManagedEntry; images?: Record<string, string> }[] }
 type Ranking = 'all-time' | 'trending' | 'hot'
+type Recovery = { kind: 'sources' } | { kind: 'search'; source: string; query: string; cursor: string; ranking: Ranking } | { kind: 'preview'; source: string; item: Listing }
+type Failure = ReturnType<typeof marketError> & { recovery: Recovery }
 
 export default function CapabilityMarket() {
   const { t, locale } = useI18n()
@@ -28,7 +31,7 @@ export default function CapabilityMarket() {
   const [totals, setTotals] = useState<Record<string, number>>({})
   const [resultRanking, setResultRanking] = useState<Ranking>('all-time')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [failure, setFailure] = useState<Failure | null>(null)
   const [success, setSuccess] = useState('')
   const [configuring, setConfiguring] = useState(false)
   const [listing, setListing] = useState<Listing | null>(null)
@@ -45,19 +48,19 @@ export default function CapabilityMarket() {
   useEffect(() => {
     const abort = new AbortController()
     void api('GET', '/agent/capability-markets', undefined, { signal: abort.signal }).then(({ data }) => {
-      if (!abort.signal.aborted) { setSources(data.sources); setSource(data.sources.find((item: MarketSource) => item.enabled)?.id || ''); setError('') }
-    }).catch((caught: Error) => { if (!abort.signal.aborted) setError(capabilityError(caught.message, t)) })
+      if (!abort.signal.aborted) { setSources(data.sources); setSource(data.sources.find((item: MarketSource) => item.enabled)?.id || ''); setFailure(null) }
+    }).catch((caught: unknown) => { if (!abort.signal.aborted) setFailure({ ...marketError(caught, 'loadFailed', t), recovery: { kind: 'sources' } }) })
     return () => { abort.abort(); request.current?.abort() }
   }, [retry, t])
-  const reset = (id: string) => { request.current?.abort(); setBusy(false); setSource(id); setItems([]); setNext(''); setSearched(false); setTotals({}); setError(''); setSuccess(''); setPreview(null) }
+  const reset = (id: string) => { request.current?.abort(); setBusy(false); setSource(id); setItems([]); setNext(''); setSearched(false); setTotals({}); setFailure(null); setSuccess(''); setPreview(null) }
   const load = useCallback(async (sourceId: string, submitted: string, cursor = '', view: Ranking = 'all-time') => {
     request.current?.abort()
     const abort = new AbortController(); request.current = abort
-    setBusy(true); setError(''); setSuccess('')
+    setBusy(true); setFailure(null); setSuccess('')
     try {
       const { data } = await api('GET', '/agent/capability-markets/' + encodeURIComponent(sourceId) + '/search?query=' + encodeURIComponent(submitted) + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '') + (view !== 'all-time' ? '&view=' + view : ''), undefined, { signal: abort.signal })
       if (!abort.signal.aborted) { lastQuery.current = submitted; if (!submitted && Number.isSafeInteger(data.total) && data.total > 0) setTotals(values => ({ ...values, [sourceId + ':' + view]: data.total })); setResultRanking(submitted ? 'all-time' : view); setItems(rows => cursor ? [...rows, ...data.items.filter((item: Listing) => !rows.some(row => row.id === item.id && row.version === item.version))] : data.items); setNext(data.nextCursor || ''); setSearched(Boolean(submitted)) }
-    } catch (caught: any) { if (!abort.signal.aborted) setError(capabilityError(caught.message, t)) } finally { if (!abort.signal.aborted) setBusy(false) }
+    } catch (caught: unknown) { if (!abort.signal.aborted) setFailure({ ...marketError(caught, 'loadFailed', t), recovery: { kind: 'search', source: sourceId, query: submitted, cursor, ranking: view } }) } finally { if (!abort.signal.aborted) setBusy(false) }
   }, [t])
   const popular = sources?.find(row => row.id === source)?.provider === 'skills_sh'
   useEffect(() => {
@@ -71,15 +74,23 @@ export default function CapabilityMarket() {
     return load(source, cursor ? lastQuery.current : submitted, cursor, popular ? ranking.current : 'all-time')
   }
   const closePreview = () => { setPreview(null); requestAnimationFrame(() => opener.current?.focus()) }
-  const view = async (item: Listing) => {
-    opener.current = document.activeElement as HTMLElement | null
+  const view = async (item: Listing, sourceId = source, rememberOpener = true) => {
+    if (rememberOpener) opener.current = document.activeElement as HTMLElement | null
     request.current?.abort()
     const abort = new AbortController(); request.current = abort
-    setBusy(true); setError(''); setSuccess(''); setInstallError(''); setPreviewId('')
+    setBusy(true); setFailure(null); setSuccess(''); setInstallError(''); setPreviewId('')
     try {
-      const { data } = await api('POST', '/agent/capability-markets/preview', { source, id: item.id, version: item.version }, { signal: abort.signal })
+      const { data } = await api('POST', '/agent/capability-markets/preview', { source: sourceId, id: item.id, version: item.version }, { signal: abort.signal })
       if (!abort.signal.aborted) { setPreviewId(data.previewId || ''); setListing(item); setPreview(data); setOption(0); setTargets(['local', 'claude', 'opencode', 'roami']) }
-    } catch (caught: any) { if (!abort.signal.aborted) setError(capabilityError(caught.message, t)) } finally { if (!abort.signal.aborted) setBusy(false) }
+    } catch (caught: unknown) { if (!abort.signal.aborted) setFailure({ ...marketError(caught, 'previewFailed', t), recovery: { kind: 'preview', source: sourceId, item } }) } finally { if (!abort.signal.aborted) setBusy(false) }
+  }
+  const retryFailed = () => {
+    const recovery = failure?.recovery
+    if (!recovery) return
+    setFailure(null)
+    if (recovery.kind === 'sources') setRetry(value => value + 1)
+    else if (recovery.kind === 'search') void load(recovery.source, recovery.query, recovery.cursor, recovery.ranking)
+    else void view(recovery.item, recovery.source, false)
   }
   const install = async () => {
     setBusy(true); setInstallError('')
@@ -108,16 +119,16 @@ export default function CapabilityMarket() {
       <Button type="primary" htmlType="submit" loading={busy} disabled={!source || (!query.trim() && !popular)}>{t('capabilities.market.search')}</Button>
       <Button icon={<GearIcon size={16} />} disabled={!sources || busy} onClick={() => setConfiguring(true)}>{t('capabilities.market.sources')}</Button>
     </Form>
-    {error && <Alert className="tt-capability-alert" type="error" message={error} action={<Button onClick={() => { if (!sources) setRetry(value => value + 1); else void search() }}>{t('agent.retry')}</Button>} />}
+    {failure && <Alert className="tt-capability-alert" type="error" message={failure.message} description={failure.diagnostic && <details className="tt-market-error-details"><summary>{t('capabilities.market.errorDetails')}</summary><code>{failure.diagnostic}</code></details>} action={<Button onClick={retryFailed}>{t('agent.retry')}</Button>} />}
     {success && <Alert className="tt-capability-alert" type="success" message={success} />}
     {popular && <>
-      <div className="tt-market-heading"><h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3>{searched ? <BackButton label={t('capabilities.market.backPopular')} onClick={() => { setQuery(''); void load(source, '', '', ranking.current) }} disabled={busy} /> : <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>
+      <div className="tt-market-heading">{searched && <BackButton label={t('capabilities.market.backPopular')} onClick={() => { setQuery(''); void load(source, '', '', ranking.current) }} disabled={busy} />}<h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3>{!searched && <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>
       <Tabs className="tt-market-ranking" aria-label={t('capabilities.market.ranking')} activeKey={searched ? ranking.current : resultRanking} onChange={value => { ranking.current = value as Ranking; void load(source, '', '', ranking.current) }} items={(['all-time', 'trending', 'hot'] as const).map(value => ({ key: value, label: <span>{t('capabilities.market.ranking.' + value)}{totals[source + ':' + value] !== undefined && <span className="tt-market-rank-count">{new Intl.NumberFormat(locale).format(totals[source + ':' + value])}</span>}</span> }))} />
     </>}
 
-    {!sources && !error && <Spin />}
+    {!sources && !failure && <Spin />}
     {busy && !items.length && <Spin />}
-    {sources && !items.length && !busy && !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t(searched || popular ? 'capabilities.market.empty' : 'capabilities.market.start')} />}
+    {sources && !items.length && !busy && !failure && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t(searched || popular ? 'capabilities.market.empty' : 'capabilities.market.start')} />}
     <div className="tt-capability-list">{items.map(item => <article className="tt-capability-row" key={item.id + ':' + item.version}>
       <button className="tt-capability-open" type="button" disabled={busy} onClick={() => { void view(item) }}><strong>{item.name}</strong></button>
       <p className="tt-capability-description">{item.description}</p>

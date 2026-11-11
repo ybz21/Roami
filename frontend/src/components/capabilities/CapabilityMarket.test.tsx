@@ -94,7 +94,7 @@ it('loads trending and hot JSON rankings and uses the correct install period', a
 })
 
 it('keeps the previous ranking and query draft when switching rankings fails', async () => {
-  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 1000 }], nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE'))
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 1000 }], nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE')).mockResolvedValueOnce({ data: { items: [{ ...item, installs: 5 }], nextCursor: '' } })
   render(<CapabilityMarket />)
   await screen.findByRole('button', { name: 'workflow' })
   const input = screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement
@@ -103,6 +103,10 @@ it('keeps the previous ranking and query draft when switching rankings fails', a
   await screen.findByRole('alert')
   expect(input.value).toBe('draft')
   expect(screen.getByText('capabilities.market.installs.all-time')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByText('capabilities.market.installs.hot')
+  expect(input.value).toBe('draft')
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=&view=hot', undefined, expect.anything())
 })
 
 it('opens full skill details and a usable install action from a single preview request', async () => {
@@ -211,4 +215,63 @@ it('shows only authoritative ranking counts and retains the successful tab on fa
   await screen.findByText('3,349')
   expect(screen.getByText('9,902')).toBeTruthy()
   expect(screen.getByRole('tab', { name: /capabilities.market.ranking.hot/ }).getAttribute('aria-selected')).toBe('true')
+})
+
+it('retries the initial ranking without submitting a newly typed draft', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockRejectedValueOnce(Object.assign(new Error('The runtime is offline'), { apiError: { code: 'AGENT_RUNTIME_UNAVAILABLE' }, status: 503 })).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('alert')
+  expect(screen.getByText('AGENT_RUNTIME_UNAVAILABLE · HTTP 503')).toBeTruthy()
+  const input = screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: 'unfinished draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByRole('button', { name: 'workflow' })
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=', undefined, expect.anything())
+  expect(input.value).toBe('unfinished draft')
+  expect(screen.queryByRole('alert')).toBeNull()
+})
+
+it('retries the failed preview instead of searching and restores the original opener', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } })
+  render(<CapabilityMarket />)
+  const opener = await screen.findByRole('button', { name: 'capabilities.market.view' })
+  opener.focus()
+  fireEvent.click(opener)
+  await screen.findByText('capabilities.market.error.network')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByRole('heading', { name: 'Original instructions' })
+  expect(api).toHaveBeenLastCalledWith('POST', '/agent/capability-markets/preview', { source: 'skills-sh', id: item.id, version: '' }, expect.anything())
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.backResults' }))
+  await waitFor(() => expect(document.activeElement).toBe(opener))
+  expect(api).toHaveBeenCalledTimes(4)
+})
+
+it('retries the failed page with its original query and cursor without replacing prior results', async () => {
+  const second = { ...item, id: 'owner/repo/second', name: 'second' }
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [], nextCursor: '' } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: 'page-2' } }).mockRejectedValueOnce(new Error('HTTP 502')).mockResolvedValueOnce({ data: { items: [item, second], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(2))
+  const input = screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: 'workflow' } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.search' }))
+  await screen.findByRole('button', { name: 'workflow' })
+  fireEvent.change(input, { target: { value: 'next draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.more' }))
+  await screen.findByText('capabilities.market.error.loadFailed')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByRole('button', { name: 'second' })
+  expect(api).toHaveBeenLastCalledWith('GET', '/agent/capability-markets/skills-sh/search?query=workflow&cursor=page-2', undefined, expect.anything())
+  expect(screen.getAllByRole('button', { name: 'workflow' })).toHaveLength(1)
+  expect(input.value).toBe('next draft')
+  const heading = screen.getByText('capabilities.market.results')
+  expect(heading.previousElementSibling).toBe(screen.getByRole('button', { name: 'capabilities.market.backPopular' }))
+})
+
+it('reloads sources before loading the ranking when source discovery fails', async () => {
+  vi.mocked(api).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByText('capabilities.market.error.network')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
+  await screen.findByRole('button', { name: 'workflow' })
+  expect(vi.mocked(api).mock.calls.map(call => call[1])).toEqual(['/agent/capability-markets', '/agent/capability-markets', '/agent/capability-markets/skills-sh/search?query='])
 })
