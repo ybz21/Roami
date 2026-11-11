@@ -12,7 +12,7 @@
 import { Dropdown, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import type { ReactNode } from 'react'
-import { PanelLeftIcon, SearchIcon } from '../../icons'
+import { ExitFullscreenIcon, FullscreenIcon, PanelLeftIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 
 export type NavEntry = {
@@ -29,7 +29,7 @@ export type NavGroup = { label: string; items: NavEntry[] }
 
 export function Navigation({
   rail, active, groups, onGo, settings, hubAlarm,
-  node, nodeMenu, onToggleRail, tree, onSearch, searchHint,
+  node, nodeMenu, onToggleRail, tree, onSearch, searchHint, fullscreen,
 }: {
   /** 品牌下面那行搜索：⌘K 面板的可见入口（22 设计 §3.5：顶栏撤了，搬到这） */
   onSearch?: () => void
@@ -50,6 +50,7 @@ export function Navigation({
   /** 中心不健康时的一句话原因；给了就在切换器上亮红点（见 cluster/hub-health.ts） */
   hubAlarm?: string
   onToggleRail: () => void
+  fullscreen?: { active: boolean; toggle: () => void }
 }) {
   const { t } = useI18n()
 
@@ -72,6 +73,11 @@ export function Navigation({
         <img src="/logo-mark.svg" width={26} height={26} alt="" aria-hidden />
         {!rail && <strong className="wd">Roami</strong>}
         <div className="tt-nav-brand-actions">
+          {!rail && fullscreen && <button type="button" className="tt-nav-icon tt-nav-fullscreen" onClick={fullscreen.toggle}
+            title={t(fullscreen.active ? 'common.exitFullscreen' : 'common.fullscreen')}
+            aria-label={t(fullscreen.active ? 'common.exitFullscreen' : 'common.fullscreen')} aria-pressed={fullscreen.active}>
+            {fullscreen.active ? <ExitFullscreenIcon size={18} /> : <FullscreenIcon size={18} />}
+          </button>}
           <button type="button" className="tt-nav-icon tt-nav-toggle" onClick={onToggleRail}
             title={t(rail ? 'common.expand' : 'common.collapse')}
             aria-label={t(rail ? 'common.expand' : 'common.collapse')} aria-expanded={!rail}>

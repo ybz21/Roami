@@ -5,6 +5,7 @@ export function useBrowserEnvironment() {
   const [isFs, setIsFs] = useState(false)
   useEffect(() => {
     const on = () => setIsFs(!!(document.fullscreenElement || (document as any).webkitFullscreenElement))
+    on()
     document.addEventListener('fullscreenchange', on)
     document.addEventListener('webkitfullscreenchange', on)
     return () => {
