@@ -56,7 +56,7 @@ func codexUntrackedStop(binding SessionBinding, promptHash string, sinceMS int64
 		return nil, "", nil
 	}
 	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > 256<<20 {
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > maxCodexTranscriptBytes {
 		return nil, "", nil
 	}
 	owner, ok := info.Sys().(*syscall.Stat_t)
@@ -89,7 +89,7 @@ func codexUntrackedStop(binding SessionBinding, promptHash string, sinceMS int64
 		return nil, "", nil
 	}
 	digest := sha256.New()
-	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (256<<20)+1), digest))
+	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, maxCodexTranscriptBytes+1), digest))
 	metadata, authenticated, terminal, final := false, false, false, false
 	active, answer := "", ""
 	matched := 0

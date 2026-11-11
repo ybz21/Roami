@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+const maxCodexTranscriptBytes = 256 << 20
+
 var codexThreadID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 var codexCommandID = regexp.MustCompile(`^exec-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
@@ -101,7 +103,7 @@ func codexObservedTerminal(binding SessionBinding, turn, promptHash string, canc
 		return nil, "", nil
 	}
 	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > 64<<20 {
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > maxCodexTranscriptBytes {
 		return nil, "", nil
 	}
 	owner, ok := info.Sys().(*syscall.Stat_t)
@@ -133,7 +135,7 @@ func codexObservedTerminal(binding SessionBinding, turn, promptHash string, canc
 		return nil, "", nil
 	}
 	hash := sha256.New()
-	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), hash))
+	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, maxCodexTranscriptBytes+1), hash))
 	active, assistant := "", ""
 	metadata, matched, finalAnswer, aborted := false, false, false, false
 	startedTurns := 0

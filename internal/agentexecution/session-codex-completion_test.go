@@ -339,3 +339,44 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 		})
 	}
 }
+
+func TestCodexCompletionLongLivedTranscript(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("CODEX_HOME", root)
+	binding := SessionBinding{ProviderID: completionThread, Directory: t.TempDir()}
+	records := completionRecords(binding, "turn-1", "task prompt")
+	path := saveCompletionRecords(t, root, records[:1])
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Historical token records grow persistent sessions without changing the bound turn.
+	padding := []byte(`{"type":"event_msg","payload":{"type":"token_count","padding":"` + strings.Repeat("x", 64<<10) + `"}}` + "\n")
+	for i := 0; i < 1025; i++ {
+		if _, err := file.Write(padding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, record := range records[1:] {
+		body, err := json.Marshal(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.Write(append(body, '\n')); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	result, proof := codexCompletion(binding, "turn-1", workspaceHash("task prompt"))
+	if result == nil || result.State != "succeeded" || result.Summary != "Verified result" || len(proof) != 64 {
+		t.Fatalf("long-lived terminal transcript not reconciled: result=%+v proof=%q", result, proof)
+	}
+	if err := os.Truncate(path, maxCodexTranscriptBytes+1); err != nil {
+		t.Fatal(err)
+	}
+	if result, proof := codexCompletion(binding, "turn-1", workspaceHash("task prompt")); result != nil || proof != "" {
+		t.Fatal("oversized transcript was accepted")
+	}
+}
