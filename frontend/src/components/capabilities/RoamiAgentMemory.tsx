@@ -27,7 +27,7 @@ function MemoryCatalogPage({ onBack }: { onBack: () => void }) {
     return () => abort.abort()
   }, [version])
   return <div className="tt-model-hub-roami">
-    {!phone && <div className="tt-pagehead tt-model-hub-detail-head"><h2>{t('agent.memoryCenter')}</h2><BackButton onClick={onBack} /></div>}
+    {!phone && <div className="tt-pagehead tt-model-hub-detail-head"><BackButton onClick={onBack} /><h2>{t('agent.memoryCenter')}</h2></div>}
     {failed && <p role="alert">{t('agent.memoryProjectsFailed')} <Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button></p>}
     <AgentMemory fullPage embedded onBack={onBack} projects={projects} select={(cid, branch, message) => { location.hash = '#/home/' + [cid, branch, message].filter(Boolean).map(encodeURIComponent).join('/') }} />
   </div>

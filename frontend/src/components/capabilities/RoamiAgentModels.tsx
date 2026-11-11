@@ -45,5 +45,5 @@ export default function RoamiAgentModels({ onBack, onMemory, inline = false, onS
     <details open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}><summary>{t('agent.models.advanced')}</summary>{advanced && <AgentSettingsForm key={catalog.value?.revision} onModelNames={() => {}} />}</details>
   </div></div>
   if (inline) return body
-  return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><h3>{t('hub.roamiModels')}</h3><BackButton onClick={onBack} /></div>{body}</div>
+  return phone ? <MobileSubPage title={t('hub.roamiModels')} search={false} onBack={onBack} manageHistory={false} keepBottomNav>{body}</MobileSubPage> : <div className="tt-model-hub-roami"><div className="tt-model-hub-detail-head"><BackButton onClick={onBack} /><h3>{t('hub.roamiModels')}</h3></div>{body}</div>
 }

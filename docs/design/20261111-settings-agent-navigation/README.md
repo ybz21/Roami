@@ -19,6 +19,7 @@
 - `AgentCatalog` 根据 `roami/memory` 子路由选择记忆页。`RoamiAgentModels` 增加可选的记忆入口；引导中内嵌的模型配置维持原有内容。
 - `normalizeRoute` 将 `settings/agent/memory` 及旧 `env/agent/memory` 映射到 `capabilities/agents/roami/memory`。查询参数仍由原有 hash 路由与记忆导航管理；模型旧链接沿用已有迁移逻辑。
 - 复用现有 i18n 文案、布局令牌及组件，不新增样式值或后端接口。
+- 返回位置按 [AGENTS.md 的标题栏返回规范](../../../AGENTS.md#back-navigation-starts-the-title-bar)执行：Roami 配置、统一记忆、首页独立记忆页及模型详情的返回控件在标题之前，DOM 顺序与视觉顺序一致；标题栏不换行，长标题省略。
 
 ## 验收记录
 
@@ -30,3 +31,9 @@
 - 类型、i18n、hover、生产构建及 quick / full 质量门禁通过。全量测试以 `npx vitest run --maxWorkers=4 --minWorkers=1` 复核，230 个文件、1676 条全部通过；高并发运行中的一条无关 OKR 保存测试，单独复跑 17 条通过。
 
 一次性截图和测量 JSON 保存在 `/tmp/roami-settings-agent-check/`：`desktop-settings.png`、`desktop-memory.png`、`phone-settings.png`、`phone-roami.png`、`phone-memory.png`、`desktop-audit.json`。截图不提交到主分支；如创建 PR，应按仓库规则上传到 `pr-shots`。
+
+### 返回位置修正验收
+
+2026-11-11：四档桌面宽度分别检查 Roami 配置、统一记忆、首页独立记忆和模型导入详情，共 16 组：返回控件是标题栏首个元素、位于标题左侧、同一行且命中正常，实际点击能返回，无横向溢出。英文浅色主题同样验证通过。Redmi Note 8 硬刷新后通过 ADB 点按记忆页左侧返回箭头，确认回到 Roami 配置。
+
+full 质量门禁及 230 个文件、1676 条测试再次全部通过。测量结果为 `back-header-audit.json`，截图为 `desktop-memory-return-before.png`、`desktop-memory-return-after.png`、`desktop-roami-return-after.png`、`desktop-model-import-return-after.png` 和 `phone-memory-return-after.png`，均存放在同一临时验收目录，随 PR #883 发布到 `pr-shots`。

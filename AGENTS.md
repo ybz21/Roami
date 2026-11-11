@@ -110,6 +110,17 @@ discoverability and a11y. Row-end actions use the quiet ghost button `.tt-act` (
 rest, brightens on hover, `.danger` / `.ok` modifiers for destructive and confirming actions).
 Reach for `<button type="button">` by default; `<a>` only when it really navigates.
 
+## Back Navigation Starts the Title Bar
+
+Hierarchical Back navigation belongs at the **left of the title bar, immediately before the
+title**, on desktop pages, panes, editors, and phone secondary pages. Put the Back control before
+the heading in DOM order and keep them on one row. Never place it after the title, at the far
+right, or in the right-hand action group.
+
+Reuse `BackButton` / `BackLink`: one left-facing Chevron, no visible "Back" / "Back to list" text,
+no border, and a localized accessible name. Keep the title outside the button. Coarse-pointer
+targets remain at least 44px. Real navigation uses `href`; an in-view action uses `type="button"`.
+
 ## Breakpoints: One Entry Point
 
 `useLayout()` is the only way to read layout size. NEVER read `window.innerWidth` and never call

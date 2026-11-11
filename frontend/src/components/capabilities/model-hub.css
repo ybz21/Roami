@@ -3,7 +3,8 @@
 .tt-model-hub-scroll { flex:1; min-width:0; min-height:0; overflow:auto; padding:var(--sp-4) var(--pad-page); }
 .tt-model-hub-scroll > .agent-settings-form { margin-inline:auto; }
 .tt-model-hub-detail { display:flex; flex-direction:column; width:45%; min-width:0; border-left:1px solid var(--border-subtle); }
-.tt-model-hub-detail-head { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); padding:var(--sp-3) var(--pad-page); border-bottom:1px solid var(--border-subtle); }
+.tt-model-hub-detail-head { display:flex; align-items:center; justify-content:flex-start; flex-wrap:nowrap; gap:var(--sp-3); padding:var(--sp-3) var(--pad-page); border-bottom:1px solid var(--border-subtle); }
+.tt-model-hub-detail-head :is(h2,h3) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tt-model-hub-detail-head h3 { margin:0; font-size:var(--fs-lg); }
 .tt-model-hub-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--sp-3); margin-bottom:var(--sp-4); }
 .tt-model-hub-actions h3 { margin:0; font-size:var(--fs-body); }
