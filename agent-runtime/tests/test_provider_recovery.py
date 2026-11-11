@@ -1,10 +1,12 @@
 """Managed recovery must use an explicit owned provider reference, never a recent neighbour."""
 
+import asyncio
 import json
 
 import pytest
 
 from roami_agent.conversation.transcript import Conversations
+from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.protocol.errors import DomainError
@@ -244,7 +246,19 @@ async def test_never_started_task_retries_initial_target_without_phantom_session
 
 
 @pytest.mark.parametrize(
-    "boundary", ["started", "unknown", "provider", "explicit-session", "unspecified", "native"]
+    "boundary",
+    [
+        "started",
+        "unknown",
+        "provider",
+        "explicit-session",
+        "unspecified",
+        "native",
+        "cancel-started",
+        "cancel-contradiction",
+        "cancel-unknown",
+        "cancel-session",
+    ],
 )
 async def test_unstarted_target_preserves_uncertain_or_existing_sessions(store, boundary):
     from roami_agent.storage.task_provider import unstarted_target
@@ -260,6 +274,12 @@ async def test_unstarted_target_preserves_uncertain_or_existing_sessions(store, 
         result["executionStarted"] = True
     if boundary == "unspecified":
         result.pop("executionStarted")
+    if boundary.startswith("cancel-"):
+        result = {"state": "cancelled"}
+        if boundary == "cancel-contradiction":
+            result["executionStarted"] = True
+        if boundary == "cancel-unknown":
+            result["executionStarted"] = None
     initial = (
         {"kind": "session", "sessionId": "original"}
         if boundary == "explicit-session"
@@ -280,6 +300,80 @@ async def test_unstarted_target_preserves_uncertain_or_existing_sessions(store, 
             db.execute(
                 "UPDATE task_attempts SET executor_kind='native' WHERE task_id=?", (task["id"],)
             )
+        if boundary.startswith("cancel-"):
+            db.execute(
+                "UPDATE task_attempts SET state='cancelled',started_ms=? WHERE task_id=?",
+                (1 if boundary == "cancel-started" else None, task["id"]),
+            )
+            if boundary == "cancel-session":
+                db.execute(
+                    "UPDATE task_attempts SET session_id='original-session' WHERE task_id=?",
+                    (task["id"],),
+                )
         return unstarted_target(db, task, 1, {"initialIntent": {"target": initial}})
 
     assert await store.call(check, write=True) is None
+
+
+@pytest.mark.parametrize("legacy_receipt", [False, True])
+async def test_queued_cancellation_does_not_block_first_real_session(store, legacy_receipt):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    cid = (await conversations.create("alice"))["id"]
+    target = {"kind": "project", "projectId": "project"}
+    task = await tasks.create(
+        "alice",
+        cid,
+        "Inspect comments",
+        key="queued-first",
+        executor="codex",
+        target=target,
+        record_intent=True,
+    )
+
+    def preflight_failed(db):
+        db.execute("UPDATE tasks SET state='failed' WHERE id=?", (task["id"],))
+        db.execute(
+            "UPDATE task_attempts SET state='failed',result_json=? WHERE task_id=?",
+            (json.dumps({"state": "failed", "executionStarted": False}), task["id"]),
+        )
+
+    await store.call(preflight_failed, write=True)
+    await tasks.revisions.request("alice", task["id"], "Inspect comments", 1, "queued-second")
+    await tasks.revisions.advance()
+    await tasks.cancel("alice", task["id"], expected_revision=2)
+    dispatcher = TaskDispatcher(store, tasks, None, None, None, asyncio.Event(), {})
+    await dispatcher.cancel()
+    verification = await store.call(
+        lambda db: row(
+            db,
+            "SELECT * FROM jobs WHERE aggregate_id=? AND kind='task.verify' ORDER BY rowid DESC LIMIT 1",
+            (task["id"],),
+        )
+    )
+    await dispatcher.verify(verification)
+
+    def legacy_target(db):
+        cancelled = row(
+            db, "SELECT * FROM task_attempts WHERE task_id=? AND attempt_no=2", (task["id"],)
+        )
+        assert cancelled["state"] == "cancelled" and cancelled["started_ms"] is None
+        result = json.loads(cancelled["result_json"])
+        assert result["executionStarted"] is False
+        if legacy_receipt:
+            result.pop("executionStarted")
+            db.execute(
+                "UPDATE task_attempts SET result_json=? WHERE id=?",
+                (json.dumps(result), cancelled["id"]),
+            )
+        current = row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],))
+        intent = json.loads(current["intent_json"])
+        intent["target"] = {"kind": "session", "sessionId": "never-created"}
+        db.execute("UPDATE tasks SET intent_json=? WHERE id=?", (json.dumps(intent), task["id"]))
+
+    await store.call(legacy_target, write=True)
+    await tasks.revisions.request("alice", task["id"], "Continue comments", 2, "queued-third")
+    await tasks.revisions.advance()
+    current = await store.call(lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],)))
+    assert current["revision"] == 3
+    assert json.loads(current["intent_json"])["target"] == target

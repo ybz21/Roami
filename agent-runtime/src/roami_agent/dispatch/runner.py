@@ -845,7 +845,11 @@ class TaskDispatcher:
                         task["id"],
                         run["id"],
                         task["revision"],
-                        {"state": "cancelled", "summary": "Cancelled before start"},
+                        {
+                            "state": "cancelled",
+                            "summary": "Cancelled before start",
+                            "executionStarted": False,
+                        },
                     )
                 elif (
                     run["executor_kind"] == "cli"

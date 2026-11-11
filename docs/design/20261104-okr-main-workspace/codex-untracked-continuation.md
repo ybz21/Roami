@@ -60,3 +60,15 @@ provider 时，才恢复最初已授权的 new_session/project 目标，仍经�
 尝试都不允许走此分支。真正存在的长期对话继续沿用原会话或受信恢复协议，不用
 新实例消除不确定性。回归覆盖首次失败与旧逻辑留下的预留 session 续派，以及上述
 拒绝边界。
+
+### 排队期间取消的旧轮次
+
+评论运营的历史包含一次宿主排队取消：CLI attempt 为 cancelled、started_ms 为空，
+宿主写入了 Cancelled before start，却没有 executionStarted。这种轮次从未派发，
+不应阻止同一任务首次创建真实实例。宿主今后的回执明确写 executionStarted=false；
+读取旧回执时，仅对 cancelled、started_ms 为空、无 session/provider 且该字段不存在的 CLI
+轮次承认未派发证明。字段显式为 true/null 或已有启动时间仍拒绝推断。
+
+回归通过真实 cancel、dispatcher 收口与 verification 流程生成回执，分别覆盖新旧
+回执后继续原任务，以及相矛盾和不确定的取消状态。该兼容不适用于已启动的 Claude
+模型请求失败；后者仍须正式停止并保留原 provider，不得借此新建替代实例。

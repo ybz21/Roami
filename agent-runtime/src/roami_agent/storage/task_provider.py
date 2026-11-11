@@ -48,7 +48,7 @@ def unstarted_target(db, task, through_attempt, intent):
         return None
     attempts = rows(
         db,
-        "SELECT executor_kind,state,agent_conversation_id,result_json FROM task_attempts "
+        "SELECT executor_kind,state,started_ms,session_id,agent_conversation_id,result_json FROM task_attempts "
         "WHERE task_id=? AND attempt_no<=? ORDER BY attempt_no",
         (task["id"], through_attempt),
     )
@@ -56,11 +56,18 @@ def unstarted_target(db, task, through_attempt, intent):
         return None
     for attempt in attempts:
         result = json.loads(attempt["result_json"]) if attempt["result_json"] else {}
+        # Older host cancellations omitted executionStarted for never-dispatched attempts.
+        queued_cancellation = (
+            attempt["state"] == "cancelled"
+            and attempt["started_ms"] is None
+            and not attempt["session_id"]
+            and "executionStarted" not in result
+        )
         if (
             attempt["executor_kind"] != "cli"
             or attempt["state"] not in {"failed", "cancelled"}
             or attempt["agent_conversation_id"]
-            or result.get("executionStarted") is not False
+            or (result.get("executionStarted") is not False and not queued_cancellation)
         ):
             return None
     target = dict(initial)
