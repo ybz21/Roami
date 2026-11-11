@@ -331,6 +331,8 @@ html[data-pointer="coarse"] .tt-rail-btn::after {
 }
 :where(html[data-pointer="fine"]) .tt-nav-icon:hover { background: var(--list-hover); color: var(--text-bright); }
 .tt-nav-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tt-nav-fullscreen { color: var(--text-bright); }
+.tt-nav-fullscreen:focus-visible { outline: none; box-shadow: inset 0 -2px var(--text-bright); }
 .tt-nav.rail .tt-nav-brand img { display: none; }
 .tt-nav.rail .tt-nav-brand-actions { margin: 0; }
 html[data-pointer="coarse"] .tt-nav-icon::after {

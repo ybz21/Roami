@@ -4,6 +4,7 @@
 
 用户在展开的桌面导航中，可直接从 Roami 品牌行进入或退出浏览器全屏。
 入口位于收起侧栏按钮左侧，沿用导航图标按钮的样式、焦点与触控命中区。
+全屏图标使用亮色文字令牌，不显示蓝色外框；键盘聚焦时用亮色下划线提示位置。
 轨态不增加横向按钮；手机继续使用设置中的全屏入口。不支持 Fullscreen API 时隐藏入口。
 
 ## 技术设计
@@ -11,7 +12,7 @@
 - `AppShell.tsx` 将现有 `useBrowserEnvironment` 的能力、状态和切换动作传给 `Navigation`。
 - `Navigation.tsx` 复用 `FullscreenIcon`、`ExitFullscreenIcon` 和已有中英文翻译；提供 `aria-label` 与 `aria-pressed`。
 - `useBrowserEnvironment.ts` 挂载时读取当前全屏状态，并沿用标准及 WebKit 全屏变化事件同步后续状态。
-- 不新增样式、偏好、依赖或请求。
+- 仅为全屏入口增加亮色图标与键盘焦点样式，不新增偏好、依赖或请求。
 
 ## 验收记录
 
@@ -22,6 +23,7 @@
 - 独立桌面 Chromium：1280、1920、2560、3440 CSS px，侧栏展开及收起均无文档横向溢出。
 - 实际点击品牌行按钮进入全屏、点击退出按钮恢复，`aria-pressed` 和图标同步；外部 `document.exitFullscreen()` 后入口恢复。
 - 中文与英文入口分别显示“全屏 / 退出全屏”和“Fullscreen / Exit fullscreen”，均可切换。
+- 白色图标调整后重跑上述前端与质量门；浏览器实测普通状态的 border 为 0、outline 和 box-shadow 为 none，键盘焦点仅有亮色下划线。
 - 无头 Chromium 不执行浏览器级 Esc 退出，因此用外部退出事件验证同一状态同步路径；未将模拟键盘结果当作真实 Esc 验收。
 - Redmi Note 8 / Android Chrome，经 LAN HTTPS 加载当前生产包，ADB 点按原有设置入口进入并退出全屏，确认 `document.fullscreenElement` 随之变化；手机无横向溢出，顶栏和底栏存在。
 

@@ -73,7 +73,7 @@ export function Navigation({
         <img src="/logo-mark.svg" width={26} height={26} alt="" aria-hidden />
         {!rail && <strong className="wd">Roami</strong>}
         <div className="tt-nav-brand-actions">
-          {!rail && fullscreen && <button type="button" className="tt-nav-icon" onClick={fullscreen.toggle}
+          {!rail && fullscreen && <button type="button" className="tt-nav-icon tt-nav-fullscreen" onClick={fullscreen.toggle}
             title={t(fullscreen.active ? 'common.exitFullscreen' : 'common.fullscreen')}
             aria-label={t(fullscreen.active ? 'common.exitFullscreen' : 'common.fullscreen')} aria-pressed={fullscreen.active}>
             {fullscreen.active ? <ExitFullscreenIcon /> : <FullscreenIcon />}
