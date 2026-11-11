@@ -6,6 +6,7 @@ import re
 from roami_agent.conversation.activity_preview import preview
 from roami_agent.conversation.professional_activity import professional_activity
 from roami_agent.dispatch.routing import public_routing
+from roami_agent.protocol.delivery_receipts import delivery_output
 from roami_agent.protocol.errors import public_error_code
 from roami_agent.storage.database import rows
 
@@ -150,6 +151,7 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
             )
         except (ValueError, TypeError, KeyError):
             pass
+        output = delivery_output(call["tool_name"], call["state"], value)
         command_failed = (
             call["tool_name"] == "shell"
             and call["state"] == "succeeded"
@@ -180,7 +182,9 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                 ),
                 "preview": {
                     "input": preview(json.loads(call["arguments_json"]), limit=2000),
-                    "output": preview(value, limit=4000) if call.get("result_json") else None,
+                    "output": preview(output, limit=4000)
+                    if call.get("result_json") and output is not None
+                    else None,
                 },
                 "anchorMessageId": anchor(task) if task else call["assistant_message_id"],
                 "taskId": task["id"] if task else None,

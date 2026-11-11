@@ -5,6 +5,7 @@ import json
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.activity_preview import preview
 from roami_agent.conversation.professional_activity import professional_payload
+from roami_agent.protocol.delivery_receipts import delivery_output
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import history, owned
@@ -47,6 +48,7 @@ def activity_payload(db, owner, cid, aid, branch_id=None, *, task_id=None):
                 output = json.loads(content["text"])
             except (ValueError, TypeError, KeyError):
                 output = content
+        output = delivery_output(call["tool_name"], call["state"], output)
     elif kind == "task":
         task = row(db, "SELECT intent_json FROM tasks WHERE id=? AND owner_id=?", (ident, owner))
         if not task:

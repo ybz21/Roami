@@ -10,6 +10,7 @@ import httpx
 from jsonschema import ValidationError
 
 from roami_agent.conversation.activity_events import activity_event as event
+from roami_agent.protocol.delivery_receipts import delivery_receipt
 from roami_agent.protocol.errors import (
     DomainError,
     ProjectReviewInputError,
@@ -789,7 +790,11 @@ class ToolGateway:
                 turn["branch_id"],
                 "tool",
                 {
-                    "text": encoded(committed_value),
+                    "text": encoded(
+                        delivery_receipt(operation_name, committed_value)
+                        if committed_state == "succeeded"
+                        else committed_value
+                    ),
                     "tool_call_id": call["id"],
                     **({"memoryIds": committed_memories} if committed_memories else {}),
                 },
