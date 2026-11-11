@@ -61,13 +61,20 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 	// Child completion notifications are retained diagnostics, not root identity changes.
 	conflict := state.ProviderConflict
 	foreignActivity := conflict != nil && (conflict.Executor != "codex" || conflict.Hook != "" || conflict.Type != "agent-turn-complete")
-	if state.Executor != "codex" || state.State != "unknown" || state.UnknownReason != "SESSION_PROMPT_MISMATCH" || state.LaunchKey != key || foreignActivity || state.Binding.ProviderID != receipt.Binding.ProviderID || state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || state.PromptHash != workspaceHash(sessionPrompt(dir, spec)) {
+	untracked := untrackedCodexLaunch(&state, spec, key)
+	if state.Executor != "codex" || state.State != "unknown" || (!untracked && state.UnknownReason != "SESSION_PROMPT_MISMATCH") || state.LaunchKey != key || foreignActivity || state.Binding.ProviderID != receipt.Binding.ProviderID || state.Binding.resourceID() != binding.resourceID() || state.Binding.PID != binding.PID || state.Binding.Directory != binding.Directory || (!untracked && state.PromptHash != workspaceHash(sessionPrompt(dir, spec))) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
 	}
 	if err = ctx.Err(); err != nil {
 		return empty, err
 	}
-	result, evidence, commands := codexObservedTerminal(state.Binding, state.TurnID, state.PromptHash, false, false, true)
+	observe := func() (*Result, string, map[string]int64) {
+		if untracked {
+			return codexUntrackedLaunchStop(state.Binding, dir, spec)
+		}
+		return codexObservedTerminal(state.Binding, state.TurnID, state.PromptHash, false, false, true)
+	}
+	result, evidence, commands := observe()
 	if result == nil || !sessionProcessesStopped(state.Binding) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_STOP_UNCONFIRMED")
 	}
@@ -93,7 +100,7 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 	if readJSON(filepath.Join(root, "writer.json"), &writer) != nil || !hasResult && writer.Key != key {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_WORKSPACE_CHANGED")
 	}
-	checked, latest, _ := codexObservedTerminal(state.Binding, state.TurnID, state.PromptHash, false, false, true)
+	checked, latest, _ := observe()
 	if checked == nil || latest != evidence || !sessionProcessesStopped(state.Binding) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_EVIDENCE_CHANGED")
 	}

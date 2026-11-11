@@ -265,18 +265,29 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 	}
 	dir, _ := s.directory(key)
 	var spec Spec
-	if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" || workspaceHash(sessionPrompt(dir, spec)) != state.PromptHash {
+	if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Executor != "codex" {
+		return status, false, nil
+	}
+	untracked := untrackedCodexLaunch(state, spec, key) && state.Binding.resourceID() == status.Binding.resourceID() && state.Binding.PID == status.Binding.PID && state.Binding.Directory == status.Binding.Directory
+	if !untracked && workspaceHash(sessionPrompt(dir, spec)) != state.PromptHash {
 		return status, false, nil
 	}
 	_, cancelErr := os.Stat(filepath.Join(dir, "cancel.json"))
-	if cancelErr == nil {
+	if cancelErr == nil && !untracked {
 		switch state.UnknownReason {
 		case "", "SESSION_INTERRUPTED", "SESSION_STOP_UNCONFIRMED", "SESSION_COMPLETION_MISMATCH":
 		default:
 			return status, false, nil
 		}
 	}
-	result, evidence, commands := codexObservedOutcome(*status.Binding, state.TurnID, state.PromptHash, cancelErr == nil, false)
+	var result *Result
+	var evidence string
+	var commands map[string]int64
+	if untracked {
+		result, evidence, commands = codexUntrackedLaunchStop(*status.Binding, dir, spec)
+	} else {
+		result, evidence, commands = codexObservedOutcome(*status.Binding, state.TurnID, state.PromptHash, cancelErr == nil, false)
+	}
 	if result == nil || !sessionProcessesStopped(*status.Binding) {
 		return status, false, nil
 	}
@@ -302,7 +313,13 @@ func (s Service) reconcileCodexCompletion(key string, status Status, state *sess
 	if _, err := os.Stat(filepath.Join(dir, "cancel.json")); err == nil {
 		result.State, result.Summary = "cancelled", "Session task stopped after cancellation request"
 	}
-	proof := completionSource{state.Binding.ProviderID, state.TurnID, evidence, result.FinishedMS}
+	sourceTurn := state.TurnID
+	if untracked {
+		// This is a stopped launch window, not success of the stale authenticated turn.
+		sourceTurn = ""
+		result.StopEvidence = evidence
+	}
+	proof := completionSource{state.Binding.ProviderID, sourceTurn, evidence, result.FinishedMS}
 	proofPath := filepath.Join(dir, "completion-source.json")
 	var prior completionSource
 	if err := readJSON(proofPath, &prior); errors.Is(err, os.ErrNotExist) {
