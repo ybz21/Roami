@@ -33,7 +33,7 @@ func interruptedClaudeRecords(binding SessionBinding, prompt, turn string, since
 }
 
 func TestClaudeInterruptedEvidenceRequiresCompleteScopedTerminalWindow(t *testing.T) {
-	for _, mode := range []string{"normal", "compact", "tool search", "wrong hash", "wrong prompt", "wrong provider", "wrong cwd", "sidechain", "wrong parent", "duplicate uuid", "missing result", "duplicate call", "missing marker", "marker in output", "old marker", "future marker", "wrong marker turn", "later user", "later assistant", "later request", "unknown metadata", "background", "untyped background", "agent", "historical agent", "compact gap", "hidden summary", "untracked summary", "malformed", "writable", "symlink", "oversize"} {
+	for _, mode := range []string{"normal", "compact", "tool search", "file history delta", "late file history delta", "wrong hash", "wrong prompt", "wrong provider", "wrong cwd", "sidechain", "wrong parent", "duplicate uuid", "missing result", "duplicate call", "missing marker", "marker in output", "old marker", "future marker", "wrong marker turn", "later user", "later assistant", "later request", "unknown metadata", "background", "untyped background", "agent", "historical agent", "compact gap", "hidden summary", "untracked summary", "malformed", "writable", "symlink", "oversize"} {
 		t.Run(mode, func(t *testing.T) {
 			binding, path, _, prompt := reportFixture(t)
 			since := time.Now().UnixMilli()
@@ -41,6 +41,10 @@ func TestClaudeInterruptedEvidenceRequiresCompleteScopedTerminalWindow(t *testin
 			hash := workspaceHash(prompt)
 			marker := len(records) - 2
 			switch mode {
+			case "file history delta":
+				records = append(records[:marker], append([]map[string]any{{"type": "file-history-delta", "messageId": "calls", "trackingPath": "report.md"}}, records[marker:]...)...)
+			case "late file history delta":
+				records = append(records, map[string]any{"type": "file-history-delta", "messageId": "calls", "trackingPath": "report.md"})
 			case "wrong hash":
 				hash = workspaceHash("other")
 			case "wrong prompt":
@@ -116,7 +120,7 @@ func TestClaudeInterruptedEvidenceRequiresCompleteScopedTerminalWindow(t *testin
 				}
 			}
 			result, digest, completed := claudeInterruptedEvidence(binding, "turn", hash, since)
-			want := mode == "normal" || mode == "compact" || mode == "tool search"
+			want := mode == "normal" || mode == "compact" || mode == "tool search" || mode == "file history delta" || mode == "late file history delta"
 			if !want {
 				if result != nil {
 					t.Fatalf("unproved %s accepted", mode)

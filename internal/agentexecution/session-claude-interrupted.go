@@ -108,7 +108,7 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 		}
 		if terminal {
 			switch record.Type {
-			case "cost-state", "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "file-history-snapshot":
+			case "cost-state", "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "file-history-snapshot", "file-history-delta":
 				continue
 			}
 			return nil, "", nil
@@ -129,7 +129,7 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 					}
 					compact = true
 				}
-			case "attachment", "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "api-request-blob", "api-request", "api-request-shape", "file-history-snapshot", "cost-state":
+			case "attachment", "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "api-request-blob", "api-request", "api-request-shape", "file-history-snapshot", "file-history-delta", "cost-state":
 			default:
 				return nil, "", nil
 			}
