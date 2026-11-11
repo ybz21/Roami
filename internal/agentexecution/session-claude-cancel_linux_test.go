@@ -17,8 +17,19 @@ func claudeCancellationWorker(t *testing.T) (*exec.Cmd, <-chan error) {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- command.Wait() }()
-	t.Cleanup(func() { _ = command.Process.Kill() })
+	go func() {
+		done <- command.Wait()
+		close(done)
+	}()
+	t.Cleanup(func() {
+		_ = command.Process.Kill()
+		// Reap fixture children before the next case takes a process snapshot.
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("fixture worker not reaped")
+		}
+	})
 	return command, done
 }
 
