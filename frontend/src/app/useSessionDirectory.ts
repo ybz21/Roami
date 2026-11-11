@@ -43,19 +43,20 @@ export function useSessionDirectory() {
   const nativeNames = native.value.map(record => nativeSessionName(record.nativeSessionId)).sort().join('\n')
   const sessIds = useMemo(() => {
     if (!cliIds) return null
-    const byId = { ...cliIds.byId }, byName = { ...cliIds.byName }
+    const byId = Object.fromEntries(Object.entries(cliIds.byId).filter(([, name]) => !overview.closingNames?.has(name)))
+    const byName = Object.fromEntries(Object.entries(cliIds.byName).filter(([name]) => !overview.closingNames?.has(name)))
     for (const name of overview.value.map(item => item.name)) { byId[name] = name; byName[name] = name }
     for (const name of nativeNames.split('\n').filter(Boolean)) { byId[name] = name; byName[name] = name }
     return { byId, byName }
-  }, [cliIds, nativeNames, overview.value])
+  }, [cliIds, nativeNames, overview.value, overview.closingNames])
   const sessList = useMemo(() => {
     const locations = new Map(overview.value.map(session => [session.name, session]))
     const pending = overview.value.filter(item => item.lifecycle && !cliSessions.some(session => session.name === item.name)).map(item => ({ ...item, agent: item.agent || undefined }))
-    return [...pending, ...cliSessions.map(session => {
+    return [...pending, ...cliSessions.filter(session => !overview.closingNames?.has(session.name)).map(session => {
       const location = locations.get(session.name)
       return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch, lifecycle: location?.lifecycle }
     }), ...native.value.map(nativeSessionRecord)]
-  }, [cliSessions, native.value, overview.value])
+  }, [cliSessions, native.value, overview.value, overview.closingNames])
   useEffect(() => { setSessionLabels(Object.fromEntries(sessList.map(session => [session.name, session.label || session.name]))) }, [sessList])
   const rename = (oldName: string, newName: string) => setSessIds((m) => {
     const id = m?.byName[oldName]

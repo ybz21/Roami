@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { App as AntApp, Button, Input } from 'antd'
+import { App as AntApp, Button, Input, Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { revealInspector } from '../shell/inspector'
@@ -39,6 +39,26 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
   }
   const stageKey = 'session.lifecycle.stage.' + op.stage
   const errorKey = 'session.lifecycle.error.' + op.errorCode
+  const preparing = op.kind === 'create' && !lifecycleEnded(op) && op.state !== 'attention'
+  if (preparing) return <div className="tt-lifecycle-wait">
+    <div className="tt-lifecycle-wait-content">
+      <div className="tt-lifecycle-wait-status" role="status" aria-live="polite">
+        <Spin size="large" />
+        <strong>{lifecycleStatus(op, t)}</strong>
+        <span>{t(stageKey)}</span>
+      </div>
+      <span className="tt-lifecycle-wait-name">{op.intent.name || op.resourceId}</span>
+      {!op.cancelRequested && <Button loading={busy} onClick={() => void act('cancel')}>{t('session.lifecycle.cancel')}</Button>}
+      <details className="tt-lifecycle-wait-draft">
+        <summary>{t('session.lifecycle.draft')}</summary>
+        <div className="tt-lifecycle-draft">
+          <label htmlFor={draftId}>{t('session.lifecycle.draft')}</label>
+          <Input.TextArea id={draftId} value={draft} autoSize={{ minRows: 3, maxRows: 8 }} onChange={e => setDraft(e.target.value)} />
+          <span>{t('session.lifecycle.draftHint')}</span>
+        </div>
+      </details>
+    </div>
+  </div>
   return <div className="tt-lifecycle-detail">
     <div className="tt-lifecycle-summary">
       <strong>{op.intent.name || op.resourceId}</strong>
@@ -76,12 +96,12 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
   const { t, locale } = useI18n()
   const operations = useSessionLifecycle()
   const native = useNativeSessionList(true, true)
-  const nativeClosures = native.value.filter(record => record.lifecycle !== 'closed' && (record.lifecycle === 'closing' || record.closureError))
+  const nativeClosures = native.value.filter(record => record.lifecycle !== 'closed' && !!record.closureError)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
-  const op = operations.value.find(o => o.operationId === selected)
-  const active = operations.value.filter(o => !lifecycleEnded(o))
-  const pendingCount = active.length + nativeClosures.filter(record => record.lifecycle === 'closing').length
+  const op = operations.value.find(o => o.operationId === selected && (o.kind === 'create' || o.state === 'attention'))
+  const active = operations.value.filter(o => !lifecycleEnded(o) && (o.kind === 'create' || o.state === 'attention'))
+  const pendingCount = active.length + nativeClosures.length
   const show = () => { if (!phone) revealInspector(); setOpen(true) }
   const close = () => { if (selected) setSelected(null); else setOpen(false) }
   return <>
@@ -106,7 +126,7 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
 export function PendingSessionLifecycle({ name }: { name: string }) {
   const { value } = useSessionLifecycle()
   const op = blockingLifecycle(value, name)
-  return op ? <div className="tt-lifecycle-guard"><LifecycleOperationView key={op.operationId} op={op} /></div> : null
+  return op?.kind === 'create' ? <div className="tt-lifecycle-guard"><LifecycleOperationView key={op.operationId} op={op} /></div> : null
 }
 
 export function SessionLifecycleDraftNotice({ name }: { name: string }) {

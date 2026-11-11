@@ -20,11 +20,15 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 it('saves drafts across navigation and never sends while preparing', async () => {
   const view = render(content(op))
+  expect(document.querySelector('details')?.open).toBe(false)
+  expect(document.querySelector('.ant-spin-spinning')).toBeTruthy()
+  fireEvent.click(document.querySelector('.tt-lifecycle-wait-draft > summary')!)
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Follow-up draft' } })
   expect(screen.queryByRole('button', { name: 'Send follow-up' })).toBeNull()
   expect(sendSessionPrompt).not.toHaveBeenCalled()
   view.unmount()
   const restored = render(content(op))
+  fireEvent.click(document.querySelector('.tt-lifecycle-wait-draft > summary')!)
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Follow-up draft')
   restored.rerender(content({ ...op, state: 'succeeded' }))
   fireEvent.click(screen.getByRole('button', { name: 'Send follow-up' }))
@@ -48,7 +52,7 @@ it('offers branch retention rather than claiming a removed workspace can be kept
 })
 
 it('keeps the original request visible when no agent was selected', () => {
-  render(content({ ...op, intent: { task: 'Saved without an agent' } }))
+  render(content({ ...op, state: 'attention', intent: { task: 'Saved without an agent' } }))
   expect(screen.getByText('Saved without an agent')).toBeTruthy()
 })
 
@@ -69,6 +73,7 @@ it('rearms phone Back after returning from an operation to the list', async () =
 
 it('keeps simultaneous pending and inspector drafts synchronized without duplicate field IDs', () => {
  render(<I18nProvider><AntApp><LifecycleOperationView op={op} /><LifecycleOperationView op={op} /></AntApp></I18nProvider>)
+ screen.getAllByText('Follow-up draft').forEach(el => { if (el.tagName === 'SUMMARY') fireEvent.click(el) })
  const fields = screen.getAllByRole('textbox') as HTMLTextAreaElement[]
  expect(fields[0].id).not.toBe(fields[1].id)
  fireEvent.change(fields[0], { target: { value: 'Shared draft' } })
@@ -82,6 +87,7 @@ it('hides completed history while keeping unresolved operations and native closu
   state.operations = [
     { ...op, operationId: 'done', state: 'succeeded', intent: { name: 'Already cleaned' } },
     { ...op, operationId: 'cancelled', state: 'cancelled', intent: { name: 'Already cancelled' } },
+    { ...op, operationId: 'closing', kind: 'close', state: 'running', intent: { name: 'Closing CLI' } },
     { ...op, state: 'attention', intent: { name: 'Needs recovery' } },
   ]
   state.native = [
@@ -93,8 +99,9 @@ it('hides completed history while keeping unresolved operations and native closu
   expect(screen.queryByText('Already cleaned')).toBeNull()
   expect(screen.queryByText('Already cancelled')).toBeNull()
   expect(screen.queryByText('Closed native')).toBeNull()
+  expect(screen.queryByText('Closing CLI')).toBeNull()
   expect(screen.getByRole('button', { name: /Needs recovery/ })).toBeTruthy()
-  expect(screen.getByRole('button', { name: /Closing native/ })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /Closing native/ })).toBeNull()
 })
 
 it('keeps the selected detail and draft when the operation completes', () => {
@@ -103,6 +110,7 @@ it('keeps the selected detail and draft when the operation completes', () => {
   const view = render(content)
   fireEvent.click(screen.getByRole('button', { name: /Background work/ }))
   fireEvent.click(screen.getByRole('button', { name: /My task/ }))
+  fireEvent.click(document.querySelector('.tt-lifecycle-wait-draft > summary')!)
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep this follow-up' } })
   state.operations = [{ ...op, state: 'succeeded' }]
   view.rerender(<I18nProvider><AntApp><SessionLifecycleInbox onOpen={() => {}} /></AntApp></I18nProvider>)
