@@ -178,3 +178,108 @@ async def test_explicit_closure_cannot_be_bypassed_by_provider_recovery(continua
     )
     with pytest.raises(DomainError, match="TASK_SESSION_CLOSED"):
         await CodingExecutor(store, Settings()).recovery_source(task, run, "original-session")
+
+
+@pytest.mark.parametrize("phantom_continuation", [False, True])
+@pytest.mark.parametrize("project_target", [False, True])
+async def test_never_started_task_retries_initial_target_without_phantom_session(
+    store, tmp_path, phantom_continuation, project_target
+):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    cid = (await conversations.create("alice"))["id"]
+    original = (
+        {"kind": "project", "projectId": "project"}
+        if project_target
+        else {"kind": "new_session", "directory": str(tmp_path)}
+    )
+    task = await tasks.create(
+        "alice",
+        cid,
+        "Collect evidence",
+        key="preflight",
+        executor="claude",
+        target=original,
+        record_intent=True,
+    )
+    result = {
+        "state": "failed",
+        "executionStarted": False,
+        "summary": "WORKSPACE_PRIOR_RESULT_MISSING",
+    }
+
+    def failed(db):
+        if project_target:
+            db.execute(
+                "UPDATE tasks SET target_json=? WHERE id=?",
+                (
+                    json.dumps({"projectId": "project", "workspaceId": "original-workspace"}),
+                    task["id"],
+                ),
+            )
+        intent = json.loads(
+            row(db, "SELECT intent_json FROM tasks WHERE id=?", (task["id"],))["intent_json"]
+        )
+        if phantom_continuation:
+            intent["initialIntent"] = dict(intent)
+            intent["target"] = {"kind": "session", "sessionId": "never-created"}
+        db.execute(
+            "UPDATE tasks SET state='failed',intent_json=? WHERE id=?",
+            (json.dumps(intent), task["id"]),
+        )
+        db.execute(
+            "UPDATE task_attempts SET state='failed',session_id='never-created',result_json=?,finished_ms=1 WHERE task_id=?",
+            (json.dumps(result), task["id"]),
+        )
+
+    await store.call(failed, write=True)
+    await tasks.revisions.request("alice", task["id"], "Continue collecting", 1, "retry-preflight")
+    await tasks.revisions.advance()
+    updated = await store.call(lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (task["id"],)))
+    intent = json.loads(updated["intent_json"])
+    assert updated["id"] == task["id"] and updated["revision"] == 2
+    expected = {**original, "workspaceId": "original-workspace"} if project_target else original
+    assert intent["executor"] == "claude" and intent["target"] == expected
+    assert "providerRunId" not in intent["continuation"]
+
+
+@pytest.mark.parametrize(
+    "boundary", ["started", "unknown", "provider", "explicit-session", "unspecified", "native"]
+)
+async def test_unstarted_target_preserves_uncertain_or_existing_sessions(store, boundary):
+    from roami_agent.storage.task_provider import unstarted_target
+
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    cid = (await conversations.create("alice"))["id"]
+    task = await tasks.create(
+        "alice", cid, "Read evidence", key="boundary", executor="claude", record_intent=True
+    )
+    result = {"state": "failed", "executionStarted": False}
+    if boundary == "started":
+        result["executionStarted"] = True
+    if boundary == "unspecified":
+        result.pop("executionStarted")
+    initial = (
+        {"kind": "session", "sessionId": "original"}
+        if boundary == "explicit-session"
+        else {"kind": "new_session", "directory": "/tmp"}
+    )
+
+    def check(db):
+        db.execute(
+            "UPDATE task_attempts SET state=?,agent_conversation_id=?,result_json=? WHERE task_id=?",
+            (
+                "unknown" if boundary == "unknown" else "failed",
+                "provider" if boundary == "provider" else None,
+                json.dumps(result),
+                task["id"],
+            ),
+        )
+        if boundary == "native":
+            db.execute(
+                "UPDATE task_attempts SET executor_kind='native' WHERE task_id=?", (task["id"],)
+            )
+        return unstarted_target(db, task, 1, {"initialIntent": {"target": initial}})
+
+    assert await store.call(check, write=True) is None

@@ -505,7 +505,7 @@ class TaskRevisions:
                 else:
                     intent.pop("coordinationAuthorization", None)
                 previous = intent.get("continuation", {})
-                from roami_agent.storage.task_provider import provider_binding
+                from roami_agent.storage.task_provider import provider_binding, unstarted_target
 
                 provider = provider_binding(
                     db,
@@ -558,7 +558,10 @@ class TaskRevisions:
                 if intent["target"]["kind"] == "new_project":
                     intent.setdefault("provisionLaunchId", run["launch_id"])
                 target = json.loads(task["target_json"]) if task["target_json"] else {}
-                if provider or run["executor_kind"] == "cli" and run["session_id"]:
+                fresh_target = unstarted_target(db, task, run["attempt_no"], intent)
+                if fresh_target:
+                    intent["target"] = fresh_target
+                elif provider or run["executor_kind"] == "cli" and run["session_id"]:
                     session = provider or run
                     intent["target"] = {
                         "kind": "session",
