@@ -34,3 +34,12 @@ it('opens legacy local file links from reported results through the origin file 
   expect(screen.getByRole('link', { name: 'shot-desktop.png' }).getAttribute('href')).toBe('/n/origin/api/file' + path + 'shot-desktop.png')
   expect(screen.getByRole('img', { name: 'mobile' }).getAttribute('src')).toBe('/n/origin/api/file' + path + 'shot-mobile-full.png')
 })
+
+
+it('pins historical file URI deliveries to the message origin', () => {
+  setCurrentNode('different-node')
+  const report = { ...item, content: { text: '[report](file:///home/ai/project/notes.md)\n\n![chart](file:///tmp/chart.png)' } }
+  render(<AgentMessageView item={report} node="origin" focused={false} remember={vi.fn()} />)
+  expect(screen.getByRole('link', { name: 'report' }).getAttribute('href')).toBe('/n/origin/api/file/home/ai/project/notes.md')
+  expect(screen.getByRole('img', { name: 'chart' }).getAttribute('src')).toBe('/n/origin/api/file/tmp/chart.png')
+})

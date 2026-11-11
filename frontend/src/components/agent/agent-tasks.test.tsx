@@ -10,7 +10,7 @@ import { api } from '../../api'
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => key + (params ? ' ' + Object.values(params).join(' ') : ''), locale: 'en-US' }) }))
-vi.mock('../cluster/node-url', () => ({ currentNodeId: () => 'selected', nodeApi: (path: string) => '/n/selected/api' + path }))
+vi.mock('../cluster/node-url', async importOriginal => ({ ...await importOriginal<typeof import('../cluster/node-url')>(), currentNodeId: () => 'selected', useCurrentNodeId: () => 'selected', nodeApi: (path: string) => '/n/selected/api' + path }))
 vi.mock('antd', () => ({
   Dropdown: ({ children }: any) => <>{children}</>,
   App: { useApp: () => ({ message: { error: vi.fn() } }) },
