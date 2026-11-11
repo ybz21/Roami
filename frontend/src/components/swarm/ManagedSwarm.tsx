@@ -4,7 +4,6 @@ import { nodeApi, useCurrentNodeId } from '../cluster/node-url'
 import { App, Button, Spin } from 'antd'
 import { api } from '../../api'
 import { useSessionOverview } from '../../session-overview'
-import { useAgentData } from '../agent/useAgentData'
 import { useAgentThread } from '../agent/useAgentThread'
 import { useLayout } from '../../layout'
 import { useI18n } from '../../i18n'
@@ -68,15 +67,11 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const workspaceSize = useSwarmWorkspaceWidth(workspaceHost, panelKey, Boolean(data) && !phone && workspaceVisible)
   const sceneVisible = tab === 'chat' && workspaceVisible
   const sceneActive = !data?.archived && sceneVisible && !memoryOpen
-  const sceneSessions = useSessionOverview(sceneActive)
   const node = useCurrentNodeId()
   const mainThread = useAgentThread(sceneActive ? data?.mainConversationId || '' : '', '', node)
   const liveMain = mainThread.view?.turns.find(turn => ['queued', 'running'].includes(turn.state))
   const mainState = data?.paused ? 'idle' : liveMain?.state === 'queued' ? 'preparing' : liveMain?.state === 'running' ? 'running' : mainThread.view ? mainThread.view.turns[0]?.state === 'failed' ? 'failed' : 'idle' : 'unknown'
-  const nativeSessions = useAgentData<{ taskId: string; revision: number; lifecycle: string }[]>(data?.work.some(item => item.executor === 'native' && item.task_id) ? '/agent/native-sessions' : null, 5000, 10000, 'GET', sceneActive)
-  const nodes = useMemo(() => data ? [{ id: 'main', name: 'Roami Main', executor: 'roami', main: true, state: mainState }, ...currentMembers.filter(member => (!member.registered?.instance || ['idle', 'assigned'].includes(member.registered.instance.state)) && (member.registered?.instance?.state === 'idle' || member.work?.task_id && (member.executor === 'native'
-    ? !nativeSessions.failed && nativeSessions.value?.some(session => session.taskId === member.work!.task_id && session.revision === member.work!.revision && session.lifecycle === 'open')
-    : !sceneSessions.failed && sceneSessions.value.some(session => session.name === member.work!.attempt?.sessionId && !session.dormant && session.agent === member.executor)))).map(member => ({ id: member.id, name: member.name, executor: member.executor, state: member.state }))] : [], [currentMembers, mainState, nativeSessions.value, nativeSessions.failed, sceneSessions.value, sceneSessions.failed])
+  const nodes = useMemo(() => data ? [{ id: 'main', name: t('swarm.conversation.main'), executor: 'roami', main: true, state: mainState }, ...currentMembers.map(member => ({ id: member.id, name: member.name, executor: member.executor, state: member.state }))] : [], [currentMembers, mainState, Boolean(data), t])
   const control = async (action: string) => {
     if (!data) return
     if (!controlKey.current || controlKey.current.action !== action || controlKey.current.revision !== data.revision) controlKey.current = { action, revision: data.revision, key: crypto.randomUUID() }
