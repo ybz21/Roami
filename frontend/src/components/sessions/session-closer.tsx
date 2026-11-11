@@ -3,7 +3,7 @@
 //   worktree 里有未收尾内容（脏、未跟踪、领先 base）→ CloseWorktreeModal 三选一（保留 / 合并 / 丢弃）；
 //   干净 worktree → 确认框附「随会话删除」勾选。
 // 左树的右键菜单和会话页都要这一套，抽出来共用；会话页那份先不动。
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { App as AntApp, Checkbox } from 'antd'
 import { api } from '../../api'
 import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
@@ -17,6 +17,7 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const [closing, setClosing] = useState<{ name: string; st: any } | null>(null)
+  const checking = useRef(new Set<string>())
   const done = (n: string) => { message.success(t('session.lifecycle.closeAccepted')); closeTerm(n); afterClose?.() }
   const kill = async (n: string) => {
     try { await closeSession(n); done(n) } catch (e: any) { message.error(sessionActionError(e, t)) }
@@ -32,8 +33,21 @@ export function useSessionCloser(closeTerm: (n: string) => void, afterClose?: ()
     }
   }
   const beginClose = async (n: string) => {
+    if (checking.current.has(n)) return
     let st: any = null
-    try { if (!nativeSessionId(n)) st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data } catch {}
+    if (!nativeSessionId(n)) {
+      checking.current.add(n)
+      const hide = message.loading({ content: t('session.closeChecking'), duration: 0 })
+      try {
+        st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data
+      } catch {
+        message.error(t('session.closeCheckFailed'))
+        return
+      } finally {
+        hide()
+        checking.current.delete(n)
+      }
+    }
     const unfinished = (st?.dirty || 0) > 0 || (st?.untracked || 0) > 0 || (st?.committedAhead || 0) > 0
     // worktree 里还有别的会话：只关这一个，worktree 和分支一根毛都不碰（收尾整个任务走 finishTask）
     if (st?.inWorktree && (st.others || 0) > 0) {

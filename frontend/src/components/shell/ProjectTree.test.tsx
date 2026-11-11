@@ -9,6 +9,17 @@ import type { TreeTask } from './task-tree'
 afterEach(cleanup)
 const task = (path: string, name: string, sessions: TreeTask['sessions']): TreeTask => ({ key: `wt:${path}`, path, name, branch: 'fix/rsi', ahead: 0, unfinished: false, sessions })
 
+it('handles the first close menu click without opening the session row', async () => {
+  const open = vi.fn()
+  const close = vi.fn()
+  render(<I18nProvider><ProjectTree tree={{ projects: [], loose: [{ name: 'test-session', label: 'Test session' }] }} activeTask={null} activeSession={null} onProject={vi.fn()} onSession={open} onKill={close} /></I18nProvider>)
+  fireEvent.contextMenu(screen.getByRole('button', { name: 'Test session' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: /关闭会话|Close session/ }))
+  expect(close).toHaveBeenCalledOnce()
+  expect(close).toHaveBeenCalledWith('test-session')
+  expect(open).not.toHaveBeenCalled()
+})
+
 it('shows recorded descendants under their parent and opens a child in its actual workspace', () => {
   const root = task('/rsi', 'RSI主任务', [{ name: 'parent', label: 'RSI修复', agent: 'codex' }, { name: 'child', label: '答案回归', parent: 'parent' }, { name: 'grandchild', label: '数值验证', parent: 'child' }])
   const separate = task('/verify', '独立验证', [{ name: 'cross', label: '跨区验证', parent: 'parent', agent: 'codex', at: Math.floor(Date.now() / 1000) - 180 }])
