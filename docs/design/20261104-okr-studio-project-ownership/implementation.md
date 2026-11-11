@@ -1,6 +1,6 @@
 # OKR 运行态、Studio 与 Skill 实现方案
 
-2026-11-05 设计提案。先审阅[运行态](../20261104-okr-main-workspace/index.html)，再看
+原方案始于2026-11-05；2026-11-11合并通用分层看板与宣传项目运营示例。先审阅[运行态](../20261104-okr-main-workspace/index.html)，再看
 [Studio](index.html)；[技术方案 HTML](implementation.html)可直接浏览。
 本轮原型均为示例数据与本地模拟，不调用模型、不派工、不采集、不注册定时任务。
 
@@ -205,21 +205,21 @@ GitHub，另五个是 manual，当前仅有 connector.json、README 和 Go 实�
 
 ## 看板定义与组件选型
 
-优先支持用户自己的 HTML。`dashboard.json` 是唯一看板入口描述；兼容现在的
-schema1/widgets，拟议 schema2 可选择 HTML 渲染并声明可读的数据绑定：
+优先支持用户自己的HTML。当前schema2继续由dashboard.json声明一个HTML入口、资源与只读指标列表；下面是现有入口结构示意，其他既有配置字段保留：
 
 ```json
 {
   "schemaVersion": 2,
-  "renderer": "html",
-  "entry": "dashboard/index.html",
-  "bindings": {
-    "github-stars": {"metricId": "github-stars", "range": "14d"},
-    "github-forks": {"metricId": "github-forks", "range": "14d"},
-    "channel-summary": {"datasetId": "channel-summary"}
+  "html": {
+    "entry": "dashboard/index.html",
+    "assets": ["dashboard/index.html", "dashboard/style.css", "dashboard/page.js"],
+    "metricIds": ["completed-items", "quality-score"],
+    "libraries": ["echarts"]
   }
 }
 ```
+
+这个入口与只读SDK已经存在，但框架级多层导航仍是下面的新增设计；不能把一个项目HTML内部的几个Tab当作框架已经支持层级。
 
 HTML、CSS、JS 都放在 `.roami/okr/dashboard/`，与绑定一起确认版本。组件数量与
 布局由这个项目决定；每个指标独立成卡。普通运行态不出现 HTML/JSON 配置表。
@@ -237,6 +237,82 @@ ECharts 不是新引入的图表框架，现有 OkrTrend 已采用其 core/LineC
 `dataset`/系列映射，数据变化通过 `setOption` 更新，容器变化用已有 ResizeObserver。
 参见 [ECharts dataset](https://echarts.apache.org/handbook/en/concepts/dataset/) 与
 [动态数据](https://echarts.apache.org/handbook/en/how-to/data/dynamic-data/)。
+
+## 看板分层的通用框架契约
+
+### 通用能力与项目配置的边界
+
+框架管理分组树、叶子看板、导航/选择、滚动与筛选状态、版本校验和只读数据权限；具体业务定义由项目目录提供。层级可嵌套，不把两层或某三个Tab写死。安全上限由版本化schema和实际负载测试确定，不等于业务只能有两级。
+
+“Roami宣传”的X/B站工作量与评论运营仅是下文的业务实例。框架代码、默认模板和导航组件不得包含平台名、固定账号、发帖量、三页签或必选运营角色。交付、研究和其他运营OKR可以声明不同层级与成员。
+
+### 定义与兼容
+
+新版本dashboard定义采用分组节点与叶子节点。下列是**拟议schema3结构**，尚未实现或发布为生产协议，不能直接sync到只支持schema2的宿主：
+
+```json
+{
+  "schemaVersion": 3,
+  "views": [
+    {"id": "overview", "name": "总览", "html": {
+      "entry": "dashboard/overview.html",
+      "assets": ["dashboard/overview.html", "dashboard/page.js"],
+      "metricIds": ["completed-items"]
+    }},
+    {"id": "execution", "name": "执行", "children": [
+      {"id": "delivery", "name": "按期交付", "children": [
+        {"id": "daily", "name": "每日交付", "html": {
+          "entry": "dashboard/daily.html",
+          "assets": ["dashboard/daily.html", "dashboard/page.js"],
+          "metricIds": ["completed-items"]
+        }}
+      ]},
+      {"id": "quality", "name": "质量", "widgets": []}
+    ]}
+  ]
+}
+```
+
+- id在整棵树内稳定且唯一；分组含children，叶子选择受支持的HTML或组件定义，不能靠标题猜身份或相互混用。名称、顺序与子页数量由项目确定。
+- 叶子引用本项目已声明的指标；视图的允许指标、资产、入口和库随同一修订确认。选择分组不创建数据源、团队或新权限。
+- 旧schema1/widgets和schema2单入口保留；新宿主将它们投影为单叶子导航。旧宿主不静默丢弃层级，生成Skill先读能力信号；不支持的新定义留作草稿。
+- 能力信号、schema迁移和写入校验先实现，再让Studio/Skill生成新定义。当前在单个HTML中模拟层级只能作为兼容原型，不冒充框架能力。
+
+### 导航与布局
+
+桌面按分组树定位当前叶子，以面包屑和当前层级Tab呈现位置；手机用当前层级入口和返回上级，不把任意深度展开成一叠Tab栏。层级/顺序来自配置，浅层目录可以只显示一排Tab。分组没有自己的内容时进入可见的首个叶子；空组给出简短空态，不伪造看板。
+
+每个叶子内容独立下滚。切换保留叶子的滚动位置与有效筛选；筛选只有在定义声明相同口径时才跨视图共享，不能把效果快照的日期偷换成发布工作量日期。节点、项目与定义版本共同隔离状态，新数据修订不重置当前视图；定义变更后保留仍存在的稳定viewId，已删除视图才回到有效父级/首叶子。
+
+### 数据读取与模块边界
+
+- Go的backend/okr/dashboard-html.go、project-files.go负责版本化树校验、资产/指标引用和原子发布；同一确认快照包含层级与叶子入口。
+- dashboard-markup.go及dashboard-sdk.js继续提供只读通道，握手增加已确认viewId与定义摘要；叶子只读自己的允许指标，切换即销毁旧通道，不复用其他项目/节点的iframe。
+- 前端OkrDashboard负责通用导航和叶子选择，新增独立的层级导航组件；叶子复用OkrHtmlDashboard或既有组件渲染。dashboard-datasets.ts继续投影确认数据，不把业务账号统计写进导航组件。
+- Studio预览复用同一树和叶子渲染器；未保存的定义在草稿作用域，不能发起真实采集或评论回复。
+- okr-development完整模板提供简单可改的起点，按目标组合视图/Connector/角色；宣传平台、工作量口径和运营Skill放项目实例或可选parts，不成为所有OKR的默认配置。
+
+### 宣传项目实例
+
+本项目选择“运营总览 / 发布工作量 / 内容效果”。[业务原型](../20261104-okr-main-workspace/workload-dashboard.html)包含已核验历史回执，展示按日/区间数量、逐条链接和内部下滚；这是通用能力的一种配置，不是框架固定菜单。
+
+工作量继续使用项目data/collection.sqlite3的登记：publications按platform/account_id/object_id唯一，content保留publishedAt和Main审核依据，版本历史不覆盖。项目Connector Skill以query_only读取确认账号和已核验集合，校验摘要，按真实公开时间与项目IANA时区形成每日数量/明确范围的累计候选。业务键或目录日期不能当公开日期；候选、上传、未知不算已发。历史补录由Main独立审核、原数据成员执行，不因扫描到任意JSON就认领为公开。
+
+若覆盖不完整，名称明确为“本项目已核验发布量”，不宣称全账号总量；未核验日期保持未知。Connector沿用prepare → Main核验record → 实际看板回读，用户HTML只用okr.data.read/subscribe，不直读数据库、文件路径或凭证。隐藏页缓存最新数据，图表在可见后初始化/resize并释放旧订阅。通用模板写清定义方法，但不带此项目账号或观测。
+
+运营角色只在本项目按用户要求增加：复用原Main、Swarm、原三成员及历史，只新增一个长期职责，保持原任务/原生实例/个人记忆。运营Skill规定评论读取与回复路径、真实产品资料、已回复索引和反馈记忆；评论是业务输入，不是新授权。回复记录包含评论ID、父评论、回复ID或URL、账号、真实时刻和证据摘要，按平台+账号+评论去重；该索引不自行证明平台已回复。
+
+运营与发布成员串行使用原Chrome/ADB、账号页和共享目录。自动模式不逐条重复审批，未知回复先对账；真实平台回读、handoff与Main独立验收分别记录。团队扩充使目标ID/revision变化时，更新同一个原cron job和daily.json绑定，保留时间/时区/runner与历史，再回读nextDue；不另建并行唤醒或把dry-run当自然触发。
+
+### 验收与状态
+
+- 通用层级至少覆盖三层嵌套、单叶子、空组、重名标签/重复ID、无效入口、删除/移动视图及版本冲突；用非宣传项目配置证明导航不依赖平台名或固定Tab。
+- 旧单页兼容，深层导航/返回、日期筛选与滚动恢复通过；桌面四档和真实手机验收。项目HTML内部Tab通过不代替框架层级通过。
+- 跨project/node/view的异步结果和数据通道隔离；指标/资产越权、旧iframe、切页/隐藏后的订阅与图表释放通过。
+- 模板与真实项目均可从目录加载；工作量去重、时区跨日、计划/公开日期不同、覆盖不完整、明确零与未知分别验证。
+- 宣传运营的真实评论读取和回复回执、原实例下一轮复用、定时目标绑定与实际自然唤醒分别验收。设计、注册、候选和消息投递都不算真实回复。
+
+通用层级框架尚未实现；宣传交互原型、角色登记和实际执行状态见[原工作区验收记录](../20261104-okr-main-workspace/README.md#宣传项目分层示例与验收范围2026-11-11)。#873跟踪新增能力，完整运营循环仍按#761验收。
 
 ## 数据怎样保存
 
