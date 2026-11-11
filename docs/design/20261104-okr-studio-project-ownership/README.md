@@ -53,3 +53,8 @@
 通信重点：[逐跳与多个 OKR 演示](../20261104-okr-main-workspace/communication-engine.html)。实现前补充 [SQLite v1 契约](sqlite-v1-contract.md) 与 [协调回合契约](../20261104-okr-main-workspace/swarm-delivery-contract.md)。
 
 SQLite 采集层的 [源库实施与验收范围](sqlite-source-store.md) 单独记录通用脚本、版本与恢复；不代表宿主确认存储迁移或完整自动循环已经完成。
+
+
+## 通用看板层级与宣传实例（2026-11-11）
+
+本轮需求合并到[原技术方案](implementation.md#看板分层的通用框架契约)和[原运行态文档](../20261104-okr-main-workspace/README.md#看板的分级与分层)：框架支持项目定义的分组、嵌套与叶子视图；[宣传工作量原型](../20261104-okr-main-workspace/workload-dashboard.html)仅是项目示例。通用导航不得写死X/B站、三个Tab或运营角色。当前原型与新增框架设计的实现/验收状态分开记录。
