@@ -40,3 +40,17 @@
 - 所有安装测试仅写入 `/tmp/roami-skills-rich` 的隔离 Roami 节点；未向用户本机 Agent 目录安装测试技能。
 
 截图：`/tmp/skills-rich-desktop.png`、`/tmp/skills-rich-examples-desktop.png`、`/tmp/skills-rich-files-desktop.png`、`/tmp/skills-rich-phone.png`、`/tmp/skills-rich-files-phone.png`、`/tmp/skills-rich-light-en.png`。手机 PR 截图仅包含网页内容。
+
+## 官方榜单标签、安装引导与效果图片
+
+依据用户提供的两张官方截图修订：累计 / 24 小时趋势 / 热门使用下划线标签，数量直接来自 JSON 榜单的 total 或正式 API 的 pagination.total。公开接口的榜单窗口计数与官网全站技能总量不同，界面不以已加载数量、搜索命中数或截图中的 1,328,493 作为总数。未知、异常和零数量隐藏，切换失败保留已成功榜单及选中状态。
+
+详情新增命令 / 给 Agent 的提示词切换及复制，明确命令执行电脑与一键安装当前节点的区别。手机将命令区及安装来源收起，优先展示效果图与正文，保留固定底部安装按钮。官方 URL 和完整技能标识可直接提交打开详情，返回保留原草稿及列表。
+
+实际使用 `designed-by-ai/skills/design-mobile-apps` 验收。该技能说明引用的 GitHub raw 图片直连失败；节点经 GitHub Contents API 读取后，以选项级预览图片返回，浏览器成功解码为 1586 × 678。图片不进入安装文件，仅允许公开 GitHub 的已验证位图，最多三张、单张 384KB、总计 768KB，额外加载整体最多六秒。失败或不支持的图片不阻断正文；拒绝路径穿越、伪造域名、查询凭据、SVG / HTML 及过大内容。
+
+full 门禁通过：Go、Python lint / format、相关 Python 113 项、前端审计 / 类型检查及构建、secret scan。前端全量 Vitest 为 228 个文件、1,643 项通过。后续仅调整手机来源折叠与标签触控宽度，并重新执行前端全量测试及生产构建。
+
+最终 Android 通过 ADB 实际输入官方 URL、切换三个榜单、展开命令区、切换到提示词并分别复制成功、打开文件页选择 designing.md（7,851 字符），再取消本机 / Claude / OpenCode，仅安装到隔离 Roami 节点。持久记录固定 commit 为 `03c20aec6dcedb5fabfb03dc37982eb52ef19ed6`，保留八个原始文件，不包含预览图片。手机首屏效果图边界为 y=510.65…664.86，固定安装栏从 y=673.09 开始，整张图可见；累计标签实际宽度 44px，文件菜单选项高度 44px。
+
+最终前端全量测试仍为 1,643 项通过，类型检查 / i18n / hover / 生产构建通过，quick 与 full 门禁通过。截图为 `/tmp/skills-official-rankings-all-desktop.png`、`/tmp/skills-official-detail-desktop.png`、`/tmp/skills-official-rankings-phone.png`、`/tmp/skills-official-detail-phone.png`、`/tmp/skills-official-guide-phone.png`，通过 pr-shots 发布。

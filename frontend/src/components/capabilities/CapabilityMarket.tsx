@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Form, Input, Modal, Segmented, Select, Spin } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Select, Tabs, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -11,7 +11,7 @@ import MarketSources, { type MarketSource } from './MarketSources'
 import type { ManagedEntry, ManagedKind } from './capability-format'
 
 type Listing = { id: string; name: string; description: string; version: string; url: string; installs?: number }
-type Preview = { previewId: string; kind: ManagedKind; options: { label: string; entry: ManagedEntry }[] }
+type Preview = { previewId: string; kind: ManagedKind; options: { label: string; entry: ManagedEntry; images?: Record<string, string> }[] }
 type Ranking = 'all-time' | 'trending' | 'hot'
 
 export default function CapabilityMarket() {
@@ -23,7 +23,8 @@ export default function CapabilityMarket() {
   const [items, setItems] = useState<Listing[]>([])
   const [next, setNext] = useState('')
   const [searched, setSearched] = useState(false)
-  const [ranking, setRanking] = useState<Ranking>('all-time')
+  const ranking = useRef<Ranking>('all-time')
+  const [totals, setTotals] = useState<Record<string, number>>({})
   const [resultRanking, setResultRanking] = useState<Ranking>('all-time')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -47,22 +48,27 @@ export default function CapabilityMarket() {
     }).catch((caught: Error) => { if (!abort.signal.aborted) setError(capabilityError(caught.message, t)) })
     return () => { abort.abort(); request.current?.abort() }
   }, [retry, t])
-  const reset = (id: string) => { request.current?.abort(); setBusy(false); setSource(id); setItems([]); setNext(''); setSearched(false); setError(''); setSuccess(''); setPreview(null) }
+  const reset = (id: string) => { request.current?.abort(); setBusy(false); setSource(id); setItems([]); setNext(''); setSearched(false); setTotals({}); setError(''); setSuccess(''); setPreview(null) }
   const load = useCallback(async (sourceId: string, submitted: string, cursor = '', view: Ranking = 'all-time') => {
     request.current?.abort()
     const abort = new AbortController(); request.current = abort
     setBusy(true); setError(''); setSuccess('')
     try {
       const { data } = await api('GET', '/agent/capability-markets/' + encodeURIComponent(sourceId) + '/search?query=' + encodeURIComponent(submitted) + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '') + (view !== 'all-time' ? '&view=' + view : ''), undefined, { signal: abort.signal })
-      if (!abort.signal.aborted) { lastQuery.current = submitted; setResultRanking(submitted ? 'all-time' : view); setItems(rows => cursor ? [...rows, ...data.items.filter((item: Listing) => !rows.some(row => row.id === item.id && row.version === item.version))] : data.items); setNext(data.nextCursor || ''); setSearched(Boolean(submitted)) }
+      if (!abort.signal.aborted) { lastQuery.current = submitted; if (!submitted && Number.isSafeInteger(data.total) && data.total > 0) setTotals(values => ({ ...values, [sourceId + ':' + view]: data.total })); setResultRanking(submitted ? 'all-time' : view); setItems(rows => cursor ? [...rows, ...data.items.filter((item: Listing) => !rows.some(row => row.id === item.id && row.version === item.version))] : data.items); setNext(data.nextCursor || ''); setSearched(Boolean(submitted)) }
     } catch (caught: any) { if (!abort.signal.aborted) setError(capabilityError(caught.message, t)) } finally { if (!abort.signal.aborted) setBusy(false) }
   }, [t])
   const popular = sources?.find(row => row.id === source)?.provider === 'skills_sh'
   useEffect(() => {
-    if (popular) void load(source, '', '', ranking)
+    if (popular) void load(source, '', '', ranking.current)
     return () => request.current?.abort()
-  }, [source, popular, sources, load, ranking])
-  const search = (cursor = '') => load(source, cursor ? lastQuery.current : query.trim(), cursor, popular ? ranking : 'all-time')
+  }, [source, popular, sources, load])
+  const search = (cursor = '') => {
+    const submitted = query.trim()
+    const identifier = popular && !cursor && submitted.match(/^(?:https:\/\/(?:www\.)?skills\.sh\/)?([\w.-]+\/[\w.-]+\/[\w.:-]+)\/?$/)?.[1]
+    if (identifier) return view({ id: identifier, name: identifier.split('/').pop() || '', description: identifier.split('/').slice(0, 2).join('/'), url: 'https://skills.sh/' + identifier, version: '' })
+    return load(source, cursor ? lastQuery.current : submitted, cursor, popular ? ranking.current : 'all-time')
+  }
   const closePreview = () => { setPreview(null); requestAnimationFrame(() => opener.current?.focus()) }
   const view = async (item: Listing) => {
     opener.current = document.activeElement as HTMLElement | null
@@ -84,7 +90,7 @@ export default function CapabilityMarket() {
   const selected = preview?.options[option]
   const variant = preview && preview.options.length > 1 && <Form.Item label={t('capabilities.market.variant')}><Select popupClassName="tt-capability-select-popup" aria-label={t('capabilities.market.variant')} value={option} onChange={setOption} options={preview.options.map((item, value) => ({ value, label: item.label }))} /></Form.Item>
   const skillPreview = preview?.kind === 'skills' && selected
-  const skillDetail = skillPreview && <SkillMarketDetail key={selected.entry.name} entry={selected.entry} marketUrl={listing?.url} repository={(listing?.id || '').split('/').slice(0, 2).join('/')} installs={listing?.installs === undefined ? undefined : t('capabilities.market.installs.' + resultRanking, { count: new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(listing.installs) })} phone={phone} busy={busy} targets={targets} onTargets={setTargets} installError={installError} canInstall={Boolean(previewId)} onInstall={() => { void install() }} onBack={closePreview} variant={variant} />
+  const skillDetail = skillPreview && <SkillMarketDetail key={selected.entry.name} entry={selected.entry} images={selected.images} marketUrl={listing?.url} repository={(listing?.id || '').split('/').slice(0, 2).join('/')} installs={listing?.installs === undefined ? undefined : t('capabilities.market.installs.' + resultRanking, { count: new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(listing.installs) })} phone={phone} busy={busy} targets={targets} onTargets={setTargets} installError={installError} canInstall={Boolean(previewId)} onInstall={() => { void install() }} onBack={closePreview} variant={variant} />
   const detail = selected && <div className="tt-market-preview">
     {variant}
     <p>{t('capabilities.market.reviewHint')}</p>
@@ -97,13 +103,17 @@ export default function CapabilityMarket() {
     <div className="tt-market-browser" hidden={Boolean(skillPreview && !phone)}>
     <Form className="tt-capability-toolbar" onFinish={() => { void search() }}>
       <Select aria-label={t('capabilities.market.source')} value={source || undefined} onChange={reset} options={(sources || []).filter(item => item.enabled).map(item => ({ value: item.id, label: item.name }))} />
-      <Input prefix={<SearchIcon size={16} />} aria-label={t('capabilities.market.query')} placeholder={t('capabilities.market.query')} value={query} onChange={event => setQuery(event.target.value)} allowClear />
+      <Input prefix={<SearchIcon size={16} />} aria-label={t('capabilities.market.query')} placeholder={t(popular ? 'capabilities.market.skillQuery' : 'capabilities.market.query')} value={query} onChange={event => setQuery(event.target.value)} allowClear />
       <Button type="primary" htmlType="submit" loading={busy} disabled={!source || (!query.trim() && !popular)}>{t('capabilities.market.search')}</Button>
       <Button icon={<GearIcon size={16} />} disabled={!sources || busy} onClick={() => setConfiguring(true)}>{t('capabilities.market.sources')}</Button>
     </Form>
     {error && <Alert className="tt-capability-alert" type="error" message={error} action={<Button onClick={() => { if (!sources) setRetry(value => value + 1); else void search() }}>{t('agent.retry')}</Button>} />}
     {success && <Alert className="tt-capability-alert" type="success" message={success} />}
-    {popular && <div className="tt-market-heading"><h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3><Segmented className="tt-market-ranking" aria-label={t('capabilities.market.ranking')} value={ranking} onChange={value => setRanking(value as Ranking)} options={(['all-time', 'trending', 'hot'] as const).map(value => ({ value, label: t('capabilities.market.ranking.' + value) }))} />{searched ? <Button onClick={() => { setQuery(''); void load(source, '', '', ranking) }} disabled={busy}>{t('capabilities.market.backPopular')}</Button> : <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>}
+    {popular && <>
+      <div className="tt-market-heading"><h3>{t(searched ? 'capabilities.market.results' : 'capabilities.market.popular')}</h3>{searched ? <Button onClick={() => { setQuery(''); void load(source, '', '', ranking.current) }} disabled={busy}>{t('capabilities.market.backPopular')}</Button> : <span>{t('capabilities.market.order.' + resultRanking)}</span>}</div>
+      <Tabs className="tt-market-ranking" aria-label={t('capabilities.market.ranking')} activeKey={searched ? ranking.current : resultRanking} onChange={value => { ranking.current = value as Ranking; void load(source, '', '', ranking.current) }} items={(['all-time', 'trending', 'hot'] as const).map(value => ({ key: value, label: <span>{t('capabilities.market.ranking.' + value)}{totals[source + ':' + value] !== undefined && <span className="tt-market-rank-count">{new Intl.NumberFormat(locale).format(totals[source + ':' + value])}</span>}</span> }))} />
+    </>}
+
     {!sources && !error && <Spin />}
     {busy && !items.length && <Spin />}
     {sources && !items.length && !busy && !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t(searched || popular ? 'capabilities.market.empty' : 'capabilities.market.start')} />}

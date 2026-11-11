@@ -5,6 +5,7 @@ import { api } from '../../api'
 import CapabilityMarket from './CapabilityMarket'
 import CapabilityEditor from './CapabilityEditor'
 import MarketSources from './MarketSources'
+import SkillInstallationGuide from './SkillInstallationGuide'
 
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
@@ -115,9 +116,9 @@ it('opens full skill details and a usable install action from a single preview r
 })
 
 it('renders the skill purpose and examples before exposing the original bundle', async () => {
-  const text = '---\nname: workflow\ndescription: >\n  Build polished pages.\n  Preview the result.\n---\n\n# Workflow\n\n## Examples\n\n**Before and after**\n\n[Read reference](references/example.md)\n\n![Result](assets/result.png)\n\n<script>window.bad = true</script>'
+  const text = '---\nname: workflow\ndescription: >\n  Build polished pages.\n  Preview the result.\n---\n\n# Workflow\n\n## Examples\n\n**Before and after**\n\n[Read reference](references/example.md)\n\n![Result](assets/result.png)\n\n![Remote result](https://raw.githubusercontent.com/o/r/main/hero.png)\n\n<script>window.bad = true</script>'
   const rich = { ...entry, text, files: { 'references/example.md': btoa('# Reference example'), 'assets/result.png': 'iVBORw0KGgo=' } }
-  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry: rich }] } })
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry: rich, images: { 'https://raw.githubusercontent.com/o/r/main/hero.png': 'data:image/png;base64,iVBORw0KGgo=' } }] } })
   render(<CapabilityMarket />)
   fireEvent.click(await screen.findByRole('button', { name: 'capabilities.market.view' }))
   expect(await screen.findByText('Build polished pages. Preview the result.')).toBeTruthy()
@@ -125,6 +126,7 @@ it('renders the skill purpose and examples before exposing the original bundle',
   expect(screen.queryByText(/name: workflow/)).toBeNull()
   expect(document.querySelector('.tt-skill-document script')).toBeNull()
   expect(screen.getByRole('img', { name: 'Result' }).getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
+  expect(screen.getByRole('img', { name: 'Remote result' }).getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
   fireEvent.click(screen.getByRole('button', { name: 'Read reference' }))
   expect(await screen.findByLabelText('references/example.md')).toBeTruthy()
   expect(screen.getByText('# Reference example')).toBeTruthy()
@@ -179,4 +181,53 @@ it('rejects conflicting MCP transport aliases before showing an editable configu
   await screen.findByRole('alert')
   expect(screen.queryByRole('textbox', { name: 'capabilities.url' })).toBeNull()
   expect(api).not.toHaveBeenCalled()
+})
+
+
+it('opens an official skill URL directly and keeps the current results', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], total: 9902, nextCursor: '' } }).mockResolvedValueOnce({ data: { previewId: 'pinned-preview', kind: 'skills', options: [{ label: 'workflow', entry }] } })
+  render(<CapabilityMarket />)
+  await screen.findByRole('button', { name: 'workflow' })
+  expect(screen.getByText('9,902')).toBeTruthy()
+  const url = 'https://skills.sh/owner/repo/workflow'
+  fireEvent.change(screen.getByRole('textbox', { name: 'capabilities.market.query' }), { target: { value: url } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.search' }))
+  expect(await screen.findByRole('heading', { name: 'Original instructions' })).toBeTruthy()
+  expect(api).toHaveBeenLastCalledWith('POST', '/agent/capability-markets/preview', { source: 'skills-sh', id: item.id, version: '' }, expect.anything())
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.market.backResults' }))
+  expect((screen.getByRole('textbox', { name: 'capabilities.market.query' }) as HTMLInputElement).value).toBe(url)
+  expect(screen.getByText('9,902')).toBeTruthy()
+  expect(api).toHaveBeenCalledTimes(3)
+})
+
+it('shows only authoritative ranking counts and retains the successful tab on failure', async () => {
+  vi.mocked(api).mockResolvedValueOnce({ data: { sources } }).mockResolvedValueOnce({ data: { items: [item], total: 9902, nextCursor: '' } }).mockRejectedValueOnce(new Error('MARKET_UNAVAILABLE')).mockResolvedValueOnce({ data: { items: [item], total: 3349, nextCursor: '' } })
+  render(<CapabilityMarket />)
+  await screen.findByText('9,902')
+  expect(screen.queryByText('1')).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: 'capabilities.market.ranking.hot' }))
+  await screen.findByRole('alert')
+  expect(screen.getByRole('tab', { name: /capabilities.market.ranking.all-time/ }).getAttribute('aria-selected')).toBe('true')
+  fireEvent.click(screen.getByRole('tab', { name: 'capabilities.market.ranking.hot' }))
+  await screen.findByText('3,349')
+  expect(screen.getByText('9,902')).toBeTruthy()
+  expect(screen.getByRole('tab', { name: /capabilities.market.ranking.hot/ }).getAttribute('aria-selected')).toBe('true')
+})
+
+it('copies the exact install command and resets feedback when switching to an agent prompt', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  try {
+    render(<SkillInstallationGuide identifier="designed-by-ai/skills/design-mobile-apps" phone={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'common.copy' }))
+    await screen.findByRole('button', { name: 'common.copied' })
+    expect(writeText).toHaveBeenCalledWith('npx skills add https://github.com/designed-by-ai/skills --skill design-mobile-apps')
+    fireEvent.click(screen.getByText('capabilities.market.prompt'))
+    expect(screen.getByRole('button', { name: 'common.copy' })).toBeTruthy()
+    writeText.mockRejectedValueOnce(new Error('Not allowed'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.copy' }))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText('capabilities.market.installPrompt')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'common.copied' })).toBeNull()
+  } finally { Reflect.deleteProperty(navigator, 'clipboard') }
 })

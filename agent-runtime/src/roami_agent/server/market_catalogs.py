@@ -13,6 +13,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.server import skills_sh_api
 from roami_agent.server.skill_market_archive import download_archive
 from roami_agent.server.skill_package import MAX_PACKAGE_BYTES
+from roami_agent.server.skill_preview_images import preview_images
 
 DEFAULT_SOURCES = [
     {
@@ -330,6 +331,9 @@ async def preview(source, identifier, version):
             entry, version = await skill_entry(identifier)
             url = "https://github.com/" + "/".join(identifier.split("/")[:2]) + "/tree/" + version
         options = [{"label": entry["name"], "entry": entry}]
+        images = await preview_images(entry["text"], fetch)
+        if images:
+            options[0]["images"] = images
     elif provider == "mcp_registry":
         url = (
             base

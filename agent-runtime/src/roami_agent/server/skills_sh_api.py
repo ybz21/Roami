@@ -56,7 +56,12 @@ async def search(source, query, cursor, view, fetch):
         data = await fetch(base + f"/api/skills/{view}/{page}")
         rows, more = data["skills"], data.get("hasMore", False)
     items = [row for item in rows[:200] if (row := listing(source, item)) is not None]
-    return {"items": items, "nextCursor": str(page + 1) if more else ""}
+    total = data.get("pagination", {}).get("total") if headers else data.get("total")
+    return {
+        "items": items,
+        "nextCursor": str(page + 1) if more else "",
+        **({"total": total} if not query and type(total) is int and total >= 0 else {}),
+    }
 
 
 async def snapshot(source, identifier, fetch):

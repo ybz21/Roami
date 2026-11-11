@@ -364,13 +364,14 @@ async def test_public_skills_uses_json_leaderboards_with_complete_pagination(mon
 
     async def fetch(url, **kwargs):
         assert url == "https://skills.sh/api/skills/" + view + "/2"
-        return {"skills": skills, "hasMore": True}
+        return {"skills": skills, "hasMore": True, "total": 9902}
 
     monkeypatch.setattr(market_catalogs, "fetch", fetch)
     result = await market_catalogs.search(market_catalogs.DEFAULT_SOURCES[0], "", "2", view)
     assert result["items"][0]["id"] == "owner/repo/workflow"
     assert result["items"][0]["installs"] == 1200
     assert result["nextCursor"] == "3"
+    assert result["total"] == 9902
 
 
 async def test_blank_query_only_browses_skill_markets(store, monkeypatch):
@@ -563,7 +564,7 @@ async def test_authorized_skills_api_handles_rankings_and_preserves_snapshot(sto
                         "installs": 10,
                     }
                 ],
-                "pagination": {"hasMore": True},
+                "pagination": {"hasMore": True, "total": 3349},
             }
         assert url.endswith("/api/v1/skills/owner/repo/workflow")
         return {
@@ -579,6 +580,7 @@ async def test_authorized_skills_api_handles_rankings_and_preserves_snapshot(sto
     markets = runtime.capability_markets
     result = await markets.search("local", "skills-sh", "", view="hot")
     assert result["nextCursor"] == "1"
+    assert result["total"] == 3349
     preview = await markets.preview(
         "local", {"source": "skills-sh", "id": "owner/repo/workflow", "version": ""}
     )
@@ -684,3 +686,15 @@ async def test_upstream_api_authorization_error_does_not_log_out_roami(monkeypat
     with pytest.raises(DomainError, match="MARKET_AUTH_REQUIRED") as caught:
         await market_catalogs.fetch("https://skills.sh/api/v1/skills")
     assert caught.value.status == 503
+
+
+@pytest.mark.parametrize("total", [None, -1, True, "9902"])
+async def test_skill_rankings_omit_unusable_total_counts(monkeypatch, total):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+
+    async def fetch(url, **kwargs):
+        return {"skills": [], "hasMore": False, "total": total}
+
+    monkeypatch.setattr(market_catalogs, "fetch", fetch)
+    result = await market_catalogs.search(market_catalogs.DEFAULT_SOURCES[0], "")
+    assert "total" not in result
