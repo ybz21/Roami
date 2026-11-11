@@ -38,7 +38,7 @@ export default function SkillMarketDetail({ entry, images = {}, marketUrl, repos
     } catch { return null }
   }
   return <div className="tt-skill-detail">
-    {!phone && <div className="tt-skill-return"><BackButton label={t('capabilities.market.backResults')} disabled={busy} onClick={onBack} autoFocus /></div>}
+    {!phone && <header className="tt-skill-return"><BackButton label={t('capabilities.market.backResults')} disabled={busy} onClick={onBack} autoFocus /><strong>{t('capabilities.market.details')}</strong></header>}
     <div className="tt-skill-scroll">
       <header className="tt-pagehead tt-skill-hero"><div className="ttl"><div className="tt-skill-identity"><span>{repository}</span>{installs && <span>{installs}</span>}</div><h2>{entry.displayName || entry.name}</h2>{summary && <p>{summary}</p>}</div></header>
       <div className="tt-skill-columns">

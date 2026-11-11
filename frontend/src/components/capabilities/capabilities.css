@@ -144,7 +144,8 @@ html[data-pointer="coarse"] .tt-capability-select-popup .ant-select-item-option 
 .tt-market { display:flex; flex-direction:column; padding:0; overflow:hidden; }
 .tt-market-browser { height:100%; overflow:auto; padding:var(--sp-5) var(--pad-page); }
 .tt-skill-detail { display:flex; flex-direction:column; height:100%; min-height:0; min-width:0; background:var(--bg-base); }
-.tt-skill-return { padding:var(--sp-3) var(--pad-page); border-bottom:1px solid var(--border-subtle); }
+.tt-skill-return { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--pad-page); border-bottom:1px solid var(--border-subtle); }
+.tt-skill-return strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-lg); font-weight:600; color:var(--text-bright); }
 .tt-skill-scroll { flex:1; min-height:0; overflow:auto; }
 .tt-skill-hero { padding:var(--sp-5) var(--pad-page); }
 .tt-skill-hero .ttl { flex-basis:0; }
