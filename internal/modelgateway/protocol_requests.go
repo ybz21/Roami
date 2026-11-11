@@ -764,6 +764,10 @@ func (q protocolRequest) encode(format, model string) ([]byte, error) {
 	return json.Marshal(out)
 }
 func prepareProtocolBridge(body []byte, from, to, model string) ([]byte, *protocolBridge, error) {
+	return prepareProtocolBridgeWithStreaming(body, from, to, model, false)
+}
+
+func prepareProtocolBridgeWithStreaming(body []byte, from, to, model string, forceStreaming bool) ([]byte, *protocolBridge, error) {
 	if from == to {
 		var raw map[string]json.RawMessage
 		if json.Unmarshal(body, &raw) != nil {
@@ -777,7 +781,9 @@ func prepareProtocolBridge(body []byte, from, to, model string) ([]byte, *protoc
 	if e != nil {
 		return nil, nil, e
 	}
-	out, e := q.encode(to, model)
+	upstream := q
+	upstream.Stream = upstream.Stream || forceStreaming
+	out, e := upstream.encode(to, model)
 	return out, &protocolBridge{from: from, to: to, request: q}, e
 }
 

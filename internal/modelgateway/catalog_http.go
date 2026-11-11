@@ -338,7 +338,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			reject(w, 400, "MODEL_GATEWAY_COMPACTION_UNSUPPORTED")
 			return
 		}
-		upstreamBody, bridge, conversionError := prepareProtocolBridge(body, protocol, source.Protocol, upstreamModel)
+		// WorkBuddy requires streams even when an Anthropic caller expects one JSON response.
+		streamUpstream := source.PluginSourceID != "" && pluginSource.ProviderID == "workbuddy" && protocol == "anthropic-messages" && source.Protocol == "openai-completions"
+		upstreamBody, bridge, conversionError := prepareProtocolBridgeWithStreaming(body, protocol, source.Protocol, upstreamModel, streamUpstream)
 		if conversionError != nil {
 			reject(w, 400, protocolCode(conversionError))
 			return
