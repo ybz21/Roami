@@ -45,3 +45,41 @@ it('shows the Doubao desktop requirement and prevents login on Linux', async () 
   expect((screen.getByRole('button', { name: 'hub.plugin.signIn' }) as HTMLButtonElement).disabled).toBe(true)
   expect(vi.mocked(api).mock.calls.some(([method]) => method === 'POST')).toBe(false)
 })
+
+it('discovers every plugin in an imported collection and adds from the matching package', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ data: { packages: [{ id: 'first', name: 'First plugin' }, { id: 'second', name: 'Second plugin' }], skipped: ['repo/broken/package.json'] } }) })))
+  vi.mocked(api).mockImplementation(async (_method, path, body) => ({ data: path.endsWith('/packages') ? [] : path.endsWith('/inspect') ? [{ ...provider, name: body.packageId === 'first' ? 'First cloud' : 'Second cloud' }] : {} }))
+  const imported = vi.fn(), page = render(<App><MagpiePluginImport revision="r1" onImported={imported} /></App>)
+  fireEvent.change(page.container.querySelector('input[accept]')!, { target: { files: [new File(['zip'], 'repository.zip')] } })
+  await screen.findByText('First cloud')
+  await screen.findByText('Second cloud')
+  expect(screen.getByText('repo/broken/package.json')).toBeTruthy()
+  const buttons = screen.getAllByRole('button', { name: 'hub.plugin.addSource' })
+  fireEvent.click(buttons[1])
+  await waitFor(() => expect(imported).toHaveBeenCalledOnce())
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/plugins/sources', { packageId: 'second', providerId: provider.id, revision: 'r1' })
+})
+
+it('keeps compatible providers visible when another imported plugin cannot load', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ data: { packages: [{ id: 'broken', name: 'Broken plugin' }, { id: 'valid', name: 'Valid plugin' }] } }) })))
+  vi.mocked(api).mockImplementation(async (_method, path, body) => {
+    if (path.endsWith('/packages')) return { data: [] }
+    if (body.packageId === 'broken') throw { apiError: { code: 'MODEL_PLUGIN_FAILED' } }
+    return { data: [{ ...provider, name: 'Available cloud' }] }
+  })
+  const page = render(<App><MagpiePluginImport revision="r1" onImported={() => {}} /></App>)
+  fireEvent.change(page.container.querySelector('input[accept]')!, { target: { files: [new File(['zip'], 'repository.zip')] } })
+  await screen.findByText('Available cloud')
+  expect(screen.getByRole('alert').textContent).toContain('hub.plugin.failed')
+})
+
+it('filters repository metadata, dependencies and environment files before a folder upload', async () => {
+  let sent: FormData | undefined
+  vi.stubGlobal('fetch', vi.fn(async (_url, options) => { sent = options.body; return { ok: true, json: async () => ({ data: { id: 'package', name: 'Plugin' } }) } }))
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/packages') ? [] : [provider] }))
+  const page = render(<App><MagpiePluginImport revision="r1" onImported={() => {}} /></App>)
+  const files = ['repo/packages/plugin/package.json', 'repo/.git/config', 'repo/node_modules/pkg/index.js', 'repo/packages/plugin/.env.local'].map(path => { const file = new File(['content'], path.split('/').pop()!); Object.defineProperty(file, 'webkitRelativePath', { value: path }); return file })
+  fireEvent.change(page.container.querySelector('input[webkitdirectory]')!, { target: { files } })
+  await waitFor(() => expect(sent).toBeTruthy())
+  expect(sent!.getAll('paths')).toEqual(['repo/packages/plugin/package.json'])
+})
