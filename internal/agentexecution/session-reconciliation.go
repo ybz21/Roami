@@ -62,6 +62,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
 	if spec.Executor == "claude" {
+		if _, err := os.Stat(filepath.Join(dir, "interrupt-request.json")); err == nil {
+			return s.reconcileClaudeInterrupted(ctx, key, dir, path, spec, receipt, binding, &state, previous, hasResult)
+		}
 		return s.reconcileClaudeChangedInput(ctx, key, dir, path, spec, receipt, binding, &state, previous, hasResult)
 	}
 	// Child completion notifications are retained diagnostics, not root identity changes.
