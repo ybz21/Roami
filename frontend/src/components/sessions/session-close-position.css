@@ -1,0 +1,6 @@
+.tt-session-close-position > .ant-modal-content { display: flex; flex-direction: column; max-height: inherit; }
+.tt-session-close-position .ant-modal-header,
+.tt-session-close-position .ant-modal-footer { flex-shrink: 0; }
+.tt-session-close-position .ant-modal-body { min-height: var(--tap); overflow-y: auto; }
+.tt-session-close-position .ant-modal-footer .ant-btn-primary { min-width: calc(var(--sp-5) * 4); }
+html[data-pointer="coarse"] .tt-session-close-position .ant-modal-footer .ant-btn::after { content: ''; position: absolute; left: calc(-1 * var(--sp-1)); right: calc(-1 * var(--sp-1)); top: 50%; height: max(100%, var(--tap)); transform: translateY(-50%); }

@@ -7,7 +7,7 @@
 后端的目录快照还会遍历忽略文件，依赖较多时等待尤其明显。
 
 点击后立即打开居中的 antd Modal，显示目标会话和「正在检查会话…」，检查期间禁用
-「关闭」，保留「取消」。检查结束后进入原有确认流程；失败显示可重试提示。
+「关闭」，保留「取消」。检查结束后在同一弹窗中展示确认或收尾选项；失败显示可重试提示。
 
 ## 用户故事
 
@@ -89,3 +89,29 @@ worktree 列表分别为 13 / 101 ms，主要成本在快照。旧代码为每�
 原始计时、基准、指纹比对及门禁日志保存在 `/tmp/roami-close-preflight-*`。
 full 门禁通过（全量 Go 测试、typecheck、i18n、hover、前端构建）；Python 业务代码未改，
 跳过 Python lint / pytest。基准输出截图随 PR 附在 `pr-shots` 分支。
+
+## 检查与确认固定操作位置
+
+等待、普通确认、干净工作区删除勾选、未收尾选项和共享工作区提示统一复用
+`CloseWorktreeModal`。标题始终使用相同的短会话名；关闭按钮保留 DOM 节点和宽度，
+检查时只在按钮上显示 loading，避免 antd 的 Modal.confirmLoading 拦截取消。
+
+`SessionClosePosition` 记录首次布局的未缩放高度，后续内容增高时向上补偿居中位置，
+保留页脚坐标。关闭弹窗不使用缩放进场动画。最大内容高度以首次页脚位置和视口计算，
+长内容在正文内滚动；手机按钮通过伪元素扩展至至少 44px 的触控范围。
+
+隔离实例 `/tmp/roami-close-position-instance` 仅使用临时会话。浏览器延迟检查并注入
+普通、干净、未收尾和共享工作区四种响应，不提交伪造状态产生的关闭请求。
+桌面 1280 / 1920 / 2560 / 3440 CSS px，以及英文浅色模式均校验按钮坐标和宽度。
+改前按钮横移约 52px、上跳约 253～377px；改后四种分流的坐标误差小于 1px。
+原始坐标与截图位于 `/tmp/roami-close-position-*`，截图通过 PR 的 pr-shots 分支交付。
+
+Redmi Note 8 通过 LAN HTTPS 与 ADB 真实 DOWN/UP 长按、点按验证普通关闭和未收尾
+分流，按钮中心偏移约 0.14 CSS px；按钮上下外侧 5px 命中检查通过，上下导航可见，
+无横向溢出。手机 Chrome 的 CLI 返回 CHROME_BROWSER_IDENTITY_UNAVAILABLE，
+因此使用同一设备的 CDP 读取布局与截图，触控仍通过 ADB 执行。
+
+前端全量 1,681 项测试、quick / full 门禁通过，覆盖同一 DOM 按钮、等待时取消、晚到响应、
+卸载、工作区删除勾选与手机关闭分流。此次功能只修改前端和设计记录，门禁按约定跳过
+无关 Python / Go 测试；部署所含最新 main 另验 modelgateway Go 测试及 provider recovery
+Python 21 项测试。

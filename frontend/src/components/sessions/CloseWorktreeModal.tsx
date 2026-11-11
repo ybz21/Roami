@@ -2,40 +2,56 @@
 import { useEffect, useState } from 'react'
 import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
 import { useI18n } from '../../i18n'
-import { Modal, Radio, Select, App as AntApp } from 'antd'
+import { Checkbox, Modal, Radio, Select, App as AntApp } from 'antd'
+import { closeSession, sessionActionError } from './session-actions'
+import { sessionLabel } from './session-label'
+import { SessionClosePosition } from './SessionClosePosition'
 
-export function CloseWorktreeModal({ info, onClose, onDone }: {
+export function CloseWorktreeModal({ info, onClose, onDone, checking = false, sessionConfirmation = false }: {
   info: { name: string; st: any } | null
   onClose: () => void
   onDone: (name: string) => void
+  checking?: boolean
+  sessionConfirmation?: boolean
 }) {
   const [mode, setMode] = useState<'keep' | 'merge' | 'discard'>('keep')
   const [strategy, setStrategy] = useState<'squash' | 'merge' | 'rebase'>('squash')
   const [busy, setBusy] = useState(false)
+  const [removeToo, setRemoveToo] = useState(true)
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const st = info?.st || {}
   const merged = !!st.mergedInto // 合入检测（10 §5）：已合入时丢弃=清理，默认直选
+  const unfinished = (st.dirty || 0) + (st.untracked || 0) + (st.committedAhead || 0) > 0
+  const owned = st.inWorktree && !st.external && !(st.others > 0)
+  const choices = !sessionConfirmation || (owned && unfinished)
+  const removeOption = sessionConfirmation && owned && !unfinished && !!st.base
   useEffect(() => { if (info) { setMode(info.st?.mergedInto ? 'discard' : 'keep'); setStrategy('squash') } }, [info])
+  useEffect(() => { setRemoveToo(true) }, [info?.name])
   const ok = async () => {
-    if (!info) return
+    if (!info || checking || busy) return
     setBusy(true)
     try {
-      await submitLifecycle('close', {
-        mode, path: st.path, snapshot: st.snapshot, sessionIdentity: st.sessionIdentity, ...(mode === 'merge' ? { strategy } : {}),
+      if (sessionConfirmation && !choices && !removeOption) await closeSession(info.name)
+      else await submitLifecycle('close', {
+        mode: choices ? mode : removeToo ? 'discard' : 'keep', path: st.path, snapshot: st.snapshot, sessionIdentity: st.sessionIdentity, ...(choices && mode === 'merge' ? { strategy } : {}),
       }, info.name)
       message.success(t('session.lifecycle.closeAccepted'))
       onClose(); onDone(info.name)
     } catch (e: any) {
       const ae = e.apiError || {}
-      message.error(ae.stage ? t('worktree.close.failedAtStage', { stage: ae.stage, msg: e.message }) : lifecycleRequestError(e, t))
+      message.error(sessionConfirmation && !choices && !removeOption ? sessionActionError(e, t) : ae.stage ? t('worktree.close.failedAtStage', { stage: ae.stage, msg: e.message }) : lifecycleRequestError(e, t))
     } finally { setBusy(false) }
   }
   return (
-    <Modal open={!!info} onCancel={onClose} onOk={ok} confirmLoading={busy} destroyOnClose
-      title={t('worktree.close.title', { name: info?.name || '' })}
+    <Modal open={!!info} centered={sessionConfirmation} transitionName={sessionConfirmation ? '' : undefined} onCancel={() => { if (!busy) onClose() }} onOk={ok} confirmLoading={busy} destroyOnHidden
+      modalRender={sessionConfirmation ? node => <SessionClosePosition>{node}</SessionClosePosition> : undefined}
+      title={sessionConfirmation ? t('session.closeConfirm', { name: sessionLabel(info?.name) }) : t('worktree.close.title', { name: info?.name || '' })}
       okText={t('session.close')}
-      okButtonProps={{ danger: mode === 'discard' && (!merged || (st.dirty || 0) + (st.untracked || 0) > 0) }}>
+      cancelText={t('common.cancel')}
+      cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} keyboard={!busy}
+      okButtonProps={{ 'aria-label': t('session.close'), loading: checking || busy, disabled: checking, danger: !choices || (mode === 'discard' && (!merged || (st.dirty || 0) + (st.untracked || 0) > 0)) }}>
+      {checking ? <div role="status" aria-live="polite" style={{ fontSize: 'var(--fs-lg)', color: 'var(--text-bright)' }}>{t('session.closeChecking')}</div> : choices ? <>
       <div style={{ color: 'var(--text-dim)', marginBottom: 'var(--sp-3)' }}>
         {/* 已合入（10 §5）：损失叙事换成绿色定心丸；未提交改动仍如实提示 */}
         {merged
@@ -73,6 +89,7 @@ export function CloseWorktreeModal({ info, onClose, onDone }: {
             : <span style={{ color: 'var(--danger)' }}>{t('worktree.close.discard')}</span>}
         </Radio>
       </Radio.Group>
+      </> : removeOption ? <Checkbox checked={removeToo} onChange={event => setRemoveToo(event.target.checked)}>{t('worktree.close.removeWithSession')}</Checkbox> : st.inWorktree && st.others > 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>{t('session.closeOthersNote', { n: st.others })}</div> : null}
     </Modal>
   )
 }

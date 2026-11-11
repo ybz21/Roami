@@ -27,7 +27,7 @@ vi.mock('antd', () => ({
   }),
   Select: () => null,
   Spin: () => null,
-  Modal: ({ open, title, children, onOk, okText }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk}>{okText}</button></div> : null,
+  Modal: ({ open, title, children, onOk, okText, okButtonProps }: any) => open ? <div role="dialog">{title}{children}<button onClick={onOk} disabled={okButtonProps?.disabled}>{okText}</button></div> : null,
 }))
 afterEach(() => { cleanup(); setSessionLabels({}); localStorage.clear(); vi.resetAllMocks(); vi.useRealTimers() })
 
@@ -51,8 +51,8 @@ it('uses the same rows, ordering, navigation and menu for Roami and Codex', asyn
     expect(menu.getByRole('button', { name: 'session.rename' })).toBeTruthy()
     expect(menu.getByRole('button', { name: /mobile.interrupt/ })).toBeTruthy()
     fireEvent.click(menu.getByRole('button', { name: 'session.close' }))
-    await waitFor(() => expect(ui.confirm).toHaveBeenCalledTimes(row === native ? 1 : 2))
-    await ui.confirm.mock.calls[ui.confirm.mock.calls.length - 1][0].onOk()
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'session.close' })) })
   }
   expect(closeSession).toHaveBeenCalledWith('roami:native')
   expect(closeSession).toHaveBeenCalledWith('codex')
@@ -67,14 +67,11 @@ const beginCodexClose = async () => {
 it.each([true, false])('honors the worktree deletion checkbox on mobile (delete=%s)', async remove => {
   mount(worktree)
   await beginCodexClose()
-  await waitFor(() => expect(ui.confirm).toHaveBeenCalledOnce())
-  const confirm = ui.confirm.mock.calls[0][0]
-  const content = render(confirm.content)
-  const checkbox = content.getByRole('checkbox', { name: 'worktree.close.removeWithSession' }) as HTMLInputElement
+  const checkbox = await screen.findByRole('checkbox', { name: 'worktree.close.removeWithSession' }) as HTMLInputElement
   expect(checkbox.checked).toBe(true)
   if (!remove) fireEvent.click(checkbox)
-  await act(async () => { await confirm.onOk() })
-  expect(api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'close', resourceId: 'codex', intent: { name: 'Codex chat', mode: remove ? 'discard' : 'keep', path: worktree.path, snapshot: worktree.snapshot, sessionIdentity: worktree.sessionIdentity } }))
+  await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'session.close' })) })
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'close', resourceId: 'codex', intent: { name: 'Codex chat', mode: remove ? 'discard' : 'keep', path: worktree.path, snapshot: worktree.snapshot, sessionIdentity: worktree.sessionIdentity } })))
   expect(closeSession).not.toHaveBeenCalled()
   expect(refreshSessionLists).toHaveBeenCalled()
   await waitFor(() => expect(screen.queryByRole('button', { name: /Codex chat/ })).toBeNull())
@@ -94,8 +91,8 @@ it('offers unfinished worktree choices before closing a mobile session', async (
 it('keeps a worktree used by another session when closing from mobile', async () => {
   mount({ ...worktree, others: 1 })
   await beginCodexClose()
-  await waitFor(() => expect(ui.confirm).toHaveBeenCalledOnce())
-  await act(async () => { await ui.confirm.mock.calls[0][0].onOk() })
+  await screen.findByText('session.closeOthersNote')
+  await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'session.close' })) })
   expect(closeSession).toHaveBeenCalledWith('codex')
   expect(vi.mocked(api).mock.calls.some(([method, path]) => method === 'POST' && path.endsWith('/close-with-worktree'))).toBe(false)
 })
