@@ -17,6 +17,7 @@ import { RESUME_RESYNC_MS, resumeHealFor, shouldJiggleAfterAttach } from './term
 import type { ResumeHeal, TerminalDimensions } from './terminal-resize'
 import { parseTerminalPong, parseTerminalRevived } from './terminal-lifecycle'
 import { synchronizeTerminalAtlas } from './terminal-atlas'
+import { synchronizeTerminalIME } from './terminal-ime'
 import { useLayout } from '../../layout'
 
 export type TermStatus = 'connecting' | 'connected' | 'closed'
@@ -846,6 +847,7 @@ const Term = forwardRef<TermHandle, {
     const themeObs = new MutationObserver(() => { try { term.options.theme = xtermTheme(); term.options.minimumContrastRatio = minContrast() } catch {} })
     themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 
+    const releaseIME = synchronizeTerminalIME(term)
     // ponytail: IME 切英文时 macOS commit 未选中拼音（"s c p"），xterm 发给 pty 造成垃圾。
     // composition 期间吞掉所有 onData；compositionend 后吞掉 xterm 延迟发出的 finalize 数据，
     // 如果是纯拼音则去空格重发，中文则原样放行。
@@ -1137,6 +1139,7 @@ const Term = forwardRef<TermHandle, {
         textarea.removeEventListener('compositionstart', onCompStart)
         textarea.removeEventListener('compositionend', onCompEnd)
       }
+      releaseIME()
       dataDisp.dispose()
       try { dprMq?.removeEventListener('change', onDpr) } catch {}
       document.removeEventListener('visibilitychange', onVisibility)
