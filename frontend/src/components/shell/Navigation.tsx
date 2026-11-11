@@ -76,7 +76,7 @@ export function Navigation({
           {!rail && fullscreen && <button type="button" className="tt-nav-icon tt-nav-fullscreen" onClick={fullscreen.toggle}
             title={t(fullscreen.active ? 'common.exitFullscreen' : 'common.fullscreen')}
             aria-label={t(fullscreen.active ? 'common.exitFullscreen' : 'common.fullscreen')} aria-pressed={fullscreen.active}>
-            {fullscreen.active ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+            {fullscreen.active ? <ExitFullscreenIcon size={18} /> : <FullscreenIcon size={18} />}
           </button>}
           <button type="button" className="tt-nav-icon tt-nav-toggle" onClick={onToggleRail}
             title={t(rail ? 'common.expand' : 'common.collapse')}
