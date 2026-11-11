@@ -4,14 +4,18 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useCurrentNodeId } from '../cluster/node-url'
 import AgentMemory from '../agent/AgentMemory'
+import BackButton from '../BackButton'
+import { useLayout } from '../../layout'
+import './model-hub.css'
 
-export function AgentMemorySettings({ onBack }: { onBack?: () => void }) {
+export default function RoamiAgentMemory({ onBack }: { onBack: () => void }) {
   const node = useCurrentNodeId()
   return <MemoryCatalogPage key={node || 'local'} onBack={onBack} />
 }
 
-function MemoryCatalogPage({ onBack }: { onBack?: () => void }) {
+function MemoryCatalogPage({ onBack }: { onBack: () => void }) {
   const { t } = useI18n()
+  const { phone } = useLayout()
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
   const [failed, setFailed] = useState(false), [version, setVersion] = useState(0)
   useEffect(() => {
@@ -22,8 +26,9 @@ function MemoryCatalogPage({ onBack }: { onBack?: () => void }) {
     }).catch(() => { if (!abort.signal.aborted) setFailed(true) })
     return () => abort.abort()
   }, [version])
-  return <>
+  return <div className="tt-model-hub-roami">
+    {!phone && <div className="tt-pagehead tt-model-hub-detail-head"><h2>{t('agent.memoryCenter')}</h2><BackButton onClick={onBack} /></div>}
     {failed && <p role="alert">{t('agent.memoryProjectsFailed')} <Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button></p>}
     <AgentMemory fullPage embedded onBack={onBack} projects={projects} select={(cid, branch, message) => { location.hash = '#/home/' + [cid, branch, message].filter(Boolean).map(encodeURIComponent).join('/') }} />
-  </>
+  </div>
 }

@@ -7,7 +7,7 @@ const deps = { t: (key: string) => key, theme: 'dark', setTheme: vi.fn(), locale
 it.each([undefined, false, true])('registers the experimental workflow only for an explicitly confirmed development node (%s)', developmentRsi => {
   const model = buildSettings({ ...deps, developmentRsi, nodeId: 'dev-node' })
   expect(!!model.pages['experiments.rsi']).toBe(developmentRsi === true)
-  expect(model.groups.find(group => group.title === 'set.groupAgent')!.pages.includes('experiments.rsi')).toBe(developmentRsi === true)
+  expect(model.groups.find(group => group.title === 'set.groupAgent')?.pages.includes('experiments.rsi') ?? false).toBe(developmentRsi === true)
   expect(model.order.includes('experiments.rsi')).toBe(developmentRsi === true)
   if (developmentRsi) {
     const control = model.pages['experiments.rsi'].items[0].control
@@ -16,16 +16,17 @@ it.each([undefined, false, true])('registers the experimental workflow only for 
   }
 })
 
-it('keeps every visible setting in one of the five groups and leaves direct links intact', () => {
+it('keeps device and account settings while removing migrated agent pages from navigation and search', () => {
   const model = buildSettings(deps)
   expect(model.groups).toEqual([
     { title: 'set.groupPreferences', pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
-    { title: 'set.groupAgent', pages: ['agent.runtime', 'agent.memory'] },
     { title: 'set.groupNotifications', pages: ['agent.messages'] },
     { title: 'set.groupDevices', pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
     { title: 'set.groupSystem', pages: ['node.env', 'sec', 'about'] },
   ])
-  expect(new Set(model.order).size).toBe(14)
+  expect(new Set(model.order).size).toBe(12)
+  expect(model.pages['agent.runtime']).toBeUndefined()
+  expect(model.pages['agent.memory']).toBeUndefined()
   for (const id of model.order) expect(model.pages[id].parent).toBe(model.groups.find(group => group.pages.includes(id))!.title)
   expect(model.pages['node.memory']).toBeTruthy()
   expect(model.order).not.toContain('node.memory')

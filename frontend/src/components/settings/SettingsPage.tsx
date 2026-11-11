@@ -104,7 +104,6 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
       await browserRestart.current()
     },
     onEnvPush: pushEnv,
-    onMemoryBack: () => { if (onNav) onNav('settings'); else location.hash = '#/settings' },
     developmentRsi: channel.value?.developmentRsi === true, nodeId, experimentRunId: runId,
     onExperimentRun: id => { const route = 'settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : ''); if (onNav) onNav(route); else location.hash = '#/' + route },
   }), [t, mode, locale, prefs, onLogout, nodeId, channel.value?.developmentRsi, runId, onNav, onInstall, fullscreen?.active, fullscreen?.toggle])
@@ -216,7 +215,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
             </section>)}
           </div>
         )}
-        {openSub?.id === 'agent.memory' ? <>{openSub.items.map(it => <SettingRow key={it.id} item={it} />)}</> : openSub && (
+        {openSub && (
           <MobileSubPage title={openSub.name} onBack={() => { const route = runId ? 'settings/experiments/rsi' : 'settings'; if (onNav) onNav(route); else location.hash = '#/' + route }} manageHistory={false} keepBottomNav>
             <div className="tt-set-pane scroll">
               {openSub.id !== 'experiments.rsi' && <PaneHead page={openSub} compact />}
@@ -245,7 +244,7 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
           </section>)}
         </nav>
         {query ? results : (
-          <div className={`tt-set-pane scroll${page.id === 'agent.memory' ? ' tt-set-memory' : ''}`}>
+          <div className="tt-set-pane scroll">
             {page.id !== 'experiments.rsi' && <PaneHead page={page} />}
             <div className="rows">{page.items.map((it) => <SettingRow key={it.id} item={it} />)}{page.id === 'about' && advanced}</div>
           </div>

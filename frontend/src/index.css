@@ -2773,8 +2773,6 @@ html[data-pointer="coarse"] .tt-set-row .ant-switch::after { content:''; positio
 html[data-pointer="coarse"] .tt-set-row .ant-btn { position:relative; }
 html[data-pointer="coarse"] .tt-set-row .ant-btn::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:max(100%, var(--tap)); min-width:var(--tap); transform:translateY(-50%); }
 .tt-set-bare { padding-top:var(--sp-2); }
-.tt-set-memory > .rows { display:flex; flex-direction:column; overflow:hidden; padding-right:0; }
-.tt-set-memory > .rows > .tt-set-bare { display:flex; flex:1; min-height:0; padding-top:0; }
 
 /* ── 机器切换器的下拉行（侧栏底座那枚按钮弹出来的列表）─────────────────
    方章原来走 antd 的 icon 槽，间距归 antd 管，实测贴着名字（「JE|Jetson」）；
