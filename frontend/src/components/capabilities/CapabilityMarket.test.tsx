@@ -5,7 +5,6 @@ import { api } from '../../api'
 import CapabilityMarket from './CapabilityMarket'
 import CapabilityEditor from './CapabilityEditor'
 import MarketSources from './MarketSources'
-import SkillInstallationGuide from './SkillInstallationGuide'
 
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
@@ -212,22 +211,4 @@ it('shows only authoritative ranking counts and retains the successful tab on fa
   await screen.findByText('3,349')
   expect(screen.getByText('9,902')).toBeTruthy()
   expect(screen.getByRole('tab', { name: /capabilities.market.ranking.hot/ }).getAttribute('aria-selected')).toBe('true')
-})
-
-it('copies the exact install command and resets feedback when switching to an agent prompt', async () => {
-  const writeText = vi.fn().mockResolvedValue(undefined)
-  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
-  try {
-    render(<SkillInstallationGuide identifier="designed-by-ai/skills/design-mobile-apps" phone={false} />)
-    fireEvent.click(screen.getByRole('button', { name: 'common.copy' }))
-    await screen.findByRole('button', { name: 'common.copied' })
-    expect(writeText).toHaveBeenCalledWith('npx skills add https://github.com/designed-by-ai/skills --skill design-mobile-apps')
-    fireEvent.click(screen.getByText('capabilities.market.prompt'))
-    expect(screen.getByRole('button', { name: 'common.copy' })).toBeTruthy()
-    writeText.mockRejectedValueOnce(new Error('Not allowed'))
-    fireEvent.click(screen.getByRole('button', { name: 'common.copy' }))
-    expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByText('capabilities.market.installPrompt')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'common.copied' })).toBeNull()
-  } finally { Reflect.deleteProperty(navigator, 'clipboard') }
 })

@@ -54,3 +54,11 @@ full 门禁通过：Go、Python lint / format、相关 Python 113 项、前端�
 最终 Android 通过 ADB 实际输入官方 URL、切换三个榜单、展开命令区、切换到提示词并分别复制成功、打开文件页选择 designing.md（7,851 字符），再取消本机 / Claude / OpenCode，仅安装到隔离 Roami 节点。持久记录固定 commit 为 `03c20aec6dcedb5fabfb03dc37982eb52ef19ed6`，保留八个原始文件，不包含预览图片。手机首屏效果图边界为 y=510.65…664.86，固定安装栏从 y=673.09 开始，整张图可见；累计标签实际宽度 44px，文件菜单选项高度 44px。
 
 最终前端全量测试仍为 1,643 项通过，类型检查 / i18n / hover / 生产构建通过，quick 与 full 门禁通过。截图为 `/tmp/skills-official-rankings-all-desktop.png`、`/tmp/skills-official-detail-desktop.png`、`/tmp/skills-official-rankings-phone.png`、`/tmp/skills-official-detail-phone.png`、`/tmp/skills-official-guide-phone.png`，通过 pr-shots 发布。
+
+## 移除重复 Installation 区域
+
+按用户修订，删除详情中的命令 / 提示词安装区，包括手机折叠入口及对应组件、样式、翻译和已失效的复制测试。正文直接呈现功能文档及效果图；桌面只使用右侧安装栏，手机只使用底部安装按钮。此前的安装引导验收为历史记录，不代表当前界面。
+
+本次前端全量 228 个文件、1,642 项测试通过；typecheck、i18n / hover、生产构建及按提交 7449b843 对比的 full 门禁通过。仅修改前端与文档，按规则跳过无改动的 Python / Go。桌面 1280 / 1920 / 2560 / 3440 CSS px、侧栏开关均无溢出，只有右侧一个安装入口，实际安装到隔离 Roami 节点成功。Android 真机 ADB 打开详情与安装位置；确认无命令区、仅一个底部安装按钮且命中正确，效果图完整解码（1586px），图底 y=592.13，底栏顶 y=673.09，无横向溢出。
+
+改后截图：`/tmp/skills-single-install-desktop.png`、`/tmp/skills-single-install-phone.png`。

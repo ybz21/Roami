@@ -5,7 +5,6 @@ import remarkGfm from 'remark-gfm'
 import { useI18n } from '../../i18n'
 import { ChevronLeft, ChevronRight, CodeIcon, FileTextIcon, GithubIcon, OpenInIcon } from '../../icons'
 import type { ManagedEntry } from './capability-format'
-import SkillInstallationGuide from './SkillInstallationGuide'
 import { skillDocument, skillFileText } from './skill-document'
 
 export default function SkillMarketDetail({ entry, images = {}, marketUrl, repository, installs, phone, busy, targets, onTargets, installError, canInstall, onInstall, onBack, variant }: {
@@ -43,7 +42,6 @@ export default function SkillMarketDetail({ entry, images = {}, marketUrl, repos
       <header className="tt-pagehead tt-skill-hero"><div className="ttl"><div className="tt-skill-identity"><span>{repository}</span>{installs && <span>{installs}</span>}</div><h2>{entry.displayName || entry.name}</h2>{summary && <p>{summary}</p>}</div></header>
       <div className="tt-skill-columns">
         <main className="tt-skill-content">
-          <SkillInstallationGuide phone={phone} identifier={entry.origin?.id || ''} />
           <Segmented className="tt-skill-tabs" aria-label={t('capabilities.market.content')} value={tab} onChange={setTab} options={[{ value: 'overview', label: t('capabilities.market.overview'), icon: <FileTextIcon size={16} /> }, { value: 'files', label: t('capabilities.market.files', { count: files.length }), icon: <CodeIcon size={16} /> }]} />
           {tab === 'overview' ? <article className="tt-skill-document"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{
             a: ({ children, href }) => {
