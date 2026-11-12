@@ -54,6 +54,9 @@ func TestAgentCapabilitiesCreatesEditableGuide(t *testing.T) {
 	if response.Data.Content != "我的自定义能力" || !strings.Contains(response.Data.ExecutionGuide, strings.TrimSpace(string(guide))) || !strings.Contains(response.Data.ExecutionGuide, "本次是用户直接打开的工作会话") {
 		t.Fatal("canonical execution and artifact guide must survive custom capabilities")
 	}
+	if !strings.Contains(response.Data.ExecutionGuide, "推送任务分支并创建 PR") || !strings.Contains(response.Data.ExecutionGuide, "无改动不空提交") {
+		t.Fatal("Git task delivery must include commit and PR while preserving read-only tasks")
+	}
 }
 
 func TestAgentCapabilitiesUpgradesShippedGuides(t *testing.T) {
