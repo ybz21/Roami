@@ -41,9 +41,33 @@ it('marks a matching gateway profile as applied', async () => {
 it.each(['upstream-a', 'model-a'])('does not match a direct preset to a different protocol or a gateway alias: %s', async model => {
   mount({ ...view, profiles: [{ ...view.profiles[0], baseUrl: sources[0].baseUrl, protocol: 'openai-completions', model }], current: { provider: 'Native preset', model } })
   await waitFor(() => expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/catalog', undefined, expect.anything()))
-  await screen.findByText('hub.chooseSource')
+  await screen.findByText('hub.gatewayDefault')
   expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(true)
   expect(api).not.toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/source-models', expect.anything(), expect.anything())
+})
+
+it('applies the gateway default without selecting or fetching a source', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { revision: 'catalog-r1', sources, models, drafts: [], uses: {}, baseUrl: view.profiles[0].baseUrl, defaultModel: 'model-b' } })
+  mount({ ...view, mode: 'official', profiles: [], current: {}, activeId: undefined })
+  fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
+  await screen.findByText('hub.gatewayDefaultHint')
+  await waitFor(() => expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(false))
+  expect(screen.queryByRole('combobox', { name: 'hub.tab.catalog' })).toBeNull()
+  expect(api).not.toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/source-models', expect.anything(), expect.anything())
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.apply' }))
+  fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.models.apply' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/apply', { kind: 'claude', model: 'roami-default', revision: 'native-r1', catalogRevision: 'catalog-r1' }))
+})
+
+it('marks default as applied and recognizes a model selected inside Claude Code', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { revision: 'catalog-r1', sources, models, baseUrl: view.profiles[0].baseUrl, defaultModel: 'model-b' } })
+  mount({ ...view, current: { model: 'roami-default' } })
+  await screen.findByText('hub.gatewayDefaultHint')
+  expect((screen.getByRole('button', { name: 'capabilities.models.applied' }) as HTMLButtonElement).disabled).toBe(true)
+  cleanup()
+  mount({ ...view, activeId: undefined, changed: true, profiles: [{ ...view.profiles[0], applied: false }], current: { model: 'roami-claude/model-b[1m]', baseUrl: view.profiles[0].baseUrl } })
+  await screen.findByText('Source b')
+  expect(screen.getByText('Model b', { selector: '.ant-select-selection-item' })).toBeTruthy()
 })
 it('chooses a saved source first and exposes only that source’s models', async () => {
   mount(); await screen.findByText('Source a')

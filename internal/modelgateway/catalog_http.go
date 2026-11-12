@@ -80,6 +80,9 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			break
 		}
 		var model *CatalogModel
+		if input.Model == gatewayDefaultModel && input.Kind == "claude" && input.SourceID == "" && input.UpstreamModel == "" {
+			model = s.defaultModel(s.value)
+		}
 		for _, m := range s.value.Models {
 			if m.ID == input.Model {
 				copy := m
@@ -165,7 +168,11 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Kind == "claude" {
 			authMode = "bearer"
 		}
-		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key})
+		selectedModel := model.ID
+		if input.Model == gatewayDefaultModel {
+			selectedModel = gatewayDefaultModel
+		}
+		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: selectedModel, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key})
 		if e != nil {
 			err = e
 			break
@@ -218,7 +225,11 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" && r.URL.Path == "/v1/models" {
 		data := []map[string]any{}
 		for _, m := range snapshot.Models {
-			data = append(data, map[string]any{"id": m.ID, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
+			id := m.ID
+			if kind == "claude" {
+				id = claudeModelPrefix + id
+			}
+			data = append(data, map[string]any{"id": id, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
 		}
 		writeJSON(w, 200, map[string]any{"object": "list", "data": data, "has_more": false})
 		return
@@ -254,8 +265,12 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	var alias string
 	_ = json.Unmarshal(payload["model"], &alias)
 	var model *CatalogModel
+	resolvedID := catalogModelID(kind, alias)
+	if resolvedID == gatewayDefaultModel && kind == "claude" {
+		model = h.Catalog.defaultModel(catalog)
+	}
 	for _, m := range catalog.Models {
-		if m.ID == alias {
+		if m.ID == resolvedID {
 			copy := m
 			model = &copy
 		}

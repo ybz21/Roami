@@ -4,7 +4,7 @@ import { api } from '../../api'
 export type ModelSource = { pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; id: string; name: string; baseUrl: string; protocol: string; authMode: string; hasKey?: boolean; apiKey?: string }
 export type ModelCandidate = { sourceId: string; model: string }
 export type CatalogModel = { id: string; name: string; protocol: string; strategy: 'fixed' | 'failover'; candidates: ModelCandidate[] }
-export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string> }
+export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string>; defaultModel?: string }
 const normalizeCatalog = (data: ModelCatalog): ModelCatalog => ({ ...data, sources: data.sources || [], models: data.models || [], drafts: data.drafts || [], uses: data.uses || {} })
 export const MODEL_CATALOG_CHANGED = 'roami:model-catalog-changed'
 export const modelProtocols = ['openai-completions', 'openai-responses', 'anthropic-messages']

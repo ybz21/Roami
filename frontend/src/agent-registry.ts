@@ -69,7 +69,7 @@ export type AgentModelInput = Omit<AgentModelProfile, 'id' | 'hasKey' | 'applied
 export type AgentModelView = {
   mode?: 'official' | 'custom'
   profiles: AgentModelProfile[]
-  current: { provider?: string; model?: string }
+  current: { provider?: string; model?: string; baseUrl?: string }
   revision: string
   activeId?: string
   changed: boolean

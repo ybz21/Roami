@@ -223,7 +223,7 @@ func defaultFields(kind string) []field {
 	case "claude":
 		doc = "settings"
 		paths = [][]string{{"model"}, {"apiKeyHelper"}, {"modelPicker"}}
-		for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY", "ROAMI_MODEL_MANAGED"} {
+		for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY", "ROAMI_MODEL_MANAGED"} {
 			paths = append(paths, []string{"env", name})
 		}
 	case "codex":
@@ -307,6 +307,9 @@ func (config nativeConfig) current(kind string) CurrentModel {
 			model := textAt(values, "env", "ANTHROPIC_MODEL")
 			if model == "" {
 				model = textAt(values, "model")
+			}
+			if model == "" {
+				model = textAt(values, "env", "ANTHROPIC_DEFAULT_MODEL")
 			}
 			return CurrentModel{Model: model, BaseURL: currentEndpoint(textAt(values, "env", "ANTHROPIC_BASE_URL"))}
 		case "codex":
@@ -397,8 +400,14 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 	switch kind {
 	case "claude":
 		add("settings", profile.Model, "model")
-		add("settings", profile.Model, "env", "ANTHROPIC_MODEL")
-		for _, name := range []string{"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL"} {
+		if profile.Name == "Roami Gateway" {
+			// Leave /model's saved selection authoritative on the next launch.
+			add("settings", nil, "env", "ANTHROPIC_MODEL")
+			add("settings", profile.Model, "env", "ANTHROPIC_DEFAULT_MODEL")
+		} else {
+			add("settings", profile.Model, "env", "ANTHROPIC_MODEL")
+		}
+		for _, name := range []string{"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL"} {
 			add("settings", profile.Model, "env", name)
 		}
 		add("settings", nil, "apiKeyHelper")
