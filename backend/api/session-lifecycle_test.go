@@ -142,6 +142,18 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 	if !strings.Contains(string(data), intent.Launch.Task) || !strings.Contains(string(data), prepared.Path) || !strings.Contains(string(data), o.ResourceID) {
 		t.Fatalf("lost original input or actual identity: %s", data)
 	}
+	for _, required := range []string{
+		"## 产物交付", "## 完成回报", "检查、commit、推送任务分支并创建 PR", "无改动不空提交",
+		"[报告（Markdown）](/api/file/tmp/report.md)", "本次是用户直接打开的工作会话",
+	} {
+		if !strings.Contains(string(data), required) {
+			t.Fatalf("delivered launch prompt missing %q: %s", required, data)
+		}
+	}
+	if strings.Count(string(data), "## 完成回报") != 1 || strings.Index(string(data), "## 完成回报") > strings.Index(string(data), "# Roami 本机能力") {
+		t.Fatal("execution guidance must appear once before capabilities in the delivered prompt")
+	}
+	t.Log("Delivered launch prompt includes Git commit, push, PR and artifact/report instructions")
 	status := call("GET", "/sessions/"+o.ResourceID+"/worktree-status", nil)
 	var st struct {
 		Data struct {
@@ -224,6 +236,41 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 		_ = json.Unmarshal(r.Body.Bytes(), &response)
 		return response.Data
 	}
+	customGuide := "项目自定义能力：保留现有资料。"
+	if err = os.WriteFile(agentCapabilitiesPath(), []byte(customGuide), 0600); err != nil {
+		t.Fatal(err)
+	}
+	customMarker := filepath.Join(repo, "custom-launch-result")
+	customCommand := "python3 -c " + shellQuote("import pathlib,sys;pathlib.Path("+fmt.Sprintf("%q", customMarker)+").write_text(sys.argv[1])")
+	custom := newFixture("custom-guide-fixture", &life.Launch{Command: customCommand, Agent: "codex", Task: "生成项目报告", FileBase: "/n/fixture-node/api/file", TaskHeading: "Task", SetupHeading: "Setup"})
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		data, err = os.ReadFile(customMarker)
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("custom-guide background launch did not execute")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for _, required := range []string{customGuide, "检查、commit、推送任务分支并创建 PR", "本次是用户直接打开的工作会话", "[报告（Markdown）](/n/fixture-node/api/file/tmp/report.md)"} {
+		if !strings.Contains(string(data), required) {
+			t.Fatalf("custom-guide delivered prompt missing %q: %s", required, data)
+		}
+	}
+	storedGuide, err := os.ReadFile(agentCapabilitiesPath())
+	if err != nil || string(storedGuide) != customGuide || strings.Count(string(data), "## 完成回报") != 1 || strings.Contains(string(data), "{{FILE_BASE}}") {
+		t.Fatal("custom guide changed, execution guidance duplicated or node file prefix not rendered")
+	}
+	customClose := closeFixture(custom, "discard")
+	if err = worker.RunOne(ctx, customClose.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Remove(customMarker); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("Custom guide launch preserves Git delivery and node-scoped artifact links")
 	detached := newFixture("detached-fixture", nil)
 	detachedWorkspace, _ := life.Result[lifecycleWorkspace](detached, "workspace")
 	detach := exec.Command("git", "-C", detachedWorkspace.Path, "checkout", "--detach", "HEAD")
