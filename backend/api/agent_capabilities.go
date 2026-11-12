@@ -15,7 +15,7 @@ import (
 	"github.com/ybz21/Roami/backend/config"
 )
 
-//go:embed prompts/agent-capabilities.md
+//go:embed prompts/agent-capabilities.md prompts/task-execution.md prompts/task-report-session.md
 var defaultAgentCapabilities embed.FS
 
 const agentCapabilitiesFile = "agent-capabilities.md"
@@ -70,7 +70,8 @@ func isShippedAgentCapabilities(data []byte) bool {
 		"a7b402f283e8182fedbd330dd5ca775ad9d210985a148f364cdbbc3e19af6aec", // #399
 		"731ca3553ff6cfedc7f5560ae54351c362a388a7d4913adfeda1478b03dea849", // #403
 		"b6ca3cf275e11f89c1b0a062dbb998bf5352fc6c0f73f6942b30c8bbd84cc70d", // Main collaboration protocol
-		"321c6e5618f393dad5e9c177ffbbb629020b0cbf5ff96c5e337f075cdf2d4974": // Top-level swarm CLI
+		"321c6e5618f393dad5e9c177ffbbb629020b0cbf5ff96c5e337f075cdf2d4974", // Top-level swarm CLI
+		"24488ffb7a7ab4b31419ea1184ad4b900c70d3975433ce2b680116e2225ac486": // Detailed command guide
 		return true
 	}
 	return false
@@ -98,5 +99,11 @@ func (a *API) AgentCapabilities(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "CAPABILITIES_READ_ERROR", "message": err.Error()}})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"content": content}})
+	guide, guideErr := defaultAgentCapabilities.ReadFile("prompts/task-execution.md")
+	channel, channelErr := defaultAgentCapabilities.ReadFile("prompts/task-report-session.md")
+	if guideErr != nil || channelErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "CAPABILITIES_READ_ERROR"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"content": content, "executionGuide": strings.TrimSpace(string(guide)) + "\n\n" + strings.TrimSpace(string(channel))}})
 }

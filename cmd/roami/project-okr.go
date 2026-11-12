@@ -13,14 +13,14 @@ import (
 )
 
 func runProjectOKR(args []string) int {
-	if len(args) == 2 && args[0] == "record" && (args[1] == "help" || args[1] == "--help") {
+	if len(args) == 2 && args[0] == "record" && (args[1] == "help" || args[1] == "--help" || args[1] == "-h") {
 		fmt.Println(`roami project okr record PROJECT --file JSON|- --json
 Single explicit observation: {"revision":N,"metricId":"ID","date":"YYYY-MM-DD","value":NUMBER,"note":"Evidence"}.
 Skill batch (requires projectFiles.connectorSkillBatches): {"revision":N,"batch":{"id":"32-lowercase-hex","connectorId":"SOURCE","packageSha256":"CONFIRMED_SHA256","sourceIdentity":"CONFIRMED_ID","date":"YYYY-MM-DD","capturedAt":"RFC3339","windowStart":"RFC3339","windowEnd":"RFC3339","values":[{"metricId":"ID","unit":"CONFIRMED_UNIT","value":NUMBER}],"evidence":[{"path":"PROJECT_RELATIVE_FILE","sha256":"RAW_SHA256"}]}}.
 Read the confirmed connectors first. Day windows are [start,end); snapshot windows have equal endpoints. Main reviews external source semantics. The host hashes and archives the referenced bytes; it never launches the Skill. After an unknown outcome, show the workspace and find connectorBatches by batch id, then retry the exact original payload/key if needed. A receipt confirms data publication, not task acceptance or an active schedule.`)
 		return 0
 	}
-	if len(args) == 2 && args[0] == "memory" && (args[1] == "help" || args[1] == "--help") {
+	if len(args) == 2 && args[0] == "memory" && (args[1] == "help" || args[1] == "--help" || args[1] == "-h") {
 		fmt.Println(`roami project okr memory PROJECT --file JSON|- --json
 Read 'roami project okr show PROJECT --json' first. Append real new knowledge with:
 {"mode":"append","content":"New verified knowledge","expectedSha256":"CURRENT_MEMORY_SHA256"}
@@ -31,7 +31,7 @@ Keep the original key and edits after an unknown result. Edits match the origina
 Never probe a live write endpoint to discover its schema. A conflict requires rereading.`)
 		return 0
 	}
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
 		fmt.Println("roami project okr show|save|sync|memory|record|collect|review PROJECT [--file JSON|-] [--server URL] [--json]\nWrites require the current revision in the JSON object; collect also requires --file. A conflict never retries a write.")
 		return 0
 	}

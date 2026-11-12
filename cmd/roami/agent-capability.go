@@ -36,8 +36,10 @@ func runAgentCapability(args []string) int {
 			fmt.Fprintln(os.Stderr, "capability name required")
 			return 2
 		}
-		name = rest[0]
-		rest = rest[1:]
+		if rest[0] != "--help" && rest[0] != "-h" {
+			name = rest[0]
+			rest = rest[1:]
+		}
 	}
 	flags := flag.NewFlagSet("agent capability "+sub, flag.ContinueOnError)
 	query := flags.String("query", "", "capability name or intent")

@@ -146,6 +146,26 @@ func (s Service) lifecycleFile(binding SessionBinding) (string, error) {
 }
 
 func sessionPrompt(dir string, spec Spec) string {
+	if spec.PromptFormat == "markdown-session" {
+		var receipt Receipt
+		context := ""
+		if readJSON(filepath.Join(dir, "receipt.json"), &receipt) == nil && receipt.Session != "" {
+			context = "当前会话（稳定 ID）：`" + receipt.Session + "`。会话操作使用此 ID；改名只改变展示名。\n\n"
+		}
+		label := "执行标识：`" + filepath.Base(dir) + "`。仅用于本次任务绑定，无需写入交付内容。"
+		if spec.ShortExecutionLabel {
+			id := filepath.Base(dir)
+			if len(id) > 8 {
+				id = id[:8]
+			}
+			label = "执行标识（短 ID）：`" + id + "`。仅供识别。"
+		}
+		return spec.Prompt + "\n\n# 执行上下文\n\n" + context + label
+	}
+	if spec.PromptFormat == "markdown" {
+		return spec.Prompt + "\n\n# 执行上下文\n\n执行标识：`" + filepath.Base(dir) + "`。仅用于本次任务绑定，无需写入交付内容。"
+	}
+	// Persisted launches must retain their original prompt hash for reconciliation.
 	return "Roami delegated task [" + filepath.Base(dir) + "]. Complete this task in the current session and preserve unrelated work. Report evidence and remaining blockers in your final answer.\n\n" + spec.Prompt
 }
 

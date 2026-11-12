@@ -68,7 +68,10 @@ async def test_delivery_includes_stable_callback_and_never_replays_an_unknown_se
     receipt = await directory.send("session-codex", "Open a PR", "one", binding=binding)
     assert receipt["replyExpected"] and not receipt["executionTracked"]
     assert "agent reply --dispatch " + receipt["dispatchId"] in calls[0]["text"]
-    assert calls[0]["text"].startswith("Open a PR")
+    assert calls[0]["text"].startswith("# 任务：\n\nOpen a PR\n\n# 执行上下文")
+    assert "当前会话（稳定 ID）：`session-codex`" in calls[0]["text"]
+    assert "## 产物交付" in calls[0]["text"]
+    assert "此旧会话通道不会自动" in calls[0]["text"]
     assert receipt == await directory.send("session-codex", "Open a PR", "one", binding=binding)
     assert len(calls) == 1
     with pytest.raises(DomainError, match="MESSAGE_KEY_CONFLICT"):

@@ -25,7 +25,10 @@ async def test_main_existing_session_delegate_sends_without_provider_hooks_or_co
         assert argv[1:4] == ["agent", "execution", "send-message"]
         spec = json.loads(kwargs["input_data"])
         assert spec["sessionId"] == "stable-id"
-        assert spec["text"].startswith("Fix the layout\n\n[Roami task return channel]")
+        assert spec["text"].startswith("# 任务：\n\nFix the layout\n\n# 执行上下文")
+        assert "当前会话（稳定 ID）：`stable-id`" in spec["text"]
+        assert "# 执行约定" in spec["text"]
+        assert "# 回报通道" in spec["text"]
         assert "agent reply --dispatch " in spec["text"]
         return {
             "exitCode": 0,

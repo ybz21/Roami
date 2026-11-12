@@ -8,6 +8,23 @@ import (
 	"github.com/ybz21/Roami/internal/terminalui"
 )
 
+// Command prints the basic session operations without contacting tmux.
+func Command(command string, w io.Writer) bool {
+	usage := map[string]string{
+		"ls":      "roami session ls [--json] [--tree]\nroami session ls --live --json",
+		"capture": "roami session capture SESSION_ID [--lines N]",
+		"fork":    "roami session fork [PARENT_ID] NAME [--dir PATH] [--detach] [--json]\nCreates a child session; does not copy agent conversations, start an agent, or create a Git worktree.",
+		"resolve": "roami session resolve SESSION [--strict] [--json]",
+		"rename":  "roami session rename SESSION_ID NAME\nRenaming changes the display name; the session ID stays the same.",
+		"send":    "roami session send SESSION_ID TEXT\nFor managed tasks, continue through task_steer or roami swarm say instead.",
+	}
+	text, ok := usage[command]
+	if ok {
+		fmt.Fprintln(w, text)
+	}
+	return ok
+}
+
 // Show prints the help screen.
 func Show(version string, w io.Writer) {
 	p := ui.P()

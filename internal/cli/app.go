@@ -42,8 +42,7 @@ func (a App) WithOutput(out io.Writer) App {
 
 func (a App) Run(args []string) error {
 	args = stripQuiet(args)
-	if len(args) > 0 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
-		help.Show(version, a.out)
+	if ShowHelp(args, a.out) {
 		return nil
 	}
 	if len(args) > 0 && !sessionCommand(args[0]) {
@@ -171,6 +170,22 @@ func (a App) Run(args []string) error {
 	default:
 		return fmt.Errorf("unknown session command %q; use roami session help", cmd)
 	}
+}
+
+// ShowHelp runs before storage migration or acquiring an instance lease.
+func ShowHelp(args []string, out io.Writer) bool {
+	args = stripQuiet(args)
+	if len(args) > 0 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
+		help.Show(version, out)
+		return true
+	}
+	if len(args) == 2 && args[1] == "--help" && sessionCommand(args[0]) {
+		if !help.Command(args[0], out) {
+			help.Show(version, out)
+		}
+		return true
+	}
+	return false
 }
 
 func (a App) runStatus(args []string) error {

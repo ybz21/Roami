@@ -24,6 +24,7 @@ RUN uv pip install --python .venv/bin/python "opencv-python-headless==4.13.0.92"
 COPY agent-runtime/src ./src
 COPY skills/okr-development ./skills/okr-development
 COPY agent-runtime/migrations ./migrations
+COPY backend/api/prompts/task-*.md backend/api/prompts/agent-capabilities.md ./prompts/
 # Evaluation cases stay on the host, outside the agent image build context.
 RUN ROAMI_RSI_CONTAINER_BUILD=1 uv sync --frozen --no-dev --inexact
 RUN rm -f src/roami_agent/improvement/evaluation/authored_fixtures.py \

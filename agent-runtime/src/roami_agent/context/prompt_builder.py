@@ -69,6 +69,8 @@ class PromptBuilder:
         return plan, prompt
 
     def _configuration(self, turn, instructions, catalog):
+        if turn.get("executionRunId") and turn.get("executionBrief"):
+            instructions += "\n\n" + turn["executionBrief"]
         if self.skills:
             instructions = workflow_instructions(instructions, self.skills())
         workspace = turn.get("workspace")

@@ -34,6 +34,9 @@ func structuredArgs(spec Spec, provider string) []string {
 }
 
 func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, receipt Receipt, provider string, stdout, stderr io.Writer) (Result, string) {
+	if spec.PromptFormat == "markdown-session" {
+		spec.Prompt = sessionPrompt(dir, spec)
+	}
 	result := Result{State: "failed", ExitCode: -1, Summary: "EXECUTOR_START_FAILED"}
 	if provider == "" && spec.Executor == "pi" {
 		provider = uuid.NewString()

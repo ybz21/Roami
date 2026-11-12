@@ -11,6 +11,7 @@ import pytest
 from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
+from roami_agent.context.execution_brief import execution_guide
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
@@ -58,8 +59,23 @@ async def prepared(store, executor="codex"):
     assert len(files) == 1 and files[0].stat().st_mode & 0o777 == 0o600
     context = json.loads(files[0].read_text())
     assert context["signature"] not in launches[0]["prompt"]
-    assert "capability read NAME --context" in launches[0]["prompt"]
-    assert "--call UNIQUE_REQUEST_ID" in launches[0]["prompt"]
+    prompt = launches[0]["prompt"]
+    assert launches[0]["promptFormat"] == "markdown-session"
+    assert launches[0]["shortExecutionLabel"] is True
+    assert execution_guide() in prompt
+    assert prompt.startswith("# 任务：\n\nUse installed capabilities\n\n# 开工准备\n\n")
+    assert prompt.index("# 开工准备") < prompt.index("# 执行约定") < prompt.index("# 回报通道")
+    assert prompt.index("# 回报通道") < prompt.index("# Roami 本机能力")
+    assert "## 产物交付" in prompt and "## 执行结束与通知 Main" in prompt
+    assert "downloadUrl" in prompt and "SHA256" in prompt
+    assert "任务第 1 版" in prompt
+    assert context["taskId"] == task["id"] and context["runId"] == run["id"]
+    assert prompt.count(str(files[0])) == 1
+    assert prompt.count("```") % 2 == 0
+    assert "[Roami platform capabilities]" not in prompt
+    assert "roami agent capability" in prompt and "roami --help" in prompt
+    assert '--context "$ROAMI_TASK_CONTEXT"' in prompt
+    assert "--call REQUEST_ID" in prompt
     return runtime, task, run, context
 
 
@@ -400,9 +416,12 @@ async def test_continuation_refreshes_signed_context_without_rebinding_session_o
         assert current_file.stat().st_mode & 0o777 == 0o600
         prompt = launches[0]["prompt"]
         assert str(current_file) in prompt and context["signature"] not in prompt
-        assert "Markdown links [filename](absolute-path)" in prompt
-        assert "automatically retains" in prompt
-        assert "No separate artifact publishing call" in prompt
+        assert execution_guide() in prompt
+        assert "[文件名](文件绝对路径)" in prompt
+        assert "校验工作区范围并复制保存" in prompt
+        assert "无需另外调用发布产物接口" in prompt
+        assert "任务第 2 版" in prompt and old_run["id"] not in prompt
+        assert context["runId"] == new_run["id"] and context["revision"] == 2
         assert launches[0]["executor"] == executor
         assert launches[0]["sessionId"] == original["sessionId"]
         assert not {"permission", "directory", "workspaceId", "projectId"} & launches[0].keys()

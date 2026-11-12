@@ -1,5 +1,6 @@
 """Offline interactive provider fixture with real lifecycle callbacks and retained context."""
 
+import codecs
 import json
 import os
 import re
@@ -194,10 +195,14 @@ def main():
     tty.setraw(sys.stdin.fileno())
     print("\x1b[?2004h", end="", flush=True)
     buffer, pasting = "", False
+    decoder = codecs.getincrementaldecoder("utf-8")()
     while True:
-        char = os.read(sys.stdin.fileno(), 1).decode()
-        if not char:
+        chunk = os.read(sys.stdin.fileno(), 1)
+        if not chunk:
             return
+        char = decoder.decode(chunk)
+        if not char:
+            continue
         buffer += char
         if buffer.endswith("\x1b[200~"):
             buffer = buffer[:-6]

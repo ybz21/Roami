@@ -18,7 +18,11 @@ export function briefPreamble(where: BriefWhere, sess: string, autoReview: boole
       : where.kind === 'adopt' ? t('session.wt.briefAdopt', { path: where.path, branch: where.branch, base: where.base, sess })
         : where.kind === 'repo' ? t('session.wt.briefRepo', { path: where.path, branch: where.branch, sess })
           : t('session.wt.briefPlain', { path: where.path, sess })
-  return head + (autoReview ? t('session.wt.briefReview') : '')
+  return sessionContext(sess, t) + '\n\n' + head + (autoReview ? t('session.wt.briefReview') : '')
+}
+
+export function sessionContext(sess: string, t: T): string {
+  return t('session.wt.briefSession', { sess })
 }
 
 export async function loadAgentCapabilities(): Promise<string> {
@@ -26,7 +30,7 @@ export async function loadAgentCapabilities(): Promise<string> {
   const fileRawBase = nodeApi('/file/raw')
   const fileServeBase = nodeApi('/file/serve')
   const response = await api('GET', '/agent/capabilities')
-  return String(response.data?.content || '').split('{{FILE_BASE}}').join(fileBase)
+  return [response.data?.executionGuide, response.data?.content].filter(Boolean).join('\n\n').split('{{FILE_BASE}}').join(fileBase)
     .split('{{FILE_RAW_BASE}}').join(fileRawBase)
     .split('{{FILE_SERVE_BASE}}').join(fileServeBase).trim()
 }

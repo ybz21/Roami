@@ -74,3 +74,13 @@ func TestProjectSessionsUsesCompleteMembershipQuery(t *testing.T) {
 		t.Fatalf("sessions exit=%d", code)
 	}
 }
+
+func TestProjectShortHelpNeedsNoServer(t *testing.T) {
+	t.Setenv("ROAMI_CONFIG", t.TempDir()+"/missing.yaml")
+	t.Setenv("ROAMI_SERVER", "http://127.0.0.1:1")
+	for _, args := range [][]string{{"-h"}, {"ls", "--help"}, {"show", "--help"}, {"okr", "-h"}, {"okr", "record", "-h"}, {"okr", "memory", "-h"}} {
+		if code := runAPICommand("project", args); code != 0 {
+			t.Fatalf("help %v must exit without contacting a server: %d", args, code)
+		}
+	}
+}

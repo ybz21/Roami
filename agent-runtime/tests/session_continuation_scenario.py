@@ -110,10 +110,9 @@ async def main():
         )
     await runtime.scheduler._job(pending)
     prompt = (root / "prompt").read_text()
-    from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
-
-    assert DELIVERY_INSTRUCTIONS in prompt
-    assert prompt.endswith(json.loads(task["intent_json"])["goal"])
+    assert prompt.startswith("# 任务：\n\n" + json.loads(task["intent_json"])["goal"] + "\n\n")
+    assert "\n\n# 开工准备\n\n" in prompt and "\n\n# 回报通道\n\n" in prompt
+    assert "\n\n# 执行上下文\n\n" in prompt
     budget = await database.call(
         lambda db: row(db, "SELECT budget_json FROM tasks WHERE id=?", (task["id"],))
     )

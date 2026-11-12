@@ -122,6 +122,9 @@ func runSessionEngine(args []string) int {
 	if len(args) > 0 && args[0] == "swarm" {
 		return runSwarm(args[1:])
 	}
+	if app.ShowHelp(args, os.Stdout) {
+		return 0
+	}
 	needsStorage := len(args) == 0 || (args[0] != "help" && args[0] != "--help" && args[0] != "-h" && args[0] != "--version" && args[0] != "-v")
 	if needsStorage {
 		release, err := instanceLease()
@@ -254,6 +257,12 @@ func legacySessionCommand(word string) bool {
 }
 
 func runChrome(args []string) int {
+	if len(args) == 2 && args[1] == "--help" {
+		args = []string{"--help"}
+	}
+	if len(args) == 3 && args[0] == "record" && args[2] == "--help" && (args[1] == "start" || args[1] == "stop") {
+		args = []string{"--help"}
+	}
 	if handled, code := managedChrome(args); handled {
 		return code
 	}

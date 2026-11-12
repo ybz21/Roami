@@ -156,11 +156,8 @@ async def test_busy_followup_survives_restart_and_returns_only_its_own_result(
         assert "permission" not in launch
         prompt = launch["prompt"]
         assert str(context_file) in prompt and context["signature"] not in prompt
-        assert prompt.startswith("\n\n[Roami platform capabilities]\n")
-        assert (
-            prompt.split("\n\n[Roami continuation handoff]\n", 1)[0].rsplit("\n\n", 1)[-1]
-            == "Add more detail"
-        )
+        assert prompt.startswith("# 任务：\n\n")
+        assert prompt.split("\n\n# 开工准备", 1)[0].split("\n\n", 1)[1] == "Add more detail"
         assert prompt.count("Add more detail") == 1
         assert "Create a research page" not in prompt and "routing" not in prompt
     await executor.poll(runtime.tasks)

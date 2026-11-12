@@ -11,7 +11,7 @@ import { pathBasename, pathDirname } from '../../path-name'
 import { usePreferences } from '../../preferences'
 import { agentName, type AgentKind } from '../../agent-kind'
 import { agentLaunch } from '../../agent-command'
-import { loadAgentCapabilities, taskWithCapabilities } from '../sessions/kickoff-brief'
+import { loadAgentCapabilities, sessionContext, taskWithCapabilities } from '../sessions/kickoff-brief'
 import { App as AntApp } from 'antd'
 
 export default function FilesPage({ openTerm }: { openTerm: (name: string) => void }) {
@@ -41,9 +41,9 @@ export default function FilesPage({ openTerm }: { openTerm: (name: string) => vo
     const dir = pathDirname(file)
     try {
       const capabilities = await loadAgentCapabilities()
-      const cmd = agentLaunch(kind, prefs, taskWithCapabilities(t('file.agentPrompt', { path: file }), t, capabilities))
       const res = await api('POST', '/sessions', { name, dir })
       const actual = res.name || name
+      const cmd = agentLaunch(kind, prefs, taskWithCapabilities(t('file.agentPrompt', { path: file }), t, `${sessionContext(actual, t)}\n\n${capabilities}`))
       await api('POST', '/tasks/_/send', { sess: actual, msg: cmd, activity: 'task' })
       message.success(t('file.openedInAgent', { agent: kind === 'claude' ? 'Claude Code' : agentName(kind) }))
       openTerm(actual)

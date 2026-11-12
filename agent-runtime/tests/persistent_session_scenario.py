@@ -150,6 +150,17 @@ async def main():
                 and continued["sessionBinding"]["providerConversationId"] == provider_id
             )
             assert continued["result"]["summary"] == f"{provider}: retained context turn 3"
+            prompts = []
+            for transcript in (transcripts / provider).rglob("*.jsonl"):
+                for line in transcript.read_text().splitlines():
+                    message = json.loads(line)
+                    message = message.get("payload", message)
+                    if message.get("role") == "user" or message.get("type") == "user":
+                        content = message.get("message", message)["content"]
+                        prompts.extend(item["text"] for item in content if "text" in item)
+            assigned = [prompt for prompt in prompts if prompt.startswith("# 任务：")]
+            assert len(assigned) == 2
+            assert all(f"当前会话（稳定 ID）：`{sid}`" in prompt for prompt in assigned)
             closed = cli("close", "--key", next_run["launch_id"])
             assert closed["state"] == "closed" and closed["session"] == sid
             assert cli("close", "--key", next_run["launch_id"])["state"] == "closed"
@@ -166,6 +177,7 @@ async def main():
                     "provider": provider,
                     "initialAndFollowupSameSession": True,
                     "sameProviderConversation": True,
+                    "currentSessionInBothPrompts": True,
                     "manualContextRetained": True,
                     "closedExplicitly": True,
                     "filesPreserved": True,

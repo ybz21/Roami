@@ -177,9 +177,9 @@ async def test_followup_retains_executor_context_and_waits_for_old_work_to_stop(
             assert launches[0]["title"] == "Original requirement"
             assert "permission" not in launches[0]
             prompt = launches[0]["prompt"]
-            assert prompt.startswith("\n\n[Roami platform capabilities]\n")
+            assert prompt.startswith("# 任务：\n\n")
             assert (
-                prompt.split("\n\n[Roami continuation handoff]\n", 1)[0].rsplit("\n\n", 1)[-1]
+                prompt.split("\n\n# 开工准备", 1)[0].split("\n\n", 1)[1]
                 == "Append this requirement"
             )
             assert prompt.count("Append this requirement") == 1
