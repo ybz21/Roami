@@ -85,6 +85,7 @@ func TestWorktreeCloseStatusSync(t *testing.T) {
 				t.Fatal(err)
 			}
 			h.WT.BindSessionHome(name, wt.Path)
+			others := 0
 			status := func() worktree.Worktree {
 				t.Helper()
 				r := httptest.NewRecorder()
@@ -95,11 +96,13 @@ func TestWorktreeCloseStatusSync(t *testing.T) {
 						InWorktree      bool   `json:"inWorktree"`
 						Snapshot        string `json:"snapshot"`
 						SessionIdentity string `json:"sessionIdentity"`
+						Others          int    `json:"others"`
 					} `json:"data"`
 				}
 				if err := json.Unmarshal(r.Body.Bytes(), &result); err != nil || r.Code != http.StatusOK || !result.Data.InWorktree || result.Data.Snapshot == "" || result.Data.SessionIdentity == "" {
 					t.Fatalf("invalid close precheck: %v %s", err, r.Body.String())
 				}
+				others = result.Data.Others
 				return result.Data.Worktree
 			}
 			if st := status(); st.MergedInto != "" || st.CommittedAhead != 1 {
@@ -119,6 +122,28 @@ func TestWorktreeCloseStatusSync(t *testing.T) {
 			if git(repo, "rev-parse", "main") != initial {
 				t.Fatal("close precheck moved the local main branch")
 			}
+			attempt := filepath.Join(t.TempDir(), "ssh-attempt")
+			ssh := filepath.Join(t.TempDir(), "ssh")
+			if err := os.WriteFile(ssh, []byte("#!/bin/sh\nprintf attempt > "+shellQuote(attempt)+"\nexit 1\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("GIT_SSH_COMMAND", ssh)
+			git(repo, "remote", "set-url", "origin", "ssh://unavailable.invalid/repo.git")
+			if st := status(); st.MergedInto != "origin/main" {
+				t.Fatalf("local merge evidence lost: %+v", st)
+			}
+			if _, err := os.Stat(attempt); !os.IsNotExist(err) {
+				t.Fatal("already merged close precheck attempted a network connection")
+			}
+			peer, err := rt.CreateSession(runtime.CreateOpts{Label: "other occupant", Dir: wt.Path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			h.WT.BindSessionHome(peer, wt.Path)
+			status()
+			if others != 1 {
+				t.Fatalf("other worktree occupant missing from close precheck: %d", others)
+			}
 			if err := os.WriteFile(filepath.Join(wt.Path, "feature"), []byte("unsaved"), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -137,6 +162,13 @@ func TestWorktreeCloseStatusSync(t *testing.T) {
 			commit(wt.Path, "feature", "followup")
 			if st := status(); st.MergedInto != "" || st.CommittedAhead == 0 || st.Dirty != 0 {
 				t.Fatalf("followup commit lost unmerged warning: %+v", st)
+			}
+			git(repo, "remote", "add", "origin", "ssh://unavailable.invalid/repo.git")
+			if st := status(); st.MergedInto != "" || st.CommittedAhead == 0 {
+				t.Fatalf("offline followup commit lost warning: %+v", st)
+			}
+			if _, err := os.Stat(attempt); err != nil {
+				t.Fatal("new unmerged HEAD did not attempt to refresh remote evidence")
 			}
 			t.Log("Close precheck detects remote merge with stale local refs; dirty changes and offline/local fallback remain visible")
 		})
