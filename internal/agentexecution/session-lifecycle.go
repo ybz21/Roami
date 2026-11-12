@@ -245,6 +245,14 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		}
 	}
 	if event.Hook == "UserPromptSubmit" {
+		if executor == "claude" && claudeTaskNotification(state, event) {
+			if state.ClaudeStop != nil {
+				state.ClaudeStop = nil
+				state.UpdatedMS = time.Now().UnixMilli()
+				return writeJSON(path, state)
+			}
+			return nil
+		}
 		state.CompletedKey, state.EndedIdle = "", false
 	}
 	if state.Binding.ProviderID != "" && (state.Binding.ProviderID != event.ProviderID || state.Executor != executor) {
