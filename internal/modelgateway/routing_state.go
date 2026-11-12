@@ -76,7 +76,8 @@ func (s *routingState) memory(model CatalogModel, ledger *Ledger) *routeMemory {
 	if memory := s.models[model.ID]; memory != nil && memory.Fingerprint == fingerprint {
 		return memory
 	}
-	if len(s.models) >= 1000 {
+	// Provider cursors share this cache with the published groups.
+	if len(s.models) >= 10000 {
 		s.models = map[string]*routeMemory{}
 	}
 	memory := &routeMemory{Fingerprint: fingerprint, Weights: map[string]int64{}}

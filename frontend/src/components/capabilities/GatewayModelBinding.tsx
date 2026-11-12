@@ -42,7 +42,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
     })
     return () => abort.abort()
   }, [kind, selectedMode, selectedSource, catalog.value?.revision, installed, directoryVersion])
-  const options = models.filter(model => selectedSource==='@group'?model.aggregate:!model.aggregate&&model.candidates[0].sourceId===selectedSource).map(model => ({ value: model.id, label: model.name, title: model.candidates[0].model, upstreamModel: model.candidates[0].model, configured: true,disabled:model.enabled===false }))
+  const options = models.filter(model => selectedSource==='@group'?model.aggregate:!model.aggregate&&model.candidates[0].sourceId===selectedSource).map(model => ({ value: model.id, label: model.name, title: model.aggregate?model.name:model.candidates[0].model, upstreamModel: model.aggregate?model.id:model.candidates[0].model, configured: true,disabled:model.enabled===false }))
   const pendingModel = model.startsWith(discoveredPrefix) ? decodeURIComponent(model.slice(discoveredPrefix.length)) : ''
   const query = search.trim()
   if(selectedSource!=='@group') for (const id of new Set([...remote.models, ...(pendingModel ? [pendingModel] : []), ...(query && query.length <= 200 ? [query] : [])])) {

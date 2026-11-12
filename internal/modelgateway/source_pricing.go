@@ -104,7 +104,11 @@ func (pc *PricingConfig) routePriceAt(source, model string, now time.Time) (Mode
 		}
 	}
 	multiplier := sourcePriceMultiplier(pc.Sources[source], model, now)
-	return ModelPricing{price.InputPerMillion * multiplier, price.OutputPerMillion * multiplier, price.CacheReadPerMillion * multiplier}, known
+	scaled := ModelPricing{price.InputPerMillion * multiplier, price.OutputPerMillion * multiplier, price.CacheReadPerMillion * multiplier}
+	if !validAmount(scaled.InputPerMillion) || !validAmount(scaled.OutputPerMillion) || !validAmount(scaled.CacheReadPerMillion) {
+		return ModelPricing{}, false
+	}
+	return scaled, known
 }
 func (pc *PricingConfig) exitPriceAt(requested, source, model string, now time.Time) (ModelPricing, bool) {
 	if pc == nil {

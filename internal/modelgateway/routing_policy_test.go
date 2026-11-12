@@ -219,3 +219,27 @@ func TestConfirmedFreeRoutingDoesNotInheritUnknownOrPaidFallbackPrice(t *testing
 		t.Fatal("explicit exit price was lost")
 	}
 }
+
+func TestSourceMultiplierCannotOverflowAccountingRates(t *testing.T) {
+	pricing := PricingConfig{Sources: map[string]SourcePricing{"source": {Default: PriceRule{Mode: "tokens", Price: ModelPricing{InputPerMillion: 1000000}}, Multiplier: 1000}}}
+	if _, known := pricing.routePriceAt("source", "model", time.Now()); known {
+		t.Fatal("unsafe scaled price could overflow integer accounting")
+	}
+}
+
+func TestUnionModelMetadataDoesNotProveEveryAccountIsFree(t *testing.T) {
+	model := &modelplugins.Model{Free: true, Rate: 1}
+	candidate := ModelCandidate{"source", "native"}
+	pool := CatalogModel{FreeOnly: true, AllowPlan: true}
+	quota := routingQuota{Known: true, Remaining: routeNumber(100)}
+	if !routeAllowed(pool, candidate, accountPricingModel(model, 1), quota, PricingConfig{}) {
+		t.Fatal("single account metadata lost")
+	}
+	if routeAllowed(pool, candidate, accountPricingModel(model, 2), quota, PricingConfig{}) {
+		t.Fatal("union metadata admitted an unverified paid account")
+	}
+	configured := PricingConfig{Sources: map[string]SourcePricing{"source": {Default: PriceRule{Mode: "free", Confirmed: true}}}}
+	if !routeAllowed(pool, candidate, accountPricingModel(model, 2), quota, configured) {
+		t.Fatal("explicit source confirmation ignored")
+	}
+}

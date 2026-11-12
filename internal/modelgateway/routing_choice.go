@@ -112,6 +112,18 @@ func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model 
 	wait.Wait()
 	return facts, ctx.Err()
 }
+
+// The provider list is a union; it cannot prove each account has the same pricing.
+func accountPricingModel(model *modelplugins.Model, accounts int) *modelplugins.Model {
+	if model == nil || accounts <= 1 {
+		return model
+	}
+	copy := *model
+	copy.Free = false
+	copy.Rate = 0
+	return &copy
+}
+
 func routeAllowed(model CatalogModel, candidate ModelCandidate, pluginModel *modelplugins.Model, quota routingQuota, pricing PricingConfig) bool {
 	if !model.enabled() {
 		return false
@@ -135,7 +147,7 @@ func routeAllowed(model CatalogModel, candidate ModelCandidate, pluginModel *mod
 	}
 	return pluginModel != nil && (pluginModel.Free || model.AllowPlan && pluginModel.Rate > 0 && quota.Known && quota.Remaining != nil && *quota.Remaining > 0)
 }
-func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, model CatalogModel) (*routingChoice, error) {
+func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, model CatalogModel, requiredProtocol ...string) (*routingChoice, error) {
 	facts, err := h.routingFacts(ctx, catalog, model)
 	if err != nil {
 		return nil, err
@@ -231,6 +243,15 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 					return nil, errors.New("MODEL_ROUTE_TOO_LARGE")
 				}
 			}
+			if len(requiredProtocol) > 0 && requiredProtocol[0] != "" {
+				effective := fact.source.Protocol
+				if pluginModel != nil {
+					effective = modelplugins.ModelProtocol(*pluginModel, fact.plugin)
+				}
+				if effective != requiredProtocol[0] {
+					continue
+				}
+			}
 			start := len(choice.targets)
 			for _, account := range accounts {
 				if len(account.Models) > 0 && !containsField(account.Models, candidate.Model) {
@@ -240,7 +261,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				if fact.valid[account.Key] {
 					quota = quotaForModel(fact.quotas[account.Key], candidate.Model, now)
 				}
-				if !routeAllowed(m, candidate, pluginModel, quota, config.Pricing) {
+				if !routeAllowed(m, candidate, accountPricingModel(pluginModel, len(accounts)), quota, config.Pricing) {
 					continue
 				}
 				count++
@@ -265,6 +286,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 					price.OutputPerMillion *= factor
 					known = true
 				}
+				known = known && validAmount(price.InputPerMillion) && validAmount(price.OutputPerMillion) && validAmount(price.CacheReadPerMillion)
 				if known {
 					inputShare := .5
 					if total := channel.Input + channel.Output; total > 0 {

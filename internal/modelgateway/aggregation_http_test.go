@@ -198,3 +198,21 @@ func TestQualityProbeUsesActualResponsesAndDoesNotStorePayloads(t *testing.T) {
 		t.Fatal("payload persisted in monitor")
 	}
 }
+
+func TestAggregateCompactionFiltersUnsupportedSourceBeforeScheduling(t *testing.T) {
+	h := aggregateFixture(t, responseFixture, responseFixture)
+	value := h.Catalog.snapshot()
+	value.Sources[0].Protocol = "openai-completions"
+	value.Models[0].Protocol = "openai-completions"
+	if err := h.Catalog.update(context.Background(), value); err != nil {
+		t.Fatal(err)
+	}
+	choice, err := h.newRoutingChoice(context.Background(), h.Catalog.snapshot(), h.Catalog.value.Models[0], "openai-responses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf, ok, err := choice.Next()
+	if err != nil || !ok || leaf.Candidate.SourceID != "backup" {
+		t.Fatalf("compaction chose incompatible source: %+v %v", leaf, err)
+	}
+}
