@@ -115,7 +115,18 @@ export function connectBrowserStream(
     source.onmessage = data => {
       if (stopped || current !== source) return
       lastActivity = Date.now()
-      if (typeof data === 'string') { stream.onmessage(data); return }
+      if (typeof data === 'string') {
+        try {
+          const message = JSON.parse(data)
+          if (message.type === 'navigation') {
+            clearFrameTimers()
+            // A pending navigation can have no JS context or frame until the server responds.
+            if (!message.loading) frameTimer = setTimeout(reconnect, 15000)
+          }
+        } catch { /* Forward other control messages unchanged. */ }
+        stream.onmessage(data)
+        return
+      }
       if (data.byteLength <= 6) return
       const view = new DataView(data)
       const w = view.getUint16(0, true), h = view.getUint16(2, true), seq = view.getUint16(4, true)

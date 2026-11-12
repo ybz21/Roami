@@ -403,7 +403,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       if (typeof data !== 'string') return
       const msg = JSON.parse(data)
       if (msg.type === 'error') {
-        const reason = msg.msg === 'BROWSER_RESOURCE_CHANGED' ? t('agent.task.browserChanged') : msg.msg === 'BROWSER_TARGET_UNAVAILABLE' ? t('agent.task.tabUnavailable') : msg.msg === 'BROWSER_PAGE_UNRESPONSIVE' ? t('browser.pageUnresponsive') : msg.msg
+        const reason = msg.msg === 'BROWSER_RESOURCE_CHANGED' ? t('agent.task.browserChanged') : msg.msg === 'BROWSER_TARGET_UNAVAILABLE' ? t('agent.task.tabUnavailable') : msg.msg === 'BROWSER_PAGE_UNRESPONSIVE' ? t('browser.pageUnresponsive') : msg.msg === 'BROWSER_NAVIGATION_TIMEOUT' ? t('browser.navigationTimeout') : msg.msg
         setHealthMsg(reason)
         setConnected(false)
         if (expectedBrowser && (msg.msg === 'BROWSER_RESOURCE_CHANGED' || msg.msg === 'BROWSER_TARGET_UNAVAILABLE')) tp.close()
@@ -878,7 +878,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
                 color: healthMsg ? 'var(--danger)' : 'var(--text-dim)', fontSize: 'var(--fs-sm)', textAlign: 'center', pointerEvents: 'auto',
               }}>
                 {healthMsg || t('browser.waitingFrame')}
-                {healthMsg === t('browser.pageUnresponsive') && !expectedBrowser && (
+                {[t('browser.pageUnresponsive'), t('browser.navigationTimeout')].includes(healthMsg) && !expectedBrowser && (
                   <div style={{ marginTop: 'var(--sp-3)' }}><button type="button" className="tt-act" onClick={reopenTab}>{t('browser.reopenTab')}</button></div>
                 )}
               </div>

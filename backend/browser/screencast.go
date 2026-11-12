@@ -143,6 +143,7 @@ const autoStart = 2 // 自适应初始档（标清，快速起步再按链路上
 
 var rendererProbeInterval = 3 * time.Second
 var rendererProbeTimeout = 9 * time.Second
+var rendererNavigationTimeout = 30 * time.Second
 
 // cursorScript 注入被镜像页：画一个跟随指针的光点，点击时在光点处绽放涟漪。
 // 无论输入来自用户接管（Input.dispatchMouseEvent）还是 agent 经 chrome-cli/CDP 操作，
@@ -277,11 +278,7 @@ func runScreencast(sink frameSink, opts scOptions) {
 	}
 	defer back.Close()
 	conn := &cdp{ws: back}
-	if _, err := conn.call("Runtime.evaluate", map[string]any{"expression": "document.readyState", "returnByValue": true}); err != nil {
-		_ = sink.writeText(map[string]any{"type": "error", "msg": "BROWSER_PAGE_UNRESPONSIVE"})
-		return
-	}
-	_ = back.SetReadDeadline(time.Time{})
+	mainFrameID := wsURL[strings.LastIndex(wsURL, "/")+1:]
 	control := opts.control
 	auto := opts.auto
 	defaultUA := browserUA() // 浏览器原生 UA，切回桌面时用它复位（CDP 没有 clearUserAgentOverride）
@@ -317,6 +314,8 @@ func runScreencast(sink frameSink, opts scOptions) {
 		clickStreak            int
 		probeID                int
 		probeAt                time.Time
+		navigationAt           time.Time
+		navigationTimedOut     bool
 	)
 
 	// 初始档：auto 用阶梯，手动用前端给的 q（分辨率给足，质量听用户）
@@ -570,7 +569,12 @@ func runScreencast(sink frameSink, opts scOptions) {
 				Params struct {
 					Data      string `json:"data"`
 					SessionID int    `json:"sessionId"`
-					Metadata  struct {
+					FrameID   string `json:"frameId"`
+					Frame     struct {
+						ID       string `json:"id"`
+						ParentID string `json:"parentId"`
+					} `json:"frame"`
+					Metadata struct {
 						DeviceWidth  float64 `json:"deviceWidth"`
 						DeviceHeight float64 `json:"deviceHeight"`
 					} `json:"metadata"`
@@ -585,6 +589,27 @@ func runScreencast(sink frameSink, opts scOptions) {
 				continue
 			}
 			if msg.Method != "Page.screencastFrame" {
+				// Page.enable replays an in-flight navigation even when the new JS context is not ready.
+				navigationChanged := false
+				mu.Lock()
+				if msg.Method == "Page.frameStartedNavigating" && msg.Params.FrameID == mainFrameID {
+					navigationAt = time.Now()
+					navigationTimedOut = false
+					navigationChanged = true
+				}
+				committed := msg.Method == "Page.frameNavigated" && msg.Params.Frame.ID == mainFrameID && msg.Params.Frame.ParentID == ""
+				stopped := msg.Method == "Page.frameStoppedLoading" && msg.Params.FrameID == mainFrameID
+				if (committed || stopped) && !navigationAt.IsZero() {
+					navigationAt = time.Time{}
+					navigationTimedOut = false
+					probeID = 0 // Probe the new context; old responses may still arrive.
+					navigationChanged = true
+				}
+				loading := !navigationAt.IsZero()
+				mu.Unlock()
+				if navigationChanged {
+					_ = sink.writeText(map[string]any{"type": "navigation", "loading": loading})
+				}
 				// 被镜像页打开新窗口/标签（target=_blank、window.open、表单提交等）→ 通知前端跟过去
 				if msg.Method == "Page.windowOpen" {
 					_ = sink.writeText(map[string]any{"type": "newtab"})
@@ -639,7 +664,7 @@ func runScreencast(sink frameSink, opts scOptions) {
 			}
 		}
 	}()
-	probeInterval, probeTimeout := rendererProbeInterval, rendererProbeTimeout
+	probeInterval, probeTimeout, navigationTimeout := rendererProbeInterval, rendererProbeTimeout, rendererNavigationTimeout
 	go func() {
 		tick := time.NewTicker(probeInterval)
 		defer tick.Stop()
@@ -654,14 +679,25 @@ func runScreencast(sink frameSink, opts scOptions) {
 				mu.Unlock()
 				return
 			}
-			unresponsive := probeID != 0 && time.Since(probeAt) >= probeTimeout
+			failure := ""
+			if !navigationAt.IsZero() {
+				if !navigationTimedOut && time.Since(navigationAt) >= navigationTimeout {
+					failure = "BROWSER_NAVIGATION_TIMEOUT"
+					navigationTimedOut = true
+				}
+			} else if probeID != 0 && time.Since(probeAt) >= probeTimeout {
+				failure = "BROWSER_PAGE_UNRESPONSIVE"
+			}
 			if probeID == 0 {
 				probeID = conn.sendID("Runtime.evaluate", map[string]any{"expression": "document.readyState", "returnByValue": true})
 				probeAt = time.Now()
 			}
 			mu.Unlock()
-			if unresponsive {
-				_ = sink.writeText(map[string]any{"type": "error", "msg": "BROWSER_PAGE_UNRESPONSIVE"})
+			if failure != "" {
+				_ = sink.writeText(map[string]any{"type": "error", "msg": failure})
+				if failure == "BROWSER_NAVIGATION_TIMEOUT" {
+					continue // Keep navigation controls and the eventual error page available.
+				}
 				shutdown()
 				return
 			}

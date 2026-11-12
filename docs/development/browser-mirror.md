@@ -39,7 +39,7 @@ Chrome 的画面实时投到网页 `<img>` 上。历史上「画面抖动 / 忽�
 
 「已连接」以 JPEG 实际加载成功为准。前端只允许一帧正在加载，保留最新待显示帧，显示后才 ACK；旧 Blob URL 在新帧加载后释放。断线或首帧超时自动重连，静态页面收到心跳即可保持连接。
 
-后端先验证页面能响应 CDP，再开始推流，并持续探测渲染器。页面停止响应时返回 `BROWSER_PAGE_UNRESPONSIVE`；普通浏览器页可显式重新打开当前地址，任务固定目标不自动替换。视口调整后请求补帧，背压等待后发送最新帧。
+后端先开始推流，再异步探测渲染器。主框架导航期间，新文档的 JavaScript 上下文可能尚未就绪，不能据此判定卡死；前端同时暂停首帧超时，保留传输静默检测。导航超过 30 秒返回 `BROWSER_NAVIGATION_TIMEOUT`，保持连接和控制，等待后续画面恢复；真正停止响应时返回 `BROWSER_PAGE_UNRESPONSIVE`。普通浏览器页可显式重新打开当前地址，任务固定目标不自动替换。新标签直接通过 `/json/new` 打开完整 URL，不等待网站响应才返回目标 ID。视口调整后请求补帧，背压等待后发送最新帧。详见[导航恢复设计与验收](../design/20261112-browser-navigation-recovery/README.md)。
 
 Linux 无头 Chrome 的默认隔离 profile `/tmp/ttmux-chrome` 使用 `--password-store=basic`，避免等待不可见的桌面钥匙环解锁窗口而停在空白页。自定义 profile 保持宿主机密码存储配置。Go 后端与 CLI launcher 的启动参数须一致。
 

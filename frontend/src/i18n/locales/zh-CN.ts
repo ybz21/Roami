@@ -2584,6 +2584,7 @@ const zhCN = {
   'browser.launchFailed': '连不上镜像 Chrome',
   'browser.waitingFrame': '正在恢复浏览器画面…',
   'browser.pageUnresponsive': '此标签页已停止响应',
+  'browser.navigationTimeout': '网页加载超时，请检查网络后重试。',
   'browser.reopenTab': '重新打开此页',
   'browser.home': '导航起始页',
   'browser.urlPlaceholder': '输入网址回车导航，如 example.com',

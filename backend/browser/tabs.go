@@ -105,7 +105,8 @@ func NewTab(c *gin.Context) {
 			return
 		}
 	}
-	id, err := newTab("about:blank")
+	// Let Chrome navigate after returning the target, without waiting for the remote server.
+	id, err := newTab(body.URL)
 	if err == nil {
 		identity, identityErr := currentBrowserIdentity()
 		err = identityErr
@@ -114,8 +115,6 @@ func NewTab(c *gin.Context) {
 		}
 		if err != nil {
 			_ = closeTab(id)
-		} else if body.URL != "about:blank" {
-			err = tabNavigate(id, body.URL)
 		}
 	}
 	if err != nil {
