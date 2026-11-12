@@ -26,7 +26,9 @@ it('keeps the task subject and exact detail destination without recovered tool e
   expect(screen.queryByRole('status')).toBeNull()
   expect(document.body.textContent).not.toContain('memory_search')
   expect(document.body.textContent).not.toContain('task:t')
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewNamed 查询天气' }))
+  expect(screen.getByRole('button', { name: 'agent.task.viewNamed 查询天气' }).contains(screen.getByText('查询天气'))).toBe(true)
+  fireEvent.click(screen.getByText('查询天气'))
+  expect(open).toHaveBeenCalledTimes(1)
   expect(open).toHaveBeenCalledWith('t')
 })
 

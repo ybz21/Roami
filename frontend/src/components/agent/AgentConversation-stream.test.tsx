@@ -6,7 +6,7 @@ import AgentChat from './AgentChat'
 import OkrMainChat from '../projects/okr/OkrMainChat'
 import { emptyConfiguration } from '../projects/okr/okr-workspace'
 import { clearAgentDataCache } from './agent-data-cache'
-import { projectAgentEvent, type AgentEvent, type AgentSnapshot } from './agent-protocol'
+import { projectAgentEvent, type AgentActivityItem, type AgentEvent, type AgentSnapshot } from './agent-protocol'
 
 const state = vi.hoisted(() => ({ phone: false, api: vi.fn(), streams: new Map<string, ReadableStreamDefaultController<Uint8Array>>(), snapshots: new Map<string, any>() }))
 vi.mock('../../api', () => ({ api: state.api, openEventStream: async (path: string, signal: AbortSignal) => {
@@ -39,6 +39,31 @@ async function emit(cid: string, event: AgentEvent) {
   state.snapshots.set(cid, projectAgentEvent(state.snapshots.get(cid), event).view)
   await act(async () => { state.streams.get(cid)!.enqueue(new TextEncoder().encode('data: ' + JSON.stringify(event) + '\n\n')) })
 }
+it.each([false, true])('hides delegated execution from snapshot and SSE while keeping Main calls and results (phone=%s)', async phone => {
+  state.phone = phone
+  const main: AgentActivityItem = { id: 'tool:delegate', kind: 'tool', name: 'delegate', state: 'succeeded', anchorMessageId: '', startedMs: 1, updatedMs: 1 }
+  const task: AgentActivityItem = { ...main, id: 'task:research', kind: 'task', name: 'native', title: 'Trending research', taskId: 'research', state: 'running', startedMs: 2 }
+  const internal: AgentActivityItem = { ...main, id: 'tool:internal', name: 'bash', taskId: 'research', state: 'failed', startedMs: 3 }
+  state.snapshots.set('home', { ...snapshot('home'), activities: [main, task, internal] })
+  const page = render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.has('home')).toBe(true))
+  expect(page.container.querySelector('[data-activity-id="tool:delegate"]')).toBeTruthy()
+  expect(screen.getByText('Trending research')).toBeTruthy()
+  expect(page.container.querySelector('[data-activity-id="tool:internal"]')).toBeNull()
+  for (const [index, status] of ['running', 'succeeded', 'failed', 'unknown'].entries()) {
+    await emit('home', { id: index + 1, kind: 'task.activity', branchId: 'branch', payload: { activity: { ...internal, id: 'tool:nested-' + index, taskId: 'nested', parentTaskId: 'research', state: status } } })
+  }
+  expect(page.container.querySelector('.agent-activity-group')).toBeNull()
+  expect(page.container.querySelectorAll('.agent-activity')).toHaveLength(1)
+  expect(page.container.querySelector('[data-state="failed"]')).toBeNull()
+  await emit('home', { id: 5, kind: 'task.failed', branchId: 'branch', payload: { activity: { ...task, state: 'failed', updatedMs: 5 } } })
+  expect(page.container.querySelector('[data-activity-id="task:research"][data-state="failed"]')).toBeTruthy()
+  await emit('home', { id: 6, kind: 'message.started', branchId: 'branch', payload: { messageId: 'result', turnId: 'turn' } })
+  await emit('home', { id: 7, kind: 'message.delta', branchId: 'branch', payload: { messageId: 'result', turnId: 'turn', offset: 0, text: 'Research result with deliverables' } })
+  await emit('home', { id: 8, kind: 'message.completed', branchId: 'branch', payload: { messageId: 'result', turnId: 'turn' } })
+  expect(screen.getByText('Research result with deliverables')).toBeTruthy()
+  expect(state.snapshots.get('home').activities).toContainEqual(internal)
+})
 it('renders real incremental SSE before completion in both hosts and keeps the project destination independent', async () => {
   const select = vi.fn()
   render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={select} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} />

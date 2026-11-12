@@ -29,7 +29,7 @@
 .agent-activity-details code,.agent-activity-details small { font-size:var(--fs-meta); }
 .agent-activity-summary { flex:none; }
 
-.agent-activity-group { border:1px solid var(--border-subtle); border-radius:var(--r-sm); padding:0 var(--sp-3); color:var(--text-dim); font-size:var(--fs-sm); min-width:0; }
+.agent-activity-group { border-left:2px solid var(--border-subtle); padding-inline:var(--sp-2); color:var(--text-dim); font-size:var(--fs-sm); min-width:0; }
 .agent-activity-group-steps { display:flex; flex-direction:column; gap:var(--sp-1); padding-bottom:var(--sp-2); }
 .agent-activity-toggle time { flex:none; font-size:var(--fs-meta); color:var(--text-dimmer); }
 .agent-activity-payloads { display:flex; flex-direction:column; gap:var(--sp-2); }
@@ -44,15 +44,21 @@ html[data-size="compact"] .agent-activity-toggle time { display:none; }
 .agent-routing-details { display:flex; flex-direction:column; gap:var(--sp-1); margin-block:var(--sp-2); color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-routing-details p { margin:0; }
 
-.agent-task-progress { padding-block:var(--sp-2); color:var(--text-dim); font-size:var(--fs-sm); }
-.agent-task-progress-line { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--tap); }
+.agent-task-progress { color:var(--text-dim); font-size:var(--fs-sm); }
+.agent-task-progress-line { display:flex; align-items:center; gap:var(--sp-2); width:100%; min-height:var(--tap); padding:0; border:0; border-radius:var(--r-xs); background:transparent; color:inherit; font:inherit; text-align:left; }
+button.agent-task-progress-line { cursor:pointer; }
+button.agent-task-progress-line:focus-visible { outline:2px solid var(--accent-border); outline-offset:var(--sp-1); }
+:where(html[data-pointer="fine"]) button.agent-task-progress-line:hover { background:var(--list-hover); }
 .agent-task-progress-line > svg { flex:none; }
 .agent-task-progress-line strong { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; color:var(--text-bright); }
 .agent-task-progress-line > span { flex:none; font-size:var(--fs-meta); }
-.agent-task-progress-line .tt-act { position:relative; display:grid; place-items:center; min-width:var(--tap); min-height:var(--tap); border-color:transparent; padding:var(--sp-1); }
+.agent-task-progress[data-state="succeeded"] .agent-task-progress-line > span { color:var(--ok); }
+.agent-task-progress[data-state="running"] .agent-task-progress-line > span { color:var(--accent); }
+.agent-task-progress[data-state="failed"] .agent-task-progress-line > span { color:var(--danger); }
+.agent-task-progress:is([data-state="waiting_user"],[data-state="unknown"],[data-state="interrupted"]) .agent-task-progress-line > span { color:var(--warn); }
 .agent-task-progress p { margin:var(--sp-1) 0 0; }
 .agent-task-progress.is-failed > p { color:var(--danger); }
 
 .agent-task-tool-steps { display:flex; flex-direction:column; gap:var(--sp-3); }
 
-.agent-execution-steps { display:flex; flex-direction:column; gap:var(--sp-2); min-width:0; }
+.agent-execution-steps { display:flex; flex-direction:column; gap:var(--sp-1); min-width:0; }
