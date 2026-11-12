@@ -24,7 +24,10 @@ html[data-pointer="coarse"] .conversation-composer .tt-pill.ico { width:calc(var
 html[data-pointer="coarse"] .conversation-composer .tt-send { width:calc(var(--tap) - var(--sp-1)); height:calc(var(--tap) - var(--sp-1)); }
 html[data-pointer="coarse"] .conversation-composer :is(.tt-pill,.tt-send)::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
 .conversation-transcript { display:flex; flex-direction:column; gap:var(--sp-3); width:100%; max-width:calc(var(--sp-5) * 32); min-width:0; margin-inline:auto; }
+.conversation-message-prose { display:flex; flex-direction:column; gap:var(--sp-1); padding:var(--sp-2) var(--sp-3); border:1px solid var(--border); border-radius:var(--r-card); background:var(--bg-container); color:var(--text-bright); }
+.cc-msg[data-side="native"] > .conversation-message-prose { padding:0; border:0; border-radius:0; background:transparent; }
 .conversation-message-footer > button { position:relative; min-height:var(--sp-5); }
+.conversation-message-footer .conversation-copy-icon { display:inline-flex; align-items:center; justify-content:center; width:var(--sp-5); height:var(--sp-5); border-radius:var(--r-xs); }
 .conversation-message-footer .agent-message-action { width:var(--sp-5); height:var(--sp-5); }
 html[data-pointer="coarse"] .conversation-message-footer > button { min-width:calc(var(--tap) - var(--sp-2)); min-height:calc(var(--tap) - var(--sp-2)); }
 html[data-pointer="coarse"] .conversation-message-footer > button::after { content:''; position:absolute; left:calc(-1 * var(--sp-1)); right:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }

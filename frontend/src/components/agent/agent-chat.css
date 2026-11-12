@@ -12,6 +12,9 @@
 .agent-feedback { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); background:var(--warn-soft); color:var(--text-bright); font-size:var(--fs-sm); }
 .agent-feedback.error { background:var(--danger-soft); }
 .agent-composer { flex:none; position:relative; padding:var(--sp-2) var(--sp-4); width:100%; align-self:center; box-sizing:border-box; }
+.agent-compose-card.conversation-composer.tt-composer { padding:0; }
+.agent-compose-card.conversation-composer.tt-composer textarea { min-height:0; padding:var(--sp-3) var(--sp-4) var(--sp-2) !important; }
+.agent-compose-card.conversation-composer .conversation-composer-bar { padding:var(--sp-1) var(--sp-2) var(--sp-2); }
 .agent-compose-footnote { height:var(--sp-5); display:flex; align-items:center; justify-content:center; color:var(--text-dimmer); font-size:var(--fs-meta); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .agent-file-input { display:none; }
 .agent-draft-files { display:flex; gap:var(--sp-2); overflow:auto; padding:var(--sp-3) var(--sp-3) 0; }

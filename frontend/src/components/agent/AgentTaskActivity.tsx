@@ -10,8 +10,9 @@ function AgentTaskActivity({ items, onTask }: { items: AgentActivityItem[]; onTa
     const state = activityState(item.state), task = item.kind === 'task'
     const failed = ['failed', 'unknown', 'interrupted'].includes(state)
     const label = task ? item.title || t('agent.task.untitled') : t(item.kind === 'turn' ? 'agent.activity.reply' : 'agent.activity.unconfirmed')
+    const identity = <>{failed ? <WarnIcon size={16} /> : task && item.name !== 'native' ? <BotIcon size={16} /> : <RoamiLogo size={16} />}<strong>{label}</strong><span>{t('agent.state.' + state)}</span></>
     return <section key={item.id} className={`agent-task-progress${failed ? ' is-failed' : ''}`} data-activity-id={item.id} data-state={state}>
-      <div className="agent-task-progress-line">{failed ? <WarnIcon size={16} /> : task && item.name !== 'native' ? <BotIcon size={16} /> : <RoamiLogo size={16} />}<strong>{label}</strong><span>{t('agent.state.' + state)}</span>{item.taskId && <button type="button" className="tt-act" aria-label={t('agent.task.viewNamed', { name: label })} onClick={() => onTask(item.taskId!)}><ChevronRight size={18} /></button>}</div>
+      {task && item.taskId ? <button type="button" className="agent-task-progress-line" aria-label={t('agent.task.viewNamed', { name: label })} onClick={() => onTask(item.taskId!)}>{identity}<ChevronRight size={18} /></button> : <div className="agent-task-progress-line">{identity}</div>}
       {failed && <p role="status">{state === 'unknown' ? t('agent.activity.outcomeUnknown') : activityReason(item.errorCode, t, item.kind === 'turn' ? 'agent.requestFailed' : 'agent.activity.failedReason')}</p>}
     </section>
   })}</>
