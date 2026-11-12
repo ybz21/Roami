@@ -93,17 +93,25 @@ func replaceAgentCapabilities(path string, data []byte) error {
 	return os.Rename(f.Name(), path)
 }
 
+func readSessionExecutionGuide() (string, error) {
+	guide, guideErr := defaultAgentCapabilities.ReadFile("prompts/task-execution.md")
+	channel, channelErr := defaultAgentCapabilities.ReadFile("prompts/task-report-session.md")
+	if guideErr != nil || channelErr != nil {
+		return "", errors.Join(guideErr, channelErr)
+	}
+	return strings.TrimSpace(string(guide)) + "\n\n" + strings.TrimSpace(string(channel)), nil
+}
+
 func (a *API) AgentCapabilities(c *gin.Context) {
 	content, err := readAgentCapabilities()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "CAPABILITIES_READ_ERROR", "message": err.Error()}})
 		return
 	}
-	guide, guideErr := defaultAgentCapabilities.ReadFile("prompts/task-execution.md")
-	channel, channelErr := defaultAgentCapabilities.ReadFile("prompts/task-report-session.md")
-	if guideErr != nil || channelErr != nil {
+	guide, err := readSessionExecutionGuide()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "CAPABILITIES_READ_ERROR"}})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"content": content, "executionGuide": strings.TrimSpace(string(guide)) + "\n\n" + strings.TrimSpace(string(channel))}})
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"content": content, "executionGuide": guide}})
 }

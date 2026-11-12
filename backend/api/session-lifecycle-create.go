@@ -209,6 +209,11 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 		if err != nil {
 			return nil, err
 		}
+		executionGuide, err := readSessionExecutionGuide()
+		if err != nil {
+			return nil, err
+		}
+		guide = executionGuide + "\n\n" + strings.TrimSpace(guide)
 		fileBase := launch.FileBase
 		if !(fileBase == "/api/file" || (strings.HasPrefix(fileBase, "/n/") && strings.HasSuffix(fileBase, "/api/file") && !strings.ContainsAny(fileBase, "\r\n?#"))) {
 			fileBase = "/api/file"
