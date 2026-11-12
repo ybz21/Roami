@@ -89,4 +89,4 @@ CC/Codex 默认附带的厂商专用思考配置不跨协议强制注入，按�
 
 首页直连时补充网关模型，并保留另一角色配置：[问题、实现与验收](records/2026-11-11/home-gateway-models.md)。
 
-- [Claude Code 默认模型与目录发现](claude-model-discovery.md)
+- [原生智能体默认模型与目录切换](native-model-discovery.md)

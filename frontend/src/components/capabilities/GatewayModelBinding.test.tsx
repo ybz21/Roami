@@ -46,9 +46,9 @@ it.each(['upstream-a', 'model-a'])('does not match a direct preset to a differen
   expect(api).not.toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/source-models', expect.anything(), expect.anything())
 })
 
-it('applies the gateway default without selecting or fetching a source', async () => {
+it.each(['claude', 'codex', 'opencode', 'pi'] as const)('applies the gateway default to %s without selecting or fetching a source', async kind => {
   vi.mocked(api).mockResolvedValue({ data: { revision: 'catalog-r1', sources, models, drafts: [], uses: {}, baseUrl: view.profiles[0].baseUrl, defaultModel: 'model-b' } })
-  mount({ ...view, mode: 'official', profiles: [], current: {}, activeId: undefined })
+  render(<App><GatewayModelBinding kind={kind} view={{ ...view, mode: 'official', profiles: [], current: {}, activeId: undefined }} onChanged={async () => {}} /></App>)
   fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
   await screen.findByText('hub.gatewayDefaultHint')
   await waitFor(() => expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(false))
@@ -56,7 +56,7 @@ it('applies the gateway default without selecting or fetching a source', async (
   expect(api).not.toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/source-models', expect.anything(), expect.anything())
   fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.apply' }))
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.models.apply' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/apply', { kind: 'claude', model: 'roami-default', revision: 'native-r1', catalogRevision: 'catalog-r1' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/apply', { kind, model: 'roami-default', revision: 'native-r1', catalogRevision: 'catalog-r1' }))
 })
 
 it('marks default as applied and recognizes a model selected inside Claude Code', async () => {
@@ -144,4 +144,17 @@ it.each(['claude', 'codex', 'opencode', 'pi'] as const)('offers the same Chat Co
   fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.apply' }))
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.models.apply' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/apply', { kind, sourceId: 'a', model: 'model-a', revision: 'native-r1', catalogRevision: 'catalog-r1' }))
+})
+
+
+it.each(['pi', 'opencode'] as const)('allows syncing a changed gateway catalog to %s without losing the current model', async kind => {
+  const profile = { ...view.profiles[0], models: models.map(model => ({ id: model.id, name: model.name })) }
+  vi.mocked(api).mockResolvedValue({ data: { revision: 'catalog-r1', sources, models, baseUrl: profile.baseUrl } })
+  const mounted = render(<App><GatewayModelBinding kind={kind} view={{ ...view, profiles: [profile] }} onChanged={async () => {}} /></App>)
+  await screen.findByText('Source a')
+  expect((screen.getByRole('button', { name: 'capabilities.models.applied' }) as HTMLButtonElement).disabled).toBe(true)
+  mounted.rerender(<App><GatewayModelBinding kind={kind} view={{ ...view, profiles: [{ ...profile, models: [] }] }} onChanged={async () => {}} /></App>)
+  expect(screen.getByText('hub.gatewayCatalogChanged')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(false)
+  expect(screen.getByText('Model a', { selector: '.ant-select-selection-item' })).toBeTruthy()
 })

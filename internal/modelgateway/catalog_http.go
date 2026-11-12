@@ -80,7 +80,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			break
 		}
 		var model *CatalogModel
-		if input.Model == gatewayDefaultModel && input.Kind == "claude" && input.SourceID == "" && input.UpstreamModel == "" {
+		if input.Model == gatewayDefaultModel && catalogProtocol(input.Kind, "openai-completions") && input.SourceID == "" && input.UpstreamModel == "" {
 			model = s.defaultModel(s.value)
 		}
 		for _, m := range s.value.Models {
@@ -172,7 +172,11 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Model == gatewayDefaultModel {
 			selectedModel = gatewayDefaultModel
 		}
-		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: selectedModel, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key})
+		var options []agentproviders.ModelOption
+		if input.Kind == "pi" || input.Kind == "opencode" {
+			options = s.modelOptions(s.value)
+		}
+		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: selectedModel, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key, Models: options})
 		if e != nil {
 			err = e
 			break
@@ -223,7 +227,14 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "GET" && r.URL.Path == "/v1/models" {
+		if kind == "codex" && r.URL.Query().Get("client_version") != "" {
+			writeJSON(w, 200, codexModelCatalog(s.modelOptions(snapshot)))
+			return
+		}
 		data := []map[string]any{}
+		if kind != "claude" && catalogProtocol(kind, "openai-completions") && s.defaultModel(snapshot) != nil {
+			data = append(data, map[string]any{"id": gatewayDefaultModel, "type": "model", "object": "model", "display_name": "Roami Default", "owned_by": "roami"})
+		}
 		for _, m := range snapshot.Models {
 			id := m.ID
 			if kind == "claude" {
@@ -266,7 +277,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	_ = json.Unmarshal(payload["model"], &alias)
 	var model *CatalogModel
 	resolvedID := catalogModelID(kind, alias)
-	if resolvedID == gatewayDefaultModel && kind == "claude" {
+	if resolvedID == gatewayDefaultModel && catalogProtocol(kind, protocol) {
 		model = h.Catalog.defaultModel(catalog)
 	}
 	for _, m := range catalog.Models {

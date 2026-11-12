@@ -63,6 +63,7 @@ export type AgentModelProfile = {
   reasoningEffort?: string
   hasKey: boolean
   applied: boolean
+  models?: { id: string; name: string }[]
 }
 
 export type AgentModelInput = Omit<AgentModelProfile, 'id' | 'hasKey' | 'applied'> & { apiKey?: string }

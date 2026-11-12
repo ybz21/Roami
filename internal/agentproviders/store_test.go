@@ -383,6 +383,40 @@ func TestClaudeGatewayKeepsPickerSelectionAcrossLaunchesAndRestoresDefaults(t *t
 	}
 }
 
+func TestCodexGatewayUsesRemoteCatalogAndRestoresLocalCatalog(t *testing.T) {
+	store, home := isolatedProviderStore(t)
+	ctx := context.Background()
+	path := filepath.Join(home, ".codex", "config.toml")
+	if err := writePrivate(path, []byte("model_catalog_json = '/original/models.json'\n")); err != nil {
+		t.Fatal(err)
+	}
+	input := modelInput("codex")
+	input.Name = "Roami Gateway"
+	profile, err := store.Save(ctx, "codex", "", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := store.View(ctx, "codex")
+	applied, err := store.Apply(ctx, "codex", profile.ID, before.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, _ := loadNative(ctx, "codex")
+	values, _ := config.Documents[0].values()
+	provider := textAt(values, "model_provider")
+	if textAt(values, "model_catalog_json") != "" || textAt(values, "model_providers", provider, "model_catalog_url") != input.BaseURL+"/models" {
+		t.Fatal("local catalog shadows gateway model discovery")
+	}
+	if _, err := store.Restore(ctx, "codex", applied.Revision); err != nil {
+		t.Fatal(err)
+	}
+	config, _ = loadNative(ctx, "codex")
+	values, _ = config.Documents[0].values()
+	if textAt(values, "model_catalog_json") != "/original/models.json" {
+		t.Fatal("original local catalog was not restored")
+	}
+}
+
 func TestFactoryModeClearsCustomConnectionAndKeepsOriginalBackup(t *testing.T) {
 	for _, kind := range []string{"claude", "codex", "opencode", "pi"} {
 		t.Run(kind, func(t *testing.T) {
