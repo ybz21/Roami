@@ -51,6 +51,7 @@
 | 本地模型代理与每日限额 | [20261026-本地模型代理与每日限额](20261026-本地模型代理与每日限额/README.md) | [2 条](20261026-本地模型代理与每日限额/records/README.md) |
 | 设置分类 | [20261027-设置分类](20261027-设置分类/README.md) | [2 条](20261027-设置分类/records/README.md) |
 | 关闭会话后的 worktree 清理 | [20261106-session-worktree-cleanup](20261106-session-worktree-cleanup/README.md) | 断连收尾、已关闭会话重试与 squash 恢复回归 |
+| 关闭会话合入状态 | [20261112-worktree-merge-status](20261112-worktree-merge-status/README.md) | 关闭预检即时同步远端、离线本地状态刷新与隔离回归 |
 
 ## 其它主题
 

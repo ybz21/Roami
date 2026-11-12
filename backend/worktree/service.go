@@ -643,6 +643,8 @@ func (s *Service) Sync(ctx context.Context, dir string) (SyncResult, error) {
 	if err != nil {
 		return SyncResult{}, err
 	}
+	// 断网或无远端时，后续检查也必须重新读取本地提交与未提交改动。
+	defer s.invalidate(repo)
 	if _, e := git(ctx, repo.Root, "remote", "get-url", "origin"); e != nil {
 		return SyncResult{NoRemote: true}, nil
 	}
@@ -703,7 +705,6 @@ func (s *Service) Sync(ctx context.Context, dir string) (SyncResult, error) {
 	s.mu.Lock()
 	s.remote[repo.CommonDir] = remoteState{at: now, heads: heads}
 	s.mu.Unlock()
-	s.invalidate(repo) // 让下一次 List 立即吃到新 origin/<base>
 	return SyncResult{SyncedAt: now.Unix()}, nil
 }
 
