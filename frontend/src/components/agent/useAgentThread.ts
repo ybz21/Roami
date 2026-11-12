@@ -66,6 +66,15 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
     }
     refreshRef.current = () => { invalidateAgentData(scope); schedule() }
     acceptedRef.current = (receipt, text, context) => {
+      if (receipt.kind === 'compaction' && receipt.operationId) {
+        if (!view) { schedule(); return }
+        // Completion can arrive over SSE before the command receipt.
+        if (view.compaction?.operationId !== receipt.operationId) {
+          view = { ...view, compaction: { operationId: receipt.operationId, state: receipt.state } }
+          publish()
+        }
+        return
+      }
       if (!view || !receipt.messageId || view.messages.some((m) => m.id === receipt.messageId)) { schedule(); return }
       const first = view.messages.findIndex(message => message.turn_id === receipt.turnId)
       const index = first < 0 ? view.messages.length : first
