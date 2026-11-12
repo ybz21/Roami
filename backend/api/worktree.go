@@ -250,6 +250,8 @@ func (a *API) SessionWorktreeStatus(c *gin.Context) {
 		return
 	}
 	hit := ann.Primary
+	// 关闭前同步远端合入证据，避免沿用项目页尚未刷新的 origin/<base>。
+	_, _ = a.WT.Sync(ctx, hit.Worktree)
 	res := gin.H{"inWorktree": true, "path": hit.Worktree, "branch": hit.Branch, "repo": hit.Repo}
 	res["sessionIdentity"] = identity
 	if snapshot, err := a.WT.Snapshot(ctx, hit.Worktree); err == nil {
