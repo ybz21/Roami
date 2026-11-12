@@ -47,3 +47,15 @@ Main 的回复生成和核对通过已有回复预览表达。`reply`、`task_re
 Go 全量 `go test ./...` 通过。未收敛的 Python 完整套件在未改动的 RSI 场景耗时较长，已明确中断，不将其记为全量通过；期间发现的 CLI 测试仍按旧顺序要求任务正文在末尾，已改为检查 Markdown 任务置顶，并单独复测通过（1 项）。后续 quality full 的 Python 选择范围显式设为该跨语言用例；受管提示词、续接、路由和授权的两组专项结果（257 项和 53 项，部分覆盖重复）另记在上方。未运行真实模型验收或更改节点模型配置。
 
 最终范围门禁通过：`PYTEST_ADDOPTS=tests/test_cli_integration.py::test_go_coding_execution_tmux_replay_cancel_and_unknown scripts/dev/quality/check.sh full`（经隔离启动器运行）。Go 全量、Python lint/format 与指定跨语言用例、前端 i18n/hover/typecheck/build、secret scan 均通过；前端 Vitest 全量另行通过。`git diff --check` 通过。本任务的开发服务器、测试 tmux 实例、测试标签和 ADB 转发均已清理；未提交、开 PR 或部署。
+
+### PR 前最终验收（2026-11-12）
+
+以下全量结果更新上方早期的范围验收记录，包含 Git 完成交付要求的最终模板。
+
+- `PYTEST_ADDOPTS='--ff -x' scripts/dev/isolated-roami.sh /tmp/roami-prompt-pr-full-check scripts/dev/quality/check.sh full` 通过。参数仅调整顺序并在失败时停止，未筛选用例；Go 全量、Python lint/format 与全量 4871 项通过、48 项跳过、6 项子测试通过，前端 i18n/hover/typecheck/build、secret scan 均通过。
+- 前端 Vitest 全量 233 个文件、1706 项通过；wheel/sdist 六份规范模板逐字节核验通过。
+- 新建 worktree / 普通目录 / 派生任务的最终示例为 2465 / 2333 / 3246 字符，包含 Git 检查、提交、推送与创建 PR 的提示。
+- 补充截图使用生产消息、回复预览与执行卡组件，同一快照分别使用基线与当前聊天投影，未调用业务接口或付费模型。桌面与手机的 reply 工具卡由 1 变为 0，预览均保留 1 份。
+- Redmi Note 8 经 LAN HTTPS 实际点按切换改前/改后及派生提示词；实际滑动使内部 scrollTop 从 0 变为 538.55，文档不滚动、无横向溢出，`data-pointer=coarse`。截图另展示完整回报通道与新 Git 交付要求。
+
+截图按 `pr-shots` 规则发布在 PR 正文；临时预览、测试实例和本任务浏览器/ADB 资源按所属身份清理。未部署线上服务。
