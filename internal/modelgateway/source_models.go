@@ -4,12 +4,14 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 func catalogProtocol(kind, protocol string) bool {
-	return containsField([]string{"anthropic-messages", "openai-responses", "openai-completions"}, protocol) && containsField([]string{"codex", "claude", "opencode", "pi"}, kind)
+	runner := agent.Get(kind)
+	return runner != nil && agent.Describe(runner).Models && containsField([]string{"anthropic-messages", "openai-responses", "openai-completions"}, protocol)
 }
 
 func (h *Handler) sourceModels(w http.ResponseWriter, r *http.Request) {

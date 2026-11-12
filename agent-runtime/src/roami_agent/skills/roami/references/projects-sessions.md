@@ -29,7 +29,7 @@
 
 使用模型的 `delegate`，不是把新会话命令拼进旧会话投递。
 
-`delegate` 只必填 `goal`；可选 `executor`（native/codex/claude/opencode/pi），省略时使用节点或项目默认值。需要特定目标时选 `directory`、`projectId` 或 `sessionId` 之一。执行器安装、目标身份和权限由后台校验，不用填写 routing、引文或覆盖清单。
+`delegate` 只必填 `goal`；可选 `executor`（`native` 或 `roami agent execution catalog` 返回的已注册类型），省略时使用节点或项目默认值。需要特定目标时选 `directory`、`projectId` 或 `sessionId` 之一。执行器安装、目标身份和权限由后台校验，不用填写 routing、引文或覆盖清单。
 
 | 用户目的 | 调用 |
 | --- | --- |

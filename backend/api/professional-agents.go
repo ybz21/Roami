@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentinventory"
 )
 
@@ -75,4 +76,9 @@ func (a *API) UpgradeProfessionalAgent(c *gin.Context) {
 	a.annotateProfessionalPresets(c.Request.Context(), rows)
 	a.annotateAgentVerification(c.Request.Context(), rows)
 	c.JSON(http.StatusOK, gin.H{"agent": rows[0]})
+}
+
+// AgentRegistry is metadata only: no provider, version or quota probes.
+func (a *API) AgentRegistry(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"agents": agent.Descriptors()})
 }

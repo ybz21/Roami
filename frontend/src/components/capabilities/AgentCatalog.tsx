@@ -4,7 +4,8 @@ import { Alert, Button, Empty, Input, Modal, Popconfirm, Select, Spin, message }
 import { AgentLogo, RoamiLogo, GearIcon, SearchIcon } from '../../icons'
 import RoamiAgentModels from './RoamiAgentModels'
 import RoamiAgentMemory from './RoamiAgentMemory'
-import { type AgentKind, isAgentKind } from '../../agent-kind'
+import { type AgentKind, agentName } from '../../agent-kind'
+import { agentCommand } from '../../agent-command'
 import { checkAgent, discoverAgents, installAgent, upgradeAgent, verifyAgent, type RegisteredAgent } from '../../agent-registry'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -17,10 +18,8 @@ import { onboardingChanged } from '../onboarding/onboarding-state'
 import './capabilities.css'
 import './agents.css'
 
-const kinds: AgentKind[] = ['claude', 'codex', 'opencode', 'pi']
-const names: Record<AgentKind, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode', pi: 'Pi' }
 const intervals = [30, 60, 300]
-const commandKey = (kind: AgentKind) => `${kind}Command` as 'claudeCommand' | 'codexCommand' | 'opencodeCommand' | 'piCommand'
+const commandKeys: Partial<Record<string, keyof Preferences>> = { claude: 'claudeCommand', codex: 'codexCommand', opencode: 'opencodeCommand', pi: 'piCommand' }
 
 type AgentCatalogProps = { embedded?: boolean; mainVerified?: boolean; initialKind?: string; initialSection?: string; onSelect: (kind: string) => void; onLaunch?: (kind: AgentKind) => Promise<void> }
 export function AgentCatalog(props: AgentCatalogProps) {
@@ -54,8 +53,14 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
     return poll.stop
   }, [interval, version])
   const rows = agents || []
-  const current = isAgentKind(initialKind) ? initialKind : null
-  const modelsOpen = initialSection === 'models'
+  const kinds = rows.map(row => row.kind)
+  const names = Object.fromEntries(rows.map(row => [row.kind, row.displayName || (row.kind === 'claude' ? 'Claude Code' : agentName(row.kind))]))
+  const description = (kind: string) => {
+    const key = 'capabilities.agents.description.' + kind, text = t(key)
+    return text === key ? t('capabilities.agents.description.registered') : text
+  }
+  const current = rows.find(row => row.kind === initialKind)?.kind || null
+  const modelsOpen = initialSection === 'models' && rows.some(row => row.kind === current && row.models !== false)
   const selected = rows.find(row => row.kind === current)
   const close = () => onSelect('')
   const check = async (kind: AgentKind) => {
@@ -100,7 +105,7 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
     try { await onLaunch(current) } catch { message.error(t('capabilities.agents.openFailed')) }
     finally { setLaunching(false) }
   }
-  const installAction = (kind: AgentKind, row?: RegisteredAgent) => row && <Popconfirm classNames={{ root: 'tt-agent-install-confirm' }}
+  const installAction = (kind: AgentKind, row?: RegisteredAgent) => row && row.canInstall !== false && <Popconfirm classNames={{ root: 'tt-agent-install-confirm' }}
     title={t(row.installed ? 'capabilities.agents.updateConfirm' : 'agentDiscovery.installConfirm', { name: names[kind] })}
     onConfirm={() => row.installed ? upgrade(kind) : install(kind)} okText={t(row.installed ? 'capabilities.agents.update' : 'agentDiscovery.install')} cancelText={t('common.cancel')}>
     <Button disabled={!!busy || (row.installed && row.canUpgrade === false)} loading={busy === (row.installed ? 'upgrade:' : 'install:') + kind}>{t(row.installed ? 'capabilities.agents.update' : 'agentDiscovery.install')}</Button>
@@ -119,26 +124,26 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
       <dt>{t('capabilities.agents.version')}</dt><dd>{selected?.version || t(selected?.versionState === 'unavailable' ? 'capabilities.agents.versionUnavailable' : 'capabilities.agents.versionUnchecked')}</dd>
       {selected?.binary && <><dt>{t('capabilities.agents.binary')}</dt><dd><code>{selected.binary}</code></dd></>}</dl>
     <div className="tt-agent-detail-actions">
-      {onLaunch && <Button type="primary" disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}
+      {onLaunch && selected?.interactive !== false && <Button type="primary" disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}
       <Button loading={busy === 'check:' + current} disabled={!!busy} onClick={() => { void check(current) }}>{t('capabilities.agents.check')}</Button>
       {installAction(current, selected)}
       <Button loading={busy === 'verify:' + current} disabled={!selected?.installed || !!busy} onClick={() => { void verify(current) }}>{t('onboarding.verify')}</Button>
       {selected?.verified && <span role="status">{t('onboarding.verified')}</span>}
-      <Button disabled={!!busy} onClick={() => onSelect(current + '/models')}>{t('capabilities.models.manage')}</Button>
+      {selected?.models !== false && <Button disabled={!!busy} onClick={() => onSelect(current + '/models')}>{t('capabilities.models.manage')}</Button>}
     </div>
     {selected?.installed && selected.canUpgrade === false && <p>{t('capabilities.agents.manualUpgrade')}</p>}
-    <p>{t('capabilities.agents.loginHint')}</p><p>{t('onboarding.verifyHint')}</p>
-    <AgentCommandForm key={current} kind={current} />
+    <p>{t(selected?.interactive === false ? 'capabilities.agents.headlessHint' : 'capabilities.agents.loginHint', { command: selected?.setupCommand || selected?.command || current })}</p><p>{t('onboarding.verifyHint')}</p>
+    {selected && <AgentCommandForm key={current} kind={current} defaultCommand={selected.command} />}
     {selected?.installed && <AgentBalance agent={selected} detail />}
   </div>
-  const models = current && <AgentModels key={current} kind={current} installed={selected?.installed === true} setup={<div className="tt-agent-model-toolbar"><span>{installation(selected)}{selected?.version && ' · ' + selected.version}</span><div className="tt-agent-detail-actions">{installAction(current, selected)}{onLaunch && <Button disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}</div></div>} />
-  const filtered = kinds.filter(kind => `${names[kind]} ${t('capabilities.agents.description.' + kind)}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const models = current && selected?.models !== false && <AgentModels key={current} kind={current} installed={selected?.installed === true} setup={<div className="tt-agent-model-toolbar"><span>{installation(selected)}{selected?.version && ' · ' + selected.version}</span><div className="tt-agent-detail-actions">{installAction(current, selected)}{onLaunch && selected?.interactive !== false && <Button disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}</div></div>} />
+  const filtered = kinds.filter(kind => `${names[kind]} ${description(kind)}`.toLowerCase().includes(query.trim().toLowerCase()))
   if (embedded && current) return <section className="onboarding-agent-detail">{!phone && <BackButton onClick={close} />}{modelsOpen ? models : detail}</section>
   return <section className="tt-capability-catalog" data-kind="agents">
     <div className="tt-capability-toolbar"><Input prefix={<SearchIcon size={16} />} aria-label={t('capabilities.agents.search')} placeholder={t('capabilities.agents.search')} value={query} onChange={event => setQuery(event.target.value)} allowClear /></div>
     {failed && <Alert type="error" className="tt-capability-alert" showIcon message={t('agent.professional.loadFailed')} action={<Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button>} />}
     {!agents && !failed && <Spin />}
-    {!filtered.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('capabilities.agents.empty')} />}
+    {agents && !filtered.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('capabilities.agents.empty')} />}
     <div className="tt-capability-list">{!query && <article className="tt-capability-row" aria-label={t('hub.roamiModels')}><div className="tt-capability-cardhead"><span className="tt-agentmark"><RoamiLogo size={32} /></span><strong>Roami</strong></div><p className="tt-capability-description">{t('hub.roamiModels')}</p>{mainVerified !== undefined && <span role="status">{t(mainVerified ? 'onboarding.verified' : 'onboarding.pending')}</span>}<button type="button" className="tt-act" onClick={() => onSelect('roami')}>{t('capabilities.agents.manage')}</button></article>}{filtered.map(kind => {
       const row = rows.find(row => row.kind === kind)
       return <article className="tt-capability-row" key={kind} aria-label={names[kind]}>
@@ -148,11 +153,11 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
           <button type="button" className="tt-capability-open" onClick={() => onSelect(kind)}><strong>{names[kind]}</strong></button>
           {row?.installed && <span className="tt-agent-version">{row.version || t('capabilities.agents.versionUnknown')}</span>}
         </div>
-        <p className="tt-capability-description">{t('capabilities.agents.description.' + kind)}</p>
+        <p className="tt-capability-description">{description(kind)}</p>
         <div className="tt-agent-meta"><span>{row?.verified ? t('onboarding.verified') : authentication(row)}</span></div>
         {row?.installed && <AgentBalance agent={row} />}
         <div className="tt-capability-cardfooter"><div><button type="button" className="tt-act" onClick={() => onSelect(kind)}><GearIcon size={14} />{t('capabilities.agents.manage')}</button>
-          <button type="button" className="tt-act" onClick={() => onSelect(kind + '/models')}>{t('capabilities.models.manage')}</button></div>
+          {row?.models !== false && <button type="button" className="tt-act" onClick={() => onSelect(kind + '/models')}>{t('capabilities.models.manage')}</button>}</div>
           <div>{installAction(kind, row)}</div>
         </div>
         {row?.installed && row.canUpgrade === false && <p className="tt-agent-upgrade-hint">{t('capabilities.agents.manualUpgrade')}</p>}
@@ -168,24 +173,24 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
   </section>
 }
 
-function AgentCommandForm({ kind }: { kind: AgentKind }) {
+function AgentCommandForm({ kind, defaultCommand }: { kind: AgentKind; defaultCommand?: string }) {
   const { t } = useI18n()
   const [prefs, savePrefs] = usePreferences()
   const [draft, setDraft] = useState(''), [baseline, setBaseline] = useState('')
   const [ready, setReady] = useState(false), [saving, setSaving] = useState(false), [failed, setFailed] = useState(false)
   const hydrated = useRef(false)
-  const key = commandKey(kind)
+  const key = commandKeys[kind]
   useEffect(() => {
     if (hydrated.current || !preferencesLoaded()) return
-    const command = prefs[key] || kind
+    const command = agentCommand(kind, prefs, defaultCommand)
     hydrated.current = true; setDraft(command); setBaseline(command); setReady(true)
-  }, [prefs, key, kind])
+  }, [prefs, key, kind, defaultCommand])
   const save = async () => {
     if (!ready || saving) return
     setSaving(true); setFailed(false)
-    const value = draft.trim() || kind
+    const value = draft.trim() || defaultCommand || kind
     try {
-      const ok = await savePrefs({ [key]: value } as Partial<Preferences>)
+      const ok = await savePrefs({ agentCommands: { ...prefs.agentCommands, [kind]: value }, ...(key ? { [key]: value } : {}) } as Partial<Preferences>)
       if (!ok) { setFailed(true); return }
       setBaseline(value); setDraft(value); message.success(t('capabilities.agents.saved'))
     } catch { setFailed(true) } finally { setSaving(false) }

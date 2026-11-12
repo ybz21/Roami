@@ -12,6 +12,7 @@ import { closeSession, sendSessionPrompt, sessionActionError } from '../sessions
 import { refreshSessionLists } from '../sessions/native-session-list'
 import { mergeProjectSessions, mergeWorktreeSessions } from './project-list/project-sessions'
 import { nativeSessionId, nativeSessionRecord } from '../sessions/session-record'
+import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
 // 项目页（08 设计）——「项目 = 目录（git 可选），任务驱动」：
@@ -257,7 +258,6 @@ const FORK_TRUNK = 'hsl(212, 78%, 58%)'
 const FORK_COLOR: Record<string, string> = {
   live: 'var(--ok)', orphan: '#d29922', merged: 'rgba(139,148,158,.55)', ext: 'rgba(139,148,158,.7)',
 }
-const CLI_KINDS = ['shell', 'claude', 'codex', 'pi', 'opencode'] as const
 
 // 行尾动作钮：一行四五个动作写成汉字太吵，收成图标方钮。
 // 图标不写进文案（图标硬规则）：label 只给字，Tooltip 和 aria-label 都用它，图标在调用处传。
@@ -834,6 +834,8 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [sessions, setSessions] = useState<any[]>([])
   const [ann, setAnn] = useState<Record<string, any>>({})
   const agentKinds = useAgentKinds()
+  const agents = useRegisteredAgents()
+  const cliKinds = ['shell', ...agents.map(agent => agent.kind)]
   const [cc, setCc] = useState<Record<string, boolean>>({})
   const [cx, setCx] = useState<Record<string, boolean>>({})
   const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
@@ -1020,7 +1022,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   // 新开命令行（P4）：shell = 裸会话；agent = 会话 + 启动命令。孤儿复活/外部收编同款。
   const newCli = async (w: any, kind: 'shell' | AgentKind) => {
     const base = (w.branch || 'wt').replace(/[^a-zA-Z0-9_.-]+/g, '-')
-    const name = `${base}-${({ shell: 'sh', claude: 'cc', codex: 'cx', pi: 'pi', opencode: 'oc' } as const)[kind]}`
+    const name = `${base}-${kind === 'shell' ? 'sh' : kind}`
     try {
       const res = await api('POST', '/sessions', { name, dir: w.path })
       const actual = res.name || name
@@ -1605,7 +1607,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                         {live === 0 && <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', padding: '4px 8px' }}>{t('project.wt.noCli')}</div>}
                         <div className="prj-addline">
                           {t('project.wt.newCli')}
-                          {CLI_KINDS.map((kind) => <button key={kind} type="button" className="tt-act" onClick={() => newCli(w, kind)}>{kind === 'shell' ? 'shell' : agentName(kind)}</button>)}
+                          {cliKinds.map((kind) => <button key={kind} type="button" className="tt-act" disabled={agents.find(agent => agent.kind === kind)?.interactive === false} onClick={() => newCli(w, kind)}>{kind === 'shell' ? 'shell' : agents.find(agent => agent.kind === kind)?.interactive === false ? t('capabilities.agents.taskOnly', { name: agentName(kind) }) : agentName(kind)}</button>)}
                         </div>
                       </div>
                     )}
@@ -1620,7 +1622,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                       {cleanable && <Button size="small" onClick={() => cleanupMerged(w)}>{t('project.cleanup')}</Button>}
                       {!cleanable && !w.external && !!w.base && (
                         live === 0 && w.committedAhead === 0 && dirty === 0
-                          ? <Dropdown menu={{ items: CLI_KINDS.map((k) => ({ key: k, label: k === 'shell' ? 'shell' : agentName(k) })), onClick: ({ key }) => newCli(w, key as 'shell' | AgentKind) }}>
+                          ? <Dropdown menu={{ items: cliKinds.map((k) => ({ key: k, label: k === 'shell' ? 'shell' : agents.find(agent => agent.kind === k)?.interactive === false ? t('capabilities.agents.taskOnly', { name: agentName(k) }) : agentName(k), disabled: agents.find(agent => agent.kind === k)?.interactive === false })), onClick: ({ key }) => newCli(w, key as 'shell' | AgentKind) }}>
                               <Button size="small" iconPosition="end" icon={<ChevronDown size={11} />}>{t('project.wt.resume')}</Button>
                             </Dropdown>
                           : <Dropdown.Button size="small" type="primary" disabled={mergingWt === w.path}

@@ -218,6 +218,7 @@ class Runtime:
         self.tasks.revisions.project_workspace = targets.project_workspace
         if isinstance(self.executor, CodingExecutor):
             self.executor.project_workspace = targets.project_workspace
+            self.executor.catalog = targets.executors
         register_main_tools(
             self.tools,
             self.tasks,

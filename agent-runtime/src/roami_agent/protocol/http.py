@@ -2,6 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from roami_agent.protocol.executor_kind import EXECUTOR_PATTERN
+
 
 class Payload(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -53,7 +55,7 @@ class CreateTask(Payload):
     requestKey: str = Field(min_length=1, max_length=200)
     conversationId: str
     goal: str = Field(min_length=1)
-    executor: Literal["native", "codex", "claude", "opencode", "pi"] = "native"
+    executor: str = Field(default="native", pattern=EXECUTOR_PATTERN)
     model: str | None = Field(default=None, min_length=1, max_length=300)
     target: dict | None = None
     fromMessageId: str | None = None

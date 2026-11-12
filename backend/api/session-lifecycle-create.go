@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ybz21/Roami/internal/agent"
 	"os"
 	"path/filepath"
 	"strings"
@@ -221,8 +222,10 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 		guide = strings.NewReplacer("{{FILE_BASE}}", fileBase, "{{FILE_RAW_BASE}}", fileBase+"/raw", "{{FILE_SERVE_BASE}}", fileBase+"/serve").Replace(guide)
 		preamble := strings.NewReplacer("{{PATH}}", prepared.Path, "{{BASE}}", prepared.Base, "{{BRANCH}}", prepared.Branch, "{{SESSION}}", o.ResourceID).Replace(launch.Preamble)
 		prompt := launch.TaskHeading + "\n\n" + strings.TrimSpace(launch.Task) + "\n\n" + launch.SetupHeading + "\n\n" + preamble + "\n\n" + strings.TrimSpace(guide)
-		if launch.Agent == "opencode" {
-			command += " --prompt"
+		if runner := agent.Get(launch.Agent); runner != nil {
+			if flag := agent.Describe(runner).PromptFlag; flag != "" {
+				command += " " + flag
+			}
 		}
 		command += " " + shellQuote(prompt)
 	}

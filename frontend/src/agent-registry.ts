@@ -1,7 +1,31 @@
 import { api } from './api'
+import { createSessionPoll } from './session-poll'
 import { nodeApi } from './components/cluster/node-url'
 
-export type RegisteredAgent = {
+export type AgentDefinition = {
+  kind: string
+  displayName: string
+  command: string
+  promptFlag?: string
+  setupCommand?: string
+  interactive: boolean
+  models: boolean
+  canInstall: boolean
+}
+const definitions = new Map<string, AgentDefinition[]>()
+const emptyDefinitions: AgentDefinition[] = []
+export const agentDefinition = (kind: string) => definitions.get(nodeApi('/agent/registry'))?.find(agent => agent.kind === kind)
+const useRegistry = createSessionPoll<AgentDefinition[]>('/agent/registry', 60_000, emptyDefinitions, response => {
+  const rows: AgentDefinition[] = Array.isArray(response?.agents) ? response.agents : []
+  return rows
+}, () => false)
+export function useRegisteredAgents(enabled = true) {
+  const snapshot = useRegistry(enabled)
+  if (snapshot.loaded) definitions.set(nodeApi('/agent/registry'), snapshot.value)
+  return snapshot.value
+}
+
+export type RegisteredAgent = Partial<AgentDefinition> & {
   verified?: boolean
   kind: string
   installed: boolean

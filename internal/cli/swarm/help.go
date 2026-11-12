@@ -2,7 +2,9 @@ package swarm
 
 import (
 	"fmt"
+	"github.com/ybz21/Roami/internal/agent"
 	"io"
+	"strings"
 )
 
 func HelpRequested(args []string) bool {
@@ -36,10 +38,10 @@ func showHelp(w io.Writer, topics []string) error {
   daily <群ID> --delegation ID --project ID --main-conversation ID
     --timezone IANA --date YYYY-MM-DD --slot NAME [--dry-run] [--json]
   say <群ID> "消息" --key KEY [--to 成员 --task-revision N] [--json]
-  member add <群ID> <成员名> --executor codex|claude|roami|opencode|pi
+  member add <群ID> <成员名> --executor EXECUTOR
     --goal TEXT --acceptance TEXT --key KEY --revision N
     [--member-id ID] [--title TEXT] [--depends-on 成员@修订#产物ID]... [--integration]
-  member register <群ID> <职责名> --executor codex|claude|roami|opencode|pi
+  member register <群ID> <职责名> --executor EXECUTOR
     --duty TEXT --key KEY --revision N（仅登记，不派发）
   member inspect <群ID> <成员ID> [--before N] [--limit 20] [--json]
   member ls <群ID> [--json]
@@ -71,6 +73,7 @@ question/blocker/handoff持久等待原Main处理；不会自动唤醒模型或�
 --file 包含完整请求；--file - 从 stdin 读 JSON。不与业务选项混用。
 roami session swarm 访问同一实现。三维动画在 Web 的「协作」Tab 查看。
 `
+	text += "\n当前注册执行器：" + strings.Join(append([]string{"native"}, agent.Kinds()...), ", ") + "（roami 为 native 别名）。\n"
 	_, err := fmt.Fprint(w, text)
 	if err != nil {
 		return err

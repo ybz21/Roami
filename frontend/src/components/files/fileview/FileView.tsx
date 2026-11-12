@@ -8,6 +8,7 @@ import { Button, Modal, Space, Spin, App as AntApp, Tooltip } from 'antd'
 import { api } from '../../../api'
 import ErrorBoundary from '../../ErrorBoundary'
 import { useI18n } from '../../../i18n'
+import { useRegisteredAgents } from '../../../agent-registry'
 import type { AgentKind } from '../../../agent-kind'
 import { useThemeMode } from '../../../theme'
 import { MD_EXT, extOf, fileKind, fileNameOf, fmtSize, localPathFromRef, monacoLangOf } from '../file-utils'
@@ -74,6 +75,7 @@ export function FileView({
   const [data, setData] = useState<any>(null)
   const [err, setErr] = useState('')
   const [source, setSource] = useState(false) // markdown/HTML：源码/渲染切换
+  const agents = useRegisteredAgents()
   const [agentPick, setAgentPick] = useState(false)
   const [draft, setDraft] = useState('') // 编辑器当前文本
   const [saving, setSaving] = useState(false)
@@ -246,10 +248,7 @@ export function FileView({
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             <div style={{ color: 'var(--text-dim)', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all' }}>{path}</div>
             <Space wrap>
-              <Button type="primary" onClick={() => { setAgentPick(false); onOpenAgent('claude', path) }}>Claude Code</Button>
-              <Button onClick={() => { setAgentPick(false); onOpenAgent('codex', path) }}>Codex</Button>
-              <Button onClick={() => { setAgentPick(false); onOpenAgent('pi', path) }}>Pi</Button>
-              <Button onClick={() => { setAgentPick(false); onOpenAgent('opencode', path) }}>OpenCode</Button>
+              {agents.map(row => <Button key={row.kind} onClick={() => { setAgentPick(false); onOpenAgent(row.kind, path) }}>{row.displayName}</Button>)}
             </Space>
           </Space>
         </Modal>

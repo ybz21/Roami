@@ -16,7 +16,7 @@ it('keeps local source credentials on the server and imports only after confirma
   vi.mocked(api).mockImplementation(async () => ({ data: { revision: 'catalog-r1', sources: [{ id: 'native1', revision: 'native-r1', agentKind: 'opencode', name: 'Work', baseUrl: 'https://fixture.example/v1', hasKey: true }, { id: 'native2', revision: 'r2', agentKind: 'claude', name: 'Dynamic', baseUrl: 'https://dynamic.example', unavailable: true }] } }))
   render(<App><LocalModelSources onImported={imported} /></App>)
   const row = await screen.findByRole('article', { name: 'Work' })
-  expect(api).toHaveBeenCalledTimes(1)
+  expect(vi.mocked(api).mock.calls.filter(call => call[1] === '/agent/model-gateway/catalog/local-sources')).toHaveLength(1)
   expect((within(await screen.findByRole('article', { name: 'Dynamic' })).getByRole('button') as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(within(row).getByRole('button', { name: 'hub.local.import' }))
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'hub.local.import' }))

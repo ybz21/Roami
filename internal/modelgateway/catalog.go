@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
@@ -175,7 +176,10 @@ func (s *CatalogStore) modelReferences(ctx context.Context, activeOnly bool) (ma
 			uses[route.model] = append(uses[route.model], "roami")
 		}
 	}
-	for _, kind := range []string{"codex", "claude", "opencode", "pi"} {
+	for _, kind := range agent.Kinds() {
+		if !agent.Describe(agent.Get(kind)).Models {
+			continue
+		}
 		view, err := s.agents.View(ctx, kind)
 		if err != nil {
 			known = false
