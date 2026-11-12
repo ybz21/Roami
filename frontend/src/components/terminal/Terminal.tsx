@@ -17,6 +17,7 @@ import { RESUME_RESYNC_MS, resumeHealFor, shouldJiggleAfterAttach } from './term
 import type { ResumeHeal, TerminalDimensions } from './terminal-resize'
 import { parseTerminalPong, parseTerminalRevived } from './terminal-lifecycle'
 import { synchronizeTerminalAtlas } from './terminal-atlas'
+import { createTerminalRenderer, disposeTerminalWebgl } from './terminal-renderer'
 import { synchronizeTerminalIME } from './terminal-ime'
 import { useLayout } from '../../layout'
 
@@ -242,6 +243,7 @@ const Term = forwardRef<TermHandle, {
   // 用户报的花屏正是这条路径——手机长期不用，回来「进入 session」才看见。
   const resumeHealPending = useRef<ResumeHeal>('none')
   const rebuildRendererRef = useRef<() => void>()
+  const rendererActivationRef = useRef<(active: boolean) => void>()
   // 自增一次 = 拆掉 xterm 实例重建（渲染器/纹理图集/WebSocket 全新），效果等同刷新整页
   const [gen, setGen] = useState(0)
 
@@ -665,45 +667,35 @@ const Term = forwardRef<TermHandle, {
     // 顺带让 rescaleOverlappingGlyphs 生效。
     // preserveDrawingBuffer=true：终端旁边的标签/页面发生 DOM 更新时，Chrome 可能重新合成 WebGL
     // canvas；不保留绘制缓冲会在 xterm 下一次 render 前露出空帧。这里优先保证 IDE 终端画面稳定。
-    // 上下文丢失（后台切回/GPU 回收/同页 WebGL 上下文超上限被回收最老的那个）时**先试着重建**，
-    // 连着重建都失败才退回 DOM 渲染器——旧写法一丢就永久 dispose，此后这个标签一直是降级渲染。
-    let lostAt = 0
-    let releaseAtlas: (() => void) | undefined
-    const mountWebgl = () => {
-      if (unmounted.current) return
-      let candidate: WebglAddon | undefined
+    // 隐藏终端保留缓冲和连接，仅前台终端占用 GPU；丢失上下文后回退 DOM。
+    const renderer = createTerminalRenderer((onLost) => {
+      const webgl = new WebglAddon(true)
+      let releaseAtlas: (() => void) | undefined
       try {
-        const webgl = candidate = new WebglAddon(true)
-        webgl.onContextLoss(() => {
-          releaseAtlas?.()
-          releaseAtlas = undefined
-          try { webgl.dispose() } catch {}
-          webglRef.current = undefined
-          const now = performance.now()
-          // 10s 内又丢一次 = 这台机器/这个页面的 WebGL 不稳，别再来回折腾，就用 DOM 渲染器
-          if (now - lostAt < 10000) return
-          lostAt = now
-          setTimeout(() => { if (!unmounted.current && termRef.current === term) mountWebgl() }, 500)
-        })
+        webgl.onContextLoss(onLost)
         term.loadAddon(webgl)
         releaseAtlas = synchronizeTerminalAtlas(term, webgl)
         webglRef.current = webgl
-      } catch {
-        try { candidate?.dispose() } catch {}
+      } catch (error) {
+        try { disposeTerminalWebgl(webgl) } catch {}
+        throw error
       }
-    }
-    mountWebgl()
+      return () => {
+        try { releaseAtlas?.() } finally {
+          if (webglRef.current === webgl) webglRef.current = undefined
+          disposeTerminalWebgl(webgl)
+        }
+      }
+    }, () => { try { term.refresh(0, term.rows - 1) } catch {} })
+    rendererActivationRef.current = renderer.setActive
+    renderer.setActive(activeRef.current)
 
     // 渲染器就地重建：拆掉 WebGL addon 再挂一个新的，纹理图集/画布随之重建，然后整屏重画。
     // 不重连、不动后端，只修「本地画丢了」这一类故障。
     const rebuildRenderer = () => {
       if (unmounted.current || termRef.current !== term) return
       beginVisualHandoff()
-      releaseAtlas?.()
-      releaseAtlas = undefined
-      try { webglRef.current?.dispose() } catch {}
-      webglRef.current = undefined
-      mountWebgl()
+      renderer.rebuild()
       applyResize()
       try { term.refresh(0, term.rows - 1) } catch {}
       releaseVisualHandoff(100)
@@ -1156,8 +1148,8 @@ const Term = forwardRef<TermHandle, {
       // （整页黑屏，而不只是这一个标签坏掉）。xterm 的 WebGL addon 就踩过——它按新版内核的
       // 私有字段做卸载判断，配到旧内核上必抛 TypeError，于是「关一个会话/改一次名」就黑屏。
       // 先单独拆 WebGL addon，再拆终端本体，各自兜住，任一步失败都不影响另一步和其他标签。
-      releaseAtlas?.()
-      try { webglRef.current?.dispose() } catch {}
+      rendererActivationRef.current = undefined
+      renderer.dispose()
       webglRef.current = undefined
       try { term.dispose() } catch {}
     }
@@ -1171,8 +1163,9 @@ const Term = forwardRef<TermHandle, {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fontSize])
 
-  // 非当前标签用 visibility 隐藏但始终保留相同布局尺寸，切回时桌面只需聚焦。
+  // 隐藏标签保留布局与终端缓冲，切回时恢复 GPU 渲染并聚焦。
   useEffect(() => {
+    rendererActivationRef.current?.(active)
     if (!active) return
     if (resumeHealPending.current !== 'none') {
       const heal = resumeHealPending.current
@@ -1204,7 +1197,7 @@ const Term = forwardRef<TermHandle, {
     // z-index 关回终端自己这一层，覆盖层就能正常接事件。真机 CDP 命中测试可复现/回归。
     <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate', contain: 'layout paint style', WebkitTouchCallout: 'none' } as CSSProperties}>
       <div ref={elRef} style={{ width: '100%', height: '100%' }} />
-      {restoredFrame && <img ref={restoredFrameRef} data-terminal-restored-frame src={restoredFrame} alt="" aria-hidden style={{
+      {restoredFrame && <img ref={restoredFrameRef} data-terminal-restored-frame src={restoredFrame} onError={hideVisualHandoff} alt="" aria-hidden style={{
         position: 'absolute', inset: 0, zIndex: 5, width: '100%', height: '100%', objectFit: 'fill',
         pointerEvents: 'none', background: 'var(--xterm-bg)',
       }} />}
