@@ -15,6 +15,19 @@ it('keeps reply review and delivery plumbing out of chat while preserving turn f
 it('keeps actions between replies and later background actions after subsequent messages', () => {
   expect(agentTimeline([message('first', 1), message('empty', 2, ''), message('reply', 5)], [step('later-child', 8), step('command', 3)]).map(e => e.id)).toEqual(['first', 'command', 'reply', 'later-child'])
 })
+it.each(['running', 'succeeded', 'failed', 'unknown', 'blocked'])('keeps %s delegated tools in records while chat retains Main calls, task status and results', state => {
+  const main = { ...step('main-delegate', 1), name: 'delegate', state }
+  const task = { ...step('task', 2), kind: 'task' as const, taskId: 'task', state }
+  const child = { ...step('child', 3), taskId: 'task', state }
+  const nested = { ...step('nested', 4), taskId: 'child-task', parentTaskId: 'task', state }
+  const parentOnly = { ...step('parent-only', 5), parentTaskId: 'task', state }
+  const activities = [main, task, child, nested, parentOnly]
+  const original = structuredClone(activities)
+  const entries = groupAgentTimeline(agentTimeline([message('result', 6)], activities))
+  expect(entries.map(entry => entry.id)).toEqual(['main-delegate', 'result'])
+  expect(entries[0].activities).toEqual([main, task])
+  expect(activities).toEqual(original)
+})
 it('renders legacy history without timestamps using the original tool-call anchor', () => {
   const messages = [message('first', 1), message('empty', 2, ''), message('reply', 5)].map(({ created_ms: _time, ...m }) => m)
   expect(agentTimeline(messages, [step('command', 3)]).map(e => e.id)).toEqual(['first', 'command', 'reply'])
