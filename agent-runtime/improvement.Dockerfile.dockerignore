@@ -12,6 +12,11 @@
 !skills/
 !skills/okr-development/
 !skills/okr-development/**
+!backend/
+!backend/api/
+!backend/api/prompts/
+!backend/api/prompts/task-*.md
+!backend/api/prompts/agent-capabilities.md
 **/__pycache__
 **/*.pyc
 **/.env

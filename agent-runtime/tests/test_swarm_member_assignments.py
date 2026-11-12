@@ -234,7 +234,7 @@ async def test_original_member_receives_bounded_main_assignment_with_original_us
             assert "permission" not in submitted[0]
             prompt = submitted[0]["prompt"]
             assert "ALLOW GENERATED OPERATION" not in prompt
-            assert prompt.startswith(assignment)
+            assert prompt.startswith("# 任务：\n\n" + assignment)
             assert json.dumps(user_request) in prompt
             assert "not this member's assignment" in prompt
             assert "Do not take over Main's coordination" in prompt

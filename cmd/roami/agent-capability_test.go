@@ -7,8 +7,11 @@ import (
 )
 
 func TestAgentCapabilityListsCategoriesAndRejectsRemovedSearch(t *testing.T) {
-	if code := runAgentCapability([]string{"list", "--help"}); code != 0 {
-		t.Fatalf("list help exit: %d", code)
+	t.Setenv("ROAMI_HOME", filepath.Join(t.TempDir(), "uninitialized"))
+	for _, sub := range []string{"list", "show", "read", "call"} {
+		if code := runAgentCapability([]string{sub, "--help"}); code != 0 {
+			t.Fatalf("%s help exit: %d", sub, code)
+		}
 	}
 	if code := runAgentCapability([]string{"search", "--query", "browser"}); code != 2 {
 		t.Fatalf("removed search entry remained callable: %d", code)

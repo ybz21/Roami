@@ -3189,11 +3189,12 @@ const zhCN = {
   // 得让 agent 自己开分支——否则一堆任务全提交在 main 上（真发生过）。
   // 开工简报里任务本体前的标题：前言说「做完再开始下面的任务」，下面得真有个「任务」
   'session.wt.briefSetup': '# 开工准备',
+  'session.wt.briefSession': '当前会话（稳定 ID）：`{sess}`。会话操作使用此 ID；改名只改变展示名。',
   'session.wt.briefTask': '# 任务：',
-  'session.wt.briefNew': '执行任务前先完成以下准备：\n1. 工作区：你已经在独立 worktree {path}（从 {base} 切出来，占位分支 {branch}）——把分支改成语义化名字：git branch -m <简短英文kebab-case>，前缀 feat/fix 等由你定；\n2. 初始化工作区：当前新 worktree 已基于所选分支快照创建（配置了远端时已先 fetch）；检查 git status，需要装依赖就装（按仓库自己的约定来）；\n3. 把这个会话改名成一眼能认出的短名字：roami session rename {sess} <新名字>——4~12 个字说清这是什么活，别照抄需求原文。',
-  'session.wt.briefRepo': '执行任务前先完成以下准备：\n1. 工作区：你在 {path}（当前分支 {branch}）——别直接在主干上改，先切一个语义化分支：git checkout -b <简短英文kebab-case>；任务大到需要隔离就自己开 worktree；\n2. 初始化工作区：拉一下最新代码，需要装依赖就装（按仓库自己的约定来）；\n3. 把这个会话改名成一眼能认出的短名字：roami session rename {sess} <新名字>——4~12 个字说清这是什么活，别照抄需求原文。',
-  'session.wt.briefPlain': '执行任务前先完成以下准备：\n1. 工作区：你在 {path}（这里未创建隔离 worktree，直接在此目录工作；不要初始化 Git 或切分支，除非任务本身要求）；\n2. 把这个会话改名成一眼能认出的短名字：roami session rename {sess} <新名字>——4~12 个字说清这是什么活，别照抄需求原文。',
-  'session.wt.briefAdopt': '执行任务前先完成以下准备：\n1. 工作区：你已经在 {path}——这是刚为**已有分支** {branch} 开的独立 worktree（比对基准 {base}）。分支是既有的，别改名、也别再切新分支，就在它上面接着干；\n2. 初始化工作区：先检查已有改动，不自动 rebase/reset 既有分支，需要装依赖就装；看看这条分支上已经做了什么（git log --oneline {base}..HEAD、git status），别把已有的活重做一遍；\n3. 把这个会话改名成一眼能认出的短名字：roami session rename {sess} <新名字>——4~12 个字说清这是什么活，别照抄需求原文。',
+  'session.wt.briefNew': '1. 工作区 {path}：已从 {base} 创建独立 worktree，占位分支 {branch}；用 git branch -m <简短英文kebab-case> 改为语义化分支，自选 feat/fix 等前缀。\n2. 已按所选分支快照创建，有远端时已 fetch；检查 git status，按仓库约定安装所需依赖。\n3. 用 roami session rename {sess} <短名称> 设置 4–12 字的会话展示名。',
+  'session.wt.briefRepo': '1. 工作区 {path}，当前分支 {branch}：先 git checkout -b <语义化分支>，不直接改主干；需要隔离时另开 worktree。\n2. 按仓库约定更新代码、安装所需依赖。\n3. 用 roami session rename {sess} <短名称> 设置 4–12 字的会话展示名。',
+  'session.wt.briefPlain': '1. 工作区 {path}：直接在此目录工作；除非任务要求，不初始化 Git、不切分支。\n2. 用 roami session rename {sess} <短名称> 设置 4–12 字的会话展示名。',
+  'session.wt.briefAdopt': '1. 工作区 {path}：刚为已有分支 {branch} 创建的独立 worktree，比对基准 {base}；沿用分支，别改名、不另切。\n2. 先检查 git status、git log --oneline {base}..HEAD，保留已有成果，不自动 rebase/reset；按仓库约定安装所需依赖。\n3. 用 roami session rename {sess} <短名称> 设置 4–12 字的会话展示名。',
   'session.wt.briefReview': '\n另外：这个任务开了「空闲自动互审」，你歇下来之后会有另一个 agent 来审你的改动。',
   'session.namePlaceholder2': '会话名(短,留空则从需求自动起名)',
   'session.wt.where': '在哪干活',

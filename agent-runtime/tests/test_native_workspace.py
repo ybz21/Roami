@@ -70,6 +70,10 @@ async def test_created_file_is_delivered_even_when_worker_and_main_omit_links(
         model = "bare-worker-report"
 
         async def stream(self, messages, tools):
+            from roami_agent.context.execution_brief import execution_guide
+
+            assert execution_guide() in messages[0]["content"]
+            assert "## 执行结束与通知 Main" in messages[0]["content"]
             observed = sum(m["role"] == "tool" for m in messages)
             if method in {"shell", "shell-only"} and observed == 0:
                 yield ModelEvent(

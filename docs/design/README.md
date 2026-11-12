@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 派生任务提示词与 Main 回复 | [20261111-derived-task-prompts](20261111-derived-task-prompts/README.md) | Markdown 任务置顶、旧执行校验兼容与回复交付记录收拢 |
 | 技能市场失败恢复 | [20261111-skill-market-recovery](20261111-skill-market-recovery/README.md) | 原请求重试、错误原因与桌面/手机验收 |
 | 设置智能体入口整理 | [20261111-settings-agent-navigation](20261111-settings-agent-navigation/README.md) | 去掉旧模型入口、统一记忆迁入 Roami、旧链接兼容与桌面/真机验收 |
 | 简洁返回按钮 | [20261111-back-navigation](20261111-back-navigation/README.md) | 统一左向 Chevron、无文字按钮、辅助技术名称与触控命中区 |

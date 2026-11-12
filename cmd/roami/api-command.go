@@ -135,7 +135,7 @@ func runAPICommand(group string, args []string) int {
 	if group == "project" && len(args) > 0 && args[0] == "okr" {
 		return runProjectOKR(args[1:])
 	}
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
 		fmt.Printf("roami %s ", group)
 		if group == "auth" {
 			fmt.Println("login|logout|status [--server URL] [--stdin] [--json]")
@@ -170,6 +170,9 @@ func runAPICommand(group string, args []string) int {
 		}
 	}
 	if err := fs.Parse(options); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	fail := func(err error) int {

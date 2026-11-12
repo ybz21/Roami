@@ -13,6 +13,7 @@ import tempfile
 
 import httpx
 
+from roami_agent.context.execution_brief import execution_prompt
 from roami_agent.conversation.activity_events import activity_event
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -99,21 +100,18 @@ class ProfessionalCapabilities:
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)
-        command = shlex.quote(self.runtime.settings.cli_bin) + " agent capability"
         return (
-            "\n\n[Roami platform capabilities]\n"
-            f"Discover installed Skills, MCP and CLI with: {command} list --query TEXT\n"
-            f"Read a Skill: {command} read NAME --context {shlex.quote(str(path))}\n"
-            f"Read a Skill reference: {command} read NAME --reference references/FILE.md --context {shlex.quote(str(path))}\n"
-            f"Inspect an operation: {command} show NAME\n"
-            f"Call an external operation: {command} call NAME --input JSON --context {shlex.quote(str(path))} --call UNIQUE_REQUEST_ID\n"
-            'For MCP, call mcp_discover with {"server":"NAME"} first if tools are not listed. '
-            "Use the exact inputSchema and operation name returned by the directory. "
-            "The private context file binds calls to this active task and revision; do not copy, "
-            "print or include its contents in deliverables. Calls obey platform disable settings, "
-            "workspace limits and cancellation. Reuse a request ID only to recover the SAME call; "
-            "an unknown outcome must not be replayed with a new ID. Skill packagePath contains "
-            "downloaded references/scripts; read them only as required by the task."
+            "\n\n"
+            + execution_prompt("agent-capabilities.md")
+            + "\n\n当前任务的能力调用参数（与命令放在同一 shell）：\n\n"
+            "```bash\n"
+            f"ROAMI_BIN={shlex.quote(self.runtime.settings.cli_bin)}\n"
+            f"ROAMI_TASK_CONTEXT={shlex.quote(str(path))}\n"
+            "```\n\n"
+            '上述 `roami` 使用 `"$ROAMI_BIN"`。读取 Skill、调用能力时带 '
+            '`--context "$ROAMI_TASK_CONTEXT"`；调用再带 '
+            "`--call REQUEST_ID`。按目录返回的名称与 inputSchema 调用；MCP 未列工具时先 mcp_discover。"
+            "上下文不外传，同次重试保留请求 ID，未知结果不换 ID 重放。"
         )
 
     @staticmethod

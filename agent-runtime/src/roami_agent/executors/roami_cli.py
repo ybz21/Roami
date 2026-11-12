@@ -4,6 +4,12 @@ import json
 import math
 from pathlib import Path
 
+from roami_agent.context.execution_brief import (
+    execution_guide,
+    managed_handoff,
+    managed_setup,
+    swarm_handoff,
+)
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.executors.professional_brief import professional_brief
 from roami_agent.executors.project import provision_project
@@ -11,7 +17,6 @@ from roami_agent.executors.task_directory import automatic_task_directory, prepa
 from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_error_code
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination_tasks import prepared_authority
 from roami_agent.storage.task_reports import retain_reported_progress
@@ -108,6 +113,8 @@ class CodingExecutor:
             raise DomainError("TASK_BUDGET_EXCEEDED")
         launch = {
             "persistent": self.persistent,
+            "promptFormat": "markdown-session",
+            "shortExecutionLabel": True,
             "key": run["launch_id"],
             "executor": spec["executor"],
             "title": spec.get("title")
@@ -131,30 +138,6 @@ class CodingExecutor:
                 (task["id"],),
             )
         )
-        if swarm:
-            collaboration = {
-                "taskId": task["id"],
-                "runId": run["id"],
-                "taskRevision": run["task_revision"],
-            }
-            launch["prompt"] += (
-                "\n\nSwarm group chat: "
-                + swarm["swarm_id"]
-                + "; member: "
-                + swarm["member_name"]
-                + ". Write a JSON file containing the following binding, commandKey, messageKey, kind and text, then call roami session swarm post "
-                + swarm["swarm_id"]
-                + " --file /absolute/path/message.json. Binding: "
-                + encoded(collaboration)
-                + '. Choose kind="progress" for discussion only; use kind="question", "blocker" or "handoff" when the original Main needs to respond or verify work. '
-                + "These kinds persist in the original Main inbox; writing @leader in progress text does not route a question. "
-                + "Preserve the same commandKey and messageKey when retrying the same message; changed content is a new message and needs new keys. "
-                + 'For an actual reply use kind="reply" and replyTo equal to the original post ID. '
-                + "Never borrow another task, revision, run or team identity. An accepted inbox receipt is not a reply, execution or task acceptance. "
-                + "Continue using the existing final result handoff for completion. Read group chat, actual replies and board with roami session swarm status "
-                + swarm["swarm_id"]
-                + " --json."
-            )
         if target["kind"] != "session":
             launch["permission"] = "auto"
         if spec.get("model") and target["kind"] != "session":
@@ -162,16 +145,24 @@ class CodingExecutor:
         continuing_session = target["kind"] == "session" and spec.get("continuation", {}).get(
             "text"
         )
-        if not continuing_session:
-            launch["prompt"] = (
-                "Roami final handoff: " + DELIVERY_INSTRUCTIONS + "\n\nTask:\n" + launch["prompt"]
-            )
+        launch["prompt"] = (
+            "# 任务：\n\n"
+            + launch["prompt"].strip()
+            + "\n\n# 开工准备\n\n"
+            + managed_setup(target)
+            + "\n\n"
+            + execution_guide()
+            + "\n\n"
+            + managed_handoff(run)
+        )
+        if swarm:
+            launch["prompt"] += "\n\n" + swarm_handoff(self.settings.cli_bin, swarm, task, run)
         if self.artifacts:
             launch["prompt"] += await professional_brief(
                 self.db, self.artifacts, task, run, continuation=bool(continuing_session)
             )
         if self.capabilities:
-            launch["prompt"] = await self.capabilities.brief(task, run) + "\n\n" + launch["prompt"]
+            launch["prompt"] += await self.capabilities.brief(task, run)
         if target.get("nodeId", "local") != "local":
             raise DomainError("CODING_NODE_UNAVAILABLE")
         if target["kind"] == "session":

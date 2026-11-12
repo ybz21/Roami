@@ -3,6 +3,7 @@
 import asyncio
 import json
 
+from roami_agent.context.execution_brief import execution_guide, managed_handoff
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.dispatch.native_model_capabilities import native_model_capabilities
 from roami_agent.executors.task_directory import automatic_task_directory, prepare_task_directory
@@ -83,6 +84,12 @@ class NativeExecutor:
                 dict(
                     prepared,
                     executionRunId=run["id"],
+                    executionBrief=execution_guide()
+                    + (
+                        "\n\n" + managed_handoff(run)
+                        if self.db and run.get("task_revision") is not None
+                        else ""
+                    ),
                     executionProfile=profile,
                     executionStartedMs=started,
                     executionDeadlineMs=deadline,

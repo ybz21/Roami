@@ -27,22 +27,24 @@ import (
 )
 
 type Spec struct {
-	Persistent     bool   `json:"persistent,omitempty"`
-	Key            string `json:"key"`
-	Executor       string `json:"executor"`
-	Directory      string `json:"directory,omitempty"`
-	ProjectID      string `json:"projectId,omitempty"`
-	WorkspaceID    string `json:"workspaceId,omitempty"`
-	SessionID      string `json:"sessionId,omitempty"`
-	ResumeFrom     string `json:"resumeFrom,omitempty"`
-	ResumeProvider string `json:"resumeProviderId,omitempty"`
-	Base           string `json:"base,omitempty"`
-	Remote         string `json:"remote,omitempty"`
-	Prompt         string `json:"prompt"`
-	Title          string `json:"title,omitempty"`
-	Model          string `json:"model,omitempty"`
-	Permission     string `json:"permission,omitempty"`
-	TimeoutSeconds int    `json:"timeoutSeconds"`
+	Persistent          bool   `json:"persistent,omitempty"`
+	Key                 string `json:"key"`
+	Executor            string `json:"executor"`
+	Directory           string `json:"directory,omitempty"`
+	ProjectID           string `json:"projectId,omitempty"`
+	WorkspaceID         string `json:"workspaceId,omitempty"`
+	SessionID           string `json:"sessionId,omitempty"`
+	ResumeFrom          string `json:"resumeFrom,omitempty"`
+	ResumeProvider      string `json:"resumeProviderId,omitempty"`
+	Base                string `json:"base,omitempty"`
+	Remote              string `json:"remote,omitempty"`
+	Prompt              string `json:"prompt"`
+	PromptFormat        string `json:"promptFormat,omitempty"`
+	ShortExecutionLabel bool   `json:"shortExecutionLabel,omitempty"`
+	Title               string `json:"title,omitempty"`
+	Model               string `json:"model,omitempty"`
+	Permission          string `json:"permission,omitempty"`
+	TimeoutSeconds      int    `json:"timeoutSeconds"`
 }
 
 type Receipt struct {
@@ -145,6 +147,12 @@ func readJSON(path string, value any) error {
 
 // Launch journals intent before starting tmux. An uncertain launch is reconciled, never replayed.
 func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
+	if spec.PromptFormat != "" && spec.PromptFormat != "markdown" && spec.PromptFormat != "markdown-session" {
+		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
+	}
+	if spec.ShortExecutionLabel && spec.PromptFormat != "markdown-session" {
+		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
+	}
 	if spec.SessionID != "" {
 		return s.continueSession(ctx, spec)
 	}
@@ -383,6 +391,9 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	}
 	if structuredExecutor(spec.Executor) {
 		return s.runStructuredOnce(ctx, dir, spec, stdout, stderr)
+	}
+	if spec.PromptFormat == "markdown-session" {
+		spec.Prompt = sessionPrompt(dir, spec)
 	}
 	a := agent.Get(spec.Executor)
 	if a == nil {

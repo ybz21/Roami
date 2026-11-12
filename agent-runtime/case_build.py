@@ -9,6 +9,22 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 class CaseBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         root = Path(self.root)
+        prompts = root / "prompts"
+        if not prompts.is_dir():
+            prompts = root.parent / "backend/api/prompts"
+        for name in (
+            "agent-capabilities.md",
+            "task-execution.md",
+            "task-report-managed.md",
+            "task-report-session.md",
+            "task-report-legacy.md",
+            "task-report-swarm.md",
+        ):
+            source = prompts / name
+            if not source.is_file():
+                raise FileNotFoundError(f"Canonical execution prompt is required: {name}")
+            destination = "roami_agent/prompts/" if self.target_name == "wheel" else "prompts/"
+            build_data["force_include"][str(source)] = destination + name
         skill = root / "skills/okr-development"
         if not skill.is_dir():
             skill = root.parent / "skills/okr-development"

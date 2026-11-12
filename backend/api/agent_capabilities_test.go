@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,7 +19,7 @@ func TestAgentCapabilitiesCreatesEditableGuide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(initial, "{{FILE_BASE}}/tmp/report.md") || !strings.Contains(initial, "{{FILE_RAW_BASE}}?path=") || !strings.Contains(initial, "roami chrome tabs") {
+	if !strings.Contains(initial, "roami agent capability") || !strings.Contains(initial, "roami chrome") || !strings.Contains(initial, "roami --help") {
 		t.Fatalf("default guide missing capabilities: %q", initial)
 	}
 	info, err := os.Stat(path)
@@ -40,6 +41,22 @@ func TestAgentCapabilitiesCreatesEditableGuide(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "我的自定义能力") {
 		t.Fatalf("GET guide: %d %s", w.Code, w.Body.String())
 	}
+	var response struct {
+		Data struct {
+			Content        string `json:"content"`
+			ExecutionGuide string `json:"executionGuide"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	guide, _ := defaultAgentCapabilities.ReadFile("prompts/task-execution.md")
+	if response.Data.Content != "我的自定义能力" || !strings.Contains(response.Data.ExecutionGuide, strings.TrimSpace(string(guide))) || !strings.Contains(response.Data.ExecutionGuide, "本次是用户直接打开的工作会话") {
+		t.Fatal("canonical execution and artifact guide must survive custom capabilities")
+	}
+	if !strings.Contains(response.Data.ExecutionGuide, "推送任务分支并创建 PR") || !strings.Contains(response.Data.ExecutionGuide, "无改动不空提交") {
+		t.Fatal("Git task delivery must include commit and PR while preserving read-only tasks")
+	}
 }
 
 func TestAgentCapabilitiesUpgradesShippedGuides(t *testing.T) {
@@ -48,7 +65,7 @@ func TestAgentCapabilitiesUpgradesShippedGuides(t *testing.T) {
 		t.Fatal(err)
 	}
 	files, err := filepath.Glob("testdata/agent-capabilities/*.txt")
-	if err != nil || len(files) != 7 {
+	if err != nil || len(files) != 8 {
 		t.Fatalf("historical guides: %v %v", files, err)
 	}
 	for _, file := range files {
@@ -81,17 +98,21 @@ func TestAgentCapabilitiesUpgradesShippedGuides(t *testing.T) {
 }
 
 func TestAgentCapabilitiesPreservesEditedLegacyGuide(t *testing.T) {
-	isolateTestStorage(t, t.TempDir())
-	old, err := os.ReadFile("testdata/agent-capabilities/original.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	custom := string(old) + "\n我的项目专用说明\n"
-	if err := os.WriteFile(agentCapabilitiesPath(), []byte(custom), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	got, err := readAgentCapabilities()
-	if err != nil || got != custom {
-		t.Fatalf("edited guide overwritten: %v", err)
+	for _, file := range []string{"original.txt", "detailed-command-guide.txt"} {
+		t.Run(file, func(t *testing.T) {
+			isolateTestStorage(t, t.TempDir())
+			old, err := os.ReadFile("testdata/agent-capabilities/" + file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			custom := string(old) + "\n我的项目专用说明\n"
+			if err := os.WriteFile(agentCapabilitiesPath(), []byte(custom), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := readAgentCapabilities()
+			if err != nil || got != custom {
+				t.Fatalf("edited guide overwritten: %v", err)
+			}
+		})
 	}
 }

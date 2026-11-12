@@ -6,12 +6,12 @@ import os
 import shlex
 import shutil
 
+from roami_agent.context.execution_brief import execution_guide, legacy_handoff
 from roami_agent.conversation.attachments import context_attachments, verified_attachment_inputs
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.http import SessionReport
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.replies.delivery_policy import DELIVERY_INSTRUCTIONS
 from roami_agent.replies.notifications import Notifications
 from roami_agent.storage.context_admission import (
     assert_context_admitted,
@@ -127,25 +127,15 @@ class SessionDispatches:
                 else ""
             )
             prompt = (
-                text
+                "# 任务：\n\n"
+                + text.strip()
+                + "\n\n# 执行上下文\n\n当前会话（稳定 ID）：`"
+                + canonical_session
+                + "`。会话操作使用此 ID；改名只改变展示名。\n\n"
+                + execution_guide()
                 + inputs
-                + (
-                    "\n\n[Roami task return channel]\n"
-                    "This request was dispatched from the user's Main conversation. Before your final reply, "
-                    "report the actual result to Main using this local CLI; replying only in this session does not notify Main. "
-                    "Write a UTF-8 JSON result file, then run:\n"
-                    + self.reply_command(did)
-                    + "\nReplace RESULT.json with the file you wrote. The summary is shown directly in Main. "
-                    + DELIVERY_INSTRUCTIONS
-                    + " Format: "
-                    '{"key":"final","status":"completed","summary":"Concise result in the user language, actual links/files, checks and limits"}. '
-                    "Use status=failed on failure; never report completed for unfinished work. "
-                    "For progress or a blocker, use a distinct stable key and status=progress or blocked; "
-                    "blocked may include question={prompt,options:[{label,description}]} with 2-4 real choices. "
-                    "A completed/failed report is final. Retry a failed callback with the SAME key and identical JSON; "
-                    "do not rerun the work just because its report failed. Include no credentials. "
-                    "If the CLI fails, retain the result file and state that Main has not acknowledged it.\n"
-                )
+                + "\n\n"
+                + legacy_handoff(self.reply_command(did))
             )
             db.execute(
                 "INSERT INTO session_dispatches(id,owner_id,request_key,request_digest,conversation_id,branch_id,turn_id,origin_message_id,session_id,prompt,created_ms,updated_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",

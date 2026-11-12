@@ -508,7 +508,9 @@ async def test_go_coding_execution_tmux_replay_cancel_and_unknown(
                 yield ModelEvent("text", "Coding result received in its original conversation.")
 
         async def verifier(task, result):
-            return result["exitCode"] == 0 and result["summary"].endswith("resume delegated task")
+            return result["exitCode"] == 0 and result["summary"].startswith(
+                "Answer: # 任务：\n\nresume delegated task\n\n# 开工准备\n\n"
+            )
 
         def runtime():
             return Runtime(
@@ -651,7 +653,24 @@ async def test_existing_legacy_codex_receives_main_message_through_real_go_cli(
     received = tmp_path / "received.txt"
     receiver = tmp_path / "receiver.py"
     receiver.write_text(
-        f'import pathlib,time\nprint("legacy ready",flush=True)\npathlib.Path({str(received)!r}).write_text(input())\ntime.sleep(15)\n'
+        "import codecs,os,pathlib,sys,time,tty\n"
+        "tty.setraw(sys.stdin.fileno())\n"
+        'print("\\x1b[?2004hlegacy ready",flush=True)\n'
+        'buffer,pasting="",False\n'
+        'decoder=codecs.getincrementaldecoder("utf-8")()\n'
+        "while True:\n"
+        "    char=decoder.decode(os.read(sys.stdin.fileno(),1))\n"
+        "    if not char: continue\n"
+        "    buffer+=char\n"
+        '    if buffer.endswith("\\x1b[200~"):\n'
+        "        buffer,pasting=buffer[:-6],True\n"
+        '    elif buffer.endswith("\\x1b[201~"):\n'
+        "        buffer,pasting=buffer[:-6],False\n"
+        '    elif char in "\\r\\n" and not pasting:\n'
+        f"        pathlib.Path({str(received)!r}).write_text("
+        'buffer.replace("\\r\\n","\\n").replace("\\r","\\n").strip())\n'
+        "        break\n"
+        "time.sleep(15)\n"
     )
     name = "2026-1018-1935-0001"
     for key in list(os.environ):
@@ -731,7 +750,10 @@ async def test_existing_legacy_codex_receives_main_message_through_real_go_cli(
         async with asyncio.timeout(3):
             while not received.exists():
                 await asyncio.sleep(0.05)
-        assert received.read_text() == "Fix the layout"
+        prompt = received.read_text()
+        assert prompt.startswith("# 任务：\n\nFix the layout\n\n")
+        assert f"当前会话（稳定 ID）：`{name}`" in prompt
+        assert "roami agent reply --dispatch " in prompt
         view = await runtime.conversations.messages("alice", c["id"])
         assert any(item["kind"] == "tool" for item in view["activities"])
         events = await runtime.conversations.events("alice", view["conversation"]["id"])

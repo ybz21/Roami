@@ -4,6 +4,14 @@ import { modelLabel } from './agent-models'
 import type { AgentActivityItem, AgentMessage } from './agent-protocol'
 const message = (id: string, created_ms: number, text = id): AgentMessage => ({ id, branch_id: 'b', role: 'assistant', seq: created_ms, created_ms, status: 'completed', content: { text } })
 const step = (id: string, startedMs: number): AgentActivityItem => ({ id, kind: 'tool', name: 'shell', state: 'running', anchorMessageId: 'empty', startedMs, updatedMs: startedMs })
+it('keeps reply review and delivery plumbing out of chat while preserving turn failures and task progress', () => {
+  const preview = { ...message('draft', 2, ''), content: { replyPreview: { text: 'Queued research', state: 'checking' as const, clipped: false } } }
+  const tools = ['reply', 'task_reply', 'task_queue_reply', 'ask_user'].flatMap(name => ['running', 'succeeded', 'failed', 'unknown'].map(state => ({ ...step(name + state, 3), name, state })))
+  const failure = { ...step('failure', 4), kind: 'turn' as const, name: 'reply', state: 'failed' }
+  const task = { ...step('task', 1), kind: 'task' as const, name: 'claude' }
+  expect(agentTimeline([preview], [...tools, failure, task]).map(entry => entry.id)).toEqual(['task', 'draft', 'failure'])
+  expect(agentTimeline([message('answer', 5)], tools).map(entry => entry.id)).toEqual(['answer'])
+})
 it('keeps actions between replies and later background actions after subsequent messages', () => {
   expect(agentTimeline([message('first', 1), message('empty', 2, ''), message('reply', 5)], [step('later-child', 8), step('command', 3)]).map(e => e.id)).toEqual(['first', 'command', 'reply', 'later-child'])
 })

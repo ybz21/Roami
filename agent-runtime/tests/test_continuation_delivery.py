@@ -101,8 +101,8 @@ async def test_merge_followup_delivers_only_user_words_and_keeps_task_title(stor
         executor.command = command
         await executor.run(current, run)
         prompt = submitted[0]["prompt"]
-        assert prompt.startswith("\n\n[Roami platform capabilities]")
-        assert "\n\n代码合入\n\n[Roami continuation handoff]" in prompt
+        assert prompt.startswith("# 任务：\n\n代码合入\n\n# 开工准备")
+        assert "\n\n# 续接交付\n" in prompt
         assert prompt.count("代码合入") == 1
         assert not any(
             text in prompt for text in ("Original detailed", "发版", "Release", "routing")
