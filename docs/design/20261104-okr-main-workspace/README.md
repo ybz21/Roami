@@ -309,3 +309,7 @@
 - [团队、协作场景与会话入口一致](team-projection.md)
 - [恢复时保留配置目录模式](provider-profile.md)
 - [Claude 首次模型失败与显式输入对账](claude-api-failure.md)
+
+## 2026-11-12：项目内创建与搭建
+
+[创建、聊天搭建与运行设计](../20261104-okr-studio-project-ownership/project-creation-flow.md) · [可点击原型](../20261104-okr-studio-project-ownership/project-creation-flow.html)。OKR 归入项目 Tab，角色与 Agent 分开配置，构建确认后显式运行；此稿取代旧的独立导航入口提案，历史验收保留。当前为设计，不恢复已停止项目。

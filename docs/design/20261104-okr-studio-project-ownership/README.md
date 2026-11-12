@@ -58,3 +58,7 @@ SQLite 采集层的 [源库实施与验收范围](sqlite-source-store.md) 单独
 ## 通用看板层级与宣传实例（2026-11-11）
 
 本轮需求合并到[原技术方案](implementation.md#看板分层的通用框架契约)和[原运行态文档](../20261104-okr-main-workspace/README.md#看板的分级与分层)：框架支持项目定义的分组、嵌套与叶子视图；[宣传工作量原型](../20261104-okr-main-workspace/workload-dashboard.html)仅是项目示例。通用导航不得写死X/B站、三个Tab或运营角色。当前原型与新增框架设计的实现/验收状态分开记录。
+
+## 2026-11-12：项目内创建与搭建
+
+[创建、聊天搭建与运行设计](project-creation-flow.md) · [可点击原型](project-creation-flow.html)。OKR 归入项目 Tab，角色与 Agent 分开配置，构建确认后显式运行；此稿取代旧的独立导航入口提案，历史验收保留。当前为设计，不恢复已停止项目。
