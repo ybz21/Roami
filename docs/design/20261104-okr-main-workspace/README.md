@@ -2,6 +2,8 @@
 
 [可视设计说明](index.html)
 
+[旧会话的有界原文读取](history-restoration.md)（#898）。
+
 [长期 Main 的聊天历史读取](history-loading.md)（#892）。
 
 [每个指标一张趋势卡片](metric-cards.md)（2026-11-05）

@@ -70,15 +70,13 @@ async def test_main_briefing_restores_old_records_without_losing_constraints_or_
         )
         first, restored = [json.loads(m["parts_json"]) for m in manifests]
         assert first["historyView"] == "main_briefing"
-        assert restored["historyView"] == "full"
+        assert restored["historyView"] == "main_briefing"
         fixed_tokens = (
             first["modelContext"]["instructionTokens"] + first["modelContext"]["toolTokens"]
         )
-        assert (
-            first["estimatedTokens"] - fixed_tokens
-            < (restored["estimatedTokens"] - fixed_tokens) / 5
-        )
-        assert first["requestBasis"] != restored["requestBasis"]
+        assert first["estimatedTokens"] < restored["estimatedTokens"]
+        assert restored["estimatedTokens"] - fixed_tokens < 5000
+        assert first["requestBasis"] == restored["requestBasis"]
         assert restored["modelContext"]["usageTokens"] != first["estimatedTokens"]
         assert rounds == 2
         with pytest.raises(DomainError, match="CONVERSATION_NOT_FOUND"):
@@ -281,7 +279,7 @@ async def test_task_result_read_does_not_restore_unrelated_main_history(store):
         assert observed[2]["oldTool"] and observed[2]["oldAnswer"] and observed[2]["currentResult"]
         assert initial["historyView"] == details["historyView"] == "main_briefing"
         assert details["suppressedHistoryCount"] > 0
-        assert restored["historyView"] == "full"
+        assert restored["historyView"] == "main_briefing"
         assert details["estimatedTokens"] < restored["estimatedTokens"]
         assert rounds == 3
     finally:

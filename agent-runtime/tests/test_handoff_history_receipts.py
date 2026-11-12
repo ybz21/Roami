@@ -244,7 +244,7 @@ async def test_multiple_handoffs_preserve_partial_request_coverage(store):
         await runtime.close()
 
 
-async def test_explicit_history_read_restores_original_handoff_protocol(store):
+async def test_explicit_history_read_exposes_original_handoff_as_evidence(store):
     rounds = 0
 
     class Main:
@@ -265,7 +265,7 @@ async def test_explicit_history_read_restores_original_handoff_protocol(store):
             else:
                 assert rounds == 3
                 assert "FULL_EXECUTOR_BRIEF" in str(messages)
-                assert "Historical task handoff (" not in str(messages)
+                assert "Historical task handoff (" in str(messages)
                 assert any(m.get("tool_calls") for m in messages)
                 assert any(m["role"] == "tool" and "acceptedOnly" in m["content"] for m in messages)
                 yield ModelEvent("text", "The original receipt is available.")

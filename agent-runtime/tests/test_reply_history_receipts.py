@@ -219,7 +219,7 @@ async def test_explicit_history_read_restores_original_answer_without_receipt_su
                 yield ModelEvent("text", "LATEST_REPLY")
             else:
                 read_rounds += 1
-                captured.append(messages)
+                captured.append(json.loads(json.dumps(messages)))
                 if read_rounds == 1:
                     yield ModelEvent("tool", call("conversation_history", {}))
                 else:
@@ -237,7 +237,8 @@ async def test_explicit_history_read_restores_original_answer_without_receipt_su
         assert read_rounds == 2
         assert any(m["content"].startswith(PREFIX) for m in captured[0])
         assert "OLDER_EXACT_VALUE" not in str(captured[0])
-        assert not any(m["content"].startswith(PREFIX) for m in captured[1])
-        assert {"role": "assistant", "content": "OLDER_EXACT_VALUE"} in captured[1]
+        assert any(m["content"].startswith(PREFIX) for m in captured[1])
+        assert "OLDER_EXACT_VALUE" in captured[1][-1]["content"]
+        assert captured[1][-1]["role"] == "tool"
     finally:
         await runtime.close()

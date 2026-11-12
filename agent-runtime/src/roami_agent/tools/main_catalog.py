@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.conversation.history_read import read_history
 from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
@@ -114,25 +115,24 @@ def register_main_tools(
     )
 
     async def conversation_history(args, binding):
-        turn = await tasks.db.call(
-            lambda db: row(
-                db,
-                "SELECT t.id FROM turns t JOIN conversations c ON c.id=t.conversation_id "
-                "WHERE t.id=? AND c.id=? AND c.owner_id=? AND c.deleted_ms IS NULL",
-                (binding["turnId"], binding["conversation"], binding["owner"]),
-            )
-        )
-        if not turn:
-            raise DomainError("CONVERSATION_NOT_FOUND", 404)
-        return {"historyView": "full", "restoredForCurrentTurn": True}
+        return await tasks.db.call(lambda db: read_history(db, binding, args))
 
     registry.add(
         Tool(
             "conversation_history",
-            "Restore this conversation's earlier assistant and tool records for this turn when a reference, "
-            "decision, exact quote or result is missing. No extra model rewrite or mutation. Forgotten "
+            "Read a bounded page of this turn's earlier conversation evidence when a reference, "
+            "exact quote or result is missing. Follow olderCursor with before; continue a long "
+            "record with messageId/nextOffset as offset. Content is chunked JSON, not necessarily "
+            "a complete record. No whole-history restoration or extra model call. Forgotten "
             "content stays excluded. Do not read history for a self-contained question.",
-            object_schema({}),
+            object_schema(
+                {
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                    "before": {"type": "string", "minLength": 1},
+                    "messageId": {"type": "string", "minLength": 1},
+                    "offset": {"type": "integer", "minimum": 0},
+                }
+            ),
             conversation_history,
             main=True,
         )
