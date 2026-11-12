@@ -96,6 +96,32 @@ describe('browser mirror recovery', () => {
     stream.close()
   })
 
+  it('waits for pending navigation without reconnecting and resumes the frame deadline after commit', async () => {
+    const { sources, open, stream } = fixture()
+    sources[0].onopen()
+    sources[0].onmessage('{"type":"navigation","loading":true}')
+    for (let i = 0; i < 35; i++) {
+      sources[0].onmessage('{"type":"pong","t":0}')
+      await vi.advanceTimersByTimeAsync(1000)
+    }
+    expect(open).toHaveBeenCalledOnce()
+    sources[0].onmessage('{"type":"navigation","loading":false}')
+    for (let i = 0; i < 16; i++) {
+      sources[0].onmessage('{"type":"pong","t":0}')
+      await vi.advanceTimersByTimeAsync(1000)
+    }
+    expect(open).toHaveBeenCalledTimes(2)
+    stream.close()
+  })
+
+  it('still reconnects a silent transport during navigation', async () => {
+    const { sources, open, stream } = fixture()
+    sources[0].onmessage('{"type":"navigation","loading":true}')
+    await vi.advanceTimersByTimeAsync(11000)
+    expect(open).toHaveBeenCalledTimes(2)
+    stream.close()
+  })
+
   it('recovers a silent channel and releases failed image frames', async () => {
     const { sources, open, image, stream, onFrame } = fixture()
     sources[0].onmessage(frame(1)); image.dispatchEvent(new Event('error'))

@@ -160,3 +160,35 @@ func TestRecoveryBindsOriginsToCreatedTargetsDespiteDuplicateURLs(t *testing.T) 
 		t.Fatal("mixed origins by URL order")
 	}
 }
+
+func TestRecoveryDoesNotRestartChromeDuringMainFrameNavigation(t *testing.T) {
+	for _, frameID := range []string{"tab", "child"} {
+		t.Run(frameID, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+				for {
+					var command struct {
+						Method string `json:"method"`
+					}
+					if conn.ReadJSON(&command) != nil {
+						return
+					}
+					if command.Method == "Page.enable" {
+						_ = conn.WriteJSON(map[string]any{"method": "Page.frameStartedNavigating", "params": map[string]any{"frameId": frameID}})
+					}
+				}
+			}))
+			defer server.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			got := pageResponds(ctx, target{ID: "tab", WebSocketDebuggerURL: "ws" + strings.TrimPrefix(server.URL, "http")})
+			if got != (frameID == "tab") {
+				t.Fatalf("navigation frame %q: responds=%v", frameID, got)
+			}
+		})
+	}
+}

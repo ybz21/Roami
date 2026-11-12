@@ -2582,6 +2582,7 @@ const enUS = {
   'browser.launchFailed': 'Cannot reach the mirrored Chrome',
   'browser.waitingFrame': 'Restoring browser view…',
   'browser.pageUnresponsive': 'This tab has stopped responding',
+  'browser.navigationTimeout': 'Page loading timed out. Check your connection and try again.',
   'browser.reopenTab': 'Reopen this page',
   'browser.home': 'Home',
   'browser.urlPlaceholder': 'Enter a URL and press Enter, e.g. example.com',

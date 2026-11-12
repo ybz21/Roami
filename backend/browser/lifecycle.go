@@ -310,16 +310,27 @@ func pageResponds(ctx context.Context, page target) bool {
 	if conn.WriteJSON(map[string]any{"id": 1, "method": "Runtime.evaluate", "params": map[string]any{"expression": "document.readyState", "returnByValue": true}}) != nil {
 		return false
 	}
+	if conn.WriteJSON(map[string]any{"id": 2, "method": "Page.enable"}) != nil {
+		return false
+	}
 	for {
 		var reply struct {
-			ID    int             `json:"id"`
-			Error json.RawMessage `json:"error"`
+			ID     int             `json:"id"`
+			Method string          `json:"method"`
+			Error  json.RawMessage `json:"error"`
+			Params struct {
+				FrameID string `json:"frameId"`
+			} `json:"params"`
 		}
 		if conn.ReadJSON(&reply) != nil {
 			return false
 		}
 		if reply.ID == 1 {
 			return len(reply.Error) == 0
+		}
+		// Waiting for a navigation context is not evidence that the whole browser is hung.
+		if reply.Method == "Page.frameStartedNavigating" && page.ID != "" && reply.Params.FrameID == page.ID {
+			return true
 		}
 	}
 }
