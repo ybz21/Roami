@@ -10,6 +10,7 @@ import (
 const usageSourceSQL = `CASE WHEN substr(role,1,4)='rsi_' OR substr(session_id,1,4)='rsi-' THEN 'rsi' ELSE 'other' END`
 
 type UsageGroup struct {
+	SourceID     string `json:"sourceId"`
 	AgentKind    string `json:"agentKind"`
 	Source       string `json:"source"`
 	Day          string `json:"day"`
@@ -28,30 +29,32 @@ type UsageGroup struct {
 }
 
 type CallRecord struct {
-	UpstreamStatus  int     `json:"upstreamHttpStatus"`
-	UpstreamRequest string  `json:"upstreamRequestId,omitempty"`
-	PriceStatus     string  `json:"priceStatus"`
-	AgentKind       string  `json:"agentKind"`
-	KeyID           string  `json:"keyId"`
-	SourceID        string  `json:"sourceId"`
-	RouteID         string  `json:"routeId"`
-	Source          string  `json:"source"`
-	ID              string  `json:"id"`
-	Day             string  `json:"day"`
-	Role            string  `json:"role"`
-	Model           string  `json:"model"`
-	Currency        string  `json:"currency"`
-	State           string  `json:"state"`
-	Started         int64   `json:"startedMs"`
-	Input           *int64  `json:"inputTokens"`
-	Output          *int64  `json:"outputTokens"`
-	Cached          *int64  `json:"cacheReadTokens"`
-	Cost            *string `json:"cost"`
-	Status          int     `json:"httpStatus"`
-	Error           string  `json:"errorCode"`
-	Reconciliation  string  `json:"reconciliation"`
-	Session         string  `json:"sessionId"`
-	Request         string  `json:"requestId"`
+	Price           *ModelPricing `json:"price,omitempty"`
+	Finished        *int64        `json:"finishedMs,omitempty"`
+	UpstreamStatus  int           `json:"upstreamHttpStatus"`
+	UpstreamRequest string        `json:"upstreamRequestId,omitempty"`
+	PriceStatus     string        `json:"priceStatus"`
+	AgentKind       string        `json:"agentKind"`
+	KeyID           string        `json:"keyId"`
+	SourceID        string        `json:"sourceId"`
+	RouteID         string        `json:"routeId"`
+	Source          string        `json:"source"`
+	ID              string        `json:"id"`
+	Day             string        `json:"day"`
+	Role            string        `json:"role"`
+	Model           string        `json:"model"`
+	Currency        string        `json:"currency"`
+	State           string        `json:"state"`
+	Started         int64         `json:"startedMs"`
+	Input           *int64        `json:"inputTokens"`
+	Output          *int64        `json:"outputTokens"`
+	Cached          *int64        `json:"cacheReadTokens"`
+	Cost            *string       `json:"cost"`
+	Status          int           `json:"httpStatus"`
+	Error           string        `json:"errorCode"`
+	Reconciliation  string        `json:"reconciliation"`
+	Session         string        `json:"sessionId"`
+	Request         string        `json:"requestId"`
 }
 
 type Statistics struct {

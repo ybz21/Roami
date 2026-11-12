@@ -7,6 +7,7 @@
 | 压缩状态反馈 | [20261112-compact-status](20261112-compact-status/README.md) | 状态行反馈、按需读取摘要与手机全屏详情，修复重复清空造成的闪烁 |
 | 浏览器导航等待与卡死检测 | [20261112-browser-navigation-recovery](20261112-browser-navigation-recovery/README.md) | 慢导航保留连接、超时恢复、新标签回执与桌面/手机验收 |
 | 首页委派任务与对话排版 | [20261112-home-delegated-activity](20261112-home-delegated-activity/README.md) | 委派工具步骤收在详情；正文阅读排版、紧凑输入区与整行任务导航 |
+| 大模型用量、聚合与监控 | [20261112-model-usage-details](20261112-model-usage-details/README.md) | 概况 / 审计、源定价、九种路由策略与 24 小时滚动监控 |
 | 派生任务提示词与 Main 回复 | [20261111-derived-task-prompts](20261111-derived-task-prompts/README.md) | Markdown 任务置顶、旧执行校验兼容与回复交付记录收拢 |
 | 技能市场失败恢复 | [20261111-skill-market-recovery](20261111-skill-market-recovery/README.md) | 原请求重试、错误原因与桌面/手机验收 |
 | 设置智能体入口整理 | [20261111-settings-agent-navigation](20261111-settings-agent-navigation/README.md) | 去掉旧模型入口、统一记忆迁入 Roami、旧链接兼容与桌面/真机验收 |

@@ -70,6 +70,18 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 		return nil, err
 	}
 	handler := NewHandler(ledger)
+	monitor, err := openMonitorStore(filepath.Join(paths.Database, "models", "monitor.ring"), monitorSlots, time.Now)
+	if err != nil {
+		listener.Close()
+		return nil, err
+	}
+	handler.Monitor = monitor
+	monitorOwned := false
+	defer func() {
+		if !monitorOwned {
+			_ = monitor.Close()
+		}
+	}()
 	catalog, err := openCatalog(ledger)
 	if err != nil {
 		listener.Close()
@@ -107,20 +119,28 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 	maintenanceStop, maintenanceDone := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(maintenanceDone)
-		ticker := time.NewTicker(time.Hour)
+		ticker := time.NewTicker(time.Minute)
+		lastCompact := time.Now()
 		defer ticker.Stop()
 		for {
 			select {
 			case <-maintenanceStop:
 				return
 			case <-ticker.C:
-				if err := ledger.Compact(); err != nil {
-					log.Printf("model gateway daily retention: %v", err)
+				if err := monitor.Maintain(); err != nil {
+					log.Printf("model gateway monitor maintenance failed")
+				}
+				if time.Since(lastCompact) >= time.Hour {
+					if err := ledger.Compact(); err != nil {
+						log.Printf("model gateway daily retention: %v", err)
+					}
+					lastCompact = time.Now()
 				}
 			}
 		}
 	}()
 	locked = true
+	monitorOwned = true
 	var once sync.Once
 	return func() {
 		once.Do(func() {
@@ -135,6 +155,7 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 			<-done
 			// Close cancels requests; wait for their deferred ledger writes before unlocking.
 			handler.wait.Wait()
+			_ = monitor.Close()
 			plugins.Close()
 			handler.Client.Transport.(*http.Transport).CloseIdleConnections()
 			_ = unix.Flock(fd, unix.LOCK_UN)

@@ -1,0 +1,182 @@
+{
+  "passed": true,
+  "layouts": [
+    {
+      "tab": "模型与连接",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "概况",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "审计",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "价格与记账",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "网关接入",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "语音模型",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "模型与连接",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "概况",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "审计",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "价格与记账",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "网关接入",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "语音模型",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "模型与连接",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "概况",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "审计",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "价格与记账",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "网关接入",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "语音模型",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "模型与连接",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "概况",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "审计",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "价格与记账",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "网关接入",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "tab": "语音模型",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "errors": [],
+  "checks": [
+    "connection edit/search",
+    "drafts across all tabs",
+    "default and model prices",
+    "key create and toggle",
+    "speech provider and sample recognition",
+    "all six pages in Chinese and English"
+  ]
+}

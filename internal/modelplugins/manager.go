@@ -23,15 +23,19 @@ var packageID = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var sourceID = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type Model struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	NPM       string `json:"npm"`
-	URL       string `json:"url"`
-	APIID     string `json:"apiId"`
-	Context   int    `json:"context"`
-	Output    int    `json:"output"`
-	Reasoning bool   `json:"reasoning"`
-	Image     bool   `json:"image"`
+	Free      bool       `json:"free"`
+	Tools     bool       `json:"tools"`
+	Rate      float64    `json:"rate"`
+	Cost      *ModelCost `json:"cost,omitempty"`
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	NPM       string     `json:"npm"`
+	URL       string     `json:"url"`
+	APIID     string     `json:"apiId"`
+	Context   int        `json:"context"`
+	Output    int        `json:"output"`
+	Reasoning bool       `json:"reasoning"`
+	Image     bool       `json:"image"`
 }
 type AuthMethod struct {
 	Keyless     bool              `json:"keyless,omitempty"`
@@ -40,7 +44,19 @@ type AuthMethod struct {
 	Type        string            `json:"type"`
 	Label       string            `json:"label"`
 }
+type ModelCost struct {
+	Input     float64 `json:"input"`
+	Output    float64 `json:"output"`
+	CacheRead float64 `json:"cache_read"`
+}
+type Account struct {
+	Key    string   `json:"key"`
+	Type   string   `json:"type"`
+	Models []string `json:"models"`
+}
 type Provider struct {
+	Accounts       []Account       `json:"accounts"`
+	Usage          bool            `json:"usage"`
 	ID             string          `json:"id"`
 	Name           string          `json:"name"`
 	NPM            string          `json:"npm"`
@@ -435,6 +451,9 @@ func ModelProtocol(model Model, provider Provider) string {
 	}
 }
 func (m *Manager) Fetch(ctx context.Context, s Source, model Model, provider Provider, request *http.Request, body []byte) (*http.Response, error) {
+	return m.FetchAccount(ctx, s, model, provider, s.ProviderID, request, body)
+}
+func (m *Manager) FetchAccount(ctx context.Context, s Source, model Model, provider Provider, account string, request *http.Request, body []byte) (*http.Response, error) {
 	if DesktopUnavailable(s.ProviderID) {
 		return nil, errors.New("MODEL_PLUGIN_DESKTOP_UNAVAILABLE")
 	}
@@ -456,7 +475,7 @@ func (m *Manager) Fetch(ctx context.Context, s Source, model Model, provider Pro
 	for key := range request.Header {
 		headers[key] = request.Header.Get(key)
 	}
-	response, err := w.host.Fetch(ctx, map[string]any{"provider": s.ProviderID, "account": s.ProviderID, "model": model.ID, "npm": model.NPM, "url": request.URL.String(), "method": request.Method, "headers": headers, "body": base64.StdEncoding.EncodeToString(body)})
+	response, err := w.host.Fetch(ctx, map[string]any{"provider": s.ProviderID, "account": account, "model": model.ID, "npm": model.NPM, "url": request.URL.String(), "method": request.Method, "headers": headers, "body": base64.StdEncoding.EncodeToString(body)})
 	if provider.MaxConcurrency == 1 {
 		if err != nil {
 			<-w.gate

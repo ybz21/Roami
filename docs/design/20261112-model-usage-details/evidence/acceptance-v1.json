@@ -1,0 +1,282 @@
+{
+  "desktopLayout": [
+    {
+      "width": 1280,
+      "collapsed": false,
+      "size": "large",
+      "documentWidth": 1280,
+      "scrollWidth": 1280,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 256,
+        "width": 1024,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1031,
+      "visibleGroups": 4
+    },
+    {
+      "width": 1280,
+      "collapsed": true,
+      "size": "large",
+      "documentWidth": 1280,
+      "scrollWidth": 1280,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 128,
+        "width": 1152,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    },
+    {
+      "width": 1920,
+      "collapsed": false,
+      "size": "large",
+      "documentWidth": 1920,
+      "scrollWidth": 1920,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 256,
+        "width": 1664,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    },
+    {
+      "width": 1920,
+      "collapsed": true,
+      "size": "large",
+      "documentWidth": 1920,
+      "scrollWidth": 1920,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 128,
+        "width": 1792,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    },
+    {
+      "width": 2560,
+      "collapsed": false,
+      "size": "large",
+      "documentWidth": 2560,
+      "scrollWidth": 2560,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 256,
+        "width": 2304,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    },
+    {
+      "width": 2560,
+      "collapsed": true,
+      "size": "large",
+      "documentWidth": 2560,
+      "scrollWidth": 2560,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 128,
+        "width": 2432,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    },
+    {
+      "width": 3440,
+      "collapsed": false,
+      "size": "large",
+      "documentWidth": 3440,
+      "scrollWidth": 3440,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 256,
+        "width": 3184,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    },
+    {
+      "width": 3440,
+      "collapsed": true,
+      "size": "large",
+      "documentWidth": 3440,
+      "scrollWidth": 3440,
+      "documentHeight": 1080,
+      "scrollHeight": 1080,
+      "main": {
+        "x": 128,
+        "width": 3312,
+        "height": 968
+      },
+      "contentHeight": 836,
+      "contentScrollHeight": 1012,
+      "visibleGroups": 4
+    }
+  ],
+  "desktopInteractions": {
+    "passed": true,
+    "paneBounds": [
+      {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "pane": {
+          "x": 951.6875,
+          "width": 328.3125,
+          "right": 1280
+        },
+        "main": {
+          "x": 256,
+          "width": 695.6875,
+          "right": 951.6875
+        }
+      },
+      {
+        "width": 1920,
+        "scrollWidth": 1920,
+        "pane": {
+          "x": 1480,
+          "width": 440,
+          "right": 1920
+        },
+        "main": {
+          "x": 256,
+          "width": 1224,
+          "right": 1480
+        }
+      },
+      {
+        "width": 2560,
+        "scrollWidth": 2560,
+        "pane": {
+          "x": 2120,
+          "width": 440,
+          "right": 2560
+        },
+        "main": {
+          "x": 256,
+          "width": 1864,
+          "right": 2120
+        }
+      },
+      {
+        "width": 3440,
+        "scrollWidth": 3440,
+        "pane": {
+          "x": 3000,
+          "width": 440,
+          "right": 3440
+        },
+        "main": {
+          "x": 256,
+          "width": 2744,
+          "right": 3000
+        }
+      }
+    ],
+    "errors": [],
+    "apiRequests": [],
+    "checks": [
+      "agent/source/model groups",
+      "metric selection",
+      "source filter",
+      "request drilldown",
+      "request detail",
+      "desktop pane bounds at 4 widths",
+      "status filter",
+      "empty result without pagination",
+      "invalid date range",
+      "English",
+      "dark theme",
+      "limits tab",
+      "no live API calls"
+    ]
+  },
+  "android": {
+    "passed": true,
+    "device": "Redmi Note 8 / 216d6a43",
+    "dimensions": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "size": "compact",
+      "pointer": "coarse",
+      "topbar": 60,
+      "bottom": 84,
+      "scrollContainers": [
+        "content-scroll"
+      ]
+    },
+    "filterControlHeights": [
+      44,
+      44,
+      44,
+      44
+    ],
+    "realTouchScroll": {
+      "before": 0,
+      "after": 529.0908813476562,
+      "restored": 529.0908813476562
+    },
+    "detail": {
+      "width": 392.727294921875,
+      "x": 0,
+      "viewport": 392,
+      "visibleBars": 1,
+      "scrollers": [
+        {
+          "height": 622,
+          "scrollHeight": 823
+        }
+      ],
+      "backLabel": "返回用量明细"
+    },
+    "english": {
+      "width": 392,
+      "scrollWidth": 392
+    },
+    "checks": [
+      "top and bottom bars",
+      "no document scrolling",
+      "coarse pointer",
+      "filter expand and collapse",
+      "request tab by touch",
+      "content scroll by touch",
+      "request open by touch",
+      "full-screen detail with one header",
+      "back by touch with scroll preserved",
+      "English bounds",
+      "dark theme"
+    ]
+  },
+  "archive": {
+    "passed": true,
+    "archivedDate": "2026-11-06",
+    "summaryCalls": 25,
+    "retainedRequestRows": 0
+  }
+}

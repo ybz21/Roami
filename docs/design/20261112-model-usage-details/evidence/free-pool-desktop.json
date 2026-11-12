@@ -1,0 +1,106 @@
+{
+  "passed": true,
+  "layouts": [
+    {
+      "page": "模型与连接",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "聚合",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "价格与记账",
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "模型与连接",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "聚合",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "价格与记账",
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "模型与连接",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "聚合",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "价格与记账",
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "模型与连接",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "聚合",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "page": "价格与记账",
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "errors": [],
+  "apiRequests": [],
+  "checks": [
+    "priority scheduling",
+    "round robin",
+    "rate-limit cooldown and recovery",
+    "all candidates exhausted: no paid fallback",
+    "no retries after output starts",
+    "paid and unconfirmed eligibility gates",
+    "plan allowance opt-in and independent credits",
+    "source default pricing",
+    "per-model overrides win",
+    "zero prices are not automatic free eligibility",
+    "new pool and duplicate ID validation",
+    "drafts across tabs",
+    "Chinese and English"
+  ]
+}

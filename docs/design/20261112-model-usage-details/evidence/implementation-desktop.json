@@ -1,0 +1,84 @@
+{
+  "passed": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainWidth": 1112,
+      "contentHeight": 906
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainWidth": 1752,
+      "contentHeight": 906
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainWidth": 2392,
+      "contentHeight": 906
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainWidth": 3272,
+      "contentHeight": 906
+    }
+  ],
+  "panels": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "mainRight": 946.40625,
+      "panelLeft": 946.40625,
+      "panelRight": 1280
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "mainRight": 1480,
+      "panelLeft": 1480,
+      "panelRight": 1920
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "mainRight": 2120,
+      "panelLeft": 2120,
+      "panelRight": 2560
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "mainRight": 3000,
+      "panelLeft": 3000,
+      "panelRight": 3440
+    }
+  ],
+  "errors": [],
+  "checks": [
+    "real gateway API",
+    "limit save",
+    "source summary and audit drilldown",
+    "server pagination",
+    "search input stability",
+    "frozen price snapshot",
+    "unknown receipt remains unknown",
+    "global today independent of source filter",
+    "navigation and state preservation",
+    "remaining budget stays unconfirmed with unknown expenses",
+    "stored duration displayed",
+    "past-day drilldown displays the explicit custom date"
+  ],
+  "requestCount": 13,
+  "pastDay": "2026-11-06"
+}
