@@ -49,6 +49,9 @@ func main() {
 
 	serverMode := len(os.Args) > 1 && os.Args[1] == "server"
 	if serverMode {
+		if handled, code := showCLIHelp(os.Args[1:]); handled {
+			os.Exit(code)
+		}
 		os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
 	}
 	if !serverMode {
@@ -63,6 +66,7 @@ func main() {
 	tlsFlag := flag.Bool("tls", false, "强制启用自签 HTTPS（覆盖配置里的 web.tls=false）")
 	tlsCertFlag := flag.String("tls-cert", "", "TLS 证书路径（缺省 <home>/tls/cert.pem，缺失则自动生成）")
 	tlsKeyFlag := flag.String("tls-key", "", "TLS 私钥路径（缺省 <home>/tls/key.pem，缺失则自动生成）")
+	flag.Usage = printServerHelp
 	flag.Parse()
 
 	// 迁移旧数据目录（~/.roam、~/.ttmux、~/.local/share/ttmux → ~/.roami），随后加载配置。

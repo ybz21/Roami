@@ -158,15 +158,15 @@ func transcribeSpeech(connection *apiConnection, audio []byte, filename string) 
 }
 
 func runSpeech(args []string) int {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("roami speech transcribe --file AUDIO.wav --file-root ROOT --expected-file-sha256 SHA [--server URL] [--json]\nUses the existing Node login and configured speech service. Uploads the selected WAV once; never overrides models or retries automatically. JSON includes exact response evidence and the input digest. Transcription is not content approval.")
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		_ = groupHelpPage("speech").Render(os.Stdout)
 		return 0
 	}
 	if args[0] != "transcribe" {
 		fmt.Fprintln(os.Stderr, "unknown speech command; run roami speech help")
 		return 2
 	}
-	fs := flag.NewFlagSet("speech transcribe", flag.ContinueOnError)
+	fs := newCommandFlags("speech transcribe")
 	file := fs.String("file", "", "selected WAV file")
 	root := fs.String("file-root", "", "allowed local audio directory")
 	expected := fs.String("expected-file-sha256", "", "expected audio digest")

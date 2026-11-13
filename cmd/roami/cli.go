@@ -5,6 +5,7 @@ import (
 	"github.com/ybz21/Roami/backend/browser/automation"
 	"github.com/ybz21/Roami/internal/cli"
 	"github.com/ybz21/Roami/internal/cli/completion"
+	clihelp "github.com/ybz21/Roami/internal/cli/help"
 	swarmcommand "github.com/ybz21/Roami/internal/cli/swarm"
 	"github.com/ybz21/Roami/internal/plugin"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
@@ -119,11 +120,27 @@ func runSwarm(args []string) int {
 }
 
 func runSessionEngine(args []string) int {
+	explicitHelp := len(args) > 1 && args[0] == "help"
+	if len(args) > 1 && args[0] == "help" {
+		args = append(args[1:], "--help")
+	}
+	if len(args) > 0 && args[0] == "plugin" {
+		if handled, code := showCLIHelp(args); handled {
+			return code
+		}
+	}
 	if len(args) > 0 && args[0] == "swarm" {
+		if commandFamilyHelp(args) {
+			return 0
+		}
 		return runSwarm(args[1:])
 	}
 	if app.ShowHelp(args, os.Stdout) {
 		return 0
+	}
+	if explicitHelp || len(args) == 2 && clihelp.IsHelp(args[1]) && args[0] != "sp" && args[0] != "split" {
+		fmt.Fprintln(os.Stderr, "未知会话帮助主题；使用 roami session --help 查看命令")
+		return 2
 	}
 	needsStorage := len(args) == 0 || (args[0] != "help" && args[0] != "--help" && args[0] != "-h" && args[0] != "--version" && args[0] != "-v")
 	if needsStorage {
@@ -155,6 +172,9 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 	if len(args) == 0 {
 		return false, 0
 	}
+	if handled, code := showCLIHelp(args); handled {
+		return true, code
+	}
 	if commandFamilyHelp(args) {
 		return true, 0
 	}
@@ -167,7 +187,7 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 		if len(rest) > 0 {
 			switch rest[0] {
 			case "session":
-				return true, runSession([]string{"help"})
+				return true, runSession(append([]string{"help"}, rest[1:]...))
 			case "swarm":
 				return true, runSwarm(append([]string{"help"}, rest[1:]...))
 			case "chrome":
@@ -237,7 +257,7 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 		fmt.Fprintf(os.Stderr, "未知命令 %q；使用 roami help 查看命令\n", word)
 		return true, 2
 	}
-	if len(rest) == 0 || rest[0] == "help" || rest[0] == "--help" {
+	if len(rest) == 0 || clihelp.IsHelp(rest[0]) {
 		printGroup(*p)
 		return true, 0
 	}
@@ -257,6 +277,9 @@ func legacySessionCommand(word string) bool {
 }
 
 func runChrome(args []string) int {
+	if handled, code := showCLIHelp(append([]string{"chrome"}, args...)); handled {
+		return code
+	}
 	if len(args) == 2 && args[1] == "--help" {
 		args = []string{"--help"}
 	}
@@ -295,27 +318,14 @@ func forward(bin string, args []string) int {
 	return 0
 }
 
-func printHelp(_ []pluginInfo) {
-	fmt.Printf("roami %s — 统一命令入口\n\n", displayVersion())
-	fmt.Println("  session <命令>     会话、窗格与环境")
-	fmt.Println("  swarm <命令>       Main 蜂群：协作、群聊、看板与受管任务")
-	fmt.Println("  chrome <命令>      浏览器自动化")
-	fmt.Println("  adb [参数...]      Android 设备操作（转发系统 ADB）")
-	fmt.Println("  speech <command>  transcribe: configured Node speech service")
-	fmt.Println("  project <命令>     ls / show / sessions / create / prefs / activity / remove")
-	fmt.Println("  agent <命令>       Python Agent 运行时、对话、任务回报与主动消息")
-	fmt.Println("  auth <命令>        login / logout / status")
-	fmt.Println("  db <命令>          status / migrate / backup")
-	fmt.Println("  plugin <命令>      插件管理；也可 roami <插件名> <命令>")
-	fmt.Println("  server [flags]     启动 Web 服务（无参和旧 flags 继续兼容）")
-	fmt.Println("  help / version / completion")
-}
+func printHelp(_ []pluginInfo) { _ = groupHelpPage("").Render(os.Stdout) }
 
 func printGroup(p pluginInfo) {
-	fmt.Printf("  %s — %s\n\n", p.Name, firstLine(p.Summary))
-	for _, c := range p.Commands {
-		fmt.Printf("    roami %s %s\n", p.Name, c)
+	var rows []clihelp.Entry
+	for _, command := range p.Commands {
+		rows = append(rows, clihelp.Entry{Name: command})
 	}
+	_ = (clihelp.Page{Command: "roami " + p.Name, Summary: firstLine(p.Summary), Usage: []string{"roami " + p.Name + " <命令> [参数]"}, Sections: []clihelp.Section{{Title: "命令", Entries: rows}}, More: "roami plugin info " + p.ID}).Render(os.Stdout)
 }
 
 // displayVersion 保证只有一个 v：注入的 tag 本身就带（v0.1.0-rc.2-…），

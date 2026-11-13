@@ -18,7 +18,7 @@ import (
 
 func runAgentExecution(args []string) int {
 	if len(args) > 0 && args[0] == "context" {
-		flags := flag.NewFlagSet("execution context", flag.ContinueOnError)
+		flags := newCommandFlags("agent execution context")
 		flags.Bool("json", false, "return the read-only native execution observation")
 		if err := flags.Parse(args[1:]); err != nil {
 			if err == flag.ErrHelp {
@@ -42,9 +42,12 @@ func runAgentExecution(args []string) int {
 		return 0
 	}
 	if len(args) > 0 && args[0] == "catalog" {
-		flags := flag.NewFlagSet("execution catalog", flag.ContinueOnError)
+		flags := newCommandFlags("agent execution catalog")
 		commands := flags.String("commands", "", "comma-separated executable names to observe without running")
 		if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
+			if err == flag.ErrHelp {
+				return 0
+			}
 			return 2
 		}
 		catalog := agentexecution.DiscoverExecutors()
@@ -61,7 +64,7 @@ func runAgentExecution(args []string) int {
 		return 0
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent execution catalog (read-only installation and tracking discovery; auth/usage unknown)\nroami agent execution context [--json] (read-only native run; no publication authority)\nroami agent execution launch --file SPEC.json\nroami agent execution send-message --file - (delivery receipt only)\nroami agent execution status|cancel|close|cleanup --key LAUNCH_KEY\nroami agent execution hold --file - (native workspace lease protocol)\nroami agent execution reconcile-native --key LAUNCH_KEY --file -\nroami agent execution reconcile-session --key LAUNCH_KEY (verified Codex/Claude changed-input terminal evidence; marks execution failed)\nroami agent execution hook-config --executor codex|claude\nroami agent execution event --executor codex --file -\nroami agent execution notify --executor codex --chain PATH --notification JSON\n  launch with persistent=true retains the interactive coding session until explicit close; legacy launch creates a one-shot session, or continues a sessionId with verified lifecycle callbacks; projectId prepares a fresh project worktree; projectId + workspaceId reuses a registered workspace without fetch/reset")
+		_ = groupHelpPage("agent execution").Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
@@ -69,7 +72,7 @@ func runAgentExecution(args []string) int {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
-	fs := flag.NewFlagSet("agent execution "+sub, flag.ContinueOnError)
+	fs := newCommandFlags("agent execution " + sub)
 	file := fs.String("file", "", "execution spec, or - for stdin")
 	key := fs.String("key", "", "stable launch key")
 	executor := fs.String("executor", "", "lifecycle callback provider")
@@ -77,6 +80,9 @@ func runAgentExecution(args []string) int {
 	tmuxBin := fs.String("tmux-bin", "", "callback tmux executable")
 	notification := fs.String("notification", "", "provider completion JSON argument")
 	if err := fs.Parse(args[1:]); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {
