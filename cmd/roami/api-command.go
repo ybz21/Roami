@@ -136,16 +136,11 @@ func runAPICommand(group string, args []string) int {
 		return runProjectOKR(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Printf("roami %s ", group)
-		if group == "auth" {
-			fmt.Println("login|logout|status [--server URL] [--stdin] [--json]")
-		} else {
-			fmt.Println("ls|show|sessions|create|prefs|activity|remove|okr [--server URL] [--json]")
-		}
+		_ = groupHelpPage(group).Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
-	fs := flag.NewFlagSet(group+" "+sub, flag.ContinueOnError)
+	fs := newCommandFlags(group + " " + sub)
 	server := fs.String("server", "", "Roami 服务地址")
 	asJSON := fs.Bool("json", false, "JSON 输出")
 	stdin := fs.Bool("stdin", false, "从 stdin 读取登录 JSON")

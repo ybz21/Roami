@@ -19,10 +19,10 @@ func runDatabase(args []string) int {
 		args = args[1:]
 	}
 	if sub == "help" || sub == "--help" || sub == "-h" {
-		fmt.Println("roami db status|migrate|backup|restore [--json]\n  migrate --layout --dry-run | --layout --offline | --recover\n  restore <backup-set>: restore into an empty instance")
+		_ = groupHelpPage("db").Render(os.Stdout)
 		return 0
 	}
-	fs := flag.NewFlagSet("db "+sub, flag.ContinueOnError)
+	fs := newCommandFlags("db " + sub)
 	asJSON := fs.Bool("json", false, "JSON")
 	layout := fs.Bool("layout", false, "迁移旧数据库目录")
 	dry := fs.Bool("dry-run", false, "只读盘点")
@@ -38,6 +38,9 @@ func runDatabase(args []string) int {
 		}
 	}
 	if e := fs.Parse(flags); e != nil {
+		if e == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	p, e := metadb.ResolvePaths(config.Home(), dataDir())
@@ -48,7 +51,7 @@ func runDatabase(args []string) int {
 	var result any
 	switch sub {
 	case "help", "--help", "-h":
-		fmt.Println("roami db status|migrate|backup|restore [--json]\n  migrate --layout --dry-run | --layout --offline | --recover\n  restore <backup-set>: restore into an empty instance")
+		_ = groupHelpPage("db").Render(os.Stdout)
 		return 0
 	case "status":
 		l, err := p.ReadLayout()

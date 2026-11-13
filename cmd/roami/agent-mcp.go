@@ -13,17 +13,20 @@ import (
 )
 
 func runAgentMCP(args []string) int {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("roami agent mcp install|serve|status [--runtime-dir PATH]\nIndependent MCP owner; configure ROAMI_MCP_SOCKET in the Agent environment.")
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		_ = groupHelpPage("agent mcp").Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
-	fs := flag.NewFlagSet("agent mcp "+sub, flag.ContinueOnError)
+	fs := newCommandFlags("agent mcp " + sub)
 	dirFlag := fs.String("runtime-dir", "", "Python runtime project")
 	homeFlag := fs.String("home-root", "", "Explicit instance home")
 	dataFlag := fs.String("data-root", "", "Explicit instance data root")
 	socketFlag := fs.String("socket", "", "Explicit private MCP socket")
 	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	paths, err := agentruntime.Resolve(*homeFlag, *dataFlag)

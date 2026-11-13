@@ -28,7 +28,7 @@ type agentBundleManifest struct {
 }
 
 func runAgentBundle(args []string) int {
-	fs := flag.NewFlagSet("agent install-bundle", flag.ContinueOnError)
+	fs := newCommandFlags("agent install-bundle")
 	expectedVersion := fs.String("expected-version", "", "release tag to require")
 	activate := fs.Bool("activate", false, "activate a prepared release")
 	check := fs.Bool("check", false, "check the live database without migration")
@@ -36,6 +36,9 @@ func runAgentBundle(args []string) int {
 	archive := fs.String("archive", "", "complete release archive")
 	destination := fs.String("destination", "", "final version directory")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if *destination == "" || fs.NArg() != 0 || (!*activate && !*check && *archive == "") {
