@@ -15,7 +15,7 @@
   },
   "chartScroll": {
     "before": 0,
-    "after": 240
+    "after": 238.5454559326172
   },
   "keyboard": {
     "keyboard": "314px",
@@ -26,6 +26,8 @@
     "real filter toggle",
     "legend selection",
     "hourly horizontal touch scroll",
+    "source cards pricing entry",
+    "pricing return to cards and switch source",
     "model price editor",
     "single full-screen return bar",
     "native pricing menu selection",

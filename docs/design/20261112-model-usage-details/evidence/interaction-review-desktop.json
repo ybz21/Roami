@@ -29,6 +29,9 @@
   "requests": 497,
   "legendRequests": 497,
   "checks": [
+    "overview has only summary and charts",
+    "source cards with pricing entry",
+    "detail tables in audit only",
     "request-first model comparison",
     "hour selection and audit back",
     "source and metric switching",
