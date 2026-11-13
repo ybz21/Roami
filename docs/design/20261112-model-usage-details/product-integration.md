@@ -72,3 +72,14 @@ PR 截图通过 `scripts/dev/pr-shot.sh` 上传独立 `pr-shots` 分支，不提
 ### 导航排序验收
 
 按用户确认将模型源保留首位，随后依次为聚合、概况、监控、审计、本机网关、模型定价和语音输入。产品与静态原型已同步。桌面四档宽度无文档溢出，实际点击概况、审计、聚合和监控通过；Redmi Note 8 实际触摸模型、聚合、概况和监控通过，手机沿用相同顺序。证据：[桌面](evidence/navigation-desktop.json)、[手机](evidence/navigation-phone.json)。完整前端测试中旧审计位置断言随新顺序调整，对应 24 项测试复跑通过，其余 236 个文件 / 1,716 项测试通过；全量质量门通过。
+
+
+### 主分支同步与冲突回归
+
+同步主分支 `104e4e53`，保留新增的网关默认模型、Claude 模型别名、Codex 目录格式和 Pi / OpenCode 目录同步，同时保留聚合组入口、免费路由条件及模型源优先的导航顺序。
+
+四处文本冲突分别位于 `GatewayModelBinding.tsx`、`model-hub-api.ts`、`catalog.go`、`catalog_http.go`。额外接入主分支的智能体注册表名称 Hook，用量筛选使用已存在的 Agent 标识校验，避免依赖尚未加载的名称表。
+
+回归覆盖默认模型实际调度聚合、停用后停止调度、Claude 聚合别名识别、默认入口切换、Pi / OpenCode 活跃目录一致性，以及停用组不进入公开 / 原生目录；直连源不会被误认成首个候选相同的聚合。定向 Go race 检查通过。完整前端 238 个文件 / 1,753 项测试通过，桌面四档宽度与 Redmi Note 8 导航复验通过，证据见 [合并验收](evidence/merge-verification.json)。
+
+质量门按最终合并树相对 `origin/main` 的实际差异运行，使用既有 `QUALITY_BASE_SHA` / `QUALITY_HEAD_SHA` 指定比较范围。最终差异不包含 Python 改动，因此按仓库规则跳过主分支带入的无关 Python 测试。

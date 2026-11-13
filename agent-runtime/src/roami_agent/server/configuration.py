@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from roami_agent.protocol.browser import browser_config
 from roami_agent.protocol.computer import computer_config
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.protocol.model_routes import ModelRoute
 from roami_agent.protocol.models import model_endpoint
 from roami_agent.replies.delivery_policy import (
@@ -307,7 +308,10 @@ class Settings:
             or not 0 < result.compaction_ratio < 1
         ):
             raise DomainError("INVALID_RUNTIME_CONFIG")
-        if result.professional_executor not in {"", "codex", "claude", "opencode", "pi"}:
+        if result.professional_executor and (
+            not is_executor(result.professional_executor)
+            or result.professional_executor == "native"
+        ):
             raise ValueError("Invalid professional_executor")
         if any(
             type(value) is not int or value < 0

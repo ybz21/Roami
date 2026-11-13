@@ -33,6 +33,9 @@ func TestNewKindNeedsNoChangesElsewhere(t *testing.T) {
 	if a := Get("gemini"); a == nil {
 		t.Fatal("注册完却取不到")
 	}
+	if d := Describe(Get("gemini")); d.Kind != "gemini" || d.DisplayName != "Gemini CLI" || d.Command != "gemini" || !d.Interactive || d.Models || d.CanInstall {
+		t.Fatalf("new registration missing metadata: %+v", d)
+	}
 	// 恢复这条路自动认得它
 	if got := ResumeCommandFor("gemini", "C1"); got != "gemini --chat C1" {
 		t.Errorf("恢复命令 = %q", got)

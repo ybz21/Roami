@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
 vi.mock('./AgentModels', () => ({ default: ({ setup }: { setup?: import('react').ReactNode }) => <div>{setup}</div> }))
 vi.mock('./RoamiAgentModels', () => ({ default: ({ onMemory }: { onMemory?: () => void }) => <div>roami-models<button onClick={onMemory}>memory</button></div> }))
 vi.mock('./RoamiAgentMemory', () => ({ default: ({ onBack }: { onBack: () => void }) => <button onClick={onBack}>memory-back</button> }))
-vi.mock('../../agent-registry', () => ({ discoverAgents: vi.fn(), installAgent: vi.fn(), checkAgent: vi.fn(), upgradeAgent: vi.fn() }))
+vi.mock('../../agent-registry', async importOriginal => ({ ...(await importOriginal<typeof import('../../agent-registry')>()), discoverAgents: vi.fn(), installAgent: vi.fn(), checkAgent: vi.fn(), upgradeAgent: vi.fn() }))
 vi.mock('../../preferences', () => ({ usePreferences: () => [state.prefs, state.save], preferencesLoaded: () => state.loaded }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: state.phone }) }))
 vi.mock('../../visible-poll', () => ({ pollWhileVisible: (load: (signal: AbortSignal) => Promise<unknown>) => {
@@ -29,7 +29,7 @@ beforeAll(() => {
   const style = window.getComputedStyle; window.getComputedStyle = element => style(element)
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
-beforeEach(() => { vi.mocked(discoverAgents).mockResolvedValue([snapshot]); state.save.mockResolvedValue(true) })
+beforeEach(() => { vi.mocked(discoverAgents).mockResolvedValue([{ kind: 'claude', displayName: 'Claude Code', installed: false, quota: { state: 'unknown' } }, snapshot, { kind: 'opencode', installed: false, quota: { state: 'unknown' } }, { kind: 'pi', installed: false, quota: { state: 'unknown' } }]); state.save.mockResolvedValue(true) })
 afterEach(() => { cleanup(); vi.clearAllMocks(); state.polls = []; state.loaded = true; state.phone = false; state.prefs = { agentBalanceRefreshSeconds: 60, codexCommand: 'codex --model configured', claudeCommand: 'claude', piCommand: 'pi', opencodeCommand: 'opencode' } })
 
 it('keeps Roami model configuration separate from professional agent polling', () => {
@@ -89,7 +89,7 @@ it('shows agent cards without opening details and keeps installation separate fr
   render(<AgentCatalog onSelect={select} />)
   await screen.findByText('agent.professional.remaining{"percent":75}')
   expect(screen.getAllByRole('article')).toHaveLength(5)
-  const card = screen.getByRole('article', { name: 'Codex' })
+  const card = await screen.findByRole('article', { name: 'Codex' })
   expect(within(card).getByText('agent.professional.installed')).toBeTruthy()
   expect(within(card).getByText('capabilities.agents.auth.unknown')).toBeTruthy()
   expect(screen.queryByRole('dialog')).toBeNull()
@@ -100,7 +100,7 @@ it('shows agent cards without opening details and keeps installation separate fr
 it('waits for stored preferences before hydrating a command and preserves edits after a failed save', async () => {
   state.loaded = false
   const view = render(<AgentCatalog initialKind="codex" onSelect={vi.fn()} />)
-  const field = screen.getByRole('textbox', { name: 'capabilities.agents.command' }) as HTMLInputElement
+  const field = await screen.findByRole('textbox', { name: 'capabilities.agents.command' }) as HTMLInputElement
   expect(field.disabled).toBe(true); expect(field.value).toBe('')
   state.loaded = true; state.prefs = { ...state.prefs, codexCommand: '/custom/codex --model stored' }
   view.rerender(<AgentCatalog initialKind="codex" onSelect={vi.fn()} />)
@@ -110,7 +110,7 @@ it('waits for stored preferences before hydrating a command and preserves edits 
   fireEvent.click(screen.getByRole('button', { name: 'capabilities.saveChanges' }))
   await screen.findByText('settings.preference.failed')
   expect(field.value).toBe('/custom/codex --model chosen')
-  expect(state.save).toHaveBeenCalledWith({ codexCommand: '/custom/codex --model chosen' })
+  expect(state.save).toHaveBeenCalledWith({ agentCommands: { codex: '/custom/codex --model chosen' }, codexCommand: '/custom/codex --model chosen' })
   fireEvent.click(screen.getByRole('button', { name: 'capabilities.saveChanges' }))
   await screen.findByText('capabilities.agents.saved')
 })
@@ -118,7 +118,7 @@ it('waits for stored preferences before hydrating a command and preserves edits 
 it('accepts newer versions from automatic snapshots and preserves data after discovery failure', async () => {
   vi.mocked(checkAgent).mockResolvedValue({ ...snapshot, version: 'codex-cli 1.2.3', versionState: 'available' })
   render(<AgentCatalog initialKind="codex" onSelect={vi.fn()} />)
-  const card = screen.getByRole('article', { name: 'Codex' })
+  const card = await screen.findByRole('article', { name: 'Codex' })
   await within(card).findByText('agent.professional.remaining{"percent":75}')
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'capabilities.agents.check' }))
   await within(card).findByText('codex-cli 1.2.3')
@@ -136,7 +136,7 @@ it('accepts newer versions from automatic snapshots and preserves data after dis
 it('upgrades an installed agent after confirmation and displays the verified version', async () => {
   vi.mocked(upgradeAgent).mockResolvedValue({ ...snapshot, version: 'codex-cli 2.0.0', versionState: 'available' })
   render(<AgentCatalog onSelect={vi.fn()} />)
-  const card = screen.getByRole('article', { name: 'Codex' })
+  const card = await screen.findByRole('article', { name: 'Codex' })
   fireEvent.click(await within(card).findByRole('button', { name: 'capabilities.agents.update' }))
   expect(upgradeAgent).not.toHaveBeenCalled()
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.agents.update' }))
@@ -148,7 +148,7 @@ it('upgrades an installed agent after confirmation and displays the verified ver
 it('opens the agent model route directly from its card', async () => {
   const select = vi.fn()
   render(<AgentCatalog onSelect={select} />)
-  const card = screen.getByRole('article', { name: 'Codex' })
+  const card = await screen.findByRole('article', { name: 'Codex' })
   fireEvent.click(within(card).getByRole('button', { name: 'capabilities.models.manage' }))
   expect(select).toHaveBeenCalledWith('codex/models')
 })
@@ -168,7 +168,7 @@ it('uses the installation endpoint only after confirming a missing agent install
   vi.mocked(discoverAgents).mockResolvedValue([snapshot, { kind: 'pi', installed: false, quota: { state: 'unknown' } }])
   vi.mocked(installAgent).mockResolvedValue()
   render(<AgentCatalog onSelect={vi.fn()} />)
-  const card = screen.getByRole('article', { name: 'Pi' })
+  const card = await screen.findByRole('article', { name: 'Pi' })
   fireEvent.click(await within(card).findByRole('button', { name: 'agentDiscovery.install' }))
   expect(installAgent).not.toHaveBeenCalled()
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'agentDiscovery.install' }))
@@ -198,9 +198,22 @@ it('installs Claude Code directly from its model settings page', async () => {
   vi.mocked(discoverAgents).mockResolvedValue([{ kind: 'claude', installed: false, quota: { state: 'unknown' } }])
   vi.mocked(installAgent).mockResolvedValue()
   render(<AgentCatalog initialKind="claude" initialSection="models" onSelect={vi.fn()} />)
-  const dialog = screen.getByRole('dialog')
+  const dialog = await screen.findByRole('dialog')
   fireEvent.click(await within(dialog).findByRole('button', { name: 'agentDiscovery.install' }))
   expect(installAgent).not.toHaveBeenCalled()
   fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'agentDiscovery.install' }))
   await waitFor(() => expect(installAgent).toHaveBeenCalledWith('claude'))
+})
+
+it.each(['deepseek', 'future-harness'])('hydrates %s from host metadata without an existing registry cache', async kind => {
+  vi.mocked(discoverAgents).mockResolvedValue([{ ...snapshot, kind, displayName: 'Registered Harness', command: 'registered-cli --task', interactive: false, models: false, canInstall: true }])
+  render(<AgentCatalog initialKind={kind} onSelect={vi.fn()} onLaunch={vi.fn()} />)
+  const field = await screen.findByRole('textbox', { name: 'capabilities.agents.command' }) as HTMLInputElement
+  await waitFor(() => expect(field.value).toBe('registered-cli --task'))
+  expect(screen.queryByRole('button', { name: 'capabilities.agents.openTerminal' })).toBeNull()
+  expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'capabilities.models.manage' })).toBeNull()
+  expect(screen.getByRole('article', { name: 'Registered Harness' })).toBeTruthy()
+  fireEvent.change(field, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.saveChanges' }))
+  await waitFor(() => expect(state.save).toHaveBeenCalledWith({ agentCommands: { [kind]: 'registered-cli --task' } }))
 })

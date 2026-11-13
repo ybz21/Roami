@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
@@ -66,6 +67,7 @@ type ModelCatalog struct {
 	AgentKeys       map[string]agentKeyState `json:"-"`
 	CanRestoreRoami bool                     `json:"canRestoreRoami"`
 	RoamiModels     map[string]string        `json:"roamiModels"`
+	DefaultModel    string                   `json:"defaultModel,omitempty"`
 }
 type catalogDisk struct {
 	Catalog     ModelCatalog             `json:"catalog"`
@@ -188,13 +190,22 @@ func (s *CatalogStore) modelReferences(ctx context.Context, activeOnly bool) (ma
 			uses[route.model] = append(uses[route.model], "roami")
 		}
 	}
-	for _, kind := range []string{"codex", "claude", "opencode", "pi"} {
+	for _, kind := range agent.Kinds() {
+		if !agent.Describe(agent.Get(kind)).Models {
+			continue
+		}
 		view, err := s.agents.View(ctx, kind)
 		if err != nil {
 			known = false
 			continue
 		}
 		add := func(model string) {
+			model = catalogModelID(kind, model)
+			if model == gatewayDefaultModel {
+				if resolved := s.defaultModel(s.value); resolved != nil {
+					model = resolved.ID
+				}
+			}
 			for _, consumer := range uses[model] {
 				if consumer == kind {
 					return
@@ -221,6 +232,9 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	v.Uses = s.uses(ctx)
 	v.CanRestoreRoami = s.value.RolesBackup != nil
 	v.RoamiModels = map[string]string{}
+	if model := s.defaultModel(s.value); model != nil {
+		v.DefaultModel = model.ID
+	}
 	for _, role := range []string{"main", "worker"} {
 		if route, err := readNodeModels(s.ledger.paths, role); err == nil {
 			v.RoamiModels[role] = route.model
@@ -314,7 +328,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	validate := func(rows []CatalogModel) error {
 		seen := map[string]bool{}
 		for _, m := range rows {
-			if !catalogID.MatchString(m.ID) || strings.TrimSpace(m.Name) == "" || len(m.Name) > 200 || seen[m.ID] || !(m.Aggregate && validateAggregate(m) || !m.Aggregate && containsField([]string{"fixed", "failover"}, m.Strategy)) || len(m.Candidates) == 0 || len(m.Candidates) > 8 || m.Strategy == "fixed" && len(m.Candidates) != 1 || m.Strategy == "failover" && len(m.Candidates) < 2 {
+			if !catalogID.MatchString(m.ID) || m.ID == gatewayDefaultModel || strings.TrimSpace(m.Name) == "" || len(m.Name) > 200 || seen[m.ID] || !(m.Aggregate && validateAggregate(m) || !m.Aggregate && containsField([]string{"fixed", "failover"}, m.Strategy)) || len(m.Candidates) == 0 || len(m.Candidates) > 8 || m.Strategy == "fixed" && len(m.Candidates) != 1 || m.Strategy == "failover" && len(m.Candidates) < 2 {
 				return catalogError()
 			}
 			seen[m.ID] = true
@@ -376,6 +390,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	}
 	v.BaseURL = ""
 	v.Uses = nil
+	v.DefaultModel = ""
 	if err := s.persist(v); err != nil {
 		return err
 	}

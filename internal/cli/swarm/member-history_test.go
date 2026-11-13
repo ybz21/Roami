@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"encoding/json"
+	"github.com/ybz21/Roami/internal/agent"
 	"net/http"
 	"strings"
 	"testing"
@@ -128,5 +129,25 @@ func TestMembersRetainsIdleNativeConversationFromAPI(t *testing.T) {
 	detail := commandResult(t, rt, "member", "inspect", fixtureID, stableMemberFixtureID)
 	if !strings.Contains(detail, "对话: reserved-conversation") || strings.Contains(detail, "已完成") {
 		t.Fatalf("misleading idle preview: %s", detail)
+	}
+}
+
+func TestMemberRegistrationUsesAgentRegistry(t *testing.T) {
+	for _, kind := range agent.Kinds() {
+		t.Run(kind, func(t *testing.T) {
+			rt := fixtureRuntime(t, func(w http.ResponseWriter, r *http.Request) {
+				var request struct {
+					Members []member `json:"members"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Fatal(err)
+				}
+				if len(request.Members) != 1 || request.Members[0].Executor != kind {
+					t.Fatalf("wrong executor: %+v", request)
+				}
+				apiReply(w, map[string]any{"id": fixtureID, "revision": 5})
+			})
+			commandResult(t, rt, "member", "register", fixtureID, "research", "--executor", kind, "--duty", "Read references", "--key", "register-1", "--revision", "4", "--json")
+		})
 	}
 }

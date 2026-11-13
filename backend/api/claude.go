@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/agent"
 )
 
 // 工作目录 → ~/.claude/projects 下的目录名（非字母数字一律换成 -，与 Claude Code 一致）
@@ -253,14 +254,14 @@ func runningAgentProcs() map[string]agentProc {
 		if err != nil {
 			continue
 		}
-		if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasClaude)); got != 0 {
-			running[parts[0]] = agentProc{Kind: "claude", Dir: parts[2], Pid: got}
-		} else if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasCodex)); got != 0 {
-			running[parts[0]] = agentProc{Kind: "codex", Dir: parts[2], Pid: got}
-		} else if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasOpenCode)); got != 0 {
-			running[parts[0]] = agentProc{Kind: "opencode", Dir: parts[2], Pid: got}
-		} else if got := treeFind(pid, children, 0, activeAgentMatch(cmdlineHasPi)); got != 0 {
-			running[parts[0]] = agentProc{Kind: "pi", Dir: parts[2], Pid: got}
+		kind, found := registeredAgentInTree(pid, children, func(pid int) []string {
+			if procStopped(pid) {
+				return nil
+			}
+			return processArgv(pid)
+		})
+		if found != 0 {
+			running[parts[0]] = agentProc{Kind: kind, Dir: parts[2], Pid: found}
 		}
 	}
 	return running
@@ -633,4 +634,27 @@ func (a *API) ClaudeTranscript(c *gin.Context) {
 	// 这一轮没扫到新行时 status 是空的；前端 sticky 保留上一次的值。
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
 		"messages": msgs, "nextOffset": n, "file": file, "status": st, "truncated": truncated}})
+}
+
+// Identify the owning harness before inspecting any agents it delegates to.
+func registeredAgentInTree(pid int, children map[int][]int, argv func(int) []string) (string, int) {
+	kind := ""
+	found := treeFind(pid, children, 0, func(pid int) bool {
+		args := argv(pid)
+		for _, candidate := range agent.Kinds() {
+			matches := agent.MatchesProcess(agent.Get(candidate), args)
+			switch candidate {
+			case "claude":
+				matches = argvIsClaude(args)
+			case "codex":
+				matches = argvIsCodex(args)
+			}
+			if matches {
+				kind = candidate
+				return true
+			}
+		}
+		return false
+	})
+	return kind, found
 }

@@ -64,6 +64,7 @@ class CodingExecutor:
         self.persistent = persistent
         self.artifacts = None
         self.capabilities = None
+        self.catalog = None
         self.project_workspace = None
 
     async def command(self, sub, *args, spec=None):
@@ -111,8 +112,17 @@ class CodingExecutor:
             raise DomainError("CODING_CHECKPOINT_FORK_NOT_IMPLEMENTED")
         if (deadline := json.loads(task["budget_json"]).get("deadlineMs")) and deadline <= now_ms():
             raise DomainError("TASK_BUDGET_EXCEEDED")
+        persistent = self.persistent
+        if self.catalog:
+            catalog = await self.catalog()
+            candidate = next(
+                (item for item in catalog["candidates"] if item["kind"] == spec["executor"]), None
+            )
+            if not candidate:
+                raise DomainError("INVALID_EXECUTOR")
+            persistent = persistent and candidate.get("interactive", True)
         launch = {
-            "persistent": self.persistent,
+            "persistent": persistent,
             "promptFormat": "markdown-session",
             "shortExecutionLabel": True,
             "key": run["launch_id"],

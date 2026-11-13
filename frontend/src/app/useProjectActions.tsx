@@ -120,7 +120,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   }
   const newTerminalAt = async (kind: 'shell' | AgentKind, dir: string, baseArg?: string, key?: TaskKey, parentArg?: string) => {
     const base = baseArg || (dir ? dir.split('/').pop() : '') || 'shell'
-    const suffix = ({ shell: 'sh', claude: 'cc', codex: 'cx', pi: 'pi', opencode: 'oc' } as const)[kind]
+    const suffix = kind === 'shell' ? 'sh' : kind
     let name = `${base}-${suffix}`
     const taken = new Set(sessList.map((s) => s.label || s.name))
     for (let i = 2; taken.has(name); i++) name = `${base}-${suffix}${i}`

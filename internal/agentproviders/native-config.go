@@ -223,11 +223,11 @@ func defaultFields(kind string) []field {
 	case "claude":
 		doc = "settings"
 		paths = [][]string{{"model"}, {"apiKeyHelper"}, {"modelPicker"}}
-		for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY", "ROAMI_MODEL_MANAGED"} {
+		for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY", "ROAMI_MODEL_MANAGED"} {
 			paths = append(paths, []string{"env", name})
 		}
 	case "codex":
-		paths = [][]string{{"model_provider"}, {"model"}, {"model_reasoning_effort"}}
+		paths = [][]string{{"model_provider"}, {"model"}, {"model_reasoning_effort"}, {"model_catalog_json"}}
 		for _, key := range []string{"base_url", "env_key", "experimental_bearer_token", "wire_api", "name"} {
 			paths = append(paths, []string{"model_providers", "openai", key})
 		}
@@ -307,6 +307,9 @@ func (config nativeConfig) current(kind string) CurrentModel {
 			model := textAt(values, "env", "ANTHROPIC_MODEL")
 			if model == "" {
 				model = textAt(values, "model")
+			}
+			if model == "" {
+				model = textAt(values, "env", "ANTHROPIC_DEFAULT_MODEL")
 			}
 			return CurrentModel{Model: model, BaseURL: currentEndpoint(textAt(values, "env", "ANTHROPIC_BASE_URL"))}
 		case "codex":
@@ -397,8 +400,14 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 	switch kind {
 	case "claude":
 		add("settings", profile.Model, "model")
-		add("settings", profile.Model, "env", "ANTHROPIC_MODEL")
-		for _, name := range []string{"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL"} {
+		if profile.Name == "Roami Gateway" {
+			// Leave /model's saved selection authoritative on the next launch.
+			add("settings", nil, "env", "ANTHROPIC_MODEL")
+			add("settings", profile.Model, "env", "ANTHROPIC_DEFAULT_MODEL")
+		} else {
+			add("settings", profile.Model, "env", "ANTHROPIC_MODEL")
+		}
+		for _, name := range []string{"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL"} {
 			add("settings", profile.Model, "env", name)
 		}
 		add("settings", nil, "apiKeyHelper")
@@ -415,6 +424,10 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 	case "codex":
 		add("config", provider, "model_provider")
 		add("config", profile.Model, "model")
+		if profile.Name == "Roami Gateway" {
+			add("config", nil, "model_catalog_json")
+			add("config", strings.TrimRight(profile.BaseURL, "/")+"/models", "model_providers", provider, "model_catalog_url")
+		}
 		var effort any
 		if profile.ReasoningEffort != "" {
 			effort = profile.ReasoningEffort
@@ -436,6 +449,9 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 		}
 		add("config", provider+"/"+profile.Model, "model")
 		models := map[string]any{profile.Model: map[string]any{"name": modelName}}
+		for _, model := range profile.Models {
+			models[model.ID] = map[string]any{"name": model.Name}
+		}
 		settings := map[string]any{"baseURL": profile.BaseURL, "apiKey": key}
 		packages := map[string]string{"openai-responses": "@opencode/ai/providers/openai-compatible/responses", "openai-completions": "@opencode/ai/providers/openai-compatible", "anthropic-messages": "@opencode/ai/providers/anthropic-compatible"}
 		if major == 2 {
@@ -447,7 +463,14 @@ func profileFields(kind string, profile Profile, major int) ([]field, error) {
 	case "pi":
 		add("settings", provider, "defaultProvider")
 		add("settings", profile.Model, "defaultModel")
-		add("models", map[string]any{"name": profile.Name, "baseUrl": profile.BaseURL, "apiKey": key, "api": profile.Protocol, "models": []any{map[string]any{"id": profile.Model, "name": modelName}}}, "providers", provider)
+		models := []any{map[string]any{"id": profile.Model, "name": modelName}}
+		if len(profile.Models) > 0 {
+			models = nil
+			for _, model := range profile.Models {
+				models = append(models, map[string]any{"id": model.ID, "name": model.Name})
+			}
+		}
+		add("models", map[string]any{"name": profile.Name, "baseUrl": profile.BaseURL, "apiKey": key, "api": profile.Protocol, "models": models}, "providers", provider)
 	}
 	return fields, nil
 }

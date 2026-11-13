@@ -2,6 +2,7 @@ package agentinventory
 
 import (
 	"context"
+	"github.com/ybz21/Roami/internal/agent"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,10 +43,11 @@ func TestNativeOpenCodeUpgradeUsesDiscoveredInstallation(t *testing.T) {
 }
 
 func TestNPMUpgradeKeepsOriginalPrefix(t *testing.T) {
-	for _, kind := range []string{"claude", "codex", "pi"} {
+	for _, kind := range []string{"claude", "codex", "pi", "deepseek"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
-			pkg := "@openai/codex"
+			installation, _ := agent.InstallPackage(kind)
+			pkg := installation.Name
 			if kind == "claude" {
 				pkg = "@anthropic-ai/claude-code"
 			}
@@ -66,12 +68,12 @@ func TestNPMUpgradeKeepsOriginalPrefix(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := os.Symlink(filepath.Join(packageDir, "cli.js"), filepath.Join(binDir, kind)); err != nil {
+			if err := os.Symlink(filepath.Join(packageDir, "cli.js"), filepath.Join(binDir, agent.Get(kind).Bin())); err != nil {
 				t.Fatal(err)
 			}
 			t.Setenv("PATH", binDir)
 			plan, err := ProfessionalUpgradePlan(kind)
-			if err != nil || plan.Method != "npm" || !strings.Contains(strings.Join(plan.Args, " "), "--prefix "+prefix) || plan.Args[len(plan.Args)-1] != pkg {
+			if err != nil || plan.Method != "npm" || !strings.Contains(strings.Join(plan.Args, " "), "--prefix "+prefix) || plan.Args[len(plan.Args)-1] != installation.Spec() {
 				t.Fatalf("upgrade changed prefix: %+v, %v", plan, err)
 			}
 		})

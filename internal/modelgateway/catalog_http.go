@@ -84,6 +84,9 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			break
 		}
 		var model *CatalogModel
+		if input.Model == gatewayDefaultModel && catalogProtocol(input.Kind, "openai-completions") && input.SourceID == "" && input.UpstreamModel == "" {
+			model = s.defaultModel(s.value)
+		}
 		for _, m := range s.value.Models {
 			if m.ID == input.Model {
 				copy := m
@@ -169,7 +172,15 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Kind == "claude" {
 			authMode = "bearer"
 		}
-		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key})
+		selectedModel := model.ID
+		if input.Model == gatewayDefaultModel {
+			selectedModel = gatewayDefaultModel
+		}
+		var options []agentproviders.ModelOption
+		if input.Kind == "pi" || input.Kind == "opencode" {
+			options = s.modelOptions(s.value)
+		}
+		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: selectedModel, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key, Models: options})
 		if e != nil {
 			err = e
 			break
@@ -220,12 +231,23 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "GET" && r.URL.Path == "/v1/models" {
+		if kind == "codex" && r.URL.Query().Get("client_version") != "" {
+			writeJSON(w, 200, codexModelCatalog(s.modelOptions(snapshot)))
+			return
+		}
 		data := []map[string]any{}
+		if kind != "claude" && catalogProtocol(kind, "openai-completions") && s.defaultModel(snapshot) != nil {
+			data = append(data, map[string]any{"id": gatewayDefaultModel, "type": "model", "object": "model", "display_name": "Roami Default", "owned_by": "roami"})
+		}
 		for _, m := range snapshot.Models {
 			if m.Aggregate && !m.enabled() {
 				continue
 			}
-			data = append(data, map[string]any{"id": m.ID, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
+			id := m.ID
+			if kind == "claude" {
+				id = claudeModelPrefix + id
+			}
+			data = append(data, map[string]any{"id": id, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
 		}
 		writeJSON(w, 200, map[string]any{"object": "list", "data": data, "has_more": false})
 		return
@@ -261,8 +283,12 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	var alias string
 	_ = json.Unmarshal(payload["model"], &alias)
 	var model *CatalogModel
+	resolvedID := catalogModelID(kind, alias)
+	if resolvedID == gatewayDefaultModel && catalogProtocol(kind, protocol) {
+		model = h.Catalog.defaultModel(catalog)
+	}
 	for _, m := range catalog.Models {
-		if m.ID == alias {
+		if m.ID == resolvedID {
 			copy := m
 			model = &copy
 		}

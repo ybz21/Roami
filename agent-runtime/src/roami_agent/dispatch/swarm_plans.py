@@ -6,6 +6,7 @@ import json
 import sqlite3
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
@@ -20,8 +21,6 @@ from roami_agent.storage.swarm_repository import (
 )
 from roami_agent.storage.swarm_scopes import project_scope, require_scope
 from roami_agent.storage.transcript_repository import owned
-
-EXECUTORS = {"native", "codex", "claude", "opencode", "pi"}
 
 
 class SwarmPlans:
@@ -315,13 +314,10 @@ class SwarmPlans:
                         or any(not isinstance(dep, dict) for dep in item.get("dependencies", []))
                     ):
                         raise DomainError("INVALID_SWARM_PLAN")
-                    if (
-                        not all(
-                            isinstance(item.get(key), str) and item[key].strip()
-                            for key in ("member", "title", "goal", "acceptance")
-                        )
-                        or item.get("executor") not in EXECUTORS
-                    ):
+                    if not all(
+                        isinstance(item.get(key), str) and item[key].strip()
+                        for key in ("member", "title", "goal", "acceptance")
+                    ) or not is_executor(item.get("executor")):
                         raise DomainError("INVALID_SWARM_PLAN")
                     from roami_agent.storage.swarm_evidence import validate_deliverables
 

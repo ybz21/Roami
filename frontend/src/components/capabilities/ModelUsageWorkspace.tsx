@@ -5,7 +5,7 @@ import { useLayout } from '../../layout'
 import { ChevronRight, SearchIcon } from '../../icons'
 import BackButton from '../BackButton'
 import MobileSubPage from '../MobileSubPage'
-import { gatewayAgentNames } from './gateway-agent'
+import { useGatewayAgentNames } from './gateway-agent'
 import { ModelCharges, chargeText } from '../settings/model-charges'
 import { gatewayTotals, gatewayUsage, remainingGatewayCharge, validGatewayDraft, type GatewayGroup } from '../settings/local-model-gateway'
 import { ModelUsageChart } from '../settings/model-usage-chart'
@@ -17,6 +17,7 @@ import './model-usage-workspace.css'
 type Call = UsageWorkspaceData['recent'][number]
 export default function ModelUsageWorkspace({ mode, controller: c, sources, onAudit, active = true }: { mode: 'overview' | 'audit'; active?: boolean; controller: GatewaySettingsController; sources: ModelSource[]; onAudit: () => void }) {
   const { t, locale } = useI18n(), { phone } = useLayout()
+  const gatewayAgentNames = useGatewayAgentNames(active)
   const [filters, setFilters] = useState(initialUsageFilters), [search, setSearch] = useState('')
   const [group, setGroup] = useState<'sourceId' | 'agentKind' | 'model'>('sourceId'), [metric, setMetric] = useState('totalTokens')
   const [sort, setSort] = useState('totalTokens'), [descending, setDescending] = useState(true), [filtersOpen, setFiltersOpen] = useState(false), [editing, setEditing] = useState(false)

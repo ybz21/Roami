@@ -4,6 +4,7 @@ package okr
 import (
 	"encoding/json"
 	"errors"
+	"github.com/ybz21/Roami/internal/agent"
 	"math"
 	"regexp"
 	"strings"
@@ -199,9 +200,7 @@ func validate(c *Config) error {
 			if !identifier.MatchString(role.ID) || ids[role.ID] || name == "" || name != role.Name || names[name] || utf8.RuneCountInString(name) > 80 || strings.EqualFold(name, "main") || strings.EqualFold(name, "leader") || strings.TrimSpace(role.Duty) == "" || utf8.RuneCountInString(role.Duty) > 8000 {
 				return ErrInvalid
 			}
-			switch role.Executor {
-			case "native", "codex", "claude", "opencode", "pi":
-			default:
+			if runner := agent.Get(role.Executor); role.Executor != "native" && (runner == nil || runner.Kind() != role.Executor) {
 				return ErrInvalid
 			}
 			ids[role.ID], names[name] = true, true

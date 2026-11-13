@@ -216,3 +216,20 @@ func TestAggregateCompactionFiltersUnsupportedSourceBeforeScheduling(t *testing.
 		t.Fatalf("compaction chose incompatible source: %+v %v", leaf, err)
 	}
 }
+
+func TestGatewayDefaultDispatchesThroughAggregateAndStopsWhenDisabled(t *testing.T) {
+	var calls atomic.Int64
+	upstream := func(w http.ResponseWriter, r *http.Request) { calls.Add(1); responseFixture(w, r) }
+	h := aggregateFixture(t, upstream, upstream)
+	saveNodeModels(t, h.Ledger, map[string]any{"connection": map[string]string{"baseUrl": h.Catalog.baseURL + "/v1"}, "main": map[string]string{"model": "coding-main"}})
+	result := catalogRequest(h, "/v1/responses", `{"model":"roami-default","input":"hello"}`)
+	if result.Code != 200 || calls.Load() != 1 {
+		t.Fatalf("default did not dispatch through the aggregate: %d %s", result.Code, result.Body)
+	}
+	off := false
+	h.Catalog.value.Models[0].Enabled = &off
+	result = catalogRequest(h, "/v1/responses", `{"model":"roami-default","input":"hello"}`)
+	if result.Code == 200 || calls.Load() != 1 {
+		t.Fatal("disabled default dispatched another request")
+	}
+}

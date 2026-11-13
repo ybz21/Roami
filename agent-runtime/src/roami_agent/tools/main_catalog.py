@@ -6,6 +6,7 @@ from roami_agent.conversation.history_read import read_history
 from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import EXECUTOR_PATTERN
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import reply_text, validate_answer
@@ -748,7 +749,7 @@ def register_main_tools(
                     "routing": routing_schema(),
                     "executor": {
                         "type": "string",
-                        "enum": ["native", "codex", "claude", "opencode", "pi"],
+                        "pattern": EXECUTOR_PATTERN,
                     },
                     "directory": {"type": "string", "minLength": 1, "maxLength": 2000},
                     "projectId": {"type": "string", "minLength": 1, "maxLength": 300},

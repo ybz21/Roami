@@ -142,7 +142,7 @@ func TestAgentKeySummaryPrivateAndRevisionProtected(t *testing.T) {
 		} `json:"data"`
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &result)
-	if w.Code != 200 || len(result.Data.Keys) != 5 || strings.Contains(w.Body.String(), old) || strings.Contains(w.Body.String(), s.value.Token) {
+	if w.Code != 200 || len(result.Data.Keys) != len(gatewayAgentKinds) || strings.Contains(w.Body.String(), old) || strings.Contains(w.Body.String(), s.value.Token) {
 		t.Fatal("key summary leaked secrets or invented identities")
 	}
 	if w = requestWithKey(h, old, "/v1/model-gateway/keys", ""); w.Code != 404 {

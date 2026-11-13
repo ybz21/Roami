@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/backend/race"
 	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/id"
 )
 
@@ -107,6 +108,11 @@ func (a *API) RaceCreate(c *gin.Context) {
 			continue
 		}
 		if cmd := strings.TrimSpace(in.Cmd); cmd != "" {
+			if runner := agent.Get(in.Agent); runner != nil {
+				if flag := agent.Describe(runner).PromptFlag; flag != "" {
+					cmd += " " + flag
+				}
+			}
 			if _, err = a.TT.Run("send", ct.Session, cmd+" "+shellQuote(b.Prompt)); err != nil {
 				a.rollbackPreparedSession(ct.Session, wt, true)
 				fail("launch: " + err.Error())
