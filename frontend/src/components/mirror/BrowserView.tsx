@@ -1,4 +1,4 @@
-import { usePageViewState, usePageViewRef, usePageRetention } from '../../page-view-state'
+import { useViewState, useViewRef, useViewRetention } from '../../view-state'
 import { usePageEffect } from '../../page-activity'
 // 浏览器镜像页：把后端全局 Chrome 的画面实时渲染到 <img>，可选「接管」转发输入。
 // 协议见 backend/browser/screencast.go：
@@ -73,13 +73,13 @@ function mergeTabs(prev: TabInfo[], incoming: TabInfo[]): TabInfo[] {
 }
 
 export default function BrowserView({ initialTarget = '', browserInstance = '' }: { initialTarget?: string; browserInstance?: string }) {
-  const retain = usePageRetention()
+  const retain = useViewRetention()
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   // 收纳档位按**容器**宽度算（不是窗口）：这一页会被塞进分栏，那时窗口很宽而容器很窄。
   // ≥1100 全平铺 / 900–1100 收指标 / <900 等同手机形态（设计 17 §5.5）
   const [shelf, shelfRef] = useShelf()
-  const [tabsOpen, setTabsOpen] = usePageViewState('browser.tabsOpen', false)
+  const [tabsOpen, setTabsOpen] = useViewState('browser.tabsOpen', false)
   const [prefs] = usePreferences()
   const imgRef = useRef<HTMLImageElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -92,12 +92,12 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const controlRef = useRef(true)
   const [connected, setConnected] = useState(false)
   const [healthMsg, setHealthMsg] = useState('') // 连不上时的原因（后端 /browser/health 的 error）
-  const [url, setUrl] = usePageViewState('browser.url', '')
+  const [url, setUrl] = useViewState('browser.url', '')
   const addrFocused = useRef(false) // 地址栏聚焦时不被轮询回写覆盖
-  const addressDraft = usePageViewRef('browser.addressDraft', false)
+  const addressDraft = useViewRef('browser.addressDraft', false)
   // 标签页（复用同一台 Chrome）
   const [tabs, setTabs] = useState<TabInfo[]>([])
-  const [tabOrder, setTabOrder] = usePageViewState<string[]>('browser.tabOrder', [])
+  const [tabOrder, setTabOrder] = useViewState<string[]>('browser.tabOrder', [])
   useEffect(() => {
     if (tabs.length) setTabOrder(previous => { const next = tabs.map(tab => tab.id); return previous.join(',') === next.join(',') ? previous : next })
   }, [tabs])
@@ -120,11 +120,11 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const togglePin = (id: string) => { void changeTab(id, { pinned: !pinnedTabs.has(id) }) }
   const changeOrigin = (id: string, origin: 'human' | 'agent') => { void changeTab(id, { origin }) }
   const tabsRef = useRef<TabInfo[]>([]) // 供 ws.onmessage 等闭包读到最新标签集（识别新开的那个）
-  const [target, setTarget] = usePageViewState('browser.target', initialTarget)
+  const [target, setTarget] = useViewState('browser.target', initialTarget)
   const addressTarget = useRef(target)
-  const [expectedBrowser, setExpectedBrowser] = usePageViewState('browser.expectedBrowser', browserInstance)
+  const [expectedBrowser, setExpectedBrowser] = useViewState('browser.expectedBrowser', browserInstance)
   const expectedBrowserRef = useRef(expectedBrowser); expectedBrowserRef.current = expectedBrowser
-  const pinnedTarget = usePageViewRef('browser.pinnedTarget', initialTarget)
+  const pinnedTarget = useViewRef('browser.pinnedTarget', initialTarget)
   // 导航起始页地址（后端 /api/me 提供，形如 http://127.0.0.1:<port>/home）；
   // 新标签默认开它、可点「主页」回到它。默认值按当前端口兜底。
   const [home, setHome] = useState(`${location.protocol}//127.0.0.1:${location.port || '8080'}/home`)
@@ -171,7 +171,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // 后端广播 {type:'active'} 会自动切到 agent 正在操作的标签；用户在画面里点击/打字
   // 视为接管，自动切到手动模式。切回智能体模式只能靠主动点按钮——不设空闲自动恢复，
   // 模式要长期保持，不能自己漂移回去（人正盯着一个 agent 没打算离开的页面时尤其如此）。
-  const [followPaused, setFollowPaused] = usePageViewState('browser.followPaused', !!initialTarget)
+  const [followPaused, setFollowPaused] = useViewState('browser.followPaused', !!initialTarget)
   const followPausedRef = useRef(followPaused)
 
   const fs = useFullscreen(rootRef)
@@ -216,8 +216,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // Chrome 有些「页」压根关不掉——它自己的界面（chrome://*.top-chrome/）就是这样：
   // /json/close 照收不误，那一行下一次轮询又回来。后端已经把认得出来的挡在外面，
   // 万一还是漏进来一条，用户按下关闭时就记在这里：关不掉，至少让它从这条标签条上消失。
-  const dismissedRef = usePageViewRef('browser.dismissed', new Set<string>())
-  const visibleTabs = (list: TabInfo[]) => list.filter((x) => !dismissedRef.current.has(x.id))
+  const dismissedRef = useViewRef<string[]>('browser.dismissed', [])
+  const visibleTabs = (list: TabInfo[]) => list.filter((x) => !dismissedRef.current.includes(x.id))
 
   // 拉取标签页列表（每 3s 刷新，反映 agent 自己开的标签页/标题变化）
   const loadTabs = async (signal?: AbortSignal) => {
@@ -265,7 +265,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
         } catch (e: any) {
           // Chrome 自身的页面拒绝关闭时，仅从镜像标签条隐藏。
           if (e?.apiError?.code !== 'not_closable') { message.error(e.message); return }
-          dismissedRef.current.add(id)
+          dismissedRef.current = [...dismissedRef.current, id]
           message.info(t('browser.tabHidden'))
         }
       }))

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { WorkspaceStateProvider } from '../../view-state'
+import { WorkspaceStateStore } from '../../workspace-state'
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -7,6 +9,8 @@ let node = 'draft-node'
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => node }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 afterEach(cleanup)
+const store = new WorkspaceStateStore()
+const wrapper = ({ children }: { children: React.ReactNode }) => <WorkspaceStateProvider store={store}>{children}</WorkspaceStateProvider>
 function Form({ id }: { id: string }) {
   const [value, setValue] = useState(''), [baseline, setBaseline] = useState('')
   const notice = useSettingsDraft(id, value, baseline, setValue)
@@ -14,13 +18,13 @@ function Form({ id }: { id: string }) {
 }
 it('SET-05 recovers edits after unmount, warns on reload, and keeps secrets out of storage', async () => {
   const storage = vi.spyOn(Storage.prototype, 'setItem')
-  const first = render(<Form id="recover" />)
+  const first = render(<Form id="recover" />, { wrapper })
   fireEvent.change(screen.getByLabelText('key'), { target: { value: 'private-draft' } })
   const unload = new Event('beforeunload', { cancelable: true })
   window.dispatchEvent(unload)
   expect(unload.defaultPrevented).toBe(true)
   first.unmount()
-  render(<Form id="recover" />)
+  render(<Form id="recover" />, { wrapper })
   await waitFor(() => expect((screen.getByLabelText('key') as HTMLInputElement).value).toBe('private-draft'))
   expect(screen.getByRole('status').textContent).toBe('settings.draftRestored')
   expect(storage).not.toHaveBeenCalled()
@@ -28,16 +32,16 @@ it('SET-05 recovers edits after unmount, warns on reload, and keeps secrets out 
 })
 it('SET-05 isolates nodes and clears the draft after saving', async () => {
   node = 'original'
-  const first = render(<Form id="isolation" />)
+  const first = render(<Form id="isolation" />, { wrapper })
   fireEvent.change(screen.getByLabelText('key'), { target: { value: 'node-only' } })
   first.unmount(); node = 'other'
-  const second = render(<Form id="isolation" />)
+  const second = render(<Form id="isolation" />, { wrapper })
   expect((screen.getByLabelText('key') as HTMLInputElement).value).toBe('')
   second.unmount(); node = 'original'
-  const third = render(<Form id="isolation" />)
+  const third = render(<Form id="isolation" />, { wrapper })
   await waitFor(() => expect((screen.getByLabelText('key') as HTMLInputElement).value).toBe('node-only'))
   fireEvent.click(screen.getByText('save'))
   third.unmount()
-  render(<Form id="isolation" />)
+  render(<Form id="isolation" />, { wrapper })
   expect((screen.getByLabelText('key') as HTMLInputElement).value).toBe('')
 })

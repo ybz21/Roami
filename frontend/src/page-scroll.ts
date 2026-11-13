@@ -1,11 +1,12 @@
+import { useViewRef } from './view-state'
 import { useLayoutEffect, useRef, type RefObject, type UIEvent } from 'react'
 
 export function usePageScroll(root: RefObject<HTMLElement>, active: boolean) {
-  const positions = useRef(new Map<string, { top: number; left: number }>())
+  const positions = useViewRef<Record<string, { top: number; left: number }>>('scroll.positions', {})
   const restoring = useRef(false), cancel = useRef(() => {})
   useLayoutEffect(() => {
-    if (!active || !root.current || !positions.current.size) return
-    const pending = new Map(positions.current)
+    if (!active || !root.current || !Object.keys(positions.current).length) return
+    const pending = new Map(Object.entries(positions.current))
     restoring.current = true
     const finish = () => { mutation.disconnect(); resize?.disconnect(); clearTimeout(timeout); pending.clear(); restoring.current = false }
     const apply = () => {
@@ -37,8 +38,10 @@ export function usePageScroll(root: RefObject<HTMLElement>, active: boolean) {
       path.unshift(Array.prototype.indexOf.call(node.parentElement.children, node))
     }
     const key = path.join('/')
-    if (element.scrollTop || element.scrollLeft) positions.current.set(key, { top: element.scrollTop, left: element.scrollLeft })
-    else positions.current.delete(key)
+    const next = { ...positions.current }
+    if (element.scrollTop || element.scrollLeft) next[key] = { top: element.scrollTop, left: element.scrollLeft }
+    else delete next[key]
+    positions.current = next
   }
   return { onScrollCapture, onPointerDownCapture: () => cancel.current(), onWheelCapture: () => cancel.current(), onTouchStartCapture: () => cancel.current() }
 }

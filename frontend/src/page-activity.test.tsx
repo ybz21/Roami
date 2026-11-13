@@ -3,8 +3,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { App as AntApp } from 'antd'
-import RetainedPage from './app/RetainedPage'
-import { usePageViewState, usePageViewRef, usePageRetention } from './page-view-state'
+import ViewBoundary from './app/ViewBoundary'
+import { useViewState, useViewRef, useViewRetention } from './view-state'
 import { usePageEffect } from './page-activity'
 
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
@@ -17,7 +17,7 @@ it('preserves page input and scroll while suspending and resuming recurring work
     usePageEffect(() => { start(); const timer = setInterval(tick, 1000); return () => { clearInterval(timer); stop() } }, [])
     return <input aria-label="draft" value={draft} onChange={event => setDraft(event.target.value)} />
   }
-  const view = (active: boolean) => <RetainedPage page="settings" active={active} mobile={false} hasDock={false}><Page /></RetainedPage>
+  const view = (active: boolean) => <ViewBoundary page="settings" lifetime="retain" active={active} mobile={false} hasDock={false}><Page /></ViewBoundary>
   const rendered = render(view(true))
   const input = screen.getByRole('textbox') as HTMLInputElement
   const pane = rendered.container.querySelector<HTMLElement>('[data-page]')!
@@ -46,7 +46,7 @@ it('pauses page work while the browser document is hidden', () => {
   vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden)
   const start = vi.fn(), stop = vi.fn()
   function Page() { usePageEffect(() => { start(); return stop }, []); return null }
-  render(<RetainedPage page="browser" active mobile={false} hasDock={false}><Page /></RetainedPage>)
+  render(<ViewBoundary page="browser" active mobile={false} hasDock={false}><Page /></ViewBoundary>)
   expect(start).toHaveBeenCalledTimes(1)
   hidden = true; fireEvent(document, new Event('visibilitychange'))
   expect(stop).toHaveBeenCalledTimes(1)
@@ -59,7 +59,7 @@ it('hides page-owned modal portals with the page and restores the same dialog', 
     const { modal } = AntApp.useApp()
     return <button onClick={() => modal.confirm({ title: 'Confirm draft' })}>open</button>
   }
-  const view = (active: boolean) => <RetainedPage page="settings" active={active} mobile={false} hasDock={false}><Page /></RetainedPage>
+  const view = (active: boolean) => <ViewBoundary page="settings" lifetime="retain" active={active} mobile={false} hasDock={false}><Page /></ViewBoundary>
   const rendered = render(view(true))
   fireEvent.click(screen.getByRole('button', { name: 'open' }))
   const dialog = await screen.findByRole('dialog')
@@ -73,13 +73,13 @@ it('hides page-owned modal portals with the page and restores the same dialog', 
 it('unloads heavy page DOM, restores lightweight state and scroll, and waits for mutations', async () => {
   let release!: () => void
   function Page() {
-    const [draft, setDraft] = usePageViewState('draft', '')
-    const edited = usePageViewRef('edited', false)
-    const retain = usePageRetention()
+    const [draft, setDraft] = useViewState('draft', '')
+    const edited = useViewRef('edited', false)
+    const retain = useViewRetention()
     return <div data-testid="list"><input aria-label="draft" value={draft} onChange={event => { edited.current = true; setDraft(event.target.value) }} />
       <button onClick={() => { release = retain() }}>save</button><span>{String(edited.current)}</span></div>
   }
-  const view = (active: boolean) => <RetainedPage page="browser" active={active} mobile={false} hasDock={false}><Page /></RetainedPage>
+  const view = (active: boolean) => <ViewBoundary page="browser" active={active} mobile={false} hasDock={false}><Page /></ViewBoundary>
   const rendered = render(view(true))
   const list = screen.getByTestId('list')
   Object.defineProperty(list, 'scrollHeight', { value: 1000 })

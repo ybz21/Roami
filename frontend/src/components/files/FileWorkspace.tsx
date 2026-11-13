@@ -4,7 +4,7 @@ import { usePageEffect } from '../../page-activity'
 // 两处复用：独立 Files 页（纯文件）与新标签 SoloTerminal（会话经 leading* 槽传入）。
 import { type ReactNode, Fragment, useEffect, useRef, useState } from 'react'
 import { App as AntApp, Dropdown, type MenuProps } from 'antd'
-import { useFilePageState, useForgetFilePageView } from './file-page-memory'
+import { useFileWorkspaceState, useForgetFilePageView } from './file-workspace-state'
 import FileBrowser from './FileBrowser'
 import { FileView } from './fileview'
 import { FileTypeIcon } from './file-icons'
@@ -65,7 +65,7 @@ export default function FileWorkspace({
   // 文件树的开合：外面给了回调就听外面的（会话页那枚「文件」按钮），没给就自己记
   // （独立文件页没有别的开关，握把是唯一入口）。
   const treeControlled = onExplorerClose != null || onExplorerOpen != null
-  const [treeOpenLocal, setTreeOpenLocal] = useFilePageState('workspace.treeOpen', true)
+  const [treeOpenLocal, setTreeOpenLocal] = useFileWorkspaceState('workspace.treeOpen', true)
   const treeOpen = treeControlled ? explorerOpen : treeOpenLocal
   const toggleTree = () => {
     if (!treeControlled) { setTreeOpenLocal((v) => !v); return }
@@ -73,11 +73,11 @@ export default function FileWorkspace({
   }
 
   // 两个编辑组：A 主（含固定首 tab）、B 副（filesB 非空时出现，即分栏）
-  const [filesA, setFilesA] = useFilePageState<string[]>('workspace.filesA', [])
-  const [filesB, setFilesB] = useFilePageState<string[]>('workspace.filesB', [])
-  const [activeA, setActiveA] = useFilePageState<string | null>('workspace.activeA', null) // null = 固定首 tab(会话)
-  const [activeB, setActiveB] = useFilePageState<string | null>('workspace.activeB', null)
-  const [focus, setFocus] = useFilePageState<Group>('workspace.focus', 'A')
+  const [filesA, setFilesA] = useFileWorkspaceState<string[]>('workspace.filesA', [])
+  const [filesB, setFilesB] = useFileWorkspaceState<string[]>('workspace.filesB', [])
+  const [activeA, setActiveA] = useFileWorkspaceState<string | null>('workspace.activeA', null) // null = 固定首 tab(会话)
+  const [activeB, setActiveB] = useFileWorkspaceState<string | null>('workspace.activeB', null)
+  const [focus, setFocus] = useFileWorkspaceState<Group>('workspace.focus', 'A')
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set())
   const [dropHint, setDropHint] = useState<Group | 'split' | null>(null) // 拖拽落点提示
   // tab 条容器引用：标签多到溢出时，新开/切到的 tab 可能落在横向滚动区域外点不到，
@@ -223,7 +223,7 @@ export default function FileWorkspace({
     const s = Number(localStorage.getItem('ttmux.fileSplitFrac'))
     return Number.isFinite(s) && s > 0 ? clampFrac(s) : 0.5
   })
-  const [swapped, setSwapped] = useFilePageState('workspace.swapped', false)
+  const [swapped, setSwapped] = useFileWorkspaceState('workspace.swapped', false)
   const leftGroup: Group = swapped ? 'B' : 'A'
 
   const fracRef = useRef(splitFrac)

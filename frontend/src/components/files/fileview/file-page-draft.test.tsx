@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
+import { WorkspaceStateStore, type ViewStateScope } from '../../../workspace-state'
 import { App as AntApp } from 'antd'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../../i18n'
-import { FilePageMemoryProvider } from '../file-page-memory'
+import { FileWorkspaceStateProvider } from '../file-workspace-state'
 import { api } from '../../../api'
-import RetainedPage from '../../../app/RetainedPage'
+import ViewBoundary from '../../../app/ViewBoundary'
 import { FileView } from './FileView'
 
 vi.mock('../../../api', () => ({ api: vi.fn(async () => ({ data: { content: 'original', mtime: 1 } })) }))
@@ -18,11 +19,11 @@ beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue(
 
 it('restores unsaved text and source/preview mode after leaving the file page', async () => {
   localStorage.setItem('ttmux-locale', 'en-US')
-  const memory = new Map()
+  const memory = new WorkspaceStateStore().scope('files')
   const dirty = vi.fn()
-  const mount = () => render(<I18nProvider><AntApp><FilePageMemoryProvider memory={memory}>
+  const mount = () => render(<I18nProvider><AntApp><FileWorkspaceStateProvider scope={memory}>
     <FileView path="/workspace/note.md" accent="var(--accent)" inline tabbed onClose={() => {}} onOpenPath={() => {}} onDirtyChange={dirty} />
-  </FilePageMemoryProvider></AntApp></I18nProvider>)
+  </FileWorkspaceStateProvider></AntApp></I18nProvider>)
   const first = mount()
   fireEvent.change(await screen.findByRole('textbox', { name: 'editor' }), { target: { value: 'unsaved draft' } })
   expect(dirty).toHaveBeenLastCalledWith('/workspace/note.md', true)
@@ -38,16 +39,16 @@ it('restores unsaved text and source/preview mode after leaving the file page', 
 })
 
 it('loads only active file tabs, aborts reads, and evicts clean content', async () => {
-  const memory = new Map()
-  const view = (active: boolean, path = '/workspace/one.txt') => <AntApp><FilePageMemoryProvider memory={memory}>
+  const memory = new WorkspaceStateStore().scope('files')
+  const view = (active: boolean, path = '/workspace/one.txt') => <AntApp><FileWorkspaceStateProvider scope={memory}>
     <FileView path={path} active={active} accent="var(--accent)" inline onClose={() => {}} onOpenPath={() => {}} />
-  </FilePageMemoryProvider></AntApp>
+  </FileWorkspaceStateProvider></AntApp>
   const rendered = render(view(false))
   expect(api).not.toHaveBeenCalled()
   rendered.rerender(view(true))
   expect((await screen.findByRole('textbox', { name: 'editor' }) as HTMLTextAreaElement).value).toBe('original')
   const signal = vi.mocked(api).mock.calls[0][3]?.signal
-  expect([...memory.keys()].some(key => key.endsWith('edit'))).toBe(false)
+  expect(memory.store.stats().entries).toBeLessThan(4)
   rendered.rerender(view(false))
   expect(signal?.aborted).toBe(true)
   rendered.rerender(view(true))
@@ -59,18 +60,18 @@ it('loads only active file tabs, aborts reads, and evicts clean content', async 
 })
 
 it('finishes a save across navigation and releases its saved baseline', async () => {
-  const memory = new Map()
+  const memory = new WorkspaceStateStore().scope('files')
   let finish!: (value: any) => void
-  const view = (active: boolean) => <I18nProvider><RetainedPage page="files" active={active} mobile={false} hasDock={false}>
-    <FilePageMemoryProvider memory={memory}><FileView path="/workspace/save.txt" accent="var(--accent)" inline onClose={() => {}} onOpenPath={() => {}} /></FilePageMemoryProvider>
-  </RetainedPage></I18nProvider>
+  const view = (active: boolean) => <I18nProvider><ViewBoundary page="files" active={active} mobile={false} hasDock={false}>
+    <FileWorkspaceStateProvider scope={memory}><FileView path="/workspace/save.txt" accent="var(--accent)" inline onClose={() => {}} onOpenPath={() => {}} /></FileWorkspaceStateProvider>
+  </ViewBoundary></I18nProvider>
   const rendered = render(view(true))
   fireEvent.change(await screen.findByRole('textbox', { name: 'editor' }), { target: { value: 'saved text' } })
   vi.mocked(api).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
   fireEvent.click(screen.getByRole('button', { name: /Save|保\s*存/ }))
   rendered.rerender(view(false))
   await act(async () => { finish({ data: { mtime: 2 } }) })
-  expect([...memory.keys()].some(key => key.endsWith('edit'))).toBe(false)
+  expect(!!memory.child('file', '/workspace/save.txt', 'source').get('edit')).toBe(false)
   expect(rendered.container.querySelector('[data-page=files]')?.childElementCount).toBe(0)
   vi.mocked(api).mockResolvedValueOnce({ data: { content: 'saved text', mtime: 2 } })
   rendered.rerender(view(true))

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+import { WorkspaceStateStore, type ViewStateScope } from '../../workspace-state'
 import { App as AntApp } from 'antd'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FileWorkspace from './FileWorkspace'
-import { FilePageMemoryProvider } from './file-page-memory'
+import { FileWorkspaceStateProvider } from './file-workspace-state'
 import { I18nProvider } from '../../i18n'
 import { requestIntent, OPEN_FILE_INTENT } from '../../intents'
 
@@ -44,16 +45,16 @@ describe('FileWorkspace resize shield', () => {
     vi.unstubAllGlobals()
   })
 
-  const renderWorkspace = (memory?: Map<string, unknown>) => render(
+  const renderWorkspace = (memory?: ViewStateScope) => render(
     <I18nProvider>
       <AntApp>
-        <FilePageMemoryProvider memory={memory}><FileWorkspace dir="/workspace" /></FilePageMemoryProvider>
+        <FileWorkspaceStateProvider scope={memory}><FileWorkspace dir="/workspace" /></FileWorkspaceStateProvider>
       </AntApp>
     </I18nProvider>,
   )
 
   it('restores tab order, selection and closed tabs after navigation', () => {
-    const memory = new Map<string, unknown>()
+    const memory = new WorkspaceStateStore().scope('files')
     const first = renderWorkspace(memory)
     act(() => requestIntent(OPEN_FILE_INTENT, { path: '/workspace/one.txt' }))
     act(() => requestIntent(OPEN_FILE_INTENT, { path: '/workspace/two.txt' }))

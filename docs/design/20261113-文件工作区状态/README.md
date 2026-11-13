@@ -17,32 +17,12 @@
 
 ## 技术设计
 
-### 页面保留与活动范围
+当前实现采用 [统一工作区状态架构](architecture.md)：`AppShell` 持有一个 `WorkspaceStateStore`，页面与资源使用 `ViewStateProvider` / `ViewBoundary` 及统一 Hooks 接入。文件、浏览器、手机、文件位置和旧表单草稿共用同一仓库，按节点、页面、资源隔离；不存在独立的文件页 Map 或浏览器页 Map。
 
-`AppRoutes` 为每个已访问的主导航页保存最近的路由，并使用独立的 `RetainedPage` 滚动容器、弹层宿主和 Suspense 边界。文件、浏览器、手机页隐藏后卸载内容树，只保存操作快照；设置、项目等有表单的页面保留控制器，避免丢失未提交的字段。切到会话时也遵循这套规则。关闭桌面页面标签时释放对应实例与快照，未访问的页面不挂载。
-
-`PageActivityProvider` 将页面是否在前台与文档可见性组合。页面的轮询、连接和全局输入监听使用 `usePageEffect`：隐藏时清理，恢复时重新建立，不清空 React state。应用壳层与终端等无页面范围的调用保持原有行为。共享会话订阅暂停观察时保留上一份快照。设置草稿的刷新离开警告继续覆盖隐藏页面。
-
-每个页面的 Ant Design 弹层在独立的 body 容器中渲染，隐藏页面时一起隐藏，避免遮住其他页面。手机二级页与检查器同样遵循活动范围。首页隐藏时暂停自动选会话、标已读和向手机顶栏插入操作。浏览器 / 手机镜像暂停连接后恢复原选项；浏览器地址草稿不会被恢复轮询覆盖。文件页隐藏时释放 Monaco / 预览实例，沿用已有滚动记忆。
-
-### 内存策略
-
-`page-view-state.tsx` 只保存浏览器目标、地址草稿、跟随模式、分组、标签 ID 顺序，以及手机应用目录的展开 / 查询状态；不保存镜像帧、标签正文或应用列表。状态更新同步写入快照，避免异步操作完成与卸载同批发生时丢失最终选择。`page-scroll.ts` 记录滚动容器的子节点路径和坐标，不持有 DOM；等待内容到达后恢复，用户开始触摸或滚轮操作时停止自动恢复。
-
-`usePageRetention` 为进行中的保存、浏览器修改操作及文件上传 / 下载暂时保留控制器；操作完成后释放；原生文件夹上传的完成回调在后台仍可接收，避免一直保留上传控制器。打开的文件表单也暂时保留，关闭后恢复按需卸载。后台活动仍由 `PageActivityProvider` 暂停，因此暂留控制器不会恢复镜像或文件轮询。
-
-隐藏页面释放 OKR 图表 iframe / 消息通道和 Swarm WebGL 场景；手机镜像清理图片地址与 object URL。Monaco 保存快捷键改用可释放的 `addAction`，卸载时调用 `dispose`；原 `addCommand` 返回的只是字符串 ID，会把处理器全局注册并留住旧编辑器。
-
-与首次状态保留实现 `148694f9` 对比，生产构建打开同样 30 个 480 KiB 文件、切换 20 轮后，V8 JavaScript 堆从 51.3 MiB 降至 29.6 MiB（约 42%），详见 [内存验收](memory-acceptance.md)。这是特定场景下的堆测量，不代表整个 Chrome 进程 RSS、GPU 或后端内存。
-
-### 文件页快照
-
-`AppShell` 的 `useFilePageMemory` 持有每个节点的独立内存快照，经 `AppRoutes` 传给 `FilesPage`。只有独立文件页的 `FilePageMemoryProvider` 启用记忆；会话文件面板和其他复用组件继续遵循原有生命周期。
-
-`useFilePageState` 在提交后记录工作区和目录状态。`FileWorkspace` 保存标签、当前选中项、分组、焦点和左右排列；显式关闭文件时释放对应文件缓存。`FileBrowser` 保存目录、列表快照、历史、路径输入、排序和搜索，首次挂载不再重置目录。路径栏只通过 `Input.Search.onSearch` 提交，避免 Enter 同时被两个处理器提交而破坏历史索引。
-
-`FileView` 只为激活标签读取正文。干净文件切走后释放正文和草稿，恢复时重新读取；只有未保存文件保存原始基线与当前草稿。源码 / 预览模式、标签和位置始终独立保存。保存完成时同步更新缓存基线，保留保存过程中继续输入的内容。文件路径变化创建独立内容实例，旧请求取消且不允许晚到结果写入新文件。源码编辑器及 HTML / Markdown 的滚动记忆复用现有实现。
+`definePage` 声明页面生命周期，新增页面默认隐藏后卸载。已有复杂表单显式保留控制器，活动范围仍负责暂停后台任务。状态分为视图、受保护草稿和有界可重建缓存；资源实例不进入仓库。
 
 ## 验收
 
-初版行为记录见 [acceptance.md](acceptance.md)，当前内存策略与再次行为验收见 [memory-acceptance.md](memory-acceptance.md)。一次性截图放在 PR 的 `pr-shots` 分支，不提交到主分支。
+当前架构的接入约定、模块关系和迁移边界见 [architecture.md](architecture.md)，行为及生产版内存对照见 [architecture-acceptance.md](architecture-acceptance.md)。
+
+初版行为记录见 [acceptance.md](acceptance.md)，上一轮内存优化记录见 [memory-acceptance.md](memory-acceptance.md)。一次性截图放在 PR 的 `pr-shots` 分支，不提交到主分支。

@@ -1,6 +1,6 @@
-import { usePageRetention } from '../../../page-view-state'
+import { ViewStateProvider, useViewRetention, useViewScope, useViewState } from '../../../view-state'
 import { usePageActive, usePageEffect } from '../../../page-activity'
-import { useFilePageState, useFilePageCache } from '../file-page-memory'
+import { useFileResourceScope } from '../file-workspace-state'
 import BackButton from '../../BackButton'
 // 文件展示组件（容器）——页面统一引用它来「展示一个文件」。
 // 职责：按路径取内容、活重载轮询、脏/保存、源码⇄渲染切换、标题栏与外壳（inline/modal）；
@@ -27,7 +27,8 @@ import { MediaView } from './MediaView'
 import { ChevronRight, CopyIcon, WarnIcon } from '../../../icons'
 
 export function FileView(props: Parameters<typeof FileViewBody>[0]) {
-  return <FileViewBody key={`${props.path}:${!!props.forcePreview}`} {...props} />
+  const scope = useFileResourceScope(props.path, props.forcePreview)
+  return <ViewStateProvider scope={scope}><FileViewBody key={`${props.path}:${!!props.forcePreview}`} {...props} /></ViewStateProvider>
 }
 
 function FileViewBody({
@@ -67,7 +68,7 @@ function FileViewBody({
   // 从对话页点「Grep 命中 path:line」跳过来时定位到那一行；nonce 让重复点同一处也能再次定位
   revealLine?: { line: number; nonce: number }
 }) {
-  const retain = usePageRetention()
+  const retain = useViewRetention()
   const kind = fileKind(path)
   const pageActive = usePageActive()
   const { isImg, isVideo, isAudio, isMd, isHtml, isPdf, isOffice, isSheet } = kind
@@ -81,17 +82,16 @@ function FileViewBody({
   const downloadUrl = `${rawUrl}&dl=1`
   const downloadName = fileNameOf(path)
   const previewHeight = inline ? '100%' : '74vh'
-  const stateKey = `view:${JSON.stringify(path)}:${forcePreview ? 'preview' : 'file'}:`
-  const memory = useFilePageCache()
-  const savedEdit = memory?.get(stateKey + 'edit') as { data: any; draft: string } | undefined
+  const memory = useViewScope()
+  const savedEdit = memory.get('edit') as { data: any; draft: string } | undefined
   const [data, setData] = useState<any>(() => savedEdit?.data || null)
   const [err, setErr] = useState('')
-  const [source, setSource] = useFilePageState(stateKey + 'source', !!tabbed && MD_EXT.includes(extOf(path))) // 源码/渲染切换
+  const [source, setSource] = useViewState('source', !!tabbed && MD_EXT.includes(extOf(path))) // 源码/渲染切换
   const agents = useRegisteredAgents()
   const [agentPick, setAgentPick] = useState(false)
   const [draft, setDraft] = useState(() => savedEdit?.draft || '') // 编辑器当前文本
   const [saving, setSaving] = useState(false)
-  const [stale, setStale] = useFilePageState(stateKey + 'stale', false) // 磁盘上文件已被外部(cc/codex)改动，但本地有未保存改动没自动覆盖
+  const [stale, setStale] = useViewState('stale', false) // 磁盘上文件已被外部(cc/codex)改动，但本地有未保存改动没自动覆盖
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const { mode } = useThemeMode()
@@ -101,9 +101,9 @@ function FileViewBody({
   const dirty = editable && data ? draft !== data.content : false
   const edit = useRef({ data, draft, dirty, saving }); edit.current = { data, draft, dirty, saving }
   useEffect(() => {
-    if (dirty || saving) memory?.set(stateKey + 'edit', { data, draft })
-    else memory?.delete(stateKey + 'edit')
-  }, [memory, stateKey, data, draft, dirty, saving])
+    if (dirty || saving) memory.set('edit', { data, draft }, 'draft')
+    else memory.delete('edit')
+  }, [memory, data, draft, dirty, saving])
   useEffect(() => { onDirtyChange?.(path, dirty); return () => onDirtyChange?.(path, false) }, [dirty, path])
 
   const save = async () => {
@@ -113,8 +113,8 @@ function FileViewBody({
     try {
       const res = await api('POST', '/file/save', { path, content: draft })
       const baseline = { ...edit.current.data, content: draft, mtime: res.data?.mtime ?? edit.current.data?.mtime }
-      if (edit.current.draft === draft) memory?.delete(stateKey + 'edit')
-      else memory?.set(stateKey + 'edit', { data: baseline, draft: edit.current.draft })
+      if (edit.current.draft === draft) memory.delete('edit')
+      else memory.set('edit', { data: baseline, draft: edit.current.draft }, 'draft')
       setData(baseline) // 基线更新 → dirty 归零；mtime 同步避免自触发重载
       setStale(false)
       message.success(t('file.saved'))

@@ -1,8 +1,8 @@
-import { usePageRetention } from '../../page-view-state'
+import { useViewRetention } from '../../view-state'
 import { usePageActive, usePageEffect } from '../../page-activity'
 // 文件侧栏 —— 在 Claude / Codex 对话页右侧浏览工作目录、查看文件内容（类似 codex 右侧边栏）。
 // 单层可导航列表：目录在前可进入、↑ 回上级、点文件在弹层里查看正文。
-import { useFilePageState } from './file-page-memory'
+import { useFileWorkspaceState } from './file-workspace-state'
 import { type ReactNode, Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { nodeApi } from '../cluster/node-url'
 import { AutoComplete, Button, ConfigProvider, Dropdown, Input, Modal, Spin, App as AntApp, Tooltip, type MenuProps } from 'antd'
@@ -401,18 +401,18 @@ export default function FileBrowser({
   // 外层当前激活的文件 tab，用于在浏览器里高亮选中项（覆盖内部 view）。
   selectedPath?: string | null
 }) {
-  const retain = usePageRetention()
+  const retain = useViewRetention()
   const pageActive = usePageActive()
-  const [path, setPath] = useFilePageState('browser.path', dir || '')
-  const [data, setData] = useFilePageState<Dir | null>('browser.data', null)
+  const [path, setPath] = useFileWorkspaceState('browser.path', dir || '')
+  const [data, setData] = useFileWorkspaceState<Dir | null>('browser.data', null, 'cache')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
-  const [view, setView] = useFilePageState<string | null>('browser.view', null)
-  const [pathDraft, setPathDraft] = useFilePageState('browser.pathDraft', displayPath(path))
+  const [view, setView] = useFileWorkspaceState<string | null>('browser.view', null)
+  const [pathDraft, setPathDraft] = useFileWorkspaceState('browser.pathDraft', displayPath(path))
   const [tick, setTick] = useState(0) // 上传后强制重载当前目录
   const [uploading, setUploading] = useState(false)
-  const [history, setHistory] = useFilePageState<string[]>('browser.history', [dir || '']) // 浏览器式前进/后退历史
-  const [histIdx, setHistIdx] = useFilePageState('browser.histIdx', 0)
+  const [history, setHistory] = useFileWorkspaceState<string[]>('browser.history', [dir || '']) // 浏览器式前进/后退历史
+  const [histIdx, setHistIdx] = useFileWorkspaceState('browser.histIdx', 0)
   const [mkdirOpen, setMkdirOpen] = useState(false)
   const [mkdirName, setMkdirName] = useState('')
   const [mkdirBusy, setMkdirBusy] = useState(false)
@@ -434,16 +434,16 @@ export default function FileBrowser({
   const [propertiesTarget, setPropertiesTarget] = useState<FileTarget | null>(null)
   const [properties, setProperties] = useState<FileStat | null>(null)
   const [propertiesLoading, setPropertiesLoading] = useState(false)
-  const [showHidden, setShowHidden] = useFilePageState('browser.showHidden', false) // 隐藏文件（点号开头）默认不显示，眼睛开关切换
-  const [sortKey, setSortKey] = useFilePageState<SortKey>('browser.sortKey', 'name')
+  const [showHidden, setShowHidden] = useFileWorkspaceState('browser.showHidden', false) // 隐藏文件（点号开头）默认不显示，眼睛开关切换
+  const [sortKey, setSortKey] = useFileWorkspaceState<SortKey>('browser.sortKey', 'name')
   // P2P 传输可见状态：按 transferId 维护进行中的下载，展示角标/进度/详情（§5.7）。
   const [transfers, setTransfers] = useState<TransferView[]>([])
   // 递归按文件名搜索（当前目录向下），放大镜开关切换；有查询词时列表区改显搜索结果。
-  const [searchOpen, setSearchOpen] = useFilePageState('browser.searchOpen', chrome === 'tree') // 树模式一上来就带搜索框
+  const [searchOpen, setSearchOpen] = useFileWorkspaceState('browser.searchOpen', chrome === 'tree') // 树模式一上来就带搜索框
   // Keep in-flight transfers and open forms until their state has settled.
   const hold = uploading || mkdirOpen || mkdirBusy || !!touchDir || touchBusy || !!renameTarget || renameBusy || !!moveTarget || moveBusy || !!copyTarget || copyBusy || !!propertiesTarget || transfers.length > 0
   useEffect(() => hold ? retain() : undefined, [hold, retain])
-  const [query, setQuery] = useFilePageState('browser.query', '')
+  const [query, setQuery] = useFileWorkspaceState('browser.query', '')
   const searchRef = useRef<import('antd').InputRef>(null)
   useEffect(() => { if (focusSearchNonce) { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 0) } }, [focusSearchNonce])
   const [results, setResults] = useState<{ path: string; name: string; rel: string }[] | null>(null)

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
+import { WorkspaceStateStore, type ViewStateScope } from '../../workspace-state'
 import { App as AntApp } from 'antd'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import RetainedPage from '../../app/RetainedPage'
+import ViewBoundary from '../../app/ViewBoundary'
 import FileBrowser from './FileBrowser'
-import { FilePageMemoryProvider } from './file-page-memory'
+import { FileWorkspaceStateProvider } from './file-workspace-state'
 import { I18nProvider } from '../../i18n'
 
 vi.mock('../../App', () => ({ recentDirs: () => [] }))
@@ -60,13 +61,13 @@ describe('FileBrowser folder context menu', () => {
     vi.unstubAllGlobals()
   })
 
-  const renderBrowser = (memory?: Map<string, unknown>) => render(
+  const renderBrowser = (memory?: ViewStateScope) => render(
     <I18nProvider>
       <AntApp>
         {/* 原来这里套的是 FloatingFileDrawer（右侧 420 浮层）。它已经下线——文件树
             进了 Inspector 列（图纸 panels-desktop.html），容器只剩一个定宽的 flex 列。 */}
         <div style={{ display: 'flex', flexDirection: 'column', width: 420, height: 600 }}>
-          <FilePageMemoryProvider memory={memory}><FileBrowser dir="/workspace" layout="dock" /></FilePageMemoryProvider>
+          <FileWorkspaceStateProvider scope={memory}><FileBrowser dir="/workspace" layout="dock" /></FileWorkspaceStateProvider>
         </div>
       </AntApp>
     </I18nProvider>,
@@ -80,7 +81,7 @@ describe('FileBrowser folder context menu', () => {
       if (url.pathname.endsWith('/files')) return jsonResponse({ data: { path, parent: '/workspace', entries: [] } })
       return jsonResponse({ data: {} })
     })
-    const memory = new Map<string, unknown>()
+    const memory = new WorkspaceStateStore().scope('files')
     const first = renderBrowser(memory)
     const path = await screen.findByRole('combobox')
     await waitFor(() => expect((path as HTMLInputElement).value).toBe('/workspace'))
@@ -154,7 +155,7 @@ describe('FileBrowser folder context menu', () => {
 
   it('finishes native uploads in the background and releases the retained page', async () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('RoamiApp/1.0')
-    const view = (active: boolean) => <I18nProvider><RetainedPage page="files" active={active} mobile={false} hasDock={false}><FileBrowser dir="/workspace" layout="dock" /></RetainedPage></I18nProvider>
+    const view = (active: boolean) => <I18nProvider><ViewBoundary page="files" active={active} mobile={false} hasDock={false}><FileBrowser dir="/workspace" layout="dock" /></ViewBoundary></I18nProvider>
     const rendered = render(view(true))
     await screen.findByText('folder')
     fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }))

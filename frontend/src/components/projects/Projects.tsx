@@ -1,3 +1,4 @@
+import { useViewState } from '../../view-state'
 import { usePageEffect } from '../../page-activity'
 import BackButton, { BackLink } from '../BackButton'
 import SessionLocation from '../sessions/SessionLocation'
@@ -471,11 +472,11 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
 
   // 搜索 + 筛选（14 §6.1）：项目一多，「哪些还欠着事」比「一共有几个」有用得多
   const { phone: isPhone } = useLayout()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useViewState('projects.query', '')
   const [searching, setSearching] = useState(false)
   const [sortSheet, setSortSheet] = useState(false)
   const searchRef = useRef<InputRef>(null)
-  const [filter, setFilter] = useState<ProjFilter>('all')
+  const [filter, setFilter] = useViewState<ProjFilter>('projects.filter', 'all')
 
   const needsOf = (p: Proj) => projNeeds(p, swarms)
   // 排序：置顶恒在最前；需要你(默认) / 名称(稳定) / 创建时间 / 最近活跃

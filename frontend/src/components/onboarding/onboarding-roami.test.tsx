@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { WorkspaceStateProvider } from '../../view-state'
+import { WorkspaceStateStore } from '../../workspace-state'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { App } from 'antd'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -8,7 +10,10 @@ import OnboardingRoami from './OnboardingRoami'
 const fixture = vi.hoisted(() => ({ api: vi.fn(), catalog: {} as any, models: { verified: true }, fail: false }))
 vi.mock('../../api', () => ({ api: (...args: any[]) => fixture.api(...args) }))
 vi.mock('./onboarding-state', () => ({ onboardingChanged: vi.fn(), useOnboardingState: () => ({ value: { models: fixture.models }, loading: false }) }))
+let workspaceState: WorkspaceStateStore
+const wrapper = ({ children }: { children: React.ReactNode }) => <WorkspaceStateProvider store={workspaceState}>{children}</WorkspaceStateProvider>
 beforeEach(() => {
+  workspaceState = new WorkspaceStateStore()
   localStorage.clear(); localStorage.setItem('ttmux-locale', 'zh-CN')
   fixture.fail = false; fixture.models.verified = true
   fixture.catalog = { revision: 'r1', sources: [], models: [
@@ -25,7 +30,7 @@ beforeEach(() => {
   })
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
-const show = (ready = vi.fn(), nav = vi.fn()) => ({ ready, nav, ...render(<I18nProvider><App><OnboardingRoami onNav={nav} onReadyChange={ready} /></App></I18nProvider>) })
+const show = (ready = vi.fn(), nav = vi.fn()) => ({ ready, nav, ...render(<I18nProvider><App><OnboardingRoami onNav={nav} onReadyChange={ready} /></App></I18nProvider>, { wrapper }) })
 it('reuses catalog role binding and requires verification after changing the selected model', async () => {
   const view = show()
   await waitFor(() => expect(view.ready).toHaveBeenLastCalledWith(true))

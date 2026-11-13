@@ -1,6 +1,6 @@
-# 页面状态与内存验收
+# 页面状态与内存验收（887898a0）
 
-2026-11-13。对照基线为初次状态保留实现 `148694f9`，优化版本为同一任务分支的本次修改。原始测量和行为断言见 [memory-acceptance.json](memory-acceptance.json)。没有新增产品文案。
+2026-11-13。对照基线为初次状态保留实现 `148694f9`，优化版本为同一任务分支的本次修改。该记录对应统一架构迁移前的内存优化版本，后续架构验收见 [architecture-acceptance.md](architecture-acceptance.md)。原始测量和行为断言见 [memory-acceptance.json](memory-acceptance.json)。没有新增产品文案。
 
 ## 测量方法
 
