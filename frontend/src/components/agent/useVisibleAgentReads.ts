@@ -1,8 +1,9 @@
-import { useEffect, type RefObject } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { type RefObject } from 'react'
 import { api } from '../../api'
 
 export function useVisibleAgentReads(cid: string, root: RefObject<HTMLDivElement>, messageEvents: string, onRead: () => void) {
-  useEffect(() => {
+  usePageEffect(() => {
     if (!cid || !root.current || !globalThis.IntersectionObserver) return
     let candidate = 0, acknowledged = 0, stopped = false
     let timer: ReturnType<typeof setTimeout> | undefined

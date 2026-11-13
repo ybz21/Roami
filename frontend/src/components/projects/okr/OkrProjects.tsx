@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { usePageEffect } from '../../../page-activity'
+import { useRef, useState } from 'react'
 import { Button, Input, Modal, Select, Spin } from 'antd'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
@@ -26,7 +27,7 @@ export default function OkrProjects({ projects, loaded, error, retry }: {
   const [project, setProject] = useState<string>()
   const [search, setSearch] = useState('')
   const poll = useRef<ReturnType<typeof pollWhileVisible> | null>(null)
-  useEffect(() => {
+  usePageEffect(() => {
     const loader = pollWhileVisible(async signal => {
       try {
         const response = await api('GET', '/okr', undefined, { signal })

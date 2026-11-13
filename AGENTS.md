@@ -268,6 +268,18 @@ Claude Code and Codex render their own alternate-screen TUIs inside our panes. A
 scrolls, resizes, or replays those panes has to account for alternate-screen mode (mouse-wheel
 synthesis, not copy-mode) and for redraw quirks on narrow widths.
 
+## Navigation State Has One Owner
+
+State that survives navigation uses the workspace store and scoped Hooks in
+`frontend/src/view-state.tsx`, with `ViewBoundary` and `definePage` for lifecycle declarations.
+Scope snapshots by node, page, and resource; do not add another page-specific or module-global
+snapshot Map. New pages default to unmounting when hidden; explicitly retain legacy controllers
+only while their local interaction state still requires it. Store plain data, never DOM, editor,
+image, connection, or timer instances. Rebuildable data uses the bounded `cache` policy; unsaved
+content uses protected `draft` entries and is removed only after saving or explicit discard.
+Runtime resources remain component-owned and clean up through the activity lifecycle.
+See [the architecture and integration contract](docs/design/20261113-文件工作区状态/architecture.md).
+
 ## Preferences Arrive Late
 
 `usePreferences()` serves defaults until the `/preferences` GET lands, so the first render of any

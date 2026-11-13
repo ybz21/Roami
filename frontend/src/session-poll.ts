@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { api } from './api'
 import { currentNodeId, useCurrentNodeId } from './components/cluster/node-url'
 import { pollWhileVisible } from './visible-poll'
+import { usePageActive } from './page-activity'
 
 /** Consumers on the same machine share a request and an unchanged snapshot. */
 export function createSessionPoll<T>(path: string, interval: number, initial: T, read: (response: any) => T, shouldPoll: (value: T) => boolean = () => true) {
@@ -52,11 +53,12 @@ export function createSessionPoll<T>(path: string, interval: number, initial: T,
   }
 
   return function useSessionPoll(enabled = true) {
+    const active = usePageActive()
     const node = useCurrentNodeId()
     const store = useMemo(() => {
       if (!current || current.node !== node) current = { node, store: createStore(node) }
       return current.store
     }, [node])
-    return useSyncExternalStore(enabled ? store.subscribe : idleSubscribe, enabled ? store.getSnapshot : emptySnapshot, emptySnapshot)
+    return useSyncExternalStore(enabled && active ? store.subscribe : idleSubscribe, enabled ? store.getSnapshot : emptySnapshot, emptySnapshot)
   }
 }

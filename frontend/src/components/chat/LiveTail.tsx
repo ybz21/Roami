@@ -1,10 +1,11 @@
+import { usePageEffect } from '../../page-activity'
 // 实时回显（会话还在生成时，从终端 capture 里扒出来的那截）。
 //
 // 从前是把 TUI 尾巴原样倒出来的一坨 pre：`└` 框线、`✔ □` 字符图标、会话名、
 // 连用户自己刚发的那句都回显一遍，还跟上面的「正在生成」气泡重复说了两次。
 // 现在收成一张卡，和运行组同一套语言：一条左脊 + 一个头 + 一段带终端底的身子，
 // 行按类型画（命令 / 待办 / 正文），字符图标一律换成 SVG（图标硬规则）。
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { api } from '../../api'
 import { detectPrompt } from '../prompt'
 import { useI18n } from '../../i18n'
@@ -65,7 +66,7 @@ export function LiveTail({ name, accent, idle, lastUser }: {
   const { t } = useI18n()
   const [raw, setRaw] = useState('')
   const [open, setOpen] = useState(true)
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const poll = async () => {
       try {

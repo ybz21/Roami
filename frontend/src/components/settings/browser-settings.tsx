@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useSettingsRead } from './settings-read'
 // Chrome(浏览器镜像)启动配置：模式 / 窗口尺寸 / 全屏 / 缩放 / profile(data-dir) / 可执行路径。
 // 持久化到后端 browser-config.json。
@@ -56,7 +57,7 @@ export function BrowserSettings({ onRestartReady }: { onRestartReady?: (run: (()
     }))
     return () => onRestartReady?.(null)
   }, [!!readState, onRestartReady, t])
-  useEffect(() => {
+  usePageEffect(() => {
     const poll = pollWhileVisible(async signal => {
       try { const response = await api('GET', '/browser/health', undefined, { signal }); if (!signal.aborted) setHealth(response.data) }
       catch (error) { if (!signal.aborted) setHealth(null); throw error }

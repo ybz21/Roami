@@ -1,3 +1,6 @@
+import { ViewStateProvider, useViewRetention, useViewScope, useViewState } from '../../../view-state'
+import { usePageActive, usePageEffect } from '../../../page-activity'
+import { useFileResourceScope } from '../file-workspace-state'
 import BackButton from '../../BackButton'
 // 文件展示组件（容器）——页面统一引用它来「展示一个文件」。
 // 职责：按路径取内容、活重载轮询、脏/保存、源码⇄渲染切换、标题栏与外壳（inline/modal）；
@@ -23,7 +26,12 @@ import { OfficeView } from './OfficeView'
 import { MediaView } from './MediaView'
 import { ChevronRight, CopyIcon, WarnIcon } from '../../../icons'
 
-export function FileView({
+export function FileView(props: Parameters<typeof FileViewBody>[0]) {
+  const scope = useFileResourceScope(props.path, props.forcePreview)
+  return <ViewStateProvider scope={scope}><FileViewBody key={`${props.path}:${!!props.forcePreview}`} {...props} /></ViewStateProvider>
+}
+
+function FileViewBody({
   path,
   accent,
   inline,
@@ -60,7 +68,9 @@ export function FileView({
   // 从对话页点「Grep 命中 path:line」跳过来时定位到那一行；nonce 让重复点同一处也能再次定位
   revealLine?: { line: number; nonce: number }
 }) {
+  const retain = useViewRetention()
   const kind = fileKind(path)
+  const pageActive = usePageActive()
   const { isImg, isVideo, isAudio, isMd, isHtml, isPdf, isOffice, isSheet } = kind
   // 二进制里能就地播/看的那几类：都不走 /file 取正文（取回来是一大坨乱码），直接交给 raw。
   const isMedia = isVideo || isAudio
@@ -72,14 +82,16 @@ export function FileView({
   const downloadUrl = `${rawUrl}&dl=1`
   const downloadName = fileNameOf(path)
   const previewHeight = inline ? '100%' : '74vh'
-  const [data, setData] = useState<any>(null)
+  const memory = useViewScope()
+  const savedEdit = memory.get('edit') as { data: any; draft: string } | undefined
+  const [data, setData] = useState<any>(() => savedEdit?.data || null)
   const [err, setErr] = useState('')
-  const [source, setSource] = useState(false) // markdown/HTML：源码/渲染切换
+  const [source, setSource] = useViewState('source', !!tabbed && MD_EXT.includes(extOf(path))) // 源码/渲染切换
   const agents = useRegisteredAgents()
   const [agentPick, setAgentPick] = useState(false)
-  const [draft, setDraft] = useState('') // 编辑器当前文本
+  const [draft, setDraft] = useState(() => savedEdit?.draft || '') // 编辑器当前文本
   const [saving, setSaving] = useState(false)
-  const [stale, setStale] = useState(false) // 磁盘上文件已被外部(cc/codex)改动，但本地有未保存改动没自动覆盖
+  const [stale, setStale] = useViewState('stale', false) // 磁盘上文件已被外部(cc/codex)改动，但本地有未保存改动没自动覆盖
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const { mode } = useThemeMode()
@@ -87,40 +99,57 @@ export function FileView({
   // 可编辑：文本/代码/JSON/Markdown（源码）；二进制、被截断的大文件、表格/图片/PDF/Office 不可编辑。
   const editable = !!data && !data.binary && !data.truncated && !isSheet && !rawOnly
   const dirty = editable && data ? draft !== data.content : false
+  const edit = useRef({ data, draft, dirty, saving }); edit.current = { data, draft, dirty, saving }
+  useEffect(() => {
+    if (dirty || saving) memory.set('edit', { data, draft }, 'draft')
+    else memory.delete('edit')
+  }, [memory, data, draft, dirty, saving])
   useEffect(() => { onDirtyChange?.(path, dirty); return () => onDirtyChange?.(path, false) }, [dirty, path])
 
   const save = async () => {
     if (!editable || saving || !dirty) return
+    const release = retain()
     setSaving(true)
     try {
       const res = await api('POST', '/file/save', { path, content: draft })
-      setData((d: any) => ({ ...d, content: draft, mtime: res.data?.mtime ?? d?.mtime })) // 基线更新 → dirty 归零；mtime 同步避免自触发重载
+      const baseline = { ...edit.current.data, content: draft, mtime: res.data?.mtime ?? edit.current.data?.mtime }
+      if (edit.current.draft === draft) memory.delete('edit')
+      else memory.set('edit', { data: baseline, draft: edit.current.draft }, 'draft')
+      setData(baseline) // 基线更新 → dirty 归零；mtime 同步避免自触发重载
       setStale(false)
       message.success(t('file.saved'))
     } catch (e: any) {
       message.error(t('file.saveFailed', { message: e.message }))
     } finally {
       setSaving(false)
+      release()
     }
   }
   // Monaco 的 Ctrl+S 命令在挂载时捕获闭包，用 ref 始终指向最新 save，避免存到旧文本。
   const saveRef = useRef(save)
   saveRef.current = save
 
-  useEffect(() => {
-    if (rawOnly) return // 图片/音视频/PDF/Office 直接走 raw 或专用面板
-    // tab 语境的 markdown 默认进编辑器(源码)、点预览才渲染;HTML 则默认直接渲染
-    // (打开网页多是想看效果,不是编辑),两者都可用「源码/渲染」钮切换。
-    setData(null); setErr(''); setStale(false); setSource(!!tabbed && MD_EXT.includes(extOf(path))); setDraft('')
-    api('GET', `/file?path=${encodeURIComponent(path)}`).then((r) => { setData(r.data); setDraft(r.data?.content || '') }).catch((e) => setErr(e.message))
-  }, [path, rawOnly])
+  usePageEffect(() => {
+    if (!active || rawOnly) return
+    const controller = new AbortController()
+    if (!edit.current.data) {
+      setErr(''); setStale(false)
+      api('GET', `/file?path=${encodeURIComponent(path)}`, undefined, { signal: controller.signal })
+        .then((r) => { if (!controller.signal.aborted) { setData(r.data); setDraft(r.data?.content || '') } })
+        .catch((e) => { if (!controller.signal.aborted) setErr(e.message) })
+    }
+    return () => {
+      controller.abort()
+      if (!edit.current.dirty && !edit.current.saving) { setData(null); setDraft('') }
+    }
+  }, [path, rawOnly, active])
 
   // 从磁盘重载（放弃本地未保存改动）
   const reloadFromDisk = () => {
     api('GET', `/file?path=${encodeURIComponent(path)}`).then((r) => { setData(r.data); setDraft(r.data?.content || ''); setStale(false) }).catch(() => {})
   }
   // 外部(cc/codex 等)改动已打开的文件 → 轮询 mtime：无本地改动自动重载渲染；有未保存改动只提示不覆盖。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!active || !data || err || rawOnly) return
     let stop = false
     const h = setInterval(async () => {
@@ -136,7 +165,7 @@ export function FileView({
   }, [active, data?.mtime, dirty, path, rawOnly, err])
 
   // 非激活 tab：只占位、不挂载重型 Monaco/预览（state 已在上面 hook 里保留，切回来不丢编辑）。
-  if (!active) return <div style={{ height: '100%' }} />
+  if (!active || !pageActive) return <div style={{ height: '100%' }} />
 
   const name = fileNameOf(path)
   const copyPath = async () => {

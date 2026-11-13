@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import BackButton from '../BackButton'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Input, Modal, Popconfirm, Select, Spin, message } from 'antd'
@@ -38,12 +39,12 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
   const [failed, setFailed] = useState(false), [version, setVersion] = useState(0)
   const [query, setQuery] = useState(''), [busy, setBusy] = useState('')
   const [launching, setLaunching] = useState(false)
-  useEffect(() => {
+  usePageEffect(() => {
     const changed = () => setVersion(value => value + 1)
     window.addEventListener('roam:agent-models-changed', changed)
     return () => window.removeEventListener('roam:agent-models-changed', changed)
   }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     const poll = pollWhileVisible(async signal => {
       try {
         const rows = await discoverAgents(signal)

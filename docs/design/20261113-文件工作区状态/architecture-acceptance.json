@@ -1,0 +1,679 @@
+{
+  "before": {
+    "variant": "before",
+    "source": "887898a0",
+    "files": 30,
+    "bytesPerFile": 491520,
+    "measure": "CDP heap after 2 forced GC, fresh browser context, production build",
+    "samples": [
+      {
+        "phase": "one-file-active",
+        "heapBytes": 32488476,
+        "documents": 3,
+        "nodes": 2552,
+        "jsEventListeners": 1091,
+        "hiddenFilesChildren": 1
+      },
+      {
+        "phase": "thirty-files-active",
+        "heapBytes": 37558684,
+        "documents": 3,
+        "nodes": 3333,
+        "jsEventListeners": 1027,
+        "hiddenFilesChildren": 1
+      },
+      {
+        "phase": "files-browser-hidden",
+        "heapBytes": 28554088,
+        "documents": 3,
+        "nodes": 783,
+        "jsEventListeners": 956,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-1",
+        "heapBytes": 28928392,
+        "documents": 3,
+        "nodes": 788,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-2",
+        "heapBytes": 29076180,
+        "documents": 3,
+        "nodes": 790,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-3",
+        "heapBytes": 29183012,
+        "documents": 3,
+        "nodes": 792,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-4",
+        "heapBytes": 29313236,
+        "documents": 3,
+        "nodes": 794,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-5",
+        "heapBytes": 29444924,
+        "documents": 3,
+        "nodes": 796,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-6",
+        "heapBytes": 29510176,
+        "documents": 3,
+        "nodes": 798,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-7",
+        "heapBytes": 29548808,
+        "documents": 3,
+        "nodes": 800,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-8",
+        "heapBytes": 29767216,
+        "documents": 3,
+        "nodes": 802,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-9",
+        "heapBytes": 30026464,
+        "documents": 3,
+        "nodes": 804,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-10",
+        "heapBytes": 30099536,
+        "documents": 3,
+        "nodes": 806,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-11",
+        "heapBytes": 30177188,
+        "documents": 3,
+        "nodes": 808,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-12",
+        "heapBytes": 30231904,
+        "documents": 3,
+        "nodes": 810,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-13",
+        "heapBytes": 30313568,
+        "documents": 3,
+        "nodes": 812,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-14",
+        "heapBytes": 30338764,
+        "documents": 3,
+        "nodes": 814,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-15",
+        "heapBytes": 30330344,
+        "documents": 3,
+        "nodes": 816,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-16",
+        "heapBytes": 30376112,
+        "documents": 3,
+        "nodes": 818,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-17",
+        "heapBytes": 30424656,
+        "documents": 3,
+        "nodes": 820,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-18",
+        "heapBytes": 30470312,
+        "documents": 3,
+        "nodes": 822,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-19",
+        "heapBytes": 30480968,
+        "documents": 3,
+        "nodes": 824,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-20",
+        "heapBytes": 30521120,
+        "documents": 3,
+        "nodes": 826,
+        "jsEventListeners": 952,
+        "hiddenFilesChildren": 0
+      }
+    ],
+    "errors": []
+  },
+  "after": {
+    "variant": "after",
+    "source": "working-tree",
+    "files": 30,
+    "bytesPerFile": 491520,
+    "measure": "CDP heap after 2 forced GC, fresh browser context, production build",
+    "samples": [
+      {
+        "phase": "one-file-active",
+        "heapBytes": 32614964,
+        "documents": 3,
+        "nodes": 2552,
+        "jsEventListeners": 1092,
+        "hiddenFilesChildren": 1
+      },
+      {
+        "phase": "thirty-files-active",
+        "heapBytes": 38726092,
+        "documents": 3,
+        "nodes": 3321,
+        "jsEventListeners": 1024,
+        "hiddenFilesChildren": 1
+      },
+      {
+        "phase": "files-browser-hidden",
+        "heapBytes": 29216056,
+        "documents": 3,
+        "nodes": 783,
+        "jsEventListeners": 957,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-1",
+        "heapBytes": 29163764,
+        "documents": 3,
+        "nodes": 788,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-2",
+        "heapBytes": 29302220,
+        "documents": 3,
+        "nodes": 790,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-3",
+        "heapBytes": 29389200,
+        "documents": 3,
+        "nodes": 792,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-4",
+        "heapBytes": 29460720,
+        "documents": 3,
+        "nodes": 794,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-5",
+        "heapBytes": 29588464,
+        "documents": 3,
+        "nodes": 796,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-6",
+        "heapBytes": 29699856,
+        "documents": 3,
+        "nodes": 798,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-7",
+        "heapBytes": 29984888,
+        "documents": 3,
+        "nodes": 800,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-8",
+        "heapBytes": 30080060,
+        "documents": 3,
+        "nodes": 802,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-9",
+        "heapBytes": 30227076,
+        "documents": 3,
+        "nodes": 804,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-10",
+        "heapBytes": 30277132,
+        "documents": 3,
+        "nodes": 806,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-11",
+        "heapBytes": 30369964,
+        "documents": 3,
+        "nodes": 808,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-12",
+        "heapBytes": 30376624,
+        "documents": 3,
+        "nodes": 810,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-13",
+        "heapBytes": 30455804,
+        "documents": 3,
+        "nodes": 812,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-14",
+        "heapBytes": 30474824,
+        "documents": 3,
+        "nodes": 814,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-15",
+        "heapBytes": 30508124,
+        "documents": 3,
+        "nodes": 816,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-16",
+        "heapBytes": 30508796,
+        "documents": 3,
+        "nodes": 818,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-17",
+        "heapBytes": 30565112,
+        "documents": 3,
+        "nodes": 820,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-18",
+        "heapBytes": 30621644,
+        "documents": 3,
+        "nodes": 822,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-19",
+        "heapBytes": 30654400,
+        "documents": 3,
+        "nodes": 824,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      },
+      {
+        "phase": "hidden-cycle-20",
+        "heapBytes": 30650404,
+        "documents": 3,
+        "nodes": 826,
+        "jsEventListeners": 953,
+        "hiddenFilesChildren": 0
+      }
+    ],
+    "errors": []
+  },
+  "desktop": {
+    "initial": {
+      "path": "",
+      "tabs": [
+        {
+          "path": "/tmp/roami-state-core-20261113/functional/fixtures/accept_final.log",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-state-core-20261113/functional/fixtures/rendered_01.html",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-state-core-20261113/functional/fixtures/rendered_02.html",
+          "active": true
+        }
+      ],
+      "overflow": false
+    },
+    "returned": {
+      "path": "",
+      "tabs": [
+        {
+          "path": "/tmp/roami-state-core-20261113/functional/fixtures/accept_final.log",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-state-core-20261113/functional/fixtures/rendered_01.html",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-state-core-20261113/functional/fixtures/rendered_02.html",
+          "active": true
+        }
+      ],
+      "overflow": false
+    },
+    "errors": []
+  },
+  "layouts": [
+    {
+      "width": 1280,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1000,
+        "height": 1015,
+        "top": 40,
+        "right": 1280,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 992,
+          "height": 984,
+          "top": 71,
+          "right": 1280,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1000,
+        "height": 1015,
+        "top": 40,
+        "right": 1280,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 752,
+          "height": 984,
+          "top": 71,
+          "right": 1280,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1640,
+        "height": 1015,
+        "top": 40,
+        "right": 1920,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 1632,
+          "height": 984,
+          "top": 71,
+          "right": 1920,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1640,
+        "height": 1015,
+        "top": 40,
+        "right": 1920,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 1392,
+          "height": 984,
+          "top": 71,
+          "right": 1920,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    },
+    {
+      "width": 2560,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 2280,
+        "height": 1015,
+        "top": 40,
+        "right": 2560,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 2272,
+          "height": 984,
+          "top": 71,
+          "right": 2560,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 2560,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 2280,
+        "height": 1015,
+        "top": 40,
+        "right": 2560,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 2032,
+          "height": 984,
+          "top": 71,
+          "right": 2560,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    },
+    {
+      "width": 3440,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 3160,
+        "height": 1015,
+        "top": 40,
+        "right": 3440,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 3152,
+          "height": 984,
+          "top": 71,
+          "right": 3440,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 3440,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 3160,
+        "height": 1015,
+        "top": 40,
+        "right": 3440,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 2912,
+          "height": 984,
+          "top": 71,
+          "right": 3440,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    }
+  ],
+  "browser": {
+    "address": "https://example.test/unfinished-address",
+    "selected": "State First",
+    "setting": "模型",
+    "hiddenBrowserRequests": 0,
+    "errors": []
+  },
+  "browserEn": {
+    "address": "https://example.test/unfinished-address",
+    "selected": "State First",
+    "setting": "模型",
+    "hiddenBrowserRequests": 0,
+    "errors": []
+  },
+  "phone": {
+    "before": 398.5454406738281,
+    "after": 398.5454406738281,
+    "hidden": {
+      "oldConnected": false,
+      "childCount": 0
+    },
+    "address": "https://example.test/phone-memory-draft",
+    "size": "compact",
+    "pointer": "coarse",
+    "overflow": false,
+    "top": true,
+    "bottom": true
+  },
+  "save": {
+    "saves": 2,
+    "content": "SECOND FIRST Original save fixture\n"
+  }
+}

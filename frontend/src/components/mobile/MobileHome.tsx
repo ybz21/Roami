@@ -1,5 +1,6 @@
+import { usePageEffect } from '../../page-activity'
 // 手机首页只给状态摘要；会话提醒与项目收尾都在项目页处理。
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -40,7 +41,7 @@ export default function MobileHome({ last, onOpen, onNav, onOpenProject }: {
   const [overviewError, setOverviewError] = useState(false)
 
   const loadLive = useCallback(() => api('GET', '/sessions/overview').then((r) => { setItems(writeMobileOverview(r.data.items || [])); setOverviewError(false) }).catch(() => { setOverviewError(true); setItems((c) => c || []) }), [])
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const slow = () => {
       api('GET', '/inbox?limit=40').then((r) => { if (!stop) setInbox(r.data.items || []) }).catch(() => {})

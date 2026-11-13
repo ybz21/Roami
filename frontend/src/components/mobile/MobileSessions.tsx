@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 手机「项目」页：按项目分组的会话列表。
 // 数据只吃一条 GET /sessions/overview（会话 + 归属 + 探测循环的活状态），5s 一轮——
 // 桌面树那三条原料手机上不齐（worktree 那趟被省了），拿来画只会全成散会话。
@@ -47,7 +48,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     if (overview.loaded) setItems(writeMobileOverview(overview.value))
     else if (overview.failed) setItems(current => current || [])
   }, [overview.loaded, overview.value, overview.failed])
-  useEffect(() => pollWhileVisible(async () => { setActivityTick(tick => tick + 1) }, 30000).stop, [])
+  usePageEffect(() => pollWhileVisible(async () => { setActivityTick(tick => tick + 1) }, 30000).stop, [])
   const [projects, setProjects] = useState<MobileProject[] | null>(() => readMobileProjects())
   const native = useNativeSessionList()
   const allItems = useMemo<OverviewItem[]>(() => [...(items || []), ...native.value.map(session => {
@@ -72,7 +73,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   }, [searchOpen, searchNonce])
   // 筛选药丸 + 每组先露 5 条（Lody 手机端的做法）：十几个会话时一屏能看到所有项目，而不是被第一个项目占满
   const [filter, setFilter] = useState<'all' | 'waiting' | 'running' | 'idle' | 'unfinished' | 'activity'>('all')
-  useEffect(() => {
+  usePageEffect(() => {
     const fromLink = () => {
       const params = getHashParams()
       const target = params.get('filter')
@@ -114,7 +115,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     if (!s || !name || name === s.label) return
     try { await renameSession(s.name, name); setRenaming(null); void reload() } catch (e: any) { message.error(sessionActionError(e, t)) }
   }
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const load = () => api('GET', '/projects').then((r) => { if (!stop) setProjects(writeMobileProjects(r.data.projects || [])) }).catch(() => {})
     load()
@@ -124,7 +125,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 
   const [swarmOf, setSwarmOf] = useState<Record<string, SwarmSessionMember>>({})
   const [swarmPending, setSwarmPending] = useState<Record<string, number>>({})
-  useEffect(() => pollWhileVisible(async signal => {
+  usePageEffect(() => pollWhileVisible(async signal => {
     const groups = await loadSwarmDirectory()
     if (!signal.aborted) {
       const membership = swarmSessionMembership(groups)

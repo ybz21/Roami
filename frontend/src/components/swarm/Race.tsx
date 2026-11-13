@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useRegisteredAgents } from '../../agent-registry'
 import { agentLaunch } from '../../agent-command'
 import { agentName } from '../../agent-kind'
@@ -189,7 +190,7 @@ export function RaceComparePanel({ race, onClose, openTerm, onChanged }: {
   raceRef.current = race
 
   // 5s 轮询实况：worktree 状态 + diff 统计 + agent 进程
-  useEffect(() => {
+  usePageEffect(() => {
     const r = race
     if (!r) { setLanes([]); setSel(''); setFile(''); setFileDiff(''); return }
     let stop = false

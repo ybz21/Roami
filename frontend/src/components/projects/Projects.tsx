@@ -1,3 +1,5 @@
+import { useViewState } from '../../view-state'
+import { usePageEffect } from '../../page-activity'
 import BackButton, { BackLink } from '../BackButton'
 import SessionLocation from '../sessions/SessionLocation'
 import SessionHierarchy from '../sessions/SessionHierarchy'
@@ -328,7 +330,7 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
     })
     setLoaded(true)
   }
-  useEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [])
+  usePageEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [])
 
   return (
     <>
@@ -470,11 +472,11 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
 
   // 搜索 + 筛选（14 §6.1）：项目一多，「哪些还欠着事」比「一共有几个」有用得多
   const { phone: isPhone } = useLayout()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useViewState('projects.query', '')
   const [searching, setSearching] = useState(false)
   const [sortSheet, setSortSheet] = useState(false)
   const searchRef = useRef<InputRef>(null)
-  const [filter, setFilter] = useState<ProjFilter>('all')
+  const [filter, setFilter] = useViewState<ProjFilter>('projects.filter', 'all')
 
   const needsOf = (p: Proj) => projNeeds(p, swarms)
   // 排序：置顶恒在最前；需要你(默认) / 名称(稳定) / 创建时间 / 最近活跃
@@ -867,7 +869,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const isGit = !!proj?.git
 
   // worktree 清单（含 main，用于 HEAD 展示；「已有(N)」与任务流用非 main 子集）
-  useEffect(() => {
+  usePageEffect(() => {
     if (!dir || !isGit) { setWtsAll([]); return }
     let stop = false
     const loadWts = () => api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`).then((r) => {
@@ -887,7 +889,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   }, [dir, isGit])
   // 远端轻量同步（10 §3 驻留档）：进项目页即同步一次，驻留期间每 5 分钟一次；
   // 失败静默（判定退回本地），worktree 轮询自然吃到新判定。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!dir || !isGit) return
     const sync = () => api('POST', '/git/worktree/sync', { dir }).catch(() => {})
     sync()
@@ -898,7 +900,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const mainWt = useMemo(() => wtsAll.find((w: any) => w.isMain), [wtsAll])
   const mainHead = useMemo(() => (wtsAll.find((w: any) => w.isMain)?.head || '').slice(0, 7), [wtsAll])
   // 会话 + 归属注解（任务流数据源，与会话页同两条接口）
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const loadSess = () => api('GET', '/sessions?tree=1').then((roots) => {
       if (stop) return
@@ -913,7 +915,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [dir])
   // 竞赛（编队 tab + 任务计数）
-  useEffect(() => {
+  usePageEffect(() => {
     if (!isGit) return
     let stop = false
     const loadRaces = () => api('GET', '/races').then((r) => {
@@ -924,7 +926,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [dir, isGit])
   // 活动流（懒加载：切到活动 tab 才拉，60s 后端缓存）
-  useEffect(() => {
+  usePageEffect(() => {
     if (tab !== 'act' || !proj) return
     let stop = false
     // 活动流 = git log(commits) ∪ 收尾留痕(traces)，按时间合并倒序（08 §2.2）
@@ -961,7 +963,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const record = nativeSessionRecord(session)
     return { ...record, last_activity: record.lastActivity }
   })].sort((a, b) => (b.last_activity || 0) - (a.last_activity || 0) || a.name.localeCompare(b.name)), [cliMine, native.value, proj?.key])
-  useEffect(() => {
+  usePageEffect(() => {
     if (!isGit) return
     return pollWhileVisible(async signal => {
       const groups = await loadSwarmDirectory()
@@ -970,7 +972,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     }, 10000).stop
   }, [isGit, dir, proj?.key, swarmScope])
   // Agent 运行标注 + 待输入检测（仅本项目会话，量小）
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const check = () => cliMine.forEach(async (s: any) => {
       try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/claude`); if (!stop) setCc((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
@@ -982,7 +984,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [cliMine])
   // 展开的 worktree 的命令行尾行预览（懒加载，5s）
-  useEffect(() => {
+  usePageEffect(() => {
     const names = wts.filter((w: any) => expanded[w.path]).flatMap((w: any) => (w.sessions || []).map((x: any) => x.session))
     if (!names.length) return
     let stop = false

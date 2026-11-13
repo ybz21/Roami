@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useCallback, useRef, useState } from 'react'
 import { api, openEventStream } from '../../api'
 import { agentEvents } from '../agent/agent-protocol'
 import { nodeApi } from '../cluster/node-url'
@@ -33,7 +34,7 @@ export function useSwarmSnapshot(id: string) {
     try { const next = await load(path); if (mounted.current && currentScope.current === scope) { update({ data: next, error: false, missing: false }) } }
     catch (cause) { if (mounted.current && currentScope.current === scope) { const absent = (cause as { status?: number }).status === 404; update({ missing: absent, error: !absent, ...(absent ? { data: null } : {}) }); if (absent) dataRef.current = null } }
   }, [scope])
-  useEffect(() => {
+  usePageEffect(() => {
     mounted.current = true; update({ data: null, error: false, missing: false }); dataRef.current = null
     if (!/^sw-[a-f0-9]{32}$/.test(id)) { update({ missing: true }); return () => { mounted.current = false } }
     let stopped = false, abort: AbortController | null = null, timer: ReturnType<typeof setTimeout> | undefined, failures = 0

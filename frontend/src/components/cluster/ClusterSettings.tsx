@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { hubConfiguration, waitForClusterRecovery } from './cluster-recovery'
 import { useSettingsDraft } from '../settings/settings-draft'
 import { useSettingsRead } from '../settings/settings-read'
@@ -10,7 +11,7 @@ import { useSettingsRead } from '../settings/settings-read'
 //
 // 接入用的是**一次性令牌**，不是中心的登录口令——口令是给人登录浏览器用的。
 // 这一条要写在界面上：用户第一反应就是去填密码。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { App as AntApp, Button, Card, Input, Switch, Tag } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -147,7 +148,7 @@ export function ClusterSettings() {
 
   const readState = useSettingsRead(load)
   // 接入状态是会自己变的（重连、掉线），停在旧值上比不显示更糟
-  useEffect(() => {
+  usePageEffect(() => {
     const id = window.setInterval(() => { api('GET', '/cluster/config').then((r) => setCfg(r?.data)).catch(() => {}) }, 5000)
     return () => window.clearInterval(id)
   }, [])

@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
 | 旧会话记录分批加载 | [20261113-transcript-paging](20261113-transcript-paging/README.md) | 最新 50 条首屏、向前游标分页、只读历史身份校验与桌面/真机验收 |
 | CLI 帮助统一 | [20261113-cli-help](20261113-cli-help/README.md) | 同一帮助结构、子命令参数与隔离回归 |
 | DeepSeek Harness 与 Agent 注册 | [20261112-deepseek-harness](20261112-deepseek-harness/README.md) | 主机统一列表、单次执行能力与桌面/真机验收 |

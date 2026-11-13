@@ -1,3 +1,5 @@
+import { useViewState, useViewRef, useViewRetention } from '../../view-state'
+import { usePageEffect } from '../../page-activity'
 // 浏览器镜像页：把后端全局 Chrome 的画面实时渲染到 <img>，可选「接管」转发输入。
 // 协议见 backend/browser/screencast.go：
 //   收 {type:'frame', data, w, h} | {type:'pong', t} | {type:'error', msg}
@@ -71,12 +73,13 @@ function mergeTabs(prev: TabInfo[], incoming: TabInfo[]): TabInfo[] {
 }
 
 export default function BrowserView({ initialTarget = '', browserInstance = '' }: { initialTarget?: string; browserInstance?: string }) {
+  const retain = useViewRetention()
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   // 收纳档位按**容器**宽度算（不是窗口）：这一页会被塞进分栏，那时窗口很宽而容器很窄。
   // ≥1100 全平铺 / 900–1100 收指标 / <900 等同手机形态（设计 17 §5.5）
   const [shelf, shelfRef] = useShelf()
-  const [tabsOpen, setTabsOpen] = useState(false)
+  const [tabsOpen, setTabsOpen] = useViewState('browser.tabsOpen', false)
   const [prefs] = usePreferences()
   const imgRef = useRef<HTMLImageElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -89,10 +92,15 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const controlRef = useRef(true)
   const [connected, setConnected] = useState(false)
   const [healthMsg, setHealthMsg] = useState('') // 连不上时的原因（后端 /browser/health 的 error）
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useViewState('browser.url', '')
   const addrFocused = useRef(false) // 地址栏聚焦时不被轮询回写覆盖
+  const addressDraft = useViewRef('browser.addressDraft', false)
   // 标签页（复用同一台 Chrome）
   const [tabs, setTabs] = useState<TabInfo[]>([])
+  const [tabOrder, setTabOrder] = useViewState<string[]>('browser.tabOrder', [])
+  useEffect(() => {
+    if (tabs.length) setTabOrder(previous => { const next = tabs.map(tab => tab.id); return previous.join(',') === next.join(',') ? previous : next })
+  }, [tabs])
   const [pinnedTabs, setPinnedTabs] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('roam.browser.pinnedTabs') || '[]')) } catch { return new Set() }
   })
@@ -102,19 +110,21 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const legacyPins = useRef(new Set(pinnedTabs))
   const displayTabs = [...tabs.filter((tb) => pinnedTabs.has(tb.id)), ...tabs.filter((tb) => !pinnedTabs.has(tb.id))]
   const changeTab = async (id: string, change: Partial<TabInfo>) => {
+    const release = retain()
     try {
       await api('PATCH', `/browser/tabs/${id}`, change)
       setTabs(current => current.map(tab => tab.id === id ? { ...tab, ...change } : tab))
       if (change.pinned !== undefined) setPinnedTabs(current => { const next = new Set(current); if (change.pinned) next.add(id); else next.delete(id); return next })
-    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUSY' ? t('browser.tabBusy') : error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : error.message) }
+    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUSY' ? t('browser.tabBusy') : error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : error.message) } finally { release() }
   }
   const togglePin = (id: string) => { void changeTab(id, { pinned: !pinnedTabs.has(id) }) }
   const changeOrigin = (id: string, origin: 'human' | 'agent') => { void changeTab(id, { origin }) }
   const tabsRef = useRef<TabInfo[]>([]) // 供 ws.onmessage 等闭包读到最新标签集（识别新开的那个）
-  const [target, setTarget] = useState(initialTarget)
-  const [expectedBrowser, setExpectedBrowser] = useState(browserInstance)
+  const [target, setTarget] = useViewState('browser.target', initialTarget)
+  const addressTarget = useRef(target)
+  const [expectedBrowser, setExpectedBrowser] = useViewState('browser.expectedBrowser', browserInstance)
   const expectedBrowserRef = useRef(expectedBrowser); expectedBrowserRef.current = expectedBrowser
-  const pinnedTarget = useRef(initialTarget)
+  const pinnedTarget = useViewRef('browser.pinnedTarget', initialTarget)
   // 导航起始页地址（后端 /api/me 提供，形如 http://127.0.0.1:<port>/home）；
   // 新标签默认开它、可点「主页」回到它。默认值按当前端口兜底。
   const [home, setHome] = useState(`${location.protocol}//127.0.0.1:${location.port || '8080'}/home`)
@@ -161,8 +171,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // 后端广播 {type:'active'} 会自动切到 agent 正在操作的标签；用户在画面里点击/打字
   // 视为接管，自动切到手动模式。切回智能体模式只能靠主动点按钮——不设空闲自动恢复，
   // 模式要长期保持，不能自己漂移回去（人正盯着一个 agent 没打算离开的页面时尤其如此）。
-  const [followPaused, setFollowPaused] = useState(!!initialTarget)
-  const followPausedRef = useRef(!!initialTarget)
+  const [followPaused, setFollowPaused] = useViewState('browser.followPaused', !!initialTarget)
+  const followPausedRef = useRef(followPaused)
 
   const fs = useFullscreen(rootRef)
 
@@ -206,8 +216,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // Chrome 有些「页」压根关不掉——它自己的界面（chrome://*.top-chrome/）就是这样：
   // /json/close 照收不误，那一行下一次轮询又回来。后端已经把认得出来的挡在外面，
   // 万一还是漏进来一条，用户按下关闭时就记在这里：关不掉，至少让它从这条标签条上消失。
-  const dismissedRef = useRef<Set<string>>(new Set())
-  const visibleTabs = (list: TabInfo[]) => list.filter((x) => !dismissedRef.current.has(x.id))
+  const dismissedRef = useViewRef<string[]>('browser.dismissed', [])
+  const visibleTabs = (list: TabInfo[]) => list.filter((x) => !dismissedRef.current.includes(x.id))
 
   // 拉取标签页列表（每 3s 刷新，反映 agent 自己开的标签页/标题变化）
   const loadTabs = async (signal?: AbortSignal) => {
@@ -215,50 +225,57 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       const expected = expectedBrowserRef.current
       const r = await api('GET', '/browser/tabs' + (expected ? '?expectedBrowser=' + encodeURIComponent(expected) : ''), undefined, { signal })
       const list: TabInfo[] = visibleTabs(r?.data || [])
+      if (!list.length) setTabOrder([])
       for (const tab of list.filter(tab => legacyPins.current.has(tab.id))) {
         await api('PATCH', `/browser/tabs/${tab.id}`, { pinned: true })
         tab.pinned = true; legacyPins.current.delete(tab.id)
       }
       setPinnedTabs(new Set(list.filter(tab => tab.pinned).map(tab => tab.id)))
-      setTabs((prev) => mergeTabs(prev, list)) // 稳定顺序，避免后端重排导致 tab 乱跳
+      setTabs((prev) => mergeTabs(prev.length ? prev : tabOrder.map(id => ({ id, title: '', url: '' })), list)) // 稳定顺序，避免后端重排导致 tab 乱跳
       // 任务接管固定目标，消失时不切换到其他页面。
       setTarget((current) => pinnedTarget.current && current === pinnedTarget.current ? current : list.some((item) => item.id === current) ? current : (list[0]?.id || ''))
     } catch (error) { if (signal) throw error }
   }
-  useEffect(() => {
+  usePageEffect(() => {
     const poll = pollWhileVisible(signal => loadTabs(signal), 3000)
     return () => poll.stop()
   }, [])
 
   const newTab = async () => {
+    const release = retain()
     pinnedTarget.current = ''; setExpectedBrowser('')
     try {
       const known = new Set(tabs.map((t) => t.id)) // 记下创建前的 id，用于定位新开的那个
       await api('POST', '/browser/tabs', { url: home, origin: 'human' }) // 新标签默认开导航起始页
+      addressDraft.current = false
       const r = await api('GET', '/browser/tabs')
       const list: TabInfo[] = visibleTabs(r?.data || [])
-      setTabs((prev) => mergeTabs(prev, list))
+      setTabs((prev) => mergeTabs(prev.length ? prev : tabOrder.map(id => ({ id, title: '', url: '' })), list))
       const fresh = list.find((t) => !known.has(t.id)) // 真正新增的(在右侧)，而非后端顺序的末位
       setTarget(fresh?.id || list[list.length - 1]?.id || '')
-    } catch (e: any) { message.error(e.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : e.message) }
+    } catch (e: any) { message.error(e.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : e.message) } finally { release() }
   }
   const closeTabs = async (ids: string[]) => {
-    if (ids.includes(pinnedTarget.current)) { pinnedTarget.current = ''; expectedBrowserRef.current = ''; setExpectedBrowser('') }
-    await Promise.all(ids.map(async (id) => {
-      try {
-        await api('DELETE', `/browser/tabs/${id}`)
-      } catch (e: any) {
-        // Chrome 自身的页面拒绝关闭时，仅从镜像标签条隐藏。
-        if (e?.apiError?.code !== 'not_closable') { message.error(e.message); return }
-        dismissedRef.current.add(id)
-        message.info(t('browser.tabHidden'))
-      }
-    }))
-    await loadTabs()
+    const release = retain()
+    try {
+      if (ids.includes(pinnedTarget.current)) { pinnedTarget.current = ''; expectedBrowserRef.current = ''; setExpectedBrowser('') }
+      await Promise.all(ids.map(async (id) => {
+        try {
+          await api('DELETE', `/browser/tabs/${id}`)
+        } catch (e: any) {
+          // Chrome 自身的页面拒绝关闭时，仅从镜像标签条隐藏。
+          if (e?.apiError?.code !== 'not_closable') { message.error(e.message); return }
+          dismissedRef.current = [...dismissedRef.current, id]
+          message.info(t('browser.tabHidden'))
+        }
+      }))
+      await loadTabs()
+    } finally { release() }
   }
   const closeTab = (id: string) => closeTabs([id])
 
   const reopenTab = async () => {
+    const release = retain()
     const previous = target
     const address = tabs.find(tab => tab.id === previous)?.url
     try {
@@ -266,12 +283,14 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       if (!result?.data?.id) return
       switchTab(result.data.id)
       await closeTab(previous)
-    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : error.message) }
+    } catch (error: any) { message.error(error.apiError?.code === 'BROWSER_TAB_BUDGET_EXCEEDED' ? t('browser.groupLimit') : error.message) } finally { release() }
   }
 
   // 地址栏跟随当前标签页真实 URL（聚焦编辑时不覆盖；about:blank 显示为空）
   useEffect(() => {
-    if (addrFocused.current) return
+    if (addressTarget.current && addressTarget.current !== target) addressDraft.current = false
+    addressTarget.current = target
+    if (addrFocused.current || addressDraft.current) return
     const t = tabs.find((x) => x.id === target)
     if (t) setUrl(t.url === 'about:blank' ? '' : t.url)
   }, [target, tabs])
@@ -283,6 +302,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     setFollowPaused(true)
   }
   const resumeFollow = () => {
+    addressDraft.current = false
+    setUrl(tabs.find(tab => tab.id === target)?.url || '')
     pinnedTarget.current = ''; setExpectedBrowser('')
     followPausedRef.current = false
     setFollowPaused(false)
@@ -290,6 +311,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
 
   // 切换标签：镜像该 tab + 在 Chrome 里把它前置（让 agent 前台焦点一致）
   const switchTab = (id: string) => {
+    addressDraft.current = false
     pinnedTarget.current = ''; setExpectedBrowser('')
     pauseFollow() // 人手动选的，别被下一条 active 广播立刻拽回去
     setTarget(id)
@@ -307,11 +329,11 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
         const fresh = list.find((t) => !known.has(t.id))
         if (fresh) {
           if (Date.now() - lastInputTouch.current < 5000) { await api('PATCH', `/browser/tabs/${fresh.id}`, { origin: 'human' }); fresh.origin = 'human' }
-          setTabs((prev) => mergeTabs(prev, list))
+          setTabs((prev) => mergeTabs(prev.length ? prev : tabOrder.map(id => ({ id, title: '', url: '' })), list))
           switchTab(fresh.id) // 切镜像 + 前置，画面随之跳到新标签
           return
         }
-        setTabs((prev) => mergeTabs(prev, list))
+        setTabs((prev) => mergeTabs(prev.length ? prev : tabOrder.map(id => ({ id, title: '', url: '' })), list))
       } catch {}
       await new Promise((res) => setTimeout(res, 200))
     }
@@ -331,11 +353,14 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // 作用于当前标签的导航控制
   const act = async (suffix: string, body?: any) => {
     if (!target) return
+    const release = retain()
     try {
       await api('POST', `/browser/tabs/${target}/${suffix}`, body)
+      addressDraft.current = false
       send({ type: 'refresh' })
     }
     catch (e: any) { message.error(e.message) }
+    finally { release() }
   }
 
   // 当前设备 → emulate 消息载荷。
@@ -371,7 +396,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
 
   // control / target 变化才重连；画质切换【不重连】(连上后发 quality 消息，见下面 changeQuality)，
   // 设备/尺寸切换也不重连(发 emulate 消息)。重连会重设 device metrics、首帧畸形 → 画面跳/页面忽大小。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!imgRef.current) return
     setConnected(false)
     setHealthMsg('')
@@ -558,7 +583,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // 本身，导致 onMouse('up') 收不到事件 —— 拖拽框选/远端滑块会一直卡在"按下"态。用 window
   // 级监听兜底；靠 dragRef.active 去重（同一次释放若已被 <img> 自身的 onMouseUp 处理过，
   // active 会先被置 false，这里直接跳过，不会重复发送)。
-  useEffect(() => {
+  usePageEffect(() => {
     const onWindowMouseUp = (e: MouseEvent) => {
       const d = dragRef.current
       if (!d.active) return
@@ -772,7 +797,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
             </>}
             <Omnibox
               value={url}
-              onChange={setUrl}
+              onChange={(value) => { const current = tabs.find(tab => tab.id === target)?.url; addressDraft.current = value !== (current === 'about:blank' ? '' : current || ''); setUrl(value); pauseFollow() }}
               onSubmit={navigate}
               onFocusChange={(f) => { addrFocused.current = f }}
               placeholder={t('browser.urlPlaceholder')}

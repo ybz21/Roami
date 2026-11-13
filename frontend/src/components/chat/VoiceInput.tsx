@@ -1,3 +1,4 @@
+import { usePageActive, usePageEffect } from '../../page-activity'
 // 微信式语音输入：会话页右下角悬浮麦克风按钮。
 // 长按开始录音 → 松开识别 → 文本回填到输入框；录音中上滑可取消。
 // 录音在浏览器内重采样成 16kHz 单声道 WAV(两家服务商都稳收)，再交后端识别。
@@ -32,6 +33,8 @@ const HOLD_MS = 350
  * 键盘开的录音没有「松手」：再按一次识别，Esc 取消。
  */
 export function VoiceInput({ accent, onResult, inline = false, toolbar = false, hotkey = false, disabled = false, scope = '' }: { accent: string; onResult: (text: string) => void; inline?: boolean; toolbar?: boolean; hotkey?: boolean; disabled?: boolean; scope?: string }) {
+  const pageActive = usePageActive()
+  disabled = disabled || !pageActive
   const { t } = useI18n()
   const { message } = AntApp.useApp()
   const kb = useKeybindings().voice
@@ -167,7 +170,7 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   // 判据是 keydown 到 keyup 的间隔：超过 HOLD_MS 才算「按住」。S 键先松、修饰键后松也算一次 keyup
   const downAt = useRef(0)
   const holding = useRef(false)
-  useEffect(() => {
+  usePageEffect(() => {
     if (!hotkey || disabled) return
     const onDown = (e: KeyboardEvent) => {
       if (e.repeat) return

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { WorkspaceStateProvider } from '../../view-state'
+import { WorkspaceStateStore } from '../../workspace-state'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from 'antd'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -13,7 +15,10 @@ vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }
 vi.mock('../settings/model-usage-chart', () => ({ ModelUsageChart: () => null }))
 const catalog = { revision: 'revision-1', sources: [{ id: 'upstream', name: 'Saved source', baseUrl: 'http://192.168.120.56:3425/v1', protocol: 'openai-responses', authMode: 'api_key', hasKey: true }], models: [{ id: 'coding', name: 'Coding', protocol: 'openai-responses', strategy: 'fixed', candidates: [{ sourceId: 'upstream', model: 'priced-model' }] }], drafts: [], baseUrl: 'http://127.0.0.1:19000', uses: {} }
 const settings = { currency: 'CNY', timezone: 'Asia/Shanghai', dailyLimit: 3, pricing: { default: { input_per_million: 1, output_per_million: 2, cache_read_per_million: 0.5 }, models: { 'priced-model': { input_per_million: 4, output_per_million: 8, cache_read_per_million: 2 } } } }
+let workspaceState: WorkspaceStateStore
+const wrapper = ({ children }: { children: React.ReactNode }) => <WorkspaceStateProvider store={workspaceState}>{children}</WorkspaceStateProvider>
 beforeEach(() => {
+  workspaceState = new WorkspaceStateStore()
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   let saved = structuredClone(catalog) as ModelCatalog
   vi.mocked(api).mockImplementation(async (method, path, body) => {
@@ -29,7 +34,7 @@ beforeEach(() => {
   })
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
-const mount = (sub: string, navigate = vi.fn()) => render(<App><ModelHub sub={sub} onNav={navigate} /></App>)
+const mount = (sub: string, navigate = vi.fn()) => render(<App><ModelHub sub={sub} onNav={navigate} /></App>, { wrapper })
 
 it('retains old default and per-model prices and saves to the existing Go configuration', async () => {
   mount('prices')

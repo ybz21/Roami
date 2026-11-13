@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
+import { WorkspaceStateStore, type ViewStateScope } from '../../workspace-state'
 import { App as AntApp } from 'antd'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import ViewBoundary from '../../app/ViewBoundary'
 import FileBrowser from './FileBrowser'
+import { FileWorkspaceStateProvider } from './file-workspace-state'
 import { I18nProvider } from '../../i18n'
 
 vi.mock('../../App', () => ({ recentDirs: () => [] }))
@@ -58,17 +61,42 @@ describe('FileBrowser folder context menu', () => {
     vi.unstubAllGlobals()
   })
 
-  const renderBrowser = () => render(
+  const renderBrowser = (memory?: ViewStateScope) => render(
     <I18nProvider>
       <AntApp>
         {/* 原来这里套的是 FloatingFileDrawer（右侧 420 浮层）。它已经下线——文件树
             进了 Inspector 列（图纸 panels-desktop.html），容器只剩一个定宽的 flex 列。 */}
         <div style={{ display: 'flex', flexDirection: 'column', width: 420, height: 600 }}>
-          <FileBrowser dir="/workspace" layout="dock" />
+          <FileWorkspaceStateProvider scope={memory}><FileBrowser dir="/workspace" layout="dock" /></FileWorkspaceStateProvider>
         </div>
       </AntApp>
     </I18nProvider>,
   )
+
+  it('restores the directory, navigation history and typed path after leaving the page', async () => {
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = new URL(String(input), 'https://test.invalid')
+      const path = url.searchParams.get('path') || '/workspace'
+      if (url.pathname.endsWith('/file/stat')) return jsonResponse({ data: { dir: true } })
+      if (url.pathname.endsWith('/files')) return jsonResponse({ data: { path, parent: '/workspace', entries: [] } })
+      return jsonResponse({ data: {} })
+    })
+    const memory = new WorkspaceStateStore().scope('files')
+    const first = renderBrowser(memory)
+    const path = await screen.findByRole('combobox')
+    await waitFor(() => expect((path as HTMLInputElement).value).toBe('/workspace'))
+    fireEvent.change(path, { target: { value: '/workspace/folder' } })
+    fireEvent.keyDown(path, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(memory.get('browser.path')).toBe('/workspace/folder'))
+    fireEvent.change(path, { target: { value: '/workspace/unfinished' } })
+    first.unmount()
+    const second = renderBrowser(memory)
+    await waitFor(() => expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('/workspace/unfinished'))
+    expect(memory.get('browser.history')).toEqual(['/workspace', '/workspace/folder'])
+    expect(memory.get('browser.histIdx')).toBe(1)
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('path=%2Fworkspace%2Ffolder'))).toBe(true)
+    second.unmount()
+  })
 
   const openFolderMenu = async () => {
     const folder = await screen.findByText('folder')
@@ -123,6 +151,20 @@ describe('FileBrowser folder context menu', () => {
       const callsAfter = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/files?')).length
       expect(callsAfter).toBeGreaterThan(callsBefore)
     })
+  })
+
+  it('finishes native uploads in the background and releases the retained page', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('RoamiApp/1.0')
+    const view = (active: boolean) => <I18nProvider><ViewBoundary page="files" active={active} mobile={false} hasDock={false}><FileBrowser dir="/workspace" layout="dock" /></ViewBoundary></I18nProvider>
+    const rendered = render(view(true))
+    await screen.findByText('folder')
+    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }))
+    fireEvent.click(await screen.findByText('上传文件夹'))
+    rendered.rerender(view(false))
+    const shell = rendered.container.querySelector('[data-page=files]')!
+    expect(shell.childElementCount).toBeGreaterThan(0)
+    act(() => window.dispatchEvent(new CustomEvent('roami-folder-upload', { detail: { saved: 2 } })))
+    await waitFor(() => expect(shell.childElementCount).toBe(0))
   })
 
   it('stays open while moving over items and runs the selected folder action', async () => {

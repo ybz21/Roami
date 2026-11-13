@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 手机覆盖层的返回键（13 §4.3）：二级页与 sheet 都应该被安卓物理返回键收掉，
 // 而不是把整个路由退掉、覆盖层还留在屏幕上。
 //
@@ -136,7 +137,7 @@ export function useBackDismiss(enabled: boolean, onDismiss: () => void): void {
   }, [enabled])
 
   // Escape 与返回键同义：桌面没有物理返回键，但有 Esc
-  useEffect(() => {
+  usePageEffect(() => {
     if (!enabled) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cb.current() }
     window.addEventListener('keydown', onKey)

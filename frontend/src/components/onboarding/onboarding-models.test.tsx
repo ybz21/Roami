@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { WorkspaceStateProvider } from '../../view-state'
+import { WorkspaceStateStore } from '../../workspace-state'
 import { App } from 'antd'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -8,7 +10,10 @@ import OnboardingModels from './OnboardingModels'
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }) }))
+let workspaceState: WorkspaceStateStore
+const wrapper = ({ children }: { children: React.ReactNode }) => <WorkspaceStateProvider store={workspaceState}>{children}</WorkspaceStateProvider>
 beforeEach(() => {
+  workspaceState = new WorkspaceStateStore()
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })
   let catalog = { revision: 'first', sources: [], models: [], drafts: [], uses: {}, baseUrl: '' }
   vi.mocked(api).mockReset().mockImplementation(async (method, path, body) => {
@@ -18,7 +23,7 @@ beforeEach(() => {
   })
 })
 afterEach(cleanup)
-const show = (navigate = vi.fn()) => ({ navigate, ...render(<App><OnboardingModels sub="catalog/source/new" onNav={navigate} /></App>) })
+const show = (navigate = vi.fn()) => ({ navigate, ...render(<App><OnboardingModels sub="catalog/source/new" onNav={navigate} /></App>, { wrapper }) })
 const save = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
 }

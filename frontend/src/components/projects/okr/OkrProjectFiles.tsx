@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../../page-activity'
+import { useState } from 'react'
 import { useLayout } from '../../../layout'
 import { useI18n } from '../../../i18n'
 import FileBrowser from '../../files/FileBrowser'
@@ -9,7 +10,7 @@ export default function OkrProjectFiles({ dir, active, openRequest }: { dir?: st
   const { phone } = useLayout(), { t } = useI18n()
   const [file, setFile] = useState<string | null>(null)
   const [visible, setVisible] = useState(() => !document.hidden)
-  useEffect(() => {
+  usePageEffect(() => {
     const update = () => setVisible(!document.hidden)
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)

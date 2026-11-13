@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Modal, Spin } from 'antd'
 import { ArchiveIcon, CheckIcon, CodeIcon, FileTextIcon, FolderIcon, GearIcon, PaperclipIcon, PlusIcon } from '../../icons'
@@ -29,7 +30,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
     const top = viewport?.offsetTop || 0
     setGeometry({ left: card.left, width: card.width, bottom: document.documentElement.clientHeight - card.top + gap, height: Math.max(0, card.top - top - gap * 2) })
   }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     if (!open) return
     measure()
     const viewport = window.visualViewport

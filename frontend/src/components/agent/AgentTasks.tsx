@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import BackButton from '../BackButton'
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Modal, Spin } from 'antd'
@@ -69,7 +70,7 @@ export default function AgentTasks({ projects = [], cid, onSession, onChanged, s
     const element = container.current?.closest<HTMLElement>('.agent-mobile-page, .ant-tabs-content-holder') || container.current
     if (element) { try { element.scrollTop = Number(localStorage.getItem(scrollKey)) || 0 } catch { /* Start at the top. */ }; restored.current = scrollKey }
   }, [selected, loading, scrollKey, tasks.length])
-  useEffect(() => {
+  usePageEffect(() => {
     if (selected) { restored.current = ''; return }
     const element = container.current?.closest<HTMLElement>('.agent-mobile-page, .ant-tabs-content-holder') || container.current
     let position = element?.scrollTop || 0

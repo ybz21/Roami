@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useRef, useState } from 'react'
 import { App as AntApp, Drawer, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -40,7 +41,7 @@ export function SessionProcesses({ name, onClose }: { name: string; onClose: () 
   const [busy, setBusy] = useState<number | null>(null)
   const confirmation = useRef<ReturnType<typeof modal.confirm> | null>(null)
   const refresh = useRef<() => Promise<unknown>>(async () => {})
-  useEffect(() => {
+  usePageEffect(() => {
     setProcesses([]); setLoaded(false); setError(false)
     const poll = pollWhileVisible(async signal => {
       try {

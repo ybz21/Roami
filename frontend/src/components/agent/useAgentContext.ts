@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useState } from 'react'
 import { api } from '../../api'
 
 export type AgentContext = { estimatedTokens: number; contextWindow?: number | null; compactionThreshold?: number | null; compactionRatio?: number; model?: string; snapshotId?: string }
@@ -6,7 +7,7 @@ export type AgentContext = { estimatedTokens: number; contextWindow?: number | n
 export function useAgentContext(cid: string, node: string | null, model: string, revision: string, active: boolean) {
   const scope = JSON.stringify([node, cid, model])
   const [state, setState] = useState<{ scope: string; data: AgentContext | null; failed: boolean }>({ scope, data: null, failed: false })
-  useEffect(() => {
+  usePageEffect(() => {
     if (!cid) return
     const abort = new AbortController()
     let pending = false

@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { MODEL_CATALOG_CHANGED, type ModelCatalog } from '../capabilities/model-hub-api'
@@ -21,7 +22,7 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   const endpoint = settings?.[role]?.baseUrl
   const catalog = useAgentData<ModelCatalog>('/agent/model-gateway/catalog', 30_000)
   const refreshCatalog = catalog.refresh
-  useEffect(() => { window.addEventListener(MODEL_CATALOG_CHANGED, refreshCatalog); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, refreshCatalog) }, [refreshCatalog])
+  usePageEffect(() => { window.addEventListener(MODEL_CATALOG_CHANGED, refreshCatalog); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, refreshCatalog) }, [refreshCatalog])
   // An identical model ID at another provider does not identify this gateway's route.
   const throughGateway = !!catalog.value?.baseUrl && endpoint?.replace(/\/$/, '') === catalog.value.baseUrl.replace(/\/$/, '') + '/v1'
   const gatewayModels = catalog.value?.models || []
@@ -33,7 +34,7 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   })
   const modelNames = Object.fromEntries((throughGateway ? gatewayModels : additionalModels).map(model => [throughGateway ? model.id : gatewayChoice + model.id, model.name]))
   const refresh = useCallback(() => setVersion(v => v + 1), [])
-  useEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
+  usePageEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
   useEffect(() => {
     const abort = new AbortController()
     const revision = settingsRevision.current

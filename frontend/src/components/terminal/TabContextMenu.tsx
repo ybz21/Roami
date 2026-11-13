@@ -1,4 +1,5 @@
-import { cloneElement, useEffect, useRef, useState, type HTMLAttributes, type ReactElement } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { cloneElement, useRef, useState, type HTMLAttributes, type ReactElement } from 'react'
 import { Dropdown, type MenuProps } from 'antd'
 
 export function TabContextMenu({ children, menu }: {
@@ -8,7 +9,7 @@ export function TabContextMenu({ children, menu }: {
   const [open, setOpen] = useState(false)
   const [point, setPoint] = useState({ x: 0, y: 0 })
   const popupRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
+  usePageEffect(() => {
     if (!open) return
     const closeOutside = (event: Event) => {
       if (event.target instanceof Node && popupRef.current?.contains(event.target)) return

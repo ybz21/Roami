@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { StatusTag, TypeTag } from '../session-tags'
@@ -22,7 +23,7 @@ export default function Tasks({ openTerm }: { openTerm: (n: string) => void }) {
   const loadGroups = () => api('GET', '/tasks').then(setGroups).catch(() => {})
   const loadDetail = (g: string) => api('GET', '/tasks/' + encodeURIComponent(g)).then((d) => setDetail((s) => ({ ...s, [g]: d }))).catch(() => {})
   useEffect(() => { loadGroups() }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     if (!open) return
     loadDetail(open)
     const t = setInterval(() => loadDetail(open), 3000)

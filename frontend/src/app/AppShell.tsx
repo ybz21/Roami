@@ -33,6 +33,7 @@ import { useLinkStatus } from '../p2p/use-link-status'
 import { usePreferences } from '../preferences'
 import { useThemeMode } from '../theme'
 
+import { WorkspaceStateProvider } from '../view-state'
 import AppRoutes from './AppRoutes'
 import { MobileBottomBar, MobileTopBar } from './MobileNavigation'
 import { CQ_PAGES, NAV, NAV_TOOLS, NAV_WORKSPACE } from './navigation'
@@ -52,7 +53,11 @@ import WorkspaceTerminals from './WorkspaceTerminals'
 
 const { Sider, Content } = Layout
 
-export default function AppShell({ routing, logout }: { routing: AppRoute; logout: () => void }) {
+type AppShellProps = { routing: AppRoute; logout: () => void }
+export default function AppShell(props: AppShellProps) {
+  return <WorkspaceStateProvider><AppShellContent {...props} /></WorkspaceStateProvider>
+}
+function AppShellContent({ routing, logout }: AppShellProps) {
   const { setRoute, tab, go, selectAgent, inboxSub } = routing
   const agentKinds = useAgentKinds()
   const [agentInboxOpen, setAgentInboxOpen] = useState(false)
@@ -108,13 +113,13 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
     taskDir={activeTask && !isLooseTask(activeTask) ? activeTask : (activeProject?.dir || '')}
     actions={{ openTerm, closeTerm, renameOpenTerm, newTerminalInTask }} />
   openTermRef.current = (n) => openTerm(n)
-  const page = taskView ? null : <AppRoutes routing={routing} isMobile={isMobile} active={active} projects={treeSrc.projects}
+  const page = <AppRoutes visible={!taskView && space.mode !== 'focus' && !(isMobile && overlay)} openPages={pageTabsState.pageTabs} hasDock={terms.length > 0} routing={routing} isMobile={isMobile} active={active} projects={treeSrc.projects}
     projectDirectory={{ loaded: directory.projectsLoaded, error: directory.projectsError, retry: directory.refresh }}
     actions={{ openTerm, closeTerm, newTerminalAt, logout, newTask: projectActions.newTask, openProject: (p) => { const project = treeSrc.projects.find(item => item.dir === p.dir); if (project) { setMobileProject(null); go(projectPath(project.key)) } else { setMobileProject({ ...p, at: Date.now() }); go('projects') } } }}
     mobileProject={mobileProject} mobileSearchNonce={mobileSearchNonce} mobileActionsHost={mobileActionsHost}
     fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined}
     agent={{ node: curNodeId, inbox: agentInbox, open: agentInboxOpen, notifications }} />
-  const pageNode = <div className={`tt-page tt-page-${tab}${isMobile ? ' tt-page-mobile' : ''}${isMobile && terms.length ? ' has-dock' : ''}`}>{page}</div>
+  const pageNode = page
   const paletteItems: PaletteItem[] = [
     ...NAV.map((n) => ({
       key: `page:${n.key}`, group: t('workspace.groupPages'), title: t(n.labelKey),
@@ -136,7 +141,7 @@ export default function AppShell({ routing, logout }: { routing: AppRoute; logou
   const canvasNode = (
     <Content ref={canvasRef} className="tt-canvas" data-cq={CQ_PAGES.has(tab) ? 'on' : undefined} style={{
       flex: 1, minWidth: 0, minHeight: 0, height: '100%', padding: 0,
-      overflow: tab === 'onboarding' || tab === 'capabilities' || tab === 'home' || tab === 'browser' || tab === 'phone' || tab === 'files' ? 'hidden' : 'auto',
+      overflow: 'hidden',
     }}>{pageNode}</Content>
   )
   const dockNode = (

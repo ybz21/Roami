@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { Input, Modal, Spin, type InputRef } from 'antd'
 import { CheckIcon, ChevronDown, CloseIcon, GearIcon, SearchIcon } from '../../icons'
@@ -33,7 +34,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
     if (open) return
     returnFocus.current?.focus({ preventScroll: true })
   }, [open])
-  useEffect(() => {
+  usePageEffect(() => {
     if (!open || (phone && open === 'model')) return
     const measure = () => {
       const button = returnFocus.current, card = button?.closest('.agent-compose-card')

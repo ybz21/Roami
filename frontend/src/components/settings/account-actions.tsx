@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useState } from 'react'
 import { App, Button } from 'antd'
 import { useI18n } from '../../i18n'
 import { ExitFullscreenIcon, FullscreenIcon, LogoutIcon } from '../../icons'
@@ -10,7 +11,7 @@ export function fullscreenSupported() {
 export function FullscreenAction({ controller }: { controller?: { active: boolean; toggle: () => void } }) {
   const { t } = useI18n()
   const [active, setActive] = useState(false)
-  useEffect(() => {
+  usePageEffect(() => {
     const onChange = () => setActive(!!(document.fullscreenElement || (document as any).webkitFullscreenElement))
     onChange()
     document.addEventListener('fullscreenchange', onChange)

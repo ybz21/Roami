@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api'
 import { agentName, isAgentKind, type AgentKind } from '../../agent-kind'
@@ -56,7 +57,7 @@ export function useOnboardingState(enabled = true) {
       .finally(() => { current.pending = undefined })
     return () => { cancelled = true }
   }, [scope, revision, enabled])
-  useEffect(() => {
+  usePageEffect(() => {
     const changed = () => refresh()
     window.addEventListener(MODEL_CATALOG_CHANGED, changed)
     window.addEventListener(ONBOARDING_CHANGED, changed)
