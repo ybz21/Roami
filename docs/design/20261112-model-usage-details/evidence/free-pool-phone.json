@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "initial": {
+    "width": 392,
+    "scrollWidth": 392,
+    "height": 766,
+    "scrollHeight": 766,
+    "pointer": "coarse"
+  },
+  "targetHeights": [
+    44,
+    44,
+    44
+  ],
+  "scroll": {
+    "before": 0,
+    "after": 448.3636474609375
+  },
+  "source": {
+    "width": 392.727294921875,
+    "top": 0,
+    "policy": "free"
+  },
+  "checks": [
+    "aggregation tab by touch",
+    "pool editor by touch",
+    "real touch scrolling",
+    "per-pool policy toggle",
+    "rate-limit demo switches to free backup",
+    "source-level default strategy on full-screen editor"
+  ]
+}

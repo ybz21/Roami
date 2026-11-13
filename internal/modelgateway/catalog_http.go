@@ -41,6 +41,10 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		h.sourceModels(w, r)
 		return true
 	}
+	if r.URL.Path == "/v1/model-gateway/catalog/routing" {
+		h.routingView(w, r)
+		return true
+	}
 	s := h.Catalog
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -104,7 +108,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				break
 			}
 			for _, row := range s.value.Models {
-				if row.Protocol == source.Protocol && row.Candidates[0].SourceID == source.ID && row.Candidates[0].Model == upstream {
+				if !row.Aggregate && row.Protocol == source.Protocol && row.Candidates[0].SourceID == source.ID && row.Candidates[0].Model == upstream {
 					copy := row
 					model = &copy
 					break
@@ -124,7 +128,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				created = true
 			}
 		}
-		if model == nil || input.SourceID != "" && model.Candidates[0].SourceID != input.SourceID {
+		if model == nil || input.SourceID != "" && !(model.Aggregate && input.SourceID == groupSource || !model.Aggregate && model.Candidates[0].SourceID == input.SourceID) {
 			err = catalogError()
 			break
 		}
@@ -236,6 +240,9 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 			data = append(data, map[string]any{"id": gatewayDefaultModel, "type": "model", "object": "model", "display_name": "Roami Default", "owned_by": "roami"})
 		}
 		for _, m := range snapshot.Models {
+			if m.Aggregate && !m.enabled() {
+				continue
+			}
 			id := m.ID
 			if kind == "claude" {
 				id = claudeModelPrefix + id
@@ -299,8 +306,47 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	for _, s := range catalog.Sources {
 		sources[s.ID] = s
 	}
+	var choice *routingChoice
+	if model.Aggregate {
+		if !model.enabled() {
+			reject(w, 503, "MODEL_ROUTE_DISABLED")
+			return
+		}
+		required := ""
+		if r.URL.Path == "/v1/responses/compact" {
+			required = protocol
+		}
+		choice, err = h.newRoutingChoice(r.Context(), catalog, *model, required)
+		if err != nil {
+			reject(w, 503, "MODEL_ROUTE_UNAVAILABLE")
+			return
+		}
+	}
 	var admissionDuration time.Duration
-	for index, candidate := range model.Candidates {
+	for index := 0; ; index++ {
+		var leaf routingLeaf
+		if choice != nil {
+			var ok bool
+			leaf, ok, err = choice.Next()
+			if err != nil {
+				reject(w, 503, "MODEL_ROUTE_STATE_FAILED")
+				return
+			}
+			if !ok {
+				reject(w, 503, "MODEL_ROUTE_NO_AVAILABLE_MEMBER")
+				return
+			}
+		} else {
+			if index >= len(model.Candidates) {
+				return
+			}
+			leaf.Candidate = model.Candidates[index]
+		}
+		candidate := leaf.Candidate
+		if leaf.ChannelID == "" {
+			leaf.ChannelID = candidateIdentity(candidate) + "/"
+		}
+
 		source, exists := sources[candidate.SourceID]
 		if !exists {
 			reject(w, 400, "MODEL_NOT_CONFIGURED")
@@ -411,7 +457,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 		}
 		admissionStarted := time.Now()
-		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID})
+		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, Free: leaf.Free})
 		admissionDuration += time.Since(admissionStarted)
 		w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(admissionDuration.Milliseconds(), 10))
 		if e != nil {
@@ -432,6 +478,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		var usage *Usage
 		// Each attempted source settles independently, including zero-send connection failures.
 		attempt := func() bool {
+			observation := newResponseObservation(source.Protocol, time.Now())
+			defer func() { h.observeAttempt(r, leaf, call, status, code, usage, observation) }()
+
 			defer func() {
 				if err := h.Ledger.Settle(call, usage, status, code, notSent); err != nil {
 					log.Printf("model gateway: settlement failed call=%s", call.ID)
@@ -475,7 +524,12 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 			var response *http.Response
 			if source.PluginSourceID != "" {
-				response, e = h.Plugins.Fetch(r.Context(), pluginSource, pluginModel, pluginProvider, out, upstreamBody)
+				response, e = h.Plugins.FetchAccount(r.Context(), pluginSource, pluginModel, pluginProvider, func() string {
+					if leaf.Account != "" {
+						return leaf.Account
+					}
+					return pluginSource.ProviderID
+				}(), out, upstreamBody)
 			} else {
 				response, e = h.Client.Do(out)
 			}
@@ -483,15 +537,36 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				var op *net.OpError
 				notSent = errors.As(e, &op) && op.Op == "dial"
 				code = "MODEL_TRANSPORT_FAILED"
-				if notSent && model.Strategy == "failover" && index+1 < len(model.Candidates) && r.Context().Err() == nil {
+				if choice != nil {
+					h.restRoute(leaf, *model, 0, 0)
+				}
+				if notSent && (choice != nil || model.Strategy == "failover" && index+1 < len(model.Candidates)) && r.Context().Err() == nil {
 					return true
 				}
 				reject(w, 502, code)
 				return false
 			}
 			defer response.Body.Close()
+			response.Body = &observedResponseBody{ReadCloser: response.Body, observation: observation}
 			call.upstream = responseReceipt(response)
 			status = response.StatusCode
+			observation.stream = strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")
+			if choice != nil && status >= 400 {
+				h.restRoute(leaf, *model, status, retryDelay(response.Header.Get("Retry-After"), h.Ledger.now()))
+				retry := status >= 400
+				if status == 429 {
+					retry = model.switchLimit()
+				}
+				if status == 402 {
+					retry = model.switchExhausted()
+				}
+				if retry && r.Context().Err() == nil {
+					n, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, (4<<20)+1))
+					code = "MODEL_HTTP_" + strconv.Itoa(status)
+					notSent = readErr == nil && n <= 4<<20 && status < 500
+					return true
+				}
+			}
 			for name, values := range response.Header {
 				lower := strings.ToLower(name)
 				if strings.HasPrefix(lower, "x-roami-") || containsField([]string{"connection", "transfer-encoding", "content-length", "set-cookie", "upgrade"}, lower) {

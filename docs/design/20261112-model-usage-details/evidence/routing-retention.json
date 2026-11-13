@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "checks": [
+    "smart: five-hour window before later weekly resets",
+    "smart: reset-free credits and equal monthly resets",
+    "resting channels rank last",
+    "drain: exhausted anchor advances and recovered earlier quota does not reclaim it",
+    "drain: temporary rest does not move its anchor",
+    "rotate: one update advances one round",
+    "usage: highest remaining first, unknown last",
+    "pace: five-hour quota rate and 90% reserve",
+    "pace: earliest credit batch can override reset rate",
+    "pace: keys rank by recent tokens and update after dispatch",
+    "weight: 3:1 interleaving counts member once across two accounts",
+    "weight: nested group is one member; resting member exits cycle",
+    "fast: within 10% preserves order; fifth request probes stale channel",
+    "fast: stream-only measurements, recent sample weighted more, reset is empty",
+    "cheap: custom effective price, unknown last, tie stable",
+    "cheap: UTC weekday half-open peak windows and weekend",
+    "monitor: exact rolling 24h boundary and future rejection",
+    "monitor: record cap evicts oldest with out-of-order arrivals",
+    "monitor: byte cap and oversized entry bound storage",
+    "monitor: unchecked quality and failed streams excluded from quality/latency"
+  ]
+}

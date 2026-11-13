@@ -155,3 +155,5 @@ html[data-pointer="coarse"] .tt-model-source-name-dialog .ant-input { min-height
 
 html[data-pointer="coarse"] .tt-model-plugin-import .ant-select,
 html[data-pointer="coarse"] .tt-model-plugin-import .ant-select-selector { min-height:var(--tap); }
+
+.tt-model-hub-main[hidden] { display:none; }

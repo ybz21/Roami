@@ -24,17 +24,19 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const currentID = kind === 'claude' ? view.current.model?.replace(/^roami-claude\//, '').replace(/\[1m\]$/, '') : view.current.model
   const usesDefault = throughGateway && currentID === gatewayDefault
   const currentModel = (throughGateway ? models.find(model => model.id === (usesDefault ? catalog.value?.defaultModel : currentID)) : undefined) || models.find(model => {
+    if (model.aggregate) return false
     const source = sources.find(source => source.id === model.candidates[0].sourceId)
     return profile && source && source.protocol === profile.protocol && endpoint(source.baseUrl) === endpoint(profile.baseUrl) && model.candidates[0].model === view.current.model
   })
   const currentMode = view.mode || (profile || view.current.provider && view.current.provider !== 'openai' ? 'custom' : 'official')
   const selectedMode = mode || currentMode
-  const selectedSource = source || (usesDefault ? defaultSource : currentModel?.candidates[0].sourceId) || defaultSource
+  const currentSource = currentModel?.aggregate ? '@group' : currentModel?.candidates[0].sourceId
+  const selectedSource = source || (usesDefault ? defaultSource : currentSource) || defaultSource
   const defaultSelected = selectedSource === defaultSource
   const directoryKey = selectedSource + ':' + catalog.value?.revision
   const remote = directory.key === directoryKey ? directory : { models: [], loading: false, error: '' }
   useEffect(() => {
-    if (selectedMode !== 'custom' || !selectedSource || defaultSelected || !catalog.value?.revision || !installed) return
+    if (selectedSource === '@group' || selectedMode !== 'custom' || !selectedSource || defaultSelected || !catalog.value?.revision || !installed) return
     const abort = new AbortController()
     const key = selectedSource + ':' + catalog.value.revision
     setDirectory({ key, models: [], loading: true, error: '' })
@@ -45,20 +47,20 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
     })
     return () => abort.abort()
   }, [kind, selectedMode, selectedSource, defaultSelected, catalog.value?.revision, installed, directoryVersion])
-  const options = models.filter(model => model.candidates[0].sourceId === selectedSource).map(model => ({ value: model.id, label: model.name, title: model.candidates[0].model, upstreamModel: model.candidates[0].model, configured: true }))
+  const options = models.filter(model => selectedSource === '@group' ? model.aggregate : !model.aggregate && model.candidates[0].sourceId === selectedSource).map(model => ({ value: model.id, label: model.name, title: model.aggregate ? model.name : model.candidates[0].model, upstreamModel: model.aggregate ? model.id : model.candidates[0].model, configured: true, disabled: model.enabled === false }))
   const pendingModel = model.startsWith(discoveredPrefix) ? decodeURIComponent(model.slice(discoveredPrefix.length)) : ''
   const query = search.trim()
-  for (const id of new Set([...remote.models, ...(pendingModel ? [pendingModel] : []), ...(query && query.length <= 200 ? [query] : [])])) {
-    if (!options.some(option => option.upstreamModel === id)) options.push({ value: discoveredPrefix + encodeURIComponent(id), label: id, title: id, upstreamModel: id, configured: false })
+  if (!defaultSelected && selectedSource !== '@group') for (const id of new Set([...remote.models, ...(pendingModel ? [pendingModel] : []), ...(query && query.length <= 200 ? [query] : [])])) {
+    if (!options.some(option => option.upstreamModel === id)) options.push({ value: discoveredPrefix + encodeURIComponent(id), label: id, title: id, upstreamModel: id, configured: false, disabled: false })
   }
-  const selectedOption = options.find(option => option.value === model) || (pendingModel ? options.find(option => option.upstreamModel === pendingModel) : undefined) || (selectedSource === currentModel?.candidates[0].sourceId ? options.find(option => option.value === currentModel?.id) : undefined)
+  const selectedOption = options.find(option => option.value === model) || (pendingModel ? options.find(option => option.upstreamModel === pendingModel) : undefined) || (selectedSource === currentSource ? options.find(option => option.value === currentModel?.id) : undefined)
   const selected = selectedOption?.value
   const currentLabel = usesDefault ? t('hub.gatewayDefault') : currentModel?.name || view.current.model || t('agent.models.notConfigured')
   const gatewayApplied = throughGateway && !!profile?.applied && !view.changed
-  const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.map(model => ({ id: model.id, name: model.name }))]
+  const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.filter(model => !model.aggregate || model.enabled !== false).map(model => ({ id: model.id, name: model.name }))]
   const catalogCurrent = kind !== 'pi' && kind !== 'opencode' || !!profile?.models && JSON.stringify(profile.models) === JSON.stringify(expectedModels)
   const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || catalogCurrent && throughGateway && !!profile?.applied && (defaultSelected ? usesDefault : !usesDefault && !!selected && selected === currentModel?.id))
-  const valid = installed && (selectedMode === 'official' || (defaultSelected ? !!catalog.value?.defaultModel : !!selectedSource && !!selected && !!catalog.value))
+  const valid = installed && (selectedMode === 'official' || (defaultSelected ? !!catalog.value?.defaultModel : !!selectedSource && !!selected && !selectedOption?.disabled && !!catalog.value))
   useEffect(() => { onModelLabel?.(usesDefault ? t('hub.gatewayDefault') : currentModel?.name || '') }, [usesDefault, currentModel?.name, onModelLabel, t])
   const apply = async () => {
     if (!valid || busy || applied) return
@@ -78,7 +80,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
     {!installed && <p>{t('hub.installFirst')}</p>}
     {(error || selectedMode === 'custom' && catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={() => { catalog.retry(); void onChanged() }}>{t('capabilities.models.reread')}</Button>} />}
     {selectedMode === 'official' ? <p>{t('hub.factoryHint')}</p> : <>
-      <div className="tt-model-binding-field"><label htmlFor={'agent-source-' + kind}>{t('hub.upstreamSource')}</label><Select id={'agent-source-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.upstreamSource')} placeholder={t('hub.chooseSource')} value={selectedSource} options={[{ value: defaultSource, label: t('hub.gatewayDefault') }, ...sources.map(source => ({ value: source.id, label: source.name }))]} onChange={source => { setSource(source); setModel(''); setSearch('') }} disabled={busy || !installed} loading={!catalog.value && !catalog.error} /></div>
+      <div className="tt-model-binding-field"><label htmlFor={'agent-source-' + kind}>{t('hub.upstreamSource')}</label><Select id={'agent-source-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.upstreamSource')} placeholder={t('hub.chooseSource')} value={selectedSource} options={[{ value: defaultSource, label: t('hub.gatewayDefault') }, ...sources.map(source => ({ value: source.id, label: source.name })), ...(models.some(model => model.aggregate) ? [{ value: '@group', label: t('pool.groups') }] : [])]} onChange={source => { setSource(source); setModel(''); setSearch('') }} disabled={busy || !installed} loading={!catalog.value && !catalog.error} /></div>
       {defaultSelected ? <p role="status">{t(catalog.value && !catalog.value.defaultModel ? 'hub.gatewayDefaultMissing' : 'hub.gatewayDefaultHint', { name: { claude: 'Claude Code', codex: 'Codex', pi: 'Pi', opencode: 'OpenCode' }[kind] })}</p> : <>
         <div className="tt-model-binding-field"><label htmlFor={'agent-model-' + kind}>{t('hub.tab.catalog')}</label><Select id={'agent-model-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.tab.catalog')} placeholder={t('hub.chooseModel')} value={selected} options={options} placement={phone ? 'topLeft' : 'bottomLeft'} showSearch loading={remote.loading} onSearch={setSearch} onChange={value => { setModel(value); setSearch('') }} filterOption={(input, option) => String(option?.label || '').toLowerCase().includes(input.toLowerCase()) || String(option?.upstreamModel || '').toLowerCase().includes(input.toLowerCase())} disabled={busy || !installed || !selectedSource} /></div>
         {remote.error && <div className="tt-model-binding-actions"><p role="status">{t(remote.error)}</p><Button onClick={() => { catalog.retry(); setDirectoryVersion(value => value + 1) }}>{t('agent.retry')}</Button></div>}

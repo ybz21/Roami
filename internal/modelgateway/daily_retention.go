@@ -14,11 +14,11 @@ const usageTotalsSQL = `(
   1 AS requests,COALESCE(input_tokens,0) AS input_tokens,COALESCE(output_tokens,0) AS output_tokens,
   COALESCE(cache_read_tokens,0) AS cache_read_tokens,COALESCE(cost_nano,0) AS cost_nano,
   state='pending' AS pending,state='unknown' AS unknown,
-  state!='pending' AND input_tokens IS NULL AS usage_unknown,state='failed' AS failed
+  state!='pending' AND input_tokens IS NULL AS usage_unknown,state='failed' AS failed,source_id
  FROM gateway_calls
  UNION ALL
  SELECT day,role,model,currency,agent_kind,source,requests,input_tokens,output_tokens,
-  cache_read_tokens,cost_nano,0,unknown,usage_unknown,failed FROM gateway_daily_usage
+  cache_read_tokens,cost_nano,0,unknown,usage_unknown,failed,source_id FROM gateway_daily_usage
 )`
 
 // Compact transfers expired receipts atomically; a late settlement starts its own retention window.
@@ -28,12 +28,12 @@ func (l *Ledger) Compact() error {
 		var removed int64
 		err := l.db.Tx(func(tx *sql.Tx) error {
 			const expired = `SELECT rowid FROM gateway_calls WHERE state!='pending' AND COALESCE(finished_ms,started_ms)<=? ORDER BY COALESCE(finished_ms,started_ms),rowid LIMIT ?`
-			_, err := tx.Exec(`INSERT INTO gateway_daily_usage(day,timezone,role,model,currency,agent_kind,source,requests,input_tokens,output_tokens,cache_read_tokens,cost_nano,unknown,usage_unknown,failed)
+			_, err := tx.Exec(`INSERT INTO gateway_daily_usage(day,timezone,role,model,currency,agent_kind,source,requests,input_tokens,output_tokens,cache_read_tokens,cost_nano,unknown,usage_unknown,failed,source_id)
  SELECT day,timezone,role,model,currency,agent_kind,`+usageSourceSQL+` AS source,
-  count(*),COALESCE(sum(input_tokens),0),COALESCE(sum(output_tokens),0),COALESCE(sum(cache_read_tokens),0),COALESCE(sum(cost_nano),0),sum(state='unknown'),sum(input_tokens IS NULL),sum(state='failed')
+  count(*),COALESCE(sum(input_tokens),0),COALESCE(sum(output_tokens),0),COALESCE(sum(cache_read_tokens),0),COALESCE(sum(cost_nano),0),sum(state='unknown'),sum(input_tokens IS NULL),sum(state='failed'),source_id
  FROM gateway_calls WHERE rowid IN (`+expired+`)
- GROUP BY day,timezone,role,model,currency,agent_kind,source
- ON CONFLICT(day,timezone,role,model,currency,agent_kind,source) DO UPDATE SET
+ GROUP BY day,timezone,role,model,currency,agent_kind,source,source_id
+ ON CONFLICT(day,timezone,role,model,currency,agent_kind,source,source_id) DO UPDATE SET
   requests=gateway_daily_usage.requests+excluded.requests,
   input_tokens=gateway_daily_usage.input_tokens+excluded.input_tokens,
   output_tokens=gateway_daily_usage.output_tokens+excluded.output_tokens,

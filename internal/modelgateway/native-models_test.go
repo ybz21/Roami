@@ -108,3 +108,44 @@ func TestNativeAgentDefaultsAndCompleteModelCatalogs(t *testing.T) {
 		})
 	}
 }
+
+func TestGatewayDefaultAndNativeCatalogRespectAggregateState(t *testing.T) {
+	h := catalogHandler(t, "https://upstream.example/v1", "openai-completions")
+	s := h.Catalog
+	native := s.value.Models[0]
+	active := CatalogModel{ID: "active-pool", Name: "Active", Aggregate: true, Protocol: native.Protocol, Strategy: "smart", Candidates: native.Candidates}
+	disabled := active
+	disabled.ID, disabled.Name = "disabled-pool", "Disabled"
+	off := false
+	disabled.Enabled = &off
+	s.value.Models = []CatalogModel{disabled, active, native}
+	main := func(endpoint, model string) {
+		saveNodeModels(t, h.Ledger, map[string]any{"connection": map[string]string{"baseUrl": endpoint, "apiKey": "upstream-secret"}, "main": map[string]string{"model": model}})
+	}
+	main(s.baseURL+"/v1", active.ID)
+	if model := s.defaultModel(s.value); model == nil || model.ID != active.ID {
+		t.Fatal("enabled group cannot be the gateway default")
+	}
+	options := s.modelOptions(s.value)
+	if len(options) != 3 || options[0].ID != gatewayDefaultModel || options[1].ID != active.ID || options[2].ID != native.ID {
+		t.Fatalf("disabled group leaked into native catalog: %+v", options)
+	}
+	for _, kind := range []string{"claude", "codex"} {
+		path := "/v1/models"
+		if kind == "codex" {
+			path += "?client_version=0.167.2"
+		}
+		result := requestWithKey(h, s.credential(kind), path, "")
+		if result.Code != 200 || strings.Contains(result.Body.String(), disabled.ID) || !strings.Contains(result.Body.String(), active.ID) {
+			t.Fatalf("invalid %s discovery: %d %s", kind, result.Code, result.Body)
+		}
+	}
+	main(s.baseURL+"/v1", disabled.ID)
+	if model := s.defaultModel(s.value); model != nil {
+		t.Fatal("disabled group became the gateway default")
+	}
+	main("https://upstream.example/v1", "fixture")
+	if model := s.defaultModel(s.value); model == nil || model.ID != native.ID {
+		t.Fatal("direct source was mistaken for a group sharing its first member")
+	}
+}

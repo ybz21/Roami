@@ -86,8 +86,9 @@ it('shows connections and their models together and accepts old source-page link
   const connection = await screen.findByRole('region', { name: 'Saved source' })
   expect(connection.textContent).toContain('Coding')
   expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
-  expect(screen.getAllByRole('tab')).toHaveLength(5)
-  expect(screen.getAllByRole('tab')[4].textContent).toBe('hub.tab.speech')
+  expect(screen.getAllByRole('tab')).toHaveLength(8)
+  expect(screen.getAllByRole('tab')[2].textContent).toBe('hub.tab.usage')
+  expect(screen.getAllByRole('tab')[7].textContent).toBe('hub.tab.speech')
   expect(screen.queryByRole('combobox', { name: 'settings.speechProvider' })).toBeNull()
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByText('hub.consumers')).toBeNull()
@@ -360,4 +361,16 @@ it('renames a source directly without discovering models or changing other confi
   await screen.findByRole('region', { name: 'My cloud' })
   expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [{ ...catalog.sources[0], name: 'My cloud' }], models: catalog.models, drafts: [] }))
   expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})
+
+it('offers published pools as a source and does not discover an upstream for a routing group', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path === '/agent/model-gateway/catalog' ? { data: { ...catalog, models: [...catalog.models, { id: 'free-pool', name: 'Free pool', aggregate: true, enabled: true, freeOnly: true, strategy: 'smart', protocol: 'openai-completions', candidates: [{ sourceId: 'upstream', model: 'priced-model' }] }] } } : original(method, path, body, options))
+  render(<App><GatewayModelBinding kind="codex" view={{ current: {}, profiles: [], revision: 'cli-r1', canRestore: false, changed: false, configPaths: [] }} onChanged={async () => {}} /></App>)
+  fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
+  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.upstreamSource' }))
+  fireEvent.click(await screen.findByTitle('pool.groups'))
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'hub.tab.catalog' }))
+  expect(await screen.findByTitle('Free pool')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.filter(([, path, body]) => path.endsWith('/source-models') && body.sourceId === '@group')).toHaveLength(0)
 })

@@ -13,6 +13,9 @@ func (s *CatalogStore) modelOptions(catalog ModelCatalog) []agentproviders.Model
 		models = append(models, agentproviders.ModelOption{ID: gatewayDefaultModel, Name: "Roami Default"})
 	}
 	for _, model := range catalog.Models {
+		if model.Aggregate && !model.enabled() {
+			continue
+		}
 		models = append(models, agentproviders.ModelOption{ID: model.ID, Name: model.Name})
 	}
 	return models
@@ -39,10 +42,16 @@ func (s *CatalogStore) defaultModel(catalog ModelCatalog) *CatalogModel {
 		return nil
 	}
 	for _, model := range catalog.Models {
+		if model.Aggregate && !model.enabled() {
+			continue
+		}
 		if strings.TrimRight(route.endpoint, "/") == s.baseURL+"/v1" {
 			if model.ID == route.model {
 				return &model
 			}
+			continue
+		}
+		if model.Aggregate {
 			continue
 		}
 		for _, source := range catalog.Sources {

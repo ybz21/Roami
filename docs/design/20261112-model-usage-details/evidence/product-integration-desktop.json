@@ -1,0 +1,101 @@
+{
+  "passed": true,
+  "distribution": {
+    "qa-a": 6,
+    "qa-b": 2
+  },
+  "layouts": [
+    {
+      "width": 1280,
+      "pane": false,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 1280
+    },
+    {
+      "width": 1280,
+      "pane": true,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 835.203125,
+      "paneLeft": 835.203125,
+      "paneRight": 1280
+    },
+    {
+      "width": 1920,
+      "pane": false,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 1920
+    },
+    {
+      "width": 1920,
+      "pane": true,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 1219.203125,
+      "paneLeft": 1219.203125,
+      "paneRight": 1920
+    },
+    {
+      "width": 2560,
+      "pane": false,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 2560
+    },
+    {
+      "width": 2560,
+      "pane": true,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 1603.203125,
+      "paneLeft": 1603.203125,
+      "paneRight": 2560
+    },
+    {
+      "width": 3440,
+      "pane": false,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 3440
+    },
+    {
+      "width": 3440,
+      "pane": true,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 906.21875,
+      "mainRight": 2131.203125,
+      "paneLeft": 2131.203125,
+      "paneRight": 3440
+    }
+  ],
+  "errors": [],
+  "checks": [
+    "HEAD before screenshot",
+    "source-before-model actual form",
+    "persisted model weights",
+    "public gateway 3:1 interleaving",
+    "zero price excluded from free pool",
+    "source default pricing saved",
+    "actual source-specific JSON quality probe",
+    "monitor source details",
+    "fixed 39.1 MiB file within 64 MiB budget"
+  ]
+}

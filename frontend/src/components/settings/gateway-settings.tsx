@@ -60,7 +60,8 @@ export function useGatewaySettings(enabled: boolean) {
     call, amount, setAmount, reason, setReason, reconciling, reconcileError, reconcile,
     openReconcile: (value: ProxyUsage['recent'][number]) => { setCall(value); setAmount(''); setReason(''); setReconcileError('') }, closeReconcile: () => { if (!reconciling) setCall(null) } }
 }
-type Controller = ReturnType<typeof useGatewaySettings>
+export type GatewaySettingsController = ReturnType<typeof useGatewaySettings>
+type Controller = GatewaySettingsController
 
 export function GatewaySettingsForm({ controller: c, mode, active, models }: { controller: Controller; mode: 'proxy' | 'prices'; active: boolean; models: string[] }) {
   const { t } = useI18n()

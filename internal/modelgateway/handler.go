@@ -17,6 +17,8 @@ import (
 )
 
 type Handler struct {
+	routing        routingState
+	Monitor        *MonitorStore
 	Plugins        *modelplugins.Manager
 	Catalog        *CatalogStore
 	Ledger         *Ledger
@@ -67,7 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
@@ -100,11 +102,30 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			h.notifyAdmission()
+			c, _ = h.Ledger.Configuration()
 			writeJSON(w, 200, map[string]any{"data": c})
 			return
 		}
 	}
 	if r.Method == "GET" && r.URL.Path == "/v1/model-gateway/usage" {
+		if r.URL.Query().Get("view") != "" {
+			q, err := workspaceQuery(r.URL.Query())
+			if err != nil {
+				reject(w, 400, err.Error())
+				return
+			}
+			data, err := h.Ledger.WorkspaceUsage(q)
+			if err != nil {
+				if strings.HasPrefix(err.Error(), "INVALID_") {
+					reject(w, 400, err.Error())
+				} else {
+					reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
+				}
+				return
+			}
+			writeJSON(w, 200, map[string]any{"data": data})
+			return
+		}
 		days := 7
 		if raw := r.URL.Query().Get("days"); raw != "" {
 			var parseErr error

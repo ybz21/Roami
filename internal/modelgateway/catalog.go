@@ -36,11 +36,21 @@ type ModelCandidate struct {
 	Model    string `json:"model"`
 }
 type CatalogModel struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	Protocol   string           `json:"protocol"`
-	Strategy   string           `json:"strategy"`
-	Candidates []ModelCandidate `json:"candidates"`
+	Aggregate       bool             `json:"aggregate,omitempty"`
+	Enabled         *bool            `json:"enabled,omitempty"`
+	FreeOnly        bool             `json:"freeOnly,omitempty"`
+	AllowPlan       bool             `json:"allowPlan,omitempty"`
+	RequireTools    bool             `json:"requireTools,omitempty"`
+	MinContext      int              `json:"minContext,omitempty"`
+	CooldownSeconds int              `json:"cooldownSeconds,omitempty"`
+	OnLimit         *bool            `json:"onLimit,omitempty"`
+	OnExhausted     *bool            `json:"onExhausted,omitempty"`
+	Weights         map[string]int   `json:"weights,omitempty"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Protocol        string           `json:"protocol"`
+	Strategy        string           `json:"strategy"`
+	Candidates      []ModelCandidate `json:"candidates"`
 }
 type ModelCatalog struct {
 	Revision        string                   `json:"revision"`
@@ -138,6 +148,9 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 		return err
 	}
 	err = s.ledger.db.Tx(func(tx *sql.Tx) error {
+		if err := pruneCatalogRouting(tx, value); err != nil {
+			return err
+		}
 		_, e := tx.Exec(`INSERT INTO gateway_catalog(id,value) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value`, string(raw))
 		return e
 	})
@@ -315,11 +328,17 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	validate := func(rows []CatalogModel) error {
 		seen := map[string]bool{}
 		for _, m := range rows {
-			if !catalogID.MatchString(m.ID) || m.ID == gatewayDefaultModel || strings.TrimSpace(m.Name) == "" || len(m.Name) > 200 || seen[m.ID] || !containsField([]string{"fixed", "failover"}, m.Strategy) || len(m.Candidates) == 0 || len(m.Candidates) > 8 || m.Strategy == "fixed" && len(m.Candidates) != 1 || m.Strategy == "failover" && len(m.Candidates) < 2 {
+			if !catalogID.MatchString(m.ID) || m.ID == gatewayDefaultModel || strings.TrimSpace(m.Name) == "" || len(m.Name) > 200 || seen[m.ID] || !(m.Aggregate && validateAggregate(m) || !m.Aggregate && containsField([]string{"fixed", "failover"}, m.Strategy)) || len(m.Candidates) == 0 || len(m.Candidates) > 8 || m.Strategy == "fixed" && len(m.Candidates) != 1 || m.Strategy == "failover" && len(m.Candidates) < 2 {
 				return catalogError()
 			}
 			seen[m.ID] = true
 			for _, c := range m.Candidates {
+				if c.SourceID == groupSource {
+					if !m.Aggregate || !catalogID.MatchString(c.Model) {
+						return catalogError()
+					}
+					continue
+				}
 				p, ok := sources[c.SourceID]
 				if !ok || c.SourceID == m.Candidates[0].SourceID && p.Protocol != m.Protocol || c.Model == "" || len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
 					return catalogError()
@@ -329,6 +348,9 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		return nil
 	}
 	if err := validate(v.Models); err != nil {
+		return err
+	}
+	if err := validateRoutingGraph(v.Models); err != nil {
 		return err
 	}
 	if err := validate(v.Drafts); err != nil {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, App, Button, Checkbox, Input, Select } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -24,10 +24,10 @@ const sourceName = (source: ModelSource) => {
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
-  onEditModel: (id: string) => void
+  pricing?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { modal, message } = App.useApp()
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
@@ -47,7 +47,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   try { const url = new URL(normalizedURL); validURL = normalizedURL.length <= 2000 && !url.username && !url.password && !url.search && !url.hash && (url.protocol === 'https:' || url.protocol === 'http:' && (['localhost', '[::1]'].includes(url.hostname) || /^(127|10)\.\d+\.\d+\.\d+$|^192\.168\.\d+\.\d+$|^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$|^\[f[cd][\da-f]{2}:/i.test(url.hostname))) } catch { /* Validated before reading or saving. */ }
   const needsKey = !!existing?.hasKey && normalizedURL !== existing.baseUrl && !source.apiKey
   const validConnection = validURL && !needsKey
-  const attached = catalog.models.filter(model => model.candidates[0].sourceId === source.id)
+  const attached = catalog.models.filter(model => !model.aggregate && model.candidates[0].sourceId === source.id)
   const added = new Set(attached.map(model => model.candidates[0].model))
   const manual = [...new Set(draft.manual.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
   const invalidManual = manual.some(value => new TextEncoder().encode(value).length > 200 || /[\r\n\x00]/.test(value))
@@ -109,6 +109,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!validConnection || busy} onClick={() => void read()}>{t(draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>
         {readError && <Alert type="warning" role="alert" message={t(readError)} />}
       </section>
+      {pricing}
       {draft.directory !== null && <section className="tt-model-directory" aria-label={t('hub.directory.title')} aria-busy={loading}>
         <div className="tt-model-directory-heading"><h3>{t('hub.directory.title')}</h3>{draft.directory.length > 0 && <span role="status">{t('hub.directory.total', { count: number(draft.directory.length) })}</span>}</div>
         {!!draft.directory.length && <><Input aria-label={t('hub.directory.search')} placeholder={t('hub.directory.search')} prefix={<SearchIcon />} allowClear value={draft.query} onChange={event => patch({ query: event.target.value })} />

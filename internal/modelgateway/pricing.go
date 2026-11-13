@@ -1,7 +1,10 @@
 // Adapted from llm-gateway/internal/observe/pricing.go at 1f1ffc1ab080c0da935d063ac79380d2f2a4a079.
 package modelgateway
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // ModelPricing 单个模型的 token 单价（元/百万 token）。
 type ModelPricing struct {
@@ -12,9 +15,10 @@ type ModelPricing struct {
 
 // PricingConfig 计费配置。
 type PricingConfig struct {
-	DefaultConfigured *bool                   `yaml:"default_configured,omitempty" json:"defaultConfigured,omitempty"`
-	Default           ModelPricing            `yaml:"default" json:"default"`
-	Models            map[string]ModelPricing `yaml:"models" json:"models"`
+	Sources           map[string]SourcePricing `yaml:"sources,omitempty" json:"sources,omitempty"`
+	DefaultConfigured *bool                    `yaml:"default_configured,omitempty" json:"defaultConfigured,omitempty"`
+	Default           ModelPricing             `yaml:"default" json:"default"`
+	Models            map[string]ModelPricing  `yaml:"models" json:"models"`
 }
 
 // lookup 返回某模型名的配置价格（精确 → 前缀），以及是否命中。
@@ -48,28 +52,16 @@ func (pc *PricingConfig) Lookup(model string) ModelPricing {
 
 // LookupRoute 按 source_id/model 维度查找价格，找不到再按 model 维度回退。
 func (pc *PricingConfig) LookupRoute(sourceID, model string) ModelPricing {
-	if pc == nil {
-		return ModelPricing{}
-	}
-	if sourceID != "" {
-		if p, ok := pc.Models[sourceID+"/"+model]; ok {
-			return p
-		}
-	}
-	return pc.Lookup(model)
+	p, _ := pc.routePriceAt(sourceID, model, time.Now())
+	return p
 }
 
 // LookupExit 按「出口模型」(客户端请求的对外模型名) 定价：聚合模型无论被哪个
 // 上游承接，都按同一个对外名计价。出口名没有配置价格时，回退到 source/native
 // 维度。这样客户付的是「广告出去的模型」的价，而不是内部路由到的具体源。
 func (pc *PricingConfig) LookupExit(requested, sourceID, native string) ModelPricing {
-	if pc == nil {
-		return ModelPricing{}
-	}
-	if p, ok := pc.lookup(requested); ok {
-		return p
-	}
-	return pc.LookupRoute(sourceID, native)
+	p, _ := pc.exitPriceAt(requested, sourceID, native, time.Now())
+	return p
 }
 
 func calc(p ModelPricing, inputTokens, outputTokens, cacheReadTokens int) float64 {
@@ -101,14 +93,6 @@ func (pc *PricingConfig) CalcCostExit(requested, sourceID, native string, inputT
 }
 
 func (pc *PricingConfig) configured(requested, sourceID, model string) bool {
-	if _, ok := pc.lookup(requested); ok {
-		return true
-	}
-	if _, ok := pc.Models[sourceID+"/"+model]; sourceID != "" && ok {
-		return true
-	}
-	if _, ok := pc.lookup(model); ok {
-		return true
-	}
-	return pc.Default != (ModelPricing{}) || pc.DefaultConfigured == nil || *pc.DefaultConfigured
+	_, known := pc.exitPriceAt(requested, sourceID, model, time.Now())
+	return known
 }

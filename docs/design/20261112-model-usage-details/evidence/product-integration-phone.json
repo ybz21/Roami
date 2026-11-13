@@ -1,0 +1,50 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "target": "866",
+  "initial": {
+    "width": 392,
+    "scrollWidth": 392,
+    "height": 766,
+    "scrollHeight": 766,
+    "pointer": "coarse"
+  },
+  "editor": {
+    "top": 0,
+    "headers": 1
+  },
+  "heights": [
+    44,
+    44,
+    44,
+    44,
+    44,
+    44
+  ],
+  "detail": {
+    "top": 0,
+    "headers": 1,
+    "back": 44
+  },
+  "scroll": {
+    "mainBefore": 0,
+    "mainAfter": 330.5454406738281,
+    "detailBefore": 0,
+    "detailAfter": 0,
+    "detailScrollable": false
+  },
+  "storage": "保留与清理最多保留 24 小时、10,000 条；固定大小的环形文件覆盖最旧记录，总预算 64 MiB，不产生 WAL。当前记录 / 上限64 / 10,000文件大小 / 总预算39.1 / 64 MiB过期 / 容量淘汰0 / 0丢弃记录0",
+  "checks": [
+    "HEAD mobile before screenshot",
+    "actual aggregate full-screen editor",
+    "touch strategy selection",
+    "44px routing targets",
+    "monitor source cards",
+    "one full-screen return bar",
+    "real main scroll and detail bounds",
+    "actual tool quality probe by touch",
+    "source filter by touch",
+    "bounded disk storage display",
+    "source price editor"
+  ]
+}

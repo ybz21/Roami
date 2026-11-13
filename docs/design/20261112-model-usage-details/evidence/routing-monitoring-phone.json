@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "bounds": {
+    "width": 392,
+    "scrollWidth": 392,
+    "height": 766,
+    "scrollHeight": 766,
+    "pointer": "coarse",
+    "mainHeight": 537.8181762695312
+  },
+  "pane": {
+    "top": 0,
+    "bottom": 765.8181762695312,
+    "width": 392.727294921875,
+    "headers": 1,
+    "back": 44
+  },
+  "detailScroll": {
+    "before": 0,
+    "after": 378.9090881347656
+  },
+  "retention": "示例记录6 / 10,000指标数据容量0.00 / 64 MiB已过期 / 提前淘汰1,740 / 0",
+  "targets": [
+    44,
+    44,
+    44,
+    44,
+    44,
+    44
+  ],
+  "checks": [
+    "native nine-policy selector",
+    "touch weight input",
+    "monitor tab by touch",
+    "full-screen source detail",
+    "touch detail scrolling",
+    "native source filter",
+    "24h pruning by touch",
+    "44px targets",
+    "no document overflow"
+  ]
+}

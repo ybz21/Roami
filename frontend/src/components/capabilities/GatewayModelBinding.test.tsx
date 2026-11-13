@@ -158,3 +158,30 @@ it.each(['pi', 'opencode'] as const)('allows syncing a changed gateway catalog t
   expect((screen.getByRole('button', { name: 'capabilities.models.apply' }) as HTMLButtonElement).disabled).toBe(false)
   expect(screen.getByText('Model a', { selector: '.ant-select-selection-item' })).toBeTruthy()
 })
+
+
+it('recognizes a Claude routing group alias and preserves the gateway default entry', async () => {
+  const group = { ...models[0], id: 'free-pool', name: 'Free pool', aggregate: true, strategy: 'smart' }
+  vi.mocked(api).mockResolvedValue({ data: { revision: 'catalog-r1', sources, models: [...models, group], baseUrl: view.profiles[0].baseUrl, defaultModel: group.id } })
+  mount({ ...view, current: { model: 'roami-claude/free-pool[1m]' } })
+  await screen.findByText('pool.groups', { selector: '.ant-select-selection-item' })
+  expect(screen.getByText('Free pool', { selector: '.ant-select-selection-item' })).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'capabilities.models.applied' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(api).not.toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/source-models', expect.anything(), expect.anything())
+  await select('hub.upstreamSource', 'hub.gatewayDefault')
+  await screen.findByText('hub.gatewayDefaultHint')
+  expect(screen.queryByRole('combobox', { name: 'hub.tab.catalog' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'capabilities.models.apply' }))
+  fireEvent.click(within(await screen.findByRole('tooltip')).getByRole('button', { name: 'capabilities.models.apply' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/apply', { kind: 'claude', model: 'roami-default', revision: 'native-r1', catalogRevision: 'catalog-r1' }))
+})
+it.each(['pi', 'opencode'] as const)('excludes disabled groups when checking the synced %s catalog', async kind => {
+  const group = { ...models[0], id: 'free-pool', name: 'Free pool', aggregate: true, strategy: 'smart' }
+  const active = [...models, group], disabled = { ...group, id: 'disabled-pool', enabled: false }
+  const profile = { ...view.profiles[0], models: [{ id: 'roami-default', name: 'Roami Default' }, ...active.map(({ id, name }) => ({ id, name }))] }
+  vi.mocked(api).mockResolvedValue({ data: { revision: 'catalog-r1', sources, models: [...active, disabled], baseUrl: profile.baseUrl, defaultModel: group.id } })
+  render(<App><GatewayModelBinding kind={kind} view={{ ...view, profiles: [profile], current: { model: group.id } }} onChanged={async () => {}} /></App>)
+  await screen.findByText('Free pool', { selector: '.ant-select-selection-item' })
+  expect((screen.getByRole('button', { name: 'capabilities.models.applied' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByText('hub.gatewayCatalogChanged')).toBeNull()
+})
