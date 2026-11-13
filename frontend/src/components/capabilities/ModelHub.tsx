@@ -1,5 +1,6 @@
 import ModelAggregationWorkspace from './ModelAggregationWorkspace'
 import ModelMonitoringWorkspace from './ModelMonitoringWorkspace'
+import { api } from '../../api'
 import SourcePricingSettings, { sourcePriceDraftChanged, type SourcePriceDraft } from './SourcePricingSettings'
 import BackButton from '../BackButton'
 import ModelUsageWorkspace from './ModelUsageWorkspace'
@@ -14,7 +15,7 @@ import { SpeechSettings } from '../settings/speech-settings'
 import MobileSubPage from '../MobileSubPage'
 import LocalModelSources from './LocalModelSources'
 import GatewayAccessKey from './GatewayAccessKeys'
-import MagpiePluginImport from './MagpiePluginImport'
+import MagpiePluginImport, {pluginFailure} from './MagpiePluginImport'
 import MagpieSourceSettings from './MagpieSourceSettings'
 import ModelSourceEditor, { initialSourceDraft, type SourceDraft } from './ModelSourceEditor'
 import { GatewaySettingsForm, GatewayReconciliation, useGatewaySettings } from '../settings/gateway-settings'
@@ -40,6 +41,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const [priceReturn, setPriceReturn] = useState('catalog')
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [gatewayKeyDraft, setGatewayKeyDraft] = useState('')
+  const [addingAccount,setAddingAccount]=useState(''),[accountError,setAccountError]=useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
   const back = () => { navigate(detail === 'pricing' ? priceReturn : detail === 'model' && returnSource ? 'catalog/source/' + returnSource : tab); setReturnSource('') }
@@ -47,6 +49,15 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const models = value?.models || [], sources = value?.sources || []
   const priceModels = [...new Set(models.flatMap(model => model.candidates.map(candidate => candidate.model)).concat(models.flatMap(model => [model.id, ...model.candidates.map(candidate => candidate.sourceId + "/" + candidate.model)])))]
   if (!loaded && tab === 'catalog' && detail && detail !== 'pricing') return <div className="tt-model-hub-scroll">{error || <Spin />}</div>
+  const addAccount = async (source:ModelSource) => {
+    if(addingAccount || controller.busy)return
+    setAddingAccount(source.id);setAccountError('')
+    try {
+      const {data}=await api('POST','/agent/model-gateway/plugins/sources',{sourceId:source.pluginSourceId,revision:value.revision})
+      controller.accept(data.catalog)
+      navigate('catalog/source/'+data.sourceId+'/connection')
+    } catch(cause){setAccountError(pluginFailure(cause))}finally{setAddingAccount('')}
+  }
   const sourceBase: ModelSource = sources.find(source => source.id === id) || { id: newSourceId, name: '', baseUrl: '', protocol: 'openai-completions', authMode: 'api_key', apiKey: '' }
   const sourceDraft = sourceDrafts[id] || initialSourceDraft(sourceBase, id !== 'new')
   const modelBase: CatalogModel = models.find(model => model.id === id) || value.drafts.find(model => model.id === id) || { id: newModelId, name: '', protocol: sources[0]?.protocol || 'openai-completions', strategy: 'fixed', candidates: [{ sourceId: sources[0]?.id || '', model: '' }] }
@@ -73,16 +84,16 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     <label className="agent-settings-field">{t('hub.source')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.source')} value={model.candidates[index].sourceId || undefined} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={sourceId => selectSource(sourceId, index)} /></label>
     <label className="agent-settings-field">{t('hub.upstreamModel')}<Input aria-label={t('hub.upstreamModel')} value={model.candidates[index].model} onChange={event => updateModel({ candidates: model.candidates.map((row, i) => i === index ? { ...row, model: event.target.value } : row) })} /></label>
   </>
-  const connectionEditor = <>{sourceBase.pluginSourceId && <MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} onChanged={controller.retry} />}<ModelSourceEditor key={sourceBase.id} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
+  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceBase.pluginSourceId ? <MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} onChanged={controller.retry}/> : undefined} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
     const saved = await controller.save(next)
     if (saved) {
       setSourceDrafts(previous => { const next = { ...previous }; delete next[id]; return next })
       if (id === 'new') setNewSourceId(newID())
     }
     return saved
-  }} /></>
+  }} />
   const sourceEditor = id === 'new' ? connectionEditor : <div className="tt-source-workspace">
-    <Tabs activeKey={section || 'connection'} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={['prices','connection','routing'].map(key => ({key,label:t('pricing.section.'+key)}))}/>
+    <Tabs activeKey={section || 'connection'} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={['connection','prices','routing'].map(key => ({key,label:t('pricing.section.'+key)}))}/>
     {(section === 'prices' || section === 'routing') ? <SourcePricingSettings key={sourceBase.id} sourceId={sourceBase.id} view={section} models={[...new Set(models.flatMap(model=>model.candidates.filter(candidate=>candidate.sourceId===sourceBase.id).map(candidate=>candidate.model)))]} draft={sourcePrices[sourceBase.id]} onChange={draft=>setSourcePrices(previous=>({...previous,[sourceBase.id]:draft}))} onSaved={billing.setSourcePolicy} onGlobal={()=>{setPriceReturn('catalog/source/'+id+'/prices');navigate('catalog/pricing')}} onAddModels={()=>{setSourceDrafts(previous=>({...previous,[id]:{...(previous[id]||initialSourceDraft(sourceBase,true)),fetchRequested:true}}));navigate('catalog/source/'+id+'/connection')}}/> : connectionEditor}
   </div>
   const modelEditor = <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); submitModel() }}>
@@ -122,7 +133,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       {source.pluginDesktopUnavailable && <p className="agent-settings-hint">{t('hub.plugin.desktopOnly')}</p>}
       {backupUsed && <p className="agent-settings-hint">{t('hub.connectionBackupUsed')}</p>}
       <div className="tt-model-connection-pricing"><span>{t('pricing.default')}</span><strong>{t('pricing.'+(billing.saved?.pricing.sources?.[source.id]?.default?.mode || 'inherit'))}</strong>{sourcePriceDraftChanged(sourcePrices[source.id],billing.saved?.pricing.sources?.[source.id]) && <small>{t('pricing.draftKept')}</small>}</div>
-      <div className="tt-model-connection-footer"><Button type="primary" aria-label={t('pricing.openSource',{name:source.name})} onClick={()=>navigate('catalog/source/'+source.id+'/prices')}>{t('pricing.action')}</Button><Button onClick={()=>navigate('catalog/source/'+source.id+'/routing')}>{t('pricing.section.routing')}</Button>
+      <div className="tt-model-connection-footer">{source.pluginSourceId&&<Button icon={<PlusIcon/>} disabled={!!addingAccount||controller.busy} loading={addingAccount===source.id} onClick={()=>void addAccount(source)}>{t('hub.plugin.addAccount')}</Button>}<Button type="primary" aria-label={t('pricing.openSource',{name:source.name})} onClick={()=>navigate('catalog/source/'+source.id+'/prices')}>{t('pricing.action')}</Button><Button onClick={()=>navigate('catalog/source/'+source.id+'/routing')}>{t('pricing.section.routing')}</Button>
         <Button disabled={controller.busy} onClick={() => { setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), fetchRequested: true } })); navigate('catalog/source/' + source.id) }}>{t('hub.directory.updateModels')}</Button>
         <Popconfirm classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.deleteConnection')} description={source.pluginDesktop ? t('hub.plugin.deleteDesktopHint') : undefined} onConfirm={() => controller.save({ ...value, sources: sources.filter(row => row.id !== source.id), models: models.filter(model => model.candidates[0].sourceId !== source.id) })}><button type="button" className="tt-act danger" disabled={backupUsed}>{t('capabilities.models.deleteAction')}</button></Popconfirm>
       </div>
@@ -151,7 +162,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)}/>
       <ModelMonitoringWorkspace active={tab==='monitor'} catalog={loaded}/>
       {tab==='aggregate'||tab==='monitor'?null:fullDetail ? null : tab === 'usage' || tab === 'audit' ? <GatewayReconciliation controller={billing} /> : <div className="tt-model-hub-scroll">
-      {tab !== 'speech' && error}
+      {tab !== 'speech' && error}{accountError&&<Alert type="error" role="alert" message={t(accountError)} action={<Button onClick={()=>{setAccountError('');controller.retry()}}>{t('capabilities.models.reread')}</Button>}/>}
       {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><SpeechSettings /></section> : tab === 'gateway' ? <section className="tt-model-hub-entry" aria-label={t('hub.tab.gateway')}><p>{t('hub.entryHint')}</p>{value.baseUrl && <div className="agent-settings-field"><span>{t('agent.models.baseUrl')}</span><code>{value.baseUrl + '/v1'}</code></div>}<p>{t('hub.continuationHint')}</p><GatewayAccessKey onChanged={controller.retry} value={gatewayKeyDraft} onChange={setGatewayKeyDraft} /></section>
         : <>{loaded ? <><div className="tt-model-hub-actions"><Button onClick={()=>{setPriceReturn('catalog');navigate('catalog/pricing')}}>{t('agent.gateway.defaultPrice')}</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'source/new', label: t('hub.addSource') }, { key: 'import', label: t('hub.plugin.import') }, { key: 'local', label: t('hub.local.title') }], onClick: ({ key }) => navigate('catalog/' + key) }}><Button type="primary" icon={<PlusIcon />}>{t('common.create')}</Button></Dropdown></div>{rows.length ? <div className="tt-model-connections">{rows}</div> : <p>{t('hub.empty.connections')}</p>}
         {!!consumers.length && <section className="tt-model-hub-consumers"><div className="tt-model-hub-actions"><h3>{t('hub.consumers')}</h3></div>{consumers.map(([model, users]) => <div className="tt-model-hub-row" key={model}><div><strong>{models.find(row => row.id === model)?.name || model}</strong><small>{[...new Set(users)].join(', ')}</small></div><Button onClick={() => onNav('capabilities/agents/' + users[0] + '/models')}>{t('hub.configure')}</Button></div>)}</section>}</> : !error && <Spin />}

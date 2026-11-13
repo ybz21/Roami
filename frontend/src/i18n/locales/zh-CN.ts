@@ -5816,6 +5816,7 @@ const zhCN = {
   'hub.tab.aggregate.compact': '聚合',
   'hub.tab.monitor.compact': '监控',
   'hub.tab.audit.compact': '审计',
+  'hub.plugin.addAccount': '添加账号',
 }
 
 export default zhCN

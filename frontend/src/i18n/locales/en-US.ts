@@ -5807,6 +5807,7 @@ const enUS = {
   'hub.tab.aggregate.compact': 'Pools',
   'hub.tab.monitor.compact': 'Monitor',
   'hub.tab.audit.compact': 'Audit',
+  'hub.plugin.addAccount': 'Add account',
 }
 
 export default enUS

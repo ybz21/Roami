@@ -195,3 +195,152 @@ func TestPluginFolderImportSupportsMoreThanDefaultMultipartPartLimit(t *testing.
 		t.Fatalf("multipart collection: %d %s", response.Code, response.Body)
 	}
 }
+
+func TestPluginTenIndependentAccounts(t *testing.T) {
+	if os.Getenv("ROAMI_MAGPIE_BUN") == "" {
+		t.Skip("set ROAMI_MAGPIE_BUN for the sandbox integration")
+	}
+	h := pluginTestHandler(t)
+	script := `export const Plugin=async()=>({config:async cfg=>{cfg.provider??={};cfg.provider.workbuddy={name:'WorkBuddy',npm:'@ai-sdk/openai-compatible',api:'https://fixture.invalid/v1',models:{sample:{name:'Sample',limit:{context:1000,output:100}}}}},auth:{provider:'workbuddy',methods:[{type:'api',label:'Key'}],loader:async getAuth=>({apiKey:(await getAuth())?.key,fetch:async()=>new Response(JSON.stringify({id:'fixture',choices:[{message:{role:'assistant',content:(await getAuth())?.key},finish_reason:'stop'}],usage:{prompt_tokens:2,completion_tokens:1}}),{headers:{'content-type':'application/json'}})})}})`
+	uploaded := pluginUpload(t, h, map[string]string{"package.json": `{"name":"test-multi-workbuddy","main":"index.mjs"}`, "index.mjs": script}, true)
+	if uploaded.Code != 200 {
+		t.Fatal(uploaded.Body.String())
+	}
+	var pkg struct {
+		Data modelplugins.Package `json:"data"`
+	}
+	if err := json.Unmarshal(uploaded.Body.Bytes(), &pkg); err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{}
+	for i := 0; i < 10; i++ {
+		input := map[string]any{"packageId": pkg.Data.ID, "providerId": "workbuddy", "revision": h.Catalog.value.Revision}
+		if i > 0 {
+			input = map[string]any{"sourceId": ids[0], "revision": h.Catalog.value.Revision}
+		}
+		raw := pluginJSON(t, h, "POST", "/sources", input)
+		var created struct {
+			SourceID string `json:"sourceId"`
+		}
+		if err := json.Unmarshal(raw, &created); err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range ids {
+			if id == created.SourceID {
+				t.Fatal("instance reused")
+			}
+		}
+		ids = append(ids, created.SourceID)
+		before := pluginJSON(t, h, "GET", "/sources/"+created.SourceID+"/info", nil)
+		var info struct {
+			Provider modelplugins.Provider `json:"provider"`
+		}
+		if err := json.Unmarshal(before, &info); err != nil || info.Provider.SignedIn {
+			t.Fatal("new instance copied credentials", err)
+		}
+		pluginJSON(t, h, "POST", "/sources/"+created.SourceID+"/auth", map[string]any{"action": "apiKey", "method": 0, "key": fmt.Sprintf("fixture-%d", i)})
+		source, err := h.Plugins.ReadSource(created.SourceID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if source.PackageID != pkg.Data.ID {
+			t.Fatal("package was duplicated")
+		}
+		if err = h.Plugins.SetOptions(context.Background(), source, map[string]any{"fixtureFlag": i%2 == 0}); err != nil {
+			t.Fatal(err)
+		}
+		source, _ = h.Plugins.ReadSource(created.SourceID)
+		if _, err = h.Plugins.Provider(context.Background(), source); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names := map[string]bool{}
+	for _, row := range h.Catalog.value.Sources {
+		if row.PluginSourceID != "" {
+			if names[row.Name] {
+				t.Fatal("duplicate account name")
+			}
+			names[row.Name] = true
+		}
+	}
+	verify := func() {
+		t.Helper()
+		for i, id := range ids {
+			source, err := h.Plugins.ReadSource(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if source.Options["fixtureFlag"] != (i%2 == 0) {
+				t.Fatal("options crossed accounts")
+			}
+			provider, err := h.Plugins.Provider(context.Background(), source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := httptest.NewRequest("POST", "https://fixture.invalid/v1/chat/completions", strings.NewReader(`{}`))
+			response, err := h.Plugins.Fetch(context.Background(), source, provider.Models[0], provider, request, []byte(`{}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := io.ReadAll(response.Body)
+			_ = response.Body.Close()
+			if err != nil || !strings.Contains(string(data), fmt.Sprintf(`"content":"fixture-%d"`, i)) {
+				t.Fatalf("account %d routed with wrong credential: %v", i, err)
+			}
+		}
+	}
+	verify()
+	results := make(chan error, len(ids))
+	for index, id := range ids {
+		go func(index int, id string) {
+			source, err := h.Plugins.ReadSource(id)
+			if err != nil {
+				results <- err
+				return
+			}
+			provider, err := h.Plugins.Provider(context.Background(), source)
+			if err != nil {
+				results <- err
+				return
+			}
+			response, err := h.Plugins.Fetch(context.Background(), source, provider.Models[0], provider, httptest.NewRequest("POST", "https://fixture.invalid/v1/chat/completions", nil), []byte(`{}`))
+			if err != nil {
+				results <- err
+				return
+			}
+			data, err := io.ReadAll(response.Body)
+			_ = response.Body.Close()
+			if err == nil && !strings.Contains(string(data), fmt.Sprintf(`"content":"fixture-%d"`, index)) {
+				err = fmt.Errorf("concurrent account %d crossed credentials", index)
+			}
+			results <- err
+		}(index, id)
+	}
+	for range ids {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := h.Plugins.Root
+	h.Plugins.Close()
+	manager, err := modelplugins.NewManager(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(manager.Close)
+	h.Plugins = manager
+	h.Catalog.plugins = manager
+	manager.AuthChanged = h.pluginAuthChanged
+	verify()
+	pluginJSON(t, h, "POST", "/sources/"+ids[0]+"/auth", map[string]any{"action": "signOut"})
+	first, _ := manager.ReadSource(ids[0])
+	p, err := manager.Provider(context.Background(), first)
+	if err != nil || p.SignedIn {
+		t.Fatal("first instance did not sign out", err)
+	}
+	second, _ := manager.ReadSource(ids[1])
+	p, err = manager.Provider(context.Background(), second)
+	if err != nil || !p.SignedIn {
+		t.Fatal("sign-out affected another account", err)
+	}
+}

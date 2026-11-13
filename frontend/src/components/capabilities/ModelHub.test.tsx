@@ -376,3 +376,22 @@ it('offers published pools as a source and does not discover an upstream for a r
   expect(await screen.findByTitle('Free pool')).toBeTruthy()
   expect(vi.mocked(api).mock.calls.filter(([, path, body]) => path.endsWith('/source-models') && body.sourceId === '@group')).toHaveLength(0)
 })
+
+
+it('creates an independent plugin account from its card and opens its connection settings',async()=>{
+ const original=vi.mocked(api).getMockImplementation()!
+ const first={...catalog.sources[0],id:'plugin-one',pluginSourceId:'plugin-one',name:'WorkBuddy'}
+ const second={...first,id:'plugin-two',pluginSourceId:'plugin-two',name:'WorkBuddy 2'}
+ vi.mocked(api).mockImplementation(async(method,path,body,options)=>{
+  if(path==='/agent/model-gateway/catalog')return {data:{...catalog,sources:[first],models:[]}}
+  if(path==='/agent/model-gateway/plugins/sources')return {data:{sourceId:second.id,catalog:{...catalog,revision:'new-r',sources:[first,second],models:[]}}}
+  return original(method,path,body,options)
+ })
+ const navigate=vi.fn(),page=mount('catalog',navigate)
+ fireEvent.click(await screen.findByRole('button',{name:'hub.plugin.addAccount'}))
+ await waitFor(()=>expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog/source/plugin-two/connection'))
+ expect(api).toHaveBeenCalledWith('POST','/agent/model-gateway/plugins/sources',{sourceId:'plugin-one',revision:catalog.revision})
+ page.rerender(<App><ModelHub sub="catalog" onNav={navigate}/></App>)
+ expect(await screen.findByRole('region',{name:'WorkBuddy 2'})).toBeTruthy()
+ expect(screen.getByRole('region',{name:'WorkBuddy'})).toBeTruthy()
+})

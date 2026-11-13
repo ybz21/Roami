@@ -110,7 +110,7 @@ html[data-keyboard="open"] .tt-model-source-footer { padding-bottom:calc(var(--s
 .tt-gateway-key-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .tt-gateway-keys summary { cursor: pointer; font-size: var(--fs-sm); color: var(--text-secondary); }
 .tt-model-plugin-import, .tt-model-plugin-settings { display: flex; flex-direction: column; gap: var(--sp-3); }
-.tt-model-plugin-settings { width:100%; max-width:var(--content-form); margin-inline:auto; padding: var(--sp-3); border-bottom: 1px solid var(--border-subtle); }
+.tt-model-plugin-settings { box-sizing:border-box; min-width:0; width:100%; max-width:var(--content-form); margin-inline:auto; padding:0 0 var(--sp-4); border-bottom: 1px solid var(--border-subtle); }
 .tt-model-plugin-signin { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
 .tt-model-plugin-signin p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .tt-model-plugin-options { display: flex; flex-direction: column; gap: var(--sp-3); }
