@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { App as AntApp } from 'antd'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import RetainedPage from '../../app/RetainedPage'
 import FileBrowser from './FileBrowser'
 import { FilePageMemoryProvider } from './file-page-memory'
 import { I18nProvider } from '../../i18n'
@@ -149,6 +150,20 @@ describe('FileBrowser folder context menu', () => {
       const callsAfter = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/files?')).length
       expect(callsAfter).toBeGreaterThan(callsBefore)
     })
+  })
+
+  it('finishes native uploads in the background and releases the retained page', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('RoamiApp/1.0')
+    const view = (active: boolean) => <I18nProvider><RetainedPage page="files" active={active} mobile={false} hasDock={false}><FileBrowser dir="/workspace" layout="dock" /></RetainedPage></I18nProvider>
+    const rendered = render(view(true))
+    await screen.findByText('folder')
+    fireEvent.click(screen.getByRole('button', { name: '上传到当前目录' }))
+    fireEvent.click(await screen.findByText('上传文件夹'))
+    rendered.rerender(view(false))
+    const shell = rendered.container.querySelector('[data-page=files]')!
+    expect(shell.childElementCount).toBeGreaterThan(0)
+    act(() => window.dispatchEvent(new CustomEvent('roami-folder-upload', { detail: { saved: 2 } })))
+    await waitFor(() => expect(shell.childElementCount).toBe(0))
   })
 
   it('stays open while moving over items and runs the selected folder action', async () => {

@@ -1,4 +1,5 @@
-import { usePageEffect } from '../../page-activity'
+import { usePageRetention } from '../../page-view-state'
+import { usePageActive, usePageEffect } from '../../page-activity'
 // 文件侧栏 —— 在 Claude / Codex 对话页右侧浏览工作目录、查看文件内容（类似 codex 右侧边栏）。
 // 单层可导航列表：目录在前可进入、↑ 回上级、点文件在弹层里查看正文。
 import { useFilePageState } from './file-page-memory'
@@ -400,6 +401,8 @@ export default function FileBrowser({
   // 外层当前激活的文件 tab，用于在浏览器里高亮选中项（覆盖内部 view）。
   selectedPath?: string | null
 }) {
+  const retain = usePageRetention()
+  const pageActive = usePageActive()
   const [path, setPath] = useFilePageState('browser.path', dir || '')
   const [data, setData] = useFilePageState<Dir | null>('browser.data', null)
   const [err, setErr] = useState('')
@@ -437,6 +440,9 @@ export default function FileBrowser({
   const [transfers, setTransfers] = useState<TransferView[]>([])
   // 递归按文件名搜索（当前目录向下），放大镜开关切换；有查询词时列表区改显搜索结果。
   const [searchOpen, setSearchOpen] = useFilePageState('browser.searchOpen', chrome === 'tree') // 树模式一上来就带搜索框
+  // Keep in-flight transfers and open forms until their state has settled.
+  const hold = uploading || mkdirOpen || mkdirBusy || !!touchDir || touchBusy || !!renameTarget || renameBusy || !!moveTarget || moveBusy || !!copyTarget || copyBusy || !!propertiesTarget || transfers.length > 0
+  useEffect(() => hold ? retain() : undefined, [hold, retain])
   const [query, setQuery] = useFilePageState('browser.query', '')
   const searchRef = useRef<import('antd').InputRef>(null)
   useEffect(() => { if (focusSearchNonce) { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 0) } }, [focusSearchNonce])
@@ -581,7 +587,8 @@ export default function FileBrowser({
     } catch (e: any) { message.error(t('chat.uploadFailed', { message: e.message })) }
     finally { setUploading(false) }
   }
-  usePageEffect(() => {
+  useEffect(() => {
+    if (!pageActive && !uploading) return
     const onFolderUploaded = (event: Event) => {
       const result = (event as CustomEvent<{ saved?: number; error?: string; cancelled?: boolean }>).detail
       setUploading(false)
@@ -603,7 +610,7 @@ export default function FileBrowser({
     }
     window.addEventListener('roami-folder-upload', onFolderUploaded)
     return () => window.removeEventListener('roami-folder-upload', onFolderUploaded)
-  }, [message, t])
+  }, [pageActive, uploading, message, t])
   const chooseFolder = (targetDir: string) => {
     uploadTargetRef.current = targetDir
     if (navigator.userAgent.includes('RoamiApp/')) {

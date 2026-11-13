@@ -22,6 +22,8 @@ export function useFilePageState<T,>(key: string, initial: T | (() => T)): [T, D
   return [value, setValue]
 }
 
+export function useFilePageCache() { return useContext(FilePageContext) }
+
 export function useForgetFilePageView() {
   const memory = useContext(FilePageContext)
   return (path: string, preview = false) => {

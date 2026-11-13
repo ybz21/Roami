@@ -1,3 +1,4 @@
+import { usePageViewState } from '../../page-view-state'
 import { usePageEffect } from '../../page-activity'
 // 手机镜像页：把后端手机（Linux→Android adb）的画面实时渲染到 <img>，并转发点按/滑动/输入。
 // 协议见 backend/phone/screencast.go：
@@ -39,8 +40,8 @@ export default function PhoneView() {
   })
   const [levelName, setLevelName] = useState('') // 自适应当前档名（auto 时显示）
   const [apps, setApps] = useState<PhoneApp[]>([])
-  const [appsOpen, setAppsOpen] = useState(false)
-  const [appQuery, setAppQuery] = useState('')
+  const [appsOpen, setAppsOpen] = usePageViewState('phone.appsOpen', false)
+  const [appQuery, setAppQuery] = usePageViewState('phone.appQuery', '')
   // 设备身份：型号 + 系统 + 分辨率。devbox 只显示，不可编辑——它是身份不是输入（设计 17 §6）
   const [devName, setDevName] = useState('')
   const [devOs, setDevOs] = useState('')
@@ -218,6 +219,7 @@ export default function PhoneView() {
       stopped = true
       clearInterval(ping); clearInterval(meter); clearTimeout(retry)
       if (objURL) URL.revokeObjectURL(objURL)
+      imgRef.current?.removeAttribute('src')
       if (tp) { tp.onmessage = () => {}; tp.onclose = () => {} } // 卸载后忽略在途回调
       tp?.close()
       if (tpRef.current === tp) tpRef.current = null

@@ -2,10 +2,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { usePageViewState } from '../page-view-state'
 import AppRoutes from './AppRoutes'
 
 vi.mock('../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('../components/mirror/BrowserView', () => ({ default: () => { const [value, setValue] = useState(''); return <input aria-label="address" value={value} onChange={event => setValue(event.target.value)} /> } }))
+vi.mock('../components/mirror/BrowserView', () => ({ default: () => { const [value, setValue] = usePageViewState('address', ''); return <input aria-label="address" value={value} onChange={event => setValue(event.target.value)} /> } }))
 vi.mock('../components/settings/SettingsPage', () => ({ default: ({ sub }: any) => { const [value, setValue] = useState(''); return <input aria-label={sub || 'settings'} value={value} onChange={event => setValue(event.target.value)} /> } }))
 vi.mock('../components/projects/Projects', () => ({ default: () => null }))
 afterEach(cleanup)

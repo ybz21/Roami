@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { App as AntApp } from 'antd'
 import RetainedPage from './app/RetainedPage'
+import { usePageViewState, usePageViewRef, usePageRetention } from './page-view-state'
 import { usePageEffect } from './page-activity'
 
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
@@ -67,4 +68,35 @@ it('hides page-owned modal portals with the page and restores the same dialog', 
   expect(document.body.contains(dialog)).toBe(true)
   rendered.rerender(view(true))
   expect(screen.getByRole('dialog')).toBe(dialog)
+})
+
+it('unloads heavy page DOM, restores lightweight state and scroll, and waits for mutations', async () => {
+  let release!: () => void
+  function Page() {
+    const [draft, setDraft] = usePageViewState('draft', '')
+    const edited = usePageViewRef('edited', false)
+    const retain = usePageRetention()
+    return <div data-testid="list"><input aria-label="draft" value={draft} onChange={event => { edited.current = true; setDraft(event.target.value) }} />
+      <button onClick={() => { release = retain() }}>save</button><span>{String(edited.current)}</span></div>
+  }
+  const view = (active: boolean) => <RetainedPage page="browser" active={active} mobile={false} hasDock={false}><Page /></RetainedPage>
+  const rendered = render(view(true))
+  const list = screen.getByTestId('list')
+  Object.defineProperty(list, 'scrollHeight', { value: 1000 })
+  list.scrollTop = 200; fireEvent.scroll(list)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'keep' } })
+  rendered.rerender(view(false))
+  expect(list.isConnected).toBe(false)
+  rendered.rerender(view(true))
+  const restored = screen.getByTestId('list')
+  Object.defineProperty(restored, 'scrollHeight', { value: 1000 })
+  await act(async () => { restored.appendChild(document.createElement('i')) })
+  expect(restored.scrollTop).toBe(200)
+  expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('keep')
+  expect(screen.getByText('true')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'save' }))
+  rendered.rerender(view(false))
+  expect(restored.isConnected).toBe(true)
+  act(() => release())
+  expect(restored.isConnected).toBe(false)
 })
