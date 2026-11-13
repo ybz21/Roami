@@ -44,6 +44,8 @@
     "invalid price",
     "draft preservation",
     "model picker preservation",
+    "default pricing nested in model sources",
+    "default pricing return to cards and source draft",
     "global scope",
     "English and light theme"
   ],
