@@ -73,7 +73,7 @@ export default function MagpieSourceSettings({ sourceId, onChanged }: { sourceId
   }
   let loginURL = ''
   try { if (signIn?.url && new URL(signIn.url).protocol === 'https:') loginURL = signIn.url } catch { /* Only browser URLs may be opened. */ }
-  return <section className="tt-model-plugin-settings" aria-label={t('hub.plugin.settings')}>
+  return <section className="tt-model-plugin-settings" aria-label={t('hub.plugin.settings')} onKeyDown={event=>{if(event.key==='Enter'&&event.target instanceof HTMLInputElement)event.preventDefault()}}>
     {error && <Alert type="error" role="alert" message={t(error)} action={<Button disabled={busy || !!job} onClick={() => { fresh.current = true; setVersion(previous => previous + 1) }}>{t('capabilities.models.reread')}</Button>} />}
     {!info ? !error && <Spin /> : <>
       {info.provider.fellBack && <Alert type="warning" message={t('hub.plugin.refreshRequired')} />}

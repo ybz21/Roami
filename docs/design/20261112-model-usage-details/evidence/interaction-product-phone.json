@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "bounds": {
+    "width": 392,
+    "height": 766,
+    "scrollWidth": 392,
+    "scrollHeight": 766,
+    "pointer": "coarse"
+  },
+  "editor": {
+    "back": 44,
+    "top": 8,
+    "headers": 1
+  },
+  "keyboard": {
+    "keyboard": 314,
+    "saveBottom": 451.8181838989258,
+    "height": 766,
+    "viewport": 765.8181762695312
+  },
+  "chartScroll": {
+    "before": 0,
+    "after": 246.90908813476562
+  },
+  "checks": [
+    "real touch filters and legend",
+    "hourly horizontal scroll",
+    "audit request and return",
+    "cards and pricing entry",
+    "default pricing within sources",
+    "source and model return bars",
+    "free confirmation and save",
+    "keyboard footer visibility"
+  ]
+}

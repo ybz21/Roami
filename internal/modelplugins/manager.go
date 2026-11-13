@@ -234,7 +234,8 @@ func (m *Manager) getWorker(ctx context.Context, s Source) (*worker, error) {
 		}
 	}
 	if w == nil {
-		if len(m.workers) >= 8 {
+		// Match the catalog source capacity so separate accounts can stay active together.
+		if len(m.workers) >= 64 {
 			m.mu.Unlock()
 			return nil, errors.New("MODEL_PLUGIN_BUSY")
 		}

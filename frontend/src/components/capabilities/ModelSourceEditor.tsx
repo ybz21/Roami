@@ -24,10 +24,10 @@ const sourceName = (source: ModelSource) => {
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
-  pricing?: ReactNode; onEditModel: (id: string) => void
+  pricing?: ReactNode; authentication?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { modal, message } = App.useApp()
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
@@ -93,6 +93,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
     <div className="tt-model-source-content">
+      {authentication}
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>

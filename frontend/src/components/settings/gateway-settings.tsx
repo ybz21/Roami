@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Modal, Spin } from 'antd'
+import { App, Button, Input, Modal, Select, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useSettingsDraft } from './settings-draft'
@@ -29,12 +29,16 @@ export function useGatewaySettings(enabled: boolean) {
   }, [enabled, saved, version])
   const notice = useSettingsDraft('local-model-gateway', draft, saved ? gatewayDraft(saved) : null, setDraft, !!draft && !!saved)
   const dirty = !!draft && !!saved && JSON.stringify(gatewayConfiguration(draft)) !== JSON.stringify(gatewayConfiguration(gatewayDraft(saved)))
-  const save = async () => {
-    if (!draft || saving || !validGatewayDraft(draft)) return
+  const scopedDraft = (scope: string) => !draft || !saved ? draft : scope==='pricing'?{...gatewayDraft(saved),defaultPrice:draft.defaultPrice,defaultPriceConfigured:draft.defaultPriceConfigured,prices:draft.prices}:scope==='limits'?{...gatewayDraft(saved),currency:draft.currency,timezone:draft.timezone,dailyLimit:draft.dailyLimit}:draft
+  const limitsDirty=!!draft&&!!saved&&JSON.stringify([draft.dailyLimit,draft.currency,draft.timezone])!==JSON.stringify([saved.dailyLimit?.toString()??'',saved.currency,saved.timezone])
+  const pricingDirty=!!draft&&!!saved&&JSON.stringify([draft.defaultPrice,draft.prices])!==JSON.stringify([gatewayDraft(saved).defaultPrice,gatewayDraft(saved).prices])
+  const save = async (scope: 'pricing' | 'limits' | '' = '') => {
+    const submitted=scopedDraft(scope)
+    if (!submitted || saving || !validGatewayDraft(submitted)) return
     setSaving(true); setError('')
     try {
-      const { data } = await api('PUT', '/agent/model-gateway/settings', gatewayConfiguration(draft))
-      if (live.current) { setSaved(data); setDraft(gatewayDraft(data)); setUsageVersion(value => value + 1); message.success(t('agent.gateway.saved')) }
+      const { data } = await api('PUT', '/agent/model-gateway/settings'+(scope?'?scope='+scope:''), gatewayConfiguration(submitted))
+      if (live.current) { setSaved(data); setDraft(previous=>{const accepted=gatewayDraft(data);return !previous?accepted:scope==='pricing'?{...accepted,dailyLimit:previous.dailyLimit,currency:previous.currency,timezone:previous.timezone}:scope==='limits'?{...accepted,defaultPrice:previous.defaultPrice,defaultPriceConfigured:previous.defaultPriceConfigured,prices:previous.prices}:accepted}); setUsageVersion(value => value + 1); message.success(t('agent.gateway.saved')) }
     } catch (cause) { if (live.current) setError(failure(cause, t)) }
     finally { if (live.current) setSaving(false) }
   }
@@ -55,8 +59,13 @@ export function useGatewaySettings(enabled: boolean) {
     } catch (cause) { if (live.current) setReconcileError(failure(cause, t)) }
     finally { if (live.current) setReconciling(false) }
   }
-  return { saved, draft, setDraft, error, saving, dirty, save, notice, usageVersion, models, loadingModels, catalogError, catalog,
-    retry: () => setVersion(value => value + 1), discard: () => { if (saved) { setDraft(gatewayDraft(saved)); setError('') } },
+  const setSourcePolicy = (sourceId: string, policy: NonNullable<GatewayConfiguration['pricing']['sources']>[string]) => {
+    setSaved(previous=>previous && ({...previous,pricing:{...previous.pricing,sources:{...previous.pricing.sources,[sourceId]:policy}}}))
+    setDraft(previous=>previous && ({...previous,sourcePolicies:{...previous.sourcePolicies,[sourceId]:policy}}))
+  }
+  const validLimits=!!scopedDraft('limits')&&validGatewayDraft(scopedDraft('limits')!),validPricing=!!scopedDraft('pricing')&&validGatewayDraft(scopedDraft('pricing')!)
+  return { validLimits, validPricing, limitsDirty, pricingDirty, setSourcePolicy, saved, draft, setDraft, error, saving, dirty, save, notice, usageVersion, models, loadingModels, catalogError, catalog,
+    retry: () => setVersion(value => value + 1), discard: (scope: 'pricing'|'limits'|''='') => { if(saved){const base=gatewayDraft(saved);setDraft(previous=>!previous?base:scope==='pricing'?{...previous,defaultPrice:base.defaultPrice,defaultPriceConfigured:base.defaultPriceConfigured,prices:base.prices}:scope==='limits'?{...previous,dailyLimit:base.dailyLimit,currency:base.currency,timezone:base.timezone}:base);setError('')} },
     call, amount, setAmount, reason, setReason, reconciling, reconcileError, reconcile,
     openReconcile: (value: ProxyUsage['recent'][number]) => { setCall(value); setAmount(''); setReason(''); setReconcileError('') }, closeReconcile: () => { if (!reconciling) setCall(null) } }
 }
@@ -66,9 +75,9 @@ type Controller = GatewaySettingsController
 export function GatewaySettingsForm({ controller: c, mode, active, models }: { controller: Controller; mode: 'proxy' | 'prices'; active: boolean; models: string[] }) {
   const { t } = useI18n()
   if (!c.draft) return c.error ? <div role="alert"><p>{c.error}</p><Button onClick={c.retry}>{t('agent.retry')}</Button></div> : <Spin />
-  const draft = c.draft
+  const draft = c.draft, dirty = mode==='prices'?c.pricingDirty:c.limitsDirty, valid = mode==='prices'?c.validPricing:c.validLimits
   const update = (value: ModelProxyDraft) => c.setDraft(previous => previous ? { ...previous, ...value } : previous)
-  return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void c.save() }}>
+  return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void c.save(mode === 'prices' ? 'pricing' : 'limits') }}>
     {c.notice}
     {mode === 'proxy' ? <>
       <ModelProxySettings value={draft} disabled={c.saving} onChange={update} snapshot={c.usageVersion} active={active} onReconcile={c.openReconcile} />
@@ -76,12 +85,12 @@ export function GatewaySettingsForm({ controller: c, mode, active, models }: { c
       <p className="agent-settings-hint">{t('agent.gateway.periodHint')}</p>
     </> : <>
       <p className="agent-settings-hint">{t('agent.gateway.priceCurrency', { currency: draft.currency })}</p>
-      <fieldset><legend>{t('agent.gateway.defaultPrice')}</legend><p className="agent-settings-hint">{t('hub.billing.priceHint')}</p><div className="agent-proxy-price-fields">{priceFields.map(key => <div className="agent-settings-field" key={key}><label htmlFor={`agent-default-price-${key}`}>{t('agent.proxy.price.' + key)}</label><Input id={`agent-default-price-${key}`} type="number" min={0} max={1_000_000} step="any" disabled={c.saving} value={draft.defaultPrice[key]} onChange={event => c.setDraft({ ...draft, defaultPrice: { ...draft.defaultPrice, [key]: event.target.value } })} /></div>)}</div></fieldset>
-      <ModelPriceSettings value={draft} models={models} catalog={c.models} loadingCatalog={c.loadingModels} catalogError={c.catalogError} loadCatalog={() => { void c.catalog() }} disabled={c.saving} onChange={update} />
+      <label className="agent-settings-field"><span>{t('pricing.method')}</span><Select aria-label={t('pricing.method')} virtual={false} value={[draft.defaultPrice.input,draft.defaultPrice.output,draft.defaultPrice.cacheRead].every(value=>value==='')?'unknown':'tokens'} disabled={c.saving} options={['tokens','unknown'].map(value=>({value,label:t('pricing.'+value)}))} onChange={value=>c.setDraft({...draft,defaultPriceConfigured:value==='tokens',defaultPrice:{...draft.defaultPrice,input:value==='unknown'?'':'0',output:value==='unknown'?'':'0',cacheRead:value==='unknown'?'':'0'}})}/></label><fieldset><legend>{t('agent.gateway.defaultPrice')}</legend><p className="agent-settings-hint">{t('hub.billing.priceHint')}</p><div className="agent-proxy-price-fields">{priceFields.map(key => <div className="agent-settings-field" key={key}><label htmlFor={`agent-default-price-${key}`}>{t('agent.proxy.price.' + key)}</label><Input id={`agent-default-price-${key}`} type="number" min={0} max={1_000_000} step="any" disabled={c.saving} value={draft.defaultPrice[key]} onChange={event => c.setDraft({ ...draft, defaultPrice: { ...draft.defaultPrice, [key]: event.target.value } })} /></div>)}</div></fieldset>
+      <details><summary>{t('pricing.legacyOverrides')}</summary><p className="agent-settings-hint">{t('pricing.legacyHint')}</p><ModelPriceSettings value={draft} models={models} catalog={c.models} loadingCatalog={c.loadingModels} catalogError={c.catalogError} loadCatalog={() => { void c.catalog() }} disabled={c.saving} onChange={update} /></details>
     </>}
     {c.error && <p className="agent-settings-error" role="alert">{c.error}</p>}
-    {!validGatewayDraft(draft) && <p className="agent-settings-error" role="status">{t('agent.gateway.invalid')}</p>}
-    <div className="agent-settings-save"><span role="status">{t(c.dirty ? 'agent.models.unsaved' : 'agent.models.savedState')}</span><Button disabled={!c.dirty || c.saving} onClick={c.discard}>{t('agent.models.discard')}</Button><Button type="primary" htmlType="submit" loading={c.saving} disabled={!c.dirty || !validGatewayDraft(draft)}>{t('agent.models.save')}</Button></div>
+    {!valid && <p className="agent-settings-error" role="status">{t('agent.gateway.invalid')}</p>}
+    <div className="agent-settings-save"><span role="status">{t(dirty ? 'agent.models.unsaved' : 'agent.models.savedState')}</span><Button disabled={!dirty || c.saving} onClick={()=>c.discard(mode==='prices'?'pricing':'limits')}>{t('agent.models.discard')}</Button><Button type="primary" htmlType="submit" loading={c.saving} disabled={!dirty || !valid}>{t('agent.models.save')}</Button></div>
   </form>
 }
 

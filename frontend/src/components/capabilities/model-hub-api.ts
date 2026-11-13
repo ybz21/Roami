@@ -23,15 +23,16 @@ export function useModelCatalog() {
     void api('GET', '/agent/model-gateway/catalog', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setValue(normalizeCatalog(data)) }).catch(cause => { if (!abort.signal.aborted) setError(catalogFailure(cause)) })
     return () => abort.abort()
   }, [version])
+  const accept = (data:ModelCatalog) => { if(live.current){setValue(normalizeCatalog(data));window.dispatchEvent(new Event(MODEL_CATALOG_CHANGED))} }
   const save = async (next: ModelCatalog) => {
     if (busy) return false
     setBusy(true); setError('')
     try {
       const { data } = await api('PUT', '/agent/model-gateway/catalog', { revision: next.revision, sources: next.sources, models: next.models, drafts: next.drafts })
-      if (live.current) { setValue(normalizeCatalog(data)); window.dispatchEvent(new Event(MODEL_CATALOG_CHANGED)) }
+      accept(data)
       return true
     } catch (cause) { if (live.current) setError(catalogFailure(cause)); return false }
     finally { if (live.current) setBusy(false) }
   }
-  return { value, error, busy, save, retry: () => setVersion(value => value + 1) }
+  return { value, error, busy, save, accept, retry: () => setVersion(value => value + 1) }
 }

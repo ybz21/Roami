@@ -142,11 +142,11 @@ func (h *Handler) sourcePricingManagement(w http.ResponseWriter, r *http.Request
 		return true
 	}
 	if r.Method == "GET" {
-		config, err := h.Ledger.Configuration()
+		response, err := h.sourcePricingResponse(id)
 		if err != nil {
 			reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
 		} else {
-			writeJSON(w, 200, map[string]any{"data": config.Pricing.Sources[id], "currency": config.Currency})
+			writeJSON(w, 200, response)
 		}
 		return true
 	}
@@ -159,6 +159,11 @@ func (h *Handler) sourcePricingManagement(w http.ResponseWriter, r *http.Request
 		reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
 		return true
 	}
+	scope, model := r.URL.Query().Get("scope"), r.URL.Query().Get("model")
+	if !containsField([]string{"", "default", "model", "account"}, scope) || scope == "model" && (model == "" || len(model) > 200) {
+		reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
+		return true
+	}
 	err := h.Ledger.db.Tx(func(tx *sql.Tx) error {
 		config, err := configuration(tx)
 		if err != nil {
@@ -167,7 +172,28 @@ func (h *Handler) sourcePricingManagement(w http.ResponseWriter, r *http.Request
 		if config.Pricing.Sources == nil {
 			config.Pricing.Sources = map[string]SourcePricing{}
 		}
-		config.Pricing.Sources[id] = policy
+		current := config.Pricing.Sources[id]
+		switch scope {
+		case "default":
+			current.Default, current.Multiplier, current.TimeRule = policy.Default, policy.Multiplier, policy.TimeRule
+		case "account":
+			current.AccountStrategy = policy.AccountStrategy
+		case "model":
+			if current.Models == nil {
+				current.Models = map[string]PriceRule{}
+			}
+			if rule, ok := policy.Models[model]; ok {
+				current.Models[model] = rule
+			} else {
+				delete(current.Models, model)
+			}
+		default:
+			current = policy
+		}
+		if !current.validate() {
+			return errors.New("INVALID_MODEL_PROXY_CONFIG")
+		}
+		config.Pricing.Sources[id] = current
 		if len(config.Pricing.Sources) > 64 {
 			return errors.New("INVALID_MODEL_PROXY_CONFIG")
 		}
@@ -181,7 +207,76 @@ func (h *Handler) sourcePricingManagement(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
 	} else {
-		writeJSON(w, 200, map[string]any{"data": policy})
+		response, e := h.sourcePricingResponse(id)
+		if e != nil {
+			reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
+		} else {
+			writeJSON(w, 200, response)
+		}
 	}
 	return true
+}
+
+type EffectiveSourcePrice struct {
+	Model      string                 `json:"model"`
+	Origin     string                 `json:"origin"`
+	Rule       PriceRule              `json:"rule"`
+	Price      ModelPricing           `json:"price"`
+	Known      bool                   `json:"known"`
+	Multiplier float64                `json:"multiplier"`
+	Exits      []EffectiveSourcePrice `json:"exits,omitempty"`
+}
+
+func (pc *PricingConfig) effectiveSourcePrice(source, model string, now time.Time) EffectiveSourcePrice {
+	p := pc.Sources[source]
+	rule := p.Models[model]
+	origin := "model"
+	if rule.Mode == "" || rule.Mode == "inherit" {
+		rule = p.Default
+		origin = "source"
+	}
+	if rule.Mode == "" || rule.Mode == "inherit" {
+		origin = "global"
+		rule = PriceRule{Mode: "tokens", Price: pc.Default}
+		if price, ok := pc.Models[source+"/"+model]; model != "" && ok {
+			rule.Price = price
+			origin = "legacySource"
+		} else if price, ok := pc.lookup(model); ok {
+			rule.Price = price
+			origin = "legacyModel"
+		}
+	}
+	price, known := pc.routePriceAt(source, model, now)
+	if !known && rule.Mode == "tokens" {
+		rule.Mode = "unknown"
+	}
+	return EffectiveSourcePrice{Model: model, Origin: origin, Rule: rule, Price: price, Known: known, Multiplier: sourcePriceMultiplier(p, model, now)}
+}
+func (h *Handler) sourcePricingResponse(id string) (map[string]any, error) {
+	config, err := h.Ledger.Configuration()
+	if err != nil {
+		return nil, err
+	}
+	now := h.Ledger.now()
+	effective := []EffectiveSourcePrice{}
+	byName := map[string]int{}
+	h.Catalog.mu.Lock()
+	defer h.Catalog.mu.Unlock()
+	for _, m := range h.Catalog.value.Models {
+		for _, c := range m.Candidates {
+			if c.SourceID != id {
+				continue
+			}
+			index, ok := byName[c.Model]
+			if !ok {
+				index = len(effective)
+				byName[c.Model] = index
+				effective = append(effective, config.Pricing.effectiveSourcePrice(id, c.Model, now))
+			}
+			if price, ok := config.Pricing.lookup(m.ID); ok {
+				effective[index].Exits = append(effective[index].Exits, EffectiveSourcePrice{Model: m.ID, Origin: "exit", Rule: PriceRule{Mode: "tokens", Price: price}, Price: price, Known: true, Multiplier: 1})
+			}
+		}
+	}
+	return map[string]any{"data": config.Pricing.Sources[id], "currency": config.Currency, "effective": effective, "summary": config.Pricing.effectiveSourcePrice(id, "", now), "now": now.UnixMilli()}, nil
 }

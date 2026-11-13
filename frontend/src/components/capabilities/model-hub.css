@@ -110,7 +110,7 @@ html[data-keyboard="open"] .tt-model-source-footer { padding-bottom:calc(var(--s
 .tt-gateway-key-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .tt-gateway-keys summary { cursor: pointer; font-size: var(--fs-sm); color: var(--text-secondary); }
 .tt-model-plugin-import, .tt-model-plugin-settings { display: flex; flex-direction: column; gap: var(--sp-3); }
-.tt-model-plugin-settings { width:100%; max-width:var(--content-form); margin-inline:auto; padding: var(--sp-3); border-bottom: 1px solid var(--border-subtle); }
+.tt-model-plugin-settings { box-sizing:border-box; min-width:0; width:100%; max-width:var(--content-form); margin-inline:auto; padding:0 0 var(--sp-4); border-bottom: 1px solid var(--border-subtle); }
 .tt-model-plugin-signin { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
 .tt-model-plugin-signin p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .tt-model-plugin-options { display: flex; flex-direction: column; gap: var(--sp-3); }
@@ -126,9 +126,9 @@ html[data-pointer="coarse"] :is(.tt-model-plugin-settings,.tt-model-plugin-impor
 html[data-pointer="coarse"] :is(.tt-model-plugin-settings,.tt-model-plugin-import,.tt-gateway-key-dialog) .ant-btn::after,
 html[data-pointer="coarse"] .tt-gateway-key-dialog .ant-modal-close::after { content:''; position:absolute; inset:calc(var(--sp-1) * -1); min-height:var(--tap); }
 
-html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-nav-list { width:100%; }
-html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab { flex:1; min-width:0; justify-content:center; margin:0; padding-inline:var(--sp-1); }
-html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab-btn { white-space:normal; text-align:center; font-size:var(--fs-sm); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-nav-list { width:max-content; }
+html:is([data-size="compact"],[data-size="medium"]) .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab { flex:0 0 auto; min-width:var(--tap); justify-content:center; margin:0; padding-inline:var(--sp-2); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab-btn { white-space:nowrap; text-align:center; font-size:var(--fs-sm); }
 
 .tt-model-hub-main { display:flex; flex:1; min-width:0; min-height:0; }
 .tt-model-hub-tabs.ant-tabs-left { flex-shrink:0; padding-block:var(--sp-2); }
