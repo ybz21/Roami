@@ -5,10 +5,10 @@ import { pollWhileVisible } from '../../visible-poll'
 import type { GatewayCall, GatewayPrice, GatewayUsage } from '../settings/local-model-gateway'
 
 export type UsageFilters = { day: string; hour: string; days: number; start: string; end: string; sourceId: string; agentKind: string; model: string; source: string; state: string; search: string; page: number }
-export type UsageWorkspaceData = GatewayUsage & { options: { sources: string[]; agents: string[]; models: string[] }; total: number; page: number; pageSize: number; archived: number; hourlyDay: string; nowMs?: number; recent: (GatewayCall & { price?: GatewayPrice; finishedMs?: number })[] }
+export type UsageWorkspaceData = GatewayUsage & { accountingTimezone?: string; options: { sources: string[]; agents: string[]; models: string[] }; total: number; page: number; pageSize: number; archived: number; hourlyDay: string; nowMs?: number; recent: (GatewayCall & { price?: GatewayPrice; finishedMs?: number })[] }
 export const initialUsageFilters = (): UsageFilters => ({ day: '', hour: '', days: 1, start: '', end: '', sourceId: '', agentKind: (() => { const kind = new URLSearchParams(location.hash.split('?')[1] || '').get('agentKind') || ''; return isAgentKind(kind) || ['external', 'roami'].includes(kind) ? kind : '' })(), model: '', source: '', state: '', search: '', page: 1 })
 export function usageWorkspacePath(view: 'overview' | 'audit', filters: UsageFilters) {
-  const q = new URLSearchParams({ view, days: String(filters.days < 0 ? 7 : filters.days) })
+  const q = new URLSearchParams({ view, days: String(filters.days < 0 ? 7 : filters.days), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
   for (const key of ['start', 'end', 'day', 'agentKind', 'model', 'source'] as const) if (filters[key]) q.set(key, filters[key])
   if (filters.sourceId === 'unknown') q.set('unattributed', '1')
   else if (filters.sourceId.startsWith('id:')) q.set('sourceId', filters.sourceId.slice(3))

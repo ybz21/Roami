@@ -5589,6 +5589,8 @@ const zhCN = {
   'modelUsage.uncached': "普通输入",
   'modelUsage.allowance': "今日额度",
   'modelUsage.editLimit': "调整限额",
+  'modelUsage.accountingTimezone': '额度按 {timezone} 结算。',
+  'modelUsage.archivedTimezone': '已归档的日汇总保留 {timezone} 结算日期。',
   'modelUsage.limitScope': "今日用量与限额覆盖全部模型源和智能体，不受下方筛选影响。",
   'modelUsage.incomplete': "用量未返回 {missing} 笔，费用未知 {unknown} 笔，进行中 {pending} 笔；汇总仅含已知值。",
   'modelUsage.breakdown': "用量分布",

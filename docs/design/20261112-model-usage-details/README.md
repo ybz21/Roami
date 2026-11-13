@@ -115,3 +115,5 @@ node docs/design/20261112-model-usage-details/assets/build.mjs
 [新版概况与模型源定价实现及验收](interaction-implementation.md)：按确认稿接入小时分组分析、概况 / 审计分工、卡片定价、嵌套默认价和独立保存。
 
 插件源可从卡片「添加账号」创建独立实例；同包 10 个账号的并发、重启与登录隔离已验收。源详情顺序为连接、定价、调度，见 [接入与多账号验收](interaction-implementation.md#插件多账号与详情顺序)。
+
+- [用量本地时间修正](local-time.md)：设备时区、跨日筛选与结算边界。
