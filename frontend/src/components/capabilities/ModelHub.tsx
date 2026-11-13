@@ -22,7 +22,7 @@ import { useModelCatalog, type ModelSource, type CatalogModel } from './model-hu
 import '../settings/agent-settings.css'
 import './model-hub.css'
 
-const tabs = ['catalog', 'usage', 'audit', 'aggregate', 'monitor', 'prices', 'gateway', 'speech']
+const tabs = ['catalog', 'aggregate', 'usage', 'monitor', 'audit', 'gateway', 'prices', 'speech']
 const newID = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36)
 export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: string; onNav: (path: string) => void; embedded?: boolean }) {
   const { t, locale } = useI18n(), { message, modal } = App.useApp(), layout = useLayout()

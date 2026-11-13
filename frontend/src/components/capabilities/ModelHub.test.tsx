@@ -87,7 +87,7 @@ it('shows connections and their models together and accepts old source-page link
   expect(connection.textContent).toContain('Coding')
   expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
   expect(screen.getAllByRole('tab')).toHaveLength(8)
-  expect(screen.getAllByRole('tab')[2].textContent).toBe('hub.tab.audit')
+  expect(screen.getAllByRole('tab')[2].textContent).toBe('hub.tab.usage')
   expect(screen.getAllByRole('tab')[7].textContent).toBe('hub.tab.speech')
   expect(screen.queryByRole('combobox', { name: 'settings.speechProvider' })).toBeNull()
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
