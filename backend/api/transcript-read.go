@@ -42,11 +42,19 @@ type transcriptLine struct {
 // readTail 从文件尾往回取最后 keep 行。
 //
 // 返回的 more 表示「前面还有」——前端据此显示「加载更早」。
-// keep<=0 视为不限，退化成从头读（只有 offset=0 且没给 tail 时才会走到）。
+// keep<=0 视为不限；对外首屏接口始终提供分页上限。
 func readTail(f *os.File, keep int) (lines []transcriptLine, size int64, more bool, err error) {
+	return readTailBefore(f, keep, 0)
+}
+
+// before is an exclusive byte cursor; zero starts with the newest records.
+func readTailBefore(f *os.File, keep int, before int64) (lines []transcriptLine, size int64, more bool, err error) {
 	size, err = f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, 0, false, err
+	}
+	if before > 0 && before < size {
+		size = before
 	}
 	if size == 0 {
 		return nil, 0, false, nil
