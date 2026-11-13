@@ -47,3 +47,11 @@
 Redmi Note 8 经 LAN HTTPS 再验收能力目录与顶部“新会话”入口，真实触摸选中 DeepSeek；两处图标存在，文档宽度与视口均为 392 CSS px。未提交测试任务。回执为 `logo-desktop.json` / `logo-phone.json`；截图为 `desktop-logo-after.png`、`desktop-logo-light-after.png`、`desktop-task-logo-after.png`、`phone-logo-after.png`、`phone-task-logo-after.png`，均位于 `/tmp/roami-deepseek-evidence/`。
 
 补充修改通过 Agent 与安装清单 Go 测试、注册与执行契约测试；前端 typecheck、i18n、hover、1,709 项测试与生产构建全部通过，日志前缀 `/tmp/deepseek-followup-`。本轮未修改 Python，沿用上述全量验收。
+
+## CI 测试隔离修复
+
+PR #914 的首次 CI 中，五组测试仅替换了执行命令，新增的能力目录读取仍调用真实 `roami`；Runner 未安装该 CLI，导致 220 项连锁失败。本机已有 CLI，使先前全量检查未暴露这个依赖。
+
+为这五组模拟执行测试显式提供主机能力目录替身，不修改生产行为，也不为目录查询失败增加降级路径。目标发现与注册能力测试仍使用各自的真实协议边界。
+
+使用 `PATH=/usr/bin:/bin` 成功复现原始失败；修复后同环境下五个测试文件的 263 项测试全部通过（91.65 秒），Ruff 检查与格式检查通过。证据日志 `/tmp/deepseek-ci-reproduction.log` 与 `/tmp/deepseek-ci-regression.log`。
