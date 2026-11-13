@@ -1,9 +1,10 @@
+import { usePageEffect } from '../page-activity'
 // 交互式选择框检测与响应 —— 供 ClaudeChat / CodexChat 专业渲染模式复用。
 //
 // 背景：Claude/Codex 的权限确认、选项菜单是终端 TUI 实时状态，不在 JSONL transcript 里，
 // 所以对话面板渲染不出、也无从响应。这里从实时屏幕(capture，纯文本含 ❯/框线)解析出
 // 选择框，渲染成可点按钮；点击经 POST /sessions/:name/keys 注入原始按键完成选择。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Modal, Space } from 'antd'
 import { api } from '../api'
 import { useI18n } from '../i18n'
@@ -200,7 +201,7 @@ function usePromptControl(name: string) {
   const [p, setP] = useState<Prompt | null>(null)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
+  usePageEffect(() => {
     if (!name) { setP(null); return }
     let stop = false
     const poll = async () => { const r = await fetchPrompt(name); if (!stop) setP(r) }

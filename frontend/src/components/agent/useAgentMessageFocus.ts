@@ -1,8 +1,9 @@
-import { useEffect, useRef, type RefObject, type MutableRefObject } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useRef, type RefObject, type MutableRefObject } from 'react'
 
 export function useAgentMessageFocus(root: RefObject<HTMLDivElement>, conversation: string, branch: string, message: string, messageIds: string, stick: MutableRefObject<boolean>) {
   const applied = useRef({ key: '', done: false })
-  useEffect(() => {
+  usePageEffect(() => {
     const key = [conversation, branch, message].join(':')
     if (applied.current.key !== key) applied.current = { key, done: false }
     if (!message || applied.current.done || !root.current) return

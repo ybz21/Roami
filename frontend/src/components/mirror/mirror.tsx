@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 镜像两页（浏览器 / 手机）共用的**页头语法层**（设计 17）。
 //
 // 这两页在做同一件事：把一块远端屏幕实时画到本地，外加一条工具条。可它们的页头长期是
@@ -134,7 +135,7 @@ export function MirrorMenu({ items, label }: { items: MenuProps['items']; label:
  */
 export function useFullscreen(ref: RefObject<HTMLElement | null>) {
   const [on, setOn] = useState(false)
-  useEffect(() => {
+  usePageEffect(() => {
     const sync = () => setOn(!!(document.fullscreenElement || (document as any).webkitFullscreenElement))
     document.addEventListener('fullscreenchange', sync)
     document.addEventListener('webkitfullscreenchange', sync)

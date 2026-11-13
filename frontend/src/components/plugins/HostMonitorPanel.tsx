@@ -1,7 +1,8 @@
+import { usePageEffect } from '../../page-activity'
 // 主机监控仪表盘(roam.host-monitor 插件的宿主侧面板):轮询插件 stats
 // 命令,展示 CPU/GPU/内存/磁盘/网络实时状态与趋势。趋势历史由插件在
 // StorageDir 持久化,面板打开即有近期曲线,不依赖页面常驻。
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Alert, App as AntApp, Card, Empty, Progress, Segmented, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import { api } from '../../api'
 import { ArrowDown, ArrowUp, Swatch } from '../../icons'
@@ -163,7 +164,7 @@ export default function HostMonitorPanel({ pluginId, enabled, t, fetchSnapshot }
 
   // 后台任务的进度。running 时每 2 秒问一次（比整块快照的 3 秒密一点：这是人盯着看的东西）
   const [swapJob, setSwapJob] = useState<{ state: string; startSwap: number; swapUsed: number; err?: string } | null>(null)
-  useEffect(() => {
+  usePageEffect(() => {
     if (swapJob?.state !== 'running') return
     let stop = false
     const tick = async () => {
@@ -212,7 +213,7 @@ export default function HostMonitorPanel({ pluginId, enabled, t, fetchSnapshot }
     })
   }
 
-  useEffect(() => {
+  usePageEffect(() => {
     if (!enabled) return
     poll()
     const timer = setInterval(poll, intervalSec * 1000)

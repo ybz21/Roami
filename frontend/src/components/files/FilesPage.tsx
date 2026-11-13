@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { FilePageMemoryProvider, useFilePageState, type FilePageMemory } from './file-page-memory'
 import FileBrowser from './FileBrowser'
 import FileWorkspace from './FileWorkspace'
 import MobileSubPage from '../MobileSubPage'
@@ -14,17 +15,21 @@ import { agentLaunch } from '../../agent-command'
 import { loadAgentCapabilities, sessionContext, taskWithCapabilities } from '../sessions/kickoff-brief'
 import { App as AntApp } from 'antd'
 
-export default function FilesPage({ openTerm }: { openTerm: (name: string) => void }) {
+export default function FilesPage({ memory, openTerm }: { memory?: FilePageMemory; openTerm: (name: string) => void }) {
+  return <FilePageMemoryProvider memory={memory}><FilesPageContent openTerm={openTerm} /></FilePageMemoryProvider>
+}
+
+function FilesPageContent({ openTerm }: { openTerm: (name: string) => void }) {
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const [prefs] = usePreferences()
   // 手机(窄屏)两级导航：一级整页文件列表，点文件后详情以全屏二级页(MobileSubPage)展开；
   // 桌面仍是 FileWorkspace(文件树 dock + 多 tab 编辑)。
   const { phone: isMobile } = useLayout()
-  const [mobileFile, setMobileFile] = useState<string | null>(null)
+  const [mobileFile, setMobileFile] = useFilePageState<string | null>('mobileFile', null)
   // 搜到文件 → 切到本页 → 打开它。桌面那条路径在 FileWorkspace 里（开成标签页），
   // 手机这里是二级全屏页，所以各接各的。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!isMobile) return
     const on = () => {
       const data = takeIntentData<{ path?: string }>(OPEN_FILE_INTENT)
@@ -57,7 +62,7 @@ export default function FilesPage({ openTerm }: { openTerm: (name: string) => vo
         <FileBrowser dir="" accent="var(--accent)" layout="dock" onOpenFile={setMobileFile} onOpenAgent={openAgent} />
         {mobileFile && (
           <MobileSubPage onBack={() => setMobileFile(null)}>
-            <FileView path={mobileFile} accent="var(--accent)" inline onBack={() => setMobileFile(null)}
+            <FileView key={mobileFile} path={mobileFile} accent="var(--accent)" inline onBack={() => setMobileFile(null)}
               onClose={() => setMobileFile(null)} onOpenPath={setMobileFile} onOpenAgent={openAgent} />
           </MobileSubPage>
         )}

@@ -1,5 +1,6 @@
+import { usePageEffect } from '../../page-activity'
 // 设置页的「录一个快捷键」：点一下进入录制，按下组合键就存；Esc 取消；「重置」回默认
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from 'antd'
 import { useI18n } from '../../i18n'
 import { formatHotkey, hotkeyFromEvent, parseHotkey } from '../shell/keybindings'
@@ -8,7 +9,7 @@ export function HotkeyRecorder({ value, fallback, onChange, conflict }: { value:
   const { t } = useI18n()
   const [rec, setRec] = useState(false)
   const [bad, setBad] = useState(false)
-  useEffect(() => {
+  usePageEffect(() => {
     if (!rec) return
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault(); e.stopPropagation()

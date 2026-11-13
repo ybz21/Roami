@@ -1,3 +1,4 @@
+import { usePageActive } from '../../page-activity'
 import { agentTimeline, groupAgentTimeline } from './agent-timeline'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -61,6 +62,7 @@ type Props = Omit<Partial<HomeConversationProps>, 'cid' | 'node'> & {
 }
 const noop = () => {}
 export default function AgentConversation({ cid, branch = '', focusMessage = '', inactive = false, node, inbox, inboxOpen = false, select = noop, notifications = noop, projects = [], onSession = noop, mobileActionsHost, project }: Props) {
+  const pageActive = usePageActive()
   const { t } = useI18n(), { phone, size } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch, node, focusMessage)
   const rsi = useAgentData<{ developmentRsi: boolean }>(project ? null : '/agent/status', 60_000)
@@ -112,8 +114,8 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     if (fresh.length) { fresh.forEach(item => completed.current.add(item.id)); project?.onUpdated?.() }
   }, [thread.view?.messages, project?.onUpdated])
   useEffect(() => {
-    if (!inactive && !inboxOpen && cid === mainCID && inbox?.cursor && thread.view && inbox.cursor > thread.view.snapshotCursor) thread.refresh()
-  }, [inactive, inboxOpen, cid, mainCID, inbox?.cursor, thread.view?.snapshotCursor, thread.refresh])
+    if (pageActive && !inactive && !inboxOpen && cid === mainCID && inbox?.cursor && thread.view && inbox.cursor > thread.view.snapshotCursor) thread.refresh()
+  }, [pageActive, inactive, inboxOpen, cid, mainCID, inbox?.cursor, thread.view?.snapshotCursor, thread.refresh])
   const historical = !!thread.view && (thread.view.branchId !== thread.view.conversation.active_branch_id || (!!mainCID && cid !== mainCID))
   const readOnly = historical || (!project && !mainCID)
   const running = thread.view?.turns.some((item) => item.state === 'running' || item.state === 'queued') || false
@@ -148,12 +150,12 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     }
   }, [thread.view?.messages, thread.loadingOlder])
   const eventIds = history.entries.map(entry => entry.message?.completedEventId || '').join(',')
-  useVisibleAgentReads(!inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox?.refresh || noop)
+  useVisibleAgentReads(pageActive && !inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox?.refresh || noop)
 
   useEffect(() => {
-    if (!project && !inactive && mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
+    if (pageActive && !project && !inactive && mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
     if (!project && cid === mainCID) { try { localStorage.setItem(`roami.agent.last.${node || 'local'}`, cid) } catch {} }
-  }, [cid, mainCID, branch, focusMessage, node, select, inactive, project])
+  }, [cid, mainCID, branch, focusMessage, node, select, inactive, project, pageActive])
 
   useEffect(() => {
     stick.current = true; setError(''); setWorkspaceTask(''); setPanel(null); setSource(null)
@@ -294,7 +296,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
       {conversationActions}
       {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
     </div>}
-    {!project && phone && mobileActionsHost && createPortal(
+    {pageActive && !project && !inactive && phone && mobileActionsHost && createPortal(
       <>
         <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.workspace.tasks')} onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>
         <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={20} /></button></Dropdown>
@@ -329,7 +331,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
           <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: agents.map(({ kind }) => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
         settings={<AgentComposerPlus {...composerActions} modelTrigger />}
-        voice={<VoiceInput inline scope={draftKey} hotkey={!inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
+        voice={<VoiceInput inline scope={draftKey} hotkey={pageActive && !inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}

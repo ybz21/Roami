@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { nodeApi } from '../cluster/node-url'
 import {
@@ -91,7 +92,7 @@ export default function PluginsPanel({ initialId, onSelect }: { initialId?: stri
     }
   }, [])
   useEffect(() => { void reload() }, [reload])
-  useEffect(() => {
+  usePageEffect(() => {
     const poll = pollWhileVisible(async signal => {
       const status = await api('GET', '/plugin/status', undefined, { signal })
       if (!signal.aborted) setDaemon(!!status?.daemon)

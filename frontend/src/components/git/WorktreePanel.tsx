@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // Worktree 管理抽屉（W4，设计见 docs/design/web/07-worktree.md §3 + w4 图纸）
 // 列出仓库全部 worktree（5s 轮询）：四态徽章、有货着色、筛选、对比 base、
 // 进入会话（孤儿复活）、合并回 base（squash/merge/rebase）、
@@ -111,7 +112,7 @@ export default function WorktreePanel({ open, onClose, openTerm, initialDir, emb
   }, [message])
 
   // 目录变化去抖加载；抽屉开着时 5s 轮询（service 侧有缓存兜底）
-  useEffect(() => {
+  usePageEffect(() => {
     if (!open) { setList(null); setAllGroups(null); return }
     const t0 = setTimeout(() => load(dir), 300)
     const iv = setInterval(() => load(dir, true), 5000)

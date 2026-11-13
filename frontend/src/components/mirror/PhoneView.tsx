@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 手机镜像页：把后端手机（Linux→Android adb）的画面实时渲染到 <img>，并转发点按/滑动/输入。
 // 协议见 backend/phone/screencast.go：
 //   收 二进制帧 [w:u16][h:u16][seq:u16][jpeg...] | {type:'pong'|'error'|'level'}
@@ -160,7 +161,7 @@ export default function PhoneView() {
   const pressKey = (name: string) => api('POST', '/phone/key', { name }).catch(() => {})
 
   // quality 变化才重建连接；断开(掉线/切设备/模拟器停起)自动重连，画面自愈无需刷新。
-  useEffect(() => {
+  usePageEffect(() => {
     let stopped = false
     let tp: DuplexTransport | null = null
     let objURL: string | null = null

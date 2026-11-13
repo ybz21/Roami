@@ -1,8 +1,9 @@
+import { usePageEffect } from '../../page-activity'
 import { useRegisteredAgents } from '../../agent-registry'
 // 手机上一个项目的 worktree 视图（从项目分组标题进入）：
 // 每张卡 = 分支 + 收尾状态 + 挂着的会话 + 在这个目录开 Claude / Codex / 终端；顶上「开任务」。
 // 桌面项目页那套问候 / 行动卡 / 筛选 chips / 路径在手机上是硬缩，这里不复用。
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Spin } from 'antd'
 import { getHashParams } from '../../route-hash'
 import { projectPath } from '../projects/okr/okr-workspace'
@@ -41,7 +42,7 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   const [gitAt, setGitAt] = useState<string | null>(null)
   const [showQuiet, setShowQuiet] = useState(false)
 
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     setWts(null)
     // 后端 nil slice 序列化成 null，这里统一成空数组

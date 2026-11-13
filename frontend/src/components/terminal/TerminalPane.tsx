@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { SessionProcesses } from '../sessions/SessionProcesses'
 import { TBtn, TI } from './terminal-toolbar'
 import { useSessionLifecycle, blockingLifecycle } from '../sessions/session-lifecycle'
@@ -462,7 +463,7 @@ export default function TerminalPane(props: {
 
   // 从文件/Git 面板把文件拖到终端 → 插入为 @绝对路径。
   const [dragOver, setDragOver] = useState(false)
-  useEffect(() => {
+  usePageEffect(() => {
     const clear = () => setDragOver(false)
     document.addEventListener('dragend', clear)
     document.addEventListener('drop', clear, true)
@@ -546,7 +547,7 @@ export default function TerminalPane(props: {
     return () => { stop = true }
   }, [active, claudeMap, codexMap])
 
-  useEffect(() => {
+  usePageEffect(() => {
     if (!terms.length) {
       promptSignals.current = {}
       setTermNeedsInput((previous) => Object.keys(previous).length ? {} : previous)

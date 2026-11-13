@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 浏览器镜像页：把后端全局 Chrome 的画面实时渲染到 <img>，可选「接管」转发输入。
 // 协议见 backend/browser/screencast.go：
 //   收 {type:'frame', data, w, h} | {type:'pong', t} | {type:'error', msg}
@@ -91,6 +92,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const [healthMsg, setHealthMsg] = useState('') // 连不上时的原因（后端 /browser/health 的 error）
   const [url, setUrl] = useState('')
   const addrFocused = useRef(false) // 地址栏聚焦时不被轮询回写覆盖
+  const addressDraft = useRef(false)
   // 标签页（复用同一台 Chrome）
   const [tabs, setTabs] = useState<TabInfo[]>([])
   const [pinnedTabs, setPinnedTabs] = useState<Set<string>>(() => {
@@ -112,6 +114,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   const changeOrigin = (id: string, origin: 'human' | 'agent') => { void changeTab(id, { origin }) }
   const tabsRef = useRef<TabInfo[]>([]) // 供 ws.onmessage 等闭包读到最新标签集（识别新开的那个）
   const [target, setTarget] = useState(initialTarget)
+  const addressTarget = useRef(target)
   const [expectedBrowser, setExpectedBrowser] = useState(browserInstance)
   const expectedBrowserRef = useRef(expectedBrowser); expectedBrowserRef.current = expectedBrowser
   const pinnedTarget = useRef(initialTarget)
@@ -225,7 +228,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
       setTarget((current) => pinnedTarget.current && current === pinnedTarget.current ? current : list.some((item) => item.id === current) ? current : (list[0]?.id || ''))
     } catch (error) { if (signal) throw error }
   }
-  useEffect(() => {
+  usePageEffect(() => {
     const poll = pollWhileVisible(signal => loadTabs(signal), 3000)
     return () => poll.stop()
   }, [])
@@ -235,6 +238,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     try {
       const known = new Set(tabs.map((t) => t.id)) // 记下创建前的 id，用于定位新开的那个
       await api('POST', '/browser/tabs', { url: home, origin: 'human' }) // 新标签默认开导航起始页
+      addressDraft.current = false
       const r = await api('GET', '/browser/tabs')
       const list: TabInfo[] = visibleTabs(r?.data || [])
       setTabs((prev) => mergeTabs(prev, list))
@@ -271,7 +275,9 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
 
   // 地址栏跟随当前标签页真实 URL（聚焦编辑时不覆盖；about:blank 显示为空）
   useEffect(() => {
-    if (addrFocused.current) return
+    if (addressTarget.current && addressTarget.current !== target) addressDraft.current = false
+    addressTarget.current = target
+    if (addrFocused.current || addressDraft.current) return
     const t = tabs.find((x) => x.id === target)
     if (t) setUrl(t.url === 'about:blank' ? '' : t.url)
   }, [target, tabs])
@@ -283,6 +289,8 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     setFollowPaused(true)
   }
   const resumeFollow = () => {
+    addressDraft.current = false
+    setUrl(tabs.find(tab => tab.id === target)?.url || '')
     pinnedTarget.current = ''; setExpectedBrowser('')
     followPausedRef.current = false
     setFollowPaused(false)
@@ -290,6 +298,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
 
   // 切换标签：镜像该 tab + 在 Chrome 里把它前置（让 agent 前台焦点一致）
   const switchTab = (id: string) => {
+    addressDraft.current = false
     pinnedTarget.current = ''; setExpectedBrowser('')
     pauseFollow() // 人手动选的，别被下一条 active 广播立刻拽回去
     setTarget(id)
@@ -333,6 +342,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
     if (!target) return
     try {
       await api('POST', `/browser/tabs/${target}/${suffix}`, body)
+      addressDraft.current = false
       send({ type: 'refresh' })
     }
     catch (e: any) { message.error(e.message) }
@@ -371,7 +381,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
 
   // control / target 变化才重连；画质切换【不重连】(连上后发 quality 消息，见下面 changeQuality)，
   // 设备/尺寸切换也不重连(发 emulate 消息)。重连会重设 device metrics、首帧畸形 → 画面跳/页面忽大小。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!imgRef.current) return
     setConnected(false)
     setHealthMsg('')
@@ -558,7 +568,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
   // 本身，导致 onMouse('up') 收不到事件 —— 拖拽框选/远端滑块会一直卡在"按下"态。用 window
   // 级监听兜底；靠 dragRef.active 去重（同一次释放若已被 <img> 自身的 onMouseUp 处理过，
   // active 会先被置 false，这里直接跳过，不会重复发送)。
-  useEffect(() => {
+  usePageEffect(() => {
     const onWindowMouseUp = (e: MouseEvent) => {
       const d = dragRef.current
       if (!d.active) return
@@ -772,7 +782,7 @@ export default function BrowserView({ initialTarget = '', browserInstance = '' }
             </>}
             <Omnibox
               value={url}
-              onChange={setUrl}
+              onChange={(value) => { const current = tabs.find(tab => tab.id === target)?.url; addressDraft.current = value !== (current === 'about:blank' ? '' : current || ''); setUrl(value); pauseFollow() }}
               onSubmit={navigate}
               onFocusChange={(f) => { addrFocused.current = f }}
               placeholder={t('browser.urlPlaceholder')}

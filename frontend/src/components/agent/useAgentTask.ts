@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { agentDataKey, invalidateAgentData, peekAgentData, loadAgentData } from './agent-data-cache'
@@ -20,7 +21,7 @@ export function useAgentTask(id: string) {
   const pending = useRef(false), sequence = useRef(0), failures = useRef(0), ticks = useRef(0), queued = useRef(false)
   const reread = useCallback(() => { if (pending.current) { queued.current = true; return }; setVersion(++sequence.current) }, [scope])
   const refresh = useCallback(() => { invalidateAgentData(agentDataKey(detailPath)); invalidateAgentData(agentDataKey(artifactPath)); invalidateAgentData(agentDataKey(detailPath + '/resources')); const next = ++sequence.current; setVersion(next); return next }, [detailPath, artifactPath, scope])
-  useEffect(() => {
+  usePageEffect(() => {
     if (scope !== agentDataKey(detailPath)) return
     let cancelled = false
     if (stateScope !== scope) { setStateScope(scope); setDetail(seed<TaskDetail>(detailPath)); setControls(empty()); setArtifacts(seed<TaskArtifact[]>(artifactPath)) }
@@ -51,7 +52,7 @@ export function useAgentTask(id: string) {
     return () => { cancelled = true; pending.current = false }
   }, [id, version, scope])
   const ended = stateScope === scope && !!detail.value && ['succeeded', 'failed', 'cancelled', 'interrupted', 'waiting_user'].includes(detail.value.task.state) && detail.value.steering?.state !== 'stopping' && detail.value.sessionClosure?.state !== 'closing'
-  useEffect(() => {
+  usePageEffect(() => {
     if (ended) return
     const timer = setInterval(() => {
       if (pending.current || document.visibilityState !== 'visible') return
@@ -60,7 +61,7 @@ export function useAgentTask(id: string) {
     }, 3000)
     return () => clearInterval(timer)
   }, [reread, ended])
-  useEffect(() => {
+  usePageEffect(() => {
     const changed = () => { if (document.visibilityState === 'visible') reread() }
     const unsubscribe = subscribeTaskChanges(id, changed)
     document.addEventListener('visibilitychange', changed)

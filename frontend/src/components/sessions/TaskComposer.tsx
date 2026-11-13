@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { primaryShortcutLabel } from '../../keyboard-platform'
 // 「开任务」的 composer（23 设计 §3.1 #1）：描述 ⏎ 就在新 worktree 里开干。
 //
@@ -82,7 +83,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   }))
   useEffect(() => { if (autoFocus) setTimeout(() => promptRef.current?.focus?.(), 0) }, [autoFocus])
 
-  useEffect(() => {
+  usePageEffect(() => {
     setWtsAll([]); setBranches([]); setRemoteBranches([]); setDefBranch(''); setBase(''); setExisting('')
     if (!dir || !isGit) return
     const poll = pollWhileVisible(async (signal) => {

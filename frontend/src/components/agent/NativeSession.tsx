@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Dropdown, Modal, Spin } from 'antd'
 import { RoamiLogo, ChevronRight, PlusIcon } from '../../icons'
@@ -59,7 +60,7 @@ function SessionConversation({ embedded, metadata, refreshMetadata, node, projec
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null), sending = useRef(false), alive = useRef(true)
   const olderRequest = useRef<AbortController | null>(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     const hidden = () => { if (document.hidden) olderRequest.current?.abort() }
     document.addEventListener('visibilitychange', hidden)
     return () => { olderRequest.current?.abort(); document.removeEventListener('visibilitychange', hidden) }

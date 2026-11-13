@@ -1,3 +1,5 @@
+import { usePageActive, usePageEffect } from '../../../page-activity'
+import { useFilePageState } from '../file-page-memory'
 import BackButton from '../../BackButton'
 // 文件展示组件（容器）——页面统一引用它来「展示一个文件」。
 // 职责：按路径取内容、活重载轮询、脏/保存、源码⇄渲染切换、标题栏与外壳（inline/modal）；
@@ -61,6 +63,7 @@ export function FileView({
   revealLine?: { line: number; nonce: number }
 }) {
   const kind = fileKind(path)
+  const pageActive = usePageActive()
   const { isImg, isVideo, isAudio, isMd, isHtml, isPdf, isOffice, isSheet } = kind
   // 二进制里能就地播/看的那几类：都不走 /file 取正文（取回来是一大坨乱码），直接交给 raw。
   const isMedia = isVideo || isAudio
@@ -72,14 +75,15 @@ export function FileView({
   const downloadUrl = `${rawUrl}&dl=1`
   const downloadName = fileNameOf(path)
   const previewHeight = inline ? '100%' : '74vh'
-  const [data, setData] = useState<any>(null)
+  const stateKey = `view:${JSON.stringify(path)}:${forcePreview ? 'preview' : 'file'}:`
+  const [data, setData] = useFilePageState<any>(stateKey + 'data', null)
   const [err, setErr] = useState('')
-  const [source, setSource] = useState(false) // markdown/HTML：源码/渲染切换
+  const [source, setSource] = useFilePageState(stateKey + 'source', !!tabbed && MD_EXT.includes(extOf(path))) // 源码/渲染切换
   const agents = useRegisteredAgents()
   const [agentPick, setAgentPick] = useState(false)
-  const [draft, setDraft] = useState('') // 编辑器当前文本
+  const [draft, setDraft] = useFilePageState(stateKey + 'draft', '') // 编辑器当前文本
   const [saving, setSaving] = useState(false)
-  const [stale, setStale] = useState(false) // 磁盘上文件已被外部(cc/codex)改动，但本地有未保存改动没自动覆盖
+  const [stale, setStale] = useFilePageState(stateKey + 'stale', false) // 磁盘上文件已被外部(cc/codex)改动，但本地有未保存改动没自动覆盖
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const { mode } = useThemeMode()
@@ -107,7 +111,10 @@ export function FileView({
   const saveRef = useRef(save)
   saveRef.current = save
 
+  const loadedPath = useRef(data ? path : null)
   useEffect(() => {
+    if (loadedPath.current === path) return
+    loadedPath.current = path
     if (rawOnly) return // 图片/音视频/PDF/Office 直接走 raw 或专用面板
     // tab 语境的 markdown 默认进编辑器(源码)、点预览才渲染;HTML 则默认直接渲染
     // (打开网页多是想看效果,不是编辑),两者都可用「源码/渲染」钮切换。
@@ -120,7 +127,7 @@ export function FileView({
     api('GET', `/file?path=${encodeURIComponent(path)}`).then((r) => { setData(r.data); setDraft(r.data?.content || ''); setStale(false) }).catch(() => {})
   }
   // 外部(cc/codex 等)改动已打开的文件 → 轮询 mtime：无本地改动自动重载渲染；有未保存改动只提示不覆盖。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!active || !data || err || rawOnly) return
     let stop = false
     const h = setInterval(async () => {
@@ -136,7 +143,7 @@ export function FileView({
   }, [active, data?.mtime, dirty, path, rawOnly, err])
 
   // 非激活 tab：只占位、不挂载重型 Monaco/预览（state 已在上面 hook 里保留，切回来不丢编辑）。
-  if (!active) return <div style={{ height: '100%' }} />
+  if (!active || !pageActive) return <div style={{ height: '100%' }} />
 
   const name = fileNameOf(path)
   const copyPath = async () => {

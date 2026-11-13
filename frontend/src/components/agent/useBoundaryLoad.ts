@@ -1,10 +1,11 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useRef, type RefObject } from 'react'
 
 export function useBoundaryLoad(container: RefObject<HTMLElement>, load: () => void, enabled: boolean, edge: 'start' | 'end' = 'end') {
   const action = useRef(load); action.current = load
   const available = useRef(enabled); available.current = enabled
   const consumed = useRef(false), touchPoint = useRef<{ x: number; y: number } | null>(null)
-  useEffect(() => {
+  usePageEffect(() => {
     let root = container.current
     if (!root) return
     while (root.parentElement && !['auto', 'scroll'].includes(getComputedStyle(root).overflowY)) root = root.parentElement

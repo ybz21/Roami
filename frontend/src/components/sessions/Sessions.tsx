@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import SessionLocation from './SessionLocation'
 import { SessionLifecycleInbox } from './SessionLifecyclePanel'
 import { SessionPauseButton } from './SessionMemoryControl'
@@ -68,17 +69,17 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     setList(flat)
   }).catch(error => { if (signal) throw error })
   useEffect(() => { setSessionLabels(Object.fromEntries(list.filter(s => s.label).map(s => [s.name, s.label]))) }, [list])
-  useEffect(() => pollWhileVisible(load, 3000).stop, [])
-  useEffect(() => {
+  usePageEffect(() => pollWhileVisible(load, 3000).stop, [])
+  usePageEffect(() => {
     return pollWhileVisible(signal => api('GET', '/sessions/annotations', undefined, { signal })
       .then((r) => { if (!signal.aborted) setWtAnn(r?.data || {}) }), 8000).stop
   }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     return pollWhileVisible(signal => api('GET', '/races', undefined, { signal })
       .then((r) => { if (!signal.aborted) setRaces(Array.isArray(r?.data) ? r.data : []) }), 8000).stop
   }, [])
   const reloadRaces = () => api('GET', '/races').then((r) => setRaces(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
-  useEffect(() => pollWhileVisible(async signal => {
+  usePageEffect(() => pollWhileVisible(async signal => {
     const groups = await loadSwarmDirectory()
     if (!signal.aborted) setSwarmMap(swarmSessionMembership(groups).sessions)
   }, 10000).stop, [])
@@ -131,7 +132,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const repoKeys = Array.from(new Set(Object.values(wtAnn)
     .map((a: any) => (a?.primary?.linked ? a.primary.repo as string : ''))
     .filter(Boolean))).sort().join('\n')
-  useEffect(() => {
+  usePageEffect(() => {
     const repos = repoKeys.split('\n').filter(Boolean)
     if (!repos.length) { setRepoWt({}); return }
     return pollWhileVisible(async signal => {

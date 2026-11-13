@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../../page-activity'
+import { useState } from 'react'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
 import { relTime } from '../../../time-format'
@@ -10,7 +11,7 @@ export function SessionActivity({ onOpenSession, showEmpty = false }: { onOpenSe
   const { t } = useI18n()
   const [items, setItems] = useState<Activity[]>([])
   const [loaded, setLoaded] = useState(false)
-  useEffect(() => {
+  usePageEffect(() => {
     let stopped = false
     const load = () => api('GET', '/inbox?limit=40').then((r) => {
       if (!stopped) {

@@ -1,6 +1,6 @@
 import { Spin } from 'antd'
 import type { ReactNode } from 'react'
-import { Suspense } from 'react'
+import { Suspense, useRef } from 'react'
 import { type AgentKind } from '../agent-kind'
 import { useAgentInbox } from '../components/agent/useAgentInbox'
 import { lazyRetry } from '../components/lazy-retry'
@@ -8,6 +8,8 @@ import MobileSubPage from '../components/MobileSubPage'
 import Projects from '../components/projects/Projects'
 import { type TreeSrc } from '../components/shell/task-tree-snapshot'
 import { useI18n } from '../i18n'
+import RetainedPage from './RetainedPage'
+import type { FilePageMemory } from '../components/files/file-page-memory'
 import type { AppRoute } from './useAppRoute'
 import type { TaskWorkspace } from './useTaskWorkspace'
 const OnboardingPage = lazyRetry(() => import('../components/onboarding/OnboardingPage'))
@@ -41,6 +43,10 @@ type RouteActions = {
 export type MobileProject = { name: string; dir: string; at: number } | null
 
 type AppRoutesProps = {
+  filesMemory?: FilePageMemory
+  visible?: boolean
+  openPages?: string[]
+  hasDock?: boolean
   routing: AppRoute
   isMobile: boolean
   active: string | null
@@ -53,7 +59,26 @@ type AppRoutesProps = {
   fullscreen?: { active: boolean; toggle: () => void }
   agent: { node: string | null; inbox: ReturnType<typeof useAgentInbox>; open: boolean; notifications: () => void }
 }
-export default function AppRoutes({ routing, isMobile, active, projects, projectDirectory, actions, mobileProject, mobileSearchNonce, mobileActionsHost, fullscreen, agent }: AppRoutesProps) {
+export default function AppRoutes(props: AppRoutesProps) {
+  return <RetainedRoutes key={props.agent.node || 'local'} {...props} />
+}
+
+function RetainedRoutes(props: AppRoutesProps) {
+  const routes = useRef(new Map<string, { routing: AppRoute; searchNonce: number }>())
+  const visible = props.visible !== false
+  if (visible) routes.current.set(props.routing.tab, { routing: props.routing, searchNonce: props.mobileSearchNonce })
+  for (const key of routes.current.keys()) {
+    if (props.openPages && !props.isMobile && key !== props.routing.tab && !props.openPages.includes(key)) routes.current.delete(key)
+  }
+  return <>{[...routes.current].map(([key, entry]) => {
+    const foreground = visible && key === props.routing.tab
+    return <RetainedPage key={key} page={key} active={foreground} mobile={props.isMobile} hasDock={!!props.hasDock}>
+      <AppRouteContent {...props} routing={entry.routing} mobileSearchNonce={entry.searchNonce} />
+    </RetainedPage>
+  })}</>
+}
+
+function AppRouteContent({ filesMemory, routing, isMobile, active, projects, projectDirectory, actions, mobileProject, mobileSearchNonce, mobileActionsHost, fullscreen, agent }: AppRoutesProps) {
   const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, pluginSub, settingsSub } = routing
   const { openTerm, closeTerm, newTerminalAt, logout } = actions
   const { node: curNodeId, inbox: agentInbox, open: agentInboxOpen } = agent
@@ -74,7 +99,7 @@ export default function AppRoutes({ routing, isMobile, active, projects, project
     sessions: isMobile
       ? mobileSessions
       : <Sessions openTerm={openTerm} closeTerm={closeTerm} activeTerm={active} />,
-    files: <FilesPage openTerm={openTerm} />,
+    files: <FilesPage key={curNodeId || 'local'} memory={filesMemory} openTerm={openTerm} />,
     settings: <SettingsPage sub={settingsSub} onNav={(r) => go(r)} onLogout={logout} searchNonce={mobileSearchNonce}
       onInstall={() => go('install')} fullscreen={fullscreen} />,
     hub: <HubPage />,

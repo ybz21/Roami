@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { nodeWs } from '../cluster/node-url'
 import type { CSSProperties, TouchEvent as RTouchEvent } from 'react'
@@ -629,7 +630,7 @@ const Term = forwardRef<TermHandle, {
     beginVisualHandoff,
   }))
 
-  useEffect(() => {
+  usePageEffect(() => {
     unmounted.current = false
     const term = new Terminal({
       fontSize,

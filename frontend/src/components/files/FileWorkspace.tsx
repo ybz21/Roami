@@ -1,8 +1,10 @@
+import { usePageEffect } from '../../page-activity'
 // 统一「文件工作区」：左侧文件浏览器(可拖拽调宽) + VSCode 式多文件编辑 tab + Monaco 编辑器。
 // 支持左右双栏(编辑组 A/B)：拖 tab 到另一栏、或从文件树拖文件到某栏；会话(终端)作为固定首 tab 常驻 A 栏。
 // 两处复用：独立 Files 页（纯文件）与新标签 SoloTerminal（会话经 leading* 槽传入）。
 import { type ReactNode, Fragment, useEffect, useRef, useState } from 'react'
 import { App as AntApp, Dropdown, type MenuProps } from 'antd'
+import { useFilePageState, useForgetFilePageView } from './file-page-memory'
 import FileBrowser from './FileBrowser'
 import { FileView } from './fileview'
 import { FileTypeIcon } from './file-icons'
@@ -58,11 +60,12 @@ export default function FileWorkspace({
   const { t } = useI18n()
   const { modal } = AntApp.useApp()
   const hasLeading = leadingTab != null
+  const forgetView = useForgetFilePageView()
 
   // 文件树的开合：外面给了回调就听外面的（会话页那枚「文件」按钮），没给就自己记
   // （独立文件页没有别的开关，握把是唯一入口）。
   const treeControlled = onExplorerClose != null || onExplorerOpen != null
-  const [treeOpenLocal, setTreeOpenLocal] = useState(true)
+  const [treeOpenLocal, setTreeOpenLocal] = useFilePageState('workspace.treeOpen', true)
   const treeOpen = treeControlled ? explorerOpen : treeOpenLocal
   const toggleTree = () => {
     if (!treeControlled) { setTreeOpenLocal((v) => !v); return }
@@ -70,11 +73,11 @@ export default function FileWorkspace({
   }
 
   // 两个编辑组：A 主（含固定首 tab）、B 副（filesB 非空时出现，即分栏）
-  const [filesA, setFilesA] = useState<string[]>([])
-  const [filesB, setFilesB] = useState<string[]>([])
-  const [activeA, setActiveA] = useState<string | null>(null) // null = 固定首 tab(会话)
-  const [activeB, setActiveB] = useState<string | null>(null)
-  const [focus, setFocus] = useState<Group>('A')
+  const [filesA, setFilesA] = useFilePageState<string[]>('workspace.filesA', [])
+  const [filesB, setFilesB] = useFilePageState<string[]>('workspace.filesB', [])
+  const [activeA, setActiveA] = useFilePageState<string | null>('workspace.activeA', null) // null = 固定首 tab(会话)
+  const [activeB, setActiveB] = useFilePageState<string | null>('workspace.activeB', null)
+  const [focus, setFocus] = useFilePageState<Group>('workspace.focus', 'A')
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set())
   const [dropHint, setDropHint] = useState<Group | 'split' | null>(null) // 拖拽落点提示
   // tab 条容器引用：标签多到溢出时，新开/切到的 tab 可能落在横向滚动区域外点不到，
@@ -84,7 +87,7 @@ export default function FileWorkspace({
   // 拖的是 tab/会话(需接盘层压过终端才能移栏) 还是文件路径(要落回终端/对话做 @引用注入,不能被接盘层截走)
   const [dragKind, setDragKind] = useState<'tab' | 'lead' | 'path' | null>(null)
   const resize = usePointerResize()
-  useEffect(() => {
+  usePageEffect(() => {
     // drop 用「冒泡阶段」清理：React 事件委托挂在 document 内层根节点，冒泡到 document 时
     // onDrop 已派发完，此时卸接盘层安全。若用捕获阶段则会赶在 onDrop 前卸掉接盘层 →
     // drop 落到已移除的元素 → onDrop 不触发 → tab 不动。dragend 兜底（拖到界外/取消）。
@@ -151,7 +154,7 @@ export default function FileWorkspace({
   openFileRef.current = openFileTab
   const openSideRef = useRef(openFileToSide)
   openSideRef.current = openFileToSide
-  useEffect(() => {
+  usePageEffect(() => {
     const on = () => {
       const data = takeIntentData<{ path?: string; line?: number; side?: boolean }>(OPEN_FILE_INTENT)
       if (!data || data === true || !data.path) return
@@ -184,6 +187,7 @@ export default function FileWorkspace({
     const next = arr.filter((x) => x !== p)
     setFilesOf(g, next)
     setFileDirty(p, false)
+    forgetView(realPath(p), isPreview(p))
     if (activeOf(g) === p) setActiveOf(g, neighbor(next, i, g))
     if (g === 'B' && next.length === 0) setFocus('A')
   }
@@ -219,7 +223,7 @@ export default function FileWorkspace({
     const s = Number(localStorage.getItem('ttmux.fileSplitFrac'))
     return Number.isFinite(s) && s > 0 ? clampFrac(s) : 0.5
   })
-  const [swapped, setSwapped] = useState(false)
+  const [swapped, setSwapped] = useFilePageState('workspace.swapped', false)
   const leftGroup: Group = swapped ? 'B' : 'A'
 
   const fracRef = useRef(splitFrac)

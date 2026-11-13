@@ -3,6 +3,7 @@ import { App as AntApp } from 'antd'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FileBrowser from './FileBrowser'
+import { FilePageMemoryProvider } from './file-page-memory'
 import { I18nProvider } from '../../i18n'
 
 vi.mock('../../App', () => ({ recentDirs: () => [] }))
@@ -58,17 +59,42 @@ describe('FileBrowser folder context menu', () => {
     vi.unstubAllGlobals()
   })
 
-  const renderBrowser = () => render(
+  const renderBrowser = (memory?: Map<string, unknown>) => render(
     <I18nProvider>
       <AntApp>
         {/* 原来这里套的是 FloatingFileDrawer（右侧 420 浮层）。它已经下线——文件树
             进了 Inspector 列（图纸 panels-desktop.html），容器只剩一个定宽的 flex 列。 */}
         <div style={{ display: 'flex', flexDirection: 'column', width: 420, height: 600 }}>
-          <FileBrowser dir="/workspace" layout="dock" />
+          <FilePageMemoryProvider memory={memory}><FileBrowser dir="/workspace" layout="dock" /></FilePageMemoryProvider>
         </div>
       </AntApp>
     </I18nProvider>,
   )
+
+  it('restores the directory, navigation history and typed path after leaving the page', async () => {
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = new URL(String(input), 'https://test.invalid')
+      const path = url.searchParams.get('path') || '/workspace'
+      if (url.pathname.endsWith('/file/stat')) return jsonResponse({ data: { dir: true } })
+      if (url.pathname.endsWith('/files')) return jsonResponse({ data: { path, parent: '/workspace', entries: [] } })
+      return jsonResponse({ data: {} })
+    })
+    const memory = new Map<string, unknown>()
+    const first = renderBrowser(memory)
+    const path = await screen.findByRole('combobox')
+    await waitFor(() => expect((path as HTMLInputElement).value).toBe('/workspace'))
+    fireEvent.change(path, { target: { value: '/workspace/folder' } })
+    fireEvent.keyDown(path, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(memory.get('browser.path')).toBe('/workspace/folder'))
+    fireEvent.change(path, { target: { value: '/workspace/unfinished' } })
+    first.unmount()
+    const second = renderBrowser(memory)
+    await waitFor(() => expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('/workspace/unfinished'))
+    expect(memory.get('browser.history')).toEqual(['/workspace', '/workspace/folder'])
+    expect(memory.get('browser.histIdx')).toBe(1)
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('path=%2Fworkspace%2Ffolder'))).toBe(true)
+    second.unmount()
+  })
 
   const openFolderMenu = async () => {
     const folder = await screen.findByText('folder')

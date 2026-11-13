@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../../page-activity'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../../api'
@@ -22,7 +23,7 @@ const same = (a: string[], b: string[]) => JSON.stringify(a) === JSON.stringify(
 export default function OkrHtmlDashboard({ workspace, active, onRefresh }: { workspace: Workspace; active: boolean; onRefresh?: () => void }) {
   const [visible, setVisible] = useState(() => !document.hidden)
   const running = active && visible
-  useEffect(() => {
+  usePageEffect(() => {
     const update = () => setVisible(!document.hidden)
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)
