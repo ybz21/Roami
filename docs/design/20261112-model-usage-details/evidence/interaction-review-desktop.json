@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "requests": 497,
+  "legendRequests": 497,
+  "checks": [
+    "request-first model comparison",
+    "hour selection and audit back",
+    "source and metric switching",
+    "hour/day and archived state",
+    "effective global/source/model prices",
+    "isolated model/source save",
+    "multiplier exactly once",
+    "restore inheritance",
+    "confirmed free gate",
+    "invalid price",
+    "draft preservation",
+    "model picker preservation",
+    "global scope",
+    "English and light theme"
+  ],
+  "errors": []
+}

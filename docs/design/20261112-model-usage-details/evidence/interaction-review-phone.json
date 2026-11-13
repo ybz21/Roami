@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "bounds": {
+    "width": 392,
+    "height": 766,
+    "scrollWidth": 392,
+    "scrollHeight": 766,
+    "pointer": "coarse"
+  },
+  "editor": {
+    "top": 0,
+    "headers": 1,
+    "back": 44
+  },
+  "chartScroll": {
+    "before": 0,
+    "after": 240
+  },
+  "keyboard": {
+    "keyboard": "314px",
+    "viewport": 765.8181762695312,
+    "saveBottom": 451.8181838989258
+  },
+  "checks": [
+    "real filter toggle",
+    "legend selection",
+    "hourly horizontal touch scroll",
+    "model price editor",
+    "single full-screen return bar",
+    "native pricing menu selection",
+    "free confirmation gate",
+    "actual save by touch",
+    "keyboard save visibility",
+    "back navigation"
+  ]
+}

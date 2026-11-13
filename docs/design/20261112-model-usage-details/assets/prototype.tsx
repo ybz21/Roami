@@ -76,7 +76,7 @@ function Prototype() {
   const compact=(value:number)=>new Intl.NumberFormat(locale,{notation:'compact',maximumFractionDigits:2}).format(value)
   const money=(value:number)=>new Intl.NumberFormat(locale,{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(value)
   const date=(day:string)=>new Intl.DateTimeFormat(locale,{month:'short',day:'numeric',timeZone:'Asia/Shanghai'}).format(new Date(day+'T00:00:00+08:00'))
-  const [theme,setTheme]=useState('light'), [nav,setNav]=useState(true), [tab,setTab]=useState('overview')
+  const [theme,setTheme]=useState('light'), [nav,setNav]=useState(true), [tab,setTab]=useState(new URLSearchParams(location.search).get('tab')||'overview')
   const [dailyLimit,setDailyLimit]=useState(50), [limitDraft,setLimitDraft]=useState('50'), [editingLimit,setEditingLimit]=useState(false)
   const [range,setRange]=useState('week'), [start,setStart]=useState('2026-11-06'), [end,setEnd]=useState('2026-11-12')
   const [source,setSource]=useState(''), [agent,setAgent]=useState(''), [model,setModel]=useState(''), [origin,setOrigin]=useState('')
