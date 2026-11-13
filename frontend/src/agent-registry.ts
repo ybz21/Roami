@@ -87,13 +87,14 @@ export type AgentModelProfile = {
   reasoningEffort?: string
   hasKey: boolean
   applied: boolean
+  models?: { id: string; name: string }[]
 }
 
 export type AgentModelInput = Omit<AgentModelProfile, 'id' | 'hasKey' | 'applied'> & { apiKey?: string }
 export type AgentModelView = {
   mode?: 'official' | 'custom'
   profiles: AgentModelProfile[]
-  current: { provider?: string; model?: string }
+  current: { provider?: string; model?: string; baseUrl?: string }
   revision: string
   activeId?: string
   changed: boolean
