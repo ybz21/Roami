@@ -106,6 +106,13 @@ class TaskDispatcher:
             if task["state"] != "queued" or run["state"] != "accepted":
                 db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
                 return None
+            from roami_agent.storage.swarm_work_pause import task_paused
+
+            if task_paused(db, task):
+                db.execute(
+                    "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 1000, job["id"])
+                )
+                return None
             try:
                 assert_dispatch_authorized(db, task, run)
             except ToolPreflightError as exc:

@@ -770,3 +770,31 @@ it('honors a fresh Main entry after a saved group selection without sending the 
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Unsent group draft')
   expect(test.api).not.toHaveBeenCalled()
 })
+
+it.each([false, true])('offers team work control directly with the workspace closed (phone=%s)', async phone => {
+  test.phone = phone
+  localStorage.setItem('roami.swarm.panel.v2:/agent/swarms/sw-one:scene:' + (phone ? 'phone' : 'desktop'), 'off')
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.work.pause' }))
+  await waitFor(() => expect(test.api).toHaveBeenCalledWith('POST', '/agent/swarms/sw-one/control', expect.objectContaining({ action: 'pause_work', expectedRevision: 2 })))
+})
+it('keeps recovery available and does not claim paused before stop confirmation', async () => {
+  test.data = { ...test.data!, paused: true, workPause: { state: 'stopping' } }
+  const view = render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect((screen.getByRole('button', { name: 'swarm.work.stopping' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByRole('status').textContent).toBe('swarm.work.stoppingHint')
+  test.data = { ...test.data!, workPause: { state: 'paused' }, revision: 3 }
+  view.rerender(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.work.resume' }))
+  await waitFor(() => expect(test.api).toHaveBeenCalledWith('POST', '/agent/swarms/sw-one/control', expect.objectContaining({ action: 'resume_work', expectedRevision: 3 })))
+})
+it('retries an unconfirmed work pause with the same command key', async () => {
+  test.api.mockRejectedValueOnce(new Error('network'))
+  render(<ManagedSwarm id="sw-one" embedded onBack={vi.fn()} openTerm={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.work.pause' }))
+  await waitFor(() => expect(test.error).toHaveBeenCalledWith('swarm.work.pauseFailed'))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'swarm.work.pause' }) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'swarm.work.pause' }))
+  await waitFor(() => expect(test.api).toHaveBeenCalledTimes(2))
+  expect(test.api.mock.calls[1][2]).toEqual(test.api.mock.calls[0][2])
+})

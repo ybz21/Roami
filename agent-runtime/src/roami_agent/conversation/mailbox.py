@@ -23,6 +23,13 @@ class TurnMailbox:
             if not turn:
                 db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
                 return None
+            from roami_agent.storage.swarm_work_pause import conversation_paused
+
+            if conversation_paused(db, turn["conversation_id"]):
+                db.execute(
+                    "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 1000, job["id"])
+                )
+                return None
             payload = json.loads(job["payload_json"])
             if turn["trigger_kind"] == "continuation" or payload.get("coordinationBatchId"):
                 batch = row(

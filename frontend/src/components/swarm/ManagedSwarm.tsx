@@ -7,7 +7,7 @@ import { useSessionOverview } from '../../session-overview'
 import { useAgentThread } from '../agent/useAgentThread'
 import { useLayout } from '../../layout'
 import { useI18n } from '../../i18n'
-import { CloseIcon, MoreIcon, PanelRightIcon, UserIcon } from '../../icons'
+import { CloseIcon, MoreIcon, PanelRightIcon, PauseIcon, PlayIcon, UserIcon } from '../../icons'
 import MobileSubPage from '../MobileSubPage'
 import Markdown from '../markdown/Markdown'
 import { taskExecutor, type TaskDetail } from '../agent/agent-task-protocol'
@@ -70,14 +70,14 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const node = useCurrentNodeId()
   const mainThread = useAgentThread(sceneActive ? data?.mainConversationId || '' : '', '', node)
   const liveMain = mainThread.view?.turns.find(turn => ['queued', 'running'].includes(turn.state))
-  const mainState = data?.paused ? 'idle' : liveMain?.state === 'queued' ? 'preparing' : liveMain?.state === 'running' ? 'running' : mainThread.view ? mainThread.view.turns[0]?.state === 'failed' ? 'failed' : 'idle' : 'unknown'
+  const mainState = data?.paused && data.workPause?.state !== 'stopping' ? 'idle' : liveMain?.state === 'queued' ? 'preparing' : liveMain?.state === 'running' ? 'running' : mainThread.view ? mainThread.view.turns[0]?.state === 'failed' ? 'failed' : 'idle' : 'unknown'
   const nodes = useMemo(() => data ? [{ id: 'main', name: t('swarm.conversation.main'), executor: 'roami', main: true, state: mainState }, ...currentMembers.map(member => ({ id: member.id, name: member.name, executor: member.executor, state: member.state }))] : [], [currentMembers, mainState, Boolean(data), t])
   const control = async (action: string) => {
-    if (!data) return
+    if (!data || busy) return
     if (!controlKey.current || controlKey.current.action !== action || controlKey.current.revision !== data.revision) controlKey.current = { action, revision: data.revision, key: crypto.randomUUID() }
     setBusy(true)
     try { await api('POST', `/agent/swarms/${encodeURIComponent(id)}/control`, { action, expectedRevision: data.revision, commandKey: controlKey.current.key }); controlKey.current = null; await refresh() }
-    catch { message.error(t('swarm.managed.actionFailed')) } finally { setBusy(false) }
+    catch { message.error(t(action === 'resume_work' ? 'swarm.work.resumeFailed' : action === 'pause_work' ? 'swarm.work.pauseFailed' : 'swarm.managed.actionFailed')); await refresh() } finally { setBusy(false) }
   }
   if (!data && missing && projectId) return <LegacySwarmHistory projectId={projectId} onManage={onManage || onBack} />
   if (!data) return <div className="swarm-loading">{missing ? <><p role="alert">{t('swarm.managed.relinkTeam')}</p><button type="button" className="tt-act" onClick={onBack}>{t('swarm.managed.selectTeam')}</button></> : error ? <><p role="alert">{t('swarm.managed.unavailable')}</p><button type="button" className="tt-act" onClick={() => void refresh()}>{t('agent.retry')}</button></> : <Spin />}</div>
@@ -104,7 +104,8 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const memberView = inspectedMember && <SwarmMemberDetails key={nodeApi('/agent/swarms/' + id) + ':' + inspectedMember.id} swarmId={id} member={inspectedMember} compact={phone} onClose={() => setMemberDetail(null)} />
   const currentMember = swarmMember(members, recipient)
   const directory = <SwarmConversations members={currentMembers} historical={roster?.historical} unbound={roster?.unbound} selected={recipient} onSelect={openChat} />
-  const controls = <details className="swarm-controls"><summary aria-label={t('common.more')}><MoreIcon /></summary><div className="swarm-control-menu">{phone && currentMember?.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}{tab === 'board' && Boolean(roster?.historical.length) && <button type="button" className="tt-act" aria-pressed={includeHistory} onClick={() => setIncludeHistory(value => !value)}>{t('swarm.member.includeHistory')}</button>}<button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</button><button type="button" className="tt-act" onClick={() => { void refresh().then(() => { setDetail(null); setMemberDetail(null); setTeamOpen(false); setMemoryOpen(true) }) }}>{t('swarm.managed.memory')}</button><button type="button" className="tt-act danger" disabled={busy || data.archived} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived} onClick={() => void control('archive')}>{t('swarm.archive')}</button></div></details>
+  const workControl = <button type="button" className="tt-act swarm-work-control" disabled={busy || data.archived || data.workPause?.state === 'stopping'} aria-busy={busy} onClick={() => void control(data.workPause ? 'resume_work' : 'pause_work')}>{data.workPause ? <PlayIcon /> : <PauseIcon />}{t(data.workPause?.state === 'stopping' ? 'swarm.work.stopping' : data.workPause ? 'swarm.work.resume' : 'swarm.work.pause')}</button>
+  const controls = <details className="swarm-controls"><summary aria-label={t('common.more')}><MoreIcon /></summary><div className="swarm-control-menu">{phone && currentMember?.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}{tab === 'board' && Boolean(roster?.historical.length) && <button type="button" className="tt-act" aria-pressed={includeHistory} onClick={() => setIncludeHistory(value => !value)}>{t('swarm.member.includeHistory')}</button>}<button type="button" className="tt-act" disabled={busy || data.archived || Boolean(data.workPause)} onClick={() => void control(data.paused ? 'resume' : 'pause')}>{t(data.paused ? 'swarm.managed.resume' : 'swarm.managed.pause')}</button><button type="button" className="tt-act" onClick={() => { void refresh().then(() => { setDetail(null); setMemberDetail(null); setTeamOpen(false); setMemoryOpen(true) }) }}>{t('swarm.managed.memory')}</button><button type="button" className="tt-act danger" disabled={busy || data.archived || Boolean(data.workPause)} onClick={() => modal.confirm({ title: t('swarm.managed.stopTitle'), content: t('swarm.managed.stopHint'), onOk: () => control('stop') })}>{t('swarm.managed.stop')}</button><button type="button" className="tt-act" disabled={busy || data.archived || Boolean(data.workPause)} onClick={() => void control('archive')}>{t('swarm.archive')}</button></div></details>
   const workspace = <div className="swarm-workbench">
     <header className="swarm-workbench-head">
       <nav className="swarm-tabs" aria-label={t('swarm.managed.workspace')}>
@@ -118,7 +119,8 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
     </ul>}
   </div>
   return <div className="swarm-managed" data-embedded={embedded} data-team-open={teamOpen}>
-    {!embedded && <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && <BackButton onClick={onBack} />}<h2>{data.name}</h2>{data.paused && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts">{controls}</div></header>}
+    {!embedded && <header className="tt-pagehead"><div className="swarm-page-identity">{!phone && <BackButton onClick={onBack} />}<h2>{data.name}</h2>{data.paused && !data.workPause && <span className="swarm-note">{t('swarm.managed.paused')}</span>}</div><div className="acts">{workControl}{controls}</div></header>}
+    {(data.workPause || embedded && phone) && <div className="swarm-work-status">{data.workPause && <span role="status">{t(data.workPause.state === 'stopping' ? 'swarm.work.stoppingHint' : data.workPause.state === 'blocked' ? 'swarm.work.blockedHint' : 'swarm.work.paused')}</span>}{embedded && phone && workControl}</div>}
     {error && <div className="swarm-stream-error" role="status">{t('swarm.managed.reconnecting')}</div>}
     {data.archived && <p className="swarm-note">{t('swarm.managed.archived')}</p>}
 
@@ -129,6 +131,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
           <header className="swarm-conversation-head">
             {phone && <button type="button" className="tt-act" aria-label={t('swarm.conversation.list')} onClick={() => setTeamOpen(true)}><UserIcon />{t('swarm.conversation.chat')}</button>}
             <div><strong>{recipient === 'main' ? t('swarm.conversation.main') : recipient === 'group' ? t('swarm.managed.tab.chat') : currentMember?.name || t('swarm.member.recipientUnavailable')}</strong>{phone && <small>{recipient === 'main' ? t('swarm.conversation.mainRole') : currentMember ? <State state={currentMember.state} /> : null}</small>}</div>
+            {embedded && !phone && workControl}
             {(phone || !workspaceVisible) && <button type="button" className="tt-act" aria-label={t('swarm.workspace.open')} aria-expanded={studioOpen} onClick={() => showWorkspace(!studioOpen)}><PanelRightIcon />{t('swarm.workspace.open')}</button>}{embedded && !workspaceVisible && controls}
             {currentMember && !phone && <div className="swarm-detail-actions"><State state={currentMember.state} />{currentMember.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}</div>}
           </header>
