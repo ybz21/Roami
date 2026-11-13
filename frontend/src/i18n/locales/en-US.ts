@@ -5580,6 +5580,8 @@ const enUS = {
   'modelUsage.uncached': "Uncached input",
   'modelUsage.allowance': "Today’s allowance",
   'modelUsage.editLimit': "Edit limit",
+  'modelUsage.accountingTimezone': 'Quota resets use {timezone}.',
+  'modelUsage.archivedTimezone': 'Archived daily totals retain their {timezone} accounting dates.',
   'modelUsage.limitScope': "Today’s usage and limits cover all sources and agents, independently of the filters below.",
   'modelUsage.incomplete': "{missing} missing usage, {unknown} unknown charges, {pending} in progress. Totals contain known values only.",
   'modelUsage.breakdown': "Usage breakdown",

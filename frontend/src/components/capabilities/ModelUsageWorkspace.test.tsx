@@ -7,14 +7,14 @@ import { gatewayDraft } from '../settings/local-model-gateway'
 import type { GatewaySettingsController } from '../settings/gateway-settings'
 import ModelUsageWorkspace from './ModelUsageWorkspace'
 vi.mock('../../api', () => ({ api: vi.fn() }))
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, args?: Record<string, string>) => args?.name ? `${key} ${args.name}` : args?.id ? `${key} ${args.id}` : key, locale: 'en-US' }) }))
+vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, args?: Record<string, string>) => args?.timezone ? `${key} ${args.timezone}` : args?.name ? `${key} ${args.name}` : args?.id ? `${key} ${args.id}` : key, locale: 'en-US' }) }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../settings/model-usage-chart', () => ({ ModelUsageChart: ({ onSelect,points,series }: {onSelect:(key:string)=>void;points:{key:string;values:number[]}[];series:{label:string}[]}) => <><div data-testid="chart-data">{JSON.stringify({points,series})}</div><button type="button" onClick={()=>onSelect(points[0]?.key==='0'?'10':'2026-11-10')}>Select interval</button></> }))
 const settings = { currency: 'USD', timezone: 'UTC', dailyLimit: 10, pricing: { default: { input_per_million: 1, output_per_million: 2, cache_read_per_million: 0.5 }, models: {} } }
 const group = (sourceId: string, requests: number) => ({ day: '2026-11-12', sourceId, agentKind: 'codex', source: 'other', role: 'main', model: 'fixture', currency: 'USD', requests, inputTokens: requests * 100, outputTokens: requests * 10, cacheReadTokens: requests * 40, pending: 0, unknown: 0, usageUnknown: 0, failed: 0, cost: '1.000000000' })
 const response = (path: string) => {
  const q = new URL(path, 'http://localhost').searchParams, audit = q.get('view') === 'audit'
- return { day: '2026-11-12', from: '2026-11-06', to: '2026-11-12', days: 7, timezone: 'UTC', today: [group('a', 30), group('b', 10)], groups: q.get('sourceId') ? [group(q.get('sourceId')!, 30)] : [group('a', 30), group('b', 10)], hourly: [group('a',30),group('b',10)].map(row=>({...row,hour:10})),hourlyDay:'2026-11-12', recent: audit ? [{ id: 'call-' + (q.get('page') || '1'), sourceId: 'a', agentKind: 'codex', source: 'other', model: 'fixture', role: 'main', state: 'unknown', currency: 'USD', cost: null, startedMs: Date.UTC(2026, 10, 12, 10), inputTokens: null, outputTokens: null, cacheReadTokens: null, priceStatus: 'unpriced', errorCode: 'MODEL_GATEWAY_PRICE_MISSING', httpStatus: 200, reconciliation: '' }] : [], options: { sources: ['a', 'b'], agents: ['codex'], models: ['fixture'] }, page: Number(q.get('page') || 1), pageSize: 20, total: audit ? 45 : 0, archived: 0, detailRetentionHours: 48 }
+ return { day: '2026-11-12', from: '2026-11-06', to: '2026-11-12', days: 7, timezone: q.get('timezone') || 'UTC', accountingTimezone: 'UTC', today: [group('a', 30), group('b', 10)], groups: q.get('sourceId') ? [group(q.get('sourceId')!, 30)] : [group('a', 30), group('b', 10)], hourly: [group('a',30),group('b',10)].map(row=>({...row,hour:10})),hourlyDay:'2026-11-12', recent: audit ? [{ id: 'call-' + (q.get('page') || '1'), sourceId: 'a', agentKind: 'codex', source: 'other', model: 'fixture', role: 'main', state: 'unknown', currency: 'USD', cost: null, startedMs: Date.UTC(2026, 10, 12, 10), inputTokens: null, outputTokens: null, cacheReadTokens: null, priceStatus: 'unpriced', errorCode: 'MODEL_GATEWAY_PRICE_MISSING', httpStatus: 200, reconciliation: '' }] : [], options: { sources: ['a', 'b'], agents: ['codex'], models: ['fixture'] }, page: Number(q.get('page') || 1), pageSize: 20, total: audit ? 45 : 0, archived: 0, detailRetentionHours: 48 }
 }
 const controller = { saved: settings, draft: gatewayDraft(settings), usageVersion: 0, saving: false, error: '', notice: null, retry: vi.fn(), discard: vi.fn(), save: vi.fn(), setDraft: vi.fn(), openReconcile: vi.fn() } as unknown as GatewaySettingsController
 function Harness() {
@@ -80,4 +80,22 @@ it('retains the chosen interval and group on returning from audit',async()=>{
  fireEvent.click(screen.getByRole('button',{name:'Overview test'}))
  await screen.findByTestId('chart-data')
  expect(screen.getByRole('combobox',{name:'modelUsage.interval'}).closest('.ant-select')?.textContent).toContain('10:00')
+})
+
+
+it('uses the device timezone for requests and audit times while keeping the quota timezone', async () => {
+ const options = new Intl.DateTimeFormat().resolvedOptions()
+ vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ ...options, timeZone: 'Asia/Shanghai' })
+ const { container } = render(<Harness />)
+ await screen.findByTestId('chart-data')
+ const overview = vi.mocked(api).mock.calls.find(call => call[1].includes('view=overview'))![1]
+ expect(new URL(overview, 'http://localhost').searchParams.get('timezone')).toBe('Asia/Shanghai')
+ expect(container.querySelector('.model-usage-period')?.textContent).toContain('Asia/Shanghai')
+ expect(container.querySelector('.model-usage-quota')?.textContent).toContain('modelUsage.accountingTimezone UTC')
+ fireEvent.click(screen.getByRole('button', { name: 'Audit test' }))
+ await screen.findByRole('button', { name: 'modelUsage.inspectCall call-1' })
+ const expected = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Shanghai' }).format(Date.UTC(2026, 10, 12, 10))
+ expect(container.querySelector('.model-usage-audit-table tbody td')?.textContent).toBe(expected)
+ fireEvent.click(screen.getByRole('button', { name: 'modelUsage.inspectCall call-1' }))
+ expect(container.querySelector('.model-usage-call-body')?.textContent).toContain(expected)
 })
