@@ -2211,7 +2211,7 @@ const enUS = {
   'dirPicker.title': 'Choose working directory',
   'dirPicker.chooseCurrent': 'Choose this directory',
   'dirPicker.home': 'Home',
-  'chat.noTranscriptYet': 'This agent just started and has no transcript yet; send a message to begin.',
+  'chat.noTranscriptYet': 'No conversation history yet.',
   'chat.files': 'Files',
   'chat.more': 'More',
   'chat.plus.bring': 'Add to this message',

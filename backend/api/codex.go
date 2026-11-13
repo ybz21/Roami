@@ -575,6 +575,10 @@ func (a *API) CodexTranscript(c *gin.Context) {
 	// offset 是**字节偏移**，见 transcript-read.go（原来是行号，逼着每次轮询
 	// 从第 1 行重数一遍，一次请求就分配一整个文件）
 	offset, _ := strconv.ParseInt(c.Query("offset"), 10, 64)
+	before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
+	if before > 0 {
+		offset = 0
+	}
 	// boff=1 是「我这个 offset 是字节偏移」的标记。没有它就说明对面是**升级前的
 	// 页面**，手里攥的还是行号——当字节偏移 seek 会跳到文件很靠前的地方，一次吐回
 	// 一大堆重复消息。这时干脆重新锚定到尾部，让它下一轮拿着新语义的游标接着走。
@@ -590,20 +594,22 @@ func (a *API) CodexTranscript(c *gin.Context) {
 	defer f.Close()
 
 	tail := tailLimit(c, int(offset))
-	win := newTranscriptWindow(tail)
 	st := cStatus{}
 	quota := 0.0
 
 	var lines []transcriptLine
 	var size int64
 	var more bool
-	if offset > 0 {
+	if before > 0 {
+		lines, size, more, err = readTailBefore(f, tail*tailLineFactor, before)
+	} else if offset > 0 {
 		if fi, e := f.Stat(); e == nil {
 			size = fi.Size()
 		}
 		if size < offset { // 文件被换过/截断过：从头来
 			offset = 0
-			lines, size, more, err = readTail(f, tail)
+			tail = tailLimit(c, 0)
+			lines, size, more, err = readTail(f, tail*tailLineFactor)
 		} else {
 			lines, err = readFrom(f, offset, size)
 		}
@@ -614,10 +620,12 @@ func (a *API) CodexTranscript(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": gin.H{"messages": []cMsg{}, "nextOffset": offset, "file": file}})
 		return
 	}
+	win := newTranscriptWindow(tail)
 	for _, ln := range lines {
 		text := string(ln.Text)
 		st = scanCodexStatus(text, st, &quota)
 		if m := parseCodexLine(text); m != nil {
+			m.at = ln.At
 			if m.ID == "" { // 行首字节偏移作稳定 key（前端窗口化/折叠态持久化用）
 				m.ID = strconv.FormatInt(ln.At, 10)
 			}
@@ -630,7 +638,7 @@ func (a *API) CodexTranscript(c *gin.Context) {
 	n := lastComplete(lines, offset)
 
 	msgs, truncated := win.out()
-	data := gin.H{"messages": msgs, "nextOffset": n, "file": file, "status": st, "truncated": truncated}
+	data := gin.H{"messages": msgs, "nextOffset": n, "file": file, "status": st, "truncated": truncated, "before": transcriptBefore(msgs, lines)}
 	if quota > 0 {
 		data["quota"] = quota
 	}

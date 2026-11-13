@@ -17,6 +17,9 @@ func TestSessionProviderReadsExactLiveBindingWithoutCreatingState(t *testing.T) 
 	if id, managed, err := agentlifecycle.SessionProvider(s.Runtime, original.Name, "codex"); err != nil || managed || id != "" {
 		t.Fatalf("unmanaged: %q %v %v", id, managed, err)
 	}
+	if id, managed, err := agentlifecycle.SessionTranscriptProvider(s.Runtime, original.Name, "codex"); err != nil || managed || id != "" {
+		t.Fatalf("unmanaged transcript: %q %v %v", id, managed, err)
+	}
 	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
 		t.Fatalf("read created lifecycle directory: %v", err)
 	}
@@ -61,6 +64,22 @@ func TestSessionProviderReadsExactLiveBindingWithoutCreatingState(t *testing.T) 
 			}
 			if id, managed, err := agentlifecycle.SessionProvider(s.Runtime, original.Name, "codex"); err == nil || !managed || id != "" {
 				t.Fatalf("mismatch accepted: %q %v %v", id, managed, err)
+			}
+			before, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			id, managed, err := agentlifecycle.SessionTranscriptProvider(s.Runtime, original.Name, "codex")
+			if mismatch == "unknown" {
+				if err != nil || !managed || id != binding.ProviderID {
+					t.Fatalf("uncertain execution hid verified history: %q %v %v", id, managed, err)
+				}
+			} else if err == nil || !managed || id != "" {
+				t.Fatalf("transcript identity mismatch accepted: %q %v %v", id, managed, err)
+			}
+			after, err := os.ReadFile(path)
+			if err != nil || string(before) != string(after) {
+				t.Fatalf("transcript reader changed lifecycle: %v", err)
 			}
 		})
 	}

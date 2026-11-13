@@ -32,6 +32,16 @@ type providerBinding struct {
 
 // SessionProvider projects the existing lifecycle record; it never creates or updates one.
 func SessionProvider(rt runtime.Runtime, name, executor string) (string, bool, error) {
+	return sessionProvider(rt, name, executor, true)
+}
+
+// SessionTranscriptProvider reads an identity-verified binding even when execution
+// is uncertain. Reading history must not admit or resume a managed run.
+func SessionTranscriptProvider(rt runtime.Runtime, name, executor string) (string, bool, error) {
+	return sessionProvider(rt, name, executor, false)
+}
+
+func sessionProvider(rt runtime.Runtime, name, executor string, requireReady bool) (string, bool, error) {
 	row, err := rt.ResolveStrict(name)
 	if err != nil {
 		return "", true, err
@@ -77,7 +87,7 @@ func SessionProvider(rt runtime.Runtime, name, executor string) (string, bool, e
 	if state.Executor != executor || b.ProviderID == "" || SessionResourceID(b.Name, b.TmuxID, b.Created, b.Server, b.Pane) != key || b.PID != pid || b.Directory != directory || (b.HostProof == "" || b.HostProof != HostProof()) || (b.DirectoryProof == "" || b.DirectoryProof != DirectoryProof(directory)) {
 		return "", true, fmt.Errorf("SESSION_PROVIDER_IDENTITY_CHANGED")
 	}
-	if state.State != "idle" && state.State != "busy" && state.State != "submitting" {
+	if requireReady && state.State != "idle" && state.State != "busy" && state.State != "submitting" {
 		return "", true, fmt.Errorf("SESSION_PROVIDER_UNAVAILABLE")
 	}
 	expected := b.Processes[pid]

@@ -10,7 +10,7 @@ import type { Block, Msg } from './types'
 import type { RawStatus } from './status'
 
 /** 首屏只取最近这么多条。整卷搬过来的代价见 backend/api/transcript-window.go。 */
-export const FIRST_PAGE = 200
+export const FIRST_PAGE = 50
 
 export function useTranscript(name: string, file: string | undefined, path: string, interval = 1500) {
   const [msgs, setMsgs] = useState<Msg[]>([])
@@ -30,14 +30,35 @@ export function useTranscript(name: string, file: string | undefined, path: stri
   // 间隔走 ref：后台会话把间隔放宽时不能重启 effect——重启等于清空重拉整个首屏
   const intervalRef = useRef(interval)
   intervalRef.current = interval
-  // 加载更早：把首屏窗口放大一档重取。往回翻是低频动作，值得用一次全量重取换实现上的简单。
-  const loadEarlier = useCallback(() => setTail((n) => n + 400), [])
+  const earlierRef = useRef<() => void>(() => {})
+  const loadEarlier = useCallback(() => earlierRef.current(), [])
   useEffect(() => {
     let stop = false
     let offset = 0
     let f = file
     let lastFile = file || ''
-    setMsgs([]); setErr(''); setStatus({}); setResolvedFile(undefined); setServerPending(undefined)
+    let before: number | undefined
+    let loadingEarlier = false
+    let revision = 0
+    setMsgs([]); setErr(''); setStatus({}); setResolvedFile(undefined); setServerPending(undefined); setHasEarlier(false)
+    earlierRef.current = async () => {
+      // Older providers still expose a growing tail window instead of a cursor.
+      if (before === undefined) { setTail((n) => n + FIRST_PAGE); return }
+      if (loadingEarlier || before <= 0 || !f) return
+      loadingEarlier = true
+      const requestedFile = f
+      const requestedRevision = revision
+      try {
+        const q = new URLSearchParams({ before: String(before), tail: String(FIRST_PAGE), boff: '1', file: f })
+        const { data: d } = await api('GET', `/sessions/${encodeURIComponent(name)}/${path}?${q}`)
+        if (stop || revision !== requestedRevision || f !== requestedFile || d.file !== requestedFile) return
+        setErr('')
+        before = d.before
+        setHasEarlier(d.truncated === true)
+        if (d.messages?.length) setMsgs((m) => [...d.messages, ...m])
+      } catch (e: any) { if (!stop) setErr(e.message) }
+      finally { loadingEarlier = false }
+    }
     const poll = async () => {
       try {
         // boff=1：告诉后端这个 offset 是字节偏移（升级前的页面不会带，后端据此重新锚定）
@@ -51,13 +72,23 @@ export function useTranscript(name: string, file: string | undefined, path: stri
         setErr('') // 这轮通了就把上一轮的报错擦掉，否则一次抖动的红字会一直挂到重开面板
         if (typeof d.file === 'string') setResolvedFile(d.file)
         if (d.file && d.file !== lastFile) {
+          revision++
           f = d.file
           lastFile = d.file
-          offset = 0
+          before = undefined
+          setHasEarlier(false)
           setMsgs([])
-          return
+          // A discovered file already includes its first page. Only an old
+          // file's nonzero cursor requires another request from the beginning.
+          if (offset > 0) {
+            offset = 0
+            return
+          }
         }
         if (typeof d.nextOffset === 'number' && d.nextOffset < offset) {
+          revision++
+          before = undefined
+          setHasEarlier(false)
           offset = 0
           setMsgs([])
           return
@@ -65,7 +96,10 @@ export function useTranscript(name: string, file: string | undefined, path: stri
         if (d.status || typeof d.quota === 'number') {
           setStatus((prev) => mergeStatus(prev, d.status, d.quota))
         }
-        if (typeof d.truncated === 'boolean') setHasEarlier(d.truncated)
+        if (offset === 0 || (path === 'pi-transcript' && d.replace === true)) {
+          before = typeof d.before === 'number' ? d.before : undefined
+          if (typeof d.truncated === 'boolean') setHasEarlier(d.truncated)
+        }
         if (typeof d.pending === 'boolean') setServerPending(d.pending)
         if (path === 'pi-transcript' && d.replace === true) {
           setMsgs(d.messages || [])

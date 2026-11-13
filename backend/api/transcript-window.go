@@ -13,6 +13,7 @@ import (
 )
 
 const maxTranscriptTail = 2000
+const defaultTranscriptTail = 50
 
 // tailLimit 读 ?tail=N：只在首屏(offset=0)生效，增量轮询必须原样返回新行。
 func tailLimit(c *gin.Context, offset int) int {
@@ -21,12 +22,22 @@ func tailLimit(c *gin.Context, offset int) int {
 	}
 	n, err := strconv.Atoi(c.Query("tail"))
 	if err != nil || n <= 0 {
-		return 0
+		return defaultTranscriptTail
 	}
 	if n > maxTranscriptTail {
 		return maxTranscriptTail
 	}
 	return n
+}
+
+func transcriptBefore(msgs []cMsg, lines []transcriptLine) int64 {
+	if len(msgs) > 0 {
+		return msgs[0].at
+	}
+	if len(lines) > 0 {
+		return lines[0].At
+	}
+	return 0
 }
 
 // transcriptWindow 累积消息但只留最后 limit 条；limit<=0 表示不限。

@@ -2211,7 +2211,7 @@ const zhCN = {
   'dirPicker.title': '选择工作目录',
   'dirPicker.chooseCurrent': '选择此目录',
   'dirPicker.home': '家目录',
-  'chat.noTranscriptYet': '这个 agent 刚起来，还没说过话；发一句它就有记录了。',
+  'chat.noTranscriptYet': '暂无对话记录。',
   'chat.files': '文件',
   'chat.more': '更多',
   'chat.plus.bring': '带进这条消息',
