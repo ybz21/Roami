@@ -51,6 +51,7 @@ import { MobileSessionSwitch } from '../mobile/MobileSessionSwitch'
 import { tabCloseTargets, type TabCloseScope } from '../shell/tab-actions'
 import { Button, Dropdown, Input, Modal, Spin, Tooltip, App as AntApp } from 'antd'
 import { AgentLogo, ChevronDown, ChevronLeft, ChevronRight, CopyIcon, PlusIcon, StopIcon, TabsIcon, TerminalIcon, PanelRightIcon } from '../../icons'
+import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, type AgentKind } from '../../agent-kind'
 // ── 终端面板（多标签 + 工具栏 + 快捷键栏），桌面右栏与手机覆盖层共用 ──
 export default function TerminalPane(props: {
@@ -80,7 +81,7 @@ export default function TerminalPane(props: {
   fileDock?: 'right' | 'left'   // 文件面板停靠：'right'=右侧浮动抽屉（默认），'left'=左侧 VSCode 栏（新标签全屏页）
   /** 标签条右端「新建 ▾」：在当前任务里开终端 / 去项目页开新任务。不传就不画 */
   /** 标签条「新建」：三样都在当前任务的 worktree 里派生；taskLabel 写在菜单顶上说明白 */
-  onNew?: { terminal: () => void; claude: () => void; codex: () => void; pi: () => void; opencode: () => void; taskLabel?: string }
+  onNew?: { terminal: () => void; agent: (kind: AgentKind) => void; taskLabel?: string }
   /** 手机切换单里点了一个还没打开的会话 */
   onOpenSession?: (name: string) => void
   /** 右栏开关（任务视图）：亮着 = 开着 */
@@ -102,6 +103,7 @@ export default function TerminalPane(props: {
   /** 从对话里点「path:line」跳过来要定位到那一行；nonce 让同一处点第二次也响 */
   reveal?: { path: string; line: number; nonce: number }
 }) {
+  const registeredAgents = useRegisteredAgents()
   const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
   const activeLabel = useSessionLabel(active)
@@ -953,10 +955,7 @@ export default function TerminalPane(props: {
             type: 'group' as const, label: onNew.taskLabel ? t('tabs.newInTask', { task: onNew.taskLabel }) : t('tabs.newHere'),
             children: [
               { key: 'terminal', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: onNew.terminal },
-              { key: 'claude', icon: <AgentLogo kind="claude" size={14} />, label: t('tabs.newClaude'), onClick: onNew.claude },
-              { key: 'codex', icon: <AgentLogo kind="codex" size={14} />, label: t('tabs.newCodex'), onClick: onNew.codex },
-              { key: 'pi', icon: <AgentLogo kind="pi" size={14} />, label: t('tabs.newPi'), onClick: onNew.pi },
-              { key: 'opencode', icon: <AgentLogo kind="opencode" size={14} />, label: t('tabs.newOpenCode'), onClick: onNew.opencode },
+              ...registeredAgents.map(agent => ({ key: agent.kind, icon: <AgentLogo kind={agent.kind} size={14} />, label: agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName }), disabled: !agent.interactive, onClick: () => onNew.agent(agent.kind) })),
             ],
           }] }}>
             <button type="button" className="tt-tbtn" title={t('tabs.new')}>

@@ -11,6 +11,7 @@ import { App as AntApp, Button, Dropdown, Input } from 'antd'
 import { api, upload, makeClipboardImageFile } from '../../api'
 import { pollWhileVisible } from '../../visible-poll'
 import { appendPaths } from '../../agent-paths'
+import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, type AgentKind } from '../../agent-kind'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
@@ -36,6 +37,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   initialAgent?: AgentKind
   initialPrompt?: string
 }>(function TaskComposer({ dir, isGit: gitHint, openTerm, onCreated, autoFocus, draftKey, initialAgent = 'claude', initialPrompt = '' }, ref) {
+  const agents = useRegisteredAgents()
   const { t } = useI18n()
   const { phone, keyboard } = useLayout()
   const { message } = AntApp.useApp()
@@ -211,7 +213,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
           </span>
         )}
         <span className="tt-cgrp agents" role="group" aria-label={t('set.groupAgent')}>
-          {(['claude', 'codex', 'pi', 'opencode'] as const).map((kind) => (
+          {agents.map(({ kind }) => (
             <button key={kind} type="button" className={`tt-pill ico${agent === kind ? ' on' : ''}`}
               title={agentName(kind)} aria-label={agentName(kind)} aria-pressed={agent === kind}
               onClick={() => setAgent(kind)}><AgentLogo kind={kind} size={16} /></button>

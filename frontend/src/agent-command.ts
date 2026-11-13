@@ -1,16 +1,18 @@
+import { agentDefinition } from './agent-registry'
 import type { AgentKind } from './agent-kind'
 import type { Preferences } from './preferences'
 import { shellQuote } from './shell-quote'
 
-const COMMAND_KEYS = {
+const COMMAND_KEYS: Partial<Record<string, keyof Preferences>> = {
   claude: 'claudeCommand',
   codex: 'codexCommand',
   pi: 'piCommand',
   opencode: 'opencodeCommand',
-} as const satisfies Record<AgentKind, keyof Preferences>
+}
 
-export function agentCommand(kind: AgentKind, prefs: Preferences): string {
-  return prefs[COMMAND_KEYS[kind]]?.trim() || kind
+export function agentCommand(kind: AgentKind, prefs: Preferences, defaultCommand?: string): string {
+  const key = COMMAND_KEYS[kind]
+  return prefs.agentCommands?.[kind]?.trim() || (key ? String(prefs[key] || '').trim() : '') || defaultCommand || agentDefinition(kind)?.command || kind
 }
 
 export function agentLaunch(kind: AgentKind, prefs: Preferences, prompt?: string): string {
@@ -24,5 +26,6 @@ export function agentLaunch(kind: AgentKind, prefs: Preferences, prompt?: string
     cmd += ' --auto'
   }
   if (!prompt) return cmd
-  return `${cmd}${kind === 'opencode' ? ' --prompt' : ''} ${shellQuote(prompt)}`
+  const flag = agentDefinition(kind)?.promptFlag || (kind === 'opencode' ? '--prompt' : '')
+  return `${cmd}${flag ? ' ' + flag : ''} ${shellQuote(prompt)}`
 }

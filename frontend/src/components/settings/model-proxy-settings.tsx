@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input, Select, Spin } from 'antd'
+import { isAgentKind } from '../../agent-kind'
 import { getHashParams } from '../../route-hash'
-import { gatewayAgentNames } from '../capabilities/gateway-agent'
+import { useGatewayAgentNames } from '../capabilities/gateway-agent'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { ModelCharges, type ModelCharge } from './model-charges'
@@ -22,13 +23,14 @@ export const validPriceDraft = (price: PriceDraft) => !hasPrice(price) || /^[A-Z
 export const validProxyDraft = (draft: ModelProxyDraft) => (draft.dailyLimit === '' || validAmount(draft.dailyLimit) && Number(draft.dailyLimit) > 0) && /^[A-Z]{3}$/.test(draft.currency) && Object.values(draft.prices).filter(hasPrice).length <= 32 && Object.values(draft.prices).every(validPriceDraft)
 
 export function ModelProxySettings({ value, disabled, onChange, snapshot, active, onReconcile }: { active: boolean; value: ModelProxyDraft; disabled: boolean; onChange: (value: ModelProxyDraft) => void; snapshot: unknown; onReconcile: (call: ProxyUsage['recent'][number]) => void }) {
+  const gatewayAgentNames = useGatewayAgentNames(active)
   const { t, locale } = useI18n()
   const recentRef = useRef<HTMLElement>(null)
   const [recentState, setRecentState] = useState<'' | 'unknown'>('')
   const [selectedDay, setSelectedDay] = useState('')
   const [days, setDays] = useState(7), [loading, setLoading] = useState(false)
   const [source, setSource] = useState<UsageSource>('')
-  const [agentKind, setAgentKind] = useState(() => { const kind = getHashParams().get('agentKind') || ''; return gatewayAgentNames[kind] || kind === 'external' ? kind : '' })
+  const [agentKind, setAgentKind] = useState(() => { const kind = getHashParams().get('agentKind') || ''; return isAgentKind(kind) || ['external', 'roami'].includes(kind) ? kind : '' })
   const [result, setResult] = useState<{ usage: ProxyUsage; source: UsageSource; agentKind: string; recentState: string; agents: ReturnType<typeof gatewayAgentTotals> } | null>(null)
   const sourceMatches = result?.source === source && result?.agentKind === agentKind, usage = sourceMatches ? result?.usage : undefined
   const recentMatches = sourceMatches && result?.recentState === recentState

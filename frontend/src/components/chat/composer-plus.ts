@@ -43,7 +43,7 @@ export function modeFromPane(text: string): string | undefined {
  * 而不是「没读到」。Claude 每一档都画，读不出就是真读不出（页脚正在重画），
  * 这时候宁可交回转录那份，也不要猜。
  */
-export function paneMode(text: string, agent?: 'claude' | 'codex' | 'opencode' | 'pi'): string | undefined {
+export function paneMode(text: string, agent?: string): string | undefined {
   if (!String(text).trim()) return undefined
   return modeFromPane(text) || (agent === 'codex' ? 'default' : undefined)
 }
@@ -70,7 +70,7 @@ export function goalFromPane(text: string): GoalState | undefined {
  *
  * Codex 的 Shift+Tab 只在「计划 ↔ 默认」之间倒，沙箱与审批策略是另一件事，走 /approvals。
  */
-export function modeChoices(agent?: 'claude' | 'codex' | 'opencode' | 'pi', current?: string): string[] {
+export function modeChoices(agent?: string, current?: string): string[] {
   const base = agent === 'codex' ? ['plan', 'default'] : ['plan', 'manual', 'auto', 'acceptEdits']
   // 当前这档必须在列——老版本 Claude 报 default，新版本报 auto，谁都不该从列表里消失
   return current && !base.includes(current) ? [current, ...base] : base
@@ -105,7 +105,7 @@ function ctxColor(percent: number): string | undefined {
 
 export function plusGroups(o: {
   /** 没有 agent（纯终端会话）时整组「这一轮怎么干」不出现：那几条都是发给 agent 的 */
-  agent?: 'claude' | 'codex' | 'opencode' | 'pi'
+  agent?: string
   status?: AgentStatus
   /** 从终端画面读到的当前权限档；有就盖过转录那份（转录要下一轮才更新） */
   mode?: AgentStatus['mode']

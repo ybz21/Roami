@@ -121,6 +121,7 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/session-lifecycle/operations/:operation", h.LifecycleGet)
 		g.POST("/session-lifecycle/operations/:operation/:action", h.LifecycleAction)
 		g.GET("/agent/capabilities", h.AgentCapabilities)
+		g.GET("/agent/registry", h.AgentRegistry)
 		g.GET("/agent/professional", h.ProfessionalAgents)
 		g.POST("/agent/professional/:kind/install", h.InstallProfessionalAgent)
 		g.POST("/agent/professional/:kind/check", h.CheckProfessionalAgent)

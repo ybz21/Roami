@@ -5,11 +5,10 @@ import json
 from roami_agent.dispatch.native_model_capabilities import native_model_capabilities
 from roami_agent.dispatch.workflow_preferences import workspace_preference
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import executor_schema, is_executor
 from roami_agent.protocol.tools import object_schema
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row
-
-EXECUTORS = {"native", "codex", "claude", "opencode", "pi"}
 
 
 def routing_schema():
@@ -18,7 +17,7 @@ def routing_schema():
         {
             "explicitExecutor": {
                 "type": ["string", "null"],
-                "enum": [None, *sorted(EXECUTORS)],
+                "pattern": executor_schema()["pattern"],
                 "description": "Required: the user's requested executor; null only with no user choice. Never hide a requested CLI in goal or relabel it as native.",
             },
             "model": object_schema(
@@ -53,7 +52,7 @@ def routing_schema():
             },
             "preference": object_schema(
                 {
-                    "executor": {"type": "string", "enum": sorted(EXECUTORS)},
+                    "executor": executor_schema(),
                     "memoryId": text,
                     "revision": {"type": "integer", "minimum": 1},
                     "quote": text,
@@ -244,7 +243,8 @@ class TaskRouter:
                     for item in catalog["candidates"]
                     if item["installed"] is True
                     and item["tracked"] is True
-                    and item["kind"] in EXECUTORS - {"native"}
+                    and is_executor(item["kind"])
+                    and item["kind"] != "native"
                 }
                 ranked = [
                     (project.get("defaultExecutor") if project else None, "project_default"),

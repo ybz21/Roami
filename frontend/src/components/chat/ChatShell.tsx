@@ -33,7 +33,7 @@ const outboxStore = new Map<string, { id: number; text: string }[]>()
 export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend }: {
   /** 这条 composer 发给谁：左端那枚亮着的 agent pill（22 设计 §3.3） */
   onSend?: (text: string) => Promise<void>
-  agent?: 'claude' | 'codex' | 'opencode' | 'pi'
+  agent?: string
   /** 还没有对话文件（agent 刚起、一句没说）：显示这句而不是「加载中」 */
   emptyHint?: string
   name: string

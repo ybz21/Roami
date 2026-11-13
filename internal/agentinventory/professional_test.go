@@ -12,6 +12,7 @@ import (
 func TestProfessionalInstallArgs(t *testing.T) {
 	for kind, want := range map[string][]string{
 		"codex":    {"install", "-g", "@openai/codex"},
+		"deepseek": {"install", "-g", "@deepseek-ai/dsh@latest"},
 		"claude":   {"install", "-g", "@anthropic-ai/claude-code"},
 		"opencode": {"install", "-g", "opencode-ai"},
 		"pi":       {"install", "-g", "--ignore-scripts", "@earendil-works/pi-coding-agent"},

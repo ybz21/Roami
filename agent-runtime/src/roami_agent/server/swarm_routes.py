@@ -12,6 +12,8 @@ from roami_agent.protocol.serialization import encoded
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
 
+from roami_agent.protocol.executor_kind import EXECUTOR_PATTERN
+
 
 class CreateSwarm(Payload):
     commandKey: str = Field(min_length=1, max_length=200)
@@ -43,7 +45,7 @@ class WorkSpec(Payload):
         default=None, min_length=1, max_length=200, exclude_if=lambda value: value is None
     )
     member: str = Field(min_length=1, max_length=80)
-    executor: Literal["native", "codex", "claude", "opencode", "pi"]
+    executor: str = Field(pattern=EXECUTOR_PATTERN)
     title: str = Field(min_length=1, max_length=80)
     goal: str = Field(min_length=1, max_length=30000)
     acceptance: str = Field(min_length=1, max_length=8000)
@@ -54,7 +56,7 @@ class WorkSpec(Payload):
 
 class RoleSpec(Payload):
     name: str = Field(min_length=1, max_length=80)
-    executor: Literal["native", "codex", "claude", "opencode", "pi"]
+    executor: str = Field(pattern=EXECUTOR_PATTERN)
     duty: str = Field(min_length=1, max_length=8000)
 
 

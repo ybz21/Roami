@@ -143,3 +143,6 @@ func lastCwd(path string) string {
 // NewConversationID 生成一个待指定的对话 id。
 // 成本为零，而少了它，会话死后就再也认不出「那段对话是哪一份 jsonl」。
 func NewConversationID() string { return id.UUID() }
+
+func (claude) InstallPackage() Package { return Package{Name: "@anthropic-ai/claude-code"} }
+func (claude) ModelConfiguration()     {}

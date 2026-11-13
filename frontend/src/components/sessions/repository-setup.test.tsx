@@ -24,6 +24,7 @@ describe('task repository setup', () => {
   layout.phone = false
   state = { repo: false, hasCommits: false }; failProbe = false; failInit = false
   fetchMock = vi.fn(async (url: string) => {
+   if (url.endsWith('/agent/registry')) return json({ agents: ['claude', 'codex', 'pi', 'opencode', 'deepseek', 'future'].map(kind => ({ kind, displayName: ({ claude: 'Claude', codex: 'Codex', pi: 'Pi', opencode: 'OpenCode', deepseek: 'DeepSeek Harness', future: 'Future Harness' } as Record<string, string>)[kind], command: kind, interactive: kind !== 'deepseek', models: false, canInstall: false })) })
    if (url.includes('/git/is-repo')) return failProbe ? json({ error: { code: 'GIT_PROBE_FAILED' } }, 500) : json({ data: state })
    if (url.includes('/git/initialize')) {
     if (failInit) return json({ error: { code: 'GIT_INIT_FAILED' } }, 409)
@@ -64,7 +65,7 @@ describe('task repository setup', () => {
   await screen.findByText(/项目尚未初始化 Git/)
   fireEvent.change(prompt(), { target: { value: '保留首个任务草稿' } })
   expect(screen.getByRole('button', { name: 'Codex' }).getAttribute('aria-pressed')).toBe('true')
-  for (const name of ['Claude', 'Codex', 'Pi', 'OpenCode', '不启动']) expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false)
+  for (const name of ['Claude', 'Codex', 'Pi', 'OpenCode', 'DeepSeek Harness', 'Future Harness', '不启动']) expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'Claude' }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Claude' }).getAttribute('aria-pressed')).toBe('true'))
   expect(prompt().value).toBe('保留首个任务草稿')

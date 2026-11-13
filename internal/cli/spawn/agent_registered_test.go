@@ -50,3 +50,14 @@ func TestNativeOpenCodeLaunchOutsidePATH(t *testing.T) {
 		}
 	}
 }
+
+func TestDeepSeekPromptFileUsesStdin(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("PATH", t.TempDir())
+	config := DefaultAgentConfig("/tmp")
+	config.Kind = "deepseek"
+	command := config.CommandFromPromptFile("/tmp/prompt file")
+	if !strings.Contains(command, "dsh --profile headless --permission-mode danger-full-access - < '/tmp/prompt file'") {
+		t.Fatalf("incorrect stdin launch: %s", command)
+	}
+}

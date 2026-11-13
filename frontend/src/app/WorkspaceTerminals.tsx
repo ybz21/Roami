@@ -59,7 +59,7 @@ export default function WorkspaceTerminals({ workspace, runtime, inspector, page
       onReorder={reorderTerm}
       onNeedsInput={setMobileWaiting}
       onOpenSession={(n) => openTerm(n)}
-      onNew={taskView ? { terminal: () => { void newTerminalInTask('shell') }, claude: () => { void newTerminalInTask('claude') }, codex: () => { void newTerminalInTask('codex') }, pi: () => { void newTerminalInTask('pi') }, opencode: () => { void newTerminalInTask('opencode') }, taskLabel: activeTaskLabel } : undefined}
+      onNew={taskView ? { terminal: () => { void newTerminalInTask('shell') }, agent: (kind) => { void newTerminalInTask(kind) }, taskLabel: activeTaskLabel } : undefined}
       onOpenFile={taskView ? (path, line) => openFileTab(path, line) : undefined}
       onOpenGit={taskView ? () => showInspector('git') : undefined}
       inspector={taskView ? { open: !space.inspectorCollapsed, toggle: toggleInspector } : undefined}

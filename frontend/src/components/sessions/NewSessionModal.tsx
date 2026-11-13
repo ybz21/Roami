@@ -7,6 +7,7 @@ import { nativeSessionId } from './session-record'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
+import { useRegisteredAgents } from '../../agent-registry'
 import type { AgentKind } from '../../agent-kind'
 import { sessionLabel } from './session-label'
 import { AutoComplete, Button, Checkbox, Input, Modal, Radio, Segmented, Select, Space, Tag, Tooltip, App as AntApp } from 'antd'
@@ -48,6 +49,7 @@ export function taskNameFromPrompt(p: string, limit = 16): string {
 }
 
 export function NewSessionModal({ open, parent, onClose, onDone }: { open: boolean; parent?: string | null; onClose: () => void; onDone: (name: string) => void }) {
+  const agents = useRegisteredAgents(open)
   const [prompt, setPrompt] = useState('')
   const [name, setName] = useState('')
   const [nameTouched, setNameTouched] = useState(false)
@@ -291,10 +293,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
           <Radio.Group value={agent} onChange={(e) => setAgent(e.target.value)} optionType="button" buttonStyle="solid"
             style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             <Radio.Button value="none">{t('session.agentNone')}</Radio.Button>
-            <Radio.Button value="claude">{t('session.agentClaude')}</Radio.Button>
-            <Radio.Button value="codex">{t('session.agentCodex')}</Radio.Button>
-            <Radio.Button value="pi">{t('session.agentPi')}</Radio.Button>
-            <Radio.Button value="opencode">{t('session.agentOpenCode')}</Radio.Button>
+            {agents.map(row => <Radio.Button key={row.kind} value={row.kind} disabled={!row.interactive && !prompt.trim()}>{row.displayName}</Radio.Button>)}
           </Radio.Group>
           <Input.TextArea placeholder={t('session.promptPlaceholder')} value={prompt}
             onChange={(e) => setPrompt(e.target.value)}

@@ -12,6 +12,7 @@ from roami_agent.dispatch.task_revisions import TaskRevisions
 from roami_agent.dispatch.task_sessions import session_closure
 from roami_agent.executors.task_directory import automatic_task_directory
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
@@ -82,12 +83,7 @@ class Tasks:
         bind_task=None,
         member_instance_id=None,
     ):
-        if (
-            not key
-            or len(key) > 200
-            or not goal.strip()
-            or executor not in {"native", "codex", "claude", "opencode", "pi"}
-        ):
+        if not key or len(key) > 200 or not goal.strip() or not is_executor(executor):
             raise DomainError("INVALID_TASK")
         if model is not None and (
             executor == "native"
@@ -139,7 +135,7 @@ class Tasks:
             )
         ):
             raise DomainError("INVALID_RESOURCE_ONLY_TARGET")
-        if executor in {"codex", "claude", "opencode", "pi"} and target.get("kind") == "session":
+        if is_executor(executor) and executor != "native" and target.get("kind") == "session":
             if not isinstance(target.get("sessionId"), str) or not target["sessionId"]:
                 raise DomainError("CODING_SESSION_ID_REQUIRED")
             if any(target.get(k) for k in ["directory", "workspaceId", "base", "remote"]):

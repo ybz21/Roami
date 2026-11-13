@@ -74,6 +74,6 @@ export function useOnboardingState(enabled = true) {
   const configured = !!value?.models.main.model && !!(value.models.connection?.baseUrl || value?.models.main.baseUrl)
   const hasModels = !!value?.catalog.models.length
   const fresh = !!value && !configured && !value.catalog.sources.length && !value.projects.length
-  const readyAgents = value?.agents.filter(agent => agent.installed && agent.verified && isAgentKind(agent.kind)).map(agent => ({ kind: agent.kind as AgentKind, name: agentName(agent.kind as AgentKind) })) || []
+  const readyAgents = value?.agents.filter(agent => agent.installed && agent.verified && isAgentKind(agent.kind)).map(agent => ({ kind: agent.kind as AgentKind, name: agent.displayName || agentName(agent.kind as AgentKind) })) || []
   return { value, progress, change, refresh, readyAgents, configured, hasModels, failed: state.scope === scope && state.failed, loading: !value && !(state.scope === scope && state.failed), visible: preferencesLoaded() && !!value && !progress.dismissed && !progress.completed && !!(fresh || progress.started) }
 }

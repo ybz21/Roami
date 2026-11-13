@@ -36,7 +36,7 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
   /** 首页点项目进来：at 每次都变，同一个项目点两次也能再开 */
   openProject?: { name: string; dir: string; at: number } | null
   onNewTask: (dir?: string) => void
-  onNewInWorktree: (kind: 'claude' | 'codex' | 'shell', path: string) => void
+  onNewInWorktree: (kind: string, path: string) => void
   searchNonce?: number
 }) {
   const { t } = useI18n()

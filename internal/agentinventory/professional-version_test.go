@@ -2,6 +2,7 @@ package agentinventory
 
 import (
 	"context"
+	"github.com/ybz21/Roami/internal/agent"
 	"os"
 	"path/filepath"
 	"sync"
@@ -20,8 +21,8 @@ func TestInstalledVersionsAreCachedAndRefreshAfterReplacement(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", dir)
-	for _, kind := range []string{"claude", "codex", "opencode", "pi"} {
-		writeVersionCLI(t, filepath.Join(dir, kind), "printf x >> '"+filepath.Join(dir, kind+"-runs")+"'\nprintf '"+kind+" 1.0\\n'\n")
+	for _, kind := range agent.Kinds() {
+		writeVersionCLI(t, filepath.Join(dir, agent.Get(kind).Bin()), "printf x >> '"+filepath.Join(dir, kind+"-runs")+"'\nprintf '"+kind+" 1.0\\n'\n")
 	}
 	for range 2 {
 		rows := DiscoverProfessionalAgents(context.Background())
