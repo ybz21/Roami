@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "panels": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "sourceCards": 2,
+  "errors": [],
+  "checks": [
+    "real APIs and hourly model requests",
+    "no overview detail tables",
+    "audit hour scope and return",
+    "source/token filters",
+    "archived hour indication",
+    "pricing inside model sources",
+    "source cards and return",
+    "independent model/default saves",
+    "model draft retention",
+    "validation and free confirmation",
+    "four widths with inspector open and closed"
+  ]
+}

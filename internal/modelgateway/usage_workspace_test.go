@@ -167,3 +167,87 @@ func TestDailySourceMigrationPreservesUnattributedHistory(t *testing.T) {
 		t.Fatalf("migration changed old totals: %+v %v", result, err)
 	}
 }
+
+func TestWorkspaceHourFiltersAndLocalDate(t *testing.T) {
+	l := newLedger(t)
+	config := testConfiguration(nil)
+	config.Timezone = "Asia/Shanghai"
+	if err := l.Configure(config); err != nil {
+		t.Fatal(err)
+	}
+	for i, source := range []string{"a", "b", "a"} {
+		instant := time.Date(2026, 10, 29, 1+i, 15, 0, 0, time.UTC)
+		l.now = func() time.Time { return instant }
+		call, err := l.Admit("main", "fixture", "", "", CallAttribution{AgentKind: "codex", SourceID: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = l.Settle(call, &Usage{Input: 100, Output: 20, Cached: 30}, 200, "", false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q := UsageQuery{View: "overview", Days: 7, Page: 1, SourceID: "a", Agent: "codex", Model: "fixture", Day: "2026-10-29"}
+	result, err := l.WorkspaceUsage(q)
+	if err != nil || len(result.Hourly) != 2 || len(result.Today) != 2 {
+		t.Fatalf("hourly filters: %+v %v", result, err)
+	}
+	for _, row := range result.Hourly {
+		if row.SourceID != "a" || row.Hour != 9 && row.Hour != 11 || row.Requests != 1 || row.Input != 100 {
+			t.Fatalf("wrong hourly group: %+v", row)
+		}
+	}
+	hour := 11
+	q.View = "audit"
+	q.Hour = &hour
+	audit, err := l.WorkspaceUsage(q)
+	if err != nil || audit.Total != 1 || len(audit.Groups) != 1 || audit.Groups[0].Requests != 1 || len(audit.Recent) != 1 {
+		t.Fatalf("hour audit: %+v %v", audit, err)
+	}
+	q.Hour = nil
+	q.View = "overview"
+	q.Day = "2026-10-20"
+	if _, err = l.WorkspaceUsage(q); err == nil {
+		t.Fatal("date outside range accepted")
+	}
+	for _, raw := range []string{"view=overview&hour=1&day=2026-10-29", "view=audit&hour=24&day=2026-10-29", "view=audit&hour=1"} {
+		v, _ := url.ParseQuery(raw)
+		if _, err = workspaceQuery(v); err == nil {
+			t.Fatal(raw)
+		}
+	}
+	later := l.now().Add(49 * time.Hour)
+	l.now = func() time.Time { return later }
+	if err = l.Compact(); err != nil {
+		t.Fatal(err)
+	}
+	q.Day = "2026-10-29"
+	archived, err := l.WorkspaceUsage(q)
+	if err != nil || !archived.DailyAggregated || len(archived.Hourly) != 0 || len(archived.Groups) != 1 {
+		t.Fatalf("archive fabricated hours: %+v %v", archived, err)
+	}
+}
+
+func TestWorkspaceDSTRepeatedHourAudit(t *testing.T) {
+	l := newLedger(t)
+	config := testConfiguration(nil)
+	config.Timezone = "America/New_York"
+	if err := l.Configure(config); err != nil {
+		t.Fatal(err)
+	}
+	for _, hour := range []int{5, 6, 7} {
+		instant := time.Date(2026, 11, 1, hour, 15, 0, 0, time.UTC)
+		l.now = func() time.Time { return instant }
+		call, err := l.Admit("main", "fixture", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = l.Settle(call, &Usage{Input: 1, Output: 1}, 200, "", false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hour := 1
+	result, err := l.WorkspaceUsage(UsageQuery{View: "audit", Days: 1, Page: 1, Day: "2026-11-01", Hour: &hour})
+	if err != nil || result.Total != 2 || len(result.Groups) != 1 || result.Groups[0].Requests != 2 {
+		t.Fatalf("DST repeated hour: %+v %v", result, err)
+	}
+}

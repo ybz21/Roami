@@ -15,6 +15,8 @@ type UsageQuery struct {
 	View, Start, End, Source, Agent, SourceID, Model, State, Search string
 	Days, Page                                                      int
 	MissingSource                                                   bool
+	Day                                                             string
+	Hour                                                            *int
 }
 
 type UsageDimensions struct {
@@ -25,15 +27,24 @@ type UsageDimensions struct {
 
 type WorkspaceUsage struct {
 	Statistics
-	Options  UsageDimensions `json:"options"`
-	Total    int             `json:"total"`
-	Page     int             `json:"page"`
-	PageSize int             `json:"pageSize"`
-	Archived int64           `json:"archived"`
+	Options   UsageDimensions `json:"options"`
+	Total     int             `json:"total"`
+	Page      int             `json:"page"`
+	PageSize  int             `json:"pageSize"`
+	Archived  int64           `json:"archived"`
+	HourlyDay string          `json:"hourlyDay"`
 }
 
 func workspaceQuery(v url.Values) (UsageQuery, error) {
 	q := UsageQuery{View: v.Get("view"), Start: v.Get("start"), End: v.Get("end"), Source: v.Get("source"), Agent: v.Get("agentKind"), SourceID: v.Get("sourceId"), Model: v.Get("model"), State: v.Get("state"), Search: strings.TrimSpace(v.Get("q")), Days: 7, Page: 1, MissingSource: v.Get("unattributed") == "1"}
+	q.Day = v.Get("day")
+	if raw := v.Get("hour"); raw != "" {
+		hour, err := strconv.Atoi(raw)
+		if err != nil || hour < 0 || hour > 23 || q.Day == "" || q.View != "audit" {
+			return q, fmt.Errorf("INVALID_MODEL_USAGE_QUERY")
+		}
+		q.Hour = &hour
+	}
 	if raw := v.Get("days"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
@@ -70,8 +81,12 @@ func (q UsageQuery) where(source string) (string, []any) {
 	return `day>=? AND day<=? AND (?='' OR ` + source + `=?) AND (?='' OR agent_kind=?) AND (?='' OR source_id=?) AND (?=0 OR source_id='') AND (?='' OR model=?)`, []any{q.Start, q.End, q.Source, q.Source, q.Agent, q.Agent, q.SourceID, q.SourceID, q.MissingSource, q.Model, q.Model}
 }
 
-func readWorkspaceGroups(tx *sql.Tx, where string, args []any) ([]UsageGroup, error) {
-	rows, err := tx.Query(`SELECT day,role,model,currency,agent_kind,source,source_id,sum(requests),sum(input_tokens),sum(output_tokens),sum(cache_read_tokens),sum(pending),sum(unknown),sum(usage_unknown),sum(failed),sum(cost_nano) FROM `+usageTotalsSQL+` WHERE `+where+` GROUP BY day,role,model,currency,agent_kind,source,source_id ORDER BY day,source_id,agent_kind,model,currency`, args...)
+func readWorkspaceGroups(tx *sql.Tx, where string, args []any, tables ...string) ([]UsageGroup, error) {
+	table := usageTotalsSQL
+	if len(tables) > 0 {
+		table = tables[0]
+	}
+	rows, err := tx.Query(`SELECT day,role,model,currency,agent_kind,source,source_id,sum(requests),sum(input_tokens),sum(output_tokens),sum(cache_read_tokens),sum(pending),sum(unknown),sum(usage_unknown),sum(failed),sum(cost_nano) FROM `+table+` WHERE `+where+` GROUP BY day,role,model,currency,agent_kind,source,source_id ORDER BY day,source_id,agent_kind,model,currency`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,11 +140,11 @@ func (l *Ledger) WorkspaceUsage(q UsageQuery) (WorkspaceUsage, error) {
 		to, _ := time.Parse("2006-01-02", q.End)
 		result.Days = int(to.Sub(from).Hours()/24) + 1
 		where, args := q.where("source")
+		result.Groups, err = readWorkspaceGroups(tx, where, args)
+		if err != nil {
+			return err
+		}
 		if q.View == "overview" {
-			result.Groups, err = readWorkspaceGroups(tx, where, args)
-			if err != nil {
-				return err
-			}
 			// Admission and today's balance always cover every caller, independently of analysis filters.
 			result.Today, err = readWorkspaceGroups(tx, "day=?", []any{today})
 			if err != nil {
@@ -138,6 +153,35 @@ func (l *Ledger) WorkspaceUsage(q UsageQuery) (WorkspaceUsage, error) {
 		}
 		if err = tx.QueryRow(`SELECT COALESCE(sum(requests),0) FROM gateway_daily_usage WHERE `+where, args...).Scan(&result.Archived); err != nil {
 			return err
+		}
+		result.HourlyDay = q.Day
+		if result.HourlyDay == "" {
+			result.HourlyDay = q.End
+		}
+		if result.HourlyDay < q.Start || result.HourlyDay > q.End {
+			return fmt.Errorf("INVALID_MODEL_USAGE_DAY")
+		}
+		selectedDay, parseErr := time.ParseInLocation("2006-01-02", result.HourlyDay, zone)
+		if parseErr != nil || selectedDay.Format("2006-01-02") != result.HourlyDay {
+			return fmt.Errorf("INVALID_MODEL_USAGE_DAY")
+		}
+		hourQuery := q
+		hourQuery.Start, hourQuery.End = result.HourlyDay, result.HourlyDay
+		hourWhere, hourArgs := hourQuery.where("source")
+		if err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM gateway_daily_usage WHERE `+hourWhere+`)`, hourArgs...).Scan(&result.DailyAggregated); err != nil {
+			return err
+		}
+		if selectedDay.AddDate(0, 0, 1).Before(l.now().Add(-callRetention)) {
+			result.DailyAggregated = true
+		}
+		if q.View == "overview" {
+			result.Hourly, err = readWorkspaceHours(tx, hourQuery, zone)
+			if err != nil {
+				return err
+			}
+		}
+		if q.Hour != nil {
+			result.Archived = 0
 		}
 		rows, err := tx.Query(`SELECT DISTINCT source_id,agent_kind,model FROM `+usageTotalsSQL+` WHERE day>=? AND day<=?`, q.Start, q.End)
 		if err != nil {
@@ -173,8 +217,29 @@ func (l *Ledger) WorkspaceUsage(q UsageQuery) (WorkspaceUsage, error) {
 			return nil
 		}
 		where, args = q.where(usageSourceSQL)
+		if q.Hour != nil {
+			var ranges []string
+			for instant := selectedDay; instant.Before(selectedDay.AddDate(0, 0, 1)); instant = instant.Add(time.Hour) {
+				if instant.In(zone).Hour() == *q.Hour {
+					ranges = append(ranges, `(started_ms>=? AND started_ms<?)`)
+					args = append(args, instant.UnixMilli(), instant.Add(time.Hour).UnixMilli())
+				}
+			}
+			if len(ranges) == 0 {
+				where += ` AND 0`
+			} else {
+				where += ` AND (` + strings.Join(ranges, " OR ") + `)`
+			}
+		}
 		where += ` AND (?='' OR state=?) AND (?='' OR instr(lower(model),lower(?))>0 OR instr(lower(id),lower(?))>0 OR instr(lower(request_id),lower(?))>0 OR instr(lower(upstream_request_id),lower(?))>0)`
 		args = append(args, q.State, q.State, q.Search, q.Search, q.Search, q.Search, q.Search)
+		if q.Hour != nil || q.State != "" || q.Search != "" {
+			callTotals := `(SELECT day,role,model,currency,agent_kind,` + usageSourceSQL + ` AS source,source_id,1 AS requests,COALESCE(input_tokens,0) AS input_tokens,COALESCE(output_tokens,0) AS output_tokens,COALESCE(cache_read_tokens,0) AS cache_read_tokens,COALESCE(cost_nano,0) AS cost_nano,state='pending' AS pending,state='unknown' AS unknown,state!='pending' AND input_tokens IS NULL AS usage_unknown,state='failed' AS failed FROM gateway_calls WHERE ` + where + `)`
+			result.Groups, err = readWorkspaceGroups(tx, "1", args, callTotals)
+			if err != nil {
+				return err
+			}
+		}
 		if err = tx.QueryRow(`SELECT count(*) FROM gateway_calls WHERE `+where, args...).Scan(&result.Total); err != nil {
 			return err
 		}
@@ -213,4 +278,63 @@ func (l *Ledger) WorkspaceUsage(q UsageQuery) (WorkspaceUsage, error) {
 		return rows.Err()
 	})
 	return result, err
+}
+
+func readWorkspaceHours(tx *sql.Tx, q UsageQuery, zone *time.Location) ([]HourlyUsage, error) {
+	where, args := q.where(usageSourceSQL)
+	rows, err := tx.Query(`SELECT started_ms,role,model,currency,agent_kind,`+usageSourceSQL+`,source_id,state,input_tokens,output_tokens,cache_read_tokens,cost_nano FROM gateway_calls WHERE `+where, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type key struct {
+		hour                                     int
+		role, model, currency, agent, source, id string
+	}
+	groups := map[key]*HourlyUsage{}
+	costs := map[key]int64{}
+	for rows.Next() {
+		var started int64
+		var k key
+		var state string
+		var input, output, cached, nano sql.NullInt64
+		if err = rows.Scan(&started, &k.role, &k.model, &k.currency, &k.agent, &k.source, &k.id, &state, &input, &output, &cached, &nano); err != nil {
+			return nil, err
+		}
+		k.hour = time.UnixMilli(started).In(zone).Hour()
+		if groups[k] == nil {
+			groups[k] = &HourlyUsage{UsageGroup: UsageGroup{Day: q.Start, Role: k.role, Model: k.model, Currency: k.currency, AgentKind: k.agent, Source: k.source, SourceID: k.id}, Hour: k.hour}
+		}
+		g := groups[k]
+		g.Requests++
+		g.Input += input.Int64
+		g.Output += output.Int64
+		g.Cached += cached.Int64
+		costs[k] += nano.Int64
+		if state == "pending" {
+			g.Pending++
+		}
+		if state == "unknown" {
+			g.Unknown++
+		}
+		if state == "failed" {
+			g.Failed++
+		}
+		if state != "pending" && !input.Valid {
+			g.UsageUnknown++
+		}
+	}
+	result := []HourlyUsage{}
+	for k, g := range groups {
+		g.Cost = money(costs[k])
+		result = append(result, *g)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		a, b := result[i], result[j]
+		if a.Hour != b.Hour {
+			return a.Hour < b.Hour
+		}
+		return strings.Join([]string{a.SourceID, a.AgentKind, a.Model, a.Currency, a.Role, a.Source}, "\x00") < strings.Join([]string{b.SourceID, b.AgentKind, b.Model, b.Currency, b.Role, b.Source}, "\x00")
+	})
+	return result, rows.Err()
 }

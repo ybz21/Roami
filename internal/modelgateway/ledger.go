@@ -106,7 +106,9 @@ func configuration(q queryRow) (Configuration, error) {
 
 func (l *Ledger) Configuration() (Configuration, error) { return configuration(l.db) }
 
-func (l *Ledger) Configure(c Configuration) error {
+func (l *Ledger) Configure(c Configuration) error { return l.configureScope(c, "") }
+
+func (l *Ledger) configureScope(c Configuration, scope string) error {
 	if err := c.validate(); err != nil {
 		return err
 	}
@@ -114,6 +116,13 @@ func (l *Ledger) Configure(c Configuration) error {
 		previous, err := configuration(tx)
 		if err != nil {
 			return err
+		}
+		switch scope {
+		case "pricing":
+			c.Currency, c.Timezone, c.DailyLimit = previous.Currency, previous.Timezone, previous.DailyLimit
+			c.Pricing.Sources = previous.Pricing.Sources
+		case "limits":
+			c.Pricing = previous.Pricing
 		}
 		if c.Pricing.Sources == nil {
 			c.Pricing.Sources = previous.Pricing.Sources

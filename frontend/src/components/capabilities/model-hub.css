@@ -126,9 +126,9 @@ html[data-pointer="coarse"] :is(.tt-model-plugin-settings,.tt-model-plugin-impor
 html[data-pointer="coarse"] :is(.tt-model-plugin-settings,.tt-model-plugin-import,.tt-gateway-key-dialog) .ant-btn::after,
 html[data-pointer="coarse"] .tt-gateway-key-dialog .ant-modal-close::after { content:''; position:absolute; inset:calc(var(--sp-1) * -1); min-height:var(--tap); }
 
-html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-nav-list { width:100%; }
-html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab { flex:1; min-width:0; justify-content:center; margin:0; padding-inline:var(--sp-1); }
-html[data-size="compact"] .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab-btn { white-space:normal; text-align:center; font-size:var(--fs-sm); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-nav-list { width:max-content; }
+html:is([data-size="compact"],[data-size="medium"]) .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab { flex:0 0 auto; min-width:var(--tap); justify-content:center; margin:0; padding-inline:var(--sp-2); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-model-hub-tabs > .ant-tabs-nav .ant-tabs-tab-btn { white-space:nowrap; text-align:center; font-size:var(--fs-sm); }
 
 .tt-model-hub-main { display:flex; flex:1; min-width:0; min-height:0; }
 .tt-model-hub-tabs.ant-tabs-left { flex-shrink:0; padding-block:var(--sp-2); }

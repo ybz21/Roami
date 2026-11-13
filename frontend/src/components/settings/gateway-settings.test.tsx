@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (method, path, body) => {
     if (path === '/agent/registry') return { agents: [{ kind: 'opencode', displayName: 'OpenCode', command: 'opencode', interactive: true, models: true, canInstall: true }] }
     if (path === '/agent/model-settings') return { data: connection }
-    if (path === '/agent/model-gateway/settings') { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
+    if (path.startsWith('/agent/model-gateway/settings')) { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, source: new URL(path, 'https://fixture.invalid').searchParams.get('source') || '', recentState: new URL(path, 'https://fixture.invalid').searchParams.get('recentState') || '' } }
     return { data: {} }
   })
@@ -77,7 +77,11 @@ it('preserves model and billing drafts across tabs and saves only the local gate
   tab('agent.proxy.tab')
   expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('0')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/settings', { ...config, dailyLimit: 0, pricing: { ...config.pricing, models: { fixture: { ...config.pricing.models.fixture, input_per_million: 3.123456789 } } } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/settings?scope=limits', { ...config, dailyLimit: 0 }))
+  tab('agent.proxy.prices')
+  expect((screen.getByLabelText('agent.proxy.priceLabel', { selector: '#agent-price-0-input' }) as HTMLInputElement).value).toBe('3.123456789')
+  fireEvent.click(screen.getByRole('button',{name:'agent.models.save'}))
+  await waitFor(()=>expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/settings?scope=pricing',expect.objectContaining({dailyLimit:0,pricing:expect.objectContaining({models:{fixture:{...config.pricing.models.fixture,input_per_million:3.123456789}}})})))
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT' && call[1] === '/agent/model-settings')).toBe(false)
   tab('agent.gateway.modelsTab')
   expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('fixture')
@@ -220,7 +224,7 @@ it('opens a default-agent billing link with server-side attribution filtering', 
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path === '/agent/registry') return { agents: [{ kind: 'opencode', displayName: 'OpenCode', command: 'opencode', interactive: true, models: true, canInstall: true }] }
     if (path === '/agent/model-settings') return { data: connection }
-    if (path === '/agent/model-gateway/settings') return { data: currentConfig }
+    if (path.startsWith('/agent/model-gateway/settings')) return { data: currentConfig }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, agentKind: 'opencode' } }
     return { data: {} }
   })

@@ -93,7 +93,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
 				return
 			}
-			if err := h.Ledger.Configure(c); err != nil {
+			scope := r.URL.Query().Get("scope")
+			if !containsField([]string{"", "pricing", "limits"}, scope) {
+				reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
+				return
+			}
+			if err := h.Ledger.configureScope(c, scope); err != nil {
 				if err.Error() == "MODEL_PROXY_CURRENCY_MISMATCH" {
 					reject(w, 409, err.Error())
 				} else {

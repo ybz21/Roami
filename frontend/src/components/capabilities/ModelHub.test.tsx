@@ -23,7 +23,7 @@ beforeEach(() => {
     }
     if (path === '/agent/model-gateway/access-keys') return { data: { revision: saved.revision, keys: [] } }
     if (path === '/agent/model-gateway/access-key') return { data: { revision: saved.revision, hasKey: false, suffix: '' } }
-    if (path === '/agent/model-gateway/settings') return { data: structuredClone(settings) }
+    if (path.startsWith('/agent/model-gateway/settings')) return { data: structuredClone(settings) }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { day: '2026-10-31', from: '2026-10-25', to: '2026-10-31', days: 7, timezone: 'Asia/Shanghai', today: [], groups: [], hourly: [], recent: [] } }
     return { data: {} }
   })
@@ -39,7 +39,7 @@ it('retains old default and per-model prices and saves to the existing Go config
   expect((screen.getByLabelText('agent.proxy.priceLabel', { selector: '#agent-price-0-input' }) as HTMLInputElement).value).toBe('4')
   fireEvent.change(input, { target: { value: '1.25' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/settings', { ...settings, pricing: { ...settings.pricing, default: { ...settings.pricing.default, input_per_million: 1.25 } } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/settings?scope=pricing', { ...settings, pricing: { ...settings.pricing, default: { ...settings.pricing.default, input_per_million: 1.25 } } }))
 })
 it('keeps pricing usable when the independent model catalog cannot load', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => { if (path === '/agent/model-gateway/catalog') throw new Error('offline'); return { data: structuredClone(settings) } })
@@ -64,7 +64,7 @@ it('saves an added model directly and makes it selectable by agents without publ
   fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
   fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.upstreamSource' }))
   fireEvent.click(await screen.findByTitle('Saved source'))
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'hub.tab.catalog' }))
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'modelUsage.model' }))
   expect(await screen.findByText('New coding model')).toBeTruthy()
 })
 it('uses the upstream model ID as the name when the optional display name is blank', async () => {
@@ -86,9 +86,9 @@ it('shows connections and their models together and accepts old source-page link
   const connection = await screen.findByRole('region', { name: 'Saved source' })
   expect(connection.textContent).toContain('Coding')
   expect(screen.queryByRole('tab', { name: 'hub.tab.sources' })).toBeNull()
-  expect(screen.getAllByRole('tab')).toHaveLength(8)
+  expect(screen.getAllByRole('tab')).toHaveLength(7)
   expect(screen.getAllByRole('tab')[2].textContent).toBe('hub.tab.usage')
-  expect(screen.getAllByRole('tab')[7].textContent).toBe('hub.tab.speech')
+  expect(screen.getAllByRole('tab')[6].textContent).toBe('hub.tab.speech')
   expect(screen.queryByRole('combobox', { name: 'settings.speechProvider' })).toBeNull()
   expect(screen.getByRole('tab', { name: 'hub.tab.catalog' }).getAttribute('aria-selected')).toBe('true')
   expect(screen.queryByText('hub.consumers')).toBeNull()
@@ -134,7 +134,7 @@ it('fetches an unsaved source, selects all matches and keeps selection across se
 it('keeps existing IDs, credentials and failover candidates while adding discovered models', async () => {
   const backup = { ...catalog.sources[0], id: 'backup', name: 'Backup source' }
   const saved = { ...catalog, sources: [...catalog.sources, backup], models: [{ ...catalog.models[0], strategy: 'failover', candidates: [...catalog.models[0].candidates, { sourceId: 'backup', model: 'backup-model' }] }] }
-  vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
+  vi.mocked(api).mockImplementation(async (method, path, body) => path==='/agent/model-gateway/settings'?{data:structuredClone(settings)}:({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
   mount('catalog/source/upstream')
   fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
   expect((await screen.findByRole('checkbox', { name: 'priced-model' }) as HTMLInputElement).disabled).toBe(false)
@@ -202,6 +202,7 @@ it('keeps selected models after save fails and retries without a new discovery r
   const original = vi.mocked(api).getMockImplementation()!
   let attempts = 0
   vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path === '/agent/model-gateway/settings') return {data:structuredClone(settings)}
     if (path.endsWith('/discover')) return { data: { models: ['recoverable-model'] } }
     if (method === 'PUT' && attempts++ === 0) throw new Error('offline')
     return original(method, path, body, options)
@@ -232,6 +233,7 @@ it('blocks stale source configuration after rereading a conflicting catalog', as
   let reads = 0
   const updated = { ...catalog, revision: 'revision-2', sources: [{ ...catalog.sources[0], baseUrl: 'https://changed.example/v1' }] }
   vi.mocked(api).mockImplementation(async (method, path) => {
+    if (path === '/agent/model-gateway/settings') return {data:structuredClone(settings)}
     if (path.endsWith('/discover')) return { data: { models: ['selected-model'] } }
     if (method === 'PUT') throw { apiError: { code: 'MODEL_CATALOG_CHANGED' } }
     return { data: reads++ ? updated : catalog }
@@ -270,8 +272,8 @@ it('recovers unsaved speech edits after switching model tabs', async () => {
   fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'settings.speechProvider' }))
   fireEvent.click(await screen.findByText('OpenAI'))
   fireEvent.change(await screen.findByLabelText('settings.speechModel'), { target: { value: 'draft-asr' } })
-  fireEvent.click(screen.getByRole('tab', { name: 'hub.tab.prices' }))
-  expect(navigate).toHaveBeenCalledWith('capabilities/models/prices')
+  fireEvent.click(screen.getByRole('tab', { name: 'hub.tab.catalog' }))
+  expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog')
   page.rerender(<App><ModelHub sub="prices" onNav={navigate} /></App>)
   page.rerender(<App><ModelHub sub="speech" onNav={navigate} /></App>)
   await waitFor(() => expect((screen.getByLabelText('settings.speechModel') as HTMLInputElement).value).toBe('draft-asr'))
@@ -311,7 +313,7 @@ it('opens a saved source directory from its card and saves additions and removal
   const other = { ...catalog.sources[0], id: 'other', name: 'Other source' }
   const unrelated = { ...catalog.models[0], id: 'other-model', name: 'Other model', candidates: [{ sourceId: 'other', model: 'unrelated' }] }
   const saved = { ...catalog, sources: [...catalog.sources, other], models: [...catalog.models, unrelated] }
-  vi.mocked(api).mockImplementation(async (method, path, body) => ({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
+  vi.mocked(api).mockImplementation(async (method, path, body) => path==='/agent/model-gateway/settings'?{data:structuredClone(settings)}:({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
   const navigate = vi.fn(), page = mount('', navigate)
   const card = await screen.findByRole('region', { name: 'Saved source' })
   fireEvent.click(within(card).getByRole('button', { name: 'hub.directory.updateModels' }))
@@ -346,8 +348,8 @@ it('keeps creation and import choices inside one New menu', async () => {
   const navigate = vi.fn()
   mount('', navigate)
   const toolbar = (await screen.findByRole('button', { name: 'common.create' })).closest('.tt-model-hub-actions')!
-  expect(within(toolbar as HTMLElement).getAllByRole('button')).toHaveLength(1)
-  fireEvent.click(within(toolbar as HTMLElement).getByRole('button'))
+  expect(within(toolbar as HTMLElement).getAllByRole('button')).toHaveLength(2)
+  fireEvent.click(within(toolbar as HTMLElement).getByRole('button',{name:'common.create'}))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
 })
@@ -370,7 +372,7 @@ it('offers published pools as a source and does not discover an upstream for a r
   fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
   fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.upstreamSource' }))
   fireEvent.click(await screen.findByTitle('pool.groups'))
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'hub.tab.catalog' }))
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'modelUsage.model' }))
   expect(await screen.findByTitle('Free pool')).toBeTruthy()
   expect(vi.mocked(api).mock.calls.filter(([, path, body]) => path.endsWith('/source-models') && body.sourceId === '@group')).toHaveLength(0)
 })
