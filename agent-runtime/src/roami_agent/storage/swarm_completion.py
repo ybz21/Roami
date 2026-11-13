@@ -48,7 +48,7 @@ def self_verified_completion(db, turn, source):
         "AND c.deleted_ms IS NULL AND c.owner_id=t.owner_id "
         "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id AND o.message_id=m.id) "
         "AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.kind='task.steer' AND j.aggregate_id=t.id AND j.state='queued') "
-        "AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.kind='control.stop' AND json_extract(j.payload_json,'$.turnId')=?)",
+        "AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.kind IN ('control.stop','control.pause') AND json_extract(j.payload_json,'$.turnId')=?)",
         (task_id, turn["owner_id"], revision, conversation_id, turn["id"]),
     )
     latest = row(

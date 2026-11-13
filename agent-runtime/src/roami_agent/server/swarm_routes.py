@@ -82,7 +82,7 @@ class DependenciesSwarm(Payload):
 class ControlSwarm(Payload):
     commandKey: str = Field(min_length=1, max_length=200)
     expectedRevision: int = Field(ge=1)
-    action: Literal["pause", "resume", "stop", "archive"]
+    action: Literal["pause", "resume", "stop", "archive", "pause_work", "resume_work"]
 
 
 class PostSwarm(Payload):

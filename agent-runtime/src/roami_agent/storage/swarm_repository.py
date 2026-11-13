@@ -320,6 +320,8 @@ def snapshot(db, owner, swarm_id):
     from roami_agent.storage.swarm_members import member_list
 
     members = member_list(db, swarm_id, work)
+    from roami_agent.storage.swarm_work_pause import pause_view
+
     return {
         "id": swarm_id,
         "name": value["name"],
@@ -336,6 +338,7 @@ def snapshot(db, owner, swarm_id):
         "target": json.loads(value["target_json"]),
         "revision": value["revision"],
         "paused": bool(value["paused"]),
+        "workPause": pause_view(db, swarm_id),
         "archived": bool(value["archived"]),
         "state": state,
         "sequence": sequence,

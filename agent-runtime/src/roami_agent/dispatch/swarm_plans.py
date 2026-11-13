@@ -456,6 +456,10 @@ class SwarmPlans:
 
     async def control(self, owner, sid, spec):
         action = spec.get("action")
+        if action in {"pause_work", "resume_work"}:
+            from roami_agent.dispatch.swarm_work_control import control_work
+
+            return await control_work(self, owner, sid, spec)
         if action not in {"pause", "resume", "archive", "stop"}:
             raise DomainError("INVALID_SWARM_ACTION")
 
@@ -463,6 +467,10 @@ class SwarmPlans:
             def apply():
                 value = group(db, owner, sid)
                 self.mutable(value, spec)
+                from roami_agent.storage.swarm_work_pause import active_pause
+
+                if active_pause(db, sid):
+                    raise DomainError("SWARM_WORK_ALREADY_PAUSED", 409)
                 db.execute(
                     "UPDATE swarm_groups SET paused=?,archived=?,revision=revision+1 WHERE id=?",
                     (int(action != "resume"), int(action == "archive"), sid),

@@ -45,6 +45,7 @@ export const PaperclipIcon = ({ size = 15 }: P) => line(
   <path d="M20 11.5 12.4 19a4.6 4.6 0 0 1-6.5-6.5l7.8-7.8a3 3 0 0 1 4.3 4.3l-7.7 7.7a1.5 1.5 0 0 1-2.1-2.1l7-7" />, size)
 /** 继续 / 恢复：原来写作 ▶ */
 export const PlayIcon = ({ size = 12 }: P) => solid(<path d="M8 5.5v13l11-6.5Z" />, size)
+export const PauseIcon = ({ size = 12 }: P) => solid(<><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></>, size)
 export const StopIcon = ({ size = 12 }: P) => solid(<rect x="6" y="6" width="12" height="12" rx="2" />, size)
 /** 进全屏 / 退全屏：四角箭头向外、向内。原来在 App.tsx 里现画一对 */
 export const FullscreenIcon = ({ size = 18 }: P) => line(

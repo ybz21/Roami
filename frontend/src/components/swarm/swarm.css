@@ -279,3 +279,8 @@ html[data-pointer="coarse"] .swarm-workbench-actions :is(.tt-act,summary)::after
 :where(html[data-pointer="fine"]) .swarm-studio-label:hover { color:var(--accent); border-color:var(--accent-border); }
 .swarm-studio-label:focus-visible { outline:2px solid var(--accent); }
 html[data-pointer="coarse"] .swarm-studio-label::after { content:''; position:absolute; min-height:var(--tap); min-width:var(--tap); width:100%; top:50%; left:50%; transform:translate(-50%,-50%); }
+
+.swarm-work-control { display:inline-flex; align-items:center; gap:var(--sp-2); white-space:nowrap; }
+.swarm-work-status { display:flex; align-items:center; gap:var(--sp-3); flex-shrink:0; padding:var(--sp-2) var(--sp-4); color:var(--warn); font-size:var(--fs-sm); border-bottom:1px solid var(--border-subtle); }
+
+.swarm-work-status > .swarm-work-control { margin-left:auto; flex-shrink:0; }
