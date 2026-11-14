@@ -69,6 +69,7 @@ export const Disclosure = ({ open, size = 12 }: P & { open: boolean }) => (
 )
 export const ArrowUp = ({ size = 12 }: P) => line(<><path d="M12 19V5" /><path d="m6 11 6-6 6 6" /></>, size, 2.2)
 export const ArrowDown = ({ size = 12 }: P) => line(<><path d="M12 5v14" /><path d="m6 13 6 6 6-6" /></>, size, 2.2)
+export const DragHandleIcon = ({ size = 16 }: P) => line(<><path d="M8 6h.01M16 6h.01M8 12h.01M16 12h.01M8 18h.01M16 18h.01" /></>, size)
 /** 回车键：原来写作 ⏎ */
 export const EnterIcon = ({ size = 16 }: P) => line(<><path d="M20 5v6a3 3 0 0 1-3 3H4.5" /><path d="m9 9-5 5 5 5" /></>, size, 2)
 export const ArrowToBottom = ({ size = 13 }: P) => line(<><path d="M12 4v10" /><path d="m7 11 5 5 5-5" /><path d="M5 20h14" /></>, size, 2)

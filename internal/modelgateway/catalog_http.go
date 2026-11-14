@@ -88,7 +88,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			model = s.defaultModel(s.value)
 		}
 		for _, m := range s.value.Models {
-			if m.ID == input.Model {
+			if m.ID == input.Model || containsField(m.Aliases, input.Model) {
 				copy := m
 				model = &copy
 			}
@@ -288,7 +288,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		model = h.Catalog.defaultModel(catalog)
 	}
 	for _, m := range catalog.Models {
-		if m.ID == resolvedID {
+		if m.ID == resolvedID || containsField(m.Aliases, resolvedID) {
 			copy := m
 			model = &copy
 		}

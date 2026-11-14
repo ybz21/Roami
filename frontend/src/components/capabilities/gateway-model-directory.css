@@ -1,0 +1,23 @@
+.tt-gateway-directory { border-top:1px solid var(--border-subtle); margin-top:var(--sp-5); padding-top:var(--sp-4); }
+.tt-gateway-directory h3 { font-size:var(--fs-body); margin:0; }
+.tt-directory-filters { display:grid; grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr)); gap:var(--sp-3); margin-block:var(--sp-4); }
+.tt-directory-filters>* { min-width:0; }
+.tt-gateway-directory-source { margin-block:var(--sp-5); }
+.tt-directory-source-head { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-3); margin-bottom:var(--sp-3); }
+.tt-directory-source-head>span { color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-directory-source-head>button { margin-left:auto; }
+.tt-gateway-model { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,2fr); gap:var(--sp-4); padding-block:var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.tt-directory-model-name { display:flex; flex-direction:column; gap:var(--sp-1); min-width:0; overflow-wrap:anywhere; }
+.tt-gateway-model strong { font-size:var(--fs-sm); font-weight:500; }
+.tt-gateway-model :is(code,small) { font-size:var(--fs-meta); color:var(--text-dim); }
+.tt-directory-capabilities { display:flex; align-items:flex-start; flex-wrap:wrap; align-content:start; gap:var(--sp-2); }
+.tt-directory-capabilities>span { background:var(--accent-soft); color:var(--accent); border-radius:var(--r-xs); padding:var(--sp-1) var(--sp-2); font-size:var(--fs-meta); }
+.tt-gateway-model dl { margin:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--sp-3); font-size:var(--fs-meta); }
+.tt-gateway-model dt { color:var(--text-dim); }
+.tt-gateway-model dd { margin:var(--sp-1) 0 0; overflow-wrap:anywhere; }
+.tt-gateway-directory-source>.ant-pagination { margin-top:var(--sp-4); }
+.tt-directory-groups>div { display:flex; flex-wrap:wrap; gap:var(--sp-3); padding-block:var(--sp-3); font-size:var(--fs-sm); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-directory-filters { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-directory-filters>.ant-input-affix-wrapper { grid-column:1/-1; }
+html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model { grid-template-columns:minmax(0,1fr); gap:var(--sp-3); }
+html[data-pointer="coarse"] .tt-gateway-directory :is(.ant-select-selector,.ant-input-affix-wrapper,.tt-act,.ant-pagination-item,.ant-pagination-prev,.ant-pagination-next) { min-height:var(--tap); }

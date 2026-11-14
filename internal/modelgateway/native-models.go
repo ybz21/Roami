@@ -46,7 +46,7 @@ func (s *CatalogStore) defaultModel(catalog ModelCatalog) *CatalogModel {
 			continue
 		}
 		if strings.TrimRight(route.endpoint, "/") == s.baseURL+"/v1" {
-			if model.ID == route.model {
+			if model.ID == route.model || containsField(model.Aliases, route.model) {
 				return &model
 			}
 			continue

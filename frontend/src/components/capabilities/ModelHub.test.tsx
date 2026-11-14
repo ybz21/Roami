@@ -347,7 +347,8 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/gateway')
   page.rerender(<App><ModelHub sub="gateway" onNav={navigate} /></App>)
   expect(await screen.findByText(catalog.baseUrl + '/v1')).toBeTruthy()
-  expect(screen.queryByRole('region', { name: 'Saved source' })).toBeNull()
+  expect(screen.getByRole('region', { name: 'directory.title' })).toBeTruthy()
+  expect(document.querySelector('.tt-model-connection')).toBeNull()
 })
 
 it('opens creation and import choices from the top New button without a pricing shortcut', async () => {

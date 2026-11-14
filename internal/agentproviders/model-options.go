@@ -58,6 +58,19 @@ func (s *Store) ModelOptions(ctx context.Context, kind string, query ModelQuery)
 
 // ReadSourceModels lists models from an already validated source.
 func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
+	rows, err := readSourceModelDetails(ctx, profile, maxFileSize)
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	return ids, err
+}
+
+func ReadSourceModelDetails(ctx context.Context, profile Profile) ([]SourceModelDetail, error) {
+	return readSourceModelDetails(ctx, profile, 8*maxFileSize)
+}
+
+func readSourceModelDetails(ctx context.Context, profile Profile, maxBytes int64) ([]SourceModelDetail, error) {
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	endpoint, err := url.Parse(profile.BaseURL)
@@ -71,9 +84,9 @@ func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 		endpoint = endpoint.JoinPath("models")
 	}
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	models := map[string]bool{}
+	models := map[string]SourceModelDetail{}
 	cursors := map[string]bool{}
-	remaining := int64(maxFileSize)
+	remaining := maxBytes
 	for page := 0; page < 1000; page++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 		if err != nil {
@@ -107,11 +120,9 @@ func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 		}
 		remaining -= int64(len(body))
 		var result struct {
-			Data []struct {
-				ID string `json:"id"`
-			} `json:"data"`
-			HasMore bool   `json:"has_more"`
-			LastID  string `json:"last_id"`
+			Data    []sourceModelWire `json:"data"`
+			HasMore bool              `json:"has_more"`
+			LastID  string            `json:"last_id"`
 		}
 		if json.Unmarshal(body, &result) != nil || result.Data == nil || len(result.Data) > 1000 {
 			return nil, fmt.Errorf("MODEL_LIST_FAILED")
@@ -119,7 +130,7 @@ func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 		for _, item := range result.Data {
 			id := strings.TrimSpace(item.ID)
 			if id != "" && len(id) <= 256 && !strings.ContainsAny(id, "\r\n\x00") && !strings.Contains(id, "{env:") && !strings.Contains(id, "{file:") && id != profile.APIKey {
-				models[id] = true
+				models[id] = item.detail(id, profile.APIKey)
 			}
 		}
 		if len(models) > 1000 {
@@ -131,7 +142,11 @@ func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 				ids = append(ids, id)
 			}
 			sort.Strings(ids)
-			return ids, nil
+			rows := make([]SourceModelDetail, 0, len(ids))
+			for _, id := range ids {
+				rows = append(rows, models[id])
+			}
+			return rows, nil
 		}
 		if !anthropic || result.LastID == "" || len(result.LastID) > 256 || cursors[result.LastID] {
 			return nil, fmt.Errorf("MODEL_LIST_FAILED")
