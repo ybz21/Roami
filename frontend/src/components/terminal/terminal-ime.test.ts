@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Terminal } from '@xterm/xterm'
-import { synchronizeTerminalIME } from './terminal-ime'
+import { bindTerminalInput, clearTerminalDrop } from './terminal-ime'
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 5))
 
@@ -23,9 +23,8 @@ describe('xterm IME compatibility', () => {
     document.body.append(host)
     term = new TerminalClass({ cols: 80, rows: 24, allowProposedApi: true })
     term.open(host)
-    release = synchronizeTerminalIME(term)
     output = []
-    term.onData(data => output.push(data))
+    release = bindTerminalInput(term, data => output.push(data))
     await new Promise<void>(resolve => term.write('\x1b[20;7H', resolve))
   })
   afterEach(async () => {
@@ -73,6 +72,18 @@ describe('xterm IME compatibility', () => {
     expect(output.join('')).toBe('新的内容')
   })
 
+  it('keeps the final candidate when Enter precedes the deferred finalizer', async () => {
+    const textarea = term.textarea!
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    textarea.value = '合'
+    textarea.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: '合并' }))
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '合并' }))
+    textarea.value = '合并'
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }))
+    await tick()
+    expect(output.join('')).toBe('合并\r')
+  })
+
   it('anchors the textarea immediately when composition starts', () => {
     const core = (term as unknown as { _core: { _renderService: { dimensions: { css: { cell: { width: number; height: number } } } } } })._core
     core._renderService.dimensions.css.cell.width = 8
@@ -87,5 +98,56 @@ describe('xterm IME compatibility', () => {
   it('keeps direct insertText input outside composition working', () => {
     term.textarea!.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'a', inputType: 'insertText' }))
     expect(output.join('')).toBe('a')
+  })
+
+  it('forwards xterm commits and Enter when keydown ends an active composition', async () => {
+    const textarea = term.textarea!
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    textarea.value = '合并'
+    textarea.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: '合并' }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }))
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '合并' }))
+    await tick()
+    expect(output.join('')).toBe('合并\r')
+  })
+
+  it('preserves trailing input when normalizing an unselected pinyin commit', async () => {
+    const textarea = term.textarea!
+    compose(textarea, 's c p')
+    textarea.value += '!'
+    await tick()
+    expect(output.join('')).toBe('scp!')
+  })
+
+  it('does not replace an unrelated keystroke after an empty pinyin commit', async () => {
+    compose(term.textarea!, 's c p')
+    term.textarea!.value = ''
+    await tick()
+    term.textarea!.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'x', inputType: 'insertText' }))
+    term.textarea!.dispatchEvent(new InputEvent('input', { bubbles: true, data: 's c p', inputType: 'insertText' }))
+    expect(output.join('')).toBe('xs c p')
+  })
+
+  it('expires pinyin normalization when the composition emits no data', async () => {
+    compose(term.textarea!, 's c p')
+    term.textarea!.value = ''
+    await tick()
+    term.textarea!.dispatchEvent(new InputEvent('input', { bubbles: true, data: 's c p', inputType: 'insertText' }))
+    expect(output.join('')).toBe('s c p')
+  })
+
+  it('keeps active and deferred compositions intact during a file drop', async () => {
+    const textarea = term.textarea!
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    textarea.value = '合并'
+    clearTerminalDrop(term)
+    expect(textarea.value).toBe('合并')
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '合并' }))
+    clearTerminalDrop(term)
+    await tick()
+    expect(output.join('')).toBe('合并')
+    textarea.value = '/tmp/dropped.txt'
+    clearTerminalDrop(term)
+    expect(textarea.value).toBe('')
   })
 })
