@@ -5206,6 +5206,7 @@ const zhCN = {
   'hub.delete': "删除此配置？被引用的配置需要先解除关联。",
   'hub.editSource': "配置模型源",
   'hub.editModel': "配置模型",
+  'hub.openSource': '打开 {name}',
   'hub.addSource': "添加模型源",
   'hub.addModel': "添加模型",
   'hub.empty.sources': "还没有模型源",

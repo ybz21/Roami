@@ -5197,6 +5197,7 @@ const enUS = {
   'hub.delete': "Delete this configuration? Remove its references first.",
   'hub.editSource': "Configure source",
   'hub.editModel': "Configure model",
+  'hub.openSource': 'Open {name}',
   'hub.addSource': "Add source",
   'hub.addModel': "Add model",
   'hub.empty.sources': "No model sources yet",
