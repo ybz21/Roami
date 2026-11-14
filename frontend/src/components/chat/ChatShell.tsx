@@ -16,6 +16,7 @@ import { useLayout } from '../../layout'
 import { ArrowToBottom, ArrowUp, ChevronDown, FileTextIcon, PaperclipIcon, TerminalIcon } from '../../icons'
 import { SESSION_MIME, buildIntro, canDrop, readDrag, type SessionDrag } from '../shell/session-drop'
 import { sessionDraftKey } from './session-draft'
+import { reachEarlierTop } from './earlier-autoload'
 import { useAgentDraft } from '../agent/useAgentDraft'
 import { currentNodeId } from '../cluster/node-url'
 import { sessionDisplay } from '../sessions/session-label'
@@ -54,7 +55,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   /** 后端首屏截过头：还有更早的没取过来 */
   hasEarlier?: boolean
   /** 把首屏窗口放大一档重取（往回翻） */
-  onLoadEarlier?: () => void
+  onLoadEarlier?: () => void | Promise<void>
   /**
    * 是不是当前标签。所有跑着 agent 的会话对话都常驻挂着（切标签只翻 visibility），
    * 不在前台的那几份不渲染消息列表——否则点一下标签，N 份 × 200 条消息一起重建 DOM、
@@ -207,12 +208,38 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId }
   }, [messages, pending, visible, live])
 
+  // 滑到接近顶部就自己往回翻一页，不用先去找那颗按钮。
+  // 首屏窗口里还有没渲染的（hidden>0）先放本地的，放完再去后端要更早的。
+  const earlierArmed = useRef(true)
+  const loadingEarlier = useRef(false)
+  const [fetchingEarlier, setFetchingEarlier] = useState(false)
+  const loadOlder = () => {
+    if (loadingEarlier.current) return
+    if (hidden > 0) { setLimit((l) => l + 200); return }
+    if (!onLoadEarlier) return
+    loadingEarlier.current = true; setFetchingEarlier(true)
+    // 同步抛错也要走收尾，否则在途标记永远挂着、按钮再也点不动
+    try { void Promise.resolve(onLoadEarlier()).finally(() => { loadingEarlier.current = false; setFetchingEarlier(false) }) }
+    catch { loadingEarlier.current = false; setFetchingEarlier(false) }
+  }
+  const reachEarlier = (el: HTMLDivElement) => {
+    if (!(hidden > 0 || hasEarlier)) return
+    const next = reachEarlierTop(earlierArmed.current, el.scrollTop, el.scrollHeight - el.clientHeight)
+    earlierArmed.current = next.armed
+    if (next.load) loadOlder()
+  }
+
   const onScroll = () => {
     const el = boxRef.current
     if (!el) return
+    // 锚点跟着手走：补位要用「此刻」的位置和高度。只靠上面那个布局效应记录的话，
+    // 纯上滚（没有新消息、不触发重渲染）这段时间里锚点停在很久以前的底部位置，
+    // 插进来的更早一页就会按错误的高度差补位，一下弹走。
+    anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId: visible[0]?.id || '' }
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     setShowJump(!atBottom.current)
     if (atBottom.current) { seenCount.current = messages.length; setUnread(0) }
+    reachEarlier(el)
   }
 
   const jump = () => {
@@ -394,8 +421,8 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
             {(hidden > 0 || hasEarlier) && (
               <div style={{ textAlign: 'center', margin: '2px 0 8px' }}>
                 {/* 先放本地渲染窗口(手里已有的)，手里这些都放完了再回后端要更早的 */}
-                <button type="button" className="tt-act" onClick={() => (hidden > 0 ? setLimit((l) => l + 200) : onLoadEarlier?.())}>
-                  <ArrowUp size={12} />{hidden > 0 ? t('chat.loadEarlier', { count: hidden }) : t('chat.loadEarlierMore')}
+                <button type="button" className="tt-act" disabled={fetchingEarlier} onClick={loadOlder}>
+                  <ArrowUp size={12} />{fetchingEarlier ? t('agent.pagination.loading') : hidden > 0 ? t('chat.loadEarlier', { count: hidden }) : t('chat.loadEarlierMore')}
                 </button>
               </div>
             )}

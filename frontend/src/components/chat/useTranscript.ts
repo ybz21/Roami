@@ -30,7 +30,7 @@ export function useTranscript(name: string, file: string | undefined, path: stri
   // 间隔走 ref：后台会话把间隔放宽时不能重启 effect——重启等于清空重拉整个首屏
   const intervalRef = useRef(interval)
   intervalRef.current = interval
-  const earlierRef = useRef<() => void>(() => {})
+  const earlierRef = useRef<() => Promise<void>>(async () => {})
   const loadEarlier = useCallback(() => earlierRef.current(), [])
   useEffect(() => {
     let stop = false
