@@ -192,7 +192,7 @@ async def test_skill_download_preserves_pinned_revision_assets_and_runtime_polic
         "SKILL.md": b"---\nname: workflow\ndescription: Example\n---\nRead references/rules.md and run scripts/check.py.",
         "references/rules.md": b"# Rules\nVerify output.",
         "scripts/check.py": b"print('verified')",
-        "assets/cover.bin": b"\x00\xff",
+        "assets/cover.bin": b"\x00\xff" * 2_000_000,
         "LICENSE": b"MIT",
     }
     urls = []
@@ -226,7 +226,9 @@ async def test_skill_download_preserves_pinned_revision_assets_and_runtime_polic
     assert entry["origin"]["version"] == commit
     await runtime.capability_imports.save("local", "skills", entry)
     skill = runtime.tools.skills["workflow"]
-    assert (Path(skill["packagePath"]) / "assets/cover.bin").read_bytes() == b"\x00\xff"
+    assert (Path(skill["packagePath"]) / "assets/cover.bin").read_bytes() == contents[
+        "assets/cover.bin"
+    ]
     assert "references/rules.md" in skill["references"]
     wire = {
         "function": {
@@ -349,6 +351,7 @@ def test_skill_archive_preserves_assets_and_rejects_symlinks():
             for name, raw in {
                 "repository/skills/flow/SKILL.md": b"---\nname: workflow\n---\nInstructions",
                 "repository/skills/flow/scripts/check.py": b"print('checked')",
+                "repository/skills/flow/data/catalog.csv": b"x,y\n" * 1_000_000,
                 "repository/LICENSE": b"MIT",
             }.items():
                 item = tarfile.TarInfo(name)
@@ -366,6 +369,7 @@ def test_skill_archive_preserves_assets_and_rejects_symlinks():
     assert "Instructions" in text
     assert base64.b64decode(files["scripts/check.py"]) == b"print('checked')"
     assert base64.b64decode(files["LICENSE"]) == b"MIT"
+    assert len(base64.b64decode(files["data/catalog.csv"])) == 4_000_000
     with pytest.raises(DomainError, match="INVALID_SKILL_PACKAGE"):
         unpack_skill(archive(symlink=True), "workflow")
 
@@ -601,11 +605,15 @@ async def test_authorized_skills_api_handles_rankings_and_preserves_snapshot(sto
                 "pagination": {"hasMore": True, "total": 3349},
             }
         assert url.endswith("/api/v1/skills/owner/repo/workflow")
+        from roami_agent.server.skill_package import MAX_PACKAGE_PAYLOAD_BYTES
+
+        assert kwargs["maximum"] == MAX_PACKAGE_PAYLOAD_BYTES
         return {
             "id": "owner/repo/workflow",
             "files": [
                 {"path": "SKILL.md", "contents": text},
                 {"path": "scripts/check.py", "contents": "print('ok')"},
+                {"path": "data/catalog.csv", "contents": "x,y\n" * 1_000_000},
             ],
         }
 
@@ -621,6 +629,7 @@ async def test_authorized_skills_api_handles_rankings_and_preserves_snapshot(sto
     entry = preview["options"][0]["entry"]
     assert entry["text"] == text
     assert base64.b64decode(entry["files"]["scripts/check.py"]) == b"print('ok')"
+    assert len(base64.b64decode(entry["files"]["data/catalog.csv"])) == 4_000_000
     assert entry["origin"]["version"].startswith("sha256:")
     assert entry["origin"]["url"] == "https://skills.sh/owner/repo/workflow"
     assert len(seen) == 2

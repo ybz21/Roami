@@ -8,7 +8,11 @@ import re
 from urllib.parse import quote
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.server.skill_package import MAX_PACKAGE_BYTES, package_files
+from roami_agent.server.skill_package import (
+    MAX_PACKAGE_BYTES,
+    MAX_PACKAGE_PAYLOAD_BYTES,
+    package_files,
+)
 
 VIEWS = {"all-time", "trending", "hot"}
 IDENTIFIER = re.compile(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.:-]+")
@@ -71,7 +75,9 @@ async def snapshot(source, identifier, fetch):
     if not IDENTIFIER.fullmatch(identifier):
         raise DomainError("MARKET_ITEM_NOT_FOUND", 404)
     data = await fetch(
-        source["url"] + "/api/v1/skills/" + quote(identifier, safe="/"), headers=headers
+        source["url"] + "/api/v1/skills/" + quote(identifier, safe="/"),
+        headers=headers,
+        maximum=MAX_PACKAGE_PAYLOAD_BYTES,
     )
     if data.get("id") != identifier:
         raise DomainError("MARKET_UNAVAILABLE", 502)

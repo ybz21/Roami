@@ -17,12 +17,17 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.skill_names import SKILL_ALIASES
 from roami_agent.protocol.tools import Tool
 from roami_agent.server.model_settings import ModelSettings
-from roami_agent.server.skill_package import materialize_package, package_files
+from roami_agent.server.skill_package import (
+    MAX_PACKAGE_PAYLOAD_BYTES,
+    materialize_package,
+    package_files,
+)
 from roami_agent.tools.mcp import Connection, validate_servers
 
 NAME = re.compile(r"[a-z][a-z0-9_-]{0,63}")
 KINDS = {"skills", "cli", "mcp"}
 MAX_BYTES = 65536
+MAX_IMPORTS_BYTES = 32_000_000
 
 
 class CapabilityImports:
@@ -37,7 +42,7 @@ class CapabilityImports:
                 not stat.S_ISREG(info.st_mode)
                 or info.st_uid != os.getuid()
                 or info.st_mode & 0o077
-                or info.st_size > 1048576
+                or info.st_size > MAX_IMPORTS_BYTES
             ):
                 raise DomainError("CAPABILITY_IMPORT_PRIVATE_FILE_REQUIRED", 503)
             try:
@@ -80,7 +85,7 @@ class CapabilityImports:
         ):
             raise DomainError("INVALID_CAPABILITY_NAME")
         if len(json.dumps(value, ensure_ascii=False).encode()) > (
-            600_000 if kind == "skills" and value.get("files") else MAX_BYTES
+            MAX_PACKAGE_PAYLOAD_BYTES if kind == "skills" and value.get("files") else MAX_BYTES
         ):
             raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
         if kind == "skills":
@@ -317,7 +322,7 @@ class CapabilityImports:
             self.runtime.mcp.register_discovery()
 
     def persist(self, saved):
-        if len(json.dumps(saved, ensure_ascii=False).encode()) > 1048576:
+        if len(json.dumps(saved, ensure_ascii=False).encode()) > MAX_IMPORTS_BYTES:
             raise DomainError("CAPABILITY_IMPORT_TOO_LARGE", 413)
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         info = self.path.parent.lstat()

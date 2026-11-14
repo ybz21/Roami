@@ -59,6 +59,7 @@ export async function streamMarketPreview(body: { source: string; id: string; ve
   const decoder = new TextDecoder()
   let buffer = '', completed = false
   const consume = (line: string) => {
+    if (line.length > 12_000_000) throw new Error('MARKET_PACKAGE_TOO_LARGE')
     if (!line.trim()) return
     const event = JSON.parse(line)
     if (event.type === 'error') throw Object.assign(new Error(event.error?.code || 'MARKET_UNAVAILABLE'), { apiError: event.error })
@@ -69,9 +70,9 @@ export async function streamMarketPreview(body: { source: string; id: string; ve
     while (!completed) {
       const { value, done } = await reader.read()
       buffer += decoder.decode(value, { stream: !done })
-      if (buffer.length > 4_000_000) throw new Error('MARKET_PACKAGE_TOO_LARGE')
       let newline: number
       while ((newline = buffer.indexOf('\n')) >= 0) { consume(buffer.slice(0, newline)); buffer = buffer.slice(newline + 1) }
+      if (buffer.length > 12_000_000) throw new Error('MARKET_PACKAGE_TOO_LARGE')
       if (done) { if (buffer.trim()) consume(buffer); break }
     }
     if (!completed && !signal.aborted) throw new Error('MARKET_UNAVAILABLE')
