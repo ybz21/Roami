@@ -73,9 +73,6 @@ func (a *API) verificationSignature(ctx context.Context, row agentinventory.Prof
 		paths = []string{filepath.Join(root, "auth.json"), filepath.Join(root, "config.toml")}
 	case "pi":
 		paths = []string{filepath.Join(configRoot("PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "auth.json")}
-	case "deepseek":
-		root := configRoot("DSH_HOME", filepath.Join(home, ".dsh"))
-		paths = []string{filepath.Join(root, "settings.yaml"), filepath.Join(root, ".credentials.yaml"), filepath.Join(root, "cordis.patch.yml"), filepath.Join(root, "profiles", "headless", "cordis.patch.yml")}
 	case "opencode":
 		paths = []string{filepath.Join(configRoot("XDG_DATA_HOME", filepath.Join(home, ".local", "share")), "opencode", "auth.json")}
 	}

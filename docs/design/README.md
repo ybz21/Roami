@@ -6,8 +6,9 @@
 | --- | --- | --- |
 | 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
 | 旧会话记录分批加载 | [20261113-transcript-paging](20261113-transcript-paging/README.md) | 最新 50 条首屏、向前游标分页、只读历史身份校验与桌面/真机验收 |
+| 移除独立 DeepSeek Harness | [20261114-remove-deepseek-harness](20261114-remove-deepseek-harness/README.md) | 撤下执行器与适配，保留 API 模型和通用注册机制 |
 | CLI 帮助统一 | [20261113-cli-help](20261113-cli-help/README.md) | 同一帮助结构、子命令参数与隔离回归 |
-| DeepSeek Harness 与 Agent 注册 | [20261112-deepseek-harness](20261112-deepseek-harness/README.md) | 主机统一列表、单次执行能力与桌面/真机验收 |
+| DeepSeek Harness 与 Agent 注册（历史） | [20261112-deepseek-harness](20261112-deepseek-harness/README.md) | 主机统一列表、单次执行能力与桌面/真机验收 |
 | 压缩状态反馈 | [20261112-compact-status](20261112-compact-status/README.md) | 状态行反馈、按需读取摘要与手机全屏详情，修复重复清空造成的闪烁 |
 | 浏览器导航等待与卡死检测 | [20261112-browser-navigation-recovery](20261112-browser-navigation-recovery/README.md) | 慢导航保留连接、超时恢复、新标签回执与桌面/手机验收 |
 | 首页委派任务与对话排版 | [20261112-home-delegated-activity](20261112-home-delegated-activity/README.md) | 委派工具步骤收在详情；正文阅读排版、紧凑输入区与整行任务导航 |

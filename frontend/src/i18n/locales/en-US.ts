@@ -1298,7 +1298,6 @@ const enUS = {
   'capabilities.agents.search': "Search agents",
   'capabilities.agents.empty': "No matching agents",
   'capabilities.agents.description.registered': 'Registered agent.',
-  'capabilities.agents.description.deepseek': 'Run one-shot tasks with the official CLI.',
   'capabilities.agents.taskOnly': '{name} (one-shot tasks)',
   'capabilities.agents.headlessHint': 'Run {command} in a terminal to configure models and credentials, then start a one-shot task with a task description.',
   'capabilities.agents.description.claude': "Coding, debugging and project collaboration.",

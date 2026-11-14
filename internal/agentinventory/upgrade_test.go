@@ -43,7 +43,7 @@ func TestNativeOpenCodeUpgradeUsesDiscoveredInstallation(t *testing.T) {
 }
 
 func TestNPMUpgradeKeepsOriginalPrefix(t *testing.T) {
-	for _, kind := range []string{"claude", "codex", "pi", "deepseek"} {
+	for _, kind := range []string{"claude", "codex", "pi"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
 			installation, _ := agent.InstallPackage(kind)

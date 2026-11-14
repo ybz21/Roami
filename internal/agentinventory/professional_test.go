@@ -12,7 +12,6 @@ import (
 func TestProfessionalInstallArgs(t *testing.T) {
 	for kind, want := range map[string][]string{
 		"codex":    {"install", "-g", "@openai/codex"},
-		"deepseek": {"install", "-g", "@deepseek-ai/dsh@latest"},
 		"claude":   {"install", "-g", "@anthropic-ai/claude-code"},
 		"opencode": {"install", "-g", "opencode-ai"},
 		"pi":       {"install", "-g", "--ignore-scripts", "@earendil-works/pi-coding-agent"},
@@ -22,7 +21,7 @@ func TestProfessionalInstallArgs(t *testing.T) {
 			t.Fatalf("%s: %v, %v", kind, got, err)
 		}
 	}
-	for _, kind := range []string{"", "unknown", "codex;echo injected", "--prefix=/tmp"} {
+	for _, kind := range []string{"", "unknown", "deepseek", "codex;echo injected", "--prefix=/tmp"} {
 		if _, err := ProfessionalInstallArgs(kind); err == nil {
 			t.Fatalf("accepted unsupported kind %q", kind)
 		}

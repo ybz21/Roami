@@ -1298,7 +1298,6 @@ const zhCN = {
   'capabilities.agents.search': "搜索 Agent",
   'capabilities.agents.empty': "没有匹配的 Agent",
   'capabilities.agents.description.registered': '已注册的 Agent。',
-  'capabilities.agents.description.deepseek': '通过官方 CLI 执行单次任务。',
   'capabilities.agents.taskOnly': '{name}（单次任务）',
   'capabilities.agents.headlessHint': '在终端运行 {command} 配置模型与凭据，再使用任务描述启动单次任务。',
   'capabilities.agents.description.claude': "编程、调试与项目协作。",

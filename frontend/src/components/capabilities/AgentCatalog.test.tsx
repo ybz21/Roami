@@ -205,7 +205,7 @@ it('installs Claude Code directly from its model settings page', async () => {
   await waitFor(() => expect(installAgent).toHaveBeenCalledWith('claude'))
 })
 
-it.each(['deepseek', 'future-harness'])('hydrates %s from host metadata without an existing registry cache', async kind => {
+it.each(['batch-harness', 'future-harness'])('hydrates %s from host metadata without an existing registry cache', async kind => {
   vi.mocked(discoverAgents).mockResolvedValue([{ ...snapshot, kind, displayName: 'Registered Harness', command: 'registered-cli --task', interactive: false, models: false, canInstall: true }])
   render(<AgentCatalog initialKind={kind} onSelect={vi.fn()} onLaunch={vi.fn()} />)
   const field = await screen.findByRole('textbox', { name: 'capabilities.agents.command' }) as HTMLInputElement
