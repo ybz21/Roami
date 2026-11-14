@@ -5,11 +5,11 @@ import SourcePricingSettings, { sourcePriceDraftChanged, type SourcePriceDraft }
 import BackButton from '../BackButton'
 import ModelUsageWorkspace from './ModelUsageWorkspace'
 import { useState } from 'react'
-import { Alert, App, Button, Dropdown, Input, Modal, Popconfirm, Select, Spin, Tabs } from 'antd'
+import { Alert, App, Button, Dropdown, Input, Popconfirm, Select, Spin, Tabs } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
-import { PlusIcon, LinkIcon, PencilIcon } from '../../icons'
+import { PlusIcon, LinkIcon, ChevronRight } from '../../icons'
 import { useSettingsDraft } from '../settings/settings-draft'
 import { SpeechSettings } from '../settings/speech-settings'
 import MobileSubPage from '../MobileSubPage'
@@ -39,7 +39,6 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const [sourcePrices, setSourcePrices] = useState<Record<string, SourcePriceDraft>>({})
   const [returnSource, setReturnSource] = useState('')
   const [priceReturn, setPriceReturn] = useState('catalog')
-  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [gatewayKeyDraft, setGatewayKeyDraft] = useState('')
   const [addingAccount,setAddingAccount]=useState(''),[accountError,setAccountError]=useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
@@ -84,7 +83,19 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     <label className="agent-settings-field">{t('hub.source')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.source')} value={model.candidates[index].sourceId || undefined} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={sourceId => selectSource(sourceId, index)} /></label>
     <label className="agent-settings-field">{t('hub.upstreamModel')}<Input aria-label={t('hub.upstreamModel')} value={model.candidates[index].model} onChange={event => updateModel({ candidates: model.candidates.map((row, i) => i === index ? { ...row, model: event.target.value } : row) })} /></label>
   </>
-  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceBase.pluginSourceId ? <MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} onChanged={controller.retry}/> : undefined} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
+  const sourceIsBackup = (sourceId: string) => models.some(model => (model.aggregate || model.candidates[0].sourceId !== sourceId) && model.candidates.some(candidate => candidate.sourceId === sourceId))
+  const removeSource = async () => {
+    const sourceId = sourceBase.id
+    if (sourceIsBackup(sourceId) || controller.busy) return
+    if (await controller.save({ ...value, sources: sources.filter(source => source.id !== sourceId), models: models.filter(model => model.candidates[0].sourceId !== sourceId) })) {
+      setSourceDrafts(previous => { const next = { ...previous }; delete next[sourceId]; return next })
+      setSourcePrices(previous => { const next = { ...previous }; delete next[sourceId]; return next })
+      back()
+    }
+  }
+  const sourceAuthentication = sourceBase.pluginSourceId ? <><Button className="tt-model-source-account-add" icon={<PlusIcon />} disabled={!!addingAccount || controller.busy} loading={addingAccount === sourceBase.id} onClick={() => void addAccount(sourceBase)}>{t('hub.plugin.addAccount')}</Button>{accountError && <Alert type="error" role="alert" message={t(accountError)} />}<MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} onChanged={controller.retry}/></> : undefined
+  const sourceManagement = id !== 'new' ? <div className="tt-model-source-management"><Popconfirm classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.deleteConnection')} description={sourceBase.pluginDesktop ? t('hub.plugin.deleteDesktopHint') : undefined} onConfirm={removeSource}><button type="button" className="tt-act danger" disabled={sourceIsBackup(sourceBase.id) || controller.busy}>{t('capabilities.models.deleteAction')}</button></Popconfirm>{sourceIsBackup(sourceBase.id) && <p className="agent-settings-hint">{t('hub.connectionBackupUsed')}</p>}</div> : undefined
+  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
     const saved = await controller.save(next)
     if (saved) {
       setSourceDrafts(previous => { const next = { ...previous }; delete next[id]; return next })
@@ -117,14 +128,13 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const fullDetail = detail === 'source' || detail === 'pricing'
   const rows = sources.map(source => {
     const attached = models.filter(model => !model.aggregate && model.candidates[0].sourceId === source.id)
-    const backupUsed = models.some(model => (model.aggregate || model.candidates[0].sourceId !== source.id) && model.candidates.some(candidate => candidate.sourceId === source.id))
+    const backupUsed = sourceIsBackup(source.id)
     const preview = new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(attached.slice(0, 3).map(model => model.name))
     let label = source.name
     try { if (!label || label === source.baseUrl) label = new URL(source.baseUrl).host } catch { /* Keep the saved source name. */ }
     return <section className="tt-model-connection" key={source.id} aria-label={source.name}>
-      <div className="tt-model-connection-head"><span className="tt-model-connection-icon"><LinkIcon size={24} /></span><div><div className="tt-model-connection-title"><strong>{label}</strong><button type="button" className="tt-act tt-model-source-rename" disabled={controller.busy} aria-label={t('hub.renameSource')} onClick={() => setRenaming({ id: source.id, name: source.name })}><PencilIcon /></button></div><small>{source.pluginSourceId ? t('hub.plugin.source') : source.baseUrl}</small></div>
-        <Button onClick={() => { setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), editing: true } })); navigate('catalog/source/' + source.id) }}>{t('hub.directory.configureSource')}</Button>
-      </div>
+      <button type="button" className="tt-model-connection-open" aria-label={t('hub.openSource', { name: label })} onClick={() => { setAccountError(''); setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), editing: true } })); navigate('catalog/source/' + source.id) }} />
+      <div className="tt-model-connection-head"><span className="tt-model-connection-icon"><LinkIcon size={24} /></span><div><strong>{label}</strong><small>{source.pluginSourceId ? t('hub.plugin.source') : source.baseUrl}</small></div><ChevronRight /></div>
       {<dl className="tt-model-connection-settings">
         <div><dt>{t('capabilities.models.protocol')}</dt><dd>{t('capabilities.models.protocol.' + source.protocol)}</dd></div>
         <div><dt>{t('capabilities.models.authMode')}</dt><dd>{t('capabilities.models.auth.' + source.authMode)}</dd></div>
@@ -133,28 +143,13 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       {source.pluginDesktopUnavailable && <p className="agent-settings-hint">{t('hub.plugin.desktopOnly')}</p>}
       {backupUsed && <p className="agent-settings-hint">{t('hub.connectionBackupUsed')}</p>}
       <div className="tt-model-connection-pricing"><span>{t('pricing.default')}</span><strong>{t('pricing.'+(billing.saved?.pricing.sources?.[source.id]?.default?.mode || 'inherit'))}</strong>{sourcePriceDraftChanged(sourcePrices[source.id],billing.saved?.pricing.sources?.[source.id]) && <small>{t('pricing.draftKept')}</small>}</div>
-      <div className="tt-model-connection-footer">{source.pluginSourceId&&<Button icon={<PlusIcon/>} disabled={!!addingAccount||controller.busy} loading={addingAccount===source.id} onClick={()=>void addAccount(source)}>{t('hub.plugin.addAccount')}</Button>}<Button type="primary" aria-label={t('pricing.openSource',{name:source.name})} onClick={()=>navigate('catalog/source/'+source.id+'/prices')}>{t('pricing.action')}</Button><Button onClick={()=>navigate('catalog/source/'+source.id+'/routing')}>{t('pricing.section.routing')}</Button>
-        <Button disabled={controller.busy} onClick={() => { setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), fetchRequested: true } })); navigate('catalog/source/' + source.id) }}>{t('hub.directory.updateModels')}</Button>
-        <Popconfirm classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.deleteConnection')} description={source.pluginDesktop ? t('hub.plugin.deleteDesktopHint') : undefined} onConfirm={() => controller.save({ ...value, sources: sources.filter(row => row.id !== source.id), models: models.filter(model => model.candidates[0].sourceId !== source.id) })}><button type="button" className="tt-act danger" disabled={backupUsed}>{t('capabilities.models.deleteAction')}</button></Popconfirm>
-      </div>
+
     </section>
   })
-  const saveSourceName = async () => {
-    if (!renaming || controller.busy || !renaming.name.trim() || renaming.name.trim() === sources.find(source => source.id === renaming.id)?.name) return
-    const name = renaming.name.trim(), sourceId = renaming.id
-    if (await controller.save({ ...value, sources: sources.map(source => source.id === sourceId ? { ...source, name } : source) })) {
-      setSourceDrafts(previous => previous[sourceId] ? { ...previous, [sourceId]: { ...previous[sourceId], source: { ...previous[sourceId].source, name }, original: { ...previous[sourceId].original, name } } } : previous)
-      setRenaming(null)
-    }
-  }
   const consumers = Object.entries(value.uses).filter(([, users]) => users.length)
   if (embedded && detail) return <div className="onboarding-model-editor">{draftNotice}{editor}</div>
   return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
     {draftNotice}
-    <Modal className="tt-model-source-name-dialog" title={t('hub.renameSource')} open={!!renaming} destroyOnHidden onCancel={() => { if (!controller.busy) setRenaming(null) }} onOk={() => void saveSourceName()} confirmLoading={controller.busy} okText={t('agent.models.save')} cancelText={t('common.cancel')} okButtonProps={{ disabled: !renaming?.name.trim() || renaming.name.trim() === sources.find(source => source.id === renaming.id)?.name }}>
-      {controller.error && <Alert type="error" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />}
-      <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} autoFocus value={renaming?.name || ''} maxLength={100} disabled={controller.busy} onChange={event => setRenaming(previous => previous && { ...previous, name: event.target.value })} onPressEnter={() => void saveSourceName()} /></label>
-    </Modal>
     {<div className="tt-model-hub-main" hidden={!!detail && layout.phone}>
       <Tabs tabPosition={layout.phone ? 'top' : 'left'} className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
       <div className="tt-model-catalog-detail" hidden={!fullDetail || layout.phone}><header className="tt-pagehead"><BackButton onClick={back}/><h2>{editorTitle}</h2></header>{fullDetail && !layout.phone && editor}</div>
@@ -164,7 +159,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       {tab==='aggregate'||tab==='monitor'?null:fullDetail ? null : tab === 'usage' || tab === 'audit' ? <GatewayReconciliation controller={billing} /> : <div className="tt-model-hub-scroll">
       {tab !== 'speech' && error}{accountError&&<Alert type="error" role="alert" message={t(accountError)} action={<Button onClick={()=>{setAccountError('');controller.retry()}}>{t('capabilities.models.reread')}</Button>}/>}
       {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><SpeechSettings /></section> : tab === 'gateway' ? <section className="tt-model-hub-entry" aria-label={t('hub.tab.gateway')}><p>{t('hub.entryHint')}</p>{value.baseUrl && <div className="agent-settings-field"><span>{t('agent.models.baseUrl')}</span><code>{value.baseUrl + '/v1'}</code></div>}<p>{t('hub.continuationHint')}</p><GatewayAccessKey onChanged={controller.retry} value={gatewayKeyDraft} onChange={setGatewayKeyDraft} /></section>
-        : <>{loaded ? <><div className="tt-model-hub-actions"><Button onClick={()=>{setPriceReturn('catalog');navigate('catalog/pricing')}}>{t('agent.gateway.defaultPrice')}</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'source/new', label: t('hub.addSource') }, { key: 'import', label: t('hub.plugin.import') }, { key: 'local', label: t('hub.local.title') }], onClick: ({ key }) => navigate('catalog/' + key) }}><Button type="primary" icon={<PlusIcon />}>{t('common.create')}</Button></Dropdown></div>{rows.length ? <div className="tt-model-connections">{rows}</div> : <p>{t('hub.empty.connections')}</p>}
+        : <>{loaded ? <><div className="tt-model-hub-actions tt-model-catalog-actions"><Dropdown trigger={['click']} disabled={controller.busy} menu={{ items: [{ key: 'source/new', label: t('hub.addSource') }, { key: 'import', label: t('hub.plugin.import') }, { key: 'local', label: t('hub.local.title') }], onClick: ({ key }) => navigate('catalog/' + key) }}><Button type="primary" icon={<PlusIcon />} disabled={controller.busy}>{t('common.create')}</Button></Dropdown></div>{rows.length ? <div className="tt-model-connections">{rows}</div> : <p>{t('hub.empty.connections')}</p>}
         {!!consumers.length && <section className="tt-model-hub-consumers"><div className="tt-model-hub-actions"><h3>{t('hub.consumers')}</h3></div>{consumers.map(([model, users]) => <div className="tt-model-hub-row" key={model}><div><strong>{models.find(row => row.id === model)?.name || model}</strong><small>{[...new Set(users)].join(', ')}</small></div><Button onClick={() => onNav('capabilities/agents/' + users[0] + '/models')}>{t('hub.configure')}</Button></div>)}</section>}</> : !error && <Spin />}
         </>}
     </div>}</div>}

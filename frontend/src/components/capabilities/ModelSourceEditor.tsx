@@ -24,10 +24,10 @@ const sourceName = (source: ModelSource) => {
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
-  pricing?: ReactNode; authentication?: ReactNode; onEditModel: (id: string) => void
+  pricing?: ReactNode; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { modal, message } = App.useApp()
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
@@ -98,11 +98,11 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
         {source.pluginSourceId ? <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} onChange={event => updateSource({ name: event.target.value })} /></label> : draft.editing ? <>
+          <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} placeholder={t('hub.directory.autoName')} onChange={event => updateSource({ name: event.target.value })} /></label>
           <label className="agent-settings-field">{t('agent.models.baseUrl')}<Input aria-label={t('agent.models.baseUrl')} type="url" value={source.baseUrl} maxLength={2000} placeholder="https://api.example.com/v1" onChange={event => updateSource({ baseUrl: event.target.value })} /></label>
           <label className="agent-settings-field">{t('agent.models.apiKey')}<Input.Password aria-label={t('agent.models.apiKey')} autoComplete="new-password" visibilityToggle={false} value={source.apiKey} maxLength={8192} placeholder={t(source.hasKey ? 'agent.models.keyKept' : 'agent.models.keyPlaceholder')} onChange={event => updateSource({ apiKey: event.target.value })} /></label>
           {needsKey && <p className="tt-model-source-warning" role="alert">{t('agent.models.newEndpointKey')}</p>}
           <details className="tt-model-source-options"><summary>{t('hub.connectionOptions')}<ChevronDown /></summary><div>
-            <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} placeholder={t('hub.directory.autoName')} onChange={event => updateSource({ name: event.target.value })} /></label>
             <label className="agent-settings-field">{t('capabilities.models.protocol')}<Select virtual={false} aria-label={t('capabilities.models.protocol')} value={source.protocol} options={modelProtocols.map(value => ({ value, label: t('capabilities.models.protocol.' + value) }))} onChange={protocol => updateSource({ protocol })} /></label>
             <label className="agent-settings-field">{t('capabilities.models.authMode')}<Select virtual={false} aria-label={t('capabilities.models.authMode')} value={source.authMode} options={['api_key', 'bearer'].map(value => ({ value, label: t('capabilities.models.auth.' + value) }))} onChange={authMode => updateSource({ authMode })} /></label>
           </div></details>
@@ -128,6 +128,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       </section>}
       {overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
       {!!attached.length && <p className="agent-settings-hint">{t('hub.directory.kept', { count: number(attached.length - removedCount) })}</p>}
+      {management}
     </div>
     <footer className="tt-model-source-footer"><span role="status">{t(removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing && draft.directory !== null ? 'hub.directory.unchanged' : 'hub.directory.choose', { count: number(additions.length), removed: number(removedCount) })}</span><Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></footer>
   </form>

@@ -301,7 +301,7 @@ it('keeps failed speech reads non-editable and offers a retry', async () => {
 
 it('updates an existing source without fetching models and retains its stored key', async () => {
   const navigate = vi.fn(), page = mount('', navigate)
-  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.configureSource' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.openSource' }))
   page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
   fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'Renamed source' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
@@ -321,8 +321,9 @@ it('opens a saved source directory from its card and saves additions and removal
   vi.mocked(api).mockImplementation(async (method, path, body) => path==='/agent/model-gateway/settings'?{data:structuredClone(settings)}:({ data: path.endsWith('/discover') ? { models: ['priced-model', 'new-model'] } : method === 'PUT' ? { ...body, revision: 'r2' } : saved }))
   const navigate = vi.fn(), page = mount('', navigate)
   const card = await screen.findByRole('region', { name: 'Saved source' })
-  fireEvent.click(within(card).getByRole('button', { name: 'hub.directory.updateModels' }))
+  fireEvent.click(within(card).getByRole('button', { name: 'hub.openSource' }))
   page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.fetch' }))
   const current = await screen.findByRole('checkbox', { name: 'priced-model' }) as HTMLInputElement
   expect(current.checked).toBe(true)
   expect(current.disabled).toBe(false)
@@ -349,25 +350,43 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(screen.queryByRole('region', { name: 'Saved source' })).toBeNull()
 })
 
-it('keeps creation and import choices inside one New menu', async () => {
+it('opens creation and import choices from the top New button without a pricing shortcut', async () => {
   const navigate = vi.fn()
-  mount('', navigate)
-  const toolbar = (await screen.findByRole('button', { name: 'common.create' })).closest('.tt-model-hub-actions')!
-  expect(within(toolbar as HTMLElement).getAllByRole('button')).toHaveLength(2)
-  fireEvent.click(within(toolbar as HTMLElement).getByRole('button',{name:'common.create'}))
+  const { container } = mount('', navigate)
+  const create = await screen.findByRole('button', { name: 'common.create' })
+  expect(create.closest('.tt-model-catalog-actions')).toBeTruthy()
+  expect(container.querySelector('.tt-model-connection-new')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'agent.gateway.defaultPrice' })).toBeNull()
+  expect(container.querySelector('.tt-model-connection-footer')).toBeNull()
+  fireEvent.click(create)
   fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
 })
 
-it('renames a source directly without discovering models or changing other configuration', async () => {
-  mount('')
-  fireEvent.click(await screen.findByRole('button', { name: 'hub.renameSource' }))
-  const dialog = await screen.findByRole('dialog')
-  fireEvent.change(within(dialog).getByRole('textbox', { name: 'hub.name' }), { target: { value: '  My cloud  ' } })
-  fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
-  await screen.findByRole('region', { name: 'My cloud' })
-  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [{ ...catalog.sources[0], name: 'My cloud' }], models: catalog.models, drafts: [] }))
-  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+it('keeps the card read-only and opens editing, pricing, routing and deletion inside its detail', async () => {
+  const navigate = vi.fn(), page = mount('', navigate)
+  const card = await screen.findByRole('region', { name: 'Saved source' })
+  expect(within(card).getAllByRole('button')).toHaveLength(1)
+  expect(screen.queryByRole('button', { name: 'hub.renameSource' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'pricing.action' })).toBeNull()
+  fireEvent.click(within(card).getByRole('button', { name: 'hub.openSource' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream')
+  page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
+  expect(await screen.findByLabelText('hub.name')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'capabilities.models.deleteAction' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab', { name: 'pricing.section.prices' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream/prices')
+  fireEvent.click(screen.getByRole('tab', { name: 'pricing.section.routing' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream/routing')
+})
+
+it('deletes a source from its connection settings and returns to the catalog', async () => {
+  const navigate = vi.fn()
+  mount('catalog/source/upstream', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'capabilities.models.deleteAction' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'OK' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [], models: [] })))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog')
 })
 
 it('offers published pools as a source and does not discover an upstream for a routing group', async () => {
@@ -383,16 +402,17 @@ it('offers published pools as a source and does not discover an upstream for a r
 })
 
 
-it('creates an independent plugin account from its card and opens its connection settings',async()=>{
+it('creates an independent plugin account inside connection settings',async()=>{
  const original=vi.mocked(api).getMockImplementation()!
  const first={...catalog.sources[0],id:'plugin-one',pluginSourceId:'plugin-one',name:'WorkBuddy'}
  const second={...first,id:'plugin-two',pluginSourceId:'plugin-two',name:'WorkBuddy 2'}
  vi.mocked(api).mockImplementation(async(method,path,body,options)=>{
   if(path==='/agent/model-gateway/catalog')return {data:{...catalog,sources:[first],models:[]}}
+  if(path.endsWith('/plugin-one/info'))return {data:{provider:{id:'plugin-one',name:'WorkBuddy',signedIn:true,methods:[],options:[]},options:{},desktopUnavailable:false}}
   if(path==='/agent/model-gateway/plugins/sources')return {data:{sourceId:second.id,catalog:{...catalog,revision:'new-r',sources:[first,second],models:[]}}}
   return original(method,path,body,options)
  })
- const navigate=vi.fn(),page=mount('catalog',navigate)
+ const navigate=vi.fn(),page=mount('catalog/source/plugin-one',navigate)
  fireEvent.click(await screen.findByRole('button',{name:'hub.plugin.addAccount'}))
  await waitFor(()=>expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog/source/plugin-two/connection'))
  expect(api).toHaveBeenCalledWith('POST','/agent/model-gateway/plugins/sources',{sourceId:'plugin-one',revision:catalog.revision})
