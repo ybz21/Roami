@@ -8,6 +8,7 @@ import (
 var routingStrategies = []string{"smart", "order", "drain", "rotate", "usage", "pace", "weight", "fast", "cheap"}
 
 const groupSource = "@group"
+const maxAggregateMembers = 64
 
 func candidateIdentity(c ModelCandidate) string { return c.SourceID + "/" + c.Model }
 func (m CatalogModel) enabled() bool            { return m.Enabled == nil || *m.Enabled }
@@ -60,7 +61,7 @@ func validateRoutingGraph(models []CatalogModel) error {
 	return nil
 }
 func validateAggregate(model CatalogModel) bool {
-	if !containsField([]string{"openai-completions", "openai-responses", "anthropic-messages"}, model.Protocol) || !containsField(routingStrategies, model.Strategy) || model.CooldownSeconds < 0 || model.CooldownSeconds > 3600 || model.MinContext < 0 || model.MinContext > 10000000 || len(model.Weights) > 8 {
+	if !containsField([]string{"openai-completions", "openai-responses", "anthropic-messages"}, model.Protocol) || !containsField(routingStrategies, model.Strategy) || model.CooldownSeconds < 0 || model.CooldownSeconds > 3600 || model.MinContext < 0 || model.MinContext > 10000000 || len(model.Weights) > maxAggregateMembers {
 		return false
 	}
 	seen := map[string]bool{}

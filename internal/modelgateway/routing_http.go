@@ -20,7 +20,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 	h.Catalog.mu.Unlock()
 	var model *CatalogModel
 	for _, value := range catalog.Models {
-		if value.ID == id {
+		if value.ID == id || containsField(value.Aliases, id) {
 			copy := value
 			model = &copy
 			break

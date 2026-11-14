@@ -23,7 +23,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const throughGateway = !!profile && !!catalog.value?.baseUrl && endpoint(profile.baseUrl) === endpoint(catalog.value.baseUrl)
   const currentID = kind === 'claude' ? view.current.model?.replace(/^roami-claude\//, '').replace(/\[1m\]$/, '') : view.current.model
   const usesDefault = throughGateway && currentID === gatewayDefault
-  const currentModel = (throughGateway ? models.find(model => model.id === (usesDefault ? catalog.value?.defaultModel : currentID)) : undefined) || models.find(model => {
+  const currentModel = (throughGateway ? models.find(model => model.id === (usesDefault ? catalog.value?.defaultModel : currentID) || !!currentID && model.aliases?.includes(currentID)) : undefined) || models.find(model => {
     if (model.aggregate) return false
     const source = sources.find(source => source.id === model.candidates[0].sourceId)
     return profile && source && source.protocol === profile.protocol && endpoint(source.baseUrl) === endpoint(profile.baseUrl) && model.candidates[0].model === view.current.model

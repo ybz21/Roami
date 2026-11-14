@@ -1,0 +1,132 @@
+{
+  "desktop-check.json": {
+    "passed": true,
+    "layouts": [
+      {
+        "tab": "effects",
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "strategy",
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "memberHealth",
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "effects",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "strategy",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "memberHealth",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "effects",
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "strategy",
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "memberHealth",
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "effects",
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "strategy",
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080
+      },
+      {
+        "tab": "memberHealth",
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080
+      }
+    ],
+    "errors": [],
+    "api": [],
+    "checks": [
+      "three views at four widths",
+      "nine routing policies",
+      "weight editing",
+      "rate-limit simulation",
+      "source before model",
+      "add member",
+      "save demo",
+      "ten-account detail",
+      "empty state",
+      "English dark mode"
+    ]
+  },
+  "phone-check.json": {
+    "passed": true,
+    "device": "Redmi Note 8",
+    "dimensions": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "timezone": "Asia/Shanghai"
+    },
+    "detail": {
+      "width": 392.727294921875,
+      "x": 0,
+      "shellHidden": true,
+      "visibleHeaders": 1
+    },
+    "checks": [
+      "real touch tab navigation",
+      "weight policy selection",
+      "rate-limit simulation",
+      "10 independent accounts",
+      "single full-screen return bar",
+      "request routing trace",
+      "English dark theme bounds"
+    ]
+  }
+}

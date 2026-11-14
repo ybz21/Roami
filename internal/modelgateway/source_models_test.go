@@ -127,3 +127,40 @@ func TestCatalogAllowsPrivateHTTPModelSources(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscoverRetainsAdvertisedCapabilitiesAndUnknowns(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"data":[{"id":"vendor/free","name":"Free model","context_length":131072,"top_provider":{"max_completion_tokens":8192},"architecture":{"input_modalities":["text","image"],"output_modalities":["text"]},"supported_parameters":["tools","reasoning"],"pricing":{"prompt":"0","completion":"0"}},{"id":"vendor/unknown"},{"id":"vendor/paid","pricing":{"prompt":"0.000001","completion":"0.000003"}}]}`)
+	}))
+	defer upstream.Close()
+	h := catalogHandler(t, upstream.URL, "openai-completions")
+	before := h.Catalog.snapshot()
+	w := discoverRequest(h, before.Sources[0], before.Revision)
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	var result struct {
+		Data struct {
+			Details []struct {
+				ID                      string
+				Context, Output         int
+				Tools, Reasoning        *bool
+				InputPrice, OutputPrice *float64
+				InputModalities         []string
+			}
+		}
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	rows := result.Data.Details
+	if len(rows) != 3 || rows[0].Context != 131072 || rows[0].Output != 8192 || rows[0].Tools == nil || !*rows[0].Tools || rows[0].Reasoning == nil || !*rows[0].Reasoning || len(rows[0].InputModalities) != 2 || rows[0].InputPrice == nil || *rows[0].InputPrice != 0 {
+		t.Fatalf("metadata lost: %s", w.Body.String())
+	}
+	if rows[1].InputPrice == nil || *rows[1].InputPrice != 1 || *rows[1].OutputPrice != 3 || rows[2].Tools != nil || rows[2].InputPrice != nil {
+		t.Fatalf("unknowns or unit conversion incorrect: %s", w.Body.String())
+	}
+	if h.Catalog.value.Revision != before.Revision {
+		t.Fatal("read changed catalog")
+	}
+}

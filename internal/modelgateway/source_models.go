@@ -82,6 +82,7 @@ func (h *Handler) discoverModels(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, source ModelSource, revision string) {
 	var models []string
+	details := []agentproviders.SourceModelDetail{}
 	var err error
 	if source.PluginSourceID != "" && h.Plugins != nil {
 		var saved modelplugins.Source
@@ -94,10 +95,28 @@ func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, sourc
 			}
 			for _, model := range provider.Models {
 				models = append(models, model.ID)
+				tools, reasoning := model.Tools, model.Reasoning
+				row := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Context: model.Context, Output: model.Output, Tools: &tools, Reasoning: &reasoning}
+				if model.Image {
+					row.InputModalities = []string{"text", "image"}
+				}
+				if model.Free {
+					zero := float64(0)
+					row.InputPrice = &zero
+					row.OutputPrice = &zero
+				} else if model.Cost != nil {
+					input, output := model.Cost.Input, model.Cost.Output
+					row.InputPrice = &input
+					row.OutputPrice = &output
+				}
+				details = append(details, row)
 			}
 		}
 	} else {
-		models, err = agentproviders.ReadSourceModels(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+		details, err = agentproviders.ReadSourceModelDetails(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+		for _, row := range details {
+			models = append(models, row.ID)
+		}
 	}
 	s := h.Catalog
 	s.mu.Lock()
@@ -121,7 +140,13 @@ func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, sourc
 			valid = append(valid, model)
 		}
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"models": valid}})
+	validDetails := []agentproviders.SourceModelDetail{}
+	for _, row := range details {
+		if len(row.ID) <= 200 {
+			validDetails = append(validDetails, row)
+		}
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"models": valid, "details": validDetails}})
 }
 
 func nativeProtocol(kind string) string {

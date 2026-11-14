@@ -118,4 +118,8 @@ node docs/design/20261112-model-usage-details/assets/build.mjs
 
 - [用量本地时间修正](local-time.md)：设备时区、跨日筛选与结算边界。
 
+- [聚合策略与运行效果原型](aggregation-review.html) · [设计说明](aggregation-effects.md)。
+
 - [模型源卡片简化](source-cards.md)：同尺寸卡片、顶部新建与详情内编辑。
+
+聚合 ID 编辑、按源批量选择与网关能力目录见 [实现设计](aggregation-editor.md)。
