@@ -7,6 +7,7 @@ import BackButton from '../BackButton'
 import ModelUsageWorkspace from './ModelUsageWorkspace'
 import { useState } from 'react'
 import { App, Tabs } from 'antd'
+import { configuredSourceModels, configuredSourceModelIds } from './configured-source-models'
 import { Alert, Button, Dropdown, Input, Popconfirm, Select, Spin, TabBar } from './model-controls'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -107,7 +108,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   }} />
   const sourceEditor = id === 'new' ? connectionEditor : <div className="tt-source-workspace">
     <TabBar activeKey={section || 'connection'} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={['connection','prices','routing'].map(key => ({key,label:t('pricing.section.'+key)}))}/>
-    {(section === 'prices' || section === 'routing') ? <SourcePricingSettings key={sourceBase.id} sourceId={sourceBase.id} view={section} models={[...new Set(models.flatMap(model=>model.candidates.filter(candidate=>candidate.sourceId===sourceBase.id).map(candidate=>candidate.model)))]} draft={sourcePrices[sourceBase.id]} onChange={draft=>setSourcePrices(previous=>({...previous,[sourceBase.id]:draft}))} onSaved={billing.setSourcePolicy} onGlobal={()=>{setPriceReturn('catalog/source/'+id+'/prices');navigate('catalog/pricing')}} onAddModels={()=>{setSourceDrafts(previous=>({...previous,[id]:{...(previous[id]||initialSourceDraft(sourceBase,true)),fetchRequested:true}}));navigate('catalog/source/'+id+'/connection')}}/> : connectionEditor}
+    {(section === 'prices' || section === 'routing') ? <SourcePricingSettings key={sourceBase.id} sourceId={sourceBase.id} view={section} models={configuredSourceModelIds(models, sourceBase.id)} draft={sourcePrices[sourceBase.id]} onChange={draft=>setSourcePrices(previous=>({...previous,[sourceBase.id]:draft}))} onSaved={billing.setSourcePolicy} onGlobal={()=>{setPriceReturn('catalog/source/'+id+'/prices');navigate('catalog/pricing')}} onAddModels={()=>{setSourceDrafts(previous=>({...previous,[id]:{...(previous[id]||initialSourceDraft(sourceBase,true)),fetchRequested:true}}));navigate('catalog/source/'+id+'/connection')}}/> : connectionEditor}
   </div>
   const modelEditor = <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); submitModel() }}>
     <label className="agent-settings-field">{t('hub.displayName')}<Input aria-label={t('hub.displayName')} value={model.name} maxLength={100} onChange={event => updateModel({ name: event.target.value })} /></label>
@@ -129,13 +130,13 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const editorTitle = detail === 'source' && id !== 'new' ? sourceBase.name : t(detail === 'pricing' ? 'agent.gateway.defaultPrice' : detail === 'import' ? 'hub.plugin.import' : detail === 'local' ? 'hub.local.title' : detail === 'source' ? id === 'new' ? 'hub.addSource' : 'hub.editSource' : 'hub.editModel')
   const fullDetail = detail === 'source' || detail === 'pricing'
   const rows = sources.map(source => {
-    const attached = models.filter(model => !model.aggregate && model.candidates[0].sourceId === source.id)
+    const attached = configuredSourceModels(models, source.id)
     const backupUsed = sourceIsBackup(source.id)
     const preview = new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(attached.slice(0, 3).map(model => model.name))
     let label = source.name
     try { if (!label || label === source.baseUrl) label = new URL(source.baseUrl).host } catch { /* Keep the saved source name. */ }
     return <section className="tt-model-connection" key={source.id} aria-label={source.name}>
-      <button type="button" className="tt-model-connection-open" aria-label={t('hub.openSource', { name: label })} onClick={() => { setAccountError(''); setSourceDrafts(previous => ({ ...previous, [source.id]: { ...(previous[source.id] || initialSourceDraft(source, true)), editing: true } })); navigate('catalog/source/' + source.id) }} />
+      <button type="button" className="tt-model-connection-open" aria-label={t('hub.openSource', { name: label })} onClick={() => { setAccountError(''); setSourceDrafts(previous => ({ ...previous, [source.id]: previous[source.id] || initialSourceDraft(source, true) })); navigate('catalog/source/' + source.id) }} />
       <div className="tt-model-connection-head"><span className="tt-model-connection-icon"><LinkIcon size={24} /></span><div><strong>{label}</strong><small>{source.pluginSourceId ? t('hub.plugin.source') : source.baseUrl}</small></div><ChevronRight /></div>
       {<dl className="tt-model-connection-settings">
         <div><dt>{t('capabilities.models.protocol')}</dt><dd>{t('capabilities.models.protocol.' + source.protocol)}</dd></div>

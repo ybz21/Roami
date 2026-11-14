@@ -328,7 +328,11 @@
       "Compact hierarchy using the existing sans family and type ladder.",
       "Neutral selection; blue actions and focus; green verified readiness.",
       "Equal functionality with mouse, keyboard, and touch.",
-      "Source-backed facts with explicit unknown states."
+      "Source-backed facts with explicit unknown states.",
+      "Common aggregate creation asks for one name, a source and confirmed models; technical settings are disclosed.",
+      "Source inventory, pricing and aggregate options share saved primary registrations; discovered upstream data is not inventory.",
+      "Default pricing is readonly until editing is explicitly requested.",
+      "Compact phone routing keeps a complete weighted member and its actions in the first viewport."
     ],
     "rules": [
       {

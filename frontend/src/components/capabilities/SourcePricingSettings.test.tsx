@@ -21,6 +21,7 @@ afterEach(()=>{cleanup();vi.clearAllMocks()})
 it('saves one model without committing source drafts and saves defaults without committing model drafts',async()=>{
  const {container}=render(<Harness/>)
  const source=await screen.findByText('pricing.default',{selector:'h3'}).then(element=>element.closest('section')!)
+ fireEvent.click(within(source).getByRole('button',{name:'orchestration.editDefault'}))
  fireEvent.change(within(source).getByLabelText('pricing.input'),{target:{value:'8'}})
  fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
  let editor=container.querySelector('.source-price-inspector')!
@@ -52,4 +53,15 @@ it('requires free confirmation and rejects invalid numeric prices without sendin
  fireEvent.click(within(editor).getByRole('checkbox',{name:'pricing.confirm'}))
  expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(false)
  expect(vi.mocked(api).mock.calls.filter(([method])=>method==='PUT')).toHaveLength(0)
+})
+it('shows current prices without a form and opens editing only on request',async()=>{
+ render(<Harness/> )
+ const edit=await screen.findByRole('button',{name:'orchestration.editDefault'})
+ expect(screen.queryByRole('combobox',{name:'pricing.method'})).toBeNull()
+ fireEvent.click(edit)
+ expect(screen.getByRole('combobox',{name:'pricing.method'})).toBeTruthy()
+ fireEvent.click(screen.getByRole('button',{name:'common.cancel'}))
+ expect(screen.queryByRole('combobox',{name:'pricing.method'})).toBeNull()
+ await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole('button',{name:'orchestration.editDefault'})))
+ expect(vi.mocked(api).mock.calls.some(([method])=>method==='PUT')).toBe(false)
 })

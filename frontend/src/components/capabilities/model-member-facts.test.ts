@@ -10,7 +10,7 @@ vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('./model-routing-api', () => ({ useRoutingStatus: vi.fn(() => ({ data: { channels: [{ sourceId: 'a', model: 'first', ready: true }, { sourceId: 'b', model: 'second', ready: false }] }, failed: false })) }))
 vi.mock('./model-monitor-api', () => ({ useModelMonitor: vi.fn(() => ({ data: { sources: [{ sourceId: 'a', totals: { firstTokenP95: 152 } }] }, failed: false })) }))
 const model: CatalogModel = { id: 'draft-id', name: 'Pool', aggregate: true, protocol: 'openai-completions', strategy: 'smart', candidates: [{ sourceId: 'a', model: 'first' }, { sourceId: 'a', model: 'other' }, { sourceId: 'b', model: 'second' }, { sourceId: 'c', model: 'third' }, { sourceId: 'd', model: 'fourth' }] }
-const catalog: ModelCatalog = { revision: 'one', sources: ['a', 'b', 'c', 'd'].map(id => ({ id, name: id, baseUrl: 'https://example.com', protocol: 'openai-completions', authMode: 'bearer' })), models: [], drafts: [], baseUrl: '', uses: {} }
+const catalog: ModelCatalog = { revision: 'one', sources: ['a', 'b', 'c', 'd'].map(id => ({ id, name: id, baseUrl: 'https://example.com', protocol: 'openai-completions', authMode: 'bearer' })), models: [{ ...model, id: 'native', aggregate: false, candidates: [model.candidates[0]] }], drafts: [], baseUrl: '', uses: {} }
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 it('loads each distinct source once with bounded concurrency and preserves unknown facts', async () => {
  let running = 0, peak = 0
@@ -19,8 +19,9 @@ it('loads each distinct source once with bounded concurrency and preserves unkno
  await waitFor(() => expect(result.current.facts['a/first'].context).toBe(131072))
  expect(api).toHaveBeenCalledTimes(4)
  expect(peak).toBe(3)
- expect(result.current.facts['a/first']).toEqual({ ready: true, context: 131072, sourceLatencyMs: 152 })
+ expect(result.current.facts['a/first']).toEqual({ configured: true, ready: true, context: 131072, sourceLatencyMs: 152 })
  expect(result.current.facts['b/second'].ready).toBe(false)
+ expect(result.current.facts['b/second'].configured).toBe(false)
  expect(result.current.facts['a/other'].ready).toBeUndefined()
  expect(result.current.facts['d/fourth'].context).toBeUndefined()
  expect(useRoutingStatus).toHaveBeenCalledWith('saved-id', true, 'one')

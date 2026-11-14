@@ -8,6 +8,15 @@
 
 状态从已保存的真实路由渠道读取；新成员未检测时明确未知。上下文来自源目录；延迟只显示具有明确来源和时间范围的实际监控值，不推断、不造在线状态。监控仍为 24 小时滚动，保持原有空间上限。
 
+## 配置减负与模型范围
+
+- 聚合常用路径：名称、源、模型；自动生成 ID、默认智能策略。ID、启停和删除收在更多设置；免费调用限制保持可见。
+- 已有源先显示连接摘要与已启用模型；新增连接只先显示地址和 Key。名称、协议、认证方式按需展开。上游目录显式读取后分页展示，每页 30 项。
+- 源内价格先显示当前规则及模型价格，点击修改后出现表单；模型级规则独立保存，明确免费仍须确认。
+- 源清单与价格表、聚合候选共同使用 `configured-source-models.ts`：只认已保存的非聚合主模型。聚合引用、备用候选和上游全目录均不能自动扩展清单。
+- 历史聚合中未在源里启用的成员保留并标记，可显式取消选择；从源移除模型不会删除对应聚合。聚合成员页不再发起上游发现请求。
+- 手机将策略选择与细则放在同一行，预览与故障测试共用标题行，首屏优先显示完整成员。跨源已选视图使用总数，避免“此源”误标。
+
 ## User Stories
 
 - 我能在一屏内看到策略、效果和优先成员，沿用熟悉的能力和模型导航。
@@ -40,10 +49,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 ## Acceptance
 
-导航修订：按用户最终确认恢复能力顶部 Tabs、模型左侧 Tabs；保留内部策略预览与拖拽重构。修订后重新完成四档桌面宽度、侧栏展开/收起及安卓真机导航、详情滚动、返回和定价路径验收。`acceptance.json` 的 `navigationRevision` 为最终布局记录，`initialDesktop` / `initialPhone` 保留初版验收历史。
+导航修订：按用户最终确认恢复能力顶部 Tabs、模型左侧 Tabs；保留内部策略预览与拖拽重构。修订后重新完成四档桌面宽度、侧栏展开/收起及安卓真机导航、详情滚动、返回和定价路径验收。`acceptance.json` 的 `navigationRevision` 记录导航修订，`simplificationRevision` 记录最终配置减负与模型范围修复，`initialDesktop` / `initialPhone` 保留初版验收历史。
 
 已验证桌面 1280/1920/2560/3440、侧栏展开/收起、深浅主题与中英文。Redmi Note 8 真机完成选源、拖拽、滚动、返回继续草稿、保存回读、原生键盘、定价切换和菜单操作；文档与编辑区均无横向溢出。
 
-255 个前端测试文件、1,834 项测试通过；typecheck、i18n、hover、生产构建和完整质量门禁通过。设计检测无机械问题；独立设计复核要求为两个折叠区恢复展开标识，已补 SVG 箭头、打开状态和触屏命中区，复核结论为 `ship`，覆盖该项修正。验收使用隔离实例和模拟上游，未调用生产模型。详细结果见 [acceptance.json](acceptance.json)，截图由 PR 的 pr-shots 分支保存。
+255 个前端测试文件、1,837 项测试通过；typecheck、i18n、hover、生产构建和完整质量门禁通过。配置减负与模型范围修订完成独立复核，手机密度与跨源计数两项修正均获 `ship`，结论覆盖这两项修正。设计检测无机械问题；独立设计复核要求为两个折叠区恢复展开标识，已补 SVG 箭头、打开状态和触屏命中区，复核结论为 `ship`，覆盖该项修正。验收使用隔离实例和模拟上游，未调用生产模型。详细结果见 [acceptance.json](acceptance.json)，截图由 PR 的 pr-shots 分支保存。
 
 参考：[Linear UI redesign](https://linear.app/now/how-we-redesigned-the-linear-ui)、[Vercel Geist](https://vercel.com/geist/introduction)、[Tailwind Vite](https://tailwindcss.com/docs/installation/using-vite)、[shadcn Vite](https://ui.shadcn.com/docs/installation/vite)。

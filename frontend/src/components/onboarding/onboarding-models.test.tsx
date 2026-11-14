@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { installRadixTestEvents } from '../ui/radix-test-events'
 import { WorkspaceStateProvider } from '../../view-state'
 import { WorkspaceStateStore } from '../../workspace-state'
 import { App } from 'antd'
@@ -13,6 +14,7 @@ vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }
 let workspaceState: WorkspaceStateStore
 const wrapper = ({ children }: { children: React.ReactNode }) => <WorkspaceStateProvider store={workspaceState}>{children}</WorkspaceStateProvider>
 beforeEach(() => {
+  installRadixTestEvents()
   workspaceState = new WorkspaceStateStore()
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })
   let catalog = { revision: 'first', sources: [], models: [], drafts: [], uses: {}, baseUrl: '' }

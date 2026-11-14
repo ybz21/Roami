@@ -4,7 +4,7 @@
   "checks": {
     "frontend": {
       "testFiles": 255,
-      "tests": 1834,
+      "tests": 1837,
       "typecheck": "passed",
       "i18n": "passed",
       "hover": "passed",
@@ -499,6 +499,153 @@
       "vitestFiles": 255,
       "vitestTests": 1834,
       "qualityFull": "passed"
+    }
+  },
+  "simplificationRevision": {
+    "request": "减少填写与选择负担，修复源内模型和聚合候选范围。",
+    "scope": "Saved nonaggregate primary source registrations define inventory. Aggregate references, backups and upstream metadata do not add candidates.",
+    "evidence": {
+      "desktop": [
+        {
+          "width": 1280,
+          "scroll": 1280,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "left": true,
+          "alignment": 0
+        },
+        {
+          "width": 1920,
+          "scroll": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "left": true,
+          "alignment": 0
+        },
+        {
+          "width": 2560,
+          "scroll": 2560,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "left": true,
+          "alignment": 0
+        },
+        {
+          "width": 3440,
+          "scroll": 3440,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "left": true,
+          "alignment": 0
+        }
+      ],
+      "created": {
+        "id": "d94defd1-7153-4be2-b439-4da8880c5ab8",
+        "candidates": [
+          {
+            "sourceId": "a",
+            "model": "hy4free"
+          },
+          {
+            "sourceId": "b",
+            "model": "vendor/coding-a"
+          }
+        ],
+        "visibleInputs": [
+          "聚合名称"
+        ]
+      },
+      "checks": [
+        "one required text field to create an aggregate",
+        "automatic ID and smart policy saved",
+        "member picker does not discover upstream",
+        "only source-confirmed models selectable",
+        "legacy members marked without silent deletion",
+        "source connection summary before editing",
+        "configured list visible before discovery",
+        "source discovery paginated at 30",
+        "saved source additions immediately available to aggregation",
+        "source pricing excludes aggregate-only references",
+        "default pricing read-only until explicit edit",
+        "free pricing still requires confirmation",
+        "top and left navigation unchanged",
+        "failure simulation remains optional and works"
+      ],
+      "phone": {
+        "device": "Redmi Note 8",
+        "visibleInputs": [
+          "聚合名称"
+        ],
+        "keyboard": {
+          "state": "open",
+          "kb": "314px",
+          "footer": 427.8181838989258
+        },
+        "pricing": {
+          "width": 392,
+          "scrollWidth": 392,
+          "pane": 393,
+          "paneScroll": 393,
+          "tableTop": 351.9261474609375,
+          "height": 766
+        },
+        "bounds": {
+          "width": 392,
+          "scrollWidth": 392,
+          "height": 766,
+          "scrollHeight": 766,
+          "pane": 393,
+          "paneScroll": 393,
+          "footer": 741.8182182312012,
+          "headers": 1,
+          "scrolled": 248.36363220214844,
+          "actions": "1"
+        },
+        "checks": [
+          "minimal create form and automatic ID",
+          "native text input and fixed save",
+          "only configured source models selectable",
+          "explicit legacy member removal and saved readback",
+          "configured source list visible on entry",
+          "pricing model list visible in first viewport",
+          "unchanged default editing can cancel",
+          "source removal preserves aggregate definitions",
+          "removed source model marked in routing",
+          "real touch navigation and scrolling"
+        ]
+      },
+      "reviewFixes": {
+        "phoneFirstRow": {
+          "headerHeight": 176.28977966308594,
+          "rowTop": 388.9432067871094,
+          "rowBottom": 572.2159423828125,
+          "footerTop": 681.0909423828125,
+          "scroll": 0
+        },
+        "crossSourceCount": "No per-source count in the selected-members view",
+        "optionalSimulation": "touch disclosure works"
+      }
+    },
+    "tests": {
+      "files": 255,
+      "tests": 1837,
+      "unhandledErrors": 0
+    },
+    "detector": [],
+    "review": {
+      "initialDisposition": "recapture",
+      "recapture": "Legacy selected-member case recaptured with stale status and explicit checkbox removal.",
+      "fullDisposition": "fix",
+      "fixes": [
+        "Compact phone strategy/preview; first full weighted member visible above footer",
+        "Remove per-source count from cross-source selected view"
+      ],
+      "finalDisposition": "ship",
+      "scope": "The reviewer scored the two phone-density and cross-source count findings resolved, with no regressions observed in recaptures."
     }
   }
 }

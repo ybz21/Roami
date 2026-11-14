@@ -186,6 +186,16 @@ Mouse hover is gated to fine pointers. Coarse-pointer buttons preserve compact v
 
 Labelled, neutral, and field-specific. Inputs use the content surface, normal border, small radius, and body type. Focus changes the border to the accent; invalid fields use the danger boundary and nearby localized error text. Validation preserves the draft and focuses the invalid field after a failed submission. Select and checkbox behavior comes from Radix; popup content uses the elevated surface and named popup layer.
 
+### Common and advanced settings
+
+Create an aggregate with one name field, source selection and configured model checkboxes. Generate the ID and use smart routing by default. Keep the free-only restriction visible; disclose ID editing, enable/disable and deletion under More settings. Existing source connections open as a summary with the saved model list; reveal credentials only through Change connection. New connections initially expose endpoint and Key; source name, protocol and authentication options remain disclosed.
+
+Default pricing is a readonly summary above the model table. Edit default pricing opens an inline form; cancel restores focus without a write. Per-model editing retains its own save boundary and free declarations still require confirmation. Simulated failover is an optional disclosure, not a required configuration field.
+
+### Model scope
+
+Use [configured source models](../../../frontend/src/components/capabilities/configured-source-models.ts) for source ownership, pricing rows and aggregate candidates. Only saved nonaggregate primary registrations define inventory. Upstream discovery metadata, aggregate references and backup-only candidates cannot create source membership. Read discovery only while explicitly managing a source, paginated at 30. Existing unconfigured aggregate members remain visible with an explicit status and removable selection; never silently delete a group while removing its source model. Cross-source selected views use total scope, not a per-source counter.
+
 ### Navigation
 
 Outer capability and model navigation keep their original AntD form and placement. Within source and aggregate details, Radix tabs use neutral text at rest and neutral selected fill with bright text. Keyboard focus remains visible. Member selection, routing, and saved runtime are distinct contexts; changing tabs keeps the draft. Source connection, pricing, and routing retain their existing destination semantics.
@@ -200,7 +210,7 @@ Independent strategy card and member rows use content surfaces with subtle perim
 
 ### Sortable members
 
-The full-width ordered rows show ordinal, model identity, source, readiness, context, and source latency. Quick move-to-top and remove actions appear on fine-pointer hover or keyboard focus and stay visible for coarse pointers. Weight controls appear when the selected strategy needs them.
+On phones, strategy and details share one row; preview and optional failover share their heading row so an initial viewport can show a complete member. The full-width ordered rows show ordinal, model identity, source, readiness, context, and source latency. Quick move-to-top and remove actions appear on fine-pointer hover or keyboard focus and stay visible for coarse pointers. Weight controls appear when the selected strategy needs them.
 
 Only the grab handle starts pointer sorting; ordinary row swipes keep scrolling. The handle supports ArrowUp/ArrowDown and Home/End ordering, Escape cancellation, disabled states, and a polite position announcement. Reordering preserves weights; removal also removes the corresponding weight. Feedback marks the dragged row and target insertion edge. The handle and quick actions meet the touch target independently of their visible size.
 

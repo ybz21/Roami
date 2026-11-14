@@ -4,8 +4,9 @@ import { usePageActive } from '../../page-activity'
 import type { CatalogModel, ModelCatalog } from './model-hub-api'
 import { useRoutingStatus } from './model-routing-api'
 import { useModelMonitor } from './model-monitor-api'
+import { configuredSourceModelIds } from './configured-source-models'
 import type { SourceModelDetail } from './source-model-directory'
-export type MemberFact = { ready?: boolean; context?: number; sourceLatencyMs?: number }
+export type MemberFact = { configured?: boolean; ready?: boolean; context?: number; sourceLatencyMs?: number }
 export function useModelMemberFacts(model: CatalogModel, saved: CatalogModel | undefined, catalog: ModelCatalog, active: boolean) {
   const pageActive = usePageActive()
   active = active && pageActive
@@ -35,6 +36,7 @@ export function useModelMemberFacts(model: CatalogModel, saved: CatalogModel | u
     const channels = status.data?.channels?.filter(row => row.sourceId === candidate.sourceId && row.model === candidate.model)
     const latency = monitor.data?.sources?.find(row => row.sourceId === candidate.sourceId)?.totals.firstTokenP95
     facts[candidate.sourceId + '/' + candidate.model] = {
+      configured: candidate.sourceId === '@group' ? undefined : configuredSourceModelIds(catalog.models, candidate.sourceId).includes(candidate.model),
       ready: channels?.length ? channels.some(row => row.ready) : undefined,
       context: directory?.key === key ? directory.models[candidate.sourceId]?.find(row => row.id === candidate.model)?.context : undefined,
       sourceLatencyMs: typeof latency === 'number' && latency >= 0 ? latency : undefined,

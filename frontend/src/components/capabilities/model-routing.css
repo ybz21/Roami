@@ -53,9 +53,7 @@ html[data-pointer="coarse"] .tt-member-quick-actions { opacity:1; pointer-events
 .tt-strategy-flow li { display:flex; align-items:center; gap:var(--sp-2); font-size:var(--fs-meta); }
 .tt-strategy-flow strong { font-weight:500; }
 .tt-strategy-flow svg { width:var(--sp-4); height:var(--sp-4); color:var(--text-dim); }
-.tt-strategy-preview-controls { display:flex; flex-wrap:wrap; align-items:end; gap:var(--sp-3); }
-.tt-strategy-preview-controls>.agent-settings-field { flex:1 1 calc(var(--sp-5) * 10); min-width:0; }
-.tt-strategy-rounds { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:var(--sp-1); list-style:none; padding:0; margin:0; flex:1 1 calc(var(--sp-5) * 14); }
+.tt-strategy-rounds { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:var(--sp-1); list-style:none; padding:0; margin:0; }
 .tt-strategy-rounds li>span { display:grid; place-items:center; width:100%; min-width:var(--sp-4); height:var(--ctl-h); border:1px solid var(--border-subtle); background:var(--sel-bg); color:var(--text-bright); border-radius:var(--r-xs); font-size:var(--fs-meta); }
 .tt-strategy-meter { height:var(--sp-1); background:var(--border-subtle); margin-top:var(--sp-1); overflow:hidden; max-width:calc(var(--sp-5) * 10); border-radius:var(--r-pill); }
 .tt-strategy-meter>span { display:block; height:100%; background:var(--accent-solid); }
@@ -77,12 +75,12 @@ html[data-pointer="coarse"] .tt-member-quick-actions { opacity:1; pointer-events
 .tt-aggregate-members .tt-model-directory-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5) * 24)),1fr)); column-gap:var(--sp-5); }
 .tt-aggregate-members .tt-model-directory-row small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
 .tt-aggregate-members .ui-pagination { margin-top:var(--sp-4); }
-.tt-aggregate-options>summary { display:flex; align-items:center; min-height:var(--tap); cursor:pointer; font-size:var(--fs-sm); }
+:is(.tt-aggregate-options,.tt-aggregate-more,.tt-strategy-test)>summary { display:flex; align-items:center; min-height:var(--tap); cursor:pointer; font-size:var(--fs-sm); }
 .tt-aggregate-options { max-width:var(--content-form); margin-top:var(--sp-5); }
-.tt-routing-guide>summary,.tt-aggregate-options>summary { gap:var(--sp-2); min-height:var(--tap); }
-.tt-routing-guide>summary>svg,.tt-aggregate-options>summary>svg { flex-shrink:0; width:var(--sp-4); height:var(--sp-4); color:var(--text-dim); }
-.tt-routing-guide[open]>summary>svg,.tt-aggregate-options[open]>summary>svg { transform:rotate(90deg); }
-.tt-routing-guide[open]>summary,.tt-aggregate-options[open]>summary { color:var(--text-bright); }
+.tt-routing-guide>summary,:is(.tt-aggregate-options,.tt-aggregate-more,.tt-strategy-test)>summary { gap:var(--sp-2); min-height:var(--tap); }
+.tt-routing-guide>summary>svg,:is(.tt-aggregate-options,.tt-aggregate-more,.tt-strategy-test)>summary>svg { flex-shrink:0; width:var(--sp-4); height:var(--sp-4); color:var(--text-dim); }
+.tt-routing-guide[open]>summary>svg,:is(.tt-aggregate-options,.tt-aggregate-more,.tt-strategy-test)[open]>summary>svg { transform:rotate(90deg); }
+.tt-routing-guide[open]>summary,:is(.tt-aggregate-options,.tt-aggregate-more,.tt-strategy-test)[open]>summary { color:var(--text-bright); }
 .tt-aggregate-footer>div { display:flex; flex-shrink:0; gap:var(--sp-3); }
 .tt-aggregate-footer>span { min-width:0; }
 .tt-aggregate-footer small { display:block; font-size:var(--fs-meta); }
@@ -108,3 +106,27 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-member-identity { displa
 html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-card { padding:var(--sp-3); gap:var(--sp-3); }
 html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-fields>.agent-settings-hint { display:none; }
 html:is([data-size="compact"],[data-size="medium"]) .tt-aggregate-tabs .ui-tabs-list { padding-block:var(--sp-1); }
+
+.tt-aggregate-basics{display:flex;align-items:flex-end;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5)}
+.tt-aggregate-basics>.tt-aggregate-identity{flex:1 1 calc(var(--sp-5) * 12);max-width:var(--content-form)}
+.tt-aggregate-basics>.tt-member-policy{margin:0;max-width:var(--content-form)}
+.tt-aggregate-more{margin-top:var(--sp-5);border-top:1px solid var(--border-subtle);padding-top:var(--sp-2)}
+.tt-aggregate-settings{max-width:var(--content-form);padding-block:var(--sp-3)}
+.tt-aggregate-more>summary>small,.tt-strategy-test>summary>small{color:var(--text-dim);font-size:var(--fs-meta)}
+.tt-strategy-test{margin-top:var(--sp-2)}
+.tt-strategy-test>.agent-settings-field{margin-block:var(--sp-2);max-width:var(--content-form)}
+
+.tt-strategy-hint-compact{display:none}
+html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-fields{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:var(--sp-2)}
+html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-fields>.agent-settings-field{flex-direction:row;align-items:center;gap:var(--sp-2)}
+html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-fields>.agent-settings-field>span{flex-shrink:0;font-size:var(--fs-sm)}
+html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-fields>.agent-settings-field>.ui-select-trigger{flex:1;min-width:0}
+html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-fields>.tt-routing-guide[open]{grid-column:1/-1}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-simulation{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--sp-2)}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-preview-head{grid-column:1;grid-row:1}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-preview-head>span,html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-flow,html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-hint-full{display:none}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-hint-compact{display:inline}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-rounds{grid-column:1/-1;grid-row:2}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-test{grid-column:2;grid-row:1;margin:0}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-test[open]{grid-column:1/-1;grid-row:3}
+html:is([data-size="compact"],[data-size="medium"]) .tt-strategy-simulation>.agent-settings-hint{grid-column:1/-1;margin:0}
