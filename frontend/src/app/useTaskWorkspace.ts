@@ -86,6 +86,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   useBackDismiss(isMobile && overlay, () => setOverlay(false))
   const taskView = hasSider && tab === TASK_ROUTE
   const space = useWorkspaceLayout(terms.length > 0 || taskView, taskView)
+  const pageVisible = isMobile ? !overlay : !taskView && space.mode !== 'focus'
   useEffect(() => { if (saved.loaded && !terms.length) setOverlay(false) }, [saved.loaded, terms.length])
 
   useEffect(() => {
@@ -125,6 +126,6 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     return ts.map((n) => (inTask(n) ? vis[i++] : n))
   })
 
-  return { terms, active, activeFile, fileTabs, curFile, activeTask, activeTaskRef, projTable, keyOf, space, taskView, overlay, setOverlay, openTerm, closeTerm, renameOpenTerm, returnToTask, activateSession, openFileTab, pinFileTab, closeFileTab, setFileMode, setActiveFile, reorderTerm, reveal }
+  return { terms, active, activeFile, fileTabs, curFile, activeTask, activeTaskRef, projTable, keyOf, space, taskView, pageVisible, overlay, setOverlay, openTerm, closeTerm, renameOpenTerm, returnToTask, activateSession, openFileTab, pinFileTab, closeFileTab, setFileMode, setActiveFile, reorderTerm, reveal }
 }
 export type TaskWorkspace = ReturnType<typeof useTaskWorkspace>
