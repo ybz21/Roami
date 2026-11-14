@@ -15,6 +15,11 @@ type BrowserTerminal = {
   _inputEvent: (event: InputEvent) => boolean
 }
 
+export function clearTerminalDrop(term: Terminal): void {
+  const helper = (term as unknown as { _core: BrowserTerminal })._core._compositionHelper
+  if (term.textarea && !helper.isComposing && !helper._isSendingComposition) term.textarea.value = ''
+}
+
 // xterm 5.5 compatibility; remove after upgrading with the IME fixes in xtermjs/xterm.js#5759 and #6060.
 export function synchronizeTerminalIME(term: Terminal): () => void {
   const core = (term as unknown as { _core: BrowserTerminal })._core
@@ -26,7 +31,13 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
   }
   const start = helper.compositionstart
   const end = helper.compositionend
+  const finalize = helper._finalizeComposition
   const input = core._inputEvent
+  helper._finalizeComposition = function (wait) {
+    // The browser may replace the last candidate after compositionend, before Enter.
+    if (!wait) this._compositionPosition.end = textarea.value.length
+    finalize.call(this, wait)
+  }
   helper.compositionstart = function () {
     // A new composition must not cancel the preceding deferred commit.
     if (this._isSendingComposition) this._finalizeComposition(false)
@@ -48,6 +59,43 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
   return () => {
     helper.compositionstart = start
     helper.compositionend = end
+    helper._finalizeComposition = finalize
     core._inputEvent = input
+  }
+}
+
+export function bindTerminalInput(term: Terminal, send: (data: string) => void): () => void {
+  const releaseIME = synchronizeTerminalIME(term)
+  const textarea = term.textarea!
+  let pendingPinyin: string | null = null
+  let pendingTimer: ReturnType<typeof setTimeout> | undefined
+  const onStart = () => {
+    clearTimeout(pendingTimer)
+    pendingPinyin = null
+  }
+  const onEnd = (event: CompositionEvent) => {
+    // macOS can commit unselected pinyin with spaces when switching input methods.
+    pendingPinyin = /^[a-zA-Z][a-zA-Z ]*$/.test(event.data) ? event.data : null
+    clearTimeout(pendingTimer)
+    // xterm's finalizer is already queued; an empty commit must not affect later input.
+    pendingTimer = setTimeout(() => { pendingPinyin = null }, 0)
+  }
+  textarea.addEventListener('compositionstart', onStart)
+  textarea.addEventListener('compositionend', onEnd)
+  const subscription = term.onData(data => {
+    const pinyin = pendingPinyin
+    pendingPinyin = null
+    if (pinyin && data.startsWith(pinyin)) {
+      send(pinyin.replace(/ /g, '') + data.slice(pinyin.length))
+    } else {
+      send(data)
+    }
+  })
+  return () => {
+    clearTimeout(pendingTimer)
+    textarea.removeEventListener('compositionstart', onStart)
+    textarea.removeEventListener('compositionend', onEnd)
+    subscription.dispose()
+    releaseIME()
   }
 }
