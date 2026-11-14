@@ -1,0 +1,276 @@
+{
+  "desktop": {
+    "passed": true,
+    "layouts": [
+      {
+        "state": "list",
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "content": null,
+        "outside": false,
+        "cards": 3
+      },
+      {
+        "state": "list",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "content": null,
+        "outside": false,
+        "cards": 3
+      },
+      {
+        "state": "list",
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "content": null,
+        "outside": false,
+        "cards": 3
+      },
+      {
+        "state": "list",
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "content": null,
+        "outside": false,
+        "cards": 3
+      },
+      {
+        "state": "members",
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 1940
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "members",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 1229
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "members",
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 992
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "members",
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 803
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "members-sidebar-open",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 1229
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "routing",
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 928
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "routing",
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 738
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "routing",
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 738
+        },
+        "outside": false,
+        "cards": 0
+      },
+      {
+        "state": "routing",
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "footer": {
+          "top": 990,
+          "bottom": 1055
+        },
+        "content": {
+          "client": 738,
+          "scroll": 738
+        },
+        "outside": false,
+        "cards": 0
+      }
+    ],
+    "checks": [
+      "full detail replaces list and split pane",
+      "fixed footer at four widths",
+      "sidebar open and closed",
+      "search selects immediately",
+      "tabs retain choices and manual order",
+      "back and resume retain ID",
+      "save/readback retains aliases and weights",
+      "source-style cards with a single open action",
+      "runtime belongs to aggregate detail",
+      "light English"
+    ]
+  },
+  "phone": {
+    "passed": true,
+    "device": "Redmi Note 8",
+    "bounds": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "footer": {
+        "top": 677.0909423828125,
+        "bottom": 741.8182144165039
+      },
+      "scroll": 1257,
+      "client": 570,
+      "headers": 1
+    },
+    "before": [
+      "b/vendor/coding-b",
+      "b/vendor/coding-a",
+      "a/hy4free",
+      "b/hy4free"
+    ],
+    "after": [
+      "b/vendor/coding-a",
+      "b/vendor/coding-b",
+      "a/hy4free",
+      "b/hy4free"
+    ],
+    "picked": "hy4free",
+    "checks": [
+      "full-screen source-style detail",
+      "single return bar",
+      "touch selection without add step",
+      "touch drag order",
+      "one content scroll area",
+      "fixed save visible",
+      "back resumes unsaved draft",
+      "touch save and readback",
+      "real touch source switch",
+      "native keyboard text input and cancel"
+    ],
+    "keyboard": {
+      "state": "open",
+      "kb": "314px",
+      "footerBottom": 451.8181838989258,
+      "viewport": 765.8181762695312,
+      "clientHeight": 766,
+      "source": "Primary source"
+    }
+  },
+  "tests": {
+    "files": 253,
+    "passed": 1821
+  },
+  "checks": [
+    "full quality gate",
+    "typecheck",
+    "i18n",
+    "hover",
+    "production build"
+  ],
+  "artifacts": "/tmp/roami-aggregation-config-20261114",
+  "scope": "Frontend only; no routing, billing, API or retention changes."
+}

@@ -1,74 +1,47 @@
 import AggregationPoolCard from './AggregationPoolCard'
-import RoutingStrategyPreview from './RoutingStrategyPreview'
+import AggregationEditor from './AggregationEditor'
 import { MAX_AGGREGATE_MEMBERS } from './routing-preview'
-import { advertisedFree, useSourceDirectory } from './source-model-directory'
 import { useState } from 'react'
-import { Alert, App, Button, Checkbox, Input, InputNumber, Select, Spin } from 'antd'
+import { Alert, App, Button, Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { PlusIcon } from '../../icons'
 import BackButton from '../BackButton'
 import MobileSubPage from '../MobileSubPage'
-import { routingStrategies, type RoutingStrategy } from './model-routing-api'
 import type { CatalogModel, ModelCatalog, ModelCandidate } from './model-hub-api'
 import './model-routing.css'
 const identity = (candidate: ModelCandidate) => candidate.sourceId + '/' + candidate.model
 const emptyPool = (): CatalogModel => ({ id: globalThis.crypto?.randomUUID?.() || 'pool-' + Date.now().toString(36), name: '', aggregate: true, enabled: true, freeOnly: true, allowPlan: false, protocol: 'openai-completions', strategy: 'smart', candidates: [], cooldownSeconds: 60, onLimit: true, onExhausted: true, minContext: 0, weights: {} })
 export default function ModelAggregationWorkspace({ active, catalog, busy, error, save, retry, onSource }: { active: boolean; catalog: ModelCatalog | null; busy: boolean; error: string; save: (value: ModelCatalog) => Promise<boolean>; retry: () => void; onSource: (source: string) => void }) {
   const { t } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
-  const [selected, setSelected] = useState(''), [draft, setDraft] = useState<CatalogModel | null>(null), [original, setOriginal] = useState<string | null>(null), [source, setSource] = useState(''), [native, setNative] = useState<string[]>([]), [onlyFree, setOnlyFree] = useState(false)
+  const [drafts, setDrafts] = useState<Record<string, CatalogModel>>({}), [original, setOriginal] = useState<string | null>(null), [editorOpen, setEditorOpen] = useState(false)
+  const key = original || '@new', draft = drafts[key] || null
   const pools = catalog?.models.filter(model => model.aggregate) || []
-  const edit = (model: CatalogModel | null) => { setSelected(model?.id || ''); setDraft(model ? { ...model, candidates: model.candidates.map(candidate => ({ ...candidate })), weights: { ...model.weights } } : emptyPool()); setOriginal(model?.id || null); setSource(''); setNative([]) }
-  const patch = (value: Partial<CatalogModel>) => { if (draft) setDraft({ ...draft, ...value }) }
+  const edit = (model: CatalogModel | null) => {
+    const id = model?.id || '@new'
+    setDrafts(previous => previous[id] ? previous : { ...previous, [id]: model ? { ...model, candidates: model.candidates.map(candidate => ({ ...candidate })), weights: model.weights ? { ...model.weights } : undefined } : emptyPool() })
+    setOriginal(model?.id || null)
+    setEditorOpen(true)
+  }
+  const cancel = () => { setDrafts(previous => { const next = { ...previous }; delete next[key]; return next }); setEditorOpen(false) }
+  const patch = (value: Partial<CatalogModel>) => setDrafts(previous => previous[key] ? { ...previous, [key]: { ...previous[key], ...value } } : previous)
   const sources = catalog?.sources || []
-  const directory = useSourceDirectory(catalog, source, active && !!draft && source !== '@group')
-  const remoteModels = (directory.value?.models || []).filter(model => !onlyFree || advertisedFree(model))
-  const availableModels = source === '@group' ? pools.filter(model => model.id !== draft?.id && model.id !== original).map(model => ({ value: model.id, label: model.name })) : [...new Set([...(!onlyFree ? catalog?.models.filter(model => !model.aggregate).flatMap(model => model.candidates.filter(candidate => candidate.sourceId === source).map(candidate => candidate.model)) || [] : []), ...remoteModels.map(row => row.id)])].map(model => ({ value: model, label: model }))
-  const selectable = availableModels.filter(row => !draft?.candidates.some(candidate => candidate.sourceId === source && candidate.model === row.value))
-  const chosen = native.filter(model => selectable.some(row => row.value === model))
-  const addMembers = () => {
-    if (!draft || !chosen.length || draft.candidates.length + chosen.length > MAX_AGGREGATE_MEMBERS) return
-    patch({ candidates: [...draft.candidates, ...chosen.map(model => ({ sourceId: source, model }))], ...(!draft.candidates.length ? { protocol: sources.find(value => value.id === source)?.protocol || pools.find(value => value.id === chosen[0])?.protocol || draft.protocol } : {}) })
-    setNative([])
-  }
   const valid = !!draft && !!draft.name.trim() && draft.id !== 'roami-default' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(draft.id) && draft.candidates.length > 0 && draft.candidates.length <= MAX_AGGREGATE_MEMBERS && (draft.aliases?.length || 0) + (original && draft.id !== original && !draft.aliases?.includes(draft.id) ? 1 : 0) <= 32 && draft.candidates.every(candidate => candidate.model && (candidate.sourceId === '@group' || sources.some(source => source.id === candidate.sourceId)) && Number.isInteger(draft.weights?.[identity(candidate)] ?? 1) && (draft.weights?.[identity(candidate)] ?? 1) >= 1 && (draft.weights?.[identity(candidate)] ?? 1) <= 1000) && !catalog?.models.some(model => (model.id === draft.id || model.aliases?.includes(draft.id)) && model.id !== original)
-  const submit = async () => { if (!catalog || !draft || !valid || busy) return; const next = { ...draft, name: draft.name.trim(), aliases: [...new Set([...(draft.aliases || []), ...(original && original !== draft.id ? [original] : [])])].filter(id => id !== draft.id) }; if (await save({ ...catalog, models: original ? catalog.models.map(model => model.id === original ? next : model) : [...catalog.models, next] })) { setSelected(next.id); setDraft(null); message.success(t('pool.saved')) } }
-  const policy = (strategy: string) => <div className="tt-routing-guide"><p>{t('pool.strategy.' + strategy + '.summary')}</p><details><summary>{t('pool.policyDetails')}</summary><p>{t('pool.strategy.' + strategy + '.detail')}</p>{strategy === 'cheap' && <p>{t('pool.timePriceHint')}</p>}</details></div>
-  const editor = draft && <form className="tt-routing-editor" onSubmit={event => { event.preventDefault(); void submit() }}>
-    <div className="tt-routing-fields"><label className="agent-settings-field">{t('pool.name')}<Input aria-label={t('pool.name')} value={draft.name} maxLength={100} onChange={event => patch({ name: event.target.value })} /></label><label className="agent-settings-field">{t('pool.modelId')}<Input aria-label={t('pool.modelId')} value={draft.id} maxLength={160} onChange={event => patch({ id: event.target.value })} /></label><label className="agent-settings-field">{t('pool.strategy')}<Select classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('pool.strategy')} virtual={false} value={draft.strategy} options={routingStrategies.map(value => ({ value, label: t('pool.strategy.' + value) + ' · ' + value + (value === 'smart' ? ' · ' + t('pool.default') : '') }))} onChange={(strategy: RoutingStrategy) => patch({ strategy })} /></label></div>
-    {original && <p className="agent-settings-hint">{t('pool.renameHint')}</p>}
-    {policy(draft.strategy)}{phone && <RoutingStrategyPreview model={draft} sources={sources} pools={pools} onChange={patch} disabled={busy} />}
-    <div className="tt-routing-flags"><Checkbox checked={draft.freeOnly === true} onChange={event => patch({ freeOnly: event.target.checked })}>{t('pool.freeOnly')}</Checkbox>{draft.freeOnly === true && <><Checkbox checked={draft.allowPlan} onChange={event => patch({ allowPlan: event.target.checked })}>{t('pool.allowPlan')}</Checkbox><p className="agent-settings-hint">{t('pool.noPaid')}</p></>}{!draft.freeOnly && <p className="agent-settings-hint">{t('pool.paidGroup')}</p>}<Checkbox checked={draft.requireTools} onChange={event => patch({ requireTools: event.target.checked })}>{t('pool.requireTools')}</Checkbox></div>
-    <div className="tt-routing-fields"><label className="agent-settings-field">{t('pool.context')}<InputNumber aria-label={t('pool.context')} min={0} max={10000000} step={1000} precision={0} value={draft.minContext || 0} onChange={value => patch({ minContext: value || 0 })} /></label><label className="agent-settings-field">{t('pool.cooldown')}<Select classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('pool.cooldown')} value={draft.cooldownSeconds || 60} options={[30, 60, 120, 300].map(value => ({ value, label: t('pool.seconds', { count: value }) }))} onChange={cooldownSeconds => patch({ cooldownSeconds })} /></label></div><div className="tt-routing-flags"><Checkbox checked={draft.onLimit !== false} onChange={event => patch({ onLimit: event.target.checked })}>{t('pool.onLimit')}</Checkbox><Checkbox checked={draft.onExhausted !== false} onChange={event => patch({ onExhausted: event.target.checked })}>{t('pool.onExhausted')}</Checkbox><p className="agent-settings-hint">{t('pool.noReplay')}</p></div>
-    <h3>{t('pool.candidateMembers')} <small>{draft.candidates.length} / {MAX_AGGREGATE_MEMBERS}</small></h3><div className="tt-candidate-picker"><label className="agent-settings-field">{t('hub.source')}<Select classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('pool.source')} virtual={false} placeholder={t('pool.selectSource')} value={source || undefined} options={[...sources.map(source => ({ value: source.id, label: source.name })), ...(pools.some(model => model.id !== draft.id && model.id !== original) ? [{ value: '@group', label: t('pool.groups') }] : [])]} onChange={value => { setSource(value); setNative([]); setOnlyFree(false) }} /></label><label className="agent-settings-field">{t('pool.model')}<Select mode="multiple" maxTagCount="responsive" classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('pool.model')} showSearch optionFilterProp="label" disabled={!source} loading={directory.loading} placeholder={t(source ? 'pool.selectModel' : 'pool.selectSource')} value={chosen} options={availableModels.map(value => ({ ...value, disabled: !selectable.some(row => row.value === value.value) }))} onChange={setNative} /></label><Button icon={<PlusIcon />} disabled={!chosen.length || draft.candidates.length + chosen.length > MAX_AGGREGATE_MEMBERS} onClick={addMembers}>{t('pool.addMember')}</Button></div>
-    {source && <div className="tt-candidate-bulk"><Checkbox checked={!!selectable.length && chosen.length === selectable.length} indeterminate={chosen.length > 0 && chosen.length < selectable.length} disabled={!selectable.length} onChange={event => setNative(event.target.checked ? selectable.map(row => row.value) : [])}>{t('pool.selectAll')}</Checkbox>{source !== '@group' && <Checkbox checked={onlyFree} onChange={event => { setOnlyFree(event.target.checked); setNative([]) }}>{t('directory.free')}</Checkbox>}<span>{t('pool.selectedCount', { count: chosen.length })}</span></div>}
-    {draft.candidates.length + chosen.length > MAX_AGGREGATE_MEMBERS && <Alert type="warning" role="alert" message={t('pool.memberLimit', { count: MAX_AGGREGATE_MEMBERS })} />}
-    {onlyFree && <p className="agent-settings-hint">{t('pool.freeFilterHint')}</p>}
-    {directory.value?.error && source !== '@group' && <Alert type="warning" message={t('directory.loadFailed')} action={<Button onClick={directory.retry}>{t('agent.retry')}</Button>} />}
-    {source && source !== '@group' && !availableModels.length && <p className="agent-settings-hint">{t('pool.fetchModels')} <button type="button" className="tt-act" onClick={() => onSource(source)}>{t('hub.configure')}</button></p>}
-    {!valid && <p className="agent-settings-hint">{t('pool.invalid')}</p>}{error && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}<footer><Button onClick={() => setDraft(null)} disabled={busy}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={!valid} loading={busy}>{t('agent.models.save')}</Button></footer>
-  </form>
-  const focused = draft ? original : selected
-  const orderedPools = focused ? [...pools].sort((a, b) => Number(b.id === focused) - Number(a.id === focused)) : pools
-  const card = (saved: CatalogModel, creating = false) => {
-    const editing = !!draft && (creating || saved.id === original)
-    const model = editing ? draft : saved
-    return <AggregationPoolCard key={creating ? 'draft' : 'saved:' + saved.id} model={model} sources={sources} pools={pools} revision={catalog?.revision || ''}
-      active={active && !(phone && !!draft)} expanded={editing ? !phone : selected === saved.id} editing={editing}
-      busy={busy} canEdit={!draft} inUse={!!catalog?.uses[saved.id]?.length} onChange={editing ? patch : undefined}
-      onToggle={() => setSelected(value => value === saved.id ? '' : saved.id)} onEdit={() => edit(saved)}
-      onEnable={() => { if (catalog) void save({ ...catalog, models: catalog.models.map(value => value.id === saved.id ? { ...value, enabled: value.enabled === false } : value) }) }}
-      onDelete={() => catalog ? save({ ...catalog, models: catalog.models.filter(value => value.id !== saved.id) }) : Promise.resolve(false)} />
-  }
+  const submit = async () => { if (!catalog || !draft || !valid || busy) return; const next = { ...draft, name: draft.name.trim(), aliases: [...new Set([...(draft.aliases || []), ...(original && original !== draft.id ? [original] : [])])].filter(id => id !== draft.id) }; if (await save({ ...catalog, models: original ? catalog.models.map(model => model.id === original ? next : model) : [...catalog.models, next] })) { cancel(); message.success(t('pool.saved')) } }
+  const card = (model: CatalogModel) => <AggregationPoolCard key={model.id} model={model} disabled={busy} unsaved={!!drafts[model.id] && JSON.stringify(drafts[model.id]) !== JSON.stringify(model)} onOpen={() => edit(model)} />
+  const remove = async () => { if (!catalog || !original || busy) return false; const saved = await save({ ...catalog, models: catalog.models.filter(row => row.id !== original) }); if (saved) cancel(); return saved }
+  const editor = draft && catalog && <AggregationEditor key={key} model={draft} original={original} catalog={catalog} active={active} busy={busy} valid={valid} error={error} retry={retry} onChange={patch} onSave={() => void submit()} onCancel={cancel} onDelete={remove} onSource={onSource} />
+  const title = original ? pools.find(row => row.id === original)?.name || t('pool.edit') : t('pool.create')
+  if (editorOpen && draft) return <section className="tt-routing-workspace tt-model-catalog-detail tt-aggregate-detail" hidden={!active} aria-label={t('hub.tab.aggregate')}>
+    {phone ? active && <MobileSubPage title={title} search={false} onBack={() => setEditorOpen(false)}>{editor}</MobileSubPage> : <><header className="tt-pagehead"><BackButton onClick={() => setEditorOpen(false)} /><h2>{title}</h2></header>{editor}</>}
+  </section>
   return <section className="tt-routing-workspace" hidden={!active} aria-label={t('hub.tab.aggregate')}>
     <div className="tt-routing-main">
-      <div className="tt-model-hub-actions"><p className="agent-settings-hint">{t('pool.entryHint')}</p><Button type="primary" icon={<PlusIcon />} disabled={!catalog || busy || !!draft} onClick={() => edit(null)}>{t('pool.create')}</Button></div>
+      <div className="tt-model-hub-actions"><p className="agent-settings-hint">{t('pool.entryHint')}</p><Button type="primary" icon={<PlusIcon />} disabled={!catalog || busy} onClick={() => edit(null)}>{t(drafts['@new'] ? 'pool.resumeCreate' : 'pool.create')}</Button></div>
       {active && error && !draft && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
-      {!catalog ? <Spin /> : !pools.length && !draft ? <p className="agent-settings-hint">{t('pool.empty')}</p> : <div className="tt-routing-pools">
-        {draft && !original && !phone && card(draft, true)}
-        {orderedPools.map(model => card(model))}
+      {!catalog ? <Spin /> : !pools.length ? <p className="agent-settings-hint">{t('pool.empty')}</p> : <div className="tt-model-connections">
+        {pools.map(model => card(model))}
       </div>}
     </div>
-    {active && draft && (phone ? <MobileSubPage title={t(original ? 'pool.edit' : 'pool.create')} search={false} onBack={() => setDraft(null)}>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><BackButton onClick={() => setDraft(null)} /><h3>{t(original ? 'pool.edit' : 'pool.create')}</h3></div>{editor}</aside>)}
   </section>
 }
