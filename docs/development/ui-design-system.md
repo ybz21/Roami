@@ -66,6 +66,8 @@
 |---|---|
 | `--accent` / `--ok` / `--warn` / `--danger` | 对应语义的文字、图标、状态点与线条 |
 | `--accent-solid` / `--ok-solid` | 实心按钮、徽标等色块 |
+| `--on-accent` | 强调色实心控件上的前景，和现有组件库共享推导值 |
+| `--overlay-backdrop` | 需要遮罩的确认弹层，和现有组件库共享推导值 |
 | `--accent-soft` / `--ok-soft` / `--warn-soft` / `--danger-soft` | 强调芯片、徽标、状态淡底；普通选中行仍用 `--sel-bg` |
 | `--accent-border` / `--ok-border` / `--warn-border` / `--danger-border` | 对应语义的描边 |
 

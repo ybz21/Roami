@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { installRadixTestEvents } from '../ui/radix-test-events'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from 'antd'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -11,9 +12,9 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }) }))
 const catalog: ModelCatalog = { revision: 'r1', sources: [{ id: 'a', name: 'Source A', baseUrl: 'https://a.example', protocol: 'openai-completions', authMode: 'bearer' }, { id: 'b', name: 'Source B', baseUrl: 'https://b.example', protocol: 'openai-completions', authMode: 'bearer' }], models: [{ id: 'model-a', name: 'A', strategy: 'fixed', protocol: 'openai-completions', candidates: [{ sourceId: 'a', model: 'native-a' }] }, { id: 'model-b', name: 'B', strategy: 'fixed', protocol: 'openai-completions', candidates: [{ sourceId: 'b', model: 'native-b' }] }], drafts: [], baseUrl: '', uses: {} }
 const totals = { requests: 2, failed: 0, success: 1, firstTokenP95: 123, outputP50: 45, quality: null, graded: 0 }
-beforeEach(() => { window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })); vi.mocked(api).mockImplementation(async (method, path) => method === 'POST' ? { data: { sourceId: 'a', model: 'native-a', quality: 'pass' } } : path.includes('/monitor?') ? { data: { now: Date.now(), hours: 24, totals, sources: [{ sourceId: 'a', totals }], models: { a: { 'native-a': true } }, points: [], events: [], storage: { records: 2, maxRecords: 10000, bytes: 40960000, maxBytes: 67108864, expired: 0, evicted: 0, dropped: 0, retentionHours: 24 } } } : { data: { available: 0, channels: [] } }) })
+beforeEach(() => { installRadixTestEvents(); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })); vi.mocked(api).mockImplementation(async (method, path) => method === 'POST' ? { data: { sourceId: 'a', model: 'native-a', quality: 'pass' } } : path.includes('/monitor?') ? { data: { now: Date.now(), hours: 24, totals, sources: [{ sourceId: 'a', totals }], models: { a: { 'native-a': true } }, points: [], events: [], storage: { records: 2, maxRecords: 10000, bytes: 40960000, maxBytes: 67108864, expired: 0, evicted: 0, dropped: 0, retentionHours: 24 } } } : { data: { available: 0, channels: [] } }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
-const pick = async (label: string, option: string) => { fireEvent.mouseDown(screen.getByRole('combobox', { name: label })); fireEvent.click(await screen.findByTitle(option)) }
+const pick = async (label: string, option: string) => { fireEvent.keyDown(screen.getByRole('combobox', { name: label }), { key: 'ArrowDown' }); fireEvent.keyDown(await screen.findByRole('option', { name: option }), { key: 'Enter' }) }
 it('requires source before model and saves a smart pool with cross-source candidates', async () => {
   const save = vi.fn(async () => true), props = { active: true, catalog, busy: false, error: '', save, retry: vi.fn(), onSource: vi.fn() }
   const mounted = render(<App><ModelAggregationWorkspace {...props} /></App>)
@@ -64,7 +65,7 @@ it('selects all models in a source, deduplicates and can select only advertised 
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', expect.stringContaining('/discover'), expect.objectContaining({ source: catalog.sources[0] }), expect.anything()))
   fireEvent.click(screen.getByRole('checkbox', { name: 'directory.free' }))
   fireEvent.click(screen.getByRole('checkbox', { name: 'hub.directory.selectMatches' }))
-  expect((screen.getByRole('checkbox', { name: 'hub.directory.selectMatches' }) as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByRole('checkbox', { name: 'hub.directory.selectMatches' }).getAttribute('aria-checked')).toBe('true')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'a', model: 'free-b' }] })]) })))
 })
@@ -75,9 +76,10 @@ it('updates the routing preview and persists manual priority without detaching w
  const save = vi.fn(async () => true)
  render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, pool] }} busy={false} error="" save={save} retry={vi.fn()} onSource={vi.fn()} /></App>)
  fireEvent.click(screen.getByRole('button', { name: 'pool.open' }))
- fireEvent.click(screen.getByRole('tab', { name: 'pool.section.routing' }))
- fireEvent.click(screen.getByText('pool.requestOptions'))
- expect((screen.getByRole('checkbox', { name: 'pool.freeOnly' }) as HTMLInputElement).checked).toBe(false)
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
+ expect(screen.getByRole('checkbox', { name: 'pool.freeOnly' }).getAttribute('aria-checked')).toBe('false')
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
  fireEvent.keyDown(screen.getAllByRole('button', { name: 'pool.dragMember' })[0], { key: 'ArrowDown' })
  expect(document.querySelector('.tt-member-identity>strong')?.textContent).toBe('second')
  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
@@ -85,19 +87,20 @@ it('updates the routing preview and persists manual priority without detaching w
 })
 
 
-it('loads live status only on the saved aggregate runtime tab and stops when leaving it', async () => {
+it('uses only the saved ID for live member status and runtime while editing', async () => {
  const a = { id: 'pool-a', name: 'Pool Alpha', aggregate: true, protocol: 'openai-completions', strategy: 'smart' as const, candidates: [{ sourceId: 'a', model: 'native-a' }] }
  const b = { ...a, id: 'pool-b', name: 'Pool Beta', candidates: [{ sourceId: 'b', model: 'native-b' }] }
  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.includes('/routing?') ? { now: Date.now(), available: 1, channels: [{ sourceId: 'a', model: 'live-native-a', account: '', kind: 'key', ready: true, remaining: 100, resetAt: null, expiresAt: null, restUntil: null, measuredAt: null, recentTokens: 0 }] } : { models: [] } }))
  render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, a, b] }} busy={false} error="" save={vi.fn(async () => true)} retry={vi.fn()} onSource={vi.fn()} /></App>)
  expect(api).not.toHaveBeenCalled()
  fireEvent.click(within(screen.getByRole('region', { name: 'Pool Alpha' })).getByRole('button', { name: 'pool.open' }))
- expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?'))).toHaveLength(0)
+ expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?'))).toHaveLength(1)
  fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'unsaved-name' } })
- fireEvent.click(screen.getByRole('tab', { name: 'pool.runtime' }))
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.runtime' }))
  expect(await screen.findByText('live-native-a')).toBeTruthy()
- expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?')).map(([, path]) => path)).toEqual(['/agent/model-gateway/catalog/routing?model=pool-a'])
- fireEvent.click(screen.getByRole('tab', { name: 'pool.section.routing' }))
+ expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?')).map(([, path]) => path)).toEqual(expect.arrayContaining(['/agent/model-gateway/catalog/routing?model=pool-a']))
+ expect(vi.mocked(api).mock.calls.some(([, path]) => path.includes('model=unsaved-name'))).toBe(false)
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
  expect(screen.queryByText('live-native-a')).toBeNull()
  fireEvent.click(document.querySelector('.tt-aggregate-detail .tt-back')!)
  expect(screen.queryByRole('region', { name: 'pool.preview' })).toBeNull()
@@ -111,9 +114,9 @@ it('uses a full detail editor and keeps the draft when returning to the list or 
  expect(screen.queryByRole('region', { name: 'Owned pool' })).toBeNull()
  expect(document.querySelector('.tt-model-hub-detail')).toBeNull()
  fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'renamed-id' } })
- fireEvent.click(screen.getByRole('tab', { name: 'pool.section.routing' }))
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
  expect(screen.getByRole('region', { name: 'pool.preview' })).toBeTruthy()
- fireEvent.click(screen.getByRole('tab', { name: 'pool.section.members' }))
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
  expect((screen.getByLabelText('pool.modelId') as HTMLInputElement).value).toBe('renamed-id')
  fireEvent.click(document.querySelector('.tt-aggregate-detail .tt-back')!)
  expect(screen.getByText('pool.unsaved')).toBeTruthy()
@@ -129,6 +132,7 @@ it('selects search matches directly, preserves other sources and removes uncheck
  const save = vi.fn(async () => true)
  render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, pool] }} busy={false} error="" save={save} retry={vi.fn()} onSource={vi.fn()} /></App>)
  fireEvent.click(screen.getByRole('button', { name: 'pool.open' }))
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
  await screen.findByRole('checkbox', { name: 'match-a' })
  fireEvent.change(screen.getByRole('textbox', { name: 'hub.directory.search' }), { target: { value: 'match' } })
  fireEvent.click(screen.getByRole('checkbox', { name: 'hub.directory.selectMatches' }))
@@ -144,10 +148,10 @@ it('blocks oversized bulk selection without truncating it and permits a narrower
  await pick('pool.source', 'Source A')
  await screen.findByRole('checkbox', { name: 'entry-0' })
  expect((screen.getByRole('checkbox', { name: 'pool.selectAll' }) as HTMLInputElement).disabled).toBe(true)
- expect((screen.getByRole('checkbox', { name: 'entry-0' }) as HTMLInputElement).checked).toBe(false)
+ expect(screen.getByRole('checkbox', { name: 'entry-0' }).getAttribute('aria-checked')).toBe('false')
  fireEvent.change(screen.getByRole('textbox', { name: 'hub.directory.search' }), { target: { value: 'entry-1' } })
  fireEvent.click(screen.getByRole('checkbox', { name: 'hub.directory.selectMatches' }))
- expect((screen.getByRole('checkbox', { name: 'entry-1' }) as HTMLInputElement).checked).toBe(true)
+ expect(screen.getByRole('checkbox', { name: 'entry-1' }).getAttribute('aria-checked')).toBe('true')
 })
 
 it('resumes a new draft from the list and keeps failed saves editable', async () => {
@@ -163,7 +167,7 @@ it('resumes a new draft from the list and keeps failed saves editable', async ()
  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
  await waitFor(() => expect(save).toHaveBeenCalled())
  expect((screen.getByLabelText('pool.name') as HTMLInputElement).value).toBe('Draft name')
- expect((screen.getByRole('checkbox', { name: 'native-a' }) as HTMLInputElement).checked).toBe(true)
+ expect(screen.getByRole('checkbox', { name: 'native-a' }).getAttribute('aria-checked')).toBe('true')
 })
 
 it('keeps separate drafts for different cards and puts management actions in the detail', () => {
@@ -173,6 +177,7 @@ it('keeps separate drafts for different cards and puts management actions in the
  expect(screen.queryByRole('button', { name: 'capabilities.models.deleteAction' })).toBeNull()
  fireEvent.click(within(screen.getByRole('region', { name: 'Alpha' })).getByRole('button', { name: 'pool.open' }))
  fireEvent.change(screen.getByLabelText('pool.name'), { target: { value: 'Alpha draft' } })
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
  expect(screen.getByRole('button', { name: 'capabilities.models.deleteAction' })).toBeTruthy()
  fireEvent.click(document.querySelector('.tt-aggregate-detail .tt-back')!)
  fireEvent.click(within(screen.getByRole('region', { name: 'Beta' })).getByRole('button', { name: 'pool.open' }))
@@ -180,4 +185,30 @@ it('keeps separate drafts for different cards and puts management actions in the
  fireEvent.click(document.querySelector('.tt-aggregate-detail .tt-back')!)
  fireEvent.click(within(screen.getByRole('region', { name: 'Alpha' })).getByRole('button', { name: 'pool.open' }))
  expect((screen.getByLabelText('pool.name') as HTMLInputElement).value).toBe('Alpha draft')
+})
+
+it('reviews and removes selected models across sources without changing the others', async () => {
+ const pool = { id: 'all', name: 'All', aggregate: true, protocol: 'openai-completions', strategy: 'smart' as const, candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'b', model: 'native-b' }] }
+ const save = vi.fn(async () => true)
+ render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, pool] }} busy={false} error="" save={save} retry={vi.fn()} onSource={vi.fn()} /></App>)
+ fireEvent.click(screen.getByRole('button', { name: 'pool.open' }))
+ fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
+ fireEvent.click(screen.getByRole('button', { name: 'orchestration.reviewSelected' }))
+ fireEvent.click(screen.getByRole('checkbox', { name: /native-b/ }))
+ expect(screen.getByRole('checkbox', { name: /native-a/ }).getAttribute('aria-checked')).toBe('true')
+ fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+ await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'all', candidates: [{ sourceId: 'a', model: 'native-a' }] })]) })))
+})
+
+it('shows field-specific errors and focuses the invalid field without sending a save', () => {
+ const save = vi.fn(async () => true)
+ render(<App><ModelAggregationWorkspace active catalog={catalog} busy={false} error="" save={save} retry={vi.fn()} onSource={vi.fn()} /></App>)
+ fireEvent.click(screen.getByRole('button', { name: 'pool.create' }))
+ fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'not a valid id' } })
+ fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+ expect(screen.getByText('orchestration.nameRequired')).toBeTruthy()
+ expect(screen.getByText('orchestration.idInvalid')).toBeTruthy()
+ expect(screen.getByLabelText('pool.name').getAttribute('aria-invalid')).toBe('true')
+ expect(document.activeElement).toBe(screen.getByLabelText('pool.name'))
+ expect(save).not.toHaveBeenCalled()
 })

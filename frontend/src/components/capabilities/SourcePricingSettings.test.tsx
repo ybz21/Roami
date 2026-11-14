@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { installRadixTestEvents } from '../ui/radix-test-events'
 import {useState} from 'react'
 import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {App} from 'antd'
@@ -10,7 +11,7 @@ vi.mock('../../i18n',()=>({useI18n:()=>({t:(key:string)=>key,locale:'en-US'})}))
 vi.mock('../../layout',()=>({useLayout:()=>({phone:false})}))
 const rule=(input:number)=>({mode:'tokens' as const,price:{input_per_million:input,output_per_million:30,cache_read_per_million:1}})
 function Harness(){const[draft,setDraft]=useState<SourcePriceDraft>();return <App><SourcePricingSettings sourceId="a" models={['gpt-5']} draft={draft} onChange={setDraft}/></App>}
-beforeEach(()=>{
+beforeEach(()=>{ installRadixTestEvents();
  window.matchMedia=vi.fn().mockImplementation(()=>({matches:false,addListener:vi.fn(),removeListener:vi.fn(),addEventListener:vi.fn(),removeEventListener:vi.fn()}))
  let saved={default:rule(3),models:{'gpt-5':rule(10)},multiplier:2,accountStrategy:'smart'}
  const snapshot=()=>({data:structuredClone(saved),currency:'CNY',effective:[{model:'gpt-5',origin:'model',rule:saved.models['gpt-5'],price:{...saved.models['gpt-5'].price,input_per_million:saved.models['gpt-5'].price.input_per_million*2},known:true,multiplier:2}],summary:{model:'',origin:'source',rule:saved.default,price:saved.default.price,known:true,multiplier:2}})
@@ -45,8 +46,8 @@ it('requires free confirmation and rejects invalid numeric prices without sendin
  const editor=container.querySelector('.source-price-inspector')! as HTMLElement
  fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'-1'}})
  expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(true)
- fireEvent.mouseDown(within(editor).getByRole('combobox',{name:'pricing.method'}))
- fireEvent.click(await screen.findByText('pricing.free',{selector:'.ant-select-item-option-content'}))
+ fireEvent.keyDown(within(editor).getByRole('combobox',{name:'pricing.method'}),{key:'ArrowDown'})
+ fireEvent.keyDown(await screen.findByRole('option',{name:'pricing.free'}),{key:'Enter'})
  expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(true)
  fireEvent.click(within(editor).getByRole('checkbox',{name:'pricing.confirm'}))
  expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(false)

@@ -220,6 +220,9 @@ function applyCssVars(mode: ThemeMode) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_TOKENS[mode].css['--bg-container'])
   // 实心强调色以 antd 推导出来的为准，自绘控件才不会比 antd 控件差一档蓝
   root.style.setProperty('--accent-solid', solidAccent(mode))
+  const controlTokens = antdTheme.getDesignToken({ algorithm: mode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm })
+  root.style.setProperty('--on-accent', controlTokens.colorTextLightSolid)
+  root.style.setProperty('--overlay-backdrop', controlTokens.colorBgMask)
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

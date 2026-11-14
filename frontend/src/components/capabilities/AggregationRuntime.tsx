@@ -1,4 +1,4 @@
-import { Alert, Button, Spin } from 'antd'
+import { Alert, Button, Spin } from './model-controls'
 import { useI18n } from '../../i18n'
 import { useRoutingStatus } from './model-routing-api'
 import type { CatalogModel, ModelSource } from './model-hub-api'

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -10,7 +11,7 @@ const pdfResources = ['cmaps', 'standard_fonts'].flatMap(directory => {
 
 // 开发期把 /api（含 WebSocket）代理到后端 Gin（:13579）
 export default defineConfig({
-  plugins: [react(), {
+  plugins: [react(), tailwindcss(), {
     name: 'pdf-document-resources',
     generateBundle() {
       for (const resource of pdfResources) this.emitFile({ type: 'asset', fileName: resource.path, source: readFileSync(resource.source) })

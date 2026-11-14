@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Alert, App, Button, Checkbox, Input, Select } from 'antd'
+import { App } from 'antd'
+import { Alert, Button, Checkbox, Input, Select, Popconfirm } from './model-controls'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { CheckIcon, ChevronDown, LinkIcon, PlusIcon, SearchIcon } from '../../icons'
@@ -29,7 +30,8 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
   pricing?: ReactNode; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
 }) {
-  const { t, locale } = useI18n(), { modal, message } = App.useApp()
+  const { t, locale } = useI18n(), { message } = App.useApp()
+  const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
   const request = useRef<AbortController | null>(null)
   const current = useRef(draft); current.current = draft
@@ -88,10 +90,11 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }
   const submit = () => {
     if (!canSave) return
-    if (changedConnection || removedCount > 0) modal.confirm({ className: 'tt-model-connection-confirm', title: t(removedCount ? 'hub.directory.applyModels' : 'hub.sourceApply'), content: t(removedCount ? 'hub.directory.removeImpact' : 'hub.sourceImpact'), okText: t('agent.models.save'), cancelText: t('common.cancel'), onOk: save })
+    if (changedConnection || removedCount > 0) setConfirming(true)
     else void save()
   }
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
+    <Popconfirm danger={removedCount > 0} open={confirming} onOpenChange={setConfirming} title={t(removedCount ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removedCount ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
     <div className="tt-model-source-content">
       {authentication}
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
@@ -113,7 +116,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       {pricing}
       {draft.directory !== null && <section className="tt-model-directory" aria-label={t('hub.directory.title')} aria-busy={loading}>
         <div className="tt-model-directory-heading"><h3>{t('hub.directory.title')}</h3>{draft.directory.length > 0 && <span role="status">{t('hub.directory.total', { count: number(draft.directory.length) })}</span>}</div>
-        {!!draft.directory.length && <><Input aria-label={t('hub.directory.search')} placeholder={t('hub.directory.search')} prefix={<SearchIcon />} allowClear value={draft.query} onChange={event => patch({ query: event.target.value })} />
+        {!!draft.directory.length && <><Input aria-label={t('hub.directory.search')} placeholder={t('hub.directory.search')} prefix={<SearchIcon />} onPressEnter={event => event.preventDefault()} allowClear value={draft.query} onChange={event => patch({ query: event.target.value })} />
           <div className="tt-model-directory-selection"><Checkbox checked={!!selectable.length && selectedVisible.length === selectable.length} indeterminate={selectedVisible.length > 0 && selectedVisible.length < selectable.length} disabled={!selectable.length} onChange={event => selectModels(selectable, event.target.checked)}>{t(draft.query ? 'hub.directory.selectMatches' : 'hub.directory.selectAll')}</Checkbox>{!!selected.length && <button type="button" className="tt-act" onClick={() => patch({ selected: [] })}>{t('hub.directory.clear')}</button>}</div>
         </>}
         <div className="tt-model-directory-list">{visible.map(model => {

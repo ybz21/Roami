@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import { installRadixTestEvents } from '../ui/radix-test-events'
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import AggregationMemberOrder from './AggregationMemberOrder'
 import type { CatalogModel } from './model-hub-api'
@@ -12,7 +13,7 @@ function Harness({ onChange = vi.fn(), disabled = false }: { onChange?: (patch: 
  return <div className="tt-routing-editor"><AggregationMemberOrder model={model} sources={sources} pools={[]} disabled={disabled} onChange={patch => { onChange(patch); setModel(previous => ({ ...previous, ...patch })) }} /><output data-testid="weights">{JSON.stringify(model.weights)}</output></div>
 }
 const names = () => [...document.querySelectorAll('.tt-member-identity>strong')].map(node => node.textContent)
-beforeEach(() => {
+beforeEach(() => { installRadixTestEvents();
  window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
  class Pointer extends MouseEvent { pointerId: number; isPrimary: boolean; constructor(type: string, init: PointerEventInit) { super(type, init); this.pointerId = init.pointerId || 1; this.isPrimary = init.isPrimary ?? true } }
  vi.stubGlobal('PointerEvent', Pointer)
@@ -33,7 +34,7 @@ it('moves the focused member with the keyboard and preserves identity-based weig
  expect(names()).toEqual(['A', 'M', 'Z']); expect(document.activeElement).toBe(handle)
  expect(screen.getByTestId('weights').textContent).toBe(JSON.stringify(initial.weights))
  fireEvent.keyDown(handle, { key: 'Home' }); expect(names()).toEqual(['Z', 'A', 'M'])
- fireEvent.click(screen.getByRole('button', { name: 'pool.down Z' })); expect(names()).toEqual(['A', 'Z', 'M'])
+ fireEvent.keyDown(handle, { key: 'ArrowDown' }); expect(names()).toEqual(['A', 'Z', 'M'])
 })
 it('commits pointer ordering only on drop, and does not mutate members on cancel or an outside drop', () => {
  const onChange = vi.fn(); render(<Harness onChange={onChange} />); geometry()
@@ -53,10 +54,11 @@ it('commits pointer ordering only on drop, and does not mutate members on cancel
 })
 it('groups sources stably and offers alphabetical model ordering', async () => {
  render(<Harness />)
- fireEvent.click(screen.getByRole('button', { name: 'pool.organize' }))
+ fireEvent.keyDown(screen.getByRole('button', { name: 'pool.organize' }), { key: 'ArrowDown' })
  fireEvent.click(await screen.findByRole('menuitem', { name: 'pool.organize.source' }))
  expect(names()).toEqual(['Z', 'M', 'A'])
- fireEvent.click(screen.getByRole('button', { name: 'pool.organize' }))
+ await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+ fireEvent.keyDown(screen.getByRole('button', { name: 'pool.organize' }), { key: 'ArrowDown' })
  fireEvent.click(await screen.findByRole('menuitem', { name: 'pool.organize.model' }))
  expect(names()).toEqual(['A', 'M', 'Z'])
 })
@@ -64,4 +66,13 @@ it('keeps order actions disabled during save', () => {
  render(<Harness disabled />)
  expect((screen.getByRole('button', { name: 'pool.dragMember Z' }) as HTMLButtonElement).disabled).toBe(true)
  expect((screen.getByRole('button', { name: 'pool.organize' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('offers a single move-to-top action without detaching weights or exposing up/down buttons', () => {
+ render(<Harness />)
+ expect(screen.queryByRole('button', { name: 'pool.down Z' })).toBeNull()
+ fireEvent.click(screen.getByRole('button', { name: 'orchestration.moveTop M' }))
+ expect(names()).toEqual(['M', 'Z', 'A'])
+ expect(screen.getByTestId('weights').textContent).toBe(JSON.stringify(initial.weights))
+ expect(document.querySelectorAll('.tt-member-status .is-ready')).toHaveLength(0)
 })

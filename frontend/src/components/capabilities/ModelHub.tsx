@@ -6,11 +6,12 @@ import SourcePricingSettings, { sourcePriceDraftChanged, type SourcePriceDraft }
 import BackButton from '../BackButton'
 import ModelUsageWorkspace from './ModelUsageWorkspace'
 import { useState } from 'react'
-import { Alert, App, Button, Dropdown, Input, Popconfirm, Select, Spin, Tabs } from 'antd'
+import { App } from 'antd'
+import { Alert, Button, Dropdown, Input, Popconfirm, Select, Spin, TabBar } from './model-controls'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
-import { PlusIcon, LinkIcon, ChevronRight } from '../../icons'
+import { PlusIcon, LinkIcon, ChevronRight, ChevronDown } from '../../icons'
 import { useSettingsDraft } from '../settings/settings-draft'
 import { SpeechSettings } from '../settings/speech-settings'
 import MobileSubPage from '../MobileSubPage'
@@ -105,7 +106,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     return saved
   }} />
   const sourceEditor = id === 'new' ? connectionEditor : <div className="tt-source-workspace">
-    <Tabs activeKey={section || 'connection'} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={['connection','prices','routing'].map(key => ({key,label:t('pricing.section.'+key)}))}/>
+    <TabBar activeKey={section || 'connection'} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={['connection','prices','routing'].map(key => ({key,label:t('pricing.section.'+key)}))}/>
     {(section === 'prices' || section === 'routing') ? <SourcePricingSettings key={sourceBase.id} sourceId={sourceBase.id} view={section} models={[...new Set(models.flatMap(model=>model.candidates.filter(candidate=>candidate.sourceId===sourceBase.id).map(candidate=>candidate.model)))]} draft={sourcePrices[sourceBase.id]} onChange={draft=>setSourcePrices(previous=>({...previous,[sourceBase.id]:draft}))} onSaved={billing.setSourcePolicy} onGlobal={()=>{setPriceReturn('catalog/source/'+id+'/prices');navigate('catalog/pricing')}} onAddModels={()=>{setSourceDrafts(previous=>({...previous,[id]:{...(previous[id]||initialSourceDraft(sourceBase,true)),fetchRequested:true}}));navigate('catalog/source/'+id+'/connection')}}/> : connectionEditor}
   </div>
   const modelEditor = <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); submitModel() }}>
@@ -113,7 +114,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     {candidateFields(0)}
     {!sources.length && <Button icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button>}
     <details><summary>{t('hub.strategy')}</summary>
-      <label className="agent-settings-field">{t('hub.strategy')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.strategy')} value={model.strategy} options={['fixed', 'failover'].map(value => ({ value, label: t('hub.strategy.' + value) }))} onChange={strategy => updateModel({ strategy, candidates: model.candidates.slice(0, 1) })} /></label>
+      <label className="agent-settings-field">{t('hub.strategy')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.strategy')} value={model.strategy} options={['fixed', 'failover'].map(value => ({ value, label: t('hub.strategy.' + value) }))} onChange={(strategy: CatalogModel['strategy']) => updateModel({ strategy, candidates: model.candidates.slice(0, 1) })} /></label>
       {model.candidates.slice(1).map((_, offset) => <fieldset key={offset}><legend>{t('hub.backup', { index: offset + 1 })}</legend>
         {candidateFields(offset + 1)}
         <Button onClick={() => updateModel({ candidates: model.candidates.filter((_, i) => i !== offset + 1) })}>{t('agent.proxy.remove')}</Button>
@@ -152,7 +153,10 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
     {draftNotice}
     {<div className="tt-model-hub-main" hidden={!!detail && layout.phone}>
-      <Tabs tabPosition={layout.phone ? 'top' : 'left'} className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
+      <div className="tt-model-navigation">
+        {!embedded && <Dropdown menu={{ items: ['models','agents','plugins','skills','mcp','cli','tools','markets'].map(key => ({ key, label: t('capabilities.tab.' + key) })), onClick: ({ key }) => onNav('capabilities/' + key) }}><Button type="text">{t('capabilities.tab.models')}<ChevronDown /></Button></Dropdown>}
+        <TabBar className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} label={t('capabilities.tab.models')} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
+      </div>
       <div className="tt-model-catalog-detail" hidden={!fullDetail || layout.phone}><header className="tt-pagehead"><BackButton onClick={back}/><h2>{editorTitle}</h2></header>{fullDetail && !layout.phone && editor}</div>
       <ModelUsageWorkspace active={tab === 'usage' || tab === 'audit'} mode={tab === 'audit' ? 'audit' : 'overview'} controller={billing} sources={sources} onAudit={() => navigate('audit')} onOverview={()=>navigate('usage')} />
       <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)}/>
