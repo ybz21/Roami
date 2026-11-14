@@ -5904,6 +5904,11 @@ const zhCN = {
   'pool.orderEffect.fast': '近期响应更快的优先；速度差距不到一成时，保留此顺序。',
   'pool.orderEffect.cheap': '当前有效价格最低的优先；价格相同时，按此顺序。',
   'pool.candidateMembers': '候选成员',
+  'pool.runtime': '运行状态',
+  'pool.detailsFor': '{name} 的调度详情',
+  'pool.showDetails': '查看调度',
+  'pool.hideDetails': '收起详情',
+  'pool.unsaved': '未保存',
 }
 
 export default zhCN

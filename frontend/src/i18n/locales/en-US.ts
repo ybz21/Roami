@@ -5895,6 +5895,11 @@ const enUS = {
   'pool.orderEffect.fast': 'Faster recent responses first; differences below 10% preserve this order.',
   'pool.orderEffect.cheap': 'Lowest effective price first; equal prices use this order.',
   'pool.candidateMembers': 'Candidate members',
+  'pool.runtime': 'Live status',
+  'pool.detailsFor': 'Routing details for {name}',
+  'pool.showDetails': 'View routing',
+  'pool.hideDetails': 'Collapse details',
+  'pool.unsaved': 'Unsaved',
 }
 
 export default enUS
