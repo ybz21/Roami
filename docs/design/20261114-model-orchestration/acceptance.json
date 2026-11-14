@@ -1,7 +1,32 @@
 {
   "date": "2026-11-15",
   "fixture": "Synthetic local upstream, two sources and three aggregates; no paid inference or production settings changed.",
-  "desktop": {
+  "checks": {
+    "frontend": {
+      "testFiles": 255,
+      "tests": 1834,
+      "typecheck": "passed",
+      "i18n": "passed",
+      "hover": "passed",
+      "build": "passed"
+    },
+    "qualityFull": "passed",
+    "detector": [],
+    "base": "723cacdf"
+  },
+  "review": {
+    "firstDisposition": "fix",
+    "finding": "Restore visible SVG disclosure indicators for policy and request options.",
+    "resolution": "Existing ChevronRight icons, open-state rotation, 44px minimum summary hit area.",
+    "finalDisposition": "ship",
+    "scope": "The reviewer scored the disclosure fix resolved; no regressions introduced by that fix.",
+    "evidence": [
+      "routing-desktop.png",
+      "routing-phone-top.png",
+      "routing-disclosures-open.png"
+    ]
+  },
+  "initialDesktop": {
     "passed": true,
     "layouts": [
       {
@@ -228,7 +253,7 @@
       "light English"
     ]
   },
-  "phone": {
+  "initialPhone": {
     "passed": true,
     "device": "Redmi Note 8",
     "bounds": {
@@ -302,29 +327,178 @@
       }
     }
   },
-  "checks": {
-    "frontend": {
-      "testFiles": 255,
-      "tests": 1834,
-      "typecheck": "passed",
-      "i18n": "passed",
-      "hover": "passed",
-      "build": "passed"
+  "navigationRevision": {
+    "request": "能力顶部 Tabs 和模型左侧 Tabs 形式不变。",
+    "scope": "Restore original outer navigation; retain the source and aggregate content redesign.",
+    "evidence": {
+      "desktop": [
+        {
+          "name": "cards",
+          "width": 1920,
+          "scrollWidth": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "leftTabs": true,
+          "header": null,
+          "list": null,
+          "footer": null
+        },
+        {
+          "name": "routing",
+          "width": 1280,
+          "scrollWidth": 1280,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "leftTabs": true,
+          "header": {
+            "left": 416,
+            "right": 1264,
+            "top": 273.78125
+          },
+          "list": {
+            "left": 416,
+            "right": 1264,
+            "top": 586.125
+          },
+          "footer": {
+            "bottom": 1055
+          }
+        },
+        {
+          "name": "routing",
+          "width": 1920,
+          "scrollWidth": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "leftTabs": true,
+          "header": {
+            "left": 416,
+            "right": 1904,
+            "top": 273.78125
+          },
+          "list": {
+            "left": 416,
+            "right": 1904,
+            "top": 542.125
+          },
+          "footer": {
+            "bottom": 1055
+          }
+        },
+        {
+          "name": "routing",
+          "width": 2560,
+          "scrollWidth": 2560,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "leftTabs": true,
+          "header": {
+            "left": 416,
+            "right": 2544,
+            "top": 273.78125
+          },
+          "list": {
+            "left": 416,
+            "right": 2544,
+            "top": 542.125
+          },
+          "footer": {
+            "bottom": 1055
+          }
+        },
+        {
+          "name": "routing",
+          "width": 3440,
+          "scrollWidth": 3440,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "leftTabs": true,
+          "header": {
+            "left": 416,
+            "right": 3424,
+            "top": 273.78125
+          },
+          "list": {
+            "left": 416,
+            "right": 3424,
+            "top": 542.125
+          },
+          "footer": {
+            "bottom": 1055
+          }
+        },
+        {
+          "name": "routing-main-sidebar-toggled",
+          "width": 1920,
+          "scrollWidth": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "topTabs": 8,
+          "leftTabs": true,
+          "header": {
+            "left": 184,
+            "right": 1904,
+            "top": 273.78125
+          },
+          "list": {
+            "left": 184,
+            "right": 1904,
+            "top": 542.125
+          },
+          "footer": {
+            "bottom": 1055
+          }
+        }
+      ],
+      "checks": [
+        "original eight capability tabs",
+        "original seven left model tabs",
+        "left navigation remains beside aggregate details",
+        "top and left navigation clickable",
+        "strategy+preview above full-width sortable rows retained",
+        "four desktop widths and root sidebar toggle",
+        "sources and pricing reachable through original navigation"
+      ],
+      "phone": {
+        "device": "Redmi Note 8",
+        "bounds": {
+          "width": 392,
+          "scrollWidth": 392,
+          "height": 766,
+          "scrollHeight": 766,
+          "pane": 393,
+          "paneScroll": 393,
+          "footer": 741.8182182312012,
+          "headers": 1,
+          "actions": "1"
+        },
+        "checks": [
+          "original capability select",
+          "original top model tabs",
+          "real touch catalog/aggregate navigation",
+          "source pricing reachable",
+          "full screen details retain one return bar",
+          "normal detail scrolling",
+          "phone row actions visible",
+          "fixed save and back return"
+        ]
+      }
     },
-    "qualityFull": "passed",
-    "detector": [],
-    "base": "723cacdf"
-  },
-  "review": {
-    "firstDisposition": "fix",
-    "finding": "Restore visible SVG disclosure indicators for policy and request options.",
-    "resolution": "Existing ChevronRight icons, open-state rotation, 44px minimum summary hit area.",
-    "finalDisposition": "ship",
-    "scope": "The reviewer scored the disclosure fix resolved; no regressions introduced by that fix.",
-    "evidence": [
-      "routing-desktop.png",
-      "routing-phone-top.png",
-      "routing-disclosures-open.png"
-    ]
+    "screenshots": [
+      "nav-routing-desktop.png",
+      "nav-routing-phone.png",
+      "nav-sources-desktop.png",
+      "nav-sources-phone.png"
+    ],
+    "checks": {
+      "vitestFiles": 255,
+      "vitestTests": 1834,
+      "qualityFull": "passed"
+    }
   }
 }

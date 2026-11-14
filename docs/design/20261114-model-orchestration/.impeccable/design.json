@@ -289,11 +289,11 @@
       "css": ".ds-field { display:grid; gap:var(--sp-2); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-sm); color:var(--text-bright); } .ds-input-wrap { display:flex; min-width:0; padding-inline:var(--sp-3); border:1px solid var(--border); border-radius:var(--r-xs); background:var(--bg-container); } .ds-input-wrap:focus-within { border-color:var(--accent); outline:1px solid var(--accent-border); } .ds-input { width:100%; min-width:0; min-height:var(--ctl-h); padding:0; border:0; outline:none; background:transparent; color:var(--text-bright); font:inherit; font-size:var(--fs-body); } .ds-input:disabled { color:var(--text-dimmer); } .ds-input-wrap:has([aria-invalid=\"true\"]) { border-color:var(--danger); } :host-context(html[data-pointer=\"coarse\"]) .ds-input { min-height:var(--tap); }"
     },
     {
-      "name": "Model navigation",
+      "name": "Detail navigation",
       "kind": "nav",
       "refersTo": "navigation-tab",
-      "description": "Visual tab states; production keyboard behavior is supplied by Radix.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Model workspace\"><button class=\"ds-tab\" type=\"button\" aria-current=\"page\">Sources</button><button class=\"ds-tab\" type=\"button\">Aggregates</button></nav>",
+      "description": "Source and aggregate detail tab states use Radix. Outer capability/model navigation retains its original AntD placement and appearance.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Aggregate details\"><button class=\"ds-tab\" type=\"button\" aria-current=\"page\">Members</button><button class=\"ds-tab\" type=\"button\">Routing</button></nav>",
       "css": ".ds-nav { display:flex; gap:var(--sp-1); overflow-x:auto; padding-block:var(--sp-2); border-bottom:1px solid var(--border-subtle); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; } .ds-tab { flex-shrink:0; min-height:var(--ctl-h); padding:var(--sp-2) var(--sp-3); border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-dim); font:inherit; font-size:var(--fs-sm); font-weight:500; cursor:pointer; } .ds-tab[aria-current] { color:var(--text-bright); background:var(--sel-bg); } .ds-tab:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); } :host-context(html[data-pointer=\"fine\"]) .ds-tab:hover { background:var(--list-hover); color:var(--text-bright); } :host-context(html[data-pointer=\"coarse\"]) .ds-tab { min-height:var(--tap); }"
     },
     {

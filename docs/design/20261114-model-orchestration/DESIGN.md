@@ -152,7 +152,7 @@ The sidecar's tonal ramps are panel-only interpolations of live tokens, not addi
 
 The workspace fills the available width and remaining shell height. Flex/grid children use zero minimum dimensions; the content container owns scrolling. The document never scrolls. Page and tab bars stay outside the editor's scroll area, and the save/cancel footer remains a separate layout item. Form and explanatory content may use `--content-form`; the workspace shell and member list do not inherit that cap.
 
-One horizontal model-function navigation replaces the persistent model sidebar. It stays reachable while desktop details are open. Tabs scroll horizontally when needed. Back navigation precedes the title using the existing BackButton. On phones, content-heavy editors use MobileSubPage with one return bar and one content scroll container. URL-backed source details do not add a second overlay-history entry. Existing app navigation, safe areas, and keyboard handling remain owned by the shared shell.
+Keep the existing capability tabs above the workspace and the model-function tabs at its left on desktop, using their incumbent AntD components. Preserve the existing capability select and top model tabs on phones. Back navigation precedes the title using the existing BackButton. On phones, content-heavy editors use MobileSubPage with one return bar and one content scroll container. URL-backed source details do not add a second overlay-history entry. Existing app navigation, safe areas, and keyboard handling remain owned by the shared shell.
 
 For aggregation routing, one independent card combines strategy configuration and a compact simulation. The implemented wide layout divides that card into configuration and simulation columns (35%/65%). A full-width, ordered member list follows below it. This composition belongs to this model surface; it is not a universal composition requirement for Roami pages.
 
@@ -188,7 +188,7 @@ Labelled, neutral, and field-specific. Inputs use the content surface, normal bo
 
 ### Navigation
 
-Horizontal, quiet, and persistent. Radix tabs use neutral text at rest and neutral selected fill with bright text. Keyboard focus remains visible. Member selection, routing, and saved runtime are distinct contexts; changing tabs keeps the draft. Source connection, pricing, and routing retain their existing destination semantics.
+Outer capability and model navigation keep their original AntD form and placement. Within source and aggregate details, Radix tabs use neutral text at rest and neutral selected fill with bright text. Keyboard focus remains visible. Member selection, routing, and saved runtime are distinct contexts; changing tabs keeps the draft. Source connection, pricing, and routing retain their existing destination semantics.
 
 ### Chips
 

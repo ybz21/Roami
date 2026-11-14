@@ -6,12 +6,12 @@ import SourcePricingSettings, { sourcePriceDraftChanged, type SourcePriceDraft }
 import BackButton from '../BackButton'
 import ModelUsageWorkspace from './ModelUsageWorkspace'
 import { useState } from 'react'
-import { App } from 'antd'
+import { App, Tabs } from 'antd'
 import { Alert, Button, Dropdown, Input, Popconfirm, Select, Spin, TabBar } from './model-controls'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
-import { PlusIcon, LinkIcon, ChevronRight, ChevronDown } from '../../icons'
+import { PlusIcon, LinkIcon, ChevronRight } from '../../icons'
 import { useSettingsDraft } from '../settings/settings-draft'
 import { SpeechSettings } from '../settings/speech-settings'
 import MobileSubPage from '../MobileSubPage'
@@ -153,10 +153,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   return <div className={embedded ? 'tt-model-hub onboarding-model-hub' : 'tt-model-hub'}>
     {draftNotice}
     {<div className="tt-model-hub-main" hidden={!!detail && layout.phone}>
-      <div className="tt-model-navigation">
-        {!embedded && <Dropdown menu={{ items: ['models','agents','plugins','skills','mcp','cli','tools','markets'].map(key => ({ key, label: t('capabilities.tab.' + key) })), onClick: ({ key }) => onNav('capabilities/' + key) }}><Button type="text">{t('capabilities.tab.models')}<ChevronDown /></Button></Dropdown>}
-        <TabBar className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} label={t('capabilities.tab.models')} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
-      </div>
+      <Tabs tabPosition={layout.phone ? 'top' : 'left'} className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
       <div className="tt-model-catalog-detail" hidden={!fullDetail || layout.phone}><header className="tt-pagehead"><BackButton onClick={back}/><h2>{editorTitle}</h2></header>{fullDetail && !layout.phone && editor}</div>
       <ModelUsageWorkspace active={tab === 'usage' || tab === 'audit'} mode={tab === 'audit' ? 'audit' : 'overview'} controller={billing} sources={sources} onAudit={() => navigate('audit')} onOverview={()=>navigate('usage')} />
       <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)}/>
