@@ -1,5 +1,6 @@
 """Managed registrations survive restarts and use existing execution boundaries."""
 
+import base64
 import json
 import os
 import sys
@@ -13,6 +14,40 @@ from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
+from roami_agent.server.skill_package import MAX_PACKAGE_BYTES, package_files
+
+
+async def test_large_skill_bundle_http_create_edit_and_restart(store):
+    runtime = Runtime(store, ConversationModel())
+    raw = b"x,y\n" * 1_000_000
+    entry = {
+        "name": "large-catalog",
+        "text": "Read data/catalog.csv",
+        "files": {"data/catalog.csv": base64.b64encode(raw).decode()},
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime, manage_lifecycle=False)),
+        base_url="http://test",
+        headers={"X-Roami-Owner": "local"},
+    ) as client:
+        response = await client.post("/v1/capability-imports/skills", json=entry)
+        assert response.status_code == 200
+        entry["text"] = "Search data/catalog.csv"
+        response = await client.put("/v1/capability-imports/skills/large-catalog", json=entry)
+        assert response.status_code == 200
+    restored = Runtime(store, ConversationModel())
+    skill = restored.tools.skills[entry["name"]]
+    assert skill["text"] == entry["text"]
+    assert (Path(skill["packagePath"]) / "data/catalog.csv").read_bytes() == raw
+
+
+def test_skill_bundle_still_rejects_excess_bytes_and_files():
+    with pytest.raises(DomainError, match="CAPABILITY_IMPORT_TOO_LARGE"):
+        package_files(
+            {"files": {"catalog.csv": base64.b64encode(b"x" * (MAX_PACKAGE_BYTES + 1)).decode()}}
+        )
+    with pytest.raises(DomainError, match="INVALID_SKILL_PACKAGE"):
+        package_files({"files": {f"{index}.csv": "eA==" for index in range(101)}})
 
 
 async def invoke(runtime, name, args, binding=None):

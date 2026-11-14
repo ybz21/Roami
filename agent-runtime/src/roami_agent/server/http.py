@@ -38,6 +38,7 @@ from roami_agent.protocol.http import (
 from roami_agent.server.installation import Installation
 from roami_agent.server.market_preview_stream import preview_stream
 from roami_agent.server.model_settings import ModelSettings
+from roami_agent.server.skill_package import MAX_PACKAGE_PAYLOAD_BYTES
 from roami_agent.server.swarm_routes import mount_swarm_routes
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
@@ -113,7 +114,9 @@ def create_app(runtime, *, manage_lifecycle=True):
             "data": await runtime.capability_imports.save(
                 owner,
                 kind,
-                await capability_payload(request, 600_000 if kind == "skills" else 65536),
+                await capability_payload(
+                    request, MAX_PACKAGE_PAYLOAD_BYTES if kind == "skills" else 65536
+                ),
             )
         }
 
@@ -126,7 +129,9 @@ def create_app(runtime, *, manage_lifecycle=True):
             "data": await runtime.capability_imports.save(
                 owner,
                 kind,
-                await capability_payload(request, 600_000 if kind == "skills" else 65536),
+                await capability_payload(
+                    request, MAX_PACKAGE_PAYLOAD_BYTES if kind == "skills" else 65536
+                ),
                 name,
             )
         }

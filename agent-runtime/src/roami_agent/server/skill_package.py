@@ -11,7 +11,9 @@ from pathlib import Path, PurePosixPath
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 
-MAX_PACKAGE_BYTES = 384_000
+MAX_PACKAGE_BYTES = 8_000_000
+# Base64 files plus instruction text, paths and source metadata.
+MAX_PACKAGE_PAYLOAD_BYTES = 12_000_000
 
 
 def package_files(value):
