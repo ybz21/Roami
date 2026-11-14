@@ -5,7 +5,7 @@ import { useSessionDirectory } from './useSessionDirectory'
 import { useTaskWorkspace } from './useTaskWorkspace'
 import { applyWorkspaceChange, type WorkspaceState } from './workspace-state'
 
-vi.mock('../components/shell/useWorkspaceLayout', () => ({ useWorkspaceLayout: () => ({ setDockOpen: vi.fn(), setFocus: vi.fn() }) }))
+vi.mock('../components/shell/useWorkspaceLayout', () => ({ useWorkspaceLayout: () => ({ mode: 'focus', setDockOpen: vi.fn(), setFocus: vi.fn() }) }))
 vi.mock('../components/sessions/session-project', () => ({ useSessionProjects: () => ({}) }))
 vi.mock('../components/cluster/node-url', async importOriginal => ({ ...await importOriginal<typeof import('../components/cluster/node-url')>(), currentNodeId: () => 'node-a', useCurrentNodeId: () => 'node-a' }))
 const mock = vi.hoisted(() => ({ api: vi.fn() }))
@@ -64,16 +64,27 @@ describe('server workspace lifecycle', () => {
     const { result } = renderHook(() => useWorkspace(true))
     await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
     expect(result.current.workspace.overlay).toBe(false)
+    expect(result.current.workspace.pageVisible).toBe(true)
     act(() => result.current.workspace.openTerm('beta'))
     await waitFor(() => expect(server.active).toBe('$2'))
     expect(result.current.workspace.terms).toEqual(['alpha', 'beta'])
     expect(result.current.workspace.overlay).toBe(true)
+    expect(result.current.workspace.pageVisible).toBe(false)
+    act(() => result.current.workspace.setOverlay(false))
+    expect(result.current.workspace.pageVisible).toBe(true)
+    expect(result.current.workspace.terms).toEqual(['alpha', 'beta'])
     act(() => result.current.workspace.closeTerm('beta'))
     await waitFor(() => expect(server.terms).toEqual(['$1']))
     act(() => result.current.workspace.closeTerm('alpha'))
     await waitFor(() => expect(server.terms).toEqual([]))
     expect(result.current.workspace.overlay).toBe(false)
     expect(result.current.workspace.active).toBeNull()
+  })
+
+  it('hides desktop pages while the task workspace has focus', async () => {
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+    expect(result.current.workspace.pageVisible).toBe(false)
   })
 
   it('dismisses the phone overlay when another device closes the last tab', async () => {
