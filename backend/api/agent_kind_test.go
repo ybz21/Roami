@@ -81,7 +81,7 @@ func TestOpenCodeAndPiLaunchArgs(t *testing.T) {
 
 func TestRegisteredHarnessOwnsItsDelegatedProcesses(t *testing.T) {
 	for _, tc := range []struct{ parent, child, want string }{
-		{"dsh", "codex", "deepseek"}, {"dsh", "claude", "deepseek"}, {"codex", "dsh", "codex"},
+		{"pi", "codex", "pi"}, {"opencode", "claude", "opencode"}, {"codex", "pi", "codex"},
 	} {
 		args := map[int][]string{1: {"bash"}, 2: {tc.parent}, 3: {tc.child}}
 		kind, pid := registeredAgentInTree(1, map[int][]int{1: {2}, 2: {3}}, func(pid int) []string { return args[pid] })

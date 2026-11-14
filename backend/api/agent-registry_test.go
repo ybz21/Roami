@@ -22,16 +22,16 @@ func TestAgentRegistryIncludesUninstalledHarnessesWithoutProbes(t *testing.T) {
 	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &body) != nil || len(body.Agents) != len(agent.Kinds()) {
 		t.Fatalf("registry mismatch: %s", response.Body)
 	}
-	found := false
+	found := map[string]bool{}
 	for _, row := range body.Agents {
+		found[row.Kind] = true
 		if row.Kind == "deepseek" {
-			found = true
-			if row.Command != "dsh --profile headless --permission-mode danger-full-access" || row.Interactive {
-				t.Fatalf("incorrect DSH metadata: %+v", row)
-			}
+			t.Fatal("removed Harness still advertised")
 		}
 	}
-	if !found {
-		t.Fatal("uninstalled DeepSeek omitted")
+	for _, kind := range []string{"claude", "codex", "opencode", "pi"} {
+		if !found[kind] {
+			t.Fatalf("uninstalled agent %s omitted", kind)
+		}
 	}
 }

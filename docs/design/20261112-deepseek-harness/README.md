@@ -1,5 +1,7 @@
 # DeepSeek Harness 与统一 Agent 注册表
 
+> 历史方案：独立 Harness 接入已撤下，见[清理设计与验收](../20261114-remove-deepseek-harness/README.md)。统一注册表仍沿用。
+
 ## 产品设计
 
 将官方 DeepSeek Harness（`dsh`）作为 `deepseek` 注册到既有 Agent 契约中。智能体目录、任务选择、文件交给 Agent、项目与终端派生菜单、会话筛选、竞赛与用量筛选使用后端返回的注册结果。新增 Agent 不再要求为这些入口逐个添加名单。

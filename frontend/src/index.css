@@ -28,7 +28,6 @@
      OpenAI/Codex 的标官方就是单色（深底走白），所以跟前景色走。 */
   --brand-claude: #d97757;
   --brand-codex: var(--text-bright);
-  --brand-deepseek: var(--text-bright);
   /* 强调色：全站只有这一组，实心块用 --accent-solid，线/文字用 --accent（见 theme.tsx） */
   --accent: #58a6ff;
   --accent-solid: #1f6feb;
