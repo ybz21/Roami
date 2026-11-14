@@ -1,24 +1,24 @@
+import AggregationPoolCard from './AggregationPoolCard'
 import RoutingStrategyPreview from './RoutingStrategyPreview'
 import { MAX_AGGREGATE_MEMBERS } from './routing-preview'
 import { advertisedFree, useSourceDirectory } from './source-model-directory'
 import { useState } from 'react'
-import { Alert, App, Button, Checkbox, Input, InputNumber, Popconfirm, Select, Spin } from 'antd'
+import { Alert, App, Button, Checkbox, Input, InputNumber, Select, Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { PlusIcon } from '../../icons'
 import BackButton from '../BackButton'
 import MobileSubPage from '../MobileSubPage'
-import { routingStrategies, useRoutingStatus, type RoutingStrategy } from './model-routing-api'
+import { routingStrategies, type RoutingStrategy } from './model-routing-api'
 import type { CatalogModel, ModelCatalog, ModelCandidate } from './model-hub-api'
 import './model-routing.css'
 const identity = (candidate: ModelCandidate) => candidate.sourceId + '/' + candidate.model
 const emptyPool = (): CatalogModel => ({ id: globalThis.crypto?.randomUUID?.() || 'pool-' + Date.now().toString(36), name: '', aggregate: true, enabled: true, freeOnly: true, allowPlan: false, protocol: 'openai-completions', strategy: 'smart', candidates: [], cooldownSeconds: 60, onLimit: true, onExhausted: true, minContext: 0, weights: {} })
 export default function ModelAggregationWorkspace({ active, catalog, busy, error, save, retry, onSource }: { active: boolean; catalog: ModelCatalog | null; busy: boolean; error: string; save: (value: ModelCatalog) => Promise<boolean>; retry: () => void; onSource: (source: string) => void }) {
-  const { t, locale } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
+  const { t } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
   const [selected, setSelected] = useState(''), [draft, setDraft] = useState<CatalogModel | null>(null), [original, setOriginal] = useState<string | null>(null), [source, setSource] = useState(''), [native, setNative] = useState<string[]>([]), [onlyFree, setOnlyFree] = useState(false)
-  const pools = catalog?.models.filter(model => model.aggregate) || [], pool = pools.find(model => model.id === selected) || pools[0]
-  const status = useRoutingStatus(pool?.id || '', active && !draft, catalog?.revision || '')
-  const edit = (model: CatalogModel | null) => { setDraft(model ? { ...model, candidates: model.candidates.map(candidate => ({ ...candidate })), weights: { ...model.weights } } : emptyPool()); setOriginal(model?.id || null); setSource(''); setNative([]) }
+  const pools = catalog?.models.filter(model => model.aggregate) || []
+  const edit = (model: CatalogModel | null) => { setSelected(model?.id || ''); setDraft(model ? { ...model, candidates: model.candidates.map(candidate => ({ ...candidate })), weights: { ...model.weights } } : emptyPool()); setOriginal(model?.id || null); setSource(''); setNative([]) }
   const patch = (value: Partial<CatalogModel>) => { if (draft) setDraft({ ...draft, ...value }) }
   const sources = catalog?.sources || []
   const directory = useSourceDirectory(catalog, source, active && !!draft && source !== '@group')
@@ -48,6 +48,27 @@ export default function ModelAggregationWorkspace({ active, catalog, busy, error
     {source && source !== '@group' && !availableModels.length && <p className="agent-settings-hint">{t('pool.fetchModels')} <button type="button" className="tt-act" onClick={() => onSource(source)}>{t('hub.configure')}</button></p>}
     {!valid && <p className="agent-settings-hint">{t('pool.invalid')}</p>}{error && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}<footer><Button onClick={() => setDraft(null)} disabled={busy}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={!valid} loading={busy}>{t('agent.models.save')}</Button></footer>
   </form>
-  const date = (value: number | null) => value === null ? t('pool.unknown') : new Intl.DateTimeFormat(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(value)
-  return <section className="tt-routing-workspace" hidden={!active} aria-label={t('hub.tab.aggregate')}><div className="tt-routing-main"><div className="tt-model-hub-actions"><p className="agent-settings-hint">{t('pool.entryHint')}</p><Button type="primary" icon={<PlusIcon />} disabled={!catalog || busy} onClick={() => edit(null)}>{t('pool.create')}</Button></div>{active && error && !draft && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}{!catalog ? <Spin /> : !pools.length ? <p className="agent-settings-hint">{t('pool.empty')}</p> : <><div className="tt-routing-pools">{pools.map(model => <section className={'tt-routing-pool' + (model.id === pool?.id ? ' is-selected' : '')} key={model.id}><button type="button" className="tt-pool-select" aria-pressed={model.id === pool?.id} onClick={() => setSelected(model.id)}><strong>{model.name}</strong><code>{model.id}</code></button><div className="tt-pool-summary"><span>{t(model.enabled === false ? 'pool.disabled' : 'pool.enabled')}</span><span>{t('pool.strategy.' + model.strategy)}</span><span>{t('pool.memberCount', { count: model.candidates.length })}</span></div><div className="tt-pool-actions"><Button onClick={() => edit(model)}>{t('hub.configure')}</Button><Button disabled={busy} onClick={() => void save({ ...catalog, models: catalog.models.map(value => value.id === model.id ? { ...value, enabled: value.enabled === false } : value) })}>{t(model.enabled === false ? 'pool.enable' : 'pool.disable')}</Button><Popconfirm title={t('pool.delete')} onConfirm={() => save({ ...catalog, models: catalog.models.filter(value => value.id !== model.id) })}><button type="button" className="tt-act danger" disabled={busy || !!catalog.uses[model.id]?.length}>{t('capabilities.models.deleteAction')}</button></Popconfirm></div></section>)}</div>{pool && !draft && <section className="tt-pool-status"><div className="section-head"><h3>{pool.name}</h3></div>{policy(pool.strategy)}<RoutingStrategyPreview model={pool} sources={sources} />{status.failed && <Alert type="error" role="alert" message={t('pool.statusFailed')} action={<Button onClick={status.retry}>{t('agent.retry')}</Button>} />}{!status.data ? !status.failed && <Spin /> : !status.data.channels.length ? <p className="agent-settings-hint">{t(pool.enabled === false ? 'pool.disabled' : 'pool.noneAvailable')}</p> : <><p className="agent-settings-hint">{t('pool.availableCount', { count: status.data.available })}</p><div className="tt-routing-channel-list">{status.data.channels.map((channel, index) => <div className="tt-routing-channel" key={channel.sourceId + channel.model + channel.account}><div><strong>{channel.model}</strong><small>{sources.find(source => source.id === channel.sourceId)?.name || t('pool.groups')} · {t('pool.channel', { index: index + 1 })}</small></div><span>{t(channel.ready ? 'pool.ready' : 'pool.resting')}</span><small>{channel.remaining === null ? t('pool.unknown') : t('pool.remaining', { count: new Intl.NumberFormat(locale).format(channel.remaining) })}</small>{(channel.resetAt || channel.expiresAt || channel.restUntil) && <small>{t(channel.restUntil ? 'pool.until' : channel.resetAt ? 'pool.resetAt' : 'pool.expireAt')} {date(channel.restUntil || channel.resetAt || channel.expiresAt)}</small>}</div>)}</div></>}</section>}</> }{draft && !phone && <RoutingStrategyPreview model={draft} sources={sources} pools={pools} onChange={patch} disabled={busy} />}</div>{active && draft && (phone ? <MobileSubPage title={t(original ? 'pool.edit' : 'pool.create')} search={false} onBack={() => setDraft(null)}>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><BackButton onClick={() => setDraft(null)} /><h3>{t(original ? 'pool.edit' : 'pool.create')}</h3></div>{editor}</aside>)}</section>
+  const focused = draft ? original : selected
+  const orderedPools = focused ? [...pools].sort((a, b) => Number(b.id === focused) - Number(a.id === focused)) : pools
+  const card = (saved: CatalogModel, creating = false) => {
+    const editing = !!draft && (creating || saved.id === original)
+    const model = editing ? draft : saved
+    return <AggregationPoolCard key={creating ? 'draft' : 'saved:' + saved.id} model={model} sources={sources} pools={pools} revision={catalog?.revision || ''}
+      active={active && !(phone && !!draft)} expanded={editing ? !phone : selected === saved.id} editing={editing}
+      busy={busy} canEdit={!draft} inUse={!!catalog?.uses[saved.id]?.length} onChange={editing ? patch : undefined}
+      onToggle={() => setSelected(value => value === saved.id ? '' : saved.id)} onEdit={() => edit(saved)}
+      onEnable={() => { if (catalog) void save({ ...catalog, models: catalog.models.map(value => value.id === saved.id ? { ...value, enabled: value.enabled === false } : value) }) }}
+      onDelete={() => catalog ? save({ ...catalog, models: catalog.models.filter(value => value.id !== saved.id) }) : Promise.resolve(false)} />
+  }
+  return <section className="tt-routing-workspace" hidden={!active} aria-label={t('hub.tab.aggregate')}>
+    <div className="tt-routing-main">
+      <div className="tt-model-hub-actions"><p className="agent-settings-hint">{t('pool.entryHint')}</p><Button type="primary" icon={<PlusIcon />} disabled={!catalog || busy || !!draft} onClick={() => edit(null)}>{t('pool.create')}</Button></div>
+      {active && error && !draft && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
+      {!catalog ? <Spin /> : !pools.length && !draft ? <p className="agent-settings-hint">{t('pool.empty')}</p> : <div className="tt-routing-pools">
+        {draft && !original && !phone && card(draft, true)}
+        {orderedPools.map(model => card(model))}
+      </div>}
+    </div>
+    {active && draft && (phone ? <MobileSubPage title={t(original ? 'pool.edit' : 'pool.create')} search={false} onBack={() => setDraft(null)}>{editor}</MobileSubPage> : <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><BackButton onClick={() => setDraft(null)} /><h3>{t(original ? 'pool.edit' : 'pool.create')}</h3></div>{editor}</aside>)}
+  </section>
 }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from 'antd'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
@@ -81,4 +81,39 @@ it('updates the routing preview and persists manual priority without detaching w
  expect(document.querySelector('.tt-member-identity>strong')?.textContent).toBe('second')
  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'ordered', candidates: [candidates[1], candidates[0]], weights: { 'a/first': 3 } })]) })))
+})
+
+
+it('keeps runtime and strategy previews inside the expanded card and stops polling collapsed cards', async () => {
+ const a = { id: 'pool-a', name: 'Pool Alpha', aggregate: true, protocol: 'openai-completions', strategy: 'smart' as const, candidates: [{ sourceId: 'a', model: 'native-a' }] }
+ const b = { ...a, id: 'pool-b', name: 'Pool Beta', candidates: [{ sourceId: 'b', model: 'native-b' }] }
+ vi.mocked(api).mockImplementation(async (_method, path) => ({ data: { now: Date.now(), available: 1, channels: [{ sourceId: path.includes('pool-a') ? 'a' : 'b', model: path.includes('pool-a') ? 'native-a' : 'native-b', account: '', kind: 'key', ready: true, remaining: 100, resetAt: null, expiresAt: null, restUntil: null, measuredAt: null, recentTokens: 0 }] } }))
+ render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, a, b] }} busy={false} error="" save={vi.fn(async () => true)} retry={vi.fn()} onSource={vi.fn()} /></App>)
+ expect(api).not.toHaveBeenCalled()
+ expect(screen.queryByRole('region', { name: 'pool.preview' })).toBeNull()
+ const alpha = screen.getByRole('region', { name: 'Pool Alpha' }), beta = screen.getByRole('region', { name: 'Pool Beta' })
+ fireEvent.click(within(alpha).getByRole('button', { name: 'pool.detailsFor' }))
+ expect(await within(alpha).findByText('native-a')).toBeTruthy()
+ expect(within(beta).queryByText('native-b')).toBeNull()
+ expect(within(alpha).getAllByText('Pool Alpha')).toHaveLength(1)
+ fireEvent.click(within(alpha).getByRole('tab', { name: 'pool.preview' }))
+ expect(within(alpha).getByRole('region', { name: 'pool.preview' })).toBeTruthy()
+ expect(within(alpha).queryByRole('region', { name: 'pool.runtime' })).toBeNull()
+ fireEvent.click(within(beta).getByRole('button', { name: 'pool.detailsFor' }))
+ expect(await within(beta).findByText('native-b')).toBeTruthy()
+ expect(within(alpha).queryByRole('region', { name: 'pool.preview' })).toBeNull()
+ fireEvent.click(within(beta).getByRole('button', { name: 'pool.detailsFor' }))
+ expect(within(beta).queryByRole('region', { name: 'pool.runtime' })).toBeNull()
+})
+
+it('keeps an existing draft in its own card while editing its ID and members', () => {
+ const pool = { id: 'owned', name: 'Owned pool', aggregate: true, protocol: 'openai-completions', strategy: 'rotate' as const, candidates: [{ sourceId: 'a', model: 'native-a' }] }
+ render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, pool] }} busy={false} error="" save={vi.fn(async () => true)} retry={vi.fn()} onSource={vi.fn()} /></App>)
+ const card = screen.getByRole('region', { name: 'Owned pool' })
+ fireEvent.click(within(card).getByRole('button', { name: 'hub.configure' }))
+ fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'renamed-id' } })
+ expect(within(card).getByRole('region', { name: 'pool.preview' })).toBeTruthy()
+ expect(within(card).getByText('renamed-id')).toBeTruthy()
+ expect(within(card).getByText('pool.unsaved')).toBeTruthy()
+ expect(screen.getAllByRole('region', { name: 'Owned pool' })).toHaveLength(1)
 })
