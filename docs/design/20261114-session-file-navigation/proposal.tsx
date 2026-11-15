@@ -10,6 +10,7 @@ const groups: Group[] = ['sea', 'login']
 const names = { sea: '海空双模式', login: '登录流程' }
 const agents = { sea: 'claude', login: 'codex' } as const
 const files: Record<string, string> = { plan: '交互方案.md', checks: '验收清单.md' }
+const openedFiles: Record<Group, Exclude<Resource, 'chat'>[]> = { sea: ['plan', 'checks'], login: [] }
 const initialDraft = '# 海空双模式\n\n## 智能体入口与下拉菜单\n\n保留智能体 Logo 和会话名。\n\n点击 Logo 或名称，直接回到对话。\n点击旁边的下拉箭头，选择对话或文件。\n\n## 交互规则\n\n1. 会话入口始终回到对话。\n2. 下拉菜单展示该组已打开文件。\n3. 文件名打开指定文件。\n4. 关闭菜单不关闭文件。\n'
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
     setNotice(r === 'chat' ? '已返回对话，文件与草稿仍然保留。' : `正在查看 ${files[r]}，点击智能体入口可回对话。`)
   }
   const toggleMenu = (g: Group, element: HTMLButtonElement) => {
+    if (!openedFiles[g].length) return
     const rect = element.parentElement!.getBoundingClientRect()
     setAnchor({ left: rect.left, bottom: rect.bottom })
     setOpenGroup(old => old === g ? null : g)
@@ -75,13 +77,13 @@ function App() {
   const resourceButton = (r: Resource) => <button type="button" className="resource-link" key={r} onClick={() => navigate('sea', r)}><FileTextIcon size={16}/><span>{files[r]}</span></button>
   const groupEntry = (g: Group) => <div className={`agent-group ${group === g ? 'current-group' : ''}`} role="group" aria-label={`${names[g]}会话及文件`} key={g}>
     <button type="button" className={`session-entry ${group === g && resource === 'chat' ? 'selected' : ''}`} aria-label={`打开${names[g]}的对话`} aria-current={group === g && resource === 'chat' ? 'page' : undefined} onClick={() => navigate(g, 'chat')}><AgentLogo kind={agents[g]} size={18}/><span>{names[g]}</span></button>
-    <button type="button" className="group-trigger icon-button" ref={element => { triggers.current[g] = element }} aria-label={`${names[g]}的对话和文件`} aria-haspopup="menu" aria-expanded={openGroup === g} aria-controls={openGroup === g ? 'resource-menu' : undefined} onClick={e => toggleMenu(g, e.currentTarget)} onKeyDown={e => { if (e.key === 'ArrowDown') { e.preventDefault(); toggleMenu(g, e.currentTarget) } }}><ChevronDown size={14}/></button>
+    {openedFiles[g].length > 0 && <button type="button" className="group-trigger icon-button" ref={element => { triggers.current[g] = element }} aria-label={`${names[g]}的对话和文件`} aria-haspopup="menu" aria-expanded={openGroup === g} aria-controls={openGroup === g ? 'resource-menu' : undefined} onClick={e => toggleMenu(g, e.currentTarget)} onKeyDown={e => { if (e.key === 'ArrowDown') { e.preventDefault(); toggleMenu(g, e.currentTarget) } }}><ChevronDown size={14}/></button>}
   </div>
   const menuItem = (g: Group, r: Resource) => <button type="button" role="menuitemradio" aria-checked={group === g && resource === r} className="menu-item" key={r} onClick={() => select(g, r)}>
     {r === 'chat' ? <AgentLogo kind={agents[g]} size={18}/> : <FileTextIcon size={18}/>}
     <span>{r === 'chat' ? '对话' : files[r]}</span>{group === g && resource === r && <CheckIcon size={15}/>}
   </button>
-  const dropdown = openGroup && createPortal(<div ref={menu} id="resource-menu" role="menu" aria-label={`${names[openGroup]}的对话和文件`} className="session-dropdown" style={{ '--anchor-left': `${anchor.left}px`, '--anchor-bottom': `${anchor.bottom}px` } as React.CSSProperties} onKeyDown={e => {
+  const dropdown = openGroup && openedFiles[openGroup].length > 0 && createPortal(<div ref={menu} id="resource-menu" role="menu" aria-label={`${names[openGroup]}的对话和文件`} className="session-dropdown" style={{ '--anchor-left': `${anchor.left}px`, '--anchor-bottom': `${anchor.bottom}px` } as React.CSSProperties} onKeyDown={e => {
     const items = Array.from(menu.current!.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
     const index = items.indexOf(document.activeElement as HTMLButtonElement)
     if (e.key === 'Escape') { e.preventDefault(); const g = openGroup; setOpenGroup(null); triggers.current[g]?.focus() }
@@ -90,7 +92,7 @@ function App() {
       const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
       items[next]?.focus()
     } else if (e.key === 'Tab') { setOpenGroup(null); triggers.current[openGroup]?.focus() }
-  }}>{menuItem(openGroup, 'chat')}{openGroup === 'sea' && <><div className="menu-section" role="presentation">已打开文件</div>{menuItem(openGroup, 'plan')}{menuItem(openGroup, 'checks')}</>}</div>, document.body)
+  }}>{menuItem(openGroup, 'chat')}<div className="menu-section" role="presentation">已打开文件</div>{openedFiles[openGroup].map(file => menuItem(openGroup, file))}</div>, document.body)
   return <div className="prototype">
     <div className="design-bar"><strong>智能体下拉导航设计稿</strong><span>智能体 Logo 与名称直达对话，箭头选择文件</span><button type="button" className="icon-button" aria-label={light ? '切换深色' : '切换浅色'} onClick={() => setLight(!light)}>{light ? <MoonIcon size={18}/> : <SunIcon size={18}/>}</button></div>
     <main className="main">

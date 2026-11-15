@@ -5,7 +5,7 @@
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
 | 模型源与聚合工作台 | [20261114-model-orchestration](20261114-model-orchestration/README.md) | 紧凑导航、Tailwind/Radix 控件、全宽拖拽排序与桌面/真机验收 |
-| 会话与文件导航 | [20261114-session-file-navigation](20261114-session-file-navigation/README.md) | 智能体 Logo 与会话名直达对话，独立箭头下拉选择文件，含历版快照（未改产品） |
+| 会话与文件导航 | [20261114-session-file-navigation](20261114-session-file-navigation/README.md) | 智能体 Logo 与会话名直达对话，有打开文件时才显示下拉，含历版快照（未改产品） |
 | 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
 | 旧会话记录分批加载 | [20261113-transcript-paging](20261113-transcript-paging/README.md) | 最新 50 条首屏、向前游标分页、只读历史身份校验与桌面/真机验收 |
 | 移除独立 DeepSeek Harness | [20261114-remove-deepseek-harness](20261114-remove-deepseek-harness/README.md) | 撤下执行器与适配，保留 API 模型和通用注册机制 |

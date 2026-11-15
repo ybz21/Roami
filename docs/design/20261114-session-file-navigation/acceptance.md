@@ -15,7 +15,7 @@
 
 - 点 Logo / 名称直接进入指定对话；点另一会话的箭头只查看菜单，不先切走当前文件。
 - 点文件进入指定文件并收起菜单；文件和分组对话草稿保留，两个会话草稿互不串用。
-- 对话与文件的当前项标记正确；无文件的会话只出现“对话”。
+- 对话与文件的当前项标记正确；无文件的会话没有下拉箭头、弹层入口或箭头占位，名称仍可直达对话。
 - Home、下方向键和 Escape 正常；Escape 将焦点还给对应箭头。
 - 外点关闭不改变文件或草稿；浏览器返回恢复实际访问位置。
 - 属性栏在 1280 / 1920 / 2560 / 3440 下开合正常；收起时主内容宽度等于整个工作区，展开时仅减去 260 CSS px。
@@ -49,6 +49,14 @@ Redmi Note 8，设备 `216d6a43`，Chrome 经 LAN 打开并硬刷新原型。实
 - 本次仅修改设计目录和设计索引，不修改 `frontend/**`、Go、Python 或产品语言包。设计资料中文属于开发者原型；产品落地须接现有中英 i18n。
 
 本机证据：`/tmp/session-agent-dropdown-results.json`、`/tmp/session-agent-dropdown-quality.log`、`/tmp/session-agent-dropdown-open.png`、`/tmp/session-agent-dropdown-closed.png`、`/tmp/session-agent-dropdown-light.png`、`/tmp/session-agent-dropdown-phone-open.png`、`/tmp/session-agent-dropdown-phone-chat.png`、`/tmp/session-agent-dropdown-phone-chat-menu.png`。截图经 `pr-shot.sh` 进入 `pr-shots`，不提交到主分支。
+
+## 无文件隐藏下拉的补充验证
+
+- 1280 / 1920 / 2560 / 3440 / 320 / 390 CSS px 下，无文件的“登录流程”组只有名称按钮，没有箭头、`aria-haspopup` 或空菜单；点名称仍进入对话。
+- 有文件的“海空双模式”显示下拉，菜单含对话与两个文件。切回对话后，文件仍打开，箭头继续显示；文件项仍可打开。
+- Android 真机宽度 392：无文件时顶栏名称区宽约 320.7 CSS px，有文件时约 284.7，箭头移除后没有保留空位。实际点按无文件的名称没有打开菜单，有文件时点箭头可展开菜单。
+- 本次没有模拟关闭最后一个文件；其关闭与焦点恢复规则写入设计文档，留待产品资源关闭能力实现时验收。
+- 本次补充证据为 `/tmp/session-file-arrow-results.json`、`/tmp/session-file-arrow-desktop.png`、`/tmp/session-file-arrow-phone-no-files.png`、`/tmp/session-file-arrow-phone-with-files.png`、`/tmp/session-file-arrow-phone-open.png`；提交钩子执行 quick 的日志保存在 `/tmp/session-file-arrow-commit.log`。
 
 ## 产品实现后再验收
 
