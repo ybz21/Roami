@@ -15,7 +15,8 @@
 - 源内价格先显示当前规则及模型价格，点击修改后出现表单；模型级规则独立保存，明确免费仍须确认。
 - 源清单与价格表、聚合候选共同使用 `configured-source-models.ts`：只认已保存的非聚合主模型。聚合引用、备用候选和上游全目录均不能自动扩展清单。
 - 历史聚合中未在源里启用的成员保留并标记，可显式取消选择；从源移除模型不会删除对应聚合。聚合成员页不再发起上游发现请求。
-- 手机将策略选择与细则放在同一行，预览与故障测试共用标题行，首屏优先显示完整成员。跨源已选视图使用总数，避免“此源”误标。
+- 手机将策略选择与细则放在同一行，预览与故障测试共用标题行，首屏优先显示完整成员。
+- 成员选择改为左侧源、右侧模型，上方直接展示聚合池；跨源选择与移除不再切换已选视图。单模型隐藏搜索与全选。详见 [聚合成员选择](member-selection.md)。
 
 ## User Stories
 
@@ -56,3 +57,5 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 255 个前端测试文件、1,837 项测试通过；typecheck、i18n、hover、生产构建和完整质量门禁通过。配置减负与模型范围修订完成独立复核，手机密度与跨源计数两项修正均获 `ship`，结论覆盖这两项修正。设计检测无机械问题；独立设计复核要求为两个折叠区恢复展开标识，已补 SVG 箭头、打开状态和触屏命中区，复核结论为 `ship`，覆盖该项修正。验收使用隔离实例和模拟上游，未调用生产模型。详细结果见 [acceptance.json](acceptance.json)，截图由 PR 的 pr-shots 分支保存。
 
 参考：[Linear UI redesign](https://linear.app/now/how-we-redesigned-the-linear-ui)、[Vercel Geist](https://vercel.com/geist/introduction)、[Tailwind Vite](https://tailwindcss.com/docs/installation/using-vite)、[shadcn Vite](https://ui.shadcn.com/docs/installation/vite)。
+
+成员选择修订：按用户确认改为左源右模型、上方聚合池；手机池成员横向滑动，源与模型独立滚动。255 个测试文件 / 1,843 项测试、完整质量门禁和 Redmi Note 8 实机流程通过；针对该成员选择范围的独立完整复核结论为 `ship`，无材料级修正项。详见 `acceptance.json` 的 `memberSelectionRevision`。
