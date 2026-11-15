@@ -28,3 +28,25 @@
 - 12 项 xterm 输入回归测试；全量前端 253 个文件、1,827 项测试通过。
 - `scripts/dev/quality/check.sh quick`、`full`；前端 typecheck、i18n、hover、构建。
 - 截图通过 `scripts/dev/pr-shot.sh` 保存到 `pr-shots`；测试脚本、输入记录与截图保留在 `/tmp/roami-ime-oul3/`，不提交一次性截图或凭据。
+
+## 2026-11-15：标点误删
+
+### 产品设计与用户故事
+
+沿用会话终端界面，输入“完整文字”再打逗号，应收到“完整文字，”。连续标点不重复、不吞字；真实退格仍删除一个字；候选词内的编辑只影响尚未提交的候选词。
+
+### 技术设计
+
+xterm 5.5 在非组合状态收到 `keyCode=229` 时，用延迟任务比较 textarea 新旧长度。输入法把残留候选词替换成更短的标点，会触发 `DEL`；多个延迟任务也会重复转发同一份后续内容。
+
+`terminal-ime.ts` 替换这条非组合输入回退：标记当前 IME 按键，通过真实 `input` 的 `insertText` / `deleteContentBackward` 分别发送文字或退格，不再根据 textarea 长度推断删除。下一次按键或组合开始时清除标记；keypress 已处理的字符不重复转发。保留 xterm 的组合提交与读屏模式路径，卸载时恢复被替换的方法。
+
+### 验收
+
+- 新增回归在旧代码上出现 11 项失败：八种中英文标点误发 `DEL`，连续标点多发，textarea 清空误删，下一次组合吞掉标点。
+- 隔离实例 `/tmp/roami-punctuation-a6rL/`，桌面 Chrome 和 Redmi Note 8 Chrome 经 HTTPS 访问真实会话；事件重放后，旧构建的 PTY 均收到“完整文”。不将事件重放视为所有系统输入法均已人工验证。
+- 修复构建两端各核对 14 条 PTY 回执：八种中英文标点、连续重复标点、IME 删除、标点接下一次组合、立即 Enter、CDP 原生组合与直接插入、普通键盘及 Backspace，全部符合预期。
+- Redmi Note 8 使用豆包输入法，ADB 真实坐标点按输入 `wenzi`、选择“文字”、连续输入两个逗号、退格一次、换行，PTY 收到“文字，”。记录的原生事件为 `keyCode=229` 与 `insertText`，未合成输入事件。
+- 桌面 1280 / 1920 / 2560 / 3440 CSS px、手机 compact/coarse 检查无文档横向溢出；软键盘打开后可输入、退格与换行。
+- 29 项 xterm 回归和全量前端 255 个文件、1,858 项测试通过；`quality/check.sh full` 包含 typecheck、i18n、hover 与生产构建，Python/Go 按变更范围跳过。
+- 本次脚本、PTY 回执、原生事件、门禁日志及前后截图保留在 `/tmp/roami-punctuation-a6rL/`，截图通过 `pr-shots` 展示；不提交测试凭据或构建产物。
