@@ -647,5 +647,347 @@
       "finalDisposition": "ship",
       "scope": "The reviewer scored the two phone-density and cross-source count findings resolved, with no regressions observed in recaptures."
     }
+  },
+  "memberSelectionRevision": {
+    "date": "2026-11-15",
+    "scope": "Aggregate member picker: left source list, right configured source models, persistent cross-source pool; outer navigation unchanged",
+    "fixture": "Private HTTPS instance, synthetic sources with 1, 2, 36 and 0 models plus nested pools and a legacy unconfigured member; no production mutations",
+    "desktop": {
+      "viewports": [
+        {
+          "width": 1280,
+          "sidebar": "open",
+          "scrollWidth": 1280,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 656,
+          "modelsLeft": 656,
+          "paneWidth": 880,
+          "paneScrollWidth": 880,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 1280,
+          "sidebar": "closed",
+          "scrollWidth": 1280,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 427.8125,
+          "modelsLeft": 427.8125,
+          "paneWidth": 1108,
+          "paneScrollWidth": 1108,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 1920,
+          "sidebar": "open",
+          "scrollWidth": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 656,
+          "modelsLeft": 656,
+          "paneWidth": 1520,
+          "paneScrollWidth": 1520,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 1920,
+          "sidebar": "closed",
+          "scrollWidth": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 427.828125,
+          "modelsLeft": 427.828125,
+          "paneWidth": 1748,
+          "paneScrollWidth": 1748,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 2092,
+          "sidebar": "open",
+          "scrollWidth": 2092,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 656,
+          "modelsLeft": 656,
+          "paneWidth": 1692,
+          "paneScrollWidth": 1692,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 2092,
+          "sidebar": "closed",
+          "scrollWidth": 2092,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 427.828125,
+          "modelsLeft": 427.828125,
+          "paneWidth": 1920,
+          "paneScrollWidth": 1920,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 2560,
+          "sidebar": "open",
+          "scrollWidth": 2560,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 656,
+          "modelsLeft": 656,
+          "paneWidth": 2160,
+          "paneScrollWidth": 2160,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 2560,
+          "sidebar": "closed",
+          "scrollWidth": 2560,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 427.8125,
+          "modelsLeft": 427.8125,
+          "paneWidth": 2388,
+          "paneScrollWidth": 2388,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 3440,
+          "sidebar": "open",
+          "scrollWidth": 3440,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 656,
+          "modelsLeft": 656,
+          "paneWidth": 3040,
+          "paneScrollWidth": 3040,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 3440,
+          "sidebar": "closed",
+          "scrollWidth": 3440,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 427.8125,
+          "modelsLeft": 427.8125,
+          "paneWidth": 3268,
+          "paneScrollWidth": 3268,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        },
+        {
+          "width": 1920,
+          "sidebar": "open-light-en",
+          "scrollWidth": 1920,
+          "height": 1080,
+          "scrollHeight": 1080,
+          "sourceRight": 656,
+          "modelsLeft": 656,
+          "paneWidth": 1520,
+          "paneScrollWidth": 1520,
+          "footerBottom": 1055,
+          "capabilityTabs": 8,
+          "leftTabs": true
+        }
+      ],
+      "saved": {
+        "strategy": "smart",
+        "candidates": [
+          {
+            "sourceId": "a",
+            "model": "hy4free"
+          },
+          {
+            "sourceId": "b",
+            "model": "vendor/coding-a"
+          }
+        ]
+      },
+      "checks": [
+        "source left/model right",
+        "source-only saved inventory",
+        "permanent cross-source selection",
+        "whole-card selection and synchronized removal",
+        "one-model hides search and bulk",
+        "search matched bulk and pagination reset",
+        "four widths plus user width, sidebar open/closed",
+        "legacy explicit removal and saved readback",
+        "return retains draft and save smart pool",
+        "empty source configuration entry",
+        "light English layout"
+      ]
+    },
+    "phone": {
+      "device": "Redmi Note 8",
+      "serial": "216d6a43",
+      "checks": [
+        "physical touch source left/model right",
+        "single model hides search and bulk",
+        "whole model card selectable",
+        "cross-source retained and removal synchronized",
+        "independent model/source scrolling, pool remains visible",
+        "search and long model wrapping",
+        "native keyboard and fixed footer",
+        "return restores draft",
+        "smart pool saved and read back",
+        "legacy member explicitly removed and saved",
+        "more settings remain reachable",
+        "return bar and document bounds intact"
+      ],
+      "singleModel": {
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "sourceRight": 128,
+        "modelsLeft": 128,
+        "modelsHeight": 151.71023559570312,
+        "modelsScrollWidth": 249,
+        "modelsWidth": 249,
+        "paneWidth": 393,
+        "paneScrollWidth": 393,
+        "footerBottom": 741.8182182312012,
+        "returnTop": 0,
+        "returnHeight": 60.72727584838867,
+        "headers": 1
+      },
+      "independentScroll": {
+        "before": {
+          "x": 289.67273178100584,
+          "y": 542.8505767822265,
+          "scroll": 0,
+          "sourceScroll": 73.81818389892578,
+          "poolTop": 317.38067626953125
+        },
+        "after": {
+          "scroll": 338.18182373046875,
+          "sourceScroll": 73.81818389892578,
+          "poolTop": 317.38067626953125
+        }
+      },
+      "longModel": {
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "sourceRight": 128,
+        "modelsLeft": 128,
+        "modelsHeight": 150.9829559326172,
+        "modelsScrollWidth": 249,
+        "modelsWidth": 249,
+        "paneWidth": 393,
+        "paneScrollWidth": 393,
+        "footerBottom": 741.8182182312012,
+        "returnTop": 0,
+        "returnHeight": 60.72727584838867,
+        "headers": 1
+      },
+      "keyboard": {
+        "keyboard": "open",
+        "footerBottom": 451.8181838989258
+      },
+      "saved": {
+        "strategy": "smart",
+        "candidates": [
+          {
+            "sourceId": "a",
+            "model": "hy4free"
+          },
+          {
+            "sourceId": "b",
+            "model": "vendor/coding-a"
+          }
+        ]
+      },
+      "legacy": {
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "sourceRight": 128,
+        "modelsLeft": 128,
+        "modelsHeight": 151.71023559570312,
+        "modelsScrollWidth": 249,
+        "modelsWidth": 249,
+        "paneWidth": 393,
+        "paneScrollWidth": 393,
+        "footerBottom": 741.8182182312012,
+        "returnTop": 0,
+        "returnHeight": 60.72727584838867,
+        "headers": 1
+      },
+      "afterMoreSettings": {
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "sourceRight": 128,
+        "modelsLeft": 128,
+        "modelsHeight": 151.71023559570312,
+        "modelsScrollWidth": 249,
+        "modelsWidth": 249,
+        "paneWidth": 393,
+        "paneScrollWidth": 393,
+        "footerBottom": 741.8182182312012,
+        "returnTop": 0,
+        "returnHeight": 60.72727584838867,
+        "headers": 1
+      }
+    },
+    "tests": {
+      "files": 255,
+      "tests": 1843,
+      "unhandledErrors": 0
+    },
+    "quality": [
+      "scripts/dev/quality/check.sh quick",
+      "scripts/dev/quality/check.sh full",
+      "npm run typecheck",
+      "npm run i18n:check",
+      "npm run hover:check",
+      "npx vitest run",
+      "npm run build"
+    ],
+    "detector": {
+      "findings": [],
+      "scope": "Changed member picker/editor/CSS; one scan before final targeted phone width and warning adjustments"
+    },
+    "screenshots": {
+      "beforeDesktop": "/tmp/roami-aggregate-picker-20261115/before-desktop.png",
+      "beforePhone": "/tmp/roami-aggregate-picker-20261115/before-phone.png",
+      "afterDesktop": "/tmp/roami-aggregate-picker-20261115/after-cross-source-desktop.png",
+      "afterPhone": "/tmp/roami-aggregate-picker-20261115/after-cross-source-phone.png",
+      "phoneLegacy": "/tmp/roami-aggregate-picker-20261115/after-legacy-phone.png"
+    },
+    "review": {
+      "disposition": "ship",
+      "scope": "Fresh full independent review of aggregate member selection; user screenshot plus five desktop widths, light English and physical phone captures",
+      "materialFixes": [],
+      "keep": [
+        "Persistent cross-source pool",
+        "Source left / saved source models right",
+        "Explicit legacy-member removal",
+        "Existing outer navigation and token system"
+      ]
+    }
   }
 }
