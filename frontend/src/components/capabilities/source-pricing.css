@@ -11,3 +11,10 @@ html[data-pointer="coarse"] :is(.source-pricing-workspace,.source-price-editor) 
 .source-price-advanced>summary{display:flex;align-items:center;gap:var(--sp-2)}
 .source-price-advanced>summary>svg{width:var(--sp-4);height:var(--sp-4);color:var(--text-dim);flex-shrink:0}
 .source-price-advanced[open]>summary>svg{transform:rotate(90deg)}
+.source-price-preview { display:grid; gap:var(--sp-3); margin:var(--sp-4) 0; font-size:var(--fs-sm); font-variant-numeric:tabular-nums; }
+.source-price-preview > div { display:flex; justify-content:space-between; gap:var(--sp-3); }
+.source-price-preview dt { color:var(--text-dim); }
+.source-price-preview dd { margin:0; }
+.source-price-current { margin-top:var(--sp-5); }
+.source-price-editor .source-price-advanced { margin-top:var(--sp-4); }
+.source-price-advanced > label { margin-block:var(--sp-3); }

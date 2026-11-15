@@ -175,3 +175,4 @@ html[data-pointer="coarse"] .tt-member-pool-list .tt-act { min-width:var(--tap);
 
 html:is([data-size="compact"],[data-size="medium"]) .tt-member-pool-list { flex-wrap:nowrap; max-height:none; }
 html:is([data-size="compact"],[data-size="medium"]) .tt-member-pool-list>li { flex-shrink:0; }
+.tt-routing-main > .tt-model-hub-actions > .ui-input-wrap { width:var(--content-form); max-width:100%; }

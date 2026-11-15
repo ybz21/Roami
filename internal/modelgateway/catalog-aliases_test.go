@@ -128,3 +128,45 @@ func TestDirectModelNameDoesNotResolveAsGatewayAlias(t *testing.T) {
 		t.Fatal("direct upstream model name was treated as a gateway alias")
 	}
 }
+
+func TestNativeRenameKeepsBoundCallsAndUpstreamIdentity(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), `"model":"fixture"`) {
+			t.Errorf("upstream identity changed: %s", body)
+		}
+		_, _ = io.WriteString(w, `{"id":"ok","choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}`)
+	}))
+	defer upstream.Close()
+	h := catalogHandler(t, upstream.URL, "openai-completions")
+	v := h.Catalog.snapshot()
+	old := v.Models[0].ID
+	saveNodeModels(t, h.Ledger, map[string]any{"connection": map[string]string{"baseUrl": h.Catalog.baseURL + "/v1", "apiKey": h.Catalog.credential("roami")}, "main": map[string]string{"model": old}})
+	v.Models[0].ID = "native-new"
+	v.Models[0].Aliases = []string{old}
+	if err := h.Catalog.update(context.Background(), v); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := openCatalog(h.Ledger)
+	if err != nil || findCatalogModel(reopened.value.Models, old) == nil {
+		t.Fatal("native alias not persisted", err)
+	}
+	if len(h.Catalog.view(context.Background()).Uses["native-new"]) == 0 {
+		t.Fatal("native binding lost")
+	}
+	for _, id := range []string{old, "native-new"} {
+		w := httptest.NewRecorder()
+		request := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"test"}]}`, id)))
+		h.forwardCatalog(w, request, h.Catalog.snapshot(), "roami", "openai-completions")
+		if w.Code != 200 {
+			t.Fatalf("%s: %d %s", id, w.Code, w.Body.String())
+		}
+	}
+	for _, aggregate := range []bool{false, true} {
+		previous := CatalogModel{ID: "old", Aggregate: aggregate, Protocol: "openai-completions"}
+		next := CatalogModel{ID: "new", Aliases: []string{"old"}, Aggregate: !aggregate, Protocol: previous.Protocol}
+		if validateModelAliases([]CatalogModel{previous}, []CatalogModel{next}) == nil {
+			t.Fatal("alias changed model type")
+		}
+	}
+}

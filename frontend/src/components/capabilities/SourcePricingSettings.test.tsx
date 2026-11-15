@@ -20,27 +20,34 @@ beforeEach(()=>{ installRadixTestEvents();
 afterEach(()=>{cleanup();vi.clearAllMocks()})
 it('saves one model without committing source drafts and saves defaults without committing model drafts',async()=>{
  const {container}=render(<Harness/>)
- const source=await screen.findByText('pricing.default',{selector:'h3'}).then(element=>element.closest('section')!)
- fireEvent.click(within(source).getByRole('button',{name:'orchestration.editDefault'}))
- fireEvent.change(within(source).getByLabelText('pricing.input'),{target:{value:'8'}})
+ const defaultButton=await screen.findByRole('button',{name:'orchestration.editDefault'})
+ fireEvent.click(defaultButton)
+ let editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'8'}})
+ fireEvent.click(within(editor).getByRole('button',{name:'common.back'}))
  fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
- let editor=container.querySelector('.source-price-inspector')!
- fireEvent.change(within(editor as HTMLElement).getByLabelText('pricing.input'),{target:{value:'12'}})
- fireEvent.click(within(editor as HTMLElement).getByRole('button',{name:'pricing.save'}))
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'12'}})
+ expect(within(editor).getByRole('region',{name:'modelInteraction.pricePreview'}).textContent).toContain('12')
+ fireEvent.click(within(editor).getByRole('button',{name:'pricing.save'}))
  await waitFor(()=>expect(container.querySelector('.source-price-inspector')).toBeNull())
  expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/settings/sources/a?scope=model&model=gpt-5',expect.objectContaining({default:rule(3),models:{'gpt-5':{...rule(12),confirmed:false}}}))
- expect((within(source).getByLabelText('pricing.input') as HTMLInputElement).value).toBe('8')
  expect(container.querySelector('td[data-label="pricing.input"]')?.textContent).toBe('24')
  fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
- editor=container.querySelector('.source-price-inspector')!
- fireEvent.change(within(editor as HTMLElement).getByLabelText('pricing.input'),{target:{value:'20'}})
- fireEvent.click(within(editor as HTMLElement).getByRole('button',{name:'common.back'}))
- fireEvent.click(within(source).getByRole('button',{name:'pricing.save'}))
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'20'}})
+ fireEvent.click(within(editor).getByRole('button',{name:'common.back'}))
+ fireEvent.click(defaultButton)
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ expect((within(editor).getByLabelText('pricing.input') as HTMLInputElement).value).toBe('8')
+ fireEvent.click(within(editor).getByRole('button',{name:'pricing.save'}))
  await waitFor(()=>expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/settings/sources/a?scope=default',expect.objectContaining({default:{...rule(8),confirmed:false},models:{'gpt-5':{...rule(12),confirmed:false}}})))
+ await waitFor(()=>expect(container.querySelector('.source-price-inspector')).toBeNull())
  fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
- editor=container.querySelector('.source-price-inspector')!
- expect((within(editor as HTMLElement).getByLabelText('pricing.input') as HTMLInputElement).value).toBe('20')
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ expect((within(editor).getByLabelText('pricing.input') as HTMLInputElement).value).toBe('20')
 })
+
 it('requires free confirmation and rejects invalid numeric prices without sending writes',async()=>{
  const {container}=render(<Harness/>)
  fireEvent.click(await screen.findByRole('button',{name:'pricing.editModel'}))

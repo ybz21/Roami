@@ -1,5 +1,8 @@
 # 模型源与聚合：工作台重构
 
+
+2026-11-16：[交互稿正式实现与验收](interaction-implementation.md)。
+
 最新交互评审稿：[完整交互设计](interaction-design.md) · [打开可交互 HTML](interaction-prototype.html)。覆盖大模型七个页面及主要详情流程，使用演示数据，尚未接入生产页面。
 
 ## Product Design
