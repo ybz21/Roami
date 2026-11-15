@@ -1,8 +1,8 @@
 # 会话与文件：智能体 Logo 下拉导航
 
-状态：第三版设计提案，尚未修改产品功能。更新：2026-11-15。
+状态：第三版方案已落地，桌面与 Android 真机验证完成。更新：2026-11-16。
 
-[交互原型](prototype.html) · [源码](proposal.tsx) · [验收记录](acceptance.md) · [第二版快照](revisions/v2/prototype.html) · [第一版快照](revisions/v1/prototype.html)
+[交互原型](prototype.html) · [源码](proposal.tsx) · [原型验收](acceptance.md) · [产品实现与验收](implementation.md) · [第二版快照](revisions/v2/prototype.html) · [第一版快照](revisions/v1/prototype.html)
 
 ## 产品设计
 
@@ -40,7 +40,7 @@ Roami / ai-app-factory
 - 菜单第一项固定为“对话”，使用对应智能体 Logo；其后“已打开文件”分区只列打开的文件，不递归展示目录。
 - 当前具体资源同时使用中性选中底色、字重和勾选图标；文件正在显示时，“对话”不能被标成当前资源。
 - 顶部会话组可以高亮表示归属，但只有正在查看对话时，Logo / 名称按钮才带 `aria-current`。菜单内使用 `menuitemradio` 与 `aria-checked`。
-- 同名文件增加最短可区分父路径；长名省略，正文标题与详情保留完整路径。
+- 同名文件显示完整路径以便区分；长名省略，正文标题与详情保留完整路径。
 - 文件多时菜单自身滚动；弹层逃逸导航的 overflow，不撑大文档，不被导航裁切。弹层靠近右边界时向左避让。
 - **没有已打开文件时，只显示智能体 Logo 与会话名，不渲染箭头、空菜单或占位间隙。** 打开第一个文件后箭头出现；关闭最后一个文件后箭头消失，点击名称仍回对话。
 - 箭头显隐依据该组已打开文件，不依据磁盘上有没有文件，也不依据当前显示对话还是文件。回到对话但仍有文件开着时，箭头保留。
@@ -64,7 +64,7 @@ Roami / ai-app-factory
 
 手机将当前智能体入口放进顶栏：左侧一个返回按钮，中间为 Logo / 会话名，有已打开文件时右侧才显示资源下拉。无文件时名称区收回箭头位置。文件名显示在正文前的文件标题，不重复另一套返回栏。下拉只是短列表选择，使用锚定菜单；长文件列表在菜单内滚动，不弹出嵌套对话框。
 
-文件页顶栏返回回来源对话；对话页返回打开独立全屏会话选择页。选择页只有一个返回栏和滚动容器，选择具体会话回到对话。会话 / 文件全屏工作内容不叠底部主导航，现有产品一级页的首页 / 项目 / 工具 / 设置底栏不变。
+文件页顶栏返回回来源对话；对话页返回收起会话工作区；独立的会话切换按钮打开全屏选择页。选择页只有一个返回栏和滚动容器，选择具体会话回到对话。会话 / 文件全屏工作内容不叠底部主导航，现有产品一级页的首页 / 项目 / 工具 / 设置底栏不变。
 
 触控箭头视觉仍为小图标，命中区由伪元素补至 44；与名称按钮相邻处增加间距，避免两个点击意图重叠。名称本身高度至少 44，不靠 Tooltip 说明用途。
 
@@ -75,7 +75,7 @@ Roami / ai-app-factory
 | 现有模块 / 拟新增组件 | 要求 |
 | --- | --- |
 | `ProjectTree.tsx`、`useProjectActions.tsx` | 保持会话真实身份，具体会话入口直接激活会话，不能继续转换为 `returnToTask` 恢复文件 |
-| 现有顶部标签导航、拟新增 `SessionResourceMenu.tsx` | 保留 `AgentLogo` 和会话名，使用现有 antd Dropdown / Menu 模式，提供独立箭头点击区 |
+| 现有顶部标签导航、`SessionResourceMenu.tsx` | 保留 `AgentLogo` 和会话名，使用现有 antd Dropdown / Menu 模式，提供独立箭头点击区 |
 | `useTaskWorkspace.ts` | 校验文件归属，原子更新活动会话 / 文件，捕获来源会话，保持文件草稿 |
 | `term-tabs-store.ts` | 继续使用全局标签数据与 `FileTab.task`；菜单不拥有另一份文件列表 |
 | `view-state.tsx` 作用域 Hooks | 保存可恢复位置与草稿，不新增模块 Map 或 localStorage 快照 |
@@ -101,7 +101,7 @@ Roami / ai-app-factory
 
 独立原型使用演示数据，不读取真实会话、不连接终端、不保存或发送业务内容。支持 Logo / 名称回对话、箭头菜单、具体资源选择、外点 / Escape 关闭、方向键、草稿隔离、手机会话选择、浏览器返回、深浅主题和可选属性面板。
 
-实际产品仍须验证文件保存 / 关闭、长列表与同名文件、多会话共享工作区、来源失效、跨节点、真实滚动恢复、i18n、软键盘与安全区，以及完整前端检查和 full gate。原型只有设计资料中文，不接产品语言包；产品落地必须进入现有中英 i18n。
+产品实现与实际验证见 [implementation.md](implementation.md)。原型保留演示数据与中文资料，不作为产品测试；产品文案已接入现有中英 i18n。
 
 ```bash
 NODE_PATH=frontend/node_modules frontend/node_modules/.bin/esbuild docs/design/20261114-session-file-navigation/proposal.tsx --bundle --minify --define:process.env.NODE_ENV='"production"' --loader:.svg=dataurl --outfile=docs/design/20261114-session-file-navigation/proposal.js

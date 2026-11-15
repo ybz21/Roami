@@ -70,7 +70,7 @@ function AppShellContent({ routing, logout }: AppShellProps) {
   const agentInbox = useAgentInbox(true, curNodeId, tab === 'home' && !routing.agentPage && !routing.agentBranch)
   const data = useSessionDirectory()
   const workspace = useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: hasSider, mobile: isMobile, page: tab, navigate: go })
-  const { terms, active, curFile, activeTask, space, taskView, overlay, returnToTask, openFileTab } = workspace
+  const { terms, active, curFile, activeTask, space, taskView, overlay, openFileTab } = workspace
   const cluster = useClusterNavigation(go)
   const { clusterNodes, curNode, hubHealth, nodeItems } = cluster
   const activeProject = useSessionProject(active)
@@ -209,7 +209,7 @@ function AppShellContent({ routing, logout }: AppShellProps) {
               onSearch={openPalette}
               searchHint={keys.search.label}
               tree={<ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
-                onProject={onTreeProject} onSession={(key, name) => (terms.includes(name) ? returnToTask(key, name) : openTerm(name, key))}
+                onProject={onTreeProject} onSession={(key, name) => openTerm(name, key)}
                 onAddProject={projectActions.addProject}
                 onRename={projectActions.renameSession}
                 onNewTask={projectActions.newTask} onKill={projectActions.kill}

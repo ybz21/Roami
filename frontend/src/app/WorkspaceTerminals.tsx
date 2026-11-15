@@ -34,7 +34,7 @@ type WorkspaceTerminalsProps = {
 export default function WorkspaceTerminals({ workspace, runtime, inspector, pages, routing, hasSider, agentKinds, activeTaskLabel, taskDir, actions }: WorkspaceTerminalsProps) {
   const { t } = useI18n()
   const keys = useKeybindings()
-  const { terms, active, taskView, space, activateSession, setOverlay, fileTabs, curFile, setActiveFile, closeFileTab, pinFileTab, setFileMode, reveal, openFileTab, reorderTerm } = workspace
+  const { terms, active, taskView, space, activateSession, setOverlay, fileTabs, curFile, closeFileTab, pinFileTab, setFileMode, reveal, openFileTab, reorderTerm } = workspace
   const { fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, setMobileWaiting } = runtime
   const { pageTabs, closePageTab, closePageTabs, tabBarHost, selectPage } = pages
   const { openTerm, closeTerm, renameOpenTerm, newTerminalInTask } = actions
@@ -60,12 +60,13 @@ export default function WorkspaceTerminals({ workspace, runtime, inspector, page
       onNeedsInput={setMobileWaiting}
       onOpenSession={(n) => openTerm(n)}
       onNew={taskView ? { terminal: () => { void newTerminalInTask('shell') }, agent: (kind) => { void newTerminalInTask(kind) }, taskLabel: activeTaskLabel } : undefined}
-      onOpenFile={taskView ? (path, line) => openFileTab(path, line) : undefined}
+      onOpenFile={taskView || !hasSider ? (path, line) => openFileTab(path, line) : undefined}
       onOpenGit={taskView ? () => showInspector('git') : undefined}
       inspector={taskView ? { open: !space.inspectorCollapsed, toggle: toggleInspector } : undefined}
-      fileTabs={hasSider ? fileTabs : undefined} activeFile={hasSider ? curFile : undefined}
+      fileTabs={fileTabs} activeFile={curFile} sessionTask={workspace.keyOf}
+      onReturnToSession={curFile && workspace.fileSession(curFile) ? workspace.returnToFileSession : undefined}
       taskDir={taskDir}
-      onFileTab={(path) => { setActiveFile(path); if (hasSider) go(TASK_ROUTE) }} onCloseFile={closeFileTab} onPinFile={pinFileTab} onFileMode={setFileMode} reveal={reveal}
+      onFileTab={(path, session) => { workspace.activateFile(path, session); if (hasSider) go(TASK_ROUTE) }} onCloseFile={closeFileTab} onPinFile={pinFileTab} onFileMode={setFileMode} reveal={reveal}
       focus={!hasSider || taskView ? undefined : { on: space.focus !== 'none', toggle: space.toggleFocus, hint: keys.focus.label }}
     />
   )
