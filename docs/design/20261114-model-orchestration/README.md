@@ -1,5 +1,7 @@
 # 模型源与聚合：工作台重构
 
+最新交互评审稿：[完整交互设计](interaction-design.md) · [打开可交互 HTML](interaction-prototype.html)。覆盖大模型七个页面及主要详情流程，使用演示数据，尚未接入生产页面。
+
 ## Product Design
 
 本阶段只重构模型源和聚合。参考 Linear 的紧凑导航与对齐、Vercel Geist 的中性表面和明确对比。React + Tailwind CSS + shadcn/Radix 控件承载新页面，沿用 Roami 已有 token、国际化、手机导航与手势约束。其他能力页继续使用既有组件。
