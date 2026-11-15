@@ -100,6 +100,100 @@ describe('xterm IME compatibility', () => {
     expect(output.join('')).toBe('a')
   })
 
+  const imeKey = (textarea: HTMLTextAreaElement, value: string, data: string | null, inputType = 'insertText') => {
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Unidentified', keyCode: 229 }))
+    textarea.value = value
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, data, inputType }))
+    textarea.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Unidentified', keyCode: 229 }))
+  }
+
+  it.each(['，', '。', '！', '？', ',', '.', '!', '?'])('inserts %s without deleting committed Chinese', async punctuation => {
+    const textarea = term.textarea!
+    compose(textarea, '完整文字')
+    await tick()
+    imeKey(textarea, punctuation, punctuation)
+    await tick()
+    expect(output.join('')).toBe('完整文字' + punctuation)
+  })
+
+  it('sends appended punctuation only once', async () => {
+    const textarea = term.textarea!
+    compose(textarea, '文字')
+    await tick()
+    imeKey(textarea, '文字，', '，')
+    await tick()
+    expect(output.join('')).toBe('文字，')
+  })
+
+  it('preserves repeated punctuation arriving before a timer tick', async () => {
+    imeKey(term.textarea!, '！', '！')
+    imeKey(term.textarea!, '！！', '！')
+    await tick()
+    expect(output.join('')).toBe('！！')
+  })
+
+  it('only deletes when the IME reports a backward deletion', async () => {
+    const textarea = term.textarea!
+    compose(textarea, '文字')
+    await tick()
+    imeKey(textarea, '文', null, 'deleteContentBackward')
+    await tick()
+    expect(output.join('')).toBe('文字\x7f')
+  })
+
+  it('does not infer deletion when an IME key clears stale textarea content', async () => {
+    term.textarea!.value = '已发送的文字'
+    term.textarea!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }))
+    term.textarea!.value = ''
+    await tick()
+    expect(output).toEqual([])
+  })
+
+  it('does not replay punctuation after another composition starts', async () => {
+    imeKey(term.textarea!, '，', '，')
+    compose(term.textarea!, '继续')
+    await tick()
+    expect(output.join('')).toBe('，继续')
+  })
+
+  it('keeps a normal Backspace after an IME key that produces no input', async () => {
+    term.textarea!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }))
+    term.textarea!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Backspace', keyCode: 8 }))
+    await tick()
+    expect(output.join('')).toBe('\x7f')
+  })
+
+  it('does not resend an IME punctuation key already handled by keypress', async () => {
+    const textarea = term.textarea!
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }))
+    textarea.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, charCode: 44 }))
+    textarea.value = ','
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, data: ',', inputType: 'insertText' }))
+    await tick()
+    expect(output.join('')).toBe(',')
+  })
+
+  it('keeps candidate edits local until composition ends', async () => {
+    const textarea = term.textarea!
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }))
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    textarea.value = '文字'
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, data: '文字', inputType: 'insertCompositionText', isComposing: true }))
+    textarea.value = '文'
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'deleteContentBackward', isComposing: true }))
+    expect(output).toEqual([])
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '文' }))
+    await tick()
+    expect(output.join('')).toBe('文')
+  })
+
+  it('keeps screen reader textarea handling unchanged', async () => {
+    term.options.screenReaderMode = true
+    imeKey(term.textarea!, '，', '，')
+    await tick()
+    expect(output.join('')).toBe('，')
+  })
+
   it('forwards xterm commits and Enter when keydown ends an active composition', async () => {
     const textarea = term.textarea!
     textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
