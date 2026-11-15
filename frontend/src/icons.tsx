@@ -35,6 +35,7 @@ export function UsageRing({ percent, color = 'currentColor', size = 16 }: P & { 
 // ── 基础动作 ──
 export const CloseIcon = ({ size = 14 }: P) => line(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, size, 2)
 export const CheckIcon = ({ size = 14 }: P) => line(<path d="m5 12.5 4.5 4.5L19 7" />, size, 2.2)
+export const MinusIcon = ({ size = 14 }: P) => line(<path d="M5 12h14" />, size)
 export const PlusIcon = ({ size = 14 }: P) => line(<path d="M12 5v14M5 12h14" />, size, 2.2)
 export const CopyIcon = ({ size = 13 }: P) => line(<><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M15 5.5A2.5 2.5 0 0 0 12.5 4H6a2 2 0 0 0-2 2v6.5A2.5 2.5 0 0 0 6.5 15" /></>, size)
 export const RefreshIcon = ({ size = 14 }: P) => line(

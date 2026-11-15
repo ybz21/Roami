@@ -1,0 +1,58 @@
+# 模型源与聚合：工作台重构
+
+## Product Design
+
+本阶段只重构模型源和聚合。参考 Linear 的紧凑导航与对齐、Vercel Geist 的中性表面和明确对比。React + Tailwind CSS + shadcn/Radix 控件承载新页面，沿用 Roami 已有 token、国际化、手机导航与手势约束。其他能力页继续使用既有组件。
+
+按用户最终确认，能力顶部 Tabs 和模型功能左侧 Tabs 保持原有形式；手机继续使用原有能力选择和顶部模型 Tabs。聚合调度采用上下结构：紧凑策略配置与预览卡在上，完整优先成员列表在下，编辑和预览不再分居两栏。成员用卡片式可排序行展示；鼠标悬停/键盘聚焦显示置顶和移除，触屏始终可见。
+
+状态从已保存的真实路由渠道读取；新成员未检测时明确未知。上下文来自源目录；延迟只显示具有明确来源和时间范围的实际监控值，不推断、不造在线状态。监控仍为 24 小时滚动，保持原有空间上限。
+
+## 配置减负与模型范围
+
+- 聚合常用路径：名称、源、模型；自动生成 ID、默认智能策略。ID、启停和删除收在更多设置；免费调用限制保持可见。
+- 已有源先显示连接摘要与已启用模型；新增连接只先显示地址和 Key。名称、协议、认证方式按需展开。上游目录显式读取后分页展示，每页 30 项。
+- 源内价格先显示当前规则及模型价格，点击修改后出现表单；模型级规则独立保存，明确免费仍须确认。
+- 源清单与价格表、聚合候选共同使用 `configured-source-models.ts`：只认已保存的非聚合主模型。聚合引用、备用候选和上游全目录均不能自动扩展清单。
+- 历史聚合中未在源里启用的成员保留并标记，可显式取消选择；从源移除模型不会删除对应聚合。聚合成员页不再发起上游发现请求。
+- 手机将策略选择与细则放在同一行，预览与故障测试共用标题行，首屏优先显示完整成员。跨源已选视图使用总数，避免“此源”误标。
+
+## User Stories
+
+- 我能在一屏内看到策略、效果和优先成员，沿用熟悉的能力和模型导航。
+- 我能从手柄拖动模型排序，或用键盘上下/Home/End 排序；置顶和移除都有清楚名称。
+- 我能看到来源、可用性和已公布的能力；未知与不可用不混为一谈。
+- 我能跨源核对已选成员，在字段旁定位错误，切换标签或返回后继续草稿。
+- 手机列表可以正常滑动，只有抓住手柄时才排序；控件、弹层和保存均可触达。
+
+## Technical Design
+
+Tailwind 使用前缀和隔离的 utility 层，由入口统一加载一次，避免懒加载路由拆 CSS 后丢失基础样式；不引入全局 Preflight，不改其他页面的默认元素。shadcn 风格的本地组件基于 Radix primitives，颜色、字号、圆角和空间映射现有 token。没有新增第二套全局主题。
+
+`ModelHub` 保留目录与源详情路由和草稿逻辑，能力顶部 Tabs、模型左侧 Tabs 沿用原组件和布局。`ModelSourceEditor`、`SourcePricingSettings` 与聚合编辑控件迁入新组件。`RoutingStrategyPreview` 只显示紧凑模拟；`AggregationMemberOrder` 独立承载全宽成员列表。现有 Pointer Events 拖动保留触屏滚动和取消语义，新增置顶，移除上下移按钮。
+
+元数据按唯一源读取、限制并发，目录请求按 revision 缓存，离开时取消。真实路由与监控最多各一组可见时轮询；新增草稿不查询虚构运行状态。排序、权重、ID 别名、定价和请求协议语义保持。
+
+## Direction contract
+
+THESIS: 让模型路由成为可操作的工作台，以优先列表为主体；配置和预览共同解释接下来会如何调度。
+
+OWN-WORLD: 使用现有中性深浅表面、细边界、标准 sans 和唯一蓝/绿语义色，压缩内容区的配置和控件层级，外层导航保持原样。保留用户指定的独立卡片。
+
+STORY: 先确认源与成员，再选策略；在同一区域观察预览，随后排序并保存。真实渠道状态始终与草稿示意区分。
+
+FIRST VIEWPORT: 原有能力顶部 Tabs 和模型左侧 Tabs；详情标题和保存动作；顶部紧凑策略/模拟卡；下方全宽成员行。宽屏有更多行内指标，手机纵排但不缩小文字。
+
+FORM: seed: none (pinned) — 用户指定“上下结构”“路由策略和调度预览合并”“下方全宽展示优先顺序列表”。签名交互为抓手拖动、即时更新调度示意和保持成员权重。
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Acceptance
+
+导航修订：按用户最终确认恢复能力顶部 Tabs、模型左侧 Tabs；保留内部策略预览与拖拽重构。修订后重新完成四档桌面宽度、侧栏展开/收起及安卓真机导航、详情滚动、返回和定价路径验收。`acceptance.json` 的 `navigationRevision` 记录导航修订，`simplificationRevision` 记录最终配置减负与模型范围修复，`initialDesktop` / `initialPhone` 保留初版验收历史。
+
+已验证桌面 1280/1920/2560/3440、侧栏展开/收起、深浅主题与中英文。Redmi Note 8 真机完成选源、拖拽、滚动、返回继续草稿、保存回读、原生键盘、定价切换和菜单操作；文档与编辑区均无横向溢出。
+
+255 个前端测试文件、1,837 项测试通过；typecheck、i18n、hover、生产构建和完整质量门禁通过。配置减负与模型范围修订完成独立复核，手机密度与跨源计数两项修正均获 `ship`，结论覆盖这两项修正。设计检测无机械问题；独立设计复核要求为两个折叠区恢复展开标识，已补 SVG 箭头、打开状态和触屏命中区，复核结论为 `ship`，覆盖该项修正。验收使用隔离实例和模拟上游，未调用生产模型。详细结果见 [acceptance.json](acceptance.json)，截图由 PR 的 pr-shots 分支保存。
+
+参考：[Linear UI redesign](https://linear.app/now/how-we-redesigned-the-linear-ui)、[Vercel Geist](https://vercel.com/geist/introduction)、[Tailwind Vite](https://tailwindcss.com/docs/installation/using-vite)、[shadcn Vite](https://ui.shadcn.com/docs/installation/vite)。

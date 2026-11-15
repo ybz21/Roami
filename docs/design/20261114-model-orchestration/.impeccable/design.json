@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T16:19:14.754667+00:00",
+  "title": "Design System: Roami model workspace",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--accent) 20%, black)",
+          "color-mix(in oklch, var(--accent) 45%, black)",
+          "color-mix(in oklch, var(--accent) 70%, black)",
+          "color-mix(in oklch, var(--accent) 90%, black)",
+          "color-mix(in oklch, var(--accent) 90%, white)",
+          "color-mix(in oklch, var(--accent) 65%, white)",
+          "color-mix(in oklch, var(--accent) 40%, white)",
+          "color-mix(in oklch, var(--accent) 15%, white)"
+        ]
+      },
+      "accent-solid": {
+        "role": "primary",
+        "displayName": "Accent solid",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--accent-solid) 20%, black)",
+          "color-mix(in oklch, var(--accent-solid) 45%, black)",
+          "color-mix(in oklch, var(--accent-solid) 70%, black)",
+          "color-mix(in oklch, var(--accent-solid) 90%, black)",
+          "color-mix(in oklch, var(--accent-solid) 90%, white)",
+          "color-mix(in oklch, var(--accent-solid) 65%, white)",
+          "color-mix(in oklch, var(--accent-solid) 40%, white)",
+          "color-mix(in oklch, var(--accent-solid) 15%, white)"
+        ]
+      },
+      "accent-border": {
+        "role": "primary",
+        "displayName": "Accent border",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--accent-border) 20%, black)",
+          "color-mix(in oklch, var(--accent-border) 45%, black)",
+          "color-mix(in oklch, var(--accent-border) 70%, black)",
+          "color-mix(in oklch, var(--accent-border) 90%, black)",
+          "color-mix(in oklch, var(--accent-border) 90%, white)",
+          "color-mix(in oklch, var(--accent-border) 65%, white)",
+          "color-mix(in oklch, var(--accent-border) 40%, white)",
+          "color-mix(in oklch, var(--accent-border) 15%, white)"
+        ]
+      },
+      "on-accent": {
+        "role": "neutral",
+        "displayName": "On accent",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--on-accent) 20%, black)",
+          "color-mix(in oklch, var(--on-accent) 45%, black)",
+          "color-mix(in oklch, var(--on-accent) 70%, black)",
+          "color-mix(in oklch, var(--on-accent) 90%, black)",
+          "color-mix(in oklch, var(--on-accent) 90%, white)",
+          "color-mix(in oklch, var(--on-accent) 65%, white)",
+          "color-mix(in oklch, var(--on-accent) 40%, white)",
+          "color-mix(in oklch, var(--on-accent) 15%, white)"
+        ]
+      },
+      "ready": {
+        "role": "secondary",
+        "displayName": "Ready",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--ok) 20%, black)",
+          "color-mix(in oklch, var(--ok) 45%, black)",
+          "color-mix(in oklch, var(--ok) 70%, black)",
+          "color-mix(in oklch, var(--ok) 90%, black)",
+          "color-mix(in oklch, var(--ok) 90%, white)",
+          "color-mix(in oklch, var(--ok) 65%, white)",
+          "color-mix(in oklch, var(--ok) 40%, white)",
+          "color-mix(in oklch, var(--ok) 15%, white)"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Danger",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--danger) 20%, black)",
+          "color-mix(in oklch, var(--danger) 45%, black)",
+          "color-mix(in oklch, var(--danger) 70%, black)",
+          "color-mix(in oklch, var(--danger) 90%, black)",
+          "color-mix(in oklch, var(--danger) 90%, white)",
+          "color-mix(in oklch, var(--danger) 65%, white)",
+          "color-mix(in oklch, var(--danger) 40%, white)",
+          "color-mix(in oklch, var(--danger) 15%, white)"
+        ]
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Warning",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--warn) 20%, black)",
+          "color-mix(in oklch, var(--warn) 45%, black)",
+          "color-mix(in oklch, var(--warn) 70%, black)",
+          "color-mix(in oklch, var(--warn) 90%, black)",
+          "color-mix(in oklch, var(--warn) 90%, white)",
+          "color-mix(in oklch, var(--warn) 65%, white)",
+          "color-mix(in oklch, var(--warn) 40%, white)",
+          "color-mix(in oklch, var(--warn) 15%, white)"
+        ]
+      },
+      "base": {
+        "role": "neutral",
+        "displayName": "Base",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--bg-base) 20%, black)",
+          "color-mix(in oklch, var(--bg-base) 45%, black)",
+          "color-mix(in oklch, var(--bg-base) 70%, black)",
+          "color-mix(in oklch, var(--bg-base) 90%, black)",
+          "color-mix(in oklch, var(--bg-base) 90%, white)",
+          "color-mix(in oklch, var(--bg-base) 65%, white)",
+          "color-mix(in oklch, var(--bg-base) 40%, white)",
+          "color-mix(in oklch, var(--bg-base) 15%, white)"
+        ]
+      },
+      "container": {
+        "role": "neutral",
+        "displayName": "Container",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--bg-container) 20%, black)",
+          "color-mix(in oklch, var(--bg-container) 45%, black)",
+          "color-mix(in oklch, var(--bg-container) 70%, black)",
+          "color-mix(in oklch, var(--bg-container) 90%, black)",
+          "color-mix(in oklch, var(--bg-container) 90%, white)",
+          "color-mix(in oklch, var(--bg-container) 65%, white)",
+          "color-mix(in oklch, var(--bg-container) 40%, white)",
+          "color-mix(in oklch, var(--bg-container) 15%, white)"
+        ]
+      },
+      "elevated": {
+        "role": "neutral",
+        "displayName": "Elevated",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--bg-elevated) 20%, black)",
+          "color-mix(in oklch, var(--bg-elevated) 45%, black)",
+          "color-mix(in oklch, var(--bg-elevated) 70%, black)",
+          "color-mix(in oklch, var(--bg-elevated) 90%, black)",
+          "color-mix(in oklch, var(--bg-elevated) 90%, white)",
+          "color-mix(in oklch, var(--bg-elevated) 65%, white)",
+          "color-mix(in oklch, var(--bg-elevated) 40%, white)",
+          "color-mix(in oklch, var(--bg-elevated) 15%, white)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--border) 20%, black)",
+          "color-mix(in oklch, var(--border) 45%, black)",
+          "color-mix(in oklch, var(--border) 70%, black)",
+          "color-mix(in oklch, var(--border) 90%, black)",
+          "color-mix(in oklch, var(--border) 90%, white)",
+          "color-mix(in oklch, var(--border) 65%, white)",
+          "color-mix(in oklch, var(--border) 40%, white)",
+          "color-mix(in oklch, var(--border) 15%, white)"
+        ]
+      },
+      "border-subtle": {
+        "role": "neutral",
+        "displayName": "Border subtle",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--border-subtle) 20%, black)",
+          "color-mix(in oklch, var(--border-subtle) 45%, black)",
+          "color-mix(in oklch, var(--border-subtle) 70%, black)",
+          "color-mix(in oklch, var(--border-subtle) 90%, black)",
+          "color-mix(in oklch, var(--border-subtle) 90%, white)",
+          "color-mix(in oklch, var(--border-subtle) 65%, white)",
+          "color-mix(in oklch, var(--border-subtle) 40%, white)",
+          "color-mix(in oklch, var(--border-subtle) 15%, white)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--text-bright) 20%, black)",
+          "color-mix(in oklch, var(--text-bright) 45%, black)",
+          "color-mix(in oklch, var(--text-bright) 70%, black)",
+          "color-mix(in oklch, var(--text-bright) 90%, black)",
+          "color-mix(in oklch, var(--text-bright) 90%, white)",
+          "color-mix(in oklch, var(--text-bright) 65%, white)",
+          "color-mix(in oklch, var(--text-bright) 40%, white)",
+          "color-mix(in oklch, var(--text-bright) 15%, white)"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Text secondary",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--text-dim) 20%, black)",
+          "color-mix(in oklch, var(--text-dim) 45%, black)",
+          "color-mix(in oklch, var(--text-dim) 70%, black)",
+          "color-mix(in oklch, var(--text-dim) 90%, black)",
+          "color-mix(in oklch, var(--text-dim) 90%, white)",
+          "color-mix(in oklch, var(--text-dim) 65%, white)",
+          "color-mix(in oklch, var(--text-dim) 40%, white)",
+          "color-mix(in oklch, var(--text-dim) 15%, white)"
+        ]
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "Selected",
+        "tonalRamp": [
+          "color-mix(in oklch, var(--sel-bg) 20%, black)",
+          "color-mix(in oklch, var(--sel-bg) 45%, black)",
+          "color-mix(in oklch, var(--sel-bg) 70%, black)",
+          "color-mix(in oklch, var(--sel-bg) 90%, black)",
+          "color-mix(in oklch, var(--sel-bg) 90%, white)",
+          "color-mix(in oklch, var(--sel-bg) 65%, white)",
+          "color-mix(in oklch, var(--sel-bg) 40%, white)",
+          "color-mix(in oklch, var(--sel-bg) 15%, white)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Page title",
+        "purpose": "Inherited desktop heading; phone details use the established return bar."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Member identity and input text; compact mode resolves the existing larger body token."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Compact buttons, tabs, and field labels."
+      },
+      "meta": {
+        "displayName": "Metadata",
+        "purpose": "Source-backed facts and explicit unknown states."
+      }
+    },
+    "motion": [
+      {
+        "name": "control-feedback",
+        "value": "150ms",
+        "purpose": "Button background, boundary, and text feedback; removed with reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "medium",
+        "value": "600px"
+      },
+      {
+        "name": "expanded",
+        "value": "905px"
+      },
+      {
+        "name": "large",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Token-bound action; the primary variant identifies the save action.",
+      "html": "<button type=\"button\" class=\"ds-button\">Save</button>",
+      "css": ".ds-button { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); min-height:var(--ctl-h); padding:var(--sp-1) var(--sp-3); border:1px solid transparent; border-radius:var(--r-xs); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-sm); font-weight:500; cursor:pointer; transition:background-color 150ms,border-color 150ms,color 150ms; } .ds-button:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); } .ds-button:disabled { opacity:.5; pointer-events:none; } :host-context(html[data-pointer=\"coarse\"]) .ds-button { position:relative; } :host-context(html[data-pointer=\"coarse\"]) .ds-button::after { content:\"\"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); min-width:var(--tap); min-height:var(--tap); inset-block:calc(var(--sp-1) * -1); } @media (prefers-reduced-motion:reduce) { .ds-button { transition:none; } } .ds-button {background:var(--accent-solid);color:var(--on-accent);border-color:var(--accent-solid);} :host-context(html[data-pointer=\"fine\"]) .ds-button:hover {filter:brightness(1.08);}"
+    },
+    {
+      "name": "Outline button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Token-bound action; the primary variant identifies the save action.",
+      "html": "<button type=\"button\" class=\"ds-button\">Save</button>",
+      "css": ".ds-button { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); min-height:var(--ctl-h); padding:var(--sp-1) var(--sp-3); border:1px solid transparent; border-radius:var(--r-xs); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-sm); font-weight:500; cursor:pointer; transition:background-color 150ms,border-color 150ms,color 150ms; } .ds-button:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); } .ds-button:disabled { opacity:.5; pointer-events:none; } :host-context(html[data-pointer=\"coarse\"]) .ds-button { position:relative; } :host-context(html[data-pointer=\"coarse\"]) .ds-button::after { content:\"\"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); min-width:var(--tap); min-height:var(--tap); inset-block:calc(var(--sp-1) * -1); } @media (prefers-reduced-motion:reduce) { .ds-button { transition:none; } } .ds-button {background:var(--bg-container);color:var(--text-bright);border-color:var(--border);} :host-context(html[data-pointer=\"fine\"]) .ds-button:hover {background:var(--list-hover);border-color:var(--text-dimmer);}"
+    },
+    {
+      "name": "Ghost button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Token-bound action; the primary variant identifies the save action.",
+      "html": "<button type=\"button\" class=\"ds-button\">Save</button>",
+      "css": ".ds-button { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); min-height:var(--ctl-h); padding:var(--sp-1) var(--sp-3); border:1px solid transparent; border-radius:var(--r-xs); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-sm); font-weight:500; cursor:pointer; transition:background-color 150ms,border-color 150ms,color 150ms; } .ds-button:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); } .ds-button:disabled { opacity:.5; pointer-events:none; } :host-context(html[data-pointer=\"coarse\"]) .ds-button { position:relative; } :host-context(html[data-pointer=\"coarse\"]) .ds-button::after { content:\"\"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); min-width:var(--tap); min-height:var(--tap); inset-block:calc(var(--sp-1) * -1); } @media (prefers-reduced-motion:reduce) { .ds-button { transition:none; } } .ds-button {background:transparent;color:var(--text-dim);} :host-context(html[data-pointer=\"fine\"]) .ds-button:hover {background:var(--list-hover);color:var(--text-bright);}"
+    },
+    {
+      "name": "Labelled input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Persistent label with the model field focus treatment.",
+      "html": "<label class=\"ds-field\">Name<span class=\"ds-input-wrap\"><input class=\"ds-input\" /></span></label>",
+      "css": ".ds-field { display:grid; gap:var(--sp-2); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-sm); color:var(--text-bright); } .ds-input-wrap { display:flex; min-width:0; padding-inline:var(--sp-3); border:1px solid var(--border); border-radius:var(--r-xs); background:var(--bg-container); } .ds-input-wrap:focus-within { border-color:var(--accent); outline:1px solid var(--accent-border); } .ds-input { width:100%; min-width:0; min-height:var(--ctl-h); padding:0; border:0; outline:none; background:transparent; color:var(--text-bright); font:inherit; font-size:var(--fs-body); } .ds-input:disabled { color:var(--text-dimmer); } .ds-input-wrap:has([aria-invalid=\"true\"]) { border-color:var(--danger); } :host-context(html[data-pointer=\"coarse\"]) .ds-input { min-height:var(--tap); }"
+    },
+    {
+      "name": "Detail navigation",
+      "kind": "nav",
+      "refersTo": "navigation-tab",
+      "description": "Source and aggregate detail tab states use Radix. Outer capability/model navigation retains its original AntD placement and appearance.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Aggregate details\"><button class=\"ds-tab\" type=\"button\" aria-current=\"page\">Members</button><button class=\"ds-tab\" type=\"button\">Routing</button></nav>",
+      "css": ".ds-nav { display:flex; gap:var(--sp-1); overflow-x:auto; padding-block:var(--sp-2); border-bottom:1px solid var(--border-subtle); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; } .ds-tab { flex-shrink:0; min-height:var(--ctl-h); padding:var(--sp-2) var(--sp-3); border:0; border-radius:var(--r-xs); background:transparent; color:var(--text-dim); font:inherit; font-size:var(--fs-sm); font-weight:500; cursor:pointer; } .ds-tab[aria-current] { color:var(--text-bright); background:var(--sel-bg); } .ds-tab:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); } :host-context(html[data-pointer=\"fine\"]) .ds-tab:hover { background:var(--list-hover); color:var(--text-bright); } :host-context(html[data-pointer=\"coarse\"]) .ds-tab { min-height:var(--tap); }"
+    },
+    {
+      "name": "Unknown fact badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Neutral metadata; this example states an unknown condition and contains no sample measurement.",
+      "html": "<span class=\"ds-badge\">Context unknown</span>",
+      "css": ".ds-badge { display:inline-flex; align-items:center; gap:var(--sp-1); min-height:var(--sp-5); padding:0 var(--sp-2); border:1px solid var(--border-subtle); border-radius:var(--r-pill); color:var(--text-dim); background:var(--sel-bg); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-meta); line-height:1.2; white-space:nowrap; }"
+    },
+    {
+      "name": "Combined strategy card",
+      "kind": "card",
+      "refersTo": "strategy-card",
+      "description": "The model surface combines configuration and simulation above its full-width ordered rows. Labels here are structural examples, not runtime facts.",
+      "html": "<section class=\"ds-strategy\"><div>Routing strategy</div><div>Scheduling preview</div></section>",
+      "css": ".ds-strategy { display:grid; grid-template-columns:minmax(0,.35fr) minmax(0,.65fr); gap:var(--sp-5); padding:var(--sp-4); border:1px solid var(--border-subtle); border-radius:var(--r-card); background:var(--bg-container); color:var(--text-bright); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-body); } .ds-strategy>div { min-width:0; } :host-context(html[data-size=\"compact\"]) .ds-strategy,:host-context(html[data-size=\"medium\"]) .ds-strategy { grid-template-columns:minmax(0,1fr); gap:var(--sp-3); padding:var(--sp-3); }"
+    },
+    {
+      "name": "Policy disclosure",
+      "kind": "custom",
+      "description": "Native disclosure with a visible SVG expansion cue and touch-sized summary. Production icons come from the central icon module.",
+      "html": "<details class=\"ds-disclosure\"><summary><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\" /></svg>Policy details</summary></details>",
+      "css": ".ds-disclosure { color:var(--text-dim); font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; font-size:var(--fs-sm); } .ds-disclosure>summary { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--tap); cursor:pointer; } .ds-disclosure svg { flex-shrink:0; width:var(--sp-4); height:var(--sp-4); } .ds-disclosure[open]>summary { color:var(--text-bright); } .ds-disclosure[open] svg { transform:rotate(90deg); } .ds-disclosure>summary:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The model operations workbench",
+    "overview": "This is a code-led record of the shipped model-source and aggregation surfaces. The confirmed Linear/Vercel direction means restrained neutral surfaces, compact controls, aligned facts, and clear working hierarchy. It uses Roami's existing identity in both themes. The user pinned the direction (`seed: none`); no catalog world or new palette was introduced.\n\nThis topic record describes a local application of the [normative UI specification](../../development/ui-design-system.md). That specification, [theme source](../../../frontend/src/theme.tsx), and [base tokens](../../../frontend/src/index.css) remain authoritative. Frontmatter primitives deliberately reference live CSS variables, including the runtime-derived solid accent; they are bindings to that system, not replacement values. The document does not redesign other capability pages.",
+    "keyCharacteristics": [
+      "A full-canvas, flat application shell with independent content cards.",
+      "Compact hierarchy using the existing sans family and type ladder.",
+      "Neutral selection; blue actions and focus; green verified readiness.",
+      "Equal functionality with mouse, keyboard, and touch.",
+      "Source-backed facts with explicit unknown states.",
+      "Common aggregate creation asks for one name, a source and confirmed models; technical settings are disclosed.",
+      "Source inventory, pricing and aggregate options share saved primary registrations; discovered upstream data is not inventory.",
+      "Default pricing is readonly until editing is explicitly requested.",
+      "Compact phone routing keeps a complete weighted member and its actions in the first viewport."
+    ],
+    "rules": [
+      {
+        "name": "The Evidence Color Rule",
+        "body": "Green readiness comes from saved channel facts; unchecked, unavailable, and simulated rest remain distinct text states. A simulation is never proof of availability.",
+        "section": "colors"
+      },
+      {
+        "name": "The Existing Ladder Rule",
+        "body": "Reuse the live `--fs-*` roles. Do not create half-step sizes or shrink text to fit narrow screens; wrap metadata and move controls below identity.",
+        "section": "typography"
+      },
+      {
+        "name": "The Canvas Rule",
+        "body": "Give free space to the actual workspace; close optional panes without leaving an empty column. Limit readable fields inside it, not the working canvas.",
+        "section": "layout"
+      },
+      {
+        "name": "The Single Boundary Rule",
+        "body": "Adjacent modules share the base surface and one subtle divider, owned by one side. Independent cards may have their own perimeter; an entire page is not a card.",
+        "section": "elevation & depth"
+      }
+    ],
+    "dos": [
+      "**Do** reference the existing CSS variables and let both themes resolve them.",
+      "**Do** fill the working canvas and keep scrolling inside the active content region.",
+      "**Do** retain localized labels, visible focus, explicit unknown states, and field-level recovery.",
+      "**Do** keep quick actions visible on touch and preserve the 44 CSS px hit target.",
+      "**Do** support handle-only dragging, keyboard ordering, and ordinary phone scrolling together.",
+      "**Do** keep disclosure chevrons and save/cancel actions discoverable."
+    ],
+    "donts": [
+      "**Don't** introduce a competing palette, type ladder, radius scale, or global Tailwind reset.",
+      "**Don't** turn adjacent modules or whole pages into enclosing rounded cards.",
+      "**Don't** treat simulation, source-level latency, or unchecked data as verified model quality.",
+      "**Don't** hide touch actions behind hover or rely on tooltip-only names.",
+      "**Don't** replace existing SVG icons with emoji, text glyphs, or new component-local SVG drawings.",
+      "**Don't** repeat page titles, explanatory copy, or implementation details in the main flow."
+    ]
+  }
+}
