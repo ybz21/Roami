@@ -2,7 +2,7 @@
 
 状态：第三版方案已落地，桌面与 Android 真机验证完成。更新：2026-11-16。
 
-[交互原型](prototype.html) · [源码](proposal.tsx) · [原型验收](acceptance.md) · [产品实现与验收](implementation.md) · [第二版快照](revisions/v2/prototype.html) · [第一版快照](revisions/v1/prototype.html)
+[交互原型](prototype.html) · [源码](proposal.tsx) · [原型验收](acceptance.md) · [产品实现与验收](implementation.md) · [间距修正](spacing.md) · [第二版快照](revisions/v2/prototype.html) · [第一版快照](revisions/v1/prototype.html)
 
 ## 产品设计
 

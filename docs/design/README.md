@@ -4,7 +4,8 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
-| 模型网关与能力选择统一 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 统一网关目录、Key 与 Roami / 任务选模的技术设计和原型（本轮只改设计资料） |
+| 模型网关与能力选择统一 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 统一模型目录、原生/聚合展示、CLI 与 Agent 选模委派及运行验收 |
+| 会话标签行尾间距 | [20261116-session-tab-spacing](20261116-session-tab-spacing/README.md) | 鼠标端动作紧邻排列、统一尺寸与桌面/真机验收 |
 | 模型源与聚合工作台 | [20261114-model-orchestration](20261114-model-orchestration/README.md) | 紧凑导航、Tailwind/Radix 控件、全宽拖拽排序与桌面/真机验收 |
 | 会话与文件导航 | [20261114-session-file-navigation](20261114-session-file-navigation/README.md) | 智能体 Logo 与会话名直达对话，有打开文件时才显示下拉，含历版快照（未改产品） |
 | 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
