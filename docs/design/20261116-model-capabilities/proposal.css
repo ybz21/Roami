@@ -53,10 +53,9 @@ dd { margin: 0 0 var(--sp-3); overflow-wrap: anywhere; }
 .wordmark { font-size: var(--fs-lg); font-weight: 700; }
 .topbar .meta { flex: 1; }
 .frame { flex: 1; min-height: 0; display: flex; }
-.nav { flex: 0 0 calc(var(--sp-5) * 9); padding: var(--sp-5) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-1); border-right: 1px solid var(--border-subtle); overflow: auto; }
-.nav a { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-xs); color: var(--text-dim); }
-.nav a[aria-current="location"] { color: var(--text-bright); background: var(--sel-bg); font-weight: 600; }
-.nav small { padding: var(--sp-3); margin-top: auto; }
+.document-nav { display: flex; gap: var(--sp-2); padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--border-subtle); }
+.document-nav a { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-xs); color: var(--text-dim); }
+.document-nav a[aria-current="page"] { color: var(--text-bright); background: var(--sel-bg); font-weight: 600; }
 main { flex: 1; min-width: 0; min-height: 0; overflow: auto; scroll-behavior: smooth; }
 .chapter { padding: var(--sp-5); border-bottom: 1px solid var(--border-subtle); scroll-margin-top: var(--sp-3); }
 .tt-pagehead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-4); }
@@ -123,8 +122,6 @@ html[data-size="expanded"] .inspector { flex-basis: calc(var(--sp-5) * 11); }
 html:is([data-size="compact"],[data-size="medium"]) .topbar { gap: var(--sp-2); }
 html:is([data-size="compact"],[data-size="medium"]) .topbar .meta { font-size: var(--fs-meta); }
 html:is([data-size="compact"],[data-size="medium"]) .frame { flex-direction: column; }
-html:is([data-size="compact"],[data-size="medium"]) .nav { flex: none; flex-direction: row; padding: var(--sp-2) var(--sp-4); border-right: 0; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
-html:is([data-size="compact"],[data-size="medium"]) .nav small { display: none; }
 html:is([data-size="compact"],[data-size="medium"]) .chapter { padding: var(--sp-4); }
 html:is([data-size="compact"],[data-size="medium"]) :is(.intro,.two-col,.three-col) { grid-template-columns: minmax(0,1fr); }
 html:is([data-size="compact"],[data-size="medium"]) .summary { border: 0; padding-left: 0; }
@@ -137,7 +134,7 @@ html:is([data-size="compact"],[data-size="medium"]) table.catalog-table td { pad
 html:is([data-size="compact"],[data-size="medium"]) table.catalog-table td::before { content: attr(data-label); color: var(--text-dim); margin-right: var(--sp-2); }
 html:is([data-size="compact"],[data-size="medium"]) .flow { grid-template-columns: 1fr 1fr; }
 html:is([data-size="compact"],[data-size="medium"]) .filters .field { flex: 1 1 40%; }
-html[data-pointer="coarse"] :is(button,select,input:not([type="checkbox"]),summary,.nav a,.check) { min-height: var(--tap); }
+html[data-pointer="coarse"] :is(button,select,input:not([type="checkbox"]),summary,.document-nav a,.check) { min-height: var(--tap); }
 html[data-pointer="coarse"] td .name { width: 100%; }
 @media (prefers-reduced-motion: reduce) { main { scroll-behavior: auto; } }
-@media print { html,body,#root { height: auto; overflow: visible; } .app,.frame { display: block; } main { overflow: visible; } .nav,.topbar,.filters,.inspector { display: none; } .chapter { break-inside: avoid; } }
+@media print { html,body,#root { height: auto; overflow: visible; } .app,.frame { display: block; } main { overflow: visible; } .document-nav,.topbar,.filters,.inspector { display: none; } .chapter { break-inside: avoid; } }

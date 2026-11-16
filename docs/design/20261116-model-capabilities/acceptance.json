@@ -184,5 +184,257 @@
     "Roami standard filters, aggregate selection, independent Main/Worker drafts",
     "Auto capability constraints, verified-only empty pool, exhaustion wait",
     "Android physical Chrome: touch filter, full screen detail, return preserves filter, picker, plan and real scrolling"
-  ]
+  ],
+  "twoDocuments": {
+    "desktop": [
+      {
+        "width": 1280,
+        "closed": {
+          "width": 1280,
+          "mainWidth": 1265,
+          "mainScrollWidth": 1265,
+          "docWidth": 1280,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 1280,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "opened": {
+          "width": 1280,
+          "mainWidth": 1265,
+          "mainScrollWidth": 1265,
+          "docWidth": 1280,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 1280,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "technical": {
+          "width": 1280,
+          "mainWidth": 1265,
+          "mainScrollWidth": 1265,
+          "docWidth": 1280,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 1280,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        }
+      },
+      {
+        "width": 1920,
+        "closed": {
+          "width": 1920,
+          "mainWidth": 1905,
+          "mainScrollWidth": 1905,
+          "docWidth": 1920,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 1920,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "opened": {
+          "width": 1920,
+          "mainWidth": 1905,
+          "mainScrollWidth": 1905,
+          "docWidth": 1920,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 1920,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "technical": {
+          "width": 1920,
+          "mainWidth": 1905,
+          "mainScrollWidth": 1905,
+          "docWidth": 1920,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 1920,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        }
+      },
+      {
+        "width": 2560,
+        "closed": {
+          "width": 2560,
+          "mainWidth": 2545,
+          "mainScrollWidth": 2545,
+          "docWidth": 2560,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 2560,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "opened": {
+          "width": 2560,
+          "mainWidth": 2545,
+          "mainScrollWidth": 2545,
+          "docWidth": 2560,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 2560,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "technical": {
+          "width": 2560,
+          "mainWidth": 2545,
+          "mainScrollWidth": 2545,
+          "docWidth": 2560,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 2560,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        }
+      },
+      {
+        "width": 3440,
+        "closed": {
+          "width": 3440,
+          "mainWidth": 3425,
+          "mainScrollWidth": 3425,
+          "docWidth": 3440,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 3440,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "opened": {
+          "width": 3440,
+          "mainWidth": 3425,
+          "mainScrollWidth": 3425,
+          "docWidth": 3440,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 3440,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "technical": {
+          "width": 3440,
+          "mainWidth": 3425,
+          "mainScrollWidth": 3425,
+          "docWidth": 3440,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 0,
+            "y": 115.3984375,
+            "width": 3440,
+            "height": 884.6015625
+          },
+          "pointer": "fine",
+          "size": "large"
+        }
+      }
+    ],
+    "phone": [
+      {
+        "prototype": {
+          "width": 392,
+          "mainWidth": 393,
+          "mainScrollWidth": 393,
+          "docWidth": 392,
+          "docHeight": 766,
+          "viewportHeight": 766,
+          "main": {
+            "x": 0,
+            "y": 121.45455169677734,
+            "width": 392.727294921875,
+            "height": 644.3636474609375
+          },
+          "pointer": "coarse",
+          "size": "compact"
+        },
+        "technical": {
+          "width": 392,
+          "mainWidth": 393,
+          "mainScrollWidth": 393,
+          "docWidth": 392,
+          "docHeight": 766,
+          "viewportHeight": 766,
+          "main": {
+            "x": 0,
+            "y": 121.45455169677734,
+            "width": 392.727294921875,
+            "height": 644.3636474609375
+          },
+          "pointer": "coarse",
+          "size": "compact"
+        },
+        "scrollBefore": 0,
+        "scrollAfter": 299.6363525390625
+      }
+    ],
+    "checks": [
+      "Only two top-level entries; distinct technical and prototype contents",
+      "Four desktop widths and inspector release space",
+      "Desktop filters, role picker, Auto verified-only empty state, theme",
+      "Android real touches: document links, filter, full-screen detail, return and scroll"
+    ]
+  }
 }

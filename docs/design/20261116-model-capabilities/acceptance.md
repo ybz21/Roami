@@ -2,6 +2,16 @@
 
 范围：仅 HTML 设计文档与页面内演示。未实现产品模型能力、CLI 选模或 Auto 调度；未调用真实模型生成，未修改生产模型、账号、密钥、额度或路由。桌面使用本任务专用 Roami Chrome 标签页，手机使用 Redmi Note 8 的 Chrome 真机。
 
+## 双文档修订（最新）
+
+- 对外交付仅两份：[技术设计](technical-design.html)、[原型设计](prototype.html)，顶部只保留两个入口。`index.html` 为原型旧入口别名，不作为第三份文档。
+- 技术设计承载能力数据、标准字段、模块/API、CLI、调度规则、长时任务与验收边界；原型仅承载能力目录、Roami 选择和 Auto 交互。
+- 重新通过桌面 1280/1920/2560/3440：两个入口真实点击切换、内容隔离、目录详情开关与空间回收、容器无横向溢出。图片筛选、Main/Worker 选择器、Auto 验证不足空池及主题切换通过。
+- Redmi Note 8 真机通过两个页面的真实触控切换、筛选、全屏详情、返回保留筛选与手势滚动；技术页和原型页均无内容容器横向溢出。无 JavaScript 异常。
+- 原始测量保存在 `acceptance.json` 的 `twoDocuments`，临时脚本为 `/tmp/roami-model-capability-design/verify-split.mjs`。本次修改仍限于设计资料。
+
+下方保留首次合稿的内容核对与历史验收；最新布局以双文档修订为准。
+
 ## 内容核对
 
 - 对照现有 `CatalogModel`、源模型详情、角色绑定、CLI 帮助、执行 spec 与 Python native 任务校验，区分现有基础和拟新增契约。
