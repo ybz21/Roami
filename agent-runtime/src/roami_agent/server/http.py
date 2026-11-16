@@ -20,6 +20,7 @@ from roami_agent.protocol.http import (
     ConfirmMemory,
     ConfirmTask,
     CreateConversation,
+    CreateNativeSession,
     CreateReminder,
     CreateTask,
     DeliveryReceipt,
@@ -973,6 +974,38 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def tasks(owner: Owner, conversationId: str | None = None):
         return {"data": await runtime.tasks.list(owner, conversationId)}
 
+    @app.post("/v1/native-sessions", status_code=202)
+    async def create_native_session(body: CreateNativeSession, owner: Owner):
+        conversation = await runtime.conversations.main(owner)
+        target = {"kind": "new_session"}
+        if body.directory is not None:
+            target["directory"] = body.directory
+        task = await runtime.tasks.create(
+            owner,
+            conversation["id"],
+            body.task,
+            key=body.requestKey,
+            executor="native",
+            model=body.model,
+            free_only=body.freeOnly,
+            target=target,
+            record_intent=True,
+            title=body.title or None,
+        )
+        detail = await runtime.tasks.get(owner, task["id"])
+        native = detail["task"]["nativeSession"]
+        runtime.wakeup.set()
+        return {
+            "data": {
+                "session": "roami:" + native["id"],
+                "taskId": task["id"],
+                "conversationId": native["conversationId"],
+                "label": body.title,
+                "model": body.model,
+                "freeOnly": body.freeOnly,
+            }
+        }
+
     @app.get("/v1/native-sessions")
     async def native_sessions(owner: Owner, projectId: str | None = None):
         return {"data": await runtime.native_sessions.list(owner, project_id=projectId)}
@@ -1033,6 +1066,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             parent_task_id=body.parentTaskId,
             executor=body.executor,
             model=body.model,
+            free_only=body.freeOnly,
             target=body.target,
             from_message_id=body.fromMessageId,
             record_intent=True,

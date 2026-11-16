@@ -366,7 +366,7 @@ it('opens creation and import choices from the top New button without a pricing 
   expect(create.closest('.tt-model-catalog-actions')).toBeTruthy()
   expect(container.querySelector('.tt-model-connection-new')).toBeNull()
   expect(screen.queryByRole('button', { name: 'agent.gateway.defaultPrice' })).toBeNull()
-  expect(container.querySelector('.tt-model-connection-footer')).toBeNull()
+  expect(container.querySelector('.tt-model-connection-footer button')).toBeNull()
   fireEvent.keyDown(create, { key: 'ArrowDown' })
   fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
@@ -469,10 +469,11 @@ it('renames a native gateway ID without changing its upstream identity or duplic
 
 it('preserves a key creation draft across top-level model tabs',async()=>{
  const page=mount('gateway')
- fireEvent.click(await screen.findByRole('button',{name:'hub.gateway.generateKey'}))
+ fireEvent.click(await screen.findByRole('button',{name:'gatewayWorkspace.newKey'}))
  fireEvent.change(screen.getByLabelText('hub.gateway.keyName'),{target:{value:'My caller'}})
  page.rerender(<App><ModelHub sub="catalog" onNav={()=>{}}/></App>)
  page.rerender(<App><ModelHub sub="gateway" onNav={()=>{}}/></App>)
+ fireEvent.click(screen.getByRole('button',{name:'gatewayWorkspace.newKey'}))
  expect((screen.getByLabelText('hub.gateway.keyName') as HTMLInputElement).value).toBe('My caller')
  expect(vi.mocked(api).mock.calls.filter(([method,path])=>method==='GET' && path==='/agent/model-gateway/access-keys')).toHaveLength(1)
 })
@@ -502,4 +503,25 @@ it('promotes a renamed pending native model without inventing aliases or retaini
  fireEvent.change(screen.getByLabelText('pool.modelId'),{target:{value:'published'}})
  fireEvent.click(screen.getByRole('button',{name:'agent.models.save'}))
  await waitFor(()=>expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/catalog',expect.objectContaining({models:[expect.objectContaining({id:'published',aliases:[]})],drafts:[]})))
+})
+
+it('adds a separate plugin account from its card and opens the new account authorization', async () => {
+ const original = vi.mocked(api).getMockImplementation()!
+ const first = { ...catalog.sources[0], id: 'plugin-one', pluginSourceId: 'plugin-one', name: 'WorkBuddy' }
+ const second = { ...first, id: 'plugin-two', pluginSourceId: 'plugin-two', name: 'WorkBuddy 2', hasKey: false }
+ vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+  if (path === '/agent/model-gateway/catalog') return { data: { ...catalog, sources: [first], models: [] } }
+  if (path.endsWith('/plugin-two/info')) return { data: { provider: { id: 'plugin-two', name: 'WorkBuddy 2', signedIn: false, methods: [], options: [] }, options: {}, desktopUnavailable: false } }
+  if (path === '/agent/model-gateway/plugins/sources') return { data: { sourceId: second.id, catalog: { ...catalog, revision: 'new-r', sources: [first, second], models: [] } } }
+  return original(method, path, body, options)
+ })
+ const navigate = vi.fn(), page = mount('catalog', navigate)
+ const card = await screen.findByRole('region', { name: 'WorkBuddy' })
+ fireEvent.click(within(card).getByRole('button', { name: 'modelInteraction.addAccountTo' }))
+ await waitFor(() => expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog/source/plugin-two/connection'))
+ expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/plugins/sources', { sourceId: 'plugin-one', revision: catalog.revision })
+ page.rerender(<App><ModelHub sub="catalog/source/plugin-two/connection" onNav={navigate} /></App>)
+ const summary = await screen.findByText('modelInteraction.authorization', { selector: 'summary' })
+ expect((summary.parentElement as HTMLDetailsElement).open).toBe(true)
+ expect(vi.mocked(api).mock.calls.some(([method]) => method === 'PUT')).toBe(false)
 })

@@ -14,6 +14,7 @@ type SourceModelDetail struct {
 	Output           int      `json:"output,omitempty"`
 	InputModalities  []string `json:"inputModalities,omitempty"`
 	OutputModalities []string `json:"outputModalities,omitempty"`
+	StructuredOutput *bool    `json:"structuredOutput,omitempty"`
 	Tools            *bool    `json:"tools,omitempty"`
 	Reasoning        *bool    `json:"reasoning,omitempty"`
 	InputPrice       *float64 `json:"inputPrice,omitempty"`
@@ -63,12 +64,13 @@ func (m sourceModelWire) detail(id, secret string) SourceModelDetail {
 	}
 	row.InputModalities, row.OutputModalities = modalities(m.Architecture.Input), modalities(m.Architecture.Output)
 	if m.Parameters != nil {
-		tools, reasoning := false, false
+		tools, reasoning, structured := false, false, false
 		for _, p := range m.Parameters {
 			tools = tools || p == "tools"
+			structured = structured || p == "structured_outputs"
 			reasoning = reasoning || p == "reasoning" || p == "reasoning_effort" || p == "include_reasoning"
 		}
-		row.Tools, row.Reasoning = &tools, &reasoning
+		row.Tools, row.Reasoning, row.StructuredOutput = &tools, &reasoning, &structured
 	}
 	price := func(raw string) *float64 {
 		v, err := strconv.ParseFloat(raw, 64)

@@ -20,6 +20,7 @@ type routingLeaf struct {
 	Account, ChannelID string
 	Ancestors          []string
 	Free               bool
+	PricingRevision    string
 	ProviderStrategy   string
 }
 type routingNode struct {
@@ -156,6 +157,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 	if err != nil {
 		return nil, err
 	}
+	priceRevision := routingPriceRevision(config)
 	now := h.Ledger.now()
 	byID := map[string]CatalogModel{}
 	for _, m := range catalog.Models {
@@ -296,7 +298,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 					target.Price = &value
 				}
 				choice.targets = append(choice.targets, target)
-				choice.nodes[target.ID] = &routingNode{target: target, leaf: &routingLeaf{Candidate: candidate, Account: account.Key, ChannelID: channelID, Free: m.FreeOnly, ProviderStrategy: config.Pricing.Sources[candidate.SourceID].AccountStrategy}}
+				choice.nodes[target.ID] = &routingNode{target: target, leaf: &routingLeaf{Candidate: candidate, Account: account.Key, ChannelID: channelID, Free: m.FreeOnly, PricingRevision: priceRevision, ProviderStrategy: config.Pricing.Sources[candidate.SourceID].AccountStrategy}}
 			}
 			if m.Strategy == "weight" && len(choice.targets) > start {
 				provider := providerRouteModel(candidate, config.Pricing.Sources[candidate.SourceID].AccountStrategy)

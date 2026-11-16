@@ -267,7 +267,7 @@ it('keeps model selection usable when the optional gateway names cannot be read'
   render(<Composer />)
   await screen.findByText('provider-model')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
-  await screen.findByRole('option', { name: 'provider-model' })
+  expect((await screen.findByRole('option', { name: 'provider-model' })).getAttribute('aria-description')).toBe('agent.models.kind.unknown')
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
@@ -322,4 +322,35 @@ it('keeps the old selection after a failed gateway binding and retries the worke
   expect(writes).toHaveLength(2)
   expect(writes[0]).toEqual(['POST', '/agent/model-gateway/catalog/roles', { role: 'worker', model: 'hy', revision: 'revision' }])
   expect(writes[1]).toEqual(['POST', '/agent/model-gateway/catalog/roles', { role: 'worker', model: 'hy', revision: 'next-revision' }])
+})
+
+it('reads native and aggregate kinds dynamically without changing the selected model', async () => {
+  let aggregate = false
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-gateway/catalog') return { data: { revision: aggregate ? 'next' : 'initial', baseUrl: 'http://127.0.0.1:19999', defaultModel: 'live', models: [{ id: 'live', name: 'Live model', aliases: ['alias'], aggregate, strategy: aggregate ? 'order' : 'fixed', candidates: [] }] } }
+    return { data: { main: { ...role, model: 'alias', baseUrl: 'http://127.0.0.1:19999/v1' }, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null))
+  await waitFor(() => expect(view.result.current.modelKinds.alias).toBe('native'))
+  aggregate = true
+  act(() => { window.dispatchEvent(new Event(MODEL_CATALOG_CHANGED)) })
+  await waitFor(() => expect(view.result.current.modelKinds.alias).toBe('aggregate'))
+  expect(view.result.current.modelKinds['roami-default']).toBe('aggregate')
+  expect(view.result.current.settings?.main.model).toBe('alias')
+  expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
+})
+
+it('reads a model changed on another client when reopening the list', async () => {
+  let current = role.model
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/models') return { data: { models: [role.model, 'remote-model'] } }
+    if (path === '/agent/model-gateway/catalog') return { data: { models: [] } }
+    return { data: { main: { ...role, model: current }, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null))
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
+  current = 'remote-model'
+  await act(async () => { await view.result.current.load() })
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe('remote-model'))
+  expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
 })

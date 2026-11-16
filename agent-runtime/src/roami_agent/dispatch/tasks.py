@@ -71,6 +71,7 @@ class Tasks:
         parent_task_id=None,
         executor="native",
         model=None,
+        free_only=False,
         target=None,
         from_message_id=None,
         origin_message_id=None,
@@ -86,13 +87,14 @@ class Tasks:
         if not key or len(key) > 200 or not goal.strip() or not is_executor(executor):
             raise DomainError("INVALID_TASK")
         if model is not None and (
-            executor == "native"
-            or target
+            target
             and target.get("kind") == "session"
             or not isinstance(model, str)
             or not model.strip()
             or len(model) > 300
         ):
+            raise DomainError("INVALID_TASK_MODEL")
+        if free_only and executor != "native":
             raise DomainError("INVALID_TASK_MODEL")
         if title is not None:
             if not isinstance(title, str) or not title.strip() or len(title) > 80:
@@ -162,6 +164,8 @@ class Tasks:
             spec["memberInstanceId"] = member_instance_id
         if model is not None:
             spec["model"] = model
+        if free_only:
+            spec["freeOnly"] = True
         if title is not None:
             spec["title"] = title
         if routing_decision is not None:

@@ -16,6 +16,7 @@ type commandGuide struct {
 }
 
 var commandGuides = map[string]commandGuide{
+	"model list":                         {"列出模型与能力", "[--json] [--all] [--refresh] [--free] [--capability NAME]", "roami model list --free --json", "json all refresh free capability", []string{"默认读取缓存；--refresh 显式读取上游目录，--all 包含尚未接入的模型。", "--free 列出已确认免费的单模型与仅免费聚合池；advertised-zero 是上游标价，不代表路由保证。"}},
 	"version":                            {"查看版本", "", "roami version", "", nil},
 	"completion":                         {"输出 Shell 补全脚本", "", "roami completion", "", []string{"输出 bash/zsh 补全脚本；会话补全安装使用 roami session completion。"}},
 	"db history":                         {"查看已结束会话", "[--json]", "roami db history --json", "json", nil},

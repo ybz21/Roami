@@ -69,7 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.modelDirectoryManagement(w, r) || h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
@@ -183,11 +183,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 256<<20))
 	var payload struct {
-		Model  string `json:"model"`
-		Stream bool   `json:"stream"`
+		Model    string `json:"model"`
+		Stream   bool   `json:"stream"`
+		FreeOnly bool   `json:"roami_free_only"`
 	}
 	if err != nil || json.Unmarshal(body, &payload) != nil || len(payload.Model) == 0 || len(payload.Model) > 200 {
 		reject(w, 400, "INVALID_MODEL_CONFIG")
+		return
+	}
+	if payload.FreeOnly && h.Catalog == nil {
+		reject(w, 503, "MODEL_GATEWAY_REQUIRED")
 		return
 	}
 	routingRole := r.Header.Get("X-Roami-Model-Role")
@@ -196,15 +201,16 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Catalog != nil {
 		configured, e := readNodeModels(h.Ledger.paths, routingRole)
-		if e == nil && configured.endpoint == h.Catalog.baseURL+"/v1" {
+		if e == nil && (configured.endpoint == h.Catalog.baseURL+"/v1" || payload.Model != configured.model || payload.FreeOnly) {
 			var requested map[string]any
 			_ = json.Unmarshal(body, &requested)
+			requested["model"] = configured.model
 			check := func() error {
 				current, err := readNodeModels(h.Ledger.paths, routingRole)
 				if err != nil {
 					return err
 				}
-				if current.endpoint != h.Catalog.baseURL+"/v1" || !current.accepts(requested, r.Header.Get("X-Roami-Model-Route")) {
+				if !current.accepts(requested, r.Header.Get("X-Roami-Model-Route")) {
 					return errors.New("MODEL_GATEWAY_ROUTE_CHANGED")
 				}
 				return nil

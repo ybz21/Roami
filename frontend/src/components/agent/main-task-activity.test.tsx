@@ -15,6 +15,8 @@ it('gives failed replies a retry hint and forwards gateway quota errors', () => 
   expect(screen.queryByRole('button')).toBeNull()
   rerender(<AgentTaskActivity items={[{ ...task, taskId: undefined, kind: 'turn', state: 'failed', errorCode: 'MODEL_HTTP_402' }]} onTask={vi.fn()} />)
   expect(screen.getByRole('status').textContent).toBe('agent.models.gatewayQuota')
+  rerender(<AgentTaskActivity items={[{ ...task, taskId: undefined, kind: 'turn', state: 'failed', errorCode: 'MODEL_NOT_CONFIGURED' }]} onTask={vi.fn()} />)
+  expect(screen.getByRole('status').textContent).toBe('agent.models.unavailable')
 })
 
 it('keeps the task subject and exact detail destination without recovered tool errors, route explanations or internal IDs', () => {

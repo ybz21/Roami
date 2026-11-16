@@ -1,8 +1,14 @@
 // ── 新建会话（prompt-first 派活）/ 派生子会话 ──
 // parent 非空 = 派生模式：同一张表单（目录默认父 cwd 可改、三选一、命名约定 prompt 全同款），
 // 仅提交路由不同（fork / fork-worktree，meta 记父子关系）。两处不再各维护一份表单。
-import { useEffect, useState } from 'react'
+import ModelSelectionFields, { type ModelChoice } from '../capabilities/ModelSelectionFields'
+import { refreshSessionLists } from './native-session-list'
+import { useLayout } from '../../layout'
+import MobileSubPage from '../MobileSubPage'
+import './new-session-modal.css'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
+import { nodeApi } from '../cluster/node-url'
 import { nativeSessionId } from './session-record'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
@@ -49,13 +55,16 @@ export function taskNameFromPrompt(p: string, limit = 16): string {
 }
 
 export function NewSessionModal({ open, parent, onClose, onDone }: { open: boolean; parent?: string | null; onClose: () => void; onDone: (name: string) => void }) {
+  const { phone } = useLayout()
   const agents = useRegisteredAgents(open)
+  const [modelChoice, setModelChoice] = useState<ModelChoice>({ model: 'auto', freeOnly: false })
+  const nativeRequest = useRef<{ signature: string; key: string } | null>(null)
   const [prompt, setPrompt] = useState('')
   const [name, setName] = useState('')
   const [nameTouched, setNameTouched] = useState(false)
   const [dir, setDir] = useState('')
   const [pick, setPick] = useState(false)
-  const [agent, setAgent] = useState<AgentKind | 'none'>('claude')
+  const [agent, setAgent] = useState<AgentKind | 'none' | 'native'>('claude')
   // 工作区三选一（W1 交互修订）：主仓库 / 新建隔离 worktree / 进入已有 worktree
   // 工作区两选一（22 设计 D4）：新建 worktree / 已有 worktree；非 git 目录才退回「就在这个目录」
   const [wtMode, setWtMode] = useState<'repo' | 'new' | 'existing'>('new')
@@ -81,6 +90,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   useEffect(() => {
     if (!open) return
     setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); setAutoReview(false)
+    setModelChoice({ model: 'auto', freeOnly: false }); nativeRequest.current = null
     setBase(''); setBranches([]); setRemoteBranches([]); setDefBranch(''); setExistingWts([]); setMainPath(''); setExisting('')
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
     if (parent) {
@@ -128,7 +138,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   // 单子里还多列一条主仓库检出的分支（置灰），免得搜不到时以为是漏了
   const pickable = branches.filter((b) => !b.worktree || b.worktree === mainPath)
   const ok = async () => {
-    if (setup.blocked || creating) return
+    if (creating || agent !== 'native' && setup.blocked) return
+    if (agent === 'native' && !prompt.trim()) return message.error(t('session.promptOrNameRequired'))
     // prompt-first：名字可全派生；prompt 与名字都空才拦
     let finalName = name.trim()
     if (!finalName) {
@@ -141,6 +152,16 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     }
     try {
       setCreating(true)
+      if (agent === 'native') {
+        const body = { title: finalName.slice(0, 80), task: prompt, ...(dir.trim() ? { directory: dir.trim() } : {}), ...(modelChoice.model !== 'auto' || modelChoice.freeOnly ? { model: modelChoice.model } : {}), freeOnly: modelChoice.freeOnly }
+        const destination = nodeApi('/agent/native-sessions')
+        const signature = JSON.stringify([destination, body])
+        if (nativeRequest.current?.signature !== signature) nativeRequest.current = { signature, key: crypto.randomUUID() }
+        const { data } = await api('POST', '/agent/native-sessions', { ...body, requestKey: nativeRequest.current.key })
+        if (nodeApi('/agent/native-sessions') !== destination) { message.info(t('modelSelection.createdOnOriginalNode')); onClose(); return }
+        refreshSessionLists(); onClose(); onDone(data.session)
+        return
+      }
       const sessionDir = (wtMode === 'existing' ? pickedWtPath(existing) : '') || dir.trim()
       const madeWt = wtMode === 'new' && isGitRepo && !!sessionDir
       const adopt = wtMode === 'existing' && isGitRepo ? pickedBranch(existing) : ''
@@ -157,16 +178,10 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       pushRecentDir(dir); message.success(t('session.lifecycle.accepted')); onClose(); onDone(op.resourceId)
 
     }
-    catch (e: any) { message.error(lifecycleRequestError(e, t)) }
+    catch (e: any) { const code = e?.apiError?.code || e?.message; message.error(code === 'MODEL_NOT_CONFIGURED' ? t('modelSelection.notConfigured') : code === 'MODEL_ROUTE_DISABLED' ? t('modelSelection.disabled') : code === 'MODEL_ROLE_REQUIRES_BINDING' ? t('agent.models.bindRoles') : lifecycleRequestError(e, t)) }
     finally { setCreating(false) }
   }
-  return (
-    <>
-      <Modal open={open} onCancel={onClose} onOk={ok}
-        okText={parent ? t('session.fork.ok') : t('file.create')}
-        title={parent ? t('session.fork.title', { parent }) : t('session.new')} destroyOnClose
-        confirmLoading={creating} okButtonProps={{ disabled: setup.blocked }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
+  const form = <Space direction="vertical" style={{ width: '100%' }}>
           {/* 名称是一等短输入(可留空自动命名)；需求是任务本体,发给 Agent/派生分支 */}
           <Input placeholder={t('session.namePlaceholder2')} value={name} autoFocus
             onChange={(e) => { setName(e.target.value); setNameTouched(true) }} />
@@ -195,8 +210,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
               </div>
             )}
           </>)}
-          {!!dir.trim() && <RepositorySetup setup={setup} />}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+          {agent !== 'native' && !!dir.trim() && <RepositorySetup setup={setup} />}
+          {agent !== 'native' && <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text-dim)', fontSize: 13, flex: '0 0 auto' }}>{t('session.wt.where')}</span>
               <Tooltip title={isGitRepo ? '' : parent ? t('session.fork.parentNotRepo') : t('session.worktreeNeedsRepo')}>
@@ -289,26 +304,32 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
                 </div>
               </div>
             )}
-          </div>
+          </div>}
           <Radio.Group value={agent} onChange={(e) => setAgent(e.target.value)} optionType="button" buttonStyle="solid"
             style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {!parent && <Radio.Button value="native">Roami</Radio.Button>}
             <Radio.Button value="none">{t('session.agentNone')}</Radio.Button>
             {agents.map(row => <Radio.Button key={row.kind} value={row.kind} disabled={!row.interactive && !prompt.trim()}>{row.displayName}</Radio.Button>)}
           </Radio.Group>
+          {agent === 'native' && <ModelSelectionFields value={modelChoice} onChange={setModelChoice} disabled={creating} />}
           <Input.TextArea placeholder={t('session.promptPlaceholder')} value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             autoSize={{ minRows: 3, maxRows: 8 }} />
           <Tooltip placement="right" title={agent !== 'none' ? t('session.autoReviewTip') : t('session.autoReviewNeedsAgent')}>
-            <Checkbox checked={autoReview && agent !== 'none'} disabled={agent === 'none'}
+            <Checkbox checked={autoReview && agent !== 'none'} disabled={agent === 'none' || agent === 'native'}
               onChange={(e) => setAutoReview(e.target.checked)} style={{ width: 'fit-content' }}>
               <span style={{ fontSize: 13 }}>{t('session.autoReview')}</span>
             </Checkbox>
           </Tooltip>
         </Space>
-      </Modal>
-      <DirPicker open={pick} start={dir || undefined} onPick={(p) => { setDir(p); setPick(false) }} onClose={() => setPick(false)} />
-    </>
-  )
+  const title = parent ? t('session.fork.title', { parent }) : t('session.new')
+  const submitLabel = parent ? t('session.fork.ok') : t('file.create')
+  return <>
+    {phone ? open && <MobileSubPage title={title} dialogLabel={title} onBack={onClose} search={false}>
+      <div className="tt-session-create-scroll">{form}<Button type="primary" loading={creating} disabled={agent !== 'native' && setup.blocked} onMouseDown={event => event.preventDefault()} onClick={ok}>{submitLabel}</Button></div>
+    </MobileSubPage> : <Modal open={open} onCancel={onClose} onOk={ok} okText={submitLabel} title={title} destroyOnClose confirmLoading={creating} okButtonProps={{ disabled: agent !== 'native' && setup.blocked }}>{form}</Modal>}
+    <DirPicker open={pick} start={dir || undefined} onPick={path => { setDir(path); setPick(false) }} onClose={() => setPick(false)} />
+  </>
 }
 
 

@@ -1,43 +1,37 @@
-import { useEffect, useState } from 'react'
-import { Alert, App, Button, Input, Spin } from 'antd'
-import { api } from '../../api'
+import { App } from 'antd'
+import { Alert, Button, Input, Spin } from './model-controls'
 import { useI18n } from '../../i18n'
-import { catalogFailure } from './model-hub-api'
+import { useGatewayFixedKey, type GatewayFixedKeyController } from './gateway-fixed-key'
 
-type AccessKeyView = { revision: string; hasKey: boolean; suffix: string }
-const failure = (cause: any) => cause?.apiError?.code === 'MODEL_GATEWAY_KEY_RESERVED' ? 'hub.gateway.reservedKey' : cause?.apiError?.code === 'INVALID_MODEL_GATEWAY_KEY' ? 'hub.gateway.invalidKey' : catalogFailure(cause)
-
-export default function GatewayAccessKey({ onChanged, value: key, onChange: setKey }: { onChanged: () => void; value: string; onChange: (value: string) => void }) {
+export default function GatewayAccessKey({ onChanged, value: key, onChange: setKey, controller, onCancel, onSaved }: { onChanged: () => void; value: string; onChange: (value: string) => void; controller?: GatewayFixedKeyController; onCancel?: () => void; onSaved?: () => void }) {
   const { t } = useI18n(), { message, modal } = App.useApp()
-  const [view, setView] = useState<AccessKeyView | null>(null)
-  const [error, setError] = useState(''), [busy, setBusy] = useState(false), [version, setVersion] = useState(0)
-  useEffect(() => {
-    const abort = new AbortController()
-    setError('')
-    void api('GET', '/agent/model-gateway/access-key', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setView(data) }).catch(cause => { if (!abort.signal.aborted) setError(failure(cause)) })
-    return () => abort.abort()
-  }, [version])
+  const local = useGatewayFixedKey(!controller), state = controller || local
+  const { view, error, busy, loading } = state
   const valid = /^[\x21-\x7e]{16,512}$/.test(key)
   const save = async (disable = false) => {
-    if (!view || busy || !disable && !valid) return
-    setBusy(true); setError('')
-    try {
-      const { data } = await api(disable ? 'DELETE' : 'PUT', '/agent/model-gateway/access-key', { revision: view.revision, ...(disable ? {} : { apiKey: key }) })
-      setView(data); if (!disable) setKey(''); onChanged(); message.success(t(disable ? 'hub.gateway.keyDisabled' : 'hub.gateway.keySaved'))
-    } catch (cause) { setError(failure(cause)) }
-    finally { setBusy(false) }
+    if (!disable && !valid) return false
+    if (!await state.save(disable ? undefined : key)) return false
+    if (!disable) setKey('')
+    onChanged(); onSaved?.(); message.success(t(disable ? 'hub.gateway.keyDisabled' : 'hub.gateway.keySaved')); return true
   }
-  return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void save() }}>
-    {error && <Alert type="error" role="alert" message={t(error)} action={<Button disabled={busy} onClick={() => setVersion(value => value + 1)}>{t('capabilities.models.reread')}</Button>} />}
-    {!view ? !error && <Spin /> : <>
-      <label className="agent-settings-field">{t('hub.gateway.key')}<Input.Password aria-label={t('hub.gateway.key')} value={key} autoComplete="new-password" visibilityToggle={false} maxLength={512} disabled={busy} placeholder={t(view.hasKey ? 'agent.models.keyKept' : 'agent.models.keyPlaceholder')} onChange={event => setKey(event.target.value)} /></label>
-      <p className="agent-settings-hint">{t('hub.gateway.keyHint')}</p>
-      {view.hasKey && <p role="status" className="agent-settings-hint">{t('hub.gateway.keyConfigured', { suffix: view.suffix })}</p>}
-      {!!key && !valid && <p role="alert" className="agent-settings-error">{t('hub.gateway.invalidKey')}</p>}
-      <div className="agent-settings-save">
-        {view.hasKey && <Button danger disabled={busy} onClick={() => modal.confirm({ title: t('hub.gateway.disableKey'), content: t('hub.gateway.disableHint'), okText: t('hub.gateway.disableKey'), cancelText: t('common.cancel'), onOk: () => save(true) })}>{t('hub.gateway.disableKey')}</Button>}
-        <Button type="primary" htmlType="submit" loading={busy} disabled={!valid || busy}>{t('settings.save')}</Button>
-      </div>
-    </>}
+  const replace = () => {
+    if (!view?.hasKey) { void save(); return }
+    modal.confirm({ className: 'tt-gateway-key-dialog', title: t('gatewayWorkspace.replaceFixed'), content: t('gatewayWorkspace.replaceHint'), okText: t('settings.save'), cancelText: t('common.cancel'), onOk: async () => { if (!await save()) throw new Error('save failed') } })
+  }
+  return <form className="tt-gateway-key-form" onSubmit={event => { event.preventDefault(); replace() }}>
+    <div className="tt-gateway-editor-scroll">
+      {error && <Alert message={t(error)} action={<Button disabled={busy || loading} onClick={state.retry}>{t('capabilities.models.reread')}</Button>} />}
+      {!view ? !error && <Spin /> : <>
+        <p className="agent-settings-hint">{t('gatewayWorkspace.fixedHint')}</p>
+        <label className="agent-settings-field"><span>{t('hub.gateway.key')}</span><Input.Password aria-label={t('hub.gateway.key')} value={key} autoComplete="new-password" maxLength={512} disabled={busy || loading} placeholder={t('gatewayWorkspace.fixedPlaceholder')} onChange={event => setKey(event.target.value)} aria-invalid={!!key && !valid} aria-describedby={key && !valid ? 'gateway-fixed-error' : undefined} /></label>
+        {view.hasKey && <><p role="status" className="agent-settings-hint">{t('hub.gateway.keyConfigured', { suffix: view.suffix })}</p><p className="tt-gateway-warning">{t('gatewayWorkspace.replaceHint')}</p></>}
+        {!!key && !valid && <p id="gateway-fixed-error" role="alert" className="agent-settings-error">{t('hub.gateway.invalidKey')}</p>}
+      </>}
+    </div>
+    <footer className="tt-gateway-editor-footer">
+      {view?.hasKey && <Button disabled={busy || loading} className="tt-gateway-danger" onClick={() => modal.confirm({ className: 'tt-gateway-key-dialog', title: t('hub.gateway.disableKey'), content: t('hub.gateway.disableHint'), okText: t('hub.gateway.disableKey'), cancelText: t('common.cancel'), onOk: async () => { if (!await save(true)) throw new Error('save failed') } })}>{t('hub.gateway.disableKey')}</Button>}
+      {onCancel && <Button disabled={busy} onClick={onCancel}>{t('common.cancel')}</Button>}
+      <Button type="primary" htmlType="submit" loading={busy} disabled={!view || !valid || loading}>{t('settings.save')}</Button>
+    </footer>
   </form>
 }

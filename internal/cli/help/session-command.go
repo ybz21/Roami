@@ -22,7 +22,7 @@ func sessionCommandPage(command string) (Page, bool) {
 	}
 	specs := map[string]spec{
 		"ls":                  {"列出会话", "[--json] [--tree]", []Entry{{"--json", "输出 JSON"}, {"--tree", "按父子层级显示"}, {"--live --json", "读取当前存活会话；不可与 --tree 合用"}}, []Entry{{"roami session ls --tree", ""}}, nil},
-		"new":                 {"新建会话", "[NAME] [选项]", []Entry{{"--dir PATH, -c PATH", "工作目录"}, {"--size WIDTHxHEIGHT", "终端尺寸"}, {"--detach, -d", "创建后不进入终端"}, {"--json", "输出 JSON，并保持分离"}, {"--no-reuse", "即使展示名相同也新建"}}, []Entry{{"roami session new build --dir . --detach", ""}}, nil},
+		"new":                 {"新建会话", "[NAME] [选项]", []Entry{{"--dir PATH, -c PATH", "工作目录"}, {"--size WIDTHxHEIGHT", "终端尺寸"}, {"--detach, -d", "创建后不进入终端"}, {"--json", "输出 JSON，并保持分离"}, {"--no-reuse", "即使展示名相同也新建"}, {"--kind roami --task TEXT", "创建 Roami 原生任务会话，返回 roami: 会话 ID"}, {"--model ID|auto", "本次 Roami 会话使用的网关模型"}, {"--free-only", "本次 Roami 会话仅使用免费路由"}, {"--key KEY", "Roami 任务的幂等键"}}, []Entry{{"roami session new build --dir . --detach", ""}}, nil},
 		"fork":                {"从父会话派生子会话", "[PARENT] NAME [选项]", []Entry{{"PARENT", "父会话 ID 或名称；省略时使用当前会话"}, {"NAME", "子会话展示名（必填）"}, {"--dir PATH, -c PATH", "子会话工作目录；默认继承父会话"}, {"--detach, -d", "创建后不进入终端"}, {"--json", "输出 JSON，并保持分离"}}, []Entry{{"roami session fork review --detach", "从当前会话派生"}, {"roami session fork PARENT_ID review --dir . --detach --json", "指定父会话和目录"}}, []string{"继承父会话环境；不复制 Agent 对话、不启动 Agent、不创建 Git worktree。", "创建结果中的 session 是稳定 ID，label 是展示名。"}},
 		"attach":              {"进入会话", "[SESSION]", nil, []Entry{{"roami session attach SESSION_ID", ""}}, []string{"省略 SESSION 时交互选择；别名 a。"}},
 		"detach":              {"分离会话", "[SESSION]", nil, nil, []string{"省略 SESSION 时分离当前客户端；别名 d。"}},

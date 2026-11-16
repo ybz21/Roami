@@ -262,8 +262,6 @@ class TaskRouter:
                     raise DomainError("ROUTING_PROFESSIONAL_UNAVAILABLE")
                 if catalog not in decision["metadataRefs"]:
                     decision["metadataRefs"].append(catalog)
-            if selected == "native" and model:
-                raise DomainError("INVALID_TASK_MODEL")
             if selected == "native" and (
                 observed := native_model_capabilities(
                     self.settings, assessment.get("requiredCapabilities", [])

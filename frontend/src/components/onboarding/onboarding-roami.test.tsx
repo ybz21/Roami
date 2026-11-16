@@ -35,7 +35,7 @@ it('reuses catalog role binding and requires verification after changing the sel
   const view = show()
   await waitFor(() => expect(view.ready).toHaveBeenLastCalledWith(true))
   expect(screen.getByText('模型能力与上下文', { selector: 'summary' })).toBeTruthy()
-  fireEvent.mouseDown(screen.getAllByRole('combobox')[0])
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '主智能体' }))
   fireEvent.click(await screen.findByText('Next model', { selector: '.ant-select-item-option-content' }))
   await waitFor(() => expect(view.ready).toHaveBeenLastCalledWith(false))
   expect(screen.getByText('Responses only', { selector: '.ant-select-item-option-content' })).toBeTruthy()
@@ -58,14 +58,14 @@ it('does not mark a failed verification ready even with previously saved evidenc
 it('preserves an unapplied model choice when revisiting the setup step', async () => {
   const first = show()
   await waitFor(() => expect(first.ready).toHaveBeenLastCalledWith(true))
-  fireEvent.mouseDown(screen.getAllByRole('combobox')[0])
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '主智能体' }))
   fireEvent.click(await screen.findByText('Next model', { selector: '.ant-select-item-option-content' }))
   first.unmount()
   const second = show()
   await screen.findByText('已恢复未保存的草稿。关闭或刷新前请保存。')
   expect(screen.getByText('Next model', { selector: '.ant-select-selection-item' })).toBeTruthy()
   await waitFor(() => expect(second.ready).toHaveBeenLastCalledWith(false))
-  fireEvent.mouseDown(screen.getAllByRole('combobox')[0])
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '主智能体' }))
   fireEvent.click(await screen.findByText('Original model', { selector: '.ant-select-item-option-content' }))
   await waitFor(() => expect(second.ready).toHaveBeenLastCalledWith(true))
 })
@@ -77,4 +77,12 @@ it('keeps an empty catalog incomplete and points to unified model source managem
   expect((screen.getByRole('button', { name: '验证可用性' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: '管理模型' }))
   expect(view.nav).toHaveBeenCalledWith('onboarding/model')
+})
+
+it('keeps a disabled saved model visible and requires an enabled replacement', async () => {
+  fixture.catalog.models[0].enabled = false
+  const view = show()
+  await waitFor(() => expect(screen.getAllByText('Original model', { selector: '.ant-select-selection-item' }).length).toBe(2))
+  expect(view.ready).toHaveBeenLastCalledWith(false)
+  expect((screen.getByRole('button', { name: /应\s*用/ }) as HTMLButtonElement).disabled).toBe(true)
 })

@@ -42,7 +42,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const [returnSource, setReturnSource] = useState('')
   const [priceReturn, setPriceReturn] = useState('catalog')
   const [sourceQuery, setSourceQuery] = useState(''), [sourceType, setSourceType] = useState('')
-  const [addingAccount,setAddingAccount]=useState(''),[accountError,setAccountError]=useState('')
+  const [addingAccount,setAddingAccount]=useState(''),[accountError,setAccountError]=useState(''),[accountToAuthorize,setAccountToAuthorize]=useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
   const back = () => { navigate(detail === 'pricing' ? priceReturn : detail === 'model' && returnSource ? 'catalog/source/' + returnSource : tab); setReturnSource('') }
@@ -56,6 +56,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     try {
       const {data}=await api('POST','/agent/model-gateway/plugins/sources',{sourceId:source.pluginSourceId,revision:value.revision})
       controller.accept(data.catalog)
+      setAccountToAuthorize(data.sourceId)
       navigate('catalog/source/'+data.sourceId+'/connection')
     } catch(cause){setAccountError(pluginFailure(cause))}finally{setAddingAccount('')}
   }
@@ -98,7 +99,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   }
   const sourceAuthentication = sourceBase.pluginSourceId ? <><Button className="tt-model-source-account-add" icon={<PlusIcon />} disabled={!!addingAccount || controller.busy} loading={addingAccount === sourceBase.id} onClick={() => void addAccount(sourceBase)}>{t('hub.plugin.addAccount')}</Button>{accountError && <Alert type="error" role="alert" message={t(accountError)} />}<MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} onChanged={controller.retry}/></> : undefined
   const sourceManagement = id !== 'new' ? <div className="tt-model-source-management"><Popconfirm classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.deleteConnection')} description={sourceBase.pluginDesktop ? t('hub.plugin.deleteDesktopHint') : undefined} onConfirm={removeSource}><button type="button" className="tt-act danger" disabled={sourceIsBackup(sourceBase.id) || controller.busy}>{t('capabilities.models.deleteAction')}</button></Popconfirm>{sourceIsBackup(sourceBase.id) && <p className="agent-settings-hint">{t('hub.connectionBackupUsed')}</p>}</div> : undefined
-  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
+  const connectionEditor = <ModelSourceEditor key={sourceBase.id} initialAuthorizationOpen={accountToAuthorize === sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [id]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
     const saved = await controller.save(next)
     if (saved) {
       setSourceDrafts(previous => { const next = { ...previous }; delete next[id]; return next })
@@ -146,7 +147,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       {<div className="tt-model-connection-preview"><span>{t(attached.length ? 'hub.directory.total' : 'hub.empty.catalog', { count: new Intl.NumberFormat(locale).format(attached.length) })}</span>{!!attached.length && <p>{preview}</p>}</div>}
       {source.pluginDesktopUnavailable && <p className="agent-settings-hint">{t('hub.plugin.desktopOnly')}</p>}
       {backupUsed && <p className="agent-settings-hint">{t('hub.connectionBackupUsed')}</p>}
-      <div className="tt-model-connection-pricing"><span>{t('pricing.default')}</span><strong>{t('pricing.'+(billing.saved?.pricing.sources?.[source.id]?.default?.mode || 'inherit'))}</strong>{sourcePriceDraftChanged(sourcePrices[source.id],billing.saved?.pricing.sources?.[source.id]) && <small>{t('pricing.draftKept')}</small>}</div>
+      <div className="tt-model-connection-footer"><div className="tt-model-connection-pricing"><span>{t('pricing.default')}</span><strong>{t('pricing.'+(billing.saved?.pricing.sources?.[source.id]?.default?.mode || 'inherit'))}</strong>{sourcePriceDraftChanged(sourcePrices[source.id],billing.saved?.pricing.sources?.[source.id]) && <small>{t('pricing.draftKept')}</small>}</div>{source.pluginSourceId && <Button className="tt-model-card-add-account" icon={<PlusIcon />} aria-label={t('modelInteraction.addAccountTo',{name:label})} disabled={!!addingAccount || controller.busy} loading={addingAccount === source.id} onClick={() => void addAccount(source)}>{t('hub.plugin.addAccount')}</Button>}</div>
 
     </section>
   })
@@ -160,7 +161,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <ModelUsageWorkspace active={tab === 'usage' || tab === 'audit'} mode={tab === 'audit' ? 'audit' : 'overview'} controller={billing} sources={sources} onAudit={query => navigate('audit?'+query)} onOverview={()=>navigate('usage')} />
       <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)}/>
       <ModelMonitoringWorkspace active={tab==='monitor'} catalog={loaded}/>
-      <ModelGatewayWorkspace active={tab==='gateway' && !detail} catalog={value} onChanged={controller.retry} onSource={source=>navigate('catalog/source/'+source)}/>
+      <ModelGatewayWorkspace active={tab==='gateway' && !detail} catalog={value} onChanged={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onPool={pool=>navigate('aggregate/'+encodeURIComponent(pool)+'/members')}/>
       {tab==='aggregate'||tab==='monitor'||tab==='gateway'?null:fullDetail ? null : tab === 'usage' || tab === 'audit' ? <GatewayReconciliation controller={billing} /> : <div className="tt-model-hub-scroll">
       {tab !== 'speech' && error}{accountError&&<Alert type="error" role="alert" message={t(accountError)} action={<Button onClick={()=>{setAccountError('');controller.retry()}}>{t('capabilities.models.reread')}</Button>}/>}
       {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><header className="tt-pagehead"><h2>{t('hub.tab.speech')}</h2></header><SpeechSettings /></section>

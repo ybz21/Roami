@@ -297,6 +297,25 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		reject(w, 400, "MODEL_NOT_CONFIGURED")
 		return
 	}
+	if !model.enabled() {
+		reject(w, 503, "MODEL_ROUTE_DISABLED")
+		return
+	}
+	if raw, present := payload["roami_free_only"]; present {
+		var freeOnly bool
+		if json.Unmarshal(raw, &freeOnly) != nil {
+			reject(w, 400, "INVALID_MODEL_CONFIG")
+			return
+		}
+		delete(payload, "roami_free_only")
+		body, _ = json.Marshal(payload)
+		if freeOnly {
+			model.FreeOnly, model.AllowPlan = true, false
+		}
+	}
+	if model.FreeOnly && !model.Aggregate {
+		model.Aggregate, model.Strategy = true, "order"
+	}
 	// Stateful provider IDs are not portable across sources or policy revisions.
 	if raw := payload["previous_response_id"]; len(raw) > 0 && string(raw) != "null" {
 		reject(w, 400, "MODEL_GATEWAY_CONTINUATION_UNSUPPORTED")
@@ -308,10 +327,6 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	}
 	var choice *routingChoice
 	if model.Aggregate {
-		if !model.enabled() {
-			reject(w, 503, "MODEL_ROUTE_DISABLED")
-			return
-		}
 		required := ""
 		if r.URL.Path == "/v1/responses/compact" {
 			required = protocol
@@ -457,11 +472,14 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 		}
 		admissionStarted := time.Now()
-		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, Free: leaf.Free})
+		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, Free: leaf.Free, PricingRevision: leaf.PricingRevision})
 		admissionDuration += time.Since(admissionStarted)
 		w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(admissionDuration.Milliseconds(), 10))
 		if e != nil {
 			status := 503
+			if e.Error() == "MODEL_GATEWAY_ROUTE_CHANGED" {
+				status = 409
+			}
 			if e.Error() == "MODEL_GATEWAY_UNAUTHORIZED" {
 				status = 401
 			}
