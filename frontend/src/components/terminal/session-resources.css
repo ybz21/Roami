@@ -14,6 +14,14 @@
 :where(html[data-pointer="fine"]) .tt-session-resource-trigger:hover { color: var(--text-bright); background: var(--list-hover); }
 .tt-session-resource-trigger[aria-expanded="true"] { color: var(--text-bright); background: var(--sel-bg); }
 .tt-tab.tt-tab-session > .tt-x { position: relative; flex: 0 0 var(--sp-5); width: var(--sp-5); height: var(--sp-5); }
+/* 鼠标端把行尾动作收成一组；触屏保留原有热区。 */
+:where(html[data-pointer="fine"]) .tt-tab.tt-tab-session { gap: 0; padding-right: var(--sp-1); }
+:where(html[data-pointer="fine"]) .tt-tab-session-open { padding-right: var(--sp-1); }
+:where(html[data-pointer="fine"]) .tt-tab.tt-tab-session > :is(.tt-session-resource-trigger, .tt-x) {
+  flex-basis: calc(var(--sp-4) + var(--sp-1));
+  width: calc(var(--sp-4) + var(--sp-1)); height: calc(var(--sp-4) + var(--sp-1));
+}
+:where(html[data-pointer="fine"]) .tt-tab-session > .tt-session-resource-trigger > svg { width: var(--sp-3); height: var(--sp-3); }
 .tt-session-resource-popup { width: min(40ch, calc(100vw - var(--sp-4)*2)); max-width: calc(100vw - var(--sp-4)*2); }
 .tt-session-resource-popup .ant-dropdown-menu { max-height: calc(100dvh - var(--tap)*3 - var(--sp-5)); overflow: auto; }
 .tt-session-resource-popup.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item { padding: var(--sp-2) var(--sp-3); }
