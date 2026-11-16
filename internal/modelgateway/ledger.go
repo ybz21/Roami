@@ -170,6 +170,7 @@ type Call struct {
 type CallAttribution struct {
 	AgentKind, KeyID, SourceID, RouteID string
 	Free                                bool
+	PricingRevision                     string
 }
 type gatewayKeyContext struct{}
 
@@ -184,6 +185,9 @@ func (l *Ledger) Admit(role, model, session, request string, attribution ...Call
 		c, err := configuration(tx)
 		if err != nil {
 			return err
+		}
+		if len(attribution) > 0 && attribution[0].Free && attribution[0].PricingRevision != "" && attribution[0].PricingRevision != routingPriceRevision(c) {
+			return fmt.Errorf("MODEL_GATEWAY_ROUTE_CHANGED")
 		}
 		zone, err := time.LoadLocation(c.Timezone)
 		if err != nil {

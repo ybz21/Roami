@@ -126,6 +126,10 @@ def facts(db):
     ):
         if table in {"schema_meta", "swarm_groups", "swarm_commands", "swarm_posts"}:
             continue
+        if table == "conversation_models":
+            # Legacy databases cannot contain choices before the new table exists.
+            assert db.execute("SELECT 1 FROM conversation_models LIMIT 1").fetchone() is None
+            continue
         result[table] = sorted(
             [tuple(row) for row in db.execute('SELECT * FROM "' + table + '"')], key=repr
         )

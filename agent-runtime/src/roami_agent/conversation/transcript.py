@@ -81,10 +81,14 @@ class Conversations:
         request_key=None,
         project_id=None,
         swarm_id=None,
+        model=None,
+        free_only=False,
     ):
         if request_key is not None and (not request_key or len(request_key) > 200):
             raise DomainError("INVALID_REQUEST_KEY")
         payload = ["create_conversation", title]
+        if model is not None or free_only:
+            payload.append({"model": model, "freeOnly": free_only})
         if project_id is not None:
             payload.append({"projectId": project_id})
         digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
@@ -112,6 +116,9 @@ class Conversations:
                 else self._new(db, owner, title)
             )
             cid = conversation["id"]
+            from roami_agent.providers.model_selection import ModelSelections
+
+            ModelSelections.save(db, cid, model, free_only)
             if request_key:
                 db.execute(
                     "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) VALUES(?,?,?,?,?,?)",

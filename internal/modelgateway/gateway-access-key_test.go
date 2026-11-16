@@ -171,3 +171,30 @@ func TestGatewayAccessKeyRevocationWakesQueuedClient(t *testing.T) {
 		t.Fatalf("admitted call was interrupted: %d", w.Code)
 	}
 }
+
+func TestFixedKeyMetadataIdentifiesItsExistingListRow(t *testing.T) {
+	h := catalogHandler(t, "http://127.0.0.1", "openai-completions")
+	w := setAccessKey(t, h, "PUT", "fixture-fixed-key-for-ui", h.Catalog.value.Revision)
+	if w.Code != 200 {
+		t.Fatal(w.Body)
+	}
+	var response struct {
+		Data struct {
+			ID     string `json:"id"`
+			Suffix string `json:"suffix"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Data.ID == "" || response.Data.ID != h.Catalog.value.AccessKey.ID {
+		t.Fatalf("fixed key identity missing: %+v", response.Data)
+	}
+	rows := h.Catalog.accessKeysView()["keys"].([]map[string]any)
+	if len(rows) != 1 || rows[0]["id"] != response.Data.ID || rows[0]["suffix"] != response.Data.Suffix {
+		t.Fatalf("fixed key must retain its existing list identity: %+v", rows)
+	}
+	if strings.Contains(w.Body.String(), "fixture-fixed-key-for-ui") || strings.Contains(w.Body.String(), h.Catalog.value.AccessKey.Hash) {
+		t.Fatal("private credential material in metadata")
+	}
+}

@@ -1,6 +1,6 @@
 import BackButton from '../BackButton'
 import { useEffect, useRef, useState } from 'react'
-import { Alert, App, Button, Select, Spin } from 'antd'
+import { Alert, App, Button, Checkbox, Select, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -8,15 +8,18 @@ import MobileSubPage from '../MobileSubPage'
 import { AgentSettingsForm } from '../settings/agent-settings'
 import { useSettingsDraft } from '../settings/settings-draft'
 import { catalogFailure, useModelCatalog } from './model-hub-api'
+import { modelCapabilities, type ModelDirectoryEntry } from './ModelSelectionFields'
 import './model-hub.css'
 
 export default function RoamiAgentModels({ onBack, onMemory, inline = false, onSelectionChange }: { onBack: () => void; onMemory?: () => void; inline?: boolean; onSelectionChange?: (applied: boolean) => void }) {
   const { t } = useI18n(), { phone } = useLayout()
   const { modal, message } = App.useApp(), catalog = useModelCatalog()
   const [main, setMain] = useState(''), [worker, setWorker] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [advanced, setAdvanced] = useState(false)
+  const [capability, setCapability] = useState(''), [freeOnly, setFreeOnly] = useState(false), [directory, setDirectory] = useState<ModelDirectoryEntry[]>([])
+  useEffect(() => { const abort = new AbortController(); void api('GET', '/agent/model-gateway/models', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setDirectory(data.models || []) }).catch(() => {}); return () => abort.abort() }, [catalog.value?.revision])
   const live = useRef(true)
   useEffect(() => { live.current = true; return () => { live.current = false } }, [])
-  const options = (catalog.value?.models || []).map(model => ({ value: model.id, label: model.name }))
+  const options = (catalog.value?.models || []).filter(model => model.enabled !== false).map(model => ({ value: model.id, label: model.name }))
   const chosen = (role: string, draft: string) => draft || (options.some(model => model.value === catalog.value?.roamiModels?.[role]) ? catalog.value?.roamiModels?.[role] : options[0]?.value)
   const draftNotice = useSettingsDraft('onboarding-role-binding', { main: chosen('main', main) || '', worker: chosen('worker', worker) || '' }, { main: catalog.value?.roamiModels?.main || '', worker: catalog.value?.roamiModels?.worker || '' }, draft => { setMain(draft.main); setWorker(draft.worker) }, inline && !!catalog.value)
   const selectionApplied = options.length > 0 && !!catalog.value && ['main', 'worker'].every(role => chosen(role, role === 'main' ? main : worker) === catalog.value?.roamiModels?.[role])
@@ -37,7 +40,9 @@ export default function RoamiAgentModels({ onBack, onMemory, inline = false, onS
     {(error || catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={catalog.retry}>{t('capabilities.models.reread')}</Button>} />}
     {!catalog.value && !catalog.error ? <Spin /> : <>
       <p className="agent-settings-hint">{t('hub.roamiBindingHint')}</p>
-      {(['main', 'worker'] as const).map(role => <label className="agent-settings-field" key={role}>{t('agent.models.role.' + role)}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('agent.models.role.' + role)} value={chosen(role, role === 'main' ? main : worker)} options={options} onChange={role === 'main' ? setMain : setWorker} disabled={busy} /></label>)}
+      <label className="agent-settings-field">{t('modelSelection.capability')}<Select aria-label={t('modelSelection.capability')} value={capability} onChange={setCapability} options={[{ value: '', label: t('modelSelection.allCapabilities') }, ...modelCapabilities.map(name => ({ value: name, label: t('modelSelection.capability.' + name) }))]} /></label>
+      <Checkbox checked={freeOnly} onChange={event => setFreeOnly(event.target.checked)}>{t('modelSelection.freePoolsOnly')}</Checkbox>
+      {(['main', 'worker'] as const).map(role => <label className="agent-settings-field" key={role}>{t('agent.models.role.' + role)}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('agent.models.role.' + role)} value={chosen(role, role === 'main' ? main : worker)} options={options.filter(option => { const row = directory.find(row => row.id === option.value); return option.value === chosen(role, role === 'main' ? main : worker) || (!freeOnly || row?.freeOnly) && (!capability || row?.capabilities[capability]?.support === 'supported') })} onChange={role === 'main' ? setMain : setWorker} disabled={busy} /></label>)}
       {!options.length && <p>{t('hub.noCompatible')}</p>}
       <div className="tt-model-binding-actions"><Button type="primary" loading={busy} disabled={!chosen('main', main) || !chosen('worker', worker)} onClick={() => modal.confirm({ title: t('hub.useGateway'), content: t('hub.roamiApplyScope'), onOk: () => apply() })}>{t('capabilities.models.apply')}</Button>
       <Button disabled={!catalog.value?.canRestoreRoami || busy} onClick={() => modal.confirm({ title: t('capabilities.models.restore'), content: t('capabilities.models.restoreConfirm'), onOk: () => apply(true) })}>{t('capabilities.models.restore')}</Button></div>

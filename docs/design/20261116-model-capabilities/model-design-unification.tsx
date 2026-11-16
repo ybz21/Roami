@@ -7,7 +7,7 @@ export default function ModelDesignUnification() {
       <tr><td>本机网关</td><td>保留“接入与密钥 / 模型目录”，保留卡片、详情检查器、复制调用名称、带入示例和聚合成员 / 权重。</td><td>能力 / 大模型 / 本机网关</td></tr>
       <tr><td>Roami 设置</td><td>只有 Main / Worker 默认模型选择与应用。需要管理时进入同一网关页，返回后继续原选择。</td><td>能力 / 智能体 / Roami</td></tr>
       <tr><td>首页 / 项目</td><td>复用共享选择器；当前对话、单次任务不改角色默认配置。仅上游目录项先启用，不能直接作为执行模型。</td><td>首页输入框 / 项目下任务</td></tr>
-      <tr><td>CLI</td><td><code>roami models</code> 是网关能力视图的查询入口；<code>--model</code> 接收同一调用 ID，<code>auto</code> 解析已保存的默认聚合。</td><td>沿用现有 Go CLI 与网关 socket</td></tr>
+      <tr><td>CLI</td><td><code>roami model list</code> 是网关能力视图的查询入口；<code>--model</code> 接收同一调用 ID，<code>auto</code> 解析已保存的默认聚合。</td><td>沿用现有 Go CLI 与网关 socket</td></tr>
     </tbody></table></div>
     <details open><summary>需要消除的设计冲突</summary><div className="table-wrap"><table><thead><tr><th>冲突</th><th>统一决定</th></tr></thead><tbody>
       <tr><td>“原生模型”混同“原生能力”</td><td>保留三类目录 Tab，名称明确为“已接入模型 / 聚合模型 / 上游目录”。模型身份另分具体模型、Roami 聚合、上游自动路由、未知；能力交付方式另分 native / adapted / unknown。上游目录是接入状态，不是能力或模型架构。</td></tr>

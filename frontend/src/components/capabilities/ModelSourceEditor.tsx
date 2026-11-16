@@ -27,10 +27,10 @@ const sourceName = (source: ModelSource) => {
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management, initialAuthorizationOpen = false }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
-  pricing?: ReactNode; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
+  pricing?: ReactNode; initialAuthorizationOpen?: boolean; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
   const [confirming, setConfirming] = useState(false), [page, setPage] = useState(1)
@@ -102,7 +102,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
     <Popconfirm danger={removedCount > 0} open={confirming} onOpenChange={setConfirming} title={t(removedCount ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removedCount ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
     <div className="tt-model-source-content">
-      {authentication && <details className="tt-model-source-authorization"><summary>{t('modelInteraction.authorization')}</summary><div>{authentication}</div></details>}
+      {authentication && <details className="tt-model-source-authorization" open={initialAuthorizationOpen || undefined}><summary>{t('modelInteraction.authorization')}</summary><div>{authentication}</div></details>}
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>

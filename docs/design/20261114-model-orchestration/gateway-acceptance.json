@@ -1,0 +1,267 @@
+{
+  "date": "2026-11-16",
+  "scope": "Local gateway interaction prototype only; no production UI or service changes",
+  "baseCommit": "b45efaa2e8571a347b1c80f582605bbe78e9564a",
+  "skill": "ui-ux-pro-max",
+  "desktop": {
+    "checks": [
+      "Create key; draft retained across tabs; generated credential removed on close",
+      "Rename, confirm disable, enable, confirm rotate, confirm delete",
+      "Fixed key validation preserves input; fixed key added to same list",
+      "Model filtering, upstream-only gating and source identity in details",
+      "English light theme; empty/loading/error/retry; four widths with open and closed panels"
+    ],
+    "bounds": [
+      {
+        "name": "access-1280",
+        "w": 1280,
+        "sw": 1280,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "editor-1280",
+        "w": 1280,
+        "sw": 1280,
+        "h": 1000,
+        "sh": 1000,
+        "panelRight": 1280,
+        "panelLeft": 920
+      },
+      {
+        "name": "access-1920",
+        "w": 1920,
+        "sw": 1920,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "editor-1920",
+        "w": 1920,
+        "sw": 1920,
+        "h": 1000,
+        "sh": 1000,
+        "panelRight": 1920,
+        "panelLeft": 1416
+      },
+      {
+        "name": "access-2560",
+        "w": 2560,
+        "sw": 2560,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "editor-2560",
+        "w": 2560,
+        "sw": 2560,
+        "h": 1000,
+        "sh": 1000,
+        "panelRight": 2560,
+        "panelLeft": 2056
+      },
+      {
+        "name": "access-3440",
+        "w": 3440,
+        "sw": 3440,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "editor-3440",
+        "w": 3440,
+        "sw": 3440,
+        "h": 1000,
+        "sh": 1000,
+        "panelRight": 3440,
+        "panelLeft": 2936
+      },
+      {
+        "name": "light-English",
+        "w": 1440,
+        "sw": 1440,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "empty",
+        "w": 1440,
+        "sw": 1440,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "loading",
+        "w": 1440,
+        "sw": 1440,
+        "h": 1000,
+        "sh": 1000
+      },
+      {
+        "name": "failed",
+        "w": 1440,
+        "sw": 1440,
+        "h": 1000,
+        "sh": 1000
+      }
+    ],
+    "errors": []
+  },
+  "phone": {
+    "device": "Redmi Note 8",
+    "checks": [
+      "Real touch expandable example, fullscreen create, native keyboard input, one-time credential and close",
+      "Touch row menu and destructive confirmation",
+      "Directory native keyboard filtering, full-screen model detail, return retains filter",
+      "Fixed key validation preserves input and reachable return"
+    ],
+    "bounds": [
+      {
+        "name": "phone-access",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "create-fullscreen",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "inspectorTop": 0,
+        "footerBottom": 765.8182144165039
+      },
+      {
+        "name": "phone-create",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "inspectorTop": 0,
+        "footerBottom": 765.8182144165039
+      },
+      {
+        "name": "phone-issued",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "inspectorTop": 0,
+        "footerBottom": 765.8182144165039
+      },
+      {
+        "name": "phone-confirm",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "phone-directory",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "phone-model",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "inspectorTop": 0,
+        "footerBottom": 765.8182144165039
+      },
+      {
+        "name": "phone-fixed-error",
+        "w": 392,
+        "sw": 392,
+        "h": 362,
+        "sh": 362,
+        "size": "compact",
+        "pointer": "coarse",
+        "inspectorTop": 0,
+        "footerBottom": 362.54544830322266
+      },
+      {
+        "name": "scrolled",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      }
+    ],
+    "scroll": {
+      "before": 0,
+      "after": 242.90908813476562
+    }
+  },
+  "edges": {
+    "checks": [
+      {
+        "size": {
+          "width": 375,
+          "height": 812
+        },
+        "w": 375,
+        "sw": 375,
+        "h": 812,
+        "sh": 812,
+        "footerBottom": 812
+      },
+      {
+        "size": {
+          "width": 812,
+          "height": 375
+        },
+        "w": 812,
+        "sw": 812,
+        "h": 375,
+        "sh": 375,
+        "footerBottom": 375
+      }
+    ],
+    "keyboardEscape": true,
+    "collapsedNavigation": true,
+    "reducedMotion": true
+  },
+  "quality": {
+    "quick": "passed",
+    "prototypeBuild": "passed",
+    "prototypeTypescriptSyntax": "passed",
+    "fullRuntimeSuite": "not run: design artifacts only"
+  },
+  "screenshots": "/tmp/roami-local-gateway-design-20261116",
+  "selfReview": {
+    "result": "ready for design review",
+    "changes": [
+      "Keep app and model navigation forms",
+      "Group endpoint and sample; adapt to one column when inspector reduces content width",
+      "Use a single readable key list and scoped edits",
+      "Collapse request example on phone; remove duplicate phone title",
+      "Separate create and rename drafts; preserve validation input"
+    ],
+    "limits": [
+      "All model and credential values are synthetic",
+      "Source and pool configuration shortcuts explain intended navigation; no live changes",
+      "Static preview uses the existing self-signed HTTPS preview service"
+    ]
+  }
+}

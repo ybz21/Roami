@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import type { ModelCatalog } from './model-hub-api'
 
-export type SourceModelDetail = { id: string; name?: string; context?: number; output?: number; inputModalities?: string[]; outputModalities?: string[]; tools?: boolean; reasoning?: boolean; inputPrice?: number; outputPrice?: number }
+export type SourceModelDetail = { id: string; name?: string; context?: number; output?: number; inputModalities?: string[]; outputModalities?: string[]; tools?: boolean; reasoning?: boolean; structuredOutput?: boolean; inputPrice?: number; outputPrice?: number }
 export type SourceDirectory = { models: SourceModelDetail[]; error?: string }
 export const advertisedFree = (model: SourceModelDetail) => model.inputPrice === 0 && model.outputPrice === 0
 

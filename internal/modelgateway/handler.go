@@ -69,7 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.modelSelectionManagement(w, r) || h.modelDirectoryManagement(w, r) || h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
@@ -193,6 +193,12 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	routingRole := r.Header.Get("X-Roami-Model-Role")
 	if routingRole == "" {
 		routingRole = "main"
+	}
+	if r.Header.Get("X-Roami-Model-Selection") != "" {
+		var requested map[string]any
+		_ = json.Unmarshal(body, &requested)
+		h.forwardSelected(w, r, body, requested, routingRole)
+		return
 	}
 	if h.Catalog != nil {
 		configured, e := readNodeModels(h.Ledger.paths, routingRole)

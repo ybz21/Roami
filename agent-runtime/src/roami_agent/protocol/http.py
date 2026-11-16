@@ -10,9 +10,25 @@ class Payload(BaseModel):
 
 
 class CreateConversation(Payload):
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    freeOnly: bool = False
     requestKey: str | None = Field(default=None, min_length=1, max_length=200)
     title: str = Field(default="New conversation", max_length=200)
     projectId: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class CreateNativeSession(Payload):
+    requestKey: str = Field(min_length=1, max_length=200)
+    title: str = Field(default="", max_length=80)
+    task: str = Field(min_length=1, max_length=100_000)
+    directory: str | None = None
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    freeOnly: bool = False
+
+
+class ConversationModel(Payload):
+    model: str = Field(default="auto", min_length=1, max_length=200)
+    freeOnly: bool = False
 
 
 class RenameNativeSession(Payload):
@@ -52,6 +68,7 @@ class Fork(Payload):
 
 
 class CreateTask(Payload):
+    freeOnly: bool = False
     requestKey: str = Field(min_length=1, max_length=200)
     conversationId: str
     goal: str = Field(min_length=1)

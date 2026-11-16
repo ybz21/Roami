@@ -5,7 +5,7 @@ import { RoamiLogo, ChevronRight, PlusIcon } from '../../icons'
 import ConversationComposer from '../chat/ConversationComposer'
 import VoiceInput from '../chat/VoiceInput'
 import AgentModelPicker from './AgentModelPicker'
-import { useAgentModels } from './useAgentModels'
+import { useConversationModels } from './useConversationModels'
 import { TaskProcess } from './AgentTaskRecord'
 import { TaskResult } from './TaskOutput'
 import NativeSessionArtifacts from './NativeSessionArtifacts'
@@ -39,7 +39,7 @@ export default function NativeSession({ id, node, projects, onChanged, onSession
 }
 
 function SessionConversation({ embedded, metadata, refreshMetadata, node, projects, onChanged, onSession }: { embedded?: boolean; metadata: Metadata; refreshMetadata: () => void; node: string | null; projects: { id: string; name: string }[]; onChanged: () => void; onSession?: (id: string) => void }) {
-  const { t } = useI18n(), snapshot = useAgentTask(metadata.taskId), models = useAgentModels(node, 'worker')
+  const { t } = useI18n(), snapshot = useAgentTask(metadata.taskId), models = useConversationModels(node, metadata.conversationId || '', 'worker')
   const sessionName = nativeSessionName(metadata.nativeSessionId), savedLabel = useSessionLabel(sessionName)
   const title = savedLabel !== sessionName ? savedLabel : metadata.title || 'Roami'
   const detail = snapshot.detail.value, task = detail?.task

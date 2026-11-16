@@ -80,6 +80,7 @@ type catalogDisk struct {
 	AgentKeys   map[string]agentKeyState `json:"agentKeys,omitempty"`
 }
 type CatalogStore struct {
+	directory   map[string]sourceDirectoryEntry
 	mu          sync.Mutex
 	ledger      *Ledger
 	value       ModelCatalog

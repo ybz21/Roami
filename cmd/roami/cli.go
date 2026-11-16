@@ -96,7 +96,12 @@ func discoverPlugins() ([]pluginInfo, error) {
 	return list, nil
 }
 
-func runSession(args []string) int { return runSessionEngine(args) }
+func runSession(args []string) int {
+	if nativeSessionNewRequested(args) {
+		return runNativeSessionNew(args[1:])
+	}
+	return runSessionEngine(args)
+}
 
 func runSwarm(args []string) int {
 	if swarmcommand.HelpRequested(args) {
@@ -219,6 +224,8 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 	case "ttmux":
 		fmt.Fprintln(os.Stderr, "ttmux entry retired; use roami session <command>")
 		return true, 2
+	case "model":
+		return true, runModel(rest)
 	case "agent":
 		return true, runAgent(rest)
 	case "db":

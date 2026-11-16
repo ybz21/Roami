@@ -33,6 +33,9 @@ from roami_agent.providers.transport_failures import relayed_transport_failure, 
 
 STREAM_ERROR_CODES = frozenset(
     {
+        "MODEL_ROUTE_DISABLED",
+        "MODEL_ROUTE_NO_AVAILABLE_MEMBER",
+        "INVALID_MODEL_PROTOCOL",
         "MODEL_OUTPUT_LENGTH",
         "MODEL_OUTPUT_CONTENT_FILTER",
         "MODEL_CONTEXT_LIMIT",

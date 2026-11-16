@@ -14,6 +14,7 @@ var helpGroups = map[string]string{
 	"":        "会话、项目与智能体的统一命令入口",
 	"project": "管理项目目录与项目信息", "project okr": "管理项目目标、记录与复盘",
 	"auth": "管理服务登录", "db": "查看、迁移与备份数据库",
+	"model": "查询本机网关模型与能力",
 	"agent": "管理智能体、对话与任务", "agent capability": "发现与调用已安装能力",
 	"agent capability market": "搜索、预览与安装能力", "agent reminder": "管理提醒",
 	"agent notification-preferences": "管理通知偏好", "agent control": "管理任务资源输入",

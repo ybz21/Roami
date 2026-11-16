@@ -1,5 +1,6 @@
 # 模型源与聚合：工作台重构
 
+2026-11-16：本机网关第二轮设计：[设计说明](gateway-design.md) · [可交互 HTML](gateway-prototype.html)。[正式实现与验收](gateway-implementation.md)。
 
 2026-11-16：[交互稿正式实现与验收](interaction-implementation.md)。
 
