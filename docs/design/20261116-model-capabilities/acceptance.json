@@ -1,0 +1,188 @@
+{
+  "desktop": [
+    {
+      "width": 1280,
+      "closed": {
+        "width": 1280,
+        "mainWidth": 1049,
+        "mainScrollWidth": 1049,
+        "docWidth": 1280,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 1064,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "opened": {
+        "width": 1280,
+        "mainWidth": 1049,
+        "mainScrollWidth": 1049,
+        "docWidth": 1280,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 1064,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "catalogWidthClosed": 1001,
+      "catalogWidthOpen": 641
+    },
+    {
+      "width": 1920,
+      "closed": {
+        "width": 1920,
+        "mainWidth": 1689,
+        "mainScrollWidth": 1689,
+        "docWidth": 1920,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 1704,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "opened": {
+        "width": 1920,
+        "mainWidth": 1689,
+        "mainScrollWidth": 1689,
+        "docWidth": 1920,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 1704,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "catalogWidthClosed": 1641,
+      "catalogWidthOpen": 1281
+    },
+    {
+      "width": 2560,
+      "closed": {
+        "width": 2560,
+        "mainWidth": 2329,
+        "mainScrollWidth": 2329,
+        "docWidth": 2560,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 2344,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "opened": {
+        "width": 2560,
+        "mainWidth": 2329,
+        "mainScrollWidth": 2329,
+        "docWidth": 2560,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 2344,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "catalogWidthClosed": 2281,
+      "catalogWidthOpen": 1921
+    },
+    {
+      "width": 3440,
+      "closed": {
+        "width": 3440,
+        "mainWidth": 3209,
+        "mainScrollWidth": 3209,
+        "docWidth": 3440,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 3224,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "opened": {
+        "width": 3440,
+        "mainWidth": 3209,
+        "mainScrollWidth": 3209,
+        "docWidth": 3440,
+        "docHeight": 1000,
+        "viewportHeight": 1000,
+        "main": {
+          "x": 216,
+          "y": 60,
+          "width": 3224,
+          "height": 940
+        },
+        "pointer": "fine",
+        "size": "large"
+      },
+      "catalogWidthClosed": 3161,
+      "catalogWidthOpen": 2801
+    }
+  ],
+  "phone": [
+    {
+      "width": 392,
+      "mainWidth": 393,
+      "mainScrollWidth": 393,
+      "docWidth": 392,
+      "docHeight": 766,
+      "viewportHeight": 766,
+      "main": {
+        "x": 0,
+        "y": 121.45455169677734,
+        "width": 392.727294921875,
+        "height": 644.3636474609375
+      },
+      "pointer": "coarse",
+      "size": "compact"
+    },
+    {
+      "detail": {
+        "x": 0,
+        "y": 0,
+        "width": 392.727294921875,
+        "height": 765.8181762695312
+      }
+    },
+    {
+      "scrollBefore": 6294.54541015625,
+      "scrollAfter": 6644.36376953125
+    }
+  ],
+  "checks": [
+    "Image input: four entries / three fixed models",
+    "Roami standard filters, aggregate selection, independent Main/Worker drafts",
+    "Auto capability constraints, verified-only empty pool, exhaustion wait",
+    "Android physical Chrome: touch filter, full screen detail, return preserves filter, picker, plan and real scrolling"
+  ]
+}
