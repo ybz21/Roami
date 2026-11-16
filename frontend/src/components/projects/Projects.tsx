@@ -57,7 +57,7 @@ import { SessionActivity, SESSION_ACTIVITY_CSS } from './project-list/session-ac
 import { ProjectCard, CARD_CSS } from './project-list/project-card'
 import { useSwarmProjection, swarmProjectMatches } from './project-list/swarm-projection'
 import FileBrowser from '../files/FileBrowser'
-import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, TargetIcon, WarnIcon, WindowsIcon } from '../../icons'
+import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, WarnIcon, WindowsIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { getHashParams } from '../../route-hash'
 import { projectPath } from './okr/okr-workspace'
@@ -1333,7 +1333,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
               </Tooltip>
             </div>
           </div>
-          <Button size="small" icon={<TargetIcon />} onClick={() => { const query = getHashParams().toString(); location.hash = '#/' + projectPath(proj.key, true) + (query ? '?' + query : '') }}>{t('okr.title')}</Button>
           {isGit && <Button size="small" onClick={() => setGitOpen(true)}>{t('project.gitPanel')}</Button>}
           {/* 「新建会话 / 蜂群 / Race / 命令行」原来散在页头和编队 tab 里，两处入口互相不知道
               对方存在。集中成一枚 split button：主动作 = 回到 composer 描述需求（这一页最主要的
@@ -1367,6 +1366,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           {isGit && tabBtn('race', t('project.tab.race'), races.length + swarms.length)}
           {isGit && tabBtn('act', t('project.tab.activity'))}
           {tabBtn('files', t('project.tab.files'))}
+          <button type="button" className="prj-tab" onClick={() => { const query = getHashParams().toString(); location.hash = '#/' + projectPath(proj.key, true) + (query ? '?' + query : '') }}>{t('okr.title')}</button>
         </div>
 
         {/* ── 任务流 ── */}
