@@ -9,7 +9,7 @@
   --fs-micro: 11px; --fs-meta: 12px; --fs-sm: 13px; --fs-body: 14px; --fs-lg: 16px; --fs-title: 22px;
   --r-xs: 6px; --r-sm: 10px; --r-card: 14px; --r-pill: 999px;
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
-  --tap: 44px; --ctl-h: 32px; --pad-page: 16px;
+  --tap: 44px; --ctl-h: 32px; --pad-page: 16px; --z-subpage: 90;
   --safe-t: env(safe-area-inset-top,0px); --safe-b: env(safe-area-inset-bottom,0px);
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: var(--fs-body); line-height: 1.6; background: var(--bg-base); color: var(--text-bright);
@@ -128,7 +128,7 @@ html:is([data-size="compact"],[data-size="medium"]) .nav small { display: none; 
 html:is([data-size="compact"],[data-size="medium"]) .chapter { padding: var(--sp-4); }
 html:is([data-size="compact"],[data-size="medium"]) :is(.intro,.two-col,.three-col) { grid-template-columns: minmax(0,1fr); }
 html:is([data-size="compact"],[data-size="medium"]) .summary { border: 0; padding-left: 0; }
-html:is([data-size="compact"],[data-size="medium"]) .inspector { position: fixed; inset: 0; margin: 0; padding: calc(var(--sp-4) + var(--safe-t)) var(--sp-4) calc(var(--sp-4) + var(--safe-b)); border: 0; background: var(--bg-base); overflow: auto; z-index: 2; }
+html:is([data-size="compact"],[data-size="medium"]) .inspector { position: fixed; inset: 0; margin: 0; padding: calc(var(--sp-4) + var(--safe-t)) var(--sp-4) calc(var(--sp-4) + var(--safe-b)); border: 0; background: var(--bg-base); overflow: auto; z-index: var(--z-subpage); }
 html:is([data-size="compact"],[data-size="medium"]) .inspector .tt-pagehead { min-height: var(--tap); justify-content: flex-start; }
 html:is([data-size="compact"],[data-size="medium"]) table.catalog-table thead { display: none; }
 html:is([data-size="compact"],[data-size="medium"]) table.catalog-table :is(tbody,tr,td) { display: block; width: 100%; min-width: 0; }
