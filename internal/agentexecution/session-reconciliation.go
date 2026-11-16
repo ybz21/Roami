@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// ReconcileSession settles changed input as failure using the provider's terminal record.
+// ReconcileSession requires bound stop evidence before settling an uncertain execution.
 func (s Service) ReconcileSession(ctx context.Context, key string) (Status, error) {
 	empty := Status{}
 	dir, err := s.directory(key)
@@ -62,6 +62,10 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
 	if spec.Executor == "claude" {
+		status := Status{Receipt: receipt}
+		if recovered, ok, problem := s.reconcileClaudeCompletion(key, status, &state, path, true); ok || problem != nil {
+			return recovered, problem
+		}
 		if _, err := os.Stat(filepath.Join(dir, "interrupt-request.json")); err == nil {
 			return s.reconcileClaudeInterrupted(ctx, key, dir, path, spec, receipt, binding, &state, previous, hasResult)
 		}

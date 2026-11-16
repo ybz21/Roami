@@ -765,6 +765,9 @@ it('shows existing reports and downloads while execution remains unconfirmed', a
   expect(screen.getByText('index.html')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'agent.task.download' }).getAttribute('href')).toBe('/n/selected/api/agent/artifacts/report-html/content')
   expect(screen.queryByRole('button', { name: 'agent.task.accept' })).toBeNull()
+  const confirm = screen.getByRole('button', { name: 'agent.task.checkAndAccept' })
+  fireEvent.click(confirm)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/pending/verify', { accepted: true, revision: 1, runId: 'attempt-pending' }))
   fireEvent.click(screen.getByRole('button', { name: 'agent.openSession' }))
   expect(session).toHaveBeenCalledWith('work-session')
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
@@ -793,4 +796,24 @@ it('accepts closing a running session and shows asynchronous cleanup failures wi
   fireEvent.click(await screen.findByRole('button', { name: /Goal one/ }))
   await screen.findByText('agent.task.cleanupDirty')
   expect(screen.getByRole('button', { name: 'agent.task.closeSession' }).hasAttribute('disabled')).toBe(false)
+})
+
+it('keeps reports, files and drafts after confirmation cannot establish a stop', async () => {
+  const progress = { source: 'provider_transcript', summary: 'Review this report', directory: '/workspace', observedMs: 123 }
+  const pending = { ...task('pending'), state: 'running', latestAttempt: { state: 'unknown', sessionId: 'work', executorKind: 'claude' } }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') throw { apiError: { code: 'TASK_STOP_UNCONFIRMED' } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [artifact('report')] }
+    return { data: { ...detail('pending'), task: pending, attempts: [{ id: 'attempt-pending', revision: 1, state: 'unknown', sessionId: 'work', progress, result: null }] } }
+  })
+  render(<AgentTasks selectedTask="pending" cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  await screen.findByText('Review this report')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep my next request' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.checkAndAccept' }))
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'agent.task.stopUnconfirmed')
+  expect(screen.getByRole('textbox')).toHaveProperty('value', 'Keep my next request')
+  expect(screen.getByText('Review this report')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'agent.task.download' })).toBeTruthy()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'agent.task.checkAndAccept' }).hasAttribute('disabled')).toBe(false))
 })

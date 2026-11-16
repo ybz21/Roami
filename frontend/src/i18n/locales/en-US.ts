@@ -392,7 +392,10 @@ const enUS = {
   'agent.pagination.fullMessage': 'Read full message',
 
   'agent.task.executionUnconfirmed': "Execution unconfirmed",
-  'agent.task.executionUnconfirmedHint': "View retained files or open the work session to check the outcome.",
+  'agent.task.executionUnconfirmedHint': "Execution needs checking. Reports and files are available to review.",
+  'agent.task.checkAndAccept': 'Check and confirm',
+  'agent.task.confirmUnconfirmedHint': 'Review the result and confirm. Execution will be checked for completion first.',
+  'agent.task.stopUnconfirmed': 'Execution has not been confirmed stopped. Open the work session and try again later.',
   'agent.task.reportUnconfirmedTitle': "Unconfirmed report",
   'agent.task.reportUnconfirmed': "The work session reported progress; completion is unconfirmed.",
   'agent.rsiResults.baselineArm': "Baseline result",
