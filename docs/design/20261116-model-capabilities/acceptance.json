@@ -609,5 +609,336 @@
       "Directory lives in models / gateway, not the Roami role page",
       "Android full screen picker, real touch selection/apply/back, all four navigation destinations"
     ]
+  },
+  "unifiedDesign": {
+    "sessions": {
+      "gateway": {
+        "id": "2026-1112-1808-jl57",
+        "checkpoint": "21ca98ec"
+      },
+      "capabilities": {
+        "id": "2026-1116-1141-fswy",
+        "checkpoint": "58c750ac"
+      }
+    },
+    "mergePreview": "clean; no actual branch merge",
+    "browser": {
+      "desktop": [
+        {
+          "width": 1280,
+          "access": {
+            "width": 1280,
+            "mainWidth": 808,
+            "mainScrollWidth": 808,
+            "docWidth": 1280,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 808,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 793,
+              "scrollWidth": 793
+            }
+          },
+          "directory": {
+            "width": 1280,
+            "mainWidth": 808,
+            "mainScrollWidth": 808,
+            "docWidth": 1280,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 808,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 793,
+              "scrollWidth": 793
+            }
+          },
+          "opened": {
+            "width": 1280,
+            "mainWidth": 808,
+            "mainScrollWidth": 808,
+            "docWidth": 1280,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 808,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 433,
+              "scrollWidth": 433
+            }
+          }
+        },
+        {
+          "width": 1920,
+          "access": {
+            "width": 1920,
+            "mainWidth": 1448,
+            "mainScrollWidth": 1448,
+            "docWidth": 1920,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 1448,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 1448,
+              "scrollWidth": 1448
+            }
+          },
+          "directory": {
+            "width": 1920,
+            "mainWidth": 1448,
+            "mainScrollWidth": 1448,
+            "docWidth": 1920,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 1448,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 1448,
+              "scrollWidth": 1448
+            }
+          },
+          "opened": {
+            "width": 1920,
+            "mainWidth": 1448,
+            "mainScrollWidth": 1448,
+            "docWidth": 1920,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 1448,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 970,
+              "scrollWidth": 970
+            }
+          }
+        },
+        {
+          "width": 2560,
+          "access": {
+            "width": 2560,
+            "mainWidth": 2088,
+            "mainScrollWidth": 2088,
+            "docWidth": 2560,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 2088,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 2088,
+              "scrollWidth": 2088
+            }
+          },
+          "directory": {
+            "width": 2560,
+            "mainWidth": 2088,
+            "mainScrollWidth": 2088,
+            "docWidth": 2560,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 2088,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 2088,
+              "scrollWidth": 2088
+            }
+          },
+          "opened": {
+            "width": 2560,
+            "mainWidth": 2088,
+            "mainScrollWidth": 2088,
+            "docWidth": 2560,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 2088,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 1584,
+              "scrollWidth": 1584
+            }
+          }
+        },
+        {
+          "width": 3440,
+          "access": {
+            "width": 3440,
+            "mainWidth": 2968,
+            "mainScrollWidth": 2968,
+            "docWidth": 3440,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 2968,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 2968,
+              "scrollWidth": 2968
+            }
+          },
+          "directory": {
+            "width": 3440,
+            "mainWidth": 2968,
+            "mainScrollWidth": 2968,
+            "docWidth": 3440,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 2968,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 2968,
+              "scrollWidth": 2968
+            }
+          },
+          "opened": {
+            "width": 3440,
+            "mainWidth": 2968,
+            "mainScrollWidth": 2968,
+            "docWidth": 3440,
+            "docHeight": 1000,
+            "viewportHeight": 1000,
+            "main": {
+              "x": 472,
+              "y": 194.59375,
+              "width": 2968,
+              "height": 805.40625
+            },
+            "pointer": "fine",
+            "size": "large",
+            "gateway": {
+              "width": 2464,
+              "scrollWidth": 2464
+            }
+          }
+        }
+      ],
+      "phone": [
+        {
+          "access": {
+            "width": 392,
+            "mainWidth": 393,
+            "mainScrollWidth": 393,
+            "docWidth": 392,
+            "docHeight": 766,
+            "viewportHeight": 766,
+            "main": {
+              "x": 0,
+              "y": 194.90341186523438,
+              "width": 392.727294921875,
+              "height": 486.1875
+            },
+            "pointer": "coarse",
+            "size": "compact",
+            "gateway": {
+              "width": 393,
+              "scrollWidth": 393
+            }
+          },
+          "inspector": {
+            "x": 0,
+            "y": 0,
+            "width": 392.727294921875,
+            "height": 765.8181762695312,
+            "top": 0,
+            "right": 392.727294921875,
+            "bottom": 765.8181762695312,
+            "left": 0
+          },
+          "final": {
+            "width": 392,
+            "mainWidth": 393,
+            "mainScrollWidth": 393,
+            "docWidth": 392,
+            "docHeight": 766,
+            "viewportHeight": 766,
+            "main": {
+              "x": 0,
+              "y": 194.90341186523438,
+              "width": 392.727294921875,
+              "height": 486.1875
+            },
+            "pointer": "coarse",
+            "size": "compact",
+            "gateway": {
+              "width": 393,
+              "scrollWidth": 393
+            }
+          }
+        }
+      ],
+      "checks": [
+        "Four desktop widths with original model navigation, two gateway tasks, three directory tabs and inspector release",
+        "One registry: discovered model enabling reaches Roami picker; canonical ID reaches invocation example",
+        "Saved pool membership constrains Auto; two image members initially, one after removing a member; verification unknown waits",
+        "Real secure clipboard writes, Key name validation, rename, disable/enable, rotate, one-time plaintext, fixed singleton replacement confirmation",
+        "Android HTTPS touch pass: gateway tabs, full-screen member detail, source enable, shared chooser, Auto pool scope and new Key copy",
+        "No API or model inference requests"
+      ]
+    }
   }
 }

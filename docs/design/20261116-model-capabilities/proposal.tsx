@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { useLayout } from '../../../frontend/src/layout'
 import { ChevronLeft, CloseIcon } from '../../../frontend/src/icons'
 import evidence from './model-evidence.json'
+import ModelDesignUnification from './model-design-unification'
 
 type Model = {
   id: string; route: string; name: string; kind: 'single' | 'router' | 'unknown';
@@ -37,7 +38,7 @@ function App() {
   const [query, setQuery] = useState(''), [kind, setKind] = useState('all')
   const [required, setRequired] = useState<string[]>([]), [minContext, setMinContext] = useState('0')
   const [selected, setSelected] = useState<Model | null>(null)
-  const [role, setRole] = useState('main'), [roleModels, setRoleModels] = useState<Record<string,string>>({ main: 'workbuddy-hy4', worker: 'auto-free' })
+  const [role, setRole] = useState('main'), [roleModels, setRoleModels] = useState<Record<string,string>>({ main: 'workbuddy-hy4', worker: 'free-pool' })
   const [pickerQuery, setPickerQuery] = useState(''), [pickerCaps, setPickerCaps] = useState<string[]>([]), [pickerKind, setPickerKind] = useState('all')
   const [notice, setNotice] = useState('')
   const [scenario, setScenario] = useState('image'), [freeOnly, setFreeOnly] = useState(true), [requireVerified, setRequireVerified] = useState(false)
@@ -47,7 +48,7 @@ function App() {
   const visible = models.filter(m => (m.id + m.name).toLowerCase().includes(query.toLowerCase()) && (kind === 'all' || m.kind === kind) && required.every(cap => supports(m, cap)) && (!Number(minContext) || (m.context || 0) >= Number(minContext)))
   const toggle = (cap: string) => setRequired(value => value.includes(cap) ? value.filter(v => v !== cap) : [...value, cap])
   const picker = models.filter(m => (m.id + m.name).toLowerCase().includes(pickerQuery.toLowerCase()) && pickerCaps.every(cap => supports(m, cap)) && (pickerKind === 'all' || m.kind === pickerKind))
-  const poolVisible = (pickerKind === 'all' || pickerKind === 'aggregate') && 'auto-free 免费任务池'.includes(pickerQuery.toLowerCase()) && models.some(m => m.kind === 'single' && pickerCaps.every(cap => supports(m,cap)))
+  const poolVisible = (pickerKind === 'all' || pickerKind === 'aggregate') && 'free-pool 免费任务池'.includes(pickerQuery.toLowerCase()) && models.some(m => m.kind === 'single' && pickerCaps.every(cap => supports(m,cap)))
   const constraints = scenario === 'image' ? ['image','tools'] : scenario === 'schema' ? ['tools','schema'] : scenario === 'audio' ? ['audio','tools'] : ['tools']
   const exclusion = (m: Model) => {
     if (offline) return '演示渠道额度已耗尽'
@@ -83,7 +84,7 @@ function App() {
       </section>
       <section className="chapter" id="roami">
         <div className="tt-pagehead"><h2>Roami 中也能按能力选择</h2><Tag>交互演示</Tag></div>
-        <div className="two-col"><div className="demo stack"><div className="tabs" role="tablist" aria-label="选择角色">{[['main','主智能体'],['worker','执行智能体']].map(([id,label]) => <button type="button" role="tab" aria-selected={role === id} key={id} onClick={() => {setRole(id); setNotice('')}}>{label}</button>)}</div><p>当前演示选择：<code>{roleModels[role]}</code></p><label className="field">查找模型<input placeholder="名称或 ID" value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} /></label><div className="row"><label className="field">类型<select value={pickerKind} onChange={e => setPickerKind(e.target.value)}><option value="all">全部类型</option><option value="single">具体模型（原生身份）</option><option value="aggregate">Roami 聚合</option><option value="router">上游自动路由</option><option value="unknown">待核对</option></select></label></div><div className="row">{[['image','图片输入'],['audio','音频输入'],['video','视频输入'],['file','文件输入'],['tools','工具调用'],['reasoning','推理'],['schema','JSON Schema'],['free','目录零价']].map(([cap,label]) => <label className="check" key={cap}><input type="checkbox" checked={pickerCaps.includes(cap)} onChange={() => setPickerCaps(v => v.includes(cap) ? v.filter(c => c !== cap) : [...v,cap])} />{label}</label>)}</div><div>{poolVisible && <div className="choice-row"><div><strong>Auto · 免费任务池</strong><code>Roami 聚合示例 · 按请求筛选成员 · 未验证</code></div><button type="button" aria-pressed={roleModels[role] === 'auto-free'} onClick={() => choose('auto-free')}>选择</button></div>}{picker.map(m => <div className="choice-row" key={m.id}><div><strong>{m.name}</strong><code>{kindName[m.kind]} · {m.input?.includes('image') ? '声明图片输入' : m.input === null ? '能力未知' : '文本输入'} · 未验证</code></div><button type="button" aria-label={'选择 '+m.name} aria-pressed={roleModels[role] === m.route} onClick={() => choose(m.route)}>选择</button></div>)}{!picker.length && !poolVisible && <p className="empty">没有符合条件的模型。</p>}</div><p className="notice" role="status">{notice}</p></div>
+        <div className="two-col"><div className="demo stack"><div className="tabs" role="tablist" aria-label="选择角色">{[['main','主智能体'],['worker','执行智能体']].map(([id,label]) => <button type="button" role="tab" aria-selected={role === id} key={id} onClick={() => {setRole(id); setNotice('')}}>{label}</button>)}</div><p>当前演示选择：<code>{roleModels[role]}</code></p><label className="field">查找模型<input placeholder="名称或 ID" value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} /></label><div className="row"><label className="field">类型<select value={pickerKind} onChange={e => setPickerKind(e.target.value)}><option value="all">全部类型</option><option value="single">具体模型（原生身份）</option><option value="aggregate">Roami 聚合</option><option value="router">上游自动路由</option><option value="unknown">待核对</option></select></label></div><div className="row">{[['image','图片输入'],['audio','音频输入'],['video','视频输入'],['file','文件输入'],['tools','工具调用'],['reasoning','推理'],['schema','JSON Schema'],['free','目录零价']].map(([cap,label]) => <label className="check" key={cap}><input type="checkbox" checked={pickerCaps.includes(cap)} onChange={() => setPickerCaps(v => v.includes(cap) ? v.filter(c => c !== cap) : [...v,cap])} />{label}</label>)}</div><div>{poolVisible && <div className="choice-row"><div><strong>Auto · 免费任务池</strong><code>Roami 聚合示例 · 按请求筛选成员 · 未验证</code></div><button type="button" aria-pressed={roleModels[role] === 'free-pool'} onClick={() => choose('free-pool')}>选择</button></div>}{picker.map(m => <div className="choice-row" key={m.id}><div><strong>{m.name}</strong><code>{kindName[m.kind]} · {m.input?.includes('image') ? '声明图片输入' : m.input === null ? '能力未知' : '文本输入'} · 未验证</code></div><button type="button" aria-label={'选择 '+m.name} aria-pressed={roleModels[role] === m.route} onClick={() => choose(m.route)}>选择</button></div>)}{!picker.length && !poolVisible && <p className="empty">没有符合条件的模型。</p>}</div><p className="notice" role="status">{notice}</p></div>
         <div className="stack"><h3>入口与选择范围</h3><ul><li>设置 / 能力 / Roami：Main、Worker 共用能力选择器，分别保存默认模型。</li><li>首页模型选择：复用相同搜索、类型与能力筛选。手机沿用全屏模型页，不把长列表塞进对话框。</li><li>新对话、启动与新建任务：支持“沿用默认 / 指定模型 / Auto 池”，同时显示作用范围。</li><li>Roami 聚合行展示“聚合”与成员数量；具体模型行展示源与关键能力；上游路由明确显示“上游自动”。</li></ul><h3>状态与保存</h3><p>当前选择即使被筛掉也留在顶部，不自动选第一项。未接入的目录模型显示“去接入”，不可直接执行；禁用、离线和能力未知显示原因。原型里的选择仅修改页面内演示状态。</p><p>配置页保存沿用 revision 检查和现有角色绑定接口；失败保留草稿。正在运行的对话不热切换模型，下一轮安全边界应用；显式任务覆盖不修改默认设置。</p><h3>能力声明编辑</h3><p>源内“模型详情 / 能力”允许逐项选择“未知、支持、不支持”，记录依据与作用路径；“原生 / 适配 / 未知”单独记录。限制能力可以立即生效，提高能力必须验证后才能用于严格 Auto。聚合能力由成员与约束推导，不能手工全选为支持。</p><p className="note">正式 UI 新文案接入项目中英文 i18n；本设计文档按仓库开发者文档例外使用中文。桌面沿用现有导航与组件；手机保留宿主顶栏、底栏和单个全屏返回层。</p></div></div>
       </section>
       <section className="chapter" id="auto">
@@ -98,6 +99,7 @@ function App() {
         <div className="intro"><div><p>同一份模型能力目录，供设置、首页、启动命令和任务调度使用。选择时看清具体模型、Roami 聚合或上游自动路由，按图片、工具调用等条件筛选；也可以选择 Auto，让网关在满足条件的候选中调度。</p><p>技术设计包含能力数据、CLI 契约、调度与长时任务方案；演示使用附件中的 8 个名称和公开目录快照。下文所有新增命令与字段都是提案，尚未实现。</p></div><aside className="summary"><strong>三个关键决定</strong><p>类型、能力、计费分开建模。</p><p>未知能力不进入严格调度。</p><p>指定模型只影响当前启动或任务。</p></aside></div>
         <details><summary>用户故事与现有基础</summary><div className="two-col"><ul><li>作为使用者，我能筛出支持图片的免费模型，并看清能力来源。</li><li>作为 CLI 使用者，我能列出模型能力，为新对话或新会话指定模型。</li><li>作为任务编排者，我能为单次任务选择具体模型或 Auto 池，不修改 Main/Worker 默认值。</li><li>作为长时任务使用者，我能在免费额度恢复后继续，不丢检查点，不自动付费。</li></ul><div className="stack"><p>现有 <code>CatalogModel.aggregate</code>、候选图、九种路由策略、<code>freeOnly</code>、<code>requireTools</code> 与 <code>minContext</code> 可复用。源目录已读取输入输出模态、工具、推理和价格；Roami 模型下拉目前主要展示名称。</p><p>已有 <code>roami agent gateway</code> 管理绑定、计价和用量，但没有 <code>models</code> 子命令。执行器 spec 已有 <code>model</code>；原生 Worker 任务当前拒绝该覆盖，属于本方案需补齐的边界。</p></div></div></details>
       </section>
+      <ModelDesignUnification />
       <section className="chapter" id="architecture">
         <div className="tt-pagehead"><h2>一份能力数据，多个选择入口</h2><Tag>Technical Design</Tag></div>
         <div className="two-col"><div className="stack"><h3>能力记录与证据</h3><Code>{`type CapabilityState = "supported" | "unsupported" | "unknown"
@@ -136,28 +138,28 @@ roami agent gateway models refresh --source SOURCE_ID
 ID                   KIND       INPUT             TOOLS  STATE
 or-super-vl-free      single     text,image,video  yes    unverified
 or-free-router       router     text,image        yes    unverified
-auto-free            aggregate  conditional       rule   ready
+free-pool            aggregate  conditional       rule   ready
 hy4free              unknown    unknown           ?      unknown`}</Code><p>“全部”是节点已接入目录与缓存，不代表自动读取互联网所有模型。仅上游目录项没有可调用的 Roami ID；返回 <code>sourceId + upstreamModel</code>，接入后才分配目录 ID。<code>--available</code> 只保留已启用且健康、额度已知可用的路径，额度未知单独展示。</p><p><code>models</code> 默认只读快照；刷新是显式源发现，不触发生成验证。常规表格保持简洁，JSON 返回每项声明、验证证据、时间、目录修订与不可用原因，不返回密钥。</p></div><div className="stack"><h3>为当前启动指定模型</h3><Code>{`# 新 Roami 主对话
 roami agent new --title 整理资料 --model or-super-vl-free
 
 # 新执行会话：在现有 fork 上扩展模型选项
-roami session fork SESSION_ID task --kind roami --model auto-free
+roami session fork SESSION_ID task --kind roami --model free-pool
 
 # 新任务：在现有 execution launch 上扩展覆盖
-roami agent execution launch --file task.json --model auto-free
+roami agent execution launch --file task.json --model free-pool
 # 同时兼容用户习惯的 -model，帮助统一展示 --model
 roami agent execution launch --file task.json -model or-lightning-free
 
 # 需解析 Auto 默认池，不使用全局随机模型
 roami agent new --model auto
-roami agent new --model auto-free`}</Code><p><code>auto</code> 保留为 Auto 选择标识，解析当前角色配置的池；未配置则报错。<code>auto-free</code> 是用户保存的聚合目录 ID，名称本身不证明免费。</p><p>优先级：本次 <code>--model</code> 高于 spec 的 <code>model</code>，高于对话/角色保存值，最后才沿用现有默认值。显式 <code>--model</code> 只覆盖目标执行，不写全局配置；固定模型不得静默换成另一模型。</p><p>目录 ID 与上游 ID 分开。含斜杠的上游名称不直接作为目录 ID；显式使用 <code>--source SOURCE_ID --upstream-model ID</code> 接入后再选，禁止仅凭同名猜来源。会话续接沿用已绑定执行器，模型变更走受管 steer 与当前任务 revision。</p></div></div>
+roami agent new --model free-pool`}</Code><p><code>auto</code> 保留为 Auto 选择标识，解析当前角色配置的池；未配置则报错。<code>free-pool</code> 是用户保存的聚合目录 ID，名称本身不证明免费。</p><p>优先级：本次 <code>--model</code> 高于 spec 的 <code>model</code>，高于对话/角色保存值，最后才沿用现有默认值。显式 <code>--model</code> 只覆盖目标执行，不写全局配置；固定模型不得静默换成另一模型。</p><p>目录 ID 与上游 ID 分开。含斜杠的上游名称不直接作为目录 ID；显式使用 <code>--source SOURCE_ID --upstream-model ID</code> 接入后再选，禁止仅凭同名猜来源。会话续接沿用已绑定执行器，模型变更走受管 steer 与当前任务 revision。</p></div></div>
         <details><summary>配置、JSON 回执与错误语义</summary><div className="two-col"><div className="stack"><Code>{`// 持久化到现有节点 / 角色配置的建议增量（JSON 示意）
 {
   "main": {
     "modelSelection": { "mode": "fixed", "modelId": "or-super-vl-free" }
   },
   "worker": {
-    "modelSelection": { "mode": "auto", "poolId": "auto-free" }
+    "modelSelection": { "mode": "auto", "poolId": "free-pool" }
   }
 }`}</Code><p>这不是新的顶层配置文件。沿用现有模型设置与节点路径；旧 <code>model</code> 按 fixed 迁移，不把既有 <code>strategy=smart</code> 自动改成“按任务复杂度分类”。</p><Code>{`// models --json 单项（建议）
 {

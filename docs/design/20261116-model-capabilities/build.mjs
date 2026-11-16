@@ -23,10 +23,10 @@ for (const kind of ['technical', 'prototype']) {
   const script = result.outputFiles[0].text.replaceAll('</script', '<\\/script')
   const name = kind === 'technical' ? 'technical-design.html' : 'prototype.html'
   const title = kind === 'technical' ? '技术设计' : '原型设计'
-  const styles = kind === 'prototype' ? css + '\n' + await readFile(path.join(directory, 'product-prototype.css'), 'utf8') : css
+  const styles = kind === 'prototype' ? css + '\n' + await readFile(path.join(directory, 'product-prototype.css'), 'utf8') + '\n' + await readFile(path.join(directory, 'prototype-gateway.css'), 'utf8') : css
   const html = `<!doctype html>
   <html lang="zh-CN" data-theme="dark" data-size="large" data-pointer="fine">
-  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=overlays-content">
   <title>${title} · 模型能力与 Auto 调度 · Roami</title><style>${styles}</style></head>
   <body><div id="root"></div><script>${script}</script></body></html>\n`
   await writeFile(path.join(directory, name), html)

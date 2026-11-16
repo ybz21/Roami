@@ -4,7 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
-| 模型能力与 Auto 调度 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 技术设计与带页面位置的 Roami 模型选择原型（未实现产品功能） |
+| 模型网关与能力选择统一 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 统一网关目录、Key 与 Roami / 任务选模的技术设计和原型（本轮只改设计资料） |
 | 模型源与聚合工作台 | [20261114-model-orchestration](20261114-model-orchestration/README.md) | 紧凑导航、Tailwind/Radix 控件、全宽拖拽排序与桌面/真机验收 |
 | 会话与文件导航 | [20261114-session-file-navigation](20261114-session-file-navigation/README.md) | 智能体 Logo 与会话名直达对话，有打开文件时才显示下拉，含历版快照（未改产品） |
 | 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
