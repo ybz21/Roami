@@ -31,3 +31,6 @@ html:is([data-size="compact"],[data-size="medium"]) .agent-model-picker-dialog .
 html:is([data-size="compact"],[data-size="medium"]) .agent-model-picker-content { max-height:calc(100dvh - var(--safe-t) - var(--safe-b) - var(--kb) - var(--mobile-topbar-h)); }
 
 .agent-model-kind { flex:none; color:var(--text-dim); font-size:var(--fs-meta); white-space:nowrap; }
+
+.agent-model-identity { display:flex; flex-direction:column; gap:var(--sp-1); }
+.agent-model-identity > small { color:var(--text-dim); font-size:var(--fs-meta); overflow-wrap:anywhere; }
