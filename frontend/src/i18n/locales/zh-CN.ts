@@ -343,7 +343,10 @@ const zhCN = {
   'agent.pagination.fullMessage': '展开全文',
 
   'agent.task.executionUnconfirmed': "执行待确认",
-  'agent.task.executionUnconfirmedHint': "已有文件可先查看，或打开工作会话核对执行结果。",
+  'agent.task.executionUnconfirmedHint': "执行状态待核对，已有回报和文件可查看。",
+  'agent.task.checkAndAccept': '核对并确认',
+  'agent.task.confirmUnconfirmedHint': '查看结果后确认，系统会先核对执行是否停止。',
+  'agent.task.stopUnconfirmed': '暂未确认执行停止，请打开工作会话查看，稍后重试。',
   'agent.task.reportUnconfirmedTitle': "待确认的回报",
   'agent.task.reportUnconfirmed': "工作会话已有回报，尚未确认完成。",
   'agent.rsiResults.baselineArm': "基线结果",

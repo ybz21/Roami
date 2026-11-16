@@ -6,10 +6,17 @@ type claudeStop struct {
 	PromptID   string `json:"promptId"`
 	PromptHash string `json:"promptHash"`
 	Summary    string `json:"summary"`
+	Idle       bool   `json:"idle,omitempty"`
 }
 
 // Stop can be blocked by another hook. Only a later matching idle notification settles it.
 func observeClaudeStop(state *sessionLifecycle, event *SessionEvent) (handled, completed bool) {
+	if state.State == "unknown" && state.UnknownReason == "SESSION_STOP_UNCONFIRMED" {
+		if event.Hook == "Notification" && event.NotificationType == "idle_prompt" && event.TurnID == state.TurnID {
+			return true, false
+		}
+		state.UnknownReason, state.ClaudeStop = "SESSION_COMPLETION_MISMATCH", nil
+	}
 	switch event.Hook {
 	case "Stop":
 		state.ClaudeStop = nil
@@ -50,7 +57,7 @@ func observeClaudeStop(state *sessionLifecycle, event *SessionEvent) (handled, c
 			delete(state.Tools, tool)
 		}
 		event.LastAssistant = candidate.Summary
-		state.ClaudeStop = nil
+		candidate.Idle = true
 		return false, true
 	default:
 		state.ClaudeStop = nil

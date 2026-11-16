@@ -1,6 +1,7 @@
 import { taskFailureKey } from './task-failure'
 
 export function taskSessionError(code: string | undefined, t: (key: string) => string) {
+  if (code === 'TASK_STOP_UNCONFIRMED') return t('agent.task.stopUnconfirmed')
   if (code === 'WORKTREE_DIRTY') return t('agent.task.cleanupDirty')
   if (code === 'WORKSPACE_BUSY' || code === 'SESSIONS_INSIDE') return t('agent.task.cleanupBusy')
   if (code === 'WORKSPACE_CLEANUP_UNAVAILABLE' || code === 'WORKSPACE_STALE') return t('agent.task.cleanupFailed')

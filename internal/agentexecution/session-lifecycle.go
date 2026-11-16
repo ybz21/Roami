@@ -364,6 +364,7 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 				}
 				state.CompletedKey = state.LaunchKey
 				state.LaunchKey, state.State = "", "idle"
+				state.ClaudeStop = nil
 			}
 		} else {
 			state.State = "idle"
@@ -542,6 +543,9 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 		return recovered, problem
 	}
 	if recovered, ok, problem := s.reconcileClaudeRejection(key, status, &state, path); ok || problem != nil {
+		return recovered, problem
+	}
+	if recovered, ok, problem := s.reconcileClaudeCompletion(key, status, &state, path, false); ok || problem != nil {
 		return recovered, problem
 	}
 	if state.LaunchKey == key && state.Executor == "claude" && state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.resourceID() == binding.resourceID() {
