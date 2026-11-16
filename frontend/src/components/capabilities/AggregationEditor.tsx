@@ -25,7 +25,7 @@ export default function AggregationEditor({ model, original, catalog, active, bu
   useEffect(() => { if (attempted && !valid) scroll.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus() }, [attempted, tab])
   return <form className="tt-aggregate-editor" onSubmit={event => { event.preventDefault(); if (valid) onSave(); else { setAttempted(true); if (idError && more.current) more.current.open = true; setTab(nameError || idError || !model.candidates.length ? 'members' : 'routing') } }}>
     <TabBar className="tt-aggregate-tabs" activeKey={tab} onChange={setTab} items={[...['members', 'routing'].map(key => ({ key, label: t('pool.section.' + key) })), ...(saved ? [{ key: 'runtime', label: t('pool.runtime') }] : [])]} />
-    <div className="tt-routing-editor tt-aggregate-editor-content" ref={scroll}>
+    <div className={"tt-routing-editor tt-aggregate-editor-content" + (tab === 'members' ? ' is-members' : '')} ref={scroll}>
       {error && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
       <section hidden={tab !== 'members'} aria-label={t('pool.section.members')}>
         <div className="tt-aggregate-basics">

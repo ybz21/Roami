@@ -31,7 +31,7 @@ export function SpeechSettings() {
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const [cfg, setCfg] = useState<any>(() => normalizeSpeech(null))
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false), [editing, setEditing] = useState(false)
   const [baseline, setBaseline] = useState(cfg)
   const readState = useSettingsRead(() => api('GET', '/speech/config').then((r) => { const next = normalizeSpeech(r?.data); setCfg(next); setBaseline(next) }))
   const draftNotice = useSettingsDraft('speech', cfg, baseline, setCfg, !readState)
@@ -39,11 +39,13 @@ export function SpeechSettings() {
   const setVolc = (k: string, v: string) => setCfg((c: any) => ({ ...c, volcano: { ...c.volcano, [k]: v } }))
   const save = async () => {
     setSaving(true)
-    try { await api('PUT', '/speech/config', cfg); setBaseline(cfg); message.success(t('settings.speechSaved')) }
+    try { await api('PUT', '/speech/config', cfg); setBaseline(cfg); setEditing(false); message.success(t('settings.speechSaved')) }
     catch (e: any) { message.error(e.message) }
     finally { setSaving(false) }
   }
   if (readState) return readState
+  const dirty = JSON.stringify(cfg) !== JSON.stringify(baseline)
+  if (!editing && !dirty) return <section className="tt-speech-summary"><div><h3>{t('settings.speechProvider')}</h3><strong>{cfg.provider==='openai' ? 'OpenAI' : cfg.provider==='volcano' ? 'Volcano Engine' : t('settings.speechProviderNone')}</strong>{cfg.provider==='openai' && <><code>{cfg.openai.model}</code><p className="agent-settings-hint">{cfg.openai.baseURL}</p></>}</div><Button onClick={()=>setEditing(true)}>{t('capabilities.edit')}</Button></section>
   return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void save() }}>
     {draftNotice}
     <p className="agent-settings-hint">{t('hub.speechHint')}</p>
@@ -65,6 +67,6 @@ export function SpeechSettings() {
       <label className="agent-settings-field">{t('settings.volcanoApiKey')}<Input.Password aria-label={t('settings.volcanoApiKey')} disabled={saving} autoComplete="new-password" placeholder={t('settings.volcanoApiKeyHint')} value={cfg.volcano.apiKey} onChange={e => setVolc('apiKey', e.target.value)} /></label>
       <p className="agent-settings-hint">{t('settings.volcanoModelHint')}</p>
     </>}
-    <div className="agent-settings-save"><Button type="primary" htmlType="submit" loading={saving}>{t('settings.save')}</Button></div>
+    <div className="agent-settings-save"><Button disabled={saving} onClick={()=>{setCfg(baseline);setEditing(false)}}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={!dirty} loading={saving}>{t('settings.save')}</Button></div>
   </form>
 }

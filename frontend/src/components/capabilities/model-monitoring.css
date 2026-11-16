@@ -49,3 +49,8 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-monitor-toolbar .agent-s
 html[data-pointer="coarse"] .tt-monitor-probe .ant-btn { min-height:var(--tap); }
 
 html[data-pointer="coarse"] :is(.tt-monitor-toolbar,.tt-monitor-probe) .ant-select-selector { min-height:var(--tap); align-items:center; }
+.tt-monitor-filters { display:flex; flex-wrap:wrap; gap:var(--sp-3); min-width:0; }
+.tt-monitor-filters[hidden] { display:none; }
+html[data-size="compact"] .tt-monitor-toolbar { align-items:flex-end; }
+html[data-size="compact"] .tt-monitor-filters { flex-basis:100%; order:1; }
+html[data-size="compact"] .tt-monitor-filters > label { flex:1; min-width:0; }

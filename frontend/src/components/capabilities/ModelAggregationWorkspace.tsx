@@ -3,10 +3,10 @@ import AggregationEditor from './AggregationEditor'
 import { MAX_AGGREGATE_MEMBERS } from './routing-preview'
 import { useState } from 'react'
 import { App } from 'antd'
-import { Alert, Button, Spin } from './model-controls'
+import { Alert, Button, Input, Spin } from './model-controls'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import { PlusIcon } from '../../icons'
+import { PlusIcon, SearchIcon } from '../../icons'
 import BackButton from '../BackButton'
 import MobileSubPage from '../MobileSubPage'
 import type { CatalogModel, ModelCatalog, ModelCandidate } from './model-hub-api'
@@ -15,7 +15,7 @@ const identity = (candidate: ModelCandidate) => candidate.sourceId + '/' + candi
 const emptyPool = (): CatalogModel => ({ id: globalThis.crypto?.randomUUID?.() || 'pool-' + Date.now().toString(36), name: '', aggregate: true, enabled: true, freeOnly: true, allowPlan: false, protocol: 'openai-completions', strategy: 'smart', candidates: [], cooldownSeconds: 60, onLimit: true, onExhausted: true, minContext: 0, weights: {} })
 export default function ModelAggregationWorkspace({ active, catalog, busy, error, save, retry, onSource }: { active: boolean; catalog: ModelCatalog | null; busy: boolean; error: string; save: (value: ModelCatalog) => Promise<boolean>; retry: () => void; onSource: (source: string) => void }) {
   const { t } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
-  const [drafts, setDrafts] = useState<Record<string, CatalogModel>>({}), [original, setOriginal] = useState<string | null>(null), [editorOpen, setEditorOpen] = useState(false)
+  const [drafts, setDrafts] = useState<Record<string, CatalogModel>>({}), [original, setOriginal] = useState<string | null>(null), [editorOpen, setEditorOpen] = useState(false), [query,setQuery]=useState('')
   const key = original || '@new', draft = drafts[key] || null
   const pools = catalog?.models.filter(model => model.aggregate) || []
   const edit = (model: CatalogModel | null) => {
@@ -38,11 +38,11 @@ export default function ModelAggregationWorkspace({ active, catalog, busy, error
   </section>
   return <section className="tt-routing-workspace" hidden={!active} aria-label={t('hub.tab.aggregate')}>
     <div className="tt-routing-main">
-      <div className="tt-model-hub-actions"><p className="agent-settings-hint">{t('pool.entryHint')}</p><Button type="primary" icon={<PlusIcon />} disabled={!catalog || busy} onClick={() => edit(null)}>{t(drafts['@new'] ? 'pool.resumeCreate' : 'pool.create')}</Button></div>
+      <header className="tt-pagehead"><h2>{t('hub.tab.aggregate')}</h2></header><div className="tt-model-hub-actions"><Input prefix={<SearchIcon />} aria-label={t('modelInteraction.poolSearch')} placeholder={t('modelInteraction.poolSearch')} value={query} onChange={event=>setQuery(event.target.value)} /><Button type="primary" icon={<PlusIcon />} disabled={!catalog || busy} onClick={() => edit(null)}>{t(drafts['@new'] ? 'pool.resumeCreate' : 'pool.create')}</Button></div>
       {active && error && !draft && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
       {!catalog ? <Spin /> : !pools.length ? <p className="agent-settings-hint">{t('pool.empty')}</p> : <div className="tt-model-connections">
-        {pools.map(model => card(model))}
-      </div>}
+        {pools.filter(model=>(model.name+' '+model.id).toLowerCase().includes(query.trim().toLowerCase())).map(model => card(model))}
+      </div>}{!!pools.length && !pools.some(model=>(model.name+' '+model.id).toLowerCase().includes(query.trim().toLowerCase())) && <p className="agent-settings-hint">{t('hub.directory.noMatches')}</p>}
     </div>
   </section>
 }

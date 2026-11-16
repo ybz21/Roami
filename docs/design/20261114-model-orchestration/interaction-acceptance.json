@@ -1,0 +1,447 @@
+{
+  "date": "2026-11-15",
+  "scope": "Interactive design prototype of seven model workspace pages and main detail flows; no production implementation",
+  "artifact": {
+    "file": "interaction-prototype.html",
+    "sha256": "2bfb09d08380584925b76428ffd84e3bafa0a402940a6e670b2575e75a7b1e54",
+    "offline": true,
+    "businessRequests": false
+  },
+  "designAuthority": [
+    "docs/development/ui-design-system.md",
+    "docs/development/mobile-material-ui.md",
+    "Existing topic PRODUCT.md, MASTER.md and DESIGN.md"
+  ],
+  "skills": [
+    "ui-ux-pro-max: verified filter-chip/standard-tab guidance; form simplification from general rules",
+    "impeccable: distill, craft floor, polish and fresh independent finish review"
+  ],
+  "fixtures": "Synthetic sources, pricing, capabilities, credentials and calls. Simulated authorization, save, key generation and quality checks.",
+  "desktop": {
+    "widths": [
+      {
+        "width": 1920,
+        "pane": "/catalog",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/catalog/openrouter/connection",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/catalog/deepseek/prices",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/aggregate/free-pool/members",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920,
+        "footerBottom": 1080
+      },
+      {
+        "width": 1920,
+        "pane": "/aggregate/free-pool/routing",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920,
+        "footerBottom": 1080
+      },
+      {
+        "width": 1920,
+        "pane": "/usage",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/monitor",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/audit",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/gateway/access",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/gateway/directory",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "/speech",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1280,
+        "pane": "closed",
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1280
+      },
+      {
+        "width": 1280,
+        "pane": "open",
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1280,
+        "inspectorLeft": 916.484375,
+        "inspectorRight": 1280,
+        "footerBottom": 1080
+      },
+      {
+        "width": 1920,
+        "pane": "closed",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920
+      },
+      {
+        "width": 1920,
+        "pane": "open",
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 1920,
+        "inspectorLeft": 1392,
+        "inspectorRight": 1920,
+        "footerBottom": 1080
+      },
+      {
+        "width": 2560,
+        "pane": "closed",
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 2560
+      },
+      {
+        "width": 2560,
+        "pane": "open",
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 2560,
+        "inspectorLeft": 2032,
+        "inspectorRight": 2560,
+        "footerBottom": 1080
+      },
+      {
+        "width": 3440,
+        "pane": "closed",
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 3440
+      },
+      {
+        "width": 3440,
+        "pane": "open",
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "mainLeft": 144,
+        "mainRight": 3440,
+        "inspectorLeft": 2912,
+        "inspectorRight": 3440,
+        "footerBottom": 1080
+      }
+    ],
+    "checks": [
+      "API source: two-phase connection/model selection and save",
+      "Plugin accounts can be added as independent source instances",
+      "Price origin, live unsaved preview, independent model save and explicit free confirmation",
+      "Native gateway name can change without changing its upstream model ID",
+      "Pool source inventory excludes unsaved upstream models and cross-source drafts survive tab navigation",
+      "Rotate/weight previews react to strategy and weight edits; keyboard reordering works",
+      "Overview model/source/hour drill-down carries filters into audit and receipt detail",
+      "Monitoring keeps unknown quality explicit; probe is labelled simulation with no real request",
+      "Key create/once-only view/disable confirmation and typing focus work",
+      "Gateway directory separates pools, enabled native models and upstream-only entries",
+      "Speech fields follow provider and preserve other provider configuration",
+      "Empty/loading/retry, light English, four desktop widths with inspector open and closed"
+    ],
+    "errors": []
+  },
+  "phone": {
+    "device": "Redmi Note 8",
+    "checks": [
+      "Full-screen phone pricing, free confirmation and save",
+      "Cross-source pool creation, rotate preview and real touch grip sorting",
+      "Hour drill-down into audit, full-screen receipt and return",
+      "Touch key creation and explicit simulated quality check"
+    ],
+    "bounds": [
+      {
+        "name": "sources",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "overview",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "monitor",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "audit",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "gateway",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "directory",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "speech",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "price-inspector",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "inspectorTop": 0,
+        "inspectorBottom": 765.8181762695312,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "pool-members",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "audit-detail",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "inspectorTop": 0,
+        "inspectorBottom": 765.8181762695312,
+        "pointer": "coarse",
+        "size": "compact"
+      },
+      {
+        "name": "scrolled",
+        "width": 392,
+        "scrollWidth": 392,
+        "height": 766,
+        "scrollHeight": 766,
+        "pointer": "coarse",
+        "size": "compact"
+      }
+    ],
+    "scroll": {
+      "before": 0,
+      "after": 317.0909118652344
+    }
+  },
+  "offline": {
+    "networkRequests": [],
+    "errors": [],
+    "timezone": "America/New_York",
+    "viewports": [
+      [
+        375,
+        812
+      ],
+      [
+        812,
+        375
+      ]
+    ]
+  },
+  "productionRegression": {
+    "files": 255,
+    "tests": 1843,
+    "note": "Existing frontend tests passed; prototype workflows are validated separately above"
+  },
+  "quality": [
+    "scripts/dev/quality/check.sh quick",
+    "scripts/dev/quality/check.sh full",
+    "frontend typecheck, i18n, hover, vitest, build"
+  ],
+  "detector": {
+    "findings": [
+      {
+        "antipattern": "overused-font",
+        "name": "Overused font",
+        "description": "Inter, Roboto, Fraunces, Geist, Plus Jakarta Sans, and Space Grotesk are used on so many sites they no longer feel distinctive. Each new wave of AI-generated UIs converges on the same handful of faces. Choose a face that gives your interface personality.",
+        "severity": "warning",
+        "category": "slop",
+        "file": "/home/ai/codes/ttmux/.worktrees/2026-1112-1808-jl57/docs/design/20261114-model-orchestration/interaction-prototype/styles.css",
+        "line": 1,
+        "snippet": "font-family:Inter"
+      }
+    ],
+    "disposition": "Inter warning retained intentionally: the existing repository system font stack is authoritative; no replacement typeface is introduced."
+  },
+  "screenshotsRoot": "/tmp/roami-model-hub-design-20261115",
+  "review": {
+    "status": "complete",
+    "scope": "Full interactive prototype initially reviewed; verdict pass restricted to the two listed fixes and direct regression",
+    "initialDisposition": "fix",
+    "findings": [
+      {
+        "issue": "Phone gateway key table wraps status vertically and overflows horizontally",
+        "resolution": "Phone key rows reflow into compact flat rows; actual touch action and zero horizontal overflow verified",
+        "status": "resolved"
+      },
+      {
+        "issue": "Phone source pricing rows label saved model overrides as source inheritance",
+        "resolution": "Phone origin label derives from model pricing mode; saved custom price and untouched inherited model verified",
+        "status": "resolved"
+      }
+    ],
+    "verdictDisposition": "ship",
+    "verdictScope": "Only the two fixes and their direct regression; not a fresh whole-prototype approval",
+    "remaining": "clear within verdict scope",
+    "reviewer": "model_hub_prototype_finish",
+    "unreadInInitialReview": [
+      "MASTER.md",
+      "design.json",
+      "README.md",
+      "entry.tsx",
+      "build.mjs"
+    ],
+    "sampledInInitialReview": [
+      "application.js",
+      "normative documentation"
+    ]
+  },
+  "phoneFixes": {
+    "keyRows": {
+      "width": 392,
+      "scrollWidth": 392,
+      "paneWidth": 385,
+      "paneScroll": 385,
+      "rows": [
+        {
+          "name": "Agent development",
+          "status": "已启用",
+          "height": 19.5,
+          "lineHeight": 19.5
+        },
+        {
+          "name": "IDE",
+          "status": "已启用",
+          "height": 19.5,
+          "lineHeight": 19.5
+        }
+      ]
+    },
+    "priceRows": [
+      "deepseek-chat模型单独定价输入 0.75缓存读取 0.03输出 1.5",
+      "deepseek-reasoner继承源默认输入 0.3缓存读取 0.03输出 1.2"
+    ],
+    "checks": [
+      "key rows remain one-line status with zero horizontal overflow",
+      "key management action reachable by actual touch",
+      "saved model override displays model origin and new unit price",
+      "other models retain source inheritance label"
+    ]
+  }
+}

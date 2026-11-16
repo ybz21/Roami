@@ -16,6 +16,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 it('configures current Volcano speech recognition with one key while retaining saved legacy configuration', async () => {
   render(<App><SpeechSettings /></App>)
+  fireEvent.click(await screen.findByRole('button', {name:'capabilities.edit'}))
   const key = await screen.findByLabelText('settings.volcanoApiKey') as HTMLInputElement
   expect(screen.getByText('settings.volcanoModelHint')).toBeTruthy()
   expect(document.querySelectorAll('input[type="password"]')).toHaveLength(1)
