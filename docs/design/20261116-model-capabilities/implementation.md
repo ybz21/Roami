@@ -59,6 +59,8 @@ roami session new 资料整理 --kind roami --model free-pool --free-only \
 | 存储 | `0029_conversation_models.sql` | 增量建立会话选模表；Go 备份恢复同步支持 schema 29 |
 | Web | `ModelSelectionFields.tsx`、`NewSessionModal.tsx`、`useConversationModels.ts` | 新建 Roami 会话、标准能力筛选和原生会话独立选模 |
 
+受管智能体通过已有的注册任务能力创建任务并传入模型；新增 CLI 用户入口与 `agent new` 一样，在受管工具上下文中拒绝绕过准入。
+
 管理接口：`GET /v1/model-gateway/models`、`GET /v1/model-gateway/models/selection`、`POST /v1/native-sessions`、`GET/PUT /v1/conversations/{cid}/model`。Web 路由经现有鉴权代理暴露；CLI 使用节点私有 Unix socket。
 
 目录默认只读缓存；上游声明缓存绑定完整来源指纹并在 15 分钟后失效，重启后按需刷新。显式刷新最多四个来源并发，整次限时 20 秒，逐源报告失败。刷新不会调用推理。并发请求各自携带选择、目录版本与角色路由身份，Go 在实际准入时重新核对；没有修改进程全局模型，也没有在 Python 增设额度规则。

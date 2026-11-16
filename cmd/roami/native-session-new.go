@@ -80,6 +80,10 @@ func runNativeSessionNew(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
+	if hasAgentToolContext() {
+		fmt.Fprintln(os.Stderr, "USE_REGISTERED_CLI_CAPABILITY")
+		return 1
+	}
 	paths, err := agentruntime.Resolve("", "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

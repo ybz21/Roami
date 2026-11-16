@@ -8,6 +8,7 @@ import MobileSubPage from '../MobileSubPage'
 import './new-session-modal.css'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
+import { nodeApi } from '../cluster/node-url'
 import { nativeSessionId } from './session-record'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
@@ -153,9 +154,11 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       setCreating(true)
       if (agent === 'native') {
         const body = { title: finalName.slice(0, 80), task: prompt, ...(dir.trim() ? { directory: dir.trim() } : {}), ...(modelChoice.model !== 'auto' || modelChoice.freeOnly ? { model: modelChoice.model } : {}), freeOnly: modelChoice.freeOnly }
-        const signature = JSON.stringify(body)
+        const destination = nodeApi('/agent/native-sessions')
+        const signature = JSON.stringify([destination, body])
         if (nativeRequest.current?.signature !== signature) nativeRequest.current = { signature, key: crypto.randomUUID() }
         const { data } = await api('POST', '/agent/native-sessions', { ...body, requestKey: nativeRequest.current.key })
+        if (nodeApi('/agent/native-sessions') !== destination) { message.info(t('modelSelection.createdOnOriginalNode')); onClose(); return }
         refreshSessionLists(); onClose(); onDone(data.session)
         return
       }

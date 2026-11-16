@@ -6029,6 +6029,7 @@ const zhCN = {
   'modelSelection.kind.all': '全部类型',
   'modelSelection.kind.single': '单模型',
   'modelSelection.kind.aggregate': '聚合模型',
+  'modelSelection.createdOnOriginalNode': '会话已在原节点创建，请切回原节点查看。',
   'modelSelection.auto': 'Auto（跟随当前角色模型）',
   'modelSelection.freePool': '免费池',
   'modelSelection.capability': '筛选能力',

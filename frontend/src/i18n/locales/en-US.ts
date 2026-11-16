@@ -6020,6 +6020,7 @@ const enUS = {
   'modelSelection.kind.all': 'All types',
   'modelSelection.kind.single': 'Single model',
   'modelSelection.kind.aggregate': 'Aggregate model',
+  'modelSelection.createdOnOriginalNode': 'The session was created on the original node. Switch back to view it.',
   'modelSelection.auto': 'Auto (use the role model)',
   'modelSelection.freePool': 'Free pool',
   'modelSelection.capability': 'Filter capabilities',

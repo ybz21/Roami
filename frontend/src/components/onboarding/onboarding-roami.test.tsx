@@ -78,3 +78,11 @@ it('keeps an empty catalog incomplete and points to unified model source managem
   fireEvent.click(screen.getByRole('button', { name: '管理模型' }))
   expect(view.nav).toHaveBeenCalledWith('onboarding/model')
 })
+
+it('keeps a disabled saved model visible and requires an enabled replacement', async () => {
+  fixture.catalog.models[0].enabled = false
+  const view = show()
+  await waitFor(() => expect(screen.getAllByText('Original model', { selector: '.ant-select-selection-item' }).length).toBe(2))
+  expect(view.ready).toHaveBeenLastCalledWith(false)
+  expect((screen.getByRole('button', { name: /应\s*用/ }) as HTMLButtonElement).disabled).toBe(true)
+})

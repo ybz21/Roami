@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Checkbox, Select, Spin } from 'antd'
 import { api } from '../../api'
+import { useCurrentNodeId } from '../cluster/node-url'
 import { useI18n } from '../../i18n'
 import { MODEL_CATALOG_CHANGED } from './model-hub-api'
 
@@ -9,7 +10,7 @@ export type ModelDirectoryEntry = { id: string; name: string; kind: string; prot
 export const modelCapabilities = ['text', 'image', 'audio', 'video', 'tools', 'reasoning', 'structuredOutput', 'streaming'] as const
 
 export default function ModelSelectionFields({ value, onChange, disabled = false }: { value: ModelChoice; onChange: (choice: ModelChoice) => void; disabled?: boolean }) {
-  const { t } = useI18n()
+  const { t } = useI18n(), node = useCurrentNodeId()
   const [models, setModels] = useState<ModelDirectoryEntry[]>([]), [loading, setLoading] = useState(true), [failed, setFailed] = useState(false)
   const [kind, setKind] = useState(''), [capability, setCapability] = useState(''), [version, setVersion] = useState(0)
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function ModelSelectionFields({ value, onChange, disabled = false
       if (!abort.signal.aborted) setModels(data.models || [])
     }).catch(() => { if (!abort.signal.aborted) setFailed(true) }).finally(() => { if (!abort.signal.aborted) setLoading(false) })
     return () => { abort.abort(); window.removeEventListener(MODEL_CATALOG_CHANGED, changed) }
-  }, [version])
+  }, [node, version])
   const compatible = models.filter(model => model.configured && model.enabled && ['openai-completions', 'openai-responses', 'anthropic-messages'].includes(model.protocol))
   const visible = compatible.filter(model => (!kind || model.kind === kind) && (!value.freeOnly || model.freeOnly || model.pricing === 'confirmed-free') && (!capability || model.capabilities[capability]?.support === 'supported'))
   const selected = compatible.find(model => model.id === value.model)

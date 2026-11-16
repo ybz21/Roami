@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -26,5 +28,24 @@ func TestNativeSessionDispatchLeavesShellAndHelpUntouched(t *testing.T) {
 		if nativeSessionNewRequested(strings.Fields(command)) {
 			t.Fatal(command)
 		}
+	}
+}
+
+func TestManagedNativeSessionCreationUsesRegisteredAdmission(t *testing.T) {
+	for _, name := range []string{"ROAMI_AGENT_CALLER_ROLE", "ROAMI_AGENT_TURN_ID", "ROAMI_AGENT_TOOL_CALL_ID"} {
+		t.Run(name, func(t *testing.T) {
+			for _, key := range []string{"ROAMI_AGENT_CALLER_ROLE", "ROAMI_AGENT_TURN_ID", "ROAMI_AGENT_TOOL_CALL_ID"} {
+				t.Setenv(key, "")
+			}
+			t.Setenv(name, "managed-context")
+			root := filepath.Join(t.TempDir(), "not-created")
+			t.Setenv("ROAMI_HOME", root)
+			if code := runNativeSessionNew([]string{"--kind", "roami", "--task", "Review fixture"}); code != 1 {
+				t.Fatal("managed caller bypassed registered admission", code)
+			}
+			if _, err := os.Stat(root); !os.IsNotExist(err) {
+				t.Fatal("managed call initialized resources", err)
+			}
+		})
 	}
 }
