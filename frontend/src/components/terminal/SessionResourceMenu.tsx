@@ -37,19 +37,19 @@ export default function SessionResourceMenu({ session, label, icon, sessionViewL
   if (!files.length) return null
   const nameOf = (path: string) => path.split('/').pop() || path
   const selected = active ? (activeFile ? `file:${activeFile}` : 'session') : ''
-  return <Dropdown trigger={['click']} placement="bottomLeft" autoFocus open={open}
+  return <Dropdown trigger={['click']} placement="bottomLeft" align={{ overflow: { adjustX: true, adjustY: true, shiftX: true } }} autoFocus open={open}
     onOpenChange={setOpen} overlayClassName="tt-session-resource-popup"
     popupRender={content => <div ref={popup} onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus() }
       if (event.key === 'Tab') setOpen(false)
     }}>{content}</div>}
     menu={{ id: menuId, selectedKeys: selected ? [selected] : [], items: [
-      { key: 'session', ...{ role: 'menuitemradio', 'aria-checked': selected === 'session' }, icon, label: <span className="tt-session-resource-row"><span className="nm">{sessionViewLabel || t('tabs.conversation')}</span>{selected === 'session' && <CheckIcon />}</span>, onClick: onSession },
+      { key: 'session', ...{ role: 'menuitemradio', 'aria-checked': selected === 'session' }, icon: <span className="tt-session-resource-icon">{icon}</span>, label: <span className="tt-session-resource-row"><span className="nm">{sessionViewLabel || t('tabs.conversation')}</span>{selected === 'session' && <CheckIcon />}</span>, onClick: onSession },
       { type: 'divider' },
       { type: 'group', label: t('tabs.openedFiles'), children: files.map(file => {
         const name = nameOf(file.path)
         const text = files.some(other => other.path !== file.path && nameOf(other.path) === name) ? file.path : name
-        return { key: `file:${file.path}`, ...{ role: 'menuitemradio', 'aria-checked': selected === `file:${file.path}` }, icon: <FileTypeIcon name={name} />,
+        return { key: `file:${file.path}`, ...{ role: 'menuitemradio', 'aria-checked': selected === `file:${file.path}` }, icon: <span className="tt-session-resource-icon"><FileTypeIcon name={name} /></span>,
           label: <span className="tt-session-resource-row" title={file.path}>
             <span className="nm">{text}</span>
             {dirtyFiles.has(file.path) && <span className="tt-tab-dirty" role="img" aria-label={t('file.unsaved')} />}

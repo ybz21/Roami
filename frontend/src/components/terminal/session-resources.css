@@ -1,4 +1,4 @@
-.tt-tab-session { gap: 0; padding: 0; }
+.tt-tab.tt-tab-session { gap: var(--sp-1); padding: 0 var(--sp-2) 0 0; }
 .tt-tab-session-open {
   display: inline-flex; flex: 1 1 auto; align-items: center; gap: var(--sp-2);
   min-width: 0; height: 100%; padding: 0 var(--sp-2);
@@ -8,16 +8,22 @@
 .tt-tab-session-open > svg, .tt-tab-session-open > span:not(.tt-name) { flex-shrink: 0; }
 .tt-session-resource-trigger {
   position: relative; display: inline-flex; flex: 0 0 var(--sp-5); align-items: center; justify-content: center;
-  width: var(--sp-5); height: var(--sp-5); margin: 0 var(--sp-1); padding: 0;
+  width: var(--sp-5); height: var(--sp-5); padding: 0;
   border: 0; border-radius: var(--r-xs); background: transparent; color: var(--text-dim); cursor: pointer;
 }
 :where(html[data-pointer="fine"]) .tt-session-resource-trigger:hover { color: var(--text-bright); background: var(--list-hover); }
 .tt-session-resource-trigger[aria-expanded="true"] { color: var(--text-bright); background: var(--sel-bg); }
-.tt-tab-session > .tt-x { position: relative; flex-shrink: 0; margin-right: var(--sp-2); }
-.tt-session-resource-popup { max-width: calc(100vw - var(--sp-4)*2); }
+.tt-tab.tt-tab-session > .tt-x { position: relative; flex: 0 0 var(--sp-5); width: var(--sp-5); height: var(--sp-5); }
+.tt-session-resource-popup { width: min(40ch, calc(100vw - var(--sp-4)*2)); max-width: calc(100vw - var(--sp-4)*2); }
 .tt-session-resource-popup .ant-dropdown-menu { max-height: calc(100dvh - var(--tap)*3 - var(--sp-5)); overflow: auto; }
+.tt-session-resource-popup.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item { padding: var(--sp-2) var(--sp-3); }
+.tt-session-resource-popup.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-title-content { min-width: 0; }
+.tt-session-resource-popup.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-title { padding: var(--sp-2) var(--sp-3); }
+.tt-session-resource-popup.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-list { margin: 0; }
+.tt-session-resource-icon { display: inline-flex; flex: 0 0 var(--sp-5); align-items: center; justify-content: center; width: var(--sp-5); height: var(--sp-5); }
 .tt-session-resource-row { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
-.tt-session-resource-row .nm { flex: 1; min-width: 0; max-width: min(40ch, calc(100vw - var(--tap)*3)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-session-resource-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-session-resource-row > .tt-tab-dirty { flex-shrink: 0; }
 .tt-session-resource-row > svg { flex-shrink: 0; color: var(--accent); }
 .tt-session-resource-row > .tt-act { position: relative; flex-shrink: 0; }
 .tt-mobile-session-group { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-1); }
