@@ -25,7 +25,7 @@ export default function ModelDesignUnification() {
   upstreamRouting: fixed-model | router | unknown
   registration: configured | discovered
   enabled: boolean
-  capabilities: CapabilityFact[]
+  capabilities: Record<CapabilityName, CapabilityFact>
   pricingEvidence: PricingEvidence
   members?: ModelReference[]
   catalogRevision: string
