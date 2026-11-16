@@ -28,7 +28,15 @@ func (s Service) reconcileClaudeCompletion(key string, status Status, state *ses
 	} else {
 		// Older hosts retained the matched-idle reason, but discarded its summary.
 		progress := claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
-		if progress == nil || progress.ObservedMS > state.UpdatedMS || !sessionProcessesStopped(state.Binding) {
+		if progress == nil {
+			return status, false, nil
+		}
+		// Metadata writes change mtime without starting another provider action.
+		activityMS := progress.ActivityMS
+		if activityMS == 0 {
+			activityMS = progress.ObservedMS
+		}
+		if activityMS > state.UpdatedMS || !sessionProcessesStopped(state.Binding) {
 			return status, false, nil
 		}
 		checked := claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
