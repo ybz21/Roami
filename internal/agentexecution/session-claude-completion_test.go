@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestClaudeRetriesMatchedIdleAfterChildExit(t *testing.T) {
@@ -89,5 +90,58 @@ func TestClaudeLaterActivityInvalidatesDeferredIdle(t *testing.T) {
 		if state.UnknownReason == "SESSION_STOP_UNCONFIRMED" || state.ClaudeStop != nil {
 			t.Fatalf("%s kept stale idle proof", hook)
 		}
+	}
+}
+
+func TestClaudeLegacyIdleUsesProviderActivityInsteadOfMetadataMtime(t *testing.T) {
+	for _, mode := range []string{"metadata", "assistant", "request", "queued command", "untimed activity"} {
+		t.Run(mode, func(t *testing.T) {
+			s, binding, spec, transcript, _ := rejectedClaudeTask(t)
+			dir, _ := s.directory(spec.Key)
+			records := reportRecords(binding, sessionPrompt(dir, spec))
+			before := time.Now().Add(-time.Minute)
+			for _, record := range records {
+				record["timestamp"] = before.Format(time.RFC3339Nano)
+			}
+			records[1]["cwd"] = binding.Directory
+			records = append(records[:1], append([]map[string]any{{"type": "api-request-blob"}}, records[1:]...)...)
+			path, _ := s.lifecycleFile(binding)
+			var state sessionLifecycle
+			if err := readJSON(path, &state); err != nil {
+				t.Fatal(err)
+			}
+			state.State, state.UnknownReason, state.ClaudeStop = "unknown", "SESSION_STOP_UNCONFIRMED", nil
+			state.UpdatedMS = time.Now().UnixMilli()
+			later := time.Now().Add(time.Second)
+			tail := map[string]any{"type": "cost-state", "timestamp": later.Format(time.RFC3339Nano)}
+			switch mode {
+			case "assistant", "untimed activity":
+				tail = map[string]any{"type": "assistant", "sessionId": binding.ProviderID, "cwd": binding.Directory, "message": map[string]any{"stop_reason": "tool_use", "content": []any{map[string]any{"type": "tool_use", "id": "later-tool"}}}}
+				if mode == "assistant" {
+					tail["timestamp"] = later.Format(time.RFC3339Nano)
+				}
+			case "request":
+				tail["type"] = "api-request"
+			case "queued command":
+				tail["type"] = "attachment"
+				tail["attachment"] = map[string]any{"type": "queued_command"}
+			}
+			records = append(records, tail)
+			writeReportRecords(t, transcript, records)
+			if err := os.Chtimes(transcript, later, later); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeJSON(path, state); err != nil {
+				t.Fatal(err)
+			}
+			status, err := s.ReconcileSession(context.Background(), spec.Key)
+			if mode == "metadata" {
+				if err != nil || status.Result == nil || status.Result.State != "succeeded" {
+					t.Fatalf("metadata blocked bound idle: %+v %v", status, err)
+				}
+			} else if err == nil || status.Result != nil {
+				t.Fatalf("later %s was accepted: %+v %v", mode, status, err)
+			}
+		})
 	}
 }

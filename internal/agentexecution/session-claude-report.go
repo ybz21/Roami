@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Reported progress never supplies stop evidence or changes the execution outcome.
@@ -21,23 +22,29 @@ type ReportedProgress struct {
 	PromptID     string `json:"promptId"`
 	SourceDigest string `json:"sourceDigest"`
 	ObservedMS   int64  `json:"observedMs"`
+	ActivityMS   int64  `json:"activityMs,omitempty"`
 }
 
 type claudeReportRecord struct {
-	Type      string `json:"type"`
-	SessionID string `json:"sessionId"`
-	PromptID  string `json:"promptId"`
-	Cwd       string `json:"cwd"`
-	Sidechain bool   `json:"isSidechain"`
-	Meta      bool   `json:"isMeta"`
-	Compact   bool   `json:"isCompactSummary"`
-	Message   struct {
+	Type       string `json:"type"`
+	SessionID  string `json:"sessionId"`
+	PromptID   string `json:"promptId"`
+	Cwd        string `json:"cwd"`
+	Sidechain  bool   `json:"isSidechain"`
+	Meta       bool   `json:"isMeta"`
+	Compact    bool   `json:"isCompactSummary"`
+	Timestamp  string `json:"timestamp"`
+	Attachment struct {
+		Type string `json:"type"`
+	} `json:"attachment"`
+	Message struct {
 		Content    json.RawMessage `json:"content"`
 		StopReason string          `json:"stop_reason"`
 	} `json:"message"`
 }
 
 type claudeReportSnapshot struct {
+	Format     int               `json:"format"`
 	Path       string            `json:"path"`
 	Size       int64             `json:"size"`
 	ModifiedNS int64             `json:"modifiedNs"`
@@ -128,10 +135,10 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 	}
 	owner := info.Sys().(*syscall.Stat_t)
 
-	snapshot := claudeReportSnapshot{Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
+	snapshot := claudeReportSnapshot{Format: 1, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
 	cache := filepath.Join(launchDir, "reported-progress.json")
 	var previous claudeReportSnapshot
-	if readJSON(cache, &previous) == nil && previous.Path == snapshot.Path && previous.Size == snapshot.Size && previous.ModifiedNS == snapshot.ModifiedNS && previous.Inode == snapshot.Inode && previous.ProviderID == snapshot.ProviderID && previous.PromptID == snapshot.PromptID && previous.PromptHash == snapshot.PromptHash && previous.Directory == snapshot.Directory {
+	if readJSON(cache, &previous) == nil && previous.Format == snapshot.Format && previous.Path == snapshot.Path && previous.Size == snapshot.Size && previous.ModifiedNS == snapshot.ModifiedNS && previous.Inode == snapshot.Inode && previous.ProviderID == snapshot.ProviderID && previous.PromptID == snapshot.PromptID && previous.PromptHash == snapshot.PromptHash && previous.Directory == snapshot.Directory {
 		return previous.Progress
 	}
 	file, err := os.Open(path)
@@ -148,6 +155,7 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 	matched := false
 	var progress *ReportedProgress
 	valid := true
+	activityKnown, activityMS := true, int64(0)
 	for {
 		var record claudeReportRecord
 		if err = decoder.Decode(&record); errors.Is(err, io.EOF) {
@@ -155,6 +163,18 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 		} else if err != nil {
 			valid = false
 			break
+		}
+		if record.Type == "user" || record.Type == "assistant" || record.Type == "api-request" || record.Type == "api-request-shape" || record.Type == "api-request-blob" || record.Type == "attachment" && record.Attachment.Type == "queued_command" {
+			stamp, problem := time.Parse(time.RFC3339Nano, record.Timestamp)
+			if problem != nil {
+				activityKnown = false
+			} else {
+				// A later timed action also bounds earlier untimed diagnostics.
+				activityKnown = true
+				if stamp.UnixMilli() > activityMS {
+					activityMS = stamp.UnixMilli()
+				}
+			}
 		}
 		if record.Sidechain || record.Type != "user" && record.Type != "assistant" {
 			continue
@@ -196,6 +216,9 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 	}
 	if progress != nil {
 		progress.SourceDigest = hex.EncodeToString(hash.Sum(nil))
+		if activityKnown {
+			progress.ActivityMS = activityMS
+		}
 	}
 	snapshot.Progress = progress
 	_ = writeJSON(cache, snapshot)
