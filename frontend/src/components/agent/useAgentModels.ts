@@ -46,9 +46,8 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
     if (loadingRef.current) return
     const requestedEpoch = epoch.current
     loadingRef.current = true
-    refreshCatalog()
+    refreshCatalog(); refresh()
     setLoading(true); setError(null)
-    if (!settings) refresh()
     try { const { data } = await api('GET', '/agent/models' + (role === 'worker' ? '?role=worker' : '')); if (epoch.current === requestedEpoch) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) } }
     catch (e) { if (epoch.current === requestedEpoch) setError(e) } finally { if (epoch.current === requestedEpoch) { loadingRef.current = false; setLoading(false) } }
   }

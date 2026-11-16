@@ -146,7 +146,7 @@ roami session new 调研 --kind roami -model free-pool --task "整理资料"
 roami session new 调研 --kind roami --model auto --task "整理资料"
 
 # 外部执行器沿用已有 JSON spec.model
-roami agent execution launch --file task.json`}</Code><p><code>auto</code> 保留为 Auto 选择标识，沿用当前角色保存的模型或池。<code>free-pool</code> 是用户保存的聚合目录 ID，名称本身不证明免费。</p><p>原生任务显式选择优先于角色默认值；外部执行器沿用 JSON spec 的模型字段。显式 <code>--model</code> 只覆盖目标执行，不写全局配置；固定模型不得静默换成另一模型。</p><p>目录 ID 与上游 ID 分开。含斜杠的上游名称不直接作为目录 ID；先在模型源中接入，再使用网关调用名称选择，禁止仅凭同名猜来源。会话续接沿用已绑定执行器，模型变更走受管 steer 与当前任务 revision。</p></div></div>
+roami agent execution launch --file task.json`}</Code><p><code>auto</code> 保留为 Auto 选择标识，沿用当前角色保存的模型或池。<code>free-pool</code> 是用户保存的聚合目录 ID，名称本身不证明免费。</p><p>首页选择器从网关动态显示模型名称和原生 / 聚合类型；打开列表时刷新节点当前选择。Agent 沿用原有 <code>delegate</code> 工具，模型或聚合池 ID 与免费条件写入已有任务记录：</p><Code>{`{"goal":"整理资料","executor":"native","model":"free-pool","freeOnly":true}`}</Code><p>原生任务显式选择优先于角色默认值；外部执行器沿用 JSON spec 的模型字段。显式 <code>--model</code> 只覆盖目标执行，不写全局配置；固定模型不得静默换成另一模型。</p><p>目录 ID 与上游 ID 分开。含斜杠的上游名称不直接作为目录 ID；先在模型源中接入，再使用网关调用名称选择，禁止仅凭同名猜来源。会话续接沿用已绑定执行器，模型变更走受管 steer 与当前任务 revision。</p></div></div>
         <details><summary>配置、JSON 回执与错误语义</summary><div className="two-col"><div className="stack"><Code>{`// 持久化到现有节点 / 角色配置的建议增量（JSON 示意）
 {
   "main": {
