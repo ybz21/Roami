@@ -27,6 +27,8 @@ import GitPanel from '../git/GitPanel'
 import MobileSubPage from '../MobileSubPage'
 import { PaneCloseConfirm, type PaneCloseTarget } from './PaneCloseConfirm'
 import { TabContextMenu } from './TabContextMenu'
+import SessionResourceMenu from './SessionResourceMenu'
+import { taskKeyOf } from '../sessions/task-key'
 import Term, { TermHandle, TermStatus } from './Terminal'
 import { api, makeClipboardImageFile, upload, uploadedPathOf } from '../../api'
 import { VoiceInput } from '../chat/VoiceInput'
@@ -42,7 +44,7 @@ import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { useLayout } from '../../layout'
 import { savePreferences, saveWorkspace, usePreferences } from '../../preferences'
 import { PromptDialog, PromptSignal, advancePromptSignal, detectPrompt } from '../prompt'
-import { SessionTitle, TabName, sessionDisplay, useSessionLabel } from '../sessions/session-label'
+import { SessionTitle, TabName, sessionDisplay, sessionLabel, useSessionLabel } from '../sessions/session-label'
 import { sessionProject, useSessionProject } from '../sessions/session-project'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useEdgeSwipe } from '../shell/edge-swipe'
@@ -91,13 +93,15 @@ export default function TerminalPane(props: {
   onOpenFile?: (path: string, line?: number) => void
   /** 对话里点「Git」→ 右栏切到 Git 面板 */
   onOpenGit?: () => void
-  /** 当前任务的文件标签（22 设计 §3.3）：会话标签后面接着画；内容用 FileView，只有当前一个渲染 Monaco */
+  /** 全局文件标签；关联会话的文件通过资源菜单访问。 */
   fileTabs?: FileTab[]
   /** 当前标签是哪个文件；空 = 当前标签是会话 */
   activeFile?: string
   /** 当前任务的 worktree 根：路径条面包屑与「改动」都从它算 */
   taskDir?: string
-  onFileTab?: (path: string) => void
+  sessionTask?: (session: string) => string
+  onReturnToSession?: () => void
+  onFileTab?: (path: string, session?: string) => void
   onCloseFile?: (path: string) => void
   onPinFile?: (path: string) => void
   onFileMode?: (path: string, mode: FileTabMode) => void
@@ -105,7 +109,7 @@ export default function TerminalPane(props: {
   reveal?: { path: string; line: number; nonce: number }
 }) {
   const registeredAgents = useRegisteredAgents()
-  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, sessionTask, onReturnToSession, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
   const activeLabel = useSessionLabel(active)
   const opaqueLabel = !!activeProject && (activeLabel === active || /^\d{4}-\d{4}-\d{4}-\d{4}(?:-[a-z0-9]+)?$/i.test(activeLabel))
@@ -113,6 +117,10 @@ export default function TerminalPane(props: {
   const islandDetail = opaqueLabel ? activeLabel.match(/\d{4}(?:-[a-z0-9]+)?$/i)?.[0] : activeProject?.name
   const tabs = terms
   const curFile = activeFile || ''
+  const sessionButtons = useRef<Record<string, HTMLButtonElement | null>>({})
+  const taskOf = (name: string) => sessionTask?.(name) || taskKeyOf(name, sessionProject(name)?.worktree)
+  const resourcesOf = (name: string) => (fileTabs || []).filter(file => file.task === taskOf(name))
+  const ungroupedFiles = (fileTabs || []).filter(file => !terms.some(name => file.task === taskOf(name)))
   // 文件标签的脏标记：FileView 报上来，关标签前问一句（FileWorkspace 同款）
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(() => new Set())
   const setFileDirty = (p: string, dirty: boolean) => setDirtyFiles((prev) => {
@@ -738,7 +746,7 @@ export default function TerminalPane(props: {
     else h?.send(key)
     setCtx(null)
   }
-  if (terms.length === 0 && !pageTabs?.length) {
+  if (terms.length === 0 && !pageTabs?.length && !fileTabs?.length) {
     return (
       <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>
         <div style={{ textAlign: 'center' }}>
@@ -758,8 +766,13 @@ export default function TerminalPane(props: {
   // 标签内的会话标记：官方品牌标，跟状态点同一行且同一光学尺寸（颜色由标自己带，见 AgentLogo）
   const agentMarks = (name: string) => {
     const kind = nativeSessionId(name) ? 'native' : agentKinds[name] || (claudeMap[name]?.running ? 'claude' : codexMap[name]?.running ? 'codex' : undefined)
-    return kind && <span title={agentName(kind)} style={{ display: 'inline-flex' }}><AgentLogo kind={kind} /></span>
+    return kind ? <span title={agentName(kind)} style={{ display: 'inline-flex' }}><AgentLogo kind={kind} /></span> : <TerminalIcon size={13} />
   }
+  const resourceMenu = (name: string, selected: boolean) => <SessionResourceMenu session={name} label={sessionLabel(name) || name}
+    sessionViewLabel={t(nativeSessionId(name) || agentKinds[name] || claudeMap[name]?.running || codexMap[name]?.running || openCodeMap[name]?.running ? 'tabs.conversation' : 'common.terminal')}
+    icon={agentMarks(name)} files={resourcesOf(name)} active={selected} activeFile={curFile} dirtyFiles={dirtyFiles}
+    sessionButton={{ get current() { return sessionButtons.current[name] || null } }}
+    onSession={() => setActive(name)} onFile={path => onFileTab?.(path, name)} onCloseFile={closeFile} />
   const sessionTab = (
     <>
       {statusDot(active ? dotOf(active) : '#f85149')}
@@ -804,7 +817,7 @@ export default function TerminalPane(props: {
           </span></TabContextMenu>
         ))}
         {tabs.map((termName, i) => {
-          const on = !activePage && !curFile && termName === active
+          const on = !activePage && termName === active && (!curFile || resourcesOf(termName).some(file => file.path === curFile))
           const waiting = termNeedsInput[termName]
           const proj = sessionProject(termName)
           // 分支进 Tooltip，不占标签宽度（14 §6.3.2）
@@ -812,9 +825,9 @@ export default function TerminalPane(props: {
             .filter(Boolean).join(' · ')
           const tab = (
             <span key={termName} ref={on ? activeTabRef : undefined}
-              className={`tt-tab${on ? ' on' : ''}${pinnedTabIds.has(`term:${termName}`) ? ' pinned' : ''}${dragTab === termName ? ' dragging' : ''}${dropAt === i ? ' dropL' : ''}${dropPeer === termName ? ' dropPeer' : ''}`}
+              className={`tt-tab tt-tab-session${on ? ' on' : ''}${pinnedTabIds.has(`term:${termName}`) ? ' pinned' : ''}${dragTab === termName ? ' dragging' : ''}${dropAt === i ? ' dropL' : ''}${dropPeer === termName ? ' dropPeer' : ''}`}
               style={{ order: pinnedTabIds.has(`term:${termName}`) ? 0 : 1 }}
-              title={tip} onClick={() => setActive(termName)}
+              title={tip}
               draggable={!!onReorder}
               onDragStart={(e) => {
                 // 自定义 MIME：文件区/终端的拖放判定按 type 分流，用通用 text/plain
@@ -858,10 +871,14 @@ export default function TerminalPane(props: {
                 setDragTab(null); setDropAt(null)
               }}
               onDragEnd={() => { setDragTab(null); setDropAt(null); setDropPeer('') }}>
-              {statusDot(dotOf(termName))}
-              {waiting && <span className="tt-wait" title={t('prompt.confirmRequired')}>{t('session.waiting')}</span>}
-              {agentMarks(termName)}
-              <TabName name={termName} />
+              <button type="button" className="tt-tab-session-open" ref={element => { sessionButtons.current[termName] = element }}
+                aria-label={t('tabs.openSession', { name: sessionLabel(termName) || termName })}
+                aria-current={on && !curFile ? 'page' : undefined} onClick={() => setActive(termName)}>
+                {statusDot(dotOf(termName))}
+                {waiting && <span className="tt-wait" title={t('prompt.confirmRequired')}>{t('session.waiting')}</span>}
+                {agentMarks(termName)}<TabName name={termName} />
+              </button>
+              {resourceMenu(termName, on)}
               <button type="button" className="tt-x" aria-label={t('common.close')} title={t('common.close')}
                 onClick={(e) => { e.stopPropagation(); closeTerm(termName) }}>{TI.close}</button>
             </span>
@@ -878,9 +895,8 @@ export default function TerminalPane(props: {
             ] }}>{tab}</TabContextMenu>
           )
         })}
-        {/* 文件标签（22 设计 §3.3）：接在会话标签后面，同一款 .tt-tab；预览态斜体，单击别的文件会替换它，
-            双击转正；脏了标签上带点。文件标签第一期不参与拖拽排序。 */}
-        {(fileTabs || []).map((f) => {
+        {/* 没有可见会话的文件保留独立入口，避免收起最后一个会话后文件失联。 */}
+        {ungroupedFiles.map((f) => {
           const on = !activePage && curFile === f.path
           const name = f.path.split('/').pop() || f.path
           const dirty = dirtyFiles.has(f.path)
@@ -974,33 +990,25 @@ export default function TerminalPane(props: {
       )}
     </div>
   )
-  // ── 手机会话页顶栏：与一级页同高，取代「标签条 + 工具条」两行 ──
-  // 中间胶囊点开 = 会话切换 sheet（取代横滑标签条）；除 Agent 视图切换外，其余控件全进「⋯」。
-  // **不能按 !inChat 收窄**：切到 Claude/Codex 对话视图后 phoneChrome 变 null，
-  // 整块外壳就掉回桌面那套「标签条 + 工具条」——按一下渲染模式，页面样式全变了。
-  // 对话只该换中间那块内容，顶栏（返回 / 会话胶囊 / Agent 切换 / 更多）自始至终是同一条。
+  // 切换对话、终端或文件时保持同一条手机顶栏。
   const phoneChrome = isPhone ? (
     <>
       <div className="tt-sesshead">
-        <button type="button" className="ic" aria-label={t('common.collapse')} onClick={onCollapse}>
+        <button type="button" className="ic" aria-label={t(curFile && onReturnToSession ? 'tabs.returnToSession' : 'common.collapse')} onClick={curFile && onReturnToSession ? onReturnToSession : onCollapse}>
           {TI.back}
         </button>
-        <button type="button" className="pill" onClick={() => setSwitchOpen(true)}>
-          {active && <span className="tt-island-label">
-            <span className="title-row">
-              <i className="d" style={{ background: dot }} />
-              <span className="island-title">{islandTitle}</span>
+        <div className="tt-mobile-session-group">
+          <button type="button" className="tt-mobile-session-open" ref={element => { if (active) sessionButtons.current[active] = element }}
+            disabled={!active} aria-label={t('tabs.openSession', { name: islandTitle || '' })} onClick={() => active && setActive(active)}>
+            {active && agentMarks(active)}
+            <span className="tt-island-label"><span className="island-title">{islandTitle || curFile.split('/').pop()}</span>
+              {(islandDetail || activeNeedsInput) && <span className="project-row">{islandDetail && <span className="project-name">{islandDetail}</span>}{activeNeedsInput && <span className="island-status">{t('session.waiting')}</span>}</span>}
             </span>
-            {(islandDetail || activeNeedsInput) && <span className="project-row">
-              {islandDetail && <span className="project-name">{islandDetail}</span>}
-              {activeNeedsInput && <span className="island-status">{t('session.waiting')}</span>}
-            </span>}
-          </span>}
-          <span className="ri">
-            <span className="ca">{TI.caret}</span>
-          </span>
-        </button>
+          </button>
+          {active && resourceMenu(active, true)}
+        </div>
         <div className="actions">
+          <button type="button" className="ic" aria-label={t('mobile.switchSession')} onClick={() => setSwitchOpen(true)}><TabsIcon size={18} /></button>
           <button type="button" className="ic" aria-label={t('common.more')} onClick={() => setMoreSheet(true)}>
             {TI.dots}
           </button>
@@ -1239,7 +1247,7 @@ export default function TerminalPane(props: {
                 ? (on && <ChangesView path={f.path} root={taskDir || ''} />)
                 : (
                   <FileView path={f.path} accent="var(--accent)" inline tabbed forcePreview={f.mode === 'preview'} active={on}
-                    onClose={() => closeFile(f.path)} onOpenPath={(p) => onFileTab?.(p)}
+                    onClose={() => closeFile(f.path)} onOpenPath={(p) => openFileFromChat(p)}
                     onDirtyChange={(p, d) => { setFileDirty(p, d); if (d) onPinFile?.(p) }}
                     revealLine={reveal?.path === f.path ? { line: reveal.line, nonce: reveal.nonce } : undefined} />
                 )}
@@ -1354,9 +1362,11 @@ export default function TerminalPane(props: {
       ) : (
         <div ref={phoneRootRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {phoneChrome || <>{tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip}{curFile
-              ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)} />
-              : sessionToolbar}</>}
+            {phoneChrome || (tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip)}
+            {curFile
+              ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)}
+                  onBack={isPhone ? undefined : onReturnToSession} onClose={() => closeFile(curFile)} />
+              : !phoneChrome && sessionToolbar}
             {active && !curFile && <SessionMemoryBanner name={active} />}
             {isPhone && active && reconnectFailures[active] && !curFile &&
               <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
@@ -1372,10 +1382,12 @@ export default function TerminalPane(props: {
           Inspector，关掉栈顶自然露出下面那个（图纸 panels-desktop.html §二）。 */}
       {/* 右停靠的文件 / Git 抽屉没了：归右栏 InspectorPanels（22 设计 §3.4）。
           这里只剩左停靠（#/term 独立页）和手机上没有右栏时的文件 / Git 二级页。 */}
-      {fileDock === 'right' && !onOpenFile && (
+      {fileDock === 'right' && (!onOpenFile || isPhone) && (
         <AdaptivePanel open={showFiles} layer="session" title={t('nav.files')}
           onClose={() => setShowFiles(false)}>
           <FileBrowser dir={cwd} accent="var(--accent)" layout="dock" onClose={() => setShowFiles(false)}
+            onOpenFile={onOpenFile ? path => { setShowFiles(false); openFileFromChat(path) } : undefined}
+            onOpenLine={onOpenFile ? (path, line) => { setShowFiles(false); openFileFromChat(path, line) } : undefined}
             openRequest={dockFileReq || undefined} />
         </AdaptivePanel>
       )}

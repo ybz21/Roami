@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { CodeIcon, DiffIcon } from '../../icons'
+import { CloseIcon, CodeIcon, DiffIcon } from '../../icons'
+import BackButton from '../BackButton'
 import { PreviewIcon } from './file-icons'
 import { extOf, MD_EXT } from './file-utils'
 import DiffView from './DiffView'
@@ -25,12 +26,14 @@ export function canPreview(path: string): boolean {
   return MD_EXT.includes(ext) || ext === 'html' || ext === 'htm'
 }
 
-export function FilePathBar({ path, root, mode, onMode }: {
+export function FilePathBar({ path, root, mode, onMode, onBack, onClose }: {
   path: string
   /** 当前任务的 worktree 根：面包屑从它下面开始 */
   root: string
   mode: FileTabMode
   onMode: (m: FileTabMode) => void
+  onBack?: () => void
+  onClose?: () => void
 }) {
   const { t } = useI18n()
   const crumbs = crumbsOf(path, root)
@@ -43,6 +46,7 @@ export function FilePathBar({ path, root, mode, onMode }: {
   )
   return (
     <div className="tt-tbar tt-pathbar">
+      {onBack && <BackButton label={t('tabs.returnToSession')} onClick={onBack} />}
       <span className="crumbs" title={path}>
         {crumbs.map((c, i) => (
           <span key={i} className={i === crumbs.length - 1 ? 'leaf' : undefined}>
@@ -50,6 +54,7 @@ export function FilePathBar({ path, root, mode, onMode }: {
           </span>
         ))}
       </span>
+      {onClose && <button type="button" className="tt-act ico" aria-label={t('tabs.closeFile', { name: path.split('/').pop() || path })} onClick={onClose}><CloseIcon /></button>}
       <span className="tt-spacer" />
       <span className="tt-tgroup">
         {seg('source', <CodeIcon size={14} />, t('pathbar.source'))}
