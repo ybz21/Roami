@@ -62,3 +62,5 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 [CLI 与 Roami 会话选模实现](implementation.md)记录本轮生产行为、命令、代码入口与范围；[简化验收](simplification-acceptance.md)记录当前修订检查；[运行验收](runtime-acceptance.md)保留简化前的历史证据。技术设计与原型继续作为两份设计交付，不替代生产验证。
 
 首页模型选择器动态显示模型与原生/聚合类型；Agent 委派复用原有 `delegate.model` / `freeOnly` 参数和任务记录。参见 [当前实现](implementation.md)。
+
+- [名称与访问密钥：用词和验收](naming-acceptance.md)

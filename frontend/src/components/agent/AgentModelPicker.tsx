@@ -64,6 +64,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
   const chooseModel = (name: string) => { void choose({ model: name, effort: name === model ? effort : 'default' }) }
   const settings = () => { if (!phone) close(); location.hash = agentSettingsRoute }
   const displayName = (id: string) => models.modelNames?.[id] || id
+  const callId = (id: string) => id.replace(/^gateway:/, '')
   const kindLabel = (id: string) => t('agent.models.kind.' + (models.modelKinds?.[id] || 'unknown'))
   const names = [...new Set([model, ...models.models].filter(Boolean))].filter(name => [name, displayName(name)].some(value => value.toLowerCase().includes(query.trim().toLowerCase())))
   const title = t(open === 'reasoning' ? 'agent.reasoning.title' : 'agent.composer.model')
@@ -90,8 +91,8 @@ export default function AgentModelPicker({ models, disabled, node }: {
     {open === 'model' && models.loading && <div className="agent-model-picker-loading" role="status" aria-label={t('common.loading')}><Spin size="small" /></div>}
     <div ref={choices} className="agent-model-picker-list" role={open === 'model' ? 'listbox' : 'menu'} aria-label={title} onKeyDown={move}>
       {open === 'model' ? <>
-        {names.map(name => <button type="button" role="option" aria-selected={name === model} aria-label={displayName(name)} aria-description={kindLabel(name)} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
-          <span>{displayName(name)}</span><small className="agent-model-kind">{kindLabel(name)}</small>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
+        {names.map(name => <button type="button" role="option" aria-selected={name === model} aria-label={displayName(name)} aria-description={displayName(name) !== callId(name) ? [kindLabel(name), t('modelIdentity.callId', { model: callId(name) })].join(', ') : kindLabel(name)} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
+          <span className="agent-model-identity"><span>{displayName(name)}</span>{displayName(name) !== callId(name) && <small>{t('modelIdentity.callId', { model: callId(name) })}</small>}</span><small className="agent-model-kind">{kindLabel(name)}</small>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
         </button>)}
         {!names.length && !!query.trim() && <button type="button" role="option" aria-selected={false} disabled={models.busy || !role} onClick={() => chooseModel(query.trim())}><span>{t('agent.models.use', { name: query.trim() })}</span>{pending && <Spin size="small" />}</button>}
         {!names.length && !query.trim() && !models.loading && !models.error && <p className="agent-menu-note">{t('agent.models.manual')}</p>}

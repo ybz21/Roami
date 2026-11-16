@@ -113,6 +113,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   </div>
   const modelEditor = <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); submitModel() }}>
     <label className="agent-settings-field">{t('hub.displayName')}<Input aria-label={t('hub.displayName')} value={model.name} maxLength={100} onChange={event => updateModel({ name: event.target.value })} /></label>
+    <p className="agent-settings-hint">{t('modelIdentity.nameHint')}</p>
     {candidateFields(0)}
     {!sources.length && <Button icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button>}
     <details><summary>{t('orchestration.moreSettings')}</summary>
