@@ -18,7 +18,7 @@
 - `internal/agentexecution/session-claude.go` 保留已匹配 Stop 与 idle 的候选。后续工具、输入或失败事件使候选失效。
 - `session-claude-completion.go` 在状态读取时重查进程、执行绑定、任务提示和工具状态；使用宿主已记录的 Stop/idle 证据生成结果。未停止时继续保留未知状态。
 - 老宿主已记录 `SESSION_STOP_UNCONFIRMED`、但没有保留候选摘要的任务，只能经显式 `reconcile-session` 核对；同时要求同一任务的转录摘要、稳定摘要指纹和停止证据。其它未知状态不进入该恢复路径。
-- Python 的 `dispatch/task_confirmation.py` 使用同一 launch key 查询与核对，保留原有 report、verify、confirm 流程。请求必须携带 revision 与 runId；不重新派发、不发送提示、不关闭会话。
+- Python 的 `dispatch/task_confirmation.py` 使用同一 launch key 查询与核对，保留原有 report、verify、confirm 流程。请求必须携带 revision 与 runId；复用正在运行的后台验收，不重复核验、不重新派发、不发送提示、不关闭会话。
 - `AgentTasks.tsx` 将确认放在回报后，使用既有变更互斥、状态刷新、草稿和错误处理。没有新增轮询或页面状态容器。
 
 ## 验收证据
@@ -26,7 +26,8 @@
 2026-11-16，隔离测试目录 `/tmp/task-confirmation-test`、`/tmp/task-confirmation-quality`、`/tmp/task-confirmation-ui-test`。
 
 - Go 回归实际运行：子进程存活时保持未知；退出后自动恢复；老记录显式核对；后续活动使候选失效。
-- Python 确认回归：停止后完成确认；停止未知时不写入成功；旧 revision/runId 在任何执行器调用前被拒绝。
+- Python 确认回归 6 项通过：停止后完成确认；停止未知时不写入成功；旧 revision/runId 在任何执行器调用前被拒绝；手动确认与后台调度共享同一次验收。
+- `quality/check.sh full` 全部检查通过，运行时 4,901 项通过、48 项跳过；最终提交的 quick 门禁 4,902 项通过、48 项跳过。最终 Go/quick 检查在独立 systemd scope 中执行，Go 包按顺序运行，避免并行测试干扰进程停止判断。
 - 前端全量 Vitest：256 个文件、1,874 项测试通过，包含确认请求身份、失败保留回报/文件/草稿与重试。
 - 浏览器使用真实 React/Ant Design 组件、模拟任务 API；Go 与 Python 的执行核对另由上述回归验证，未修改用户线上任务或替用户验收其产物。
 - 桌面 Chrome：1280、1920、2560、3440 CSS px 均无横向溢出，确认按钮首屏可见且命中正确。
