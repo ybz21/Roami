@@ -69,8 +69,10 @@ func TestSelectedNativeModelUsesFreeRoutesWithoutChangingDefaults(t *testing.T) 
 	handler := func(counter *atomic.Int32) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			counter.Add(1)
-			if r.Header.Get("X-Roami-Model-Selection") != "" || r.Header.Get("X-Roami-Free-Only") != "" {
-				t.Error("selection headers escaped upstream")
+			var payload map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&payload)
+			if _, present := payload["roami_free_only"]; present {
+				t.Error("local free-only option escaped upstream")
 			}
 			_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}],"usage":{"prompt_tokens":4,"completion_tokens":1}}`))
 		}
@@ -96,18 +98,15 @@ func TestSelectedNativeModelUsesFreeRoutesWithoutChangingDefaults(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	call := func(revision, identity string) *httptest.ResponseRecorder {
+	call := func(identity string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"pool","messages":[{"role":"user","content":"hello"}]}`))
+		r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"pool","roami_free_only":true,"messages":[{"role":"user","content":"hello"}]}`))
 		r.Header.Set("X-Roami-Model-Role", "worker")
-		r.Header.Set("X-Roami-Model-Selection", "pool")
-		r.Header.Set("X-Roami-Model-Revision", revision)
 		r.Header.Set("X-Roami-Model-Route", identity)
-		r.Header.Set("X-Roami-Free-Only", "true")
 		h.ServeHTTP(w, r)
 		return w
 	}
-	w := call(s.value.Revision, route.identity())
+	w := call(route.identity())
 	if w.Code != 200 || paid.Load() != 0 || free.Load() != 1 {
 		t.Fatal("free-only leaked into paid route", w.Code, w.Body.String(), paid.Load(), free.Load())
 	}
@@ -115,40 +114,34 @@ func TestSelectedNativeModelUsesFreeRoutesWithoutChangingDefaults(t *testing.T) 
 	if unchanged.model != "default-worker" {
 		t.Fatal("global role changed")
 	}
-	if w := call("old", route.identity()); w.Code != 409 || free.Load() != 1 {
-		t.Fatal("stale selection was forwarded", w.Code)
-	}
-	if w := call(s.value.Revision, ""); w.Code != 409 || free.Load() != 1 {
-		t.Fatal("unbound selection was forwarded", w.Code)
+	if w := call("stale-route"); w.Code != 409 || free.Load() != 1 {
+		t.Fatal("stale role settings were forwarded", w.Code)
 	}
 	cfg.Pricing.Sources["free"] = SourcePricing{Default: PriceRule{Mode: "unknown"}}
 	if err := h.Ledger.Configure(cfg); err != nil {
 		t.Fatal(err)
 	}
-	if w := call(s.value.Revision, route.identity()); w.Code != 503 || paid.Load() != 0 || free.Load() != 1 {
+	if w := call(route.identity()); w.Code != 503 || paid.Load() != 0 || free.Load() != 1 {
 		t.Fatal("unknown pricing entered free route", w.Code, w.Body.String())
 	}
+	h.Catalog = nil
+	if w := call(route.identity()); w.Code != 503 || paid.Load() != 0 {
+		t.Fatal("free-only bypassed the unavailable catalog", w.Code, w.Body.String())
+	}
 }
-func TestModelSelectionRejectsDisabledMissingAndIncompatibleModels(t *testing.T) {
+func TestNativeModelRejectsMissingAndDisabledRoutes(t *testing.T) {
 	h := catalogHandler(t, "https://example.test/v1", "openai-completions")
-	saveNodeModels(t, h.Ledger, map[string]any{"connection": map[string]any{"baseUrl": h.Catalog.baseURL + "/v1", "apiKey": "fixture"}, "main": map[string]any{"model": "coding-main"}, "worker": map[string]any{"model": "coding-main"}})
-	for _, id := range []string{"auto", "coding-main", "missing"} {
+	saveNodeModels(t, h.Ledger, map[string]any{"connection": map[string]any{"baseUrl": h.Catalog.baseURL + "/v1", "apiKey": "fixture"}, "main": map[string]any{"model": "coding-main"}})
+	for _, id := range []string{"missing", "coding-main"} {
+		if id == "coding-main" {
+			key := h.Catalog.value.AgentKeys["roami"]
+			key.Disabled = true
+			h.Catalog.value.AgentKeys["roami"] = key
+		}
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", "/v1/model-gateway/models/selection?role=main&model="+id, nil))
-		if id == "missing" {
-			if w.Code != 400 {
-				t.Fatal(w.Code)
-			}
-			continue
-		}
-		var reply struct {
-			Data struct {
-				Model string `json:"model"`
-			} `json:"data"`
-		}
-		_ = json.Unmarshal(w.Body.Bytes(), &reply)
-		if w.Code != 200 || reply.Data.Model != "coding-main" {
-			t.Fatal(w.Code, w.Body.String())
+		h.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"`+id+`"}`)))
+		if id == "missing" && w.Code != 400 || id == "coding-main" && w.Code != 403 {
+			t.Fatal(id, w.Code, w.Body.String())
 		}
 	}
 }

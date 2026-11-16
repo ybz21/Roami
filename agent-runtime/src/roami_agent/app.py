@@ -311,10 +311,6 @@ class Runtime:
             self.active,
         )
         self.task_sessions = TaskSessions(database, self.executor)
-        from roami_agent.providers.model_selection import ModelSelections
-
-        self.model_selections = ModelSelections(database, self.settings)
-        self.tasks.model_selections = self.model_selections
         self.loop = AgentLoop(
             model,
             self.worker_model,
@@ -342,7 +338,6 @@ class Runtime:
             self.gateway,
             reply_reviewer=self.reply_review,
             require_final_tool=require_final_tool,
-            model_selector=self.model_selections.provider,
         )
         self.scheduler = Scheduler(
             database,

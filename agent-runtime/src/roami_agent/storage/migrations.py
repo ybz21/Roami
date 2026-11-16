@@ -1,9 +1,8 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 29
+SCHEMA_VERSION = 28
 UPGRADES = {
-    29: "0029_conversation_models.sql",
     2: "0002_artifact_metadata.sql",
     3: "0003_resource_controls.sql",
     4: "0004_reminder_policy.sql",

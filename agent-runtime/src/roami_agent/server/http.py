@@ -19,7 +19,6 @@ from roami_agent.protocol.http import (
     Compact,
     ConfirmMemory,
     ConfirmTask,
-    ConversationModel,
     CreateConversation,
     CreateNativeSession,
     CreateReminder,
@@ -766,7 +765,6 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/conversations", status_code=201)
     async def create_conversation(body: CreateConversation, owner: Owner):
-        await runtime.model_selections.validate(body.model, body.freeOnly)
         project_id = None
         swarm_id = None
         if body.projectId is not None:
@@ -783,24 +781,12 @@ def create_app(runtime, *, manage_lifecycle=True):
                 request_key=body.requestKey,
                 project_id=project_id,
                 swarm_id=swarm_id,
-                model=body.model,
-                free_only=body.freeOnly,
             )
         }
 
     @app.get("/v1/conversations/{cid}/activities/{aid}")
     async def activity_detail(cid: str, aid: str, owner: Owner, branchId: str | None = None):
         return {"data": await runtime.conversations.activity_detail(owner, cid, aid, branchId)}
-
-    @app.get("/v1/conversations/{cid}/model")
-    async def conversation_model(cid: str, owner: Owner):
-        return {"data": await runtime.model_selections.get(owner, cid)}
-
-    @app.put("/v1/conversations/{cid}/model")
-    async def choose_conversation_model(cid: str, body: ConversationModel, owner: Owner):
-        return {
-            "data": await runtime.model_selections.update(owner, cid, body.model, body.freeOnly)
-        }
 
     @app.get("/v1/conversations/{cid}/identity")
     async def conversation_identity(cid: str, owner: Owner):
@@ -990,7 +976,6 @@ def create_app(runtime, *, manage_lifecycle=True):
 
     @app.post("/v1/native-sessions", status_code=202)
     async def create_native_session(body: CreateNativeSession, owner: Owner):
-        await runtime.model_selections.validate(body.model, body.freeOnly, "worker")
         conversation = await runtime.conversations.main(owner)
         target = {"kind": "new_session"}
         if body.directory is not None:

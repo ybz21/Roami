@@ -40,7 +40,6 @@ class AgentLoop:
         gateway: ToolInvoker,
         reply_reviewer: ReplyReviewer | None = None,
         require_final_tool=False,
-        model_selector=None,
     ):
         self.model, self.worker_model, self.settings = model, worker_model, settings
         self.context, self.journal, self.tools = context, journal, tools
@@ -49,7 +48,6 @@ class AgentLoop:
         self.gateway, self.reply_reviewer = gateway, reply_reviewer
         self.require_final_tool = require_final_tool
         self.preemptible = set()
-        self.model_selector = model_selector
 
     def preempt(self, turn_id):
         handle = self.turn_tasks.get(turn_id)
@@ -115,11 +113,9 @@ class AgentLoop:
         self.turn_tasks[tid] = asyncio.current_task()
         model = self.model if role == "main" else self.worker_model
         phase = "context"
-        selected_model = None
         try:
-            if self.model_selector:
-                selected_model = await self.model_selector(turn, role)
-                model = selected_model or model
+            if turn.get("model") or turn.get("freeOnly"):
+                model = model.with_model(turn.get("model"), free_only=turn.get("freeOnly", False))
             execution_deadline = asyncio.timeout(turn.get("executionTimeoutSeconds"))
             async with execution_deadline:
                 instructions = (
@@ -535,5 +531,3 @@ class AgentLoop:
             if self.reply_reviewer is not None:
                 self.reply_reviewer.forget_turn(turn)
             self.turn_tasks.pop(tid, None)
-            if selected_model is not None:
-                await selected_model.close()

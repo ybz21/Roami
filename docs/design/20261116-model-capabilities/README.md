@@ -19,7 +19,7 @@
 ## User Stories
 
 - 按图片、音频、工具、推理等能力选择模型，看到明确的未知与不可用原因。
-- 通过 `roami model list` 查看相同能力，使用 `--model`（兼容 `-model`）为新对话、执行会话或任务指定模型。
+- 通过 `roami model list` 查看相同能力，使用 `--model`（兼容 `-model`）为新建 Roami 执行会话或任务指定模型。
 - 指定已配置的 Auto 聚合池，在任务硬约束下复用现有策略调度，不改全局 Main/Worker 默认模型。
 - 未来以检查点和持久等待恢复免费长时任务，额度不足不静默转付费。
 
@@ -59,4 +59,6 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 
 ## 实现进展
 
-[CLI 与 Roami 会话选模实现](implementation.md)记录本轮生产行为、命令、代码入口与范围；[运行验收](runtime-acceptance.md)记录真实调用与检查结果。技术设计与原型继续作为两份设计交付，不替代生产验证。
+[CLI 与 Roami 会话选模实现](implementation.md)记录本轮生产行为、命令、代码入口与范围；[简化验收](simplification-acceptance.md)记录当前修订检查；[运行验收](runtime-acceptance.md)保留简化前的历史证据。技术设计与原型继续作为两份设计交付，不替代生产验证。
+
+首页模型选择器动态显示模型与原生/聚合类型；Agent 委派复用原有 `delegate.model` / `freeOnly` 参数和任务记录。参见 [当前实现](implementation.md)。

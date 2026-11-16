@@ -1,6 +1,6 @@
 import { usePageEffect } from '../../page-activity'
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
-import { Checkbox, Input, Modal, Select, Spin, type InputRef } from 'antd'
+import { Input, Modal, Spin, type InputRef } from 'antd'
 import { CheckIcon, ChevronDown, CloseIcon, GearIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
@@ -8,20 +8,17 @@ import MobileSubPage from '../MobileSubPage'
 import { useBackDismiss } from '../shell/useBackDismiss'
 import { agentSettingsRoute, modelFailure } from './agent-models'
 import { reasoningChoices, reasoningCustom, reasoningKnown, reasoningLabel, reasoningValue } from './agent-reasoning'
-import { modelCapabilities } from '../capabilities/ModelSelectionFields'
-import type { useConversationModels } from './useConversationModels'
 import type { useAgentModels } from './useAgentModels'
 import './agent-model-picker.css'
 
-type PickerModels = ReturnType<typeof useAgentModels> & Partial<Pick<ReturnType<typeof useConversationModels>, 'choice' | 'setFreeOnly' | 'directory'>>
 type Panel = 'model' | 'reasoning'
 type Choice = { model: string; effort: string }
 
 export default function AgentModelPicker({ models, disabled, node }: {
-  models: PickerModels; disabled: boolean; node: string | null
+  models: ReturnType<typeof useAgentModels>; disabled: boolean; node: string | null
 }) {
   const { t } = useI18n(), { phone } = useLayout()
-  const [open, setOpen] = useState<Panel | null>(null), [query, setQuery] = useState(''), [capability, setCapability] = useState(''), [kind, setKind] = useState('')
+  const [open, setOpen] = useState<Panel | null>(null), [query, setQuery] = useState('')
   const [pending, setPending] = useState<Choice | null>(null)
   const [geometry, setGeometry] = useState<{ left: number; bottom: number; width: number; height: number }>()
   const modelTrigger = useRef<HTMLButtonElement>(null), effortTrigger = useRef<HTMLButtonElement>(null)
@@ -67,7 +64,8 @@ export default function AgentModelPicker({ models, disabled, node }: {
   const chooseModel = (name: string) => { void choose({ model: name, effort: name === model ? effort : 'default' }) }
   const settings = () => { if (!phone) close(); location.hash = agentSettingsRoute }
   const displayName = (id: string) => models.modelNames?.[id] || id
-  const names = [...new Set([model, ...models.models].filter(Boolean))].filter(name => { const row = models.directory?.find(row => row.id === name); return name === model || name === 'auto' || (!kind || row?.kind === kind) && (!models.choice?.freeOnly || row?.freeOnly || row?.pricing === 'confirmed-free') && (!capability || row?.capabilities[capability]?.support === 'supported') }).filter(name => [name, displayName(name)].some(value => value.toLowerCase().includes(query.trim().toLowerCase())))
+  const kindLabel = (id: string) => t('agent.models.kind.' + (models.modelKinds?.[id] || 'unknown'))
+  const names = [...new Set([model, ...models.models].filter(Boolean))].filter(name => [name, displayName(name)].some(value => value.toLowerCase().includes(query.trim().toLowerCase())))
   const title = t(open === 'reasoning' ? 'agent.reasoning.title' : 'agent.composer.model')
   const move = (event: KeyboardEvent<HTMLElement>) => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
@@ -78,7 +76,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
     buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length].focus()
   }
   const content = <div className="agent-model-picker-body" aria-busy={models.busy}>
-    {open === 'model' && <p className="agent-menu-note">{t(models.choice ? 'modelSelection.scope' : roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>}
+    {open === 'model' && <p className="agent-menu-note">{t(roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>}
     {open === 'reasoning' && <>
       {reasoningCustom(effort) && <p className="agent-reasoning-note">{t('agent.reasoning.customCurrent')}</p>}
       {!reasoningKnown(role) && <p className="agent-reasoning-note">{t('agent.reasoning.unknown')}</p>}
@@ -88,20 +86,14 @@ export default function AgentModelPicker({ models, disabled, node }: {
         if (event.key === 'Enter' && (names.length || query.trim())) { event.preventDefault(); chooseModel(names[0] || query.trim()) }
         if (event.key === 'ArrowDown') { event.preventDefault(); event.currentTarget.closest('.agent-model-picker-body')?.querySelector<HTMLButtonElement>('[role="option"]')?.focus() }
       }} />}
-    {open === 'model' && models.choice && <>
-      <Select aria-label={t('modelSelection.kind')} value={kind} disabled={models.busy} onChange={setKind} options={['', 'single', 'aggregate'].map(value => ({ value, label: t('modelSelection.kind.' + (value || 'all')) }))} />
-      <Select aria-label={t('modelSelection.capability')} value={capability} disabled={models.busy} onChange={setCapability} options={[{ value: '', label: t('modelSelection.allCapabilities') }, ...modelCapabilities.map(name => ({ value: name, label: t('modelSelection.capability.' + name) }))]} />
-      <Checkbox checked={models.choice.freeOnly} disabled={models.busy || !role} onChange={event => { void models.setFreeOnly?.(event.target.checked) }}>{t('modelSelection.freeOnly')}</Checkbox>
-      {models.choice.freeOnly && <p className="agent-menu-note">{t('modelSelection.freeHint')}</p>}
-    </>}
     {models.error && <div className="agent-model-picker-error" role="alert"><span>{modelFailure(models.error, t)}</span><button type="button" className="tt-act" disabled={models.busy || models.loading} onClick={() => { if (retry.current) void choose(retry.current); else void models.load() }}>{t('agent.retry')}</button></div>}
     {open === 'model' && models.loading && <div className="agent-model-picker-loading" role="status" aria-label={t('common.loading')}><Spin size="small" /></div>}
     <div ref={choices} className="agent-model-picker-list" role={open === 'model' ? 'listbox' : 'menu'} aria-label={title} onKeyDown={move}>
       {open === 'model' ? <>
-        {names.map(name => <button type="button" role="option" aria-selected={name === model} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
-          <span>{displayName(name)}</span>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
+        {names.map(name => <button type="button" role="option" aria-selected={name === model} aria-label={displayName(name)} aria-description={kindLabel(name)} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
+          <span>{displayName(name)}</span><small className="agent-model-kind">{kindLabel(name)}</small>{pending?.model === name ? <Spin size="small" /> : name === model && <CheckIcon size={18} />}
         </button>)}
-        {!models.choice && !names.length && !!query.trim() && <button type="button" role="option" aria-selected={false} disabled={models.busy || !role} onClick={() => chooseModel(query.trim())}><span>{t('agent.models.use', { name: query.trim() })}</span>{pending && <Spin size="small" />}</button>}
+        {!names.length && !!query.trim() && <button type="button" role="option" aria-selected={false} disabled={models.busy || !role} onClick={() => chooseModel(query.trim())}><span>{t('agent.models.use', { name: query.trim() })}</span>{pending && <Spin size="small" />}</button>}
         {!names.length && !query.trim() && !models.loading && !models.error && <p className="agent-menu-note">{t('agent.models.manual')}</p>}
       </> : options.map(value => <button type="button" role="menuitemradio" aria-label={t(reasoningLabel(value))} aria-checked={effort === value} key={value} disabled={models.busy || !role} onClick={() => { void choose({ model, effort: value }) }}>
         <span className="agent-reasoning-copy"><span>{t(reasoningLabel(value))}</span><small>{t('agent.reasoning.description.' + value)}</small></span><span className="agent-reasoning-mark">{pending?.effort === value ? <Spin size="small" /> : effort === value && <CheckIcon size={18} />}</span>
@@ -109,7 +101,7 @@ export default function AgentModelPicker({ models, disabled, node }: {
     </div>
   </div>
   return <>
-    <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: displayName(model) || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{displayName(model) || t('agent.composer.model')}</span><ChevronDown size={14} /></button>
+    <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: displayName(model) || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{displayName(model) || t('agent.composer.model')}</span>{model && <small className="agent-model-kind">{kindLabel(model)}</small>}<ChevronDown size={14} /></button>
     {role && (role.reasoningSupport !== 'unsupported' || effort !== 'default') && <button type="button" ref={effortTrigger} className="tt-pill agent-thinking-trigger" disabled={disabled || models.busy} aria-label={t('agent.reasoning.picker', { effort: t(reasoningLabel(effort)) })} aria-haspopup="dialog" aria-expanded={open === 'reasoning'} onClick={() => show('reasoning')}><span>{t(reasoningLabel(effort))}</span></button>}
     {phone && open === 'model' ? <MobileSubPage title={title} dialogLabel={title} onBack={close} search={false} action={{ label: t('agent.models.settings'), icon: <GearIcon size={20} />, onClick: settings }}>
       <section className="agent-model-picker-page" aria-label={title}>{content}</section>

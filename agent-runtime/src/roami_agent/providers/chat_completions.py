@@ -6,7 +6,7 @@ import json
 import math
 import re
 import time
-from copy import deepcopy
+from copy import copy, deepcopy
 
 import httpx
 
@@ -33,9 +33,6 @@ from roami_agent.providers.transport_failures import relayed_transport_failure, 
 
 STREAM_ERROR_CODES = frozenset(
     {
-        "MODEL_ROUTE_DISABLED",
-        "MODEL_ROUTE_NO_AVAILABLE_MEMBER",
-        "INVALID_MODEL_PROTOCOL",
         "MODEL_OUTPUT_LENGTH",
         "MODEL_OUTPUT_CONTENT_FILTER",
         "MODEL_CONTEXT_LIMIT",
@@ -104,6 +101,17 @@ class ChatCompletions:
         self.client = client or httpx.AsyncClient(
             timeout=httpx.Timeout(self.timeout, connect=10), follow_redirects=False
         )
+
+    def with_model(self, model, *, free_only=False):
+        selected = copy(self)
+        selected.model = self.model if model in {None, "auto"} else model
+        selected.parameters = dict(self.parameters)
+        if free_only:
+            selected.parameters["roami_free_only"] = True
+        _, selected.settings_hash = request_identity(
+            self.endpoint, selected.model, self.capabilities, self.cache, selected.parameters
+        )
+        return selected
 
     async def stream(self, messages, tools):
         if not self.model or not self.endpoint:

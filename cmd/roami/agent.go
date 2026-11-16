@@ -79,8 +79,6 @@ func runAgent(args []string) int {
 	operation := fs.String("operation", "", "steering operation ID")
 	revision := fs.Int("revision", 1, "task revision")
 	source := fs.String("source", "local-cli", "proactive source")
-	model := fs.String("model", "", "model gateway ID or auto for this conversation")
-	freeOnly := fs.Bool("free-only", false, "only use confirmed free routes for this conversation")
 	title := fs.String("title", "New conversation", "conversation title")
 	limit := fs.Int("limit", 20, "history page size (1-100)")
 	before := fs.String("before", "", "history olderCursor from the previous page")
@@ -94,10 +92,6 @@ func runAgent(args []string) int {
 	}
 	if fs.NArg() != 0 {
 		fmt.Fprintln(os.Stderr, "unexpected positional arguments")
-		return 2
-	}
-	if sub != "new" && (*model != "" || *freeOnly) {
-		fmt.Fprintln(os.Stderr, "--model and --free-only require agent new")
 		return 2
 	}
 	fail := func(err error) int { fmt.Fprintln(os.Stderr, err); return 1 }
@@ -156,13 +150,7 @@ func runAgent(args []string) int {
 	case "conversations":
 		path = "/v1/conversations"
 	case "new":
-		request := map[string]any{"title": *title}
-		if *model != "" {
-			request["model"] = *model
-		}
-		if *freeOnly {
-			request["freeOnly"] = true
-		}
+		request := map[string]string{"title": *title}
 		if *key != "" {
 			request["requestKey"] = *key
 		}

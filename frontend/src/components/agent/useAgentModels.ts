@@ -46,6 +46,7 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
     if (loadingRef.current) return
     const requestedEpoch = epoch.current
     loadingRef.current = true
+    refreshCatalog()
     setLoading(true); setError(null)
     if (!settings) refresh()
     try { const { data } = await api('GET', '/agent/models' + (role === 'worker' ? '?role=worker' : '')); if (epoch.current === requestedEpoch) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) } }
@@ -75,5 +76,10 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   }
   const apply = (model: string, effort: string) => model.trim() ? configure({ model: model.trim(), reasoningEffort: effort === 'default' ? null : effort }) : Promise.resolve(false)
   const choices = throughGateway && gatewayModels.length ? gatewayModels.map(model => model.id) : [...models, ...additionalModels.map(model => gatewayChoice + model.id)]
-  return { role, settings, models: choices, modelNames, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
+  const modelKinds: Record<string, 'native' | 'aggregate'> = Object.fromEntries(catalog.value ? models.map(id => [id, 'native']) : [])
+  for (const entry of throughGateway ? gatewayModels : additionalModels) {
+    for (const id of throughGateway ? [entry.id, ...(entry.aliases || [])] : [gatewayChoice + entry.id]) modelKinds[id] = entry.aggregate ? 'aggregate' : 'native'
+  }
+  if (throughGateway && catalog.value?.defaultModel && modelKinds[catalog.value.defaultModel]) modelKinds['roami-default'] = modelKinds[catalog.value.defaultModel]
+  return { role, settings, models: choices, modelNames, modelKinds, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
 }

@@ -96,11 +96,6 @@ class Tasks:
             raise DomainError("INVALID_TASK_MODEL")
         if free_only and executor != "native":
             raise DomainError("INVALID_TASK_MODEL")
-        if executor == "native" and (model is not None or free_only):
-            selector = getattr(self, "model_selections", None)
-            if selector is None:
-                raise DomainError("MODEL_GATEWAY_REQUIRED", 503)
-            await selector.validate(model, free_only, "worker")
         if title is not None:
             if not isinstance(title, str) or not title.strip() or len(title) > 80:
                 raise DomainError("INVALID_TASK")
@@ -477,9 +472,6 @@ class Tasks:
                     db.execute(
                         "UPDATE conversations SET active_branch_id=? WHERE id=?", (branch_id, child)
                     )
-                from roami_agent.providers.model_selection import ModelSelections
-
-                ModelSelections.save(db, child, model, free_only)
                 register_native_session(db, tid, child, branch_id)
                 source_content = json.loads(origin["content_json"])
                 resource_only = (spec.get("target") or {}).get("resourceOnly")

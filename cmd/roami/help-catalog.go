@@ -49,7 +49,7 @@ var commandGuides = map[string]commandGuide{
 	"agent resume-upgrade":               {"恢复升级后的受管运行时", "", "roami agent resume-upgrade", "", nil},
 	"agent conversations":                {"列出 Agent 对话", "[--json]", "roami agent conversations", "json", nil},
 	"agent identity":                     {"查看对话身份", "--conversation ID", "roami agent identity --conversation CONVERSATION_ID", "conversation json", nil},
-	"agent new":                          {"新建 Agent 对话", "[--title TEXT] [--key KEY] [--model ID|auto] [--free-only]", "roami agent new --title review --model free-pool --free-only", "title key json model free-only", []string{"模型选择仅作用于新对话，不修改主智能体或执行智能体的默认模型。"}},
+	"agent new":                          {"新建 Agent 对话", "[--title TEXT] [--key KEY]", "roami agent new --title review", "title key json", nil},
 	"agent send":                         {"向对话发送消息", "--conversation ID (--text TEXT | --file PATH) [--key KEY]", "roami agent send --conversation CONVERSATION_ID --text '检查项目'", "conversation text file key json", nil},
 	"agent wake":                         {"从外部唤醒项目对话", "--conversation ID --project ID --key KEY (--text TEXT | --file PATH)", "roami agent wake --conversation CONVERSATION_ID --project PROJECT_ID --key wake-1 --text '检查进展'", "conversation project key text file json", nil},
 	"agent history":                      {"读取对话历史", "--conversation ID [--limit N] [--before CURSOR] [--branch ID]", "roami agent history --conversation CONVERSATION_ID --limit 20", "conversation limit before branch json", nil},

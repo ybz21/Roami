@@ -366,3 +366,36 @@ async def test_task_continuation_binds_revision_without_model_repeating_it(store
         assert repeated == first
     finally:
         await runtime.close()
+
+
+async def test_delegate_exposes_and_preserves_native_model_and_free_constraint(store):
+    runtime, _, _, registry, binding = await setup(store)
+    register_model_inputs(registry)
+    try:
+        schema = next(
+            tool["function"]["parameters"]
+            for tool in registry.catalog("main")
+            if tool["function"]["name"] == "delegate"
+        )
+        assert {"model", "freeOnly"} <= schema["properties"].keys()
+        result = await registry.invoke(
+            call(
+                "delegate",
+                {
+                    "goal": "Prepare the requested report",
+                    "executor": "native",
+                    "model": "free-pool",
+                    "freeOnly": True,
+                },
+            ),
+            "main",
+            binding,
+        )
+        task = await store.call(
+            lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (result["taskId"],))
+        )
+        intent = json.loads(task["intent_json"])
+        assert result["acceptedOnly"] and result["executor"] == "native"
+        assert intent["model"] == "free-pool" and intent["freeOnly"] is True
+    finally:
+        await runtime.close()

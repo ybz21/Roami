@@ -9,10 +9,9 @@ from roami_agent.providers.request_receipts import GATEWAY_EXTENSION
 
 
 class LocalGatewayTransport(httpx.AsyncBaseTransport):
-    def __init__(self, socket, role, route_id=None, selection=None):
+    def __init__(self, socket, role, route_id=None):
         self.transport = httpx.AsyncHTTPTransport(uds=socket, retries=0) if socket else None
         self.role, self.route_id = role, route_id
-        self.selection = selection
 
     async def handle_async_request(self, request):
         if self.transport is None:
@@ -24,11 +23,6 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
         if self.route_id:
             headers["X-Roami-Model-Route"] = self.route_id
         headers["X-Roami-Model-Role"] = self.role
-        if self.selection:
-            headers["X-Roami-Model-Selection"] = self.selection["model"]
-            headers["X-Roami-Model-Revision"] = self.selection["revision"]
-            headers["X-Roami-Free-Only"] = str(self.selection["freeOnly"]).lower()
-            headers["X-Roami-Model-Route"] = self.selection["routeId"]
         forwarded = httpx.Request(
             request.method,
             "http://roami-model/v1/chat/completions",
@@ -45,6 +39,7 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
             "MODEL_PROXY_USAGE_UNKNOWN",
             "MODEL_GATEWAY_STORAGE_FAILED",
             "MODEL_GATEWAY_UNAVAILABLE",
+            "MODEL_GATEWAY_REQUIRED",
             "MODEL_GATEWAY_KEY_DISABLED",
             "MODEL_GATEWAY_UNAUTHORIZED",
             "MODEL_NOT_CONFIGURED",
@@ -64,10 +59,10 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
             await self.transport.aclose()
 
 
-def local_gateway_client(role, timeout, *, socket=None, route_id=None, selection=None):
+def local_gateway_client(role, timeout, *, socket=None, route_id=None):
     socket = socket or os.environ.get("ROAMI_MODEL_GATEWAY_SOCKET")
     return httpx.AsyncClient(
-        transport=LocalGatewayTransport(socket, role, route_id, selection),
+        transport=LocalGatewayTransport(socket, role, route_id),
         timeout=httpx.Timeout(timeout or None, connect=10),
         follow_redirects=False,
     )

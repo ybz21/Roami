@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/ybz21/Roami/internal/agentruntime"
-	"github.com/ybz21/Roami/internal/modelgateway"
 )
 
 type nativeSessionOptions struct {
@@ -88,17 +86,6 @@ func runNativeSessionNew(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
-	}
-	if options.Model != "" || options.FreeOnly {
-		model := options.Model
-		if model == "" {
-			model = "auto"
-		}
-		query := url.Values{"role": {"worker"}, "model": {model}, "freeOnly": {fmt.Sprint(options.FreeOnly)}}
-		if _, err = agentRequest(modelgateway.Socket(paths.Socket), "GET", "/v1/model-gateway/models/selection?"+query.Encode(), nil); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return 1
-		}
 	}
 	request := map[string]any{"requestKey": options.Key, "title": options.Name, "task": options.Task, "freeOnly": options.FreeOnly}
 	if options.Model != "" {

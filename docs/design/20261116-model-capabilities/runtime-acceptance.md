@@ -1,3 +1,5 @@
+> 历史记录：以下证据对应简化前的 `40de2934`。独立会话切模、预校验和选模表已撤回；当前版本见 [简化验收](simplification-acceptance.md)。
+
 # 模型选模运行验收
 
 日期：2026-11-16。使用本任务私有实例 `/tmp/roami-model-implementation/instance`，启动与清理统一经过 `scripts/dev/isolated-roami.sh`；没有改动宿主模型设置。

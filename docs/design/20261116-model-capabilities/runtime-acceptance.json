@@ -242,5 +242,8 @@
       "subtestsPassed": 6
     },
     "go": "passed"
-  }
+  },
+  "status": "historical-superseded",
+  "coversCommit": "40de2934",
+  "currentAcceptance": "simplification-acceptance.md"
 }

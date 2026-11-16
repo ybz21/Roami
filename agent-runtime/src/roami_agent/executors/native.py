@@ -84,6 +84,8 @@ class NativeExecutor:
                 dict(
                     prepared,
                     executionRunId=run["id"],
+                    model=json.loads(task["intent_json"]).get("model"),
+                    freeOnly=json.loads(task["intent_json"]).get("freeOnly", False),
                     executionBrief=execution_guide()
                     + (
                         "\n\n" + managed_handoff(run)
