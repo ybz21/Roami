@@ -1,12 +1,14 @@
 # 模型能力与 Auto 调度
 
-[技术设计（HTML）](technical-design.html) · [原型设计（HTML）](prototype.html)
+[技术设计（HTML）](technical-design.html) · [原型设计（HTML）](prototype.html#/capabilities/agents/roami)
 
 ## Product Design
 
 统一模型类型、输入输出能力、工具、推理、结构化输出、容量、费用与证据视图，供模型设置、Roami Main/Worker、首页和 CLI 共用。能力目录可筛选，详情展示声明与验证的差别。Roami 聚合、固定模型与上游自动路由分别呈现，来源与原生/适配能力单独建模。
 
 对外交付只保留技术设计、原型设计两份 HTML。原始证据、源码与验收记录作为内部支撑资料。
+
+原型默认打开用户截图对应的 **能力 / 智能体 / Roami** 页面（手机经“工具 / 能力”进入）。点击主智能体或执行智能体选择框，打开含能力筛选的模型列表。首页和项目下任务各有独立页面；本机网关的模型目录用于核对能力，不能混作角色设置页。
 
 本次仅交付设计文档，不修改产品代码、生产模型配置、凭据或路由。所有新增命令、配置和错误码均为拟议契约。
 
@@ -21,7 +23,9 @@
 
 技术设计包含能力数据、模块与接口、CLI 契约、长时任务和验收边界；原型设计包含能力目录、Roami 选模和 Auto 调度的交互。扩展已有 Go 网关、目录修订与路径验证，不创建第二套路由/额度准入。Python 传播 Go 决定；前端复用能力选择器和 workspace store。
 
-- `proposal.tsx`：中文开发者设计文档与交互；直接复用项目 `useLayout()` 和图标。
+- `proposal.tsx`：技术设计源码；本次保持技术设计 HTML 逐字节不变。
+- `product-prototype.tsx` / `product-prototype.css`：带实际导航、页面位置和独立流程的当前原型，复用 `useLayout()` 与仓库图标。
+- `prototype-models.ts`：原型模型身份、能力快照与聚合示例。
 - `proposal.css`：与仓库设计规范一致的令牌快照、平面布局和手机全屏详情。
 - `build.mjs`：通过项目既有 esbuild 依赖构建可直接打开的 HTML；不请求 CDN。
 - `technical-design.html`：技术设计，内嵌 JS/CSS，离线可用。

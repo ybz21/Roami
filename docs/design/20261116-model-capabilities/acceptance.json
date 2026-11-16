@@ -436,5 +436,178 @@
       "Desktop filters, role picker, Auto verified-only empty state, theme",
       "Android real touches: document links, filter, full-screen detail, return and scroll"
     ]
+  },
+  "contextualPrototype": {
+    "desktop": [
+      {
+        "width": 1280,
+        "closed": {
+          "width": 1280,
+          "mainWidth": 1000,
+          "mainScrollWidth": 1000,
+          "docWidth": 1280,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 280,
+            "y": 194.59375,
+            "width": 1000,
+            "height": 805.40625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "dialog": {
+          "x": 180,
+          "y": 116,
+          "width": 920,
+          "height": 768,
+          "top": 116,
+          "right": 1100,
+          "bottom": 884,
+          "left": 180
+        }
+      },
+      {
+        "width": 1920,
+        "closed": {
+          "width": 1920,
+          "mainWidth": 1640,
+          "mainScrollWidth": 1640,
+          "docWidth": 1920,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 280,
+            "y": 194.59375,
+            "width": 1640,
+            "height": 805.40625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "dialog": {
+          "x": 500,
+          "y": 116,
+          "width": 920,
+          "height": 768,
+          "top": 116,
+          "right": 1420,
+          "bottom": 884,
+          "left": 500
+        }
+      },
+      {
+        "width": 2560,
+        "closed": {
+          "width": 2560,
+          "mainWidth": 2280,
+          "mainScrollWidth": 2280,
+          "docWidth": 2560,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 280,
+            "y": 194.59375,
+            "width": 2280,
+            "height": 805.40625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "dialog": {
+          "x": 820,
+          "y": 116,
+          "width": 920,
+          "height": 768,
+          "top": 116,
+          "right": 1740,
+          "bottom": 884,
+          "left": 820
+        }
+      },
+      {
+        "width": 3440,
+        "closed": {
+          "width": 3440,
+          "mainWidth": 3160,
+          "mainScrollWidth": 3160,
+          "docWidth": 3440,
+          "docHeight": 1000,
+          "viewportHeight": 1000,
+          "main": {
+            "x": 280,
+            "y": 194.59375,
+            "width": 3160,
+            "height": 805.40625
+          },
+          "pointer": "fine",
+          "size": "large"
+        },
+        "dialog": {
+          "x": 1260,
+          "y": 116,
+          "width": 920,
+          "height": 768,
+          "top": 116,
+          "right": 2180,
+          "bottom": 884,
+          "left": 1260
+        }
+      }
+    ],
+    "phone": [
+      {
+        "settings": {
+          "width": 392,
+          "mainWidth": 393,
+          "mainScrollWidth": 393,
+          "docWidth": 392,
+          "docHeight": 766,
+          "viewportHeight": 766,
+          "main": {
+            "x": 0,
+            "y": 149.3806915283203,
+            "width": 392.727294921875,
+            "height": 531.7102661132812
+          },
+          "pointer": "coarse",
+          "size": "compact"
+        },
+        "picker": {
+          "x": 0,
+          "y": 0,
+          "width": 392.727294921875,
+          "height": 765.8181762695312,
+          "top": 0,
+          "right": 392.727294921875,
+          "bottom": 765.8181762695312,
+          "left": 0
+        },
+        "final": {
+          "width": 392,
+          "mainWidth": 393,
+          "mainScrollWidth": 393,
+          "docWidth": 392,
+          "docHeight": 766,
+          "viewportHeight": 766,
+          "main": {
+            "x": 0,
+            "y": 149.3806915283203,
+            "width": 392.727294921875,
+            "height": 531.7102661132812
+          },
+          "pointer": "coarse",
+          "size": "compact"
+        }
+      }
+    ],
+    "checks": [
+      "Default is screenshot page: capabilities / agents / Roami",
+      "Native dialog shared by role settings, homepage conversation and project task",
+      "Filters, role apply, contextual navigation and independent task override",
+      "Directory lives in models / gateway, not the Roami role page",
+      "Android full screen picker, real touch selection/apply/back, all four navigation destinations"
+    ]
   }
 }
