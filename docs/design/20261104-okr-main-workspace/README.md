@@ -313,3 +313,7 @@
 ## 2026-11-12：项目内创建与搭建
 
 [创建、聊天搭建与运行设计](../20261104-okr-studio-project-ownership/project-creation-flow.md) · [可点击原型](../20261104-okr-studio-project-ownership/project-creation-flow.html)。OKR 归入项目 Tab，角色与 Agent 分开配置，构建确认后显式运行；此稿取代旧的独立导航入口提案，历史验收保留。当前为设计，不恢复已停止项目。
+
+## 2026-11-16：边聊边搭建
+
+[交互设计](../20261104-okr-studio-project-ownership/chat-building.md) · [可操作原型](../20261104-okr-studio-project-ownership/chat-building.html)。首次发送前选择搭建 Agent，聊天增量编辑与版本预览同步；开发会话与运行 Main 分离，已停运行不自动恢复。
