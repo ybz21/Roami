@@ -14,6 +14,7 @@ from roami_agent.context.token_estimate import (
     request_tokens,
     text_tokens,
 )
+from roami_agent.context.working_brief import project as project_working_brief
 from roami_agent.conversation.attachments import context_attachments
 from roami_agent.conversation.okr_message_context import draft_reference, human_text
 from roami_agent.protocol.delivery_receipts import delivery_receipt
@@ -248,9 +249,9 @@ class Context:
 
     async def project(self, owner, cid, *, branch_id=None, through_turn=None, request_context=None):
         configuration = request_context if request_context is not None else self.request_context()
-        basis = request_basis(configuration)
 
         def read(db):
+            basis = request_basis(configuration)
             c = owned(db, owner, cid)
             bid = branch_id or c["active_branch_id"]
             b = row(db, "SELECT * FROM branches WHERE id=? AND conversation_id=?", (bid, cid))
@@ -267,6 +268,11 @@ class Context:
                 (bid, b["epoch"], epoch),
             )
             prefix, remaining = [], messages
+            working = (
+                project_working_brief(db, b, epoch, messages, configuration)
+                if configuration.get("contextMaintenance")
+                else None
+            )
             if snapshot:
                 summary = json.loads(snapshot["summary_json"])
                 source_ids = summary["sourceIds"]
@@ -286,6 +292,12 @@ class Context:
                     remaining = messages[len(source_ids) :]
                 else:
                     snapshot = None
+            if working and (not snapshot or working[0]["created_ms"] > snapshot["created_ms"]):
+                _brief, cut, prefix = working
+                remaining, snapshot = messages[cut:], None
+                basis = request_basis(dict(configuration, workingBriefId=working[0]["id"]))
+            else:
+                working = None
             entries = model_entries(remaining)
             pending = (
                 {
@@ -348,7 +360,7 @@ class Context:
                 (bid, epoch, snapshot["id"] if snapshot else None),
             )
             for manifest in manifests:
-                if pending:
+                if pending or working:
                     break
                 parts = json.loads(manifest["parts_json"])
                 used = provider_tokens(json.loads(manifest["usage_json"]))
@@ -399,6 +411,8 @@ class Context:
                 "compactionRatio": configuration.get("compactionRatio"),
                 "capacityBasis": configuration.get("capacityBasis"),
                 "snapshotId": snapshot["id"] if snapshot else None,
+                "workingBriefId": working[0]["id"] if working else None,
+                "workingBriefSources": [m["id"] for m in messages[: working[1]]] if working else [],
                 "branchId": bid,
                 "branchEpoch": b["epoch"],
                 "memoryEpoch": epoch,

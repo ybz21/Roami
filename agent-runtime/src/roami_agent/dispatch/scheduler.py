@@ -43,6 +43,8 @@ class Scheduler:
                 await self._scan()
                 await self.dispatch.cancel()
                 await self.memory_jobs.scan()
+                if getattr(self.context, "maintenance", None):
+                    await self.context.maintenance.scan()
             except (DomainError, OSError):
                 log.exception("Agent supervisor iteration failed")
             try:
@@ -60,7 +62,7 @@ class Scheduler:
                 "LEFT JOIN task_attempts a ON j.kind='task.run' AND a.id=json_extract(j.payload_json,'$.runId') "
                 "LEFT JOIN tasks k ON k.id=a.task_id "
                 "LEFT JOIN branches b ON b.id=a.native_branch_id "
-                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','task.run','task.verify','task.close_session','swarm.advance','swarm.coordinate','swarm.goal.start','swarm.goal.daily','swarm.inbox.wakeup','memory.daily','memory.extract') "
+                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','context.maintain','task.run','task.verify','task.close_session','swarm.advance','swarm.coordinate','swarm.goal.start','swarm.goal.daily','swarm.inbox.wakeup','memory.daily','memory.extract') "
                 "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'task.verify' THEN 0 WHEN 'task.close_session' THEN 1 WHEN 'turn.run' THEN 2 WHEN 'swarm.coordinate' THEN 2 WHEN 'swarm.goal.start' THEN 2 WHEN 'swarm.goal.daily' THEN 2 WHEN 'swarm.inbox.wakeup' THEN 2 WHEN 'task.run' THEN 3 WHEN 'context.compact' THEN 4 WHEN 'memory.daily' THEN 5 ELSE 6 END,"
                 "CASE WHEN j.kind='turn.run' AND t.trigger_kind='user' AND COALESCE(json_extract(j.payload_json,'$.deferred'),0)=0 THEN 0 ELSE 1 END,j.rowid LIMIT 100",
                 (now_ms(),),
@@ -81,7 +83,7 @@ class Scheduler:
                 return
             if job["id"] in self.active:
                 continue
-            memory_job = job["kind"].startswith("memory.")
+            memory_job = job["kind"].startswith("memory.") or job["kind"] == "context.maintain"
             if memory_job and any(item.get("memory") for item in self.active.values()):
                 continue
             group = (
@@ -178,6 +180,9 @@ class Scheduler:
                 return
             if job["kind"] == "context.compact":
                 await self.context.run(job["id"])
+                return
+            if job["kind"] == "context.maintain":
+                await self.context.maintenance.run(job["id"])
                 return
             if job["kind"] == "turn.run":
                 turn = await self.mailbox.claim(job)

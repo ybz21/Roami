@@ -11,6 +11,7 @@ from roami_agent.storage import migrations
 async def test_schema25_failure_and_retry_preserve_old_data_without_legacy_grants(
     tmp_path, monkeypatch
 ):
+    monkeypatch.setattr(migrations, "SCHEMA_VERSION", 28)
     _, path, _, _ = await legacy_database(tmp_path, monkeypatch)
     db = sqlite3.connect(path, isolation_level=None)
     db.execute("PRAGMA foreign_keys=ON")

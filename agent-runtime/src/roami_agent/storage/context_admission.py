@@ -75,6 +75,16 @@ def assert_context_admitted(db, turn):
 
     if row(
         db,
+        "SELECT 1 FROM prompt_manifests p JOIN json_each(p.parts_json,'$.workingTaskEvidence') e "
+        "LEFT JOIN tasks t ON t.id=json_extract(e.value,'$.taskId') WHERE p.turn_id=? AND "
+        "(t.id IS NULL OR t.owner_id!=? OR t.revision!=json_extract(e.value,'$.revision') "
+        "OR t.state!=json_extract(e.value,'$.state')) LIMIT 1",
+        (turn["id"], turn["owner_id"]),
+    ):
+        raise DomainError("TASK_RESULT_SUPERSEDED", 409)
+
+    if row(
+        db,
         "SELECT 1 FROM prompt_manifests p LEFT JOIN tasks t ON t.id=json_extract(p.parts_json,'$.taskEvidence.taskId') "
         "WHERE p.turn_id=? AND json_type(p.parts_json,'$.taskEvidence')='object' "
         "AND (t.id IS NULL OR t.owner_id!=? OR t.revision!=json_extract(p.parts_json,'$.taskEvidence.revision') "

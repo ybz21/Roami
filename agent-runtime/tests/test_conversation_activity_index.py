@@ -81,7 +81,9 @@ async def test_activity_index_upgrade_rolls_back_and_preserves_legacy_facts(tmp_
             is None
         )
         assert facts(db) == before
-        migrations.upgrade_schema(db, 27)
+        with monkeypatch.context() as activity_index:
+            activity_index.setattr(migrations, "SCHEMA_VERSION", 28)
+            migrations.upgrade_schema(db, 27)
         assert db.execute("SELECT max(version) FROM schema_meta").fetchone()[0] == 28
         assert facts(db) == before
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []

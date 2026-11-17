@@ -1,0 +1,20 @@
+{
+  "measurement": "actual Main PromptBuilder assembly, local token estimate; not provider usage",
+  "sameSavedRoute": true,
+  "sameCatalogSha256": "daf8d52e21cf8426b811db2cf2966994ec26db5e99baa6420204068fbc91c4fa",
+  "inferenceCalls": 0,
+  "before": {
+    "estimatedTokens": 7772,
+    "planEstimatedTokens": 7772,
+    "messageCount": 9,
+    "oneOffFormatPresent": true,
+    "deploymentConstraintPresent": true
+  },
+  "after": {
+    "estimatedTokens": 4814,
+    "planEstimatedTokens": 4814,
+    "messageCount": 6,
+    "oneOffFormatPresent": false,
+    "deploymentConstraintPresent": true
+  }
+}

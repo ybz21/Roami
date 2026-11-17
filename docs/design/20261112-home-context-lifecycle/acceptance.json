@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-17",
+  "phase": 1,
+  "scenario": "synthetic-history-on-saved-main-route",
+  "passed": true,
+  "checks": {
+    "constraint_preserved": true,
+    "one_off_removed": true,
+    "original_retrievable": true,
+    "daily_sources_available": true,
+    "prompt_smaller": true,
+    "same_main": true,
+    "saved_route_unchanged": true
+  },
+  "beforeEstimatedTokens": 13067,
+  "afterEstimatedTokens": 4172,
+  "timezone": "Asia/Shanghai",
+  "measurement": "Context.project projection before Main history filtering; same instructions, catalog and saved route; local estimate, not final Main assembly",
+  "scope": "one extraction and source-retrieval fixture, not a production accuracy or CPU/memory measurement",
+  "focusedTestsPassed": 35,
+  "mainAssemblyEvidence": "main-assembly.json"
+}

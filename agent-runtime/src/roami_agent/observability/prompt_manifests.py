@@ -58,6 +58,8 @@ class PromptManifests:
                             "coordinationEvidence": coordination,
                             "executionResultEvidence": plan.get("executionResultEvidence", []),
                             "memoryEvidence": plan.get("memoryEvidence", []),
+                            "workingBriefId": plan.get("workingBriefId"),
+                            "workingTaskEvidence": plan.get("workingTaskEvidence", []),
                             "timing": plan.get("timing"),
                         }
                     ),

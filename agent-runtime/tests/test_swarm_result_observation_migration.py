@@ -9,6 +9,7 @@ from roami_agent.storage import migrations
 
 
 async def test_schema26_rolls_back_and_preserves_all_old_facts_on_retry(tmp_path, monkeypatch):
+    monkeypatch.setattr(migrations, "SCHEMA_VERSION", 28)
     _, path, _, _ = await legacy_database(tmp_path, monkeypatch)
     db = sqlite3.connect(path, isolation_level=None)
     db.execute("PRAGMA foreign_keys=ON")
