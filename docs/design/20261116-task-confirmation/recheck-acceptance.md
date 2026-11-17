@@ -44,3 +44,14 @@
 - Python 全量两次均为 4,937 passed、48 skipped、6 subtests passed；quick 耗时 1,954.09 秒，full 耗时 2,001.85 秒。跳过项不算作验收成功。
 - 最终前端全量 259 文件、1,897 项通过；typecheck、i18n（6,001 keys）、hover、Vite 生产构建与压缩产物检查、秘密扫描、暂存文件策略均通过。
 - 原始日志：`/tmp/task-execution-recheck-20261117/commit-integrated.log`、`quality-integrated-full.log`、`vitest-integrated.log`；截图与 `ui-results.json` 同目录保留。
+
+## 自动核对最终门禁
+
+自动核对代码提交 `086db4a9`。相关回归 265 项通过后，quick/full 全部门禁通过：
+
+- Go 全仓检查通过；两个门禁均在隔离 tmux 实例与独立 systemd scope 中执行。
+- Python 两次均为 4,960 passed、48 skipped、6 subtests passed；quick 耗时 2,114.91 秒，full 耗时 2,123.84 秒。
+- typecheck、i18n、hover、Vite 生产构建与压缩、秘密扫描、暂存文件策略均通过。自动核对阶段未修改前端代码，原界面阶段的 1,897 项前端测试和 Android 真机证据保留。
+- 原始日志：`/tmp/task-execution-recheck-20261117/auto-validated-commit.log`、`auto-validated-full.log`、`auto-combined-regression.log`；实际回归输出截图为同目录 `auto-regression.png`，发布至 PR 的 pr-shots 图片分支，不进入 main。
+
+本次仅更新源码和 PR，未替换运行中的服务，也未代用户验收任务成果。
