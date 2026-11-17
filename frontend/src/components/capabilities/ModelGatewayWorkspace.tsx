@@ -12,9 +12,9 @@ import './gateway-workspace.css'
 
 export default function ModelGatewayWorkspace({ active, catalog, onChanged, onSource, onPool }: { active: boolean; catalog: ModelCatalog; onChanged: () => void; onSource: (id: string) => void; onPool?: (id: string) => void }) {
   const { t } = useI18n(), { message } = App.useApp(), { phone } = useLayout()
-  const [tab, setTab] = useState('access'), [keyDraft, setKeyDraft] = useState(''), [modelId, setModelId] = useState(''), [language, setLanguage] = useState('curl'), [sampleOpen, setSampleOpen] = useState(false)
-  const [visited, setVisited] = useState(active), [directoryVisited, setDirectoryVisited] = useState(false)
-  useEffect(() => { if (active) setVisited(true) }, [active])
+  const [tab, setTab] = useState('directory'), [keyDraft, setKeyDraft] = useState(''), [modelId, setModelId] = useState(''), [language, setLanguage] = useState('curl'), [sampleOpen, setSampleOpen] = useState(false)
+  const [visited, setVisited] = useState(active), [directoryVisited, setDirectoryVisited] = useState(active)
+  useEffect(() => { if (active) { setVisited(true); setDirectoryVisited(true) } }, [active])
   const endpoint = catalog.baseUrl ? catalog.baseUrl.replace(/\/+$/, '') + '/v1' : ''
   const models = gatewayCallableModels(catalog), selected = models.find(model => model.id === modelId) || models[0]
   const code = selected && endpoint ? gatewayCallExample(endpoint, selected.id, language) : ''
@@ -28,7 +28,7 @@ export default function ModelGatewayWorkspace({ active, catalog, onChanged, onSo
   </div>
   return <section className="tt-model-gateway" hidden={!active} aria-label={t('hub.tab.gateway')}>
     {!phone && <header className="tt-pagehead"><h2>{t('hub.tab.gateway')}</h2><span className="tt-gateway-protocol">{t('gatewayWorkspace.compatible')}</span></header>}
-    <TabBar className="tt-gateway-tabs" activeKey={tab} onChange={value => { setTab(value); if (value === 'directory') setDirectoryVisited(true) }} items={['access', 'directory'].map(key => ({ key, label: t('modelInteraction.gateway.' + key) }))} />
+    <TabBar className="tt-gateway-tabs" activeKey={tab} onChange={value => { setTab(value); if (value === 'directory') setDirectoryVisited(true) }} items={['directory', 'access'].map(key => ({ key, label: t('modelInteraction.gateway.' + key) }))} />
     {visited && <div className="tt-gateway-tab" hidden={tab !== 'access'}><GatewayAccessKeys active={active && tab === 'access'} onChanged={onChanged} value={keyDraft} onChange={setKeyDraft}>{access}</GatewayAccessKeys></div>}
     {directoryVisited && <div className="tt-gateway-tab" hidden={tab !== 'directory'}><GatewayModelDirectory active={active && tab === 'directory'} catalog={catalog} onSource={onSource} onPool={onPool} /></div>}
   </section>

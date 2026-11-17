@@ -142,7 +142,7 @@ func (h *Handler) fetchSourceModels(ctx context.Context, source ModelSource) ([]
 			for _, model := range provider.Models {
 				models = append(models, model.ID)
 				tools, reasoning := model.Tools, model.Reasoning
-				row := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Context: model.Context, Output: model.Output, Tools: &tools, Reasoning: &reasoning}
+				row := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Context: model.Context, Output: model.Output, Tools: &tools, Reasoning: &reasoning, InputModalities: []string{"text"}}
 				if model.Image {
 					row.InputModalities = []string{"text", "image"}
 				}

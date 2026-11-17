@@ -1,9 +1,10 @@
 import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
-import { MODEL_CATALOG_CHANGED, type ModelCatalog } from '../capabilities/model-hub-api'
+import { MODEL_CATALOG_CHANGED, type ModelCatalog, type ModelDirectoryEntry } from '../capabilities/model-hub-api'
+import { configuredGatewayModels, gatewayDirectoryPath, loadGatewayModels } from '../capabilities/gateway-model-catalog'
+import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentData } from './useAgentData'
-import { useGatewayModelCatalog, type GatewayModel } from '../capabilities/gateway-model-catalog'
 import { MODEL_SETTINGS_CHANGED, saveAgentModels, type AgentModelSettings } from './agent-models'
 
 const gatewayChoice = 'gateway:'
@@ -16,32 +17,27 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   const settingsRevision = useRef(0)
   if (currentNode.current !== scope) { currentNode.current = scope; epoch.current++; loadingRef.current = false; savingRef.current = false }
   const [settings, setSettings] = useState<AgentModelSettings | null>(null)
+  const [directory, setDirectory] = useState<{ revision?: string; models: ModelDirectoryEntry[]; refreshFailures?: string[] }>({ models: [] })
+  const [directoryFailed, setDirectoryFailed] = useState(false)
   const [models, setModels] = useState<string[]>([])
   const [efforts, setEfforts] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false)
   const [error, setError] = useState<any>(null), [version, setVersion] = useState(0)
-  const [directoryOpen, setDirectoryOpen] = useState(false)
   const endpoint = settings?.[role]?.baseUrl
   const catalog = useAgentData<ModelCatalog>('/agent/model-gateway/catalog', 30_000)
-  const directory = useGatewayModelCatalog(catalog.value?.revision, directoryOpen)
   const refreshCatalog = catalog.refresh
-  usePageEffect(() => { window.addEventListener(MODEL_CATALOG_CHANGED, refreshCatalog); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, refreshCatalog) }, [refreshCatalog])
+  usePageEffect(() => { const changed = () => { invalidateAgentData(agentDataKey(gatewayDirectoryPath(catalog.value?.revision))); refreshCatalog() }; window.addEventListener(MODEL_CATALOG_CHANGED, changed); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, changed) }, [refreshCatalog, catalog.value?.revision])
   // An identical model ID at another provider does not identify this gateway's route.
   const throughGateway = !!catalog.value?.baseUrl && endpoint?.replace(/\/$/, '') === catalog.value.baseUrl.replace(/\/$/, '') + '/v1'
   const gatewayModels = catalog.value?.models || []
-  const additionalModels = throughGateway ? [] : gatewayModels.filter(model => {
-    if (model.strategy !== 'fixed' || model.candidates?.length !== 1) return true
-    const candidate = model.candidates[0]
-    const source = catalog.value?.sources?.find(source => source.id === candidate.sourceId)
-    return !models.includes(candidate.model) || source?.baseUrl.replace(/\/$/, '') !== endpoint?.replace(/\/$/, '')
-  })
+  const additionalModels = throughGateway ? [] : gatewayModels
   const modelNames = Object.fromEntries((throughGateway ? gatewayModels : additionalModels).map(model => [throughGateway ? model.id : gatewayChoice + model.id, model.name]))
   const refresh = useCallback(() => setVersion(v => v + 1), [])
   usePageEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
   useEffect(() => {
     const abort = new AbortController()
     const revision = settingsRevision.current
-    if (loadedNode.current !== scope) { setSettings(null); setModels([]); setEfforts({}); setError(null); setLoading(false); setBusy(false); loadedNode.current = scope }
+    if (loadedNode.current !== scope) { setSettings(null); setModels([]); setDirectory({ models: [] }); setDirectoryFailed(false); setEfforts({}); setError(null); setLoading(false); setBusy(false); loadedNode.current = scope }
     void api('GET', '/agent/model-settings', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted && revision === settingsRevision.current) setSettings(data) }).catch(e => { if (!abort.signal.aborted && revision === settingsRevision.current) setError(e) })
     return () => abort.abort()
   }, [scope, version])
@@ -49,9 +45,16 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
     if (loadingRef.current) return
     const requestedEpoch = epoch.current
     loadingRef.current = true
-    setDirectoryOpen(true); refreshCatalog(); refresh()
+    refreshCatalog(); refresh()
     setLoading(true); setError(null)
-    try { const { data } = await api('GET', '/agent/models' + (role === 'worker' ? '?role=worker' : '')); if (epoch.current === requestedEpoch) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) } }
+    try {
+      const results = await Promise.allSettled([Array.isArray(catalog.value?.models) ? Promise.resolve({ data: { models: [], reasoningEfforts: {} } }) : api('GET', '/agent/models' + (role === 'worker' ? '?role=worker' : '')), loadGatewayModels(catalog.value?.revision)])
+      if (epoch.current !== requestedEpoch) return
+      const [provider, gateway] = results
+      if (gateway.status === 'fulfilled') { setDirectory({ revision: gateway.value.revision, models: gateway.value.models || [] }); setDirectoryFailed(!!gateway.value.refreshFailures?.length) } else setDirectoryFailed(true)
+      if (provider.status === 'fulfilled') { setModels(provider.value.data.models || []); setEfforts(provider.value.data.reasoningEfforts || {}) }
+      else if (!gatewayModels.length) throw provider.reason
+    }
     catch (e) { if (epoch.current === requestedEpoch) setError(e) } finally { if (epoch.current === requestedEpoch) { loadingRef.current = false; setLoading(false) } }
   }
   const configure = async (change: { model?: string; reasoningEffort?: string | null }) => {
@@ -77,31 +80,22 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
     catch (e) { if (epoch.current === requestedEpoch) { setError(e); if (gatewaySelection) refreshCatalog() } return false } finally { if (epoch.current === requestedEpoch) { savingRef.current = false; setBusy(false) } }
   }
   const apply = (model: string, effort: string) => model.trim() ? configure({ model: model.trim(), reasoningEffort: effort === 'default' ? null : effort }) : Promise.resolve(false)
-  const directoryIds = directory.value?.models.filter(model => model.configured && gatewayModels.some(saved => saved.id === model.id)).map(model => model.id)
-  const choices = throughGateway && gatewayModels.length ? (directoryIds?.length ? directoryIds : gatewayModels.map(model => model.id)) : [...models, ...additionalModels.map(model => gatewayChoice + model.id)]
+  const catalogAvailable = Array.isArray(catalog.value?.models)
+  const currentModel = settings?.[role]?.model || ''
+  const currentRouteId = throughGateway && currentModel === 'roami-default' ? catalog.value?.defaultModel : currentModel
+  const currentRoute = gatewayModels.find(model => throughGateway ? model.id === currentRouteId || !!currentRouteId && model.aliases?.includes(currentRouteId) : !model.aggregate && model.candidates?.length === 1 && model.candidates[0].model === currentModel && catalog.value?.sources?.find(source => source.id === model.candidates[0].sourceId)?.baseUrl?.replace(/\/+$/, '') === endpoint?.replace(/\/+$/, ''))
+  const selectedOption = currentRoute ? throughGateway ? currentRoute.id : gatewayChoice + currentRoute.id : currentModel
+  const choices = catalogAvailable ? gatewayModels.filter(model => model.enabled !== false).map(model => throughGateway ? model.id : gatewayChoice + model.id) : models
+  const modelDetails: Record<string, ModelDirectoryEntry> = {}
+  const configured = configuredGatewayModels(catalog.value, directory)
+  for (const model of gatewayModels) {
+    const detail = configured.find(row => row.id === model.id)
+    if (detail) for (const id of throughGateway ? [model.id, ...(model.aliases || [])] : [gatewayChoice + model.id]) modelDetails[id] = detail
+  }
   const modelKinds: Record<string, 'native' | 'aggregate'> = Object.fromEntries(catalog.value ? models.map(id => [id, 'native']) : [])
   for (const entry of throughGateway ? gatewayModels : additionalModels) {
     for (const id of throughGateway ? [entry.id, ...(entry.aliases || [])] : [gatewayChoice + entry.id]) modelKinds[id] = entry.aggregate ? 'aggregate' : 'native'
   }
-  const modelDetails: Record<string, GatewayModel> = {}
-  for (const detail of directory.value?.models || []) {
-    if (!detail.configured) continue
-    const entry = gatewayModels.find(model => model.id === detail.id)
-    if (!entry) continue
-    if (throughGateway) {
-      for (const id of [entry.id, ...(entry.aliases || [])]) modelDetails[id] = detail
-    } else {
-      if (additionalModels.includes(entry)) modelDetails[gatewayChoice + entry.id] = detail
-      if (!entry.aggregate && entry.candidates?.length === 1) {
-        const candidate = entry.candidates[0], source = catalog.value?.sources?.find(source => source.id === candidate.sourceId)
-        if (source?.baseUrl.replace(/\/$/, '') === endpoint?.replace(/\/$/, '')) modelDetails[candidate.model] = detail
-      }
-    }
-  }
-  if (throughGateway && catalog.value?.defaultModel) {
-    const defaultId = catalog.value.defaultModel
-    if (modelKinds[defaultId]) modelKinds['roami-default'] = modelKinds[defaultId]
-    if (modelDetails[defaultId]) modelDetails['roami-default'] = modelDetails[defaultId]
-  }
-  return { role, settings, models: choices, modelNames, modelKinds, modelDetails, directoryFailed: directory.failed || !!directory.value?.refreshFailures?.length, retryDirectory: directory.refresh, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
+  if (throughGateway && catalog.value?.defaultModel && modelKinds[catalog.value.defaultModel]) modelKinds['roami-default'] = modelKinds[catalog.value.defaultModel]
+  return { role, settings, models: choices, modelNames, modelKinds, modelDetails, directoryFailed, retryDirectory: load, catalogAvailable, selectedOption, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
 }

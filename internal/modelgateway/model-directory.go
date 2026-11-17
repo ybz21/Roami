@@ -107,8 +107,11 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 			if saved, err := s.plugins.ReadSource(source.PluginSourceID); err == nil {
 				if provider, err := s.plugins.CachedProvider(saved); err == nil && !provider.FellBack {
 					for _, model := range provider.Models {
+						if _, exists := details[ModelCandidate{source.ID, model.ID}]; exists {
+							continue
+						}
 						tools, reasoning := model.Tools, model.Reasoning
-						detail := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Tools: &tools, Reasoning: &reasoning, InputModalities: []string{"text"}}
+						detail := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Context: model.Context, Output: model.Output, Tools: &tools, Reasoning: &reasoning, InputModalities: []string{"text"}}
 						if model.Image {
 							detail.InputModalities = append(detail.InputModalities, "image")
 						}
@@ -144,6 +147,8 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 				entry.InputPrice, entry.OutputPrice = detail.InputPrice, detail.OutputPrice
 				if detail.InputPrice != nil && detail.OutputPrice != nil && *detail.InputPrice == 0 && *detail.OutputPrice == 0 {
 					entry.Pricing = "advertised-zero"
+				} else if detail.InputPrice != nil && *detail.InputPrice > 0 || detail.OutputPrice != nil && *detail.OutputPrice > 0 {
+					entry.Pricing = "metered"
 				}
 			}
 			if rule, exists := pricing.Pricing.sourceRule(candidate.SourceID, candidate.Model); exists {
@@ -162,10 +167,7 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 			if configured[candidate] {
 				continue
 			}
-			entry := ModelDirectoryRow{ID: candidate.Model, Name: detail.Name, Kind: "single", Pricing: "unknown", Capabilities: advertisedCapabilities(detail), Candidates: []ModelCandidate{candidate}}
-			entry.ContextWindow, entry.MaxOutputTokens = detail.Context, detail.Output
-			entry.InputModalities, entry.OutputModalities = detail.InputModalities, detail.OutputModalities
-			entry.InputPrice, entry.OutputPrice = detail.InputPrice, detail.OutputPrice
+			entry := ModelDirectoryRow{ID: candidate.Model, Name: detail.Name, Kind: "single", Pricing: "unknown", Capabilities: advertisedCapabilities(detail), Candidates: []ModelCandidate{candidate}, ContextWindow: detail.Context, MaxOutputTokens: detail.Output, InputModalities: detail.InputModalities, OutputModalities: detail.OutputModalities, InputPrice: detail.InputPrice, OutputPrice: detail.OutputPrice}
 			for _, source := range catalog.Sources {
 				if source.ID == candidate.SourceID {
 					entry.Protocol = source.Protocol
@@ -173,6 +175,8 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 			}
 			if detail.InputPrice != nil && detail.OutputPrice != nil && *detail.InputPrice == 0 && *detail.OutputPrice == 0 {
 				entry.Pricing = "advertised-zero"
+			} else if detail.InputPrice != nil && *detail.InputPrice > 0 || detail.OutputPrice != nil && *detail.OutputPrice > 0 {
+				entry.Pricing = "metered"
 			}
 			rows = append(rows, entry)
 		}
