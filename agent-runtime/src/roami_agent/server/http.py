@@ -28,6 +28,7 @@ from roami_agent.protocol.http import (
     NotificationPreferences,
     Proactive,
     ReadCursor,
+    ReconcileTask,
     RenameNativeSession,
     Report,
     SaveMemory,
@@ -1115,6 +1116,16 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.post("/v1/resources/{resource_id}/resume")
     async def resume_resource(resource_id: str, owner: Owner):
         return {"data": await runtime.controls.resume(owner, resource_id)}
+
+    @app.post("/v1/tasks/{task_id}/reconcile")
+    async def reconcile_task(task_id: str, body: ReconcileTask, owner: Owner):
+        from roami_agent.dispatch.task_confirmation import reconcile_task
+
+        return {
+            "data": await reconcile_task(
+                runtime.dispatch, owner, task_id, body.revision, body.runId
+            )
+        }
 
     @app.post("/v1/tasks/{task_id}/verify")
     async def verify_task(task_id: str, body: ConfirmTask, owner: Owner):
