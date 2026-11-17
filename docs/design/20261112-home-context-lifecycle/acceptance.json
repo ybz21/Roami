@@ -18,5 +18,14 @@
   "measurement": "Context.project projection before Main history filtering; same instructions, catalog and saved route; local estimate, not final Main assembly",
   "scope": "one extraction and source-retrieval fixture, not a production accuracy or CPU/memory measurement",
   "focusedTestsPassed": 35,
-  "mainAssemblyEvidence": "main-assembly.json"
+  "mainAssemblyEvidence": "main-assembly.json",
+  "quality": {
+    "full": "passed",
+    "quickPreCommit": "passed",
+    "pythonPassed": 4942,
+    "pythonSkipped": 48,
+    "pythonSubtestsPassed": 6,
+    "go": "passed",
+    "frontendChecksAndBuild": "passed"
+  }
 }
