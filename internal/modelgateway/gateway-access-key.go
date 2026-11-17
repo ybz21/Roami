@@ -55,7 +55,7 @@ func validStoredGatewayAccessKey(key gatewayAccessKey) bool {
 
 func (s *CatalogStore) accessKeyView() map[string]any {
 	key := s.value.AccessKey
-	return map[string]any{"revision": s.value.Revision, "hasKey": key.Hash != "", "suffix": key.Suffix}
+	return map[string]any{"revision": s.value.Revision, "hasKey": key.Hash != "", "suffix": key.Suffix, "id": key.ID}
 }
 
 func (h *Handler) accessKeyManagement(w http.ResponseWriter, r *http.Request) bool {

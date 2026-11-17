@@ -1,15 +1,18 @@
 package modelgateway
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 func catalogProtocol(kind, protocol string) bool {
-	return containsField([]string{"anthropic-messages", "openai-responses", "openai-completions"}, protocol) && containsField([]string{"codex", "claude", "opencode", "pi"}, kind)
+	runner := agent.Get(kind)
+	return runner != nil && agent.Describe(runner).Models && containsField([]string{"anthropic-messages", "openai-responses", "openai-completions"}, protocol)
 }
 
 func (h *Handler) sourceModels(w http.ResponseWriter, r *http.Request) {
@@ -79,24 +82,7 @@ func (h *Handler) discoverModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, source ModelSource, revision string) {
-	var models []string
-	var err error
-	if source.PluginSourceID != "" && h.Plugins != nil {
-		var saved modelplugins.Source
-		saved, err = h.Plugins.ReadSource(source.PluginSourceID)
-		if err == nil {
-			var provider modelplugins.Provider
-			provider, err = h.Plugins.Provider(r.Context(), saved)
-			if provider.FellBack {
-				err = errors.New("MODEL_LIST_FAILED")
-			}
-			for _, model := range provider.Models {
-				models = append(models, model.ID)
-			}
-		}
-	} else {
-		models, err = agentproviders.ReadSourceModels(r.Context(), agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
-	}
+	models, details, err := h.fetchSourceModels(r.Context(), source)
 	s := h.Catalog
 	s.mu.Lock()
 	changed := revision != s.value.Revision
@@ -119,7 +105,14 @@ func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, sourc
 			valid = append(valid, model)
 		}
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"models": valid}})
+	validDetails := []agentproviders.SourceModelDetail{}
+	for _, row := range details {
+		if len(row.ID) <= 200 {
+			validDetails = append(validDetails, row)
+		}
+	}
+	s.rememberSourceDetails(source, revision, validDetails)
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"models": valid, "details": validDetails}})
 }
 
 func nativeProtocol(kind string) string {
@@ -131,4 +124,45 @@ func nativeProtocol(kind string) string {
 	default:
 		return "openai-completions"
 	}
+}
+
+func (h *Handler) fetchSourceModels(ctx context.Context, source ModelSource) ([]string, []agentproviders.SourceModelDetail, error) {
+	var models []string
+	details := []agentproviders.SourceModelDetail{}
+	var err error
+	if source.PluginSourceID != "" && h.Plugins != nil {
+		var saved modelplugins.Source
+		saved, err = h.Plugins.ReadSource(source.PluginSourceID)
+		if err == nil {
+			var provider modelplugins.Provider
+			provider, err = h.Plugins.Provider(ctx, saved)
+			if provider.FellBack {
+				err = errors.New("MODEL_LIST_FAILED")
+			}
+			for _, model := range provider.Models {
+				models = append(models, model.ID)
+				tools, reasoning := model.Tools, model.Reasoning
+				row := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Context: model.Context, Output: model.Output, Tools: &tools, Reasoning: &reasoning}
+				if model.Image {
+					row.InputModalities = []string{"text", "image"}
+				}
+				if model.Free {
+					zero := float64(0)
+					row.InputPrice = &zero
+					row.OutputPrice = &zero
+				} else if model.Cost != nil {
+					input, output := model.Cost.Input, model.Cost.Output
+					row.InputPrice = &input
+					row.OutputPrice = &output
+				}
+				details = append(details, row)
+			}
+		}
+	} else {
+		details, err = agentproviders.ReadSourceModelDetails(ctx, agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+		for _, row := range details {
+			models = append(models, row.ID)
+		}
+	}
+	return models, details, err
 }

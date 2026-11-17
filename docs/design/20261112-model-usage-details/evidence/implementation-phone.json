@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8 / 216d6a43",
+  "overview": {
+    "width": 392,
+    "scrollWidth": 392,
+    "height": 766,
+    "scrollHeight": 766,
+    "size": "compact",
+    "pointer": "coarse"
+  },
+  "targets": [
+    44,
+    44,
+    44,
+    44
+  ],
+  "detail": {
+    "x": 0,
+    "width": 392.727294921875,
+    "height": 621.0909423828125,
+    "scrollHeight": 785,
+    "headerCount": 1,
+    "backHit": true
+  },
+  "scroll": {
+    "after": 428.7272644042969,
+    "restored": 428.7272644042969
+  },
+  "checks": [
+    "LAN HTTPS and real API",
+    "coarse pointer layout and safe areas",
+    "sibling overview and audit tabs",
+    "filter targets",
+    "real touch scroll",
+    "full-screen detail",
+    "return restores scroll"
+  ]
+}

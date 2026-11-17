@@ -1,0 +1,177 @@
+{
+  "desktop": {
+    "passed": true,
+    "checks": [
+      "collapsed card summary",
+      "runtime only inside expanded owner",
+      "preview tab replaces live data",
+      "one expanded saved card",
+      "draft preview stays in original card",
+      "new draft has its own card",
+      "mouse drag updates card member order",
+      "light English",
+      "four widths, collapsed/expanded/editing"
+    ],
+    "viewportColumns": [
+      "state",
+      "width",
+      "height",
+      "expandedCards",
+      "maximumCardOverflow"
+    ],
+    "viewports": [
+      [
+        "collapsed",
+        1280,
+        1080,
+        0,
+        0
+      ],
+      [
+        "collapsed",
+        1920,
+        1080,
+        0,
+        0
+      ],
+      [
+        "collapsed",
+        2560,
+        1080,
+        0,
+        0
+      ],
+      [
+        "collapsed",
+        3440,
+        1080,
+        0,
+        0
+      ],
+      [
+        "expanded",
+        1280,
+        1080,
+        1,
+        0
+      ],
+      [
+        "expanded",
+        1920,
+        1080,
+        1,
+        0
+      ],
+      [
+        "expanded",
+        2560,
+        1080,
+        1,
+        0
+      ],
+      [
+        "expanded",
+        3440,
+        1080,
+        1,
+        0
+      ],
+      [
+        "editing",
+        1280,
+        1080,
+        1,
+        0
+      ],
+      [
+        "editing",
+        1920,
+        1080,
+        1,
+        0
+      ],
+      [
+        "editing",
+        2560,
+        1080,
+        1,
+        0
+      ],
+      [
+        "editing",
+        3440,
+        1080,
+        1,
+        0
+      ]
+    ]
+  },
+  "phone": {
+    "passed": true,
+    "device": "Redmi Note 8",
+    "layout": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "cards": [
+        {
+          "right": 376.727294921875,
+          "width": 360.727294921875,
+          "scrollWidth": 359,
+          "clientWidth": 359
+        },
+        {
+          "right": 376.727294921875,
+          "width": 360.727294921875,
+          "scrollWidth": 359,
+          "clientWidth": 359
+        },
+        {
+          "right": 376.727294921875,
+          "width": 360.727294921875,
+          "scrollWidth": 359,
+          "clientWidth": 359
+        }
+      ]
+    },
+    "before": [
+      "a/hy4free",
+      "b/vendor/coding-a",
+      "b/vendor/coding-b"
+    ],
+    "after": [
+      "b/vendor/coding-a",
+      "a/hy4free",
+      "b/vendor/coding-b"
+    ],
+    "checks": [
+      "card summaries only until expanded",
+      "live status inside owning card",
+      "card-local preview tab",
+      "previous card collapses",
+      "full-screen editor owns draft",
+      "touch reorder works",
+      "back returns to owner card",
+      "no document/card overflow",
+      "touch scrolling"
+    ]
+  },
+  "checks": [
+    "typecheck",
+    "i18n audit",
+    "hover audit",
+    "253 frontend files / 1817 tests",
+    "production build",
+    "full quality gate; Go and Python correctly skipped for frontend-only changes"
+  ],
+  "screenshots": {
+    "desktopBefore": "/tmp/roami-aggregation-card-20261114/card-desktop-before.png",
+    "desktopRuntime": "/tmp/roami-aggregation-card-20261114/card-desktop-after-runtime.png",
+    "desktopPreview": "/tmp/roami-aggregation-card-20261114/card-desktop-after-preview.png",
+    "phoneBefore": "/tmp/roami-aggregation-card-20261114/card-phone-before.png",
+    "phoneRuntime": "/tmp/roami-aggregation-card-20261114/card-phone-after-runtime.png",
+    "phonePreview": "/tmp/roami-aggregation-card-20261114/card-phone-after-preview.png"
+  }
+}

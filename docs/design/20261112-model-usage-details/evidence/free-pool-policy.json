@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "checks": [
+    "per-pool cooldown duration",
+    "stop or switch on rate limit",
+    "stop or switch on exhausted allowance",
+    "cooldown does not expire early",
+    "pool policy isolation",
+    "tool and context eligibility"
+  ]
+}

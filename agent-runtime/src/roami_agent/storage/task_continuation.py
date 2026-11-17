@@ -24,7 +24,7 @@ def continuation_candidates(db, owner, conversation, turn_id, target):
         "LEFT JOIN task_attempts a ON a.id=(SELECT id FROM task_attempts WHERE task_id=t.id "
         "ORDER BY task_revision DESC,attempt_no DESC LIMIT 1) "
         "WHERE t.owner_id=? AND t.origin_conversation_id=? AND t.parent_task_id IS NULL "
-        "AND json_extract(t.intent_json,'$.executor') IN ('codex','claude','opencode','pi','native') "
+        "AND json_type(t.intent_json,'$.executor')='text' "
         "AND NOT EXISTS(SELECT 1 FROM task_session_closures z WHERE z.task_id=t.id AND z.state='closed') "
         "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=t.owner_id "
         "AND o.message_id=t.origin_message_id) ORDER BY t.created_ms DESC,t.id",

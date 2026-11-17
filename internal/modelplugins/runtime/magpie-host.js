@@ -2664,6 +2664,7 @@ function rowOf(id, a, keys, stored, p, own) {
         cost: m.cost,
         variants: Object.keys(m.variants ?? {}),
         free: m.free === true,
+        tools: m.capabilities?.toolcall === true || m.capabilities?.tools === true,
         // what a request costs of the plan's credits, as a multiple,
         // and before a discount running now (Qoder's price_factor)
         rate: rateOf(m.rate),

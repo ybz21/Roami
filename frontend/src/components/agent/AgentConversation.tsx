@@ -1,13 +1,14 @@
+import { usePageActive } from '../../page-activity'
 import { agentTimeline, groupAgentTimeline } from './agent-timeline'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { App, Button, Dropdown, Input, Modal, Spin } from 'antd'
+import { App, Dropdown, Input, Modal, Spin } from 'antd'
 import { api } from '../../api'
+import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, isAgentKind, type AgentKind } from '../../agent-kind'
 import { AgentLogo, ArrowDown, BellIcon, ChecklistIcon, ChevronDown, ClockIcon, CloseIcon, CodeIcon, FileTextIcon, MoreIcon, NotebookIcon, PanelRightIcon, RefreshIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import Markdown from '../markdown/Markdown'
 import MobileSubPage from '../MobileSubPage'
 import AgentMemory from './AgentMemory'
 import { openAgentPage } from './agent-page-route'
@@ -32,6 +33,8 @@ import ConversationComposer from '../chat/ConversationComposer'
 import VoiceInput from '../chat/VoiceInput'
 import AgentMessageView from './AgentMessageView'
 import AgentTaskActivity from './AgentTaskActivity'
+import AgentCompactionStatus from './AgentCompactionStatus'
+import AgentContextDetails from './AgentContextDetails'
 import AgentActivity from './AgentActivity'
 import { mainTaskActivities, groupExecutionSteps } from './main-task-activity'
 import { useAgentAttachments } from './useAgentAttachments'
@@ -59,6 +62,7 @@ type Props = Omit<Partial<HomeConversationProps>, 'cid' | 'node'> & {
 }
 const noop = () => {}
 export default function AgentConversation({ cid, branch = '', focusMessage = '', inactive = false, node, inbox, inboxOpen = false, select = noop, notifications = noop, projects = [], onSession = noop, mobileActionsHost, project }: Props) {
+  const pageActive = usePageActive()
   const { t } = useI18n(), { phone, size } = useLayout(), { message } = App.useApp()
   const thread = useAgentThread(cid, branch, node, focusMessage)
   const rsi = useAgentData<{ developmentRsi: boolean }>(project ? null : '/agent/status', 60_000)
@@ -68,6 +72,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const setWorkspaceTask = (value: string) => { editWorkspaceTask(value); try { if (value) localStorage.setItem(workspaceSelectionKey, value); else localStorage.removeItem(workspaceSelectionKey) } catch { /* Keep selection in memory. */ } }
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
+  const agents = useRegisteredAgents()
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState<AgentKind>('codex')
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const showPanel = (next: 'tasks' | 'memory' | 'context') => {
@@ -75,8 +80,6 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     if (wide && next !== 'context') { workspace.change({ open: true, tab: next }); setWorkspaceTask(''); setPanel(null) }
     else setPanel(next)
   }
-  const [context, setContext] = useState<any>(null), [summary, setSummary] = useState('')
-  const [panelLoading, setPanelLoading] = useState(false), [panelError, setPanelError] = useState(false)
   const [source, setSource] = useState<AgentMessage | null>(null)
   const [memoryTitle, setMemoryTitle] = useState(''), [memoryBody, setMemoryBody] = useState('')
   const [error, setError] = useState('')
@@ -87,7 +90,6 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const models = useAgentModels(node)
   const scroll = useRef<HTMLDivElement>(null), stick = useRef(true), sendingRef = useRef(false)
   const activeCID = useRef(cid); activeCID.current = cid
-  const panelRequest = useRef(0)
   const pending = useRef<{ text: string; payload?: string; okrContext?: AgentMessage['content']['okrContext']; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
   const pendingOwner = useRef('')
   const createKey = useMemo(newKey, [cid, node])
@@ -112,8 +114,8 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     if (fresh.length) { fresh.forEach(item => completed.current.add(item.id)); project?.onUpdated?.() }
   }, [thread.view?.messages, project?.onUpdated])
   useEffect(() => {
-    if (!inactive && !inboxOpen && cid === mainCID && inbox?.cursor && thread.view && inbox.cursor > thread.view.snapshotCursor) thread.refresh()
-  }, [inactive, inboxOpen, cid, mainCID, inbox?.cursor, thread.view?.snapshotCursor, thread.refresh])
+    if (pageActive && !inactive && !inboxOpen && cid === mainCID && inbox?.cursor && thread.view && inbox.cursor > thread.view.snapshotCursor) thread.refresh()
+  }, [pageActive, inactive, inboxOpen, cid, mainCID, inbox?.cursor, thread.view?.snapshotCursor, thread.refresh])
   const historical = !!thread.view && (thread.view.branchId !== thread.view.conversation.active_branch_id || (!!mainCID && cid !== mainCID))
   const readOnly = historical || (!project && !mainCID)
   const running = thread.view?.turns.some((item) => item.state === 'running' || item.state === 'queued') || false
@@ -148,15 +150,15 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     }
   }, [thread.view?.messages, thread.loadingOlder])
   const eventIds = history.entries.map(entry => entry.message?.completedEventId || '').join(',')
-  useVisibleAgentReads(!inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox?.refresh || noop)
+  useVisibleAgentReads(pageActive && !inactive && !panel && !source && !inboxOpen ? cid : '', scroll, eventIds, inbox?.refresh || noop)
 
   useEffect(() => {
-    if (!project && !inactive && mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
+    if (pageActive && !project && !inactive && mainCID && !branch && !focusMessage && cid !== mainCID) select(mainCID)
     if (!project && cid === mainCID) { try { localStorage.setItem(`roami.agent.last.${node || 'local'}`, cid) } catch {} }
-  }, [cid, mainCID, branch, focusMessage, node, select, inactive, project])
+  }, [cid, mainCID, branch, focusMessage, node, select, inactive, project, pageActive])
 
   useEffect(() => {
-    stick.current = true; setError(''); setWorkspaceTask(''); setPanel(null); setSource(null); panelRequest.current++
+    stick.current = true; setError(''); setWorkspaceTask(''); setPanel(null); setSource(null)
     if (!sendingRef.current || pending.current?.cid !== cid) {
       setTarget('direct')
     }
@@ -178,24 +180,6 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     }
     inbox?.refresh(); return data.id as string
   }
-  const loadPanel = useCallback(async () => {
-    if (!panel || panel === 'memory' || panel === 'tasks' || !cid) return
-    const version = ++panelRequest.current
-    const current = () => version === panelRequest.current && activeCID.current === cid
-    setPanelLoading(true); setPanelError(false)
-    try {
-      const r = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context`)
-      if (!current()) return
-      setContext(r.data); setSummary('')
-      if (r.data.snapshotId) { const s = await api('GET', `/agent/conversations/${encodeURIComponent(cid)}/context/snapshots/${encodeURIComponent(r.data.snapshotId)}`); if (current()) setSummary(s.data.summary.text || '') }
-    } catch { if (current()) setPanelError(true) } finally { if (current()) setPanelLoading(false) }
-  }, [panel, cid])
-  useEffect(() => {
-    let stop = false
-    const timer = setTimeout(() => { if (!stop) void loadPanel() }, 150)
-    const interval = panel === 'context' ? setInterval(() => { void loadPanel() }, 3000) : undefined
-    return () => { stop = true; panelRequest.current++; clearTimeout(timer); clearInterval(interval) }
-  }, [loadPanel, panel])
   const submit = async (text = draft, consumeDraft = true, direct = false) => {
     const destination = direct ? 'direct' : target
     const attachmentIds = consumeDraft ? attachments.ids : []
@@ -225,7 +209,8 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
         if (!current()) { inbox?.refresh(); return }
         if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
         else if (data.kind === 'commands') showPanel('context')
-        else if (data.kind === 'status' || data.kind === 'compaction') showPanel('context')
+        else if (data.kind === 'compaction') { thread.accepted(data, ''); setPanel(null) }
+        else if (data.kind === 'status') showPanel('context')
         else if (data.kind === 'message' && origin === cid) thread.accepted(data, value, request.okrContext)
       }
       if (!current()) { inbox?.refresh(); return }
@@ -243,14 +228,14 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   }
   const action = async (path: string, body: any = {}) => {
     if (project && !project.isCurrent()) return
-    try { await api('POST', path, body); thread.refresh(); void loadPanel(); inbox?.refresh() } catch (reason) { message.error(agentFailure(reason, t)) }
+    try { await api('POST', path, body); thread.refresh(); inbox?.refresh() } catch (reason) { message.error(agentFailure(reason, t)) }
   }
   const beginMemory = useCallback((m: AgentMessage) => { setSource(m); setMemoryTitle((m.content.text || '').slice(0, 80)); setMemoryBody(m.content.text || '') }, [])
   const submitRef = useRef(submit); submitRef.current = submit
   const answer = useCallback(async (text: string) => await submitRef.current(text, false, true) === true, [])
   const saveMemory = async () => {
     if (!source || project && !project.isCurrent()) return
-    try { await api('POST', '/agent/memories', { title: memoryTitle, body: memoryBody, sourceMessageId: source.id, conversationId: cid }); setSource(null); message.success(t('agent.memorySaved')); void loadPanel() } catch (reason) { message.error(agentFailure(reason, t)) }
+    try { await api('POST', '/agent/memories', { title: memoryTitle, body: memoryBody, sourceMessageId: source.id, conversationId: cid }); setSource(null); message.success(t('agent.memorySaved')) } catch (reason) { message.error(agentFailure(reason, t)) }
   }
   const slash = !commandsDismissed && (commandsOpen || (draft.startsWith('/') && !draft.includes(' ') && !draft.includes('\n')))
     ? ['compact', 'status', 'tasks', 'memory', 'stop', 'help'].filter(name => commandsOpen || ('/' + name).startsWith(draft)) : []
@@ -296,14 +281,11 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
 
   const panelBody = <>
 
-      {panel !== 'memory' && panel !== 'tasks' && panelLoading && <Spin size="small" />}{panel !== 'memory' && panel !== 'tasks' && panelError && <p role="alert">{t('agent.requestFailed')}</p>}
       {panel === 'tasks' && <AgentTasks selectedTask={project ? workspaceTask : undefined} onSelectTask={project ? setWorkspaceTask : undefined} projects={projects} key={`${node || 'local'}:${cid}`} cid={cid} onSession={(session) => { setPanel(null); onSession(session) }} onChanged={() => { thread.refresh(); inbox?.refresh() }} />}
       {panel === 'memory' && <AgentMemory cid={cid} projects={projects} select={(sourceCID, sourceBranch, sourceMessage) => { if (project && sourceCID !== cid) { setError(t('agent.requestFailed')); return }; setPanel(null); select(sourceCID, sourceBranch, sourceMessage) }} />}
-      {panel === 'context' && <div className="agent-context">{context?.model && <p>{context.model}</p>}<p>{context ? context.contextWindow ? t('agent.contextUsage', { used: context.estimatedTokens, budget: context.contextWindow }) : t('agent.contextUnknown', { used: context.estimatedTokens }) : t('agent.contextHint')}</p>{context?.contextWindow && <p>{t('agent.contextMeter.threshold', { percent: Math.round((context.compactionRatio ?? 0.75) * 100) })}</p>}{compact && <p role="status">{t('agent.compaction.' + compact.state)}</p>}{summary && <Markdown>{summary}</Markdown>}
-        <Button disabled={!cid || readOnly || compacting || running} onClick={() => { void submit('/compact') }}>{t('agent.compactNow')}</Button>
-        {compacting && compact && <Button onClick={() => { void action(`/agent/conversations/${encodeURIComponent(cid)}/compactions/${encodeURIComponent(compact.operationId)}/cancel`) }}>{t('agent.cancelCompact')}</Button>}
+      {panel === 'context' && <AgentContextDetails key={`${node || 'local'}:${cid}:${branch}`} cid={cid} node={node} branch={branch} compaction={compact} running={running} readOnly={readOnly} onCompact={() => { void submit('/compact', false) }} onCancel={() => { if (compact) void action(`/agent/conversations/${encodeURIComponent(cid)}/compactions/${encodeURIComponent(compact.operationId)}/cancel`) }}>
         <div className="agent-command-list">{['compact', 'status', 'tasks', 'memory', 'stop', 'help'].map((name) => <button className="tt-act" type="button" key={name} onClick={() => { changeDraft('/' + name + (name === 'compact' ? ' ' : '')); setPanel(null) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>
-      </div>}
+      </AgentContextDetails>}
   </>
 
   return <div className="agent-workspace" style={inactive ? { display: 'none' } : undefined}><section className={`agent-chat${dragging ? ' is-dragging' : ''}`} aria-label={t('agent.title')}
@@ -314,7 +296,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
       {conversationActions}
       {wide && <button type="button" className="tt-act" aria-label={t('agent.workspace.toggle')} title={t('agent.workspace.title')} aria-pressed={workspace.open} onClick={() => workspace.change({ open: true })}><PanelRightIcon size={18} /></button>}
     </div>}
-    {!project && phone && mobileActionsHost && createPortal(
+    {pageActive && !project && !inactive && phone && mobileActionsHost && createPortal(
       <>
         <button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.workspace.tasks')} onClick={() => showPanel('tasks')}><ChecklistIcon size={20} /></button>
         <Dropdown trigger={['click']} menu={moreMenu}><button type="button" className="tt-mobile-topbar-icon" aria-label={t('agent.composer.conversationMenu')}><MoreIcon size={20} /></button></Dropdown>
@@ -329,13 +311,14 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     </div>
     {error && <div className="agent-feedback error" role="alert">{error}</div>}
     <div className="agent-composer">
+      <AgentCompactionStatus value={compact} onOpen={() => showPanel('context')} />
       <AgentOutbox key={draftKey} outbox={outbox} ready={outboxReady} running={running} />
       <ConversationComposer className="agent-compose-card" minRows={phone ? 1 : 2} value={draft} onChange={value => { changeDraft(value); setCommandsDismissed(false); setCommandIndex(0); if (!value) setCommandsOpen(false) }} label={project?.inputLabel || t('agent.message')} placeholder={project?.placeholder || t(target === 'direct' ? 'agent.placeholder' : 'composer.taskPlaceholder')} maxLength={target === 'direct' ? 100000 : 20000} disabled={readOnly} hasAttachments={!!attachments.ids.length}
         send={{ label: queueDraft ? t('agent.outbox.add') : project?.sendLabel || t(target !== 'direct' ? 'composer.createTask' : 'agent.send'), disabled: sending || attachments.blocked || (target !== 'direct' && draft.trim().length > 20000), pending: sending, icon: queueDraft ? <ClockIcon size={16} /> : undefined, onClick: sendDraft }}
         stop={running && !readOnly ? { label: t('agent.stop'), onClick: () => { void action(`/agent/conversations/${encodeURIComponent(cid)}/messages`, { requestKey: newKey(), text: '/stop' }) } } : undefined}
         attachments={<AgentDraftFiles attachments={attachments} disabled={sending} imagesAvailable={!!models.settings?.main?.images} onError={() => message.error(t('agent.requestFailed'))} />}
         suggestions={<>{slash.length > 0 && <div className="agent-slash" role="listbox" aria-label={t('agent.commands')}>{slash.map((name, index) => <button type="button" key={name} role="option" aria-selected={index === commandIndex % slash.length} onClick={() => { if (commandsOpen) openCommand(name); else void submit('/' + name) }}><code>/{name}</code><span>{t('agent.command.' + name)}</span></button>)}</div>}
-          {(compacting || attachments.items.length > 0) && <div className="agent-compose-status"><span role="status">{compacting ? t('agent.compacting') : t('agent.composer.attachmentMode')}</span></div>}</>}
+          {attachments.items.length > 0 && <div className="agent-compose-status"><span role="status">{t('agent.composer.attachmentMode')}</span></div>}</>}
         onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void addFiles(Array.from(event.clipboardData.files)) } }}
         onKeyDown={event => {
           if (slash.length && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
@@ -346,13 +329,13 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
         }}
         leading={<AgentComposerPlus {...composerActions} mode={project ? undefined : { task: target !== 'direct', onChange: task => setTarget(task ? 'loose' : 'direct') }} options={<>
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
-          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: (['codex', 'claude', 'opencode', 'pi'] as const).map(kind => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
+          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: agents.map(({ kind }) => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
         settings={<AgentComposerPlus {...composerActions} modelTrigger />}
-        voice={<VoiceInput inline scope={draftKey} hotkey={!inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
+        voice={<VoiceInput inline scope={draftKey} hotkey={pageActive && !inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}
-    {project && phone && panel ? <MobileSubPage title={panelTitle} onBack={() => setPanel(null)}><div className="agent-project-panel">{panelBody}</div></MobileSubPage> : <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>{panelBody}</Modal>}
+    {phone && panel ? <MobileSubPage title={panelTitle} onBack={() => setPanel(null)}><div className="agent-project-panel">{panelBody}</div></MobileSubPage> : <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>{panelBody}</Modal>}
     <Modal destroyOnClose title={t('agent.remember')} open={!!source} onCancel={() => setSource(null)} onOk={() => { void saveMemory() }} okText={t('agent.save')} cancelText={t('common.cancel')} okButtonProps={{ 'aria-label': t('agent.save'), disabled: !memoryBody.trim() || memoryBody.length > 20000 }}>
       <label className="agent-field">{t('agent.memoryTitle')}<Input aria-label={t('agent.memoryTitle')} value={memoryTitle} maxLength={200} onChange={(e) => setMemoryTitle(e.target.value)} /></label>
       <label className="agent-field">{t('agent.memoryBody')}<Input.TextArea aria-label={t('agent.memoryBody')} value={memoryBody} autoSize={{ minRows: 4, maxRows: 10 }} maxLength={20000} onChange={(e) => setMemoryBody(e.target.value)} /></label>

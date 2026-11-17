@@ -1,0 +1,99 @@
+{
+  "passed": true,
+  "checks": [
+    "nine policies and smart default",
+    "descriptions",
+    "weight defaults and validation",
+    "weighted nested group example",
+    "source and model filters",
+    "quality separate from latency",
+    "24h pruning and 10000-record capacity",
+    "strategy persistence",
+    "English labels",
+    "no API requests"
+  ],
+  "layouts": [
+    {
+      "width": 1280,
+      "pane": false,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 1265
+    },
+    {
+      "width": 1280,
+      "pane": true,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 833,
+      "detailLeft": 833,
+      "detailRight": 1265
+    },
+    {
+      "width": 1920,
+      "pane": false,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 1905
+    },
+    {
+      "width": 1920,
+      "pane": true,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 1473,
+      "detailLeft": 1473,
+      "detailRight": 1905
+    },
+    {
+      "width": 2560,
+      "pane": false,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 2545
+    },
+    {
+      "width": 2560,
+      "pane": true,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 2113,
+      "detailLeft": 2113,
+      "detailRight": 2545
+    },
+    {
+      "width": 3440,
+      "pane": false,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 3425
+    },
+    {
+      "width": 3440,
+      "pane": true,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "mainHeight": 892.8125,
+      "mainRight": 2993,
+      "detailLeft": 2993,
+      "detailRight": 3425
+    }
+  ],
+  "errors": [],
+  "apiRequests": []
+}

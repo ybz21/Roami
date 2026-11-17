@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	clihelp "github.com/ybz21/Roami/internal/cli/help"
 	"io"
 	"net/url"
 	"os"
@@ -14,25 +15,29 @@ import (
 
 func runProjectOKR(args []string) int {
 	if len(args) == 2 && args[0] == "record" && (args[1] == "help" || args[1] == "--help" || args[1] == "-h") {
-		fmt.Println(`roami project okr record PROJECT --file JSON|- --json
-Single explicit observation: {"revision":N,"metricId":"ID","date":"YYYY-MM-DD","value":NUMBER,"note":"Evidence"}.
+		page := guidePage("project okr record")
+		page.Sections = []clihelp.Section{{Title: "参数", Entries: []clihelp.Entry{{Name: "PROJECT_ID", Description: "项目 ID"}, {Name: "--file JSON|-", Description: "JSON 文件；- 从标准输入读取"}, {Name: "--server URL", Description: "Roami 服务地址"}, {Name: "--json", Description: "输出 JSON"}}}}
+		page.Notes = append(page.Notes, strings.Split(`Single explicit observation: {"revision":N,"metricId":"ID","date":"YYYY-MM-DD","value":NUMBER,"note":"Evidence"}.
 Skill batch (requires projectFiles.connectorSkillBatches): {"revision":N,"batch":{"id":"32-lowercase-hex","connectorId":"SOURCE","packageSha256":"CONFIRMED_SHA256","sourceIdentity":"CONFIRMED_ID","date":"YYYY-MM-DD","capturedAt":"RFC3339","windowStart":"RFC3339","windowEnd":"RFC3339","values":[{"metricId":"ID","unit":"CONFIRMED_UNIT","value":NUMBER}],"evidence":[{"path":"PROJECT_RELATIVE_FILE","sha256":"RAW_SHA256"}]}}.
-Read the confirmed connectors first. Day windows are [start,end); snapshot windows have equal endpoints. Main reviews external source semantics. The host hashes and archives the referenced bytes; it never launches the Skill. After an unknown outcome, show the workspace and find connectorBatches by batch id, then retry the exact original payload/key if needed. A receipt confirms data publication, not task acceptance or an active schedule.`)
+Read the confirmed connectors first. Day windows are [start,end); snapshot windows have equal endpoints. Main reviews external source semantics. The host hashes and archives the referenced bytes; it never launches the Skill. After an unknown outcome, show the workspace and find connectorBatches by batch id, then retry the exact original payload/key if needed. A receipt confirms data publication, not task acceptance or an active schedule.`, "\n")...)
+		_ = page.Render(os.Stdout)
 		return 0
 	}
 	if len(args) == 2 && args[0] == "memory" && (args[1] == "help" || args[1] == "--help" || args[1] == "-h") {
-		fmt.Println(`roami project okr memory PROJECT --file JSON|- --json
-Read 'roami project okr show PROJECT --json' first. Append real new knowledge with:
+		page := guidePage("project okr memory")
+		page.Sections = []clihelp.Section{{Title: "参数", Entries: []clihelp.Entry{{Name: "PROJECT_ID", Description: "项目 ID"}, {Name: "--file JSON|-", Description: "JSON 文件；- 从标准输入读取"}, {Name: "--server URL", Description: "Roami 服务地址"}, {Name: "--json", Description: "输出 JSON"}}}}
+		page.Notes = append(page.Notes, strings.Split(`Read 'roami project okr show PROJECT --json' first. Append real new knowledge with:
 {"mode":"append","content":"New verified knowledge","expectedSha256":"CURRENT_MEMORY_SHA256"}
 Full replacement uses mode=replace. Prior bytes are retained in memory/history/<sha256>.md.
 On hosts advertising projectFiles.memoryEditsSupported, edit exact unique fragments with:
 {"mode":"edit","operationKey":"PERSISTENT_EDIT_KEY","expectedSha256":"CURRENT_MEMORY_SHA256","edits":[{"oldText":"Exact current paragraph","newText":"Corrected paragraph"}]}
 Keep the original key and edits after an unknown result. Edits match the original document once each, cannot overlap, and commit together. The response contains current/result hashes and the durable receipt, not the whole document.
-Never probe a live write endpoint to discover its schema. A conflict requires rereading.`)
+Never probe a live write endpoint to discover its schema. A conflict requires rereading.`, "\n")...)
+		_ = page.Render(os.Stdout)
 		return 0
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami project okr show|save|sync|memory|record|collect|review PROJECT [--file JSON|-] [--server URL] [--json]\nWrites require the current revision in the JSON object; collect also requires --file. A conflict never retries a write.")
+		_ = groupHelpPage("project okr").Render(os.Stdout)
 		return 0
 	}
 	action := args[0]
@@ -56,7 +61,7 @@ Never probe a live write endpoint to discover its schema. A conflict requires re
 		fmt.Fprintln(os.Stderr, "Unknown OKR command:", action)
 		return 2
 	}
-	fs := flag.NewFlagSet("project okr "+action, flag.ContinueOnError)
+	fs := newCommandFlags("project okr " + action)
 	server := fs.String("server", "", "Roami server")
 	file := fs.String("file", "", "JSON file, or - for stdin")
 	asJSON := fs.Bool("json", false, "JSON output")
@@ -73,6 +78,9 @@ Never probe a live write endpoint to discover its schema. A conflict requires re
 		}
 	}
 	if err := fs.Parse(options); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	fail := func(err error) int {

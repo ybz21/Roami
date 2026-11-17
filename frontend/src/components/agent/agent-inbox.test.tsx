@@ -13,6 +13,20 @@ const notices = [
   { id: 2, conversation_id: 'main', branch_id: 'branch', title: 'Old report', summary: '', created_ms: 1, read: true },
 ]
 const inbox = () => ({ conversations: [{ id: 'main', title: 'Home', active_branch_id: 'branch', updated_ms: 0 }], notices: [], unread: 1, cursor: 4, unavailable: false, refresh: vi.fn() })
+it.each([null, undefined, ''])('keeps notices without a summary readable and navigable (%s)', async summary => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.includes('/summary')
+    ? { conversationId: 'main', unread: 1, cursor: 5 }
+    : { items: [{ ...notices[0], id: 5, title: 'No preview', summary }, ...notices], nextCursor: null } }))
+  const select = vi.fn()
+  render(<AgentInbox inbox={inbox()} select={select} />)
+  const notice = await screen.findByRole('button', { name: /No preview/ })
+  expect(notice.querySelector('span')?.textContent).toBe('')
+  expect(screen.getByText('Report ready: 交付文件')).toBeTruthy()
+  fireEvent.click(notice)
+  await waitFor(() => expect(select).toHaveBeenCalledWith('main', 'branch', 'message'))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.notification.readAll' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/conversations/main/read', { eventId: 5 }))
+})
 it('loads a short page only when opened and applies Unread on the server', async () => {
   vi.mocked(api).mockImplementation(async (_method, path) => ({ data: { items: path.includes('unreadOnly=true') ? notices.slice(0, 1) : notices, nextCursor: null } }))
   const select = vi.fn()

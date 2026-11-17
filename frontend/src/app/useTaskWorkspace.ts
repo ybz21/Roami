@@ -11,6 +11,7 @@ import { dropDeadTokens, type FileTab } from '../components/terminal/term-tabs-s
 import { nativeSessionId } from '../components/sessions/session-record'
 import { TASK_ROUTE } from '../route-hash'
 import { useWorkspaceState } from './useWorkspaceState'
+import { useWorkspaceStateStore } from '../view-state'
 
 import type { SessionDirectory } from './useSessionDirectory'
 type TaskWorkspaceOptions = {
@@ -25,6 +26,8 @@ type TaskWorkspaceOptions = {
 export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: hasSider, mobile: isMobile, page: tab, navigate: go }: TaskWorkspaceOptions) {
   const { sessIds, sessList } = data
   const saved = useWorkspaceState(curNodeId, data)
+  const viewStore = useWorkspaceStateStore()
+  const fileNavigation = useMemo(() => viewStore.node(curNodeId).child('page', 'workspace').child('files'), [viewStore, curNodeId])
   useEffect(() => {
     if (!sessIds || !data.sessListLoaded || !saved.loaded) return
     saved.update(state => {
@@ -70,23 +73,44 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   const isMd = (p: string) => /\.(md|markdown|mdx|html?)$/i.test(p)
   const openFileTab = (path: string, line?: number) => {
     const key = activeTaskRef.current || ''
-    setFileTabs((list) => (list.some((f) => f.path === path) ? list : [...list, { path, preview: false, mode: isMd(path) ? 'preview' : 'source', task: key }]))
-    setActiveFile(path)
+    const existing = fileTabsRef.current.find(file => file.path === path)
+    if (active && keyOf(active) === (existing?.task || key)) fileNavigation.child('file', path).set('source', toId(active))
+    saved.update(state => ({ ...state, files: state.files.some(file => file.path === path) ? state.files : [...state.files, { path, preview: false, mode: isMd(path) ? 'preview' : 'source', task: key }], activeFile: path }))
     if (line && line > 0) setReveal((prev) => ({ path, line, nonce: (prev?.nonce || 0) + 1 }))
   }
   const pinFileTab = (path: string) => setFileTabs((list) => list.map((f) => (f.path === path ? { ...f, preview: false } : f)))
   const setFileMode = (path: string, mode: FileTabMode) => setFileTabs((list) => list.map((f) => (f.path === path ? { ...f, mode, preview: false } : f)))
   const closeFileTab = (path: string) => saved.update(state => {
-    const i = state.files.findIndex(file => file.path === path)
+    const closing = state.files.find(file => file.path === path)
+    const siblings = state.files.filter(file => file.task === closing?.task)
+    const i = siblings.findIndex(file => file.path === path)
     const files = state.files.filter(file => file.path !== path)
-    return { ...state, files, activeFile: state.activeFile === path ? (files[i - 1] || files[i])?.path || '' : state.activeFile }
+    const remaining = siblings.filter(file => file.path !== path)
+    const source = fileNavigation.child('file', path).get<string>('source')
+    fileNavigation.child('file', path).clear()
+    const session = [state.active && toName(state.active), source && toName(source), ...terms].find(name => name && terms.includes(name) && keyOf(name) === closing?.task)
+    return { ...state, files, ...(state.activeFile === path ? { activeFile: (remaining[i - 1] || remaining[i])?.path || '', active: session ? toId(session) : state.active } : {}) }
   })
-  const activateSession = (n: string) => { setActive(n); setActiveFile('') }
+  const activateSession = (n: string) => saved.update(state => ({ ...state, active: toId(n), activeFile: '' }))
+  const fileSession = (path: string) => {
+    const file = fileTabsRef.current.find(file => file.path === path)
+    if (!file) return undefined
+    const source = fileNavigation.child('file', path).get<string>('source')
+    return [source && toName(source), active, ...terms].find(name => !!name && terms.includes(name) && keyOf(name) === file.task) || undefined
+  }
+  const activateFile = (path: string, session?: string) => {
+    const file = fileTabsRef.current.find(file => file.path === path)
+    if (!file) return
+    const target = session && terms.includes(session) && keyOf(session) === file.task ? session : fileSession(path)
+    saved.update(state => ({ ...state, active: target ? toId(target) : '', activeFile: path }))
+  }
+  const returnToFileSession = () => { const target = curFile && fileSession(curFile); if (target) activateSession(target) }
   const [overlay, setOverlay] = useState(false) // 手机/平板全屏终端
   useBackDismiss(isMobile && overlay, () => setOverlay(false))
   const taskView = hasSider && tab === TASK_ROUTE
-  const space = useWorkspaceLayout(terms.length > 0 || taskView, taskView)
-  useEffect(() => { if (saved.loaded && !terms.length) setOverlay(false) }, [saved.loaded, terms.length])
+  const space = useWorkspaceLayout(terms.length > 0 || fileTabs.length > 0 || taskView, taskView)
+  const pageVisible = isMobile ? !overlay : !taskView && space.mode !== 'focus'
+  useEffect(() => { if (saved.loaded && !terms.length && !fileTabs.length) setOverlay(false) }, [saved.loaded, terms.length, fileTabs.length])
 
   useEffect(() => {
     pruneTabInspector([...saved.state.terms.map(id => `s:${id}`), ...fileTabs.map(file => `f:${file.path}`)])
@@ -114,7 +138,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     const current = activeTaskRef.current
     const pool = current ? next.filter(n => keyOf(n) === current) : next
     saved.update(state => ({ ...state, terms: state.terms.filter(id => id !== toId(name)), active: state.active === toId(name) ? toId(pool[pool.length - 1] || next[next.length - 1] || '') : state.active }))
-    if (!next.length) { setOverlay(false); space.setFocus('none') }
+    if (!next.length && !fileTabsRef.current.length) { setOverlay(false); space.setFocus('none') }
   }
   const reorderTerm = (name: string, to: number) => setTerms((ts) => {
     const cur = activeTaskRef.current
@@ -125,6 +149,6 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     return ts.map((n) => (inTask(n) ? vis[i++] : n))
   })
 
-  return { terms, active, activeFile, fileTabs, curFile, activeTask, activeTaskRef, projTable, keyOf, space, taskView, overlay, setOverlay, openTerm, closeTerm, renameOpenTerm, returnToTask, activateSession, openFileTab, pinFileTab, closeFileTab, setFileMode, setActiveFile, reorderTerm, reveal }
+  return { terms, active, activeFile, fileTabs, curFile, activeTask, activeTaskRef, projTable, keyOf, space, taskView, pageVisible, overlay, setOverlay, openTerm, closeTerm, renameOpenTerm, returnToTask, activateSession, activateFile, fileSession, returnToFileSession, openFileTab, pinFileTab, closeFileTab, setFileMode, setActiveFile, reorderTerm, reveal }
 }
 export type TaskWorkspace = ReturnType<typeof useTaskWorkspace>

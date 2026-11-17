@@ -4,9 +4,21 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 模型网关与能力选择统一 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 统一模型目录、原生/聚合展示、CLI 与 Agent 选模委派及运行验收 |
+| 会话标签行尾间距 | [20261116-session-tab-spacing](20261116-session-tab-spacing/README.md) | 鼠标端动作紧邻排列、统一尺寸与桌面/真机验收 |
+| 后台任务确认与停止核对 | [20261116-task-confirmation](20261116-task-confirmation/README.md) | 停止检查重试、回报旁确认入口与桌面/真机验收 |
+| 模型源与聚合工作台 | [20261114-model-orchestration](20261114-model-orchestration/README.md) | 紧凑导航、Tailwind/Radix 控件、全宽拖拽排序与桌面/真机验收 |
+| 会话与文件导航 | [20261114-session-file-navigation](20261114-session-file-navigation/README.md) | 智能体 Logo 与会话名直达对话，有打开文件时才显示下拉，含历版快照（未改产品） |
+| 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
+| 旧会话记录分批加载 | [20261113-transcript-paging](20261113-transcript-paging/README.md) | 最新 50 条首屏、向前游标分页、只读历史身份校验与桌面/真机验收 |
+| 移除独立 DeepSeek Harness | [20261114-remove-deepseek-harness](20261114-remove-deepseek-harness/README.md) | 撤下执行器与适配，保留 API 模型和通用注册机制 |
+| CLI 帮助统一 | [20261113-cli-help](20261113-cli-help/README.md) | 同一帮助结构、子命令参数与隔离回归 |
 | 首页上下文自动整理与历史检索（草案） | [20261112-home-context-lifecycle](20261112-home-context-lifecycle/README.md) | 近期原文、当前工作简报、日周月年归档与按需回源；未启用定时任务 |
+| DeepSeek Harness 与 Agent 注册（历史） | [20261112-deepseek-harness](20261112-deepseek-harness/README.md) | 主机统一列表、单次执行能力与桌面/真机验收 |
+| 压缩状态反馈 | [20261112-compact-status](20261112-compact-status/README.md) | 状态行反馈、按需读取摘要与手机全屏详情，修复重复清空造成的闪烁 |
 | 浏览器导航等待与卡死检测 | [20261112-browser-navigation-recovery](20261112-browser-navigation-recovery/README.md) | 慢导航保留连接、超时恢复、新标签回执与桌面/手机验收 |
 | 首页委派任务与对话排版 | [20261112-home-delegated-activity](20261112-home-delegated-activity/README.md) | 委派工具步骤收在详情；正文阅读排版、紧凑输入区与整行任务导航 |
+| 大模型用量、聚合与监控 | [20261112-model-usage-details](20261112-model-usage-details/README.md) | 概况 / 审计、源定价、九种路由策略与 24 小时滚动监控 |
 | 派生任务提示词与 Main 回复 | [20261111-derived-task-prompts](20261111-derived-task-prompts/README.md) | Markdown 任务置顶、旧执行校验兼容与回复交付记录收拢 |
 | 技能市场失败恢复 | [20261111-skill-market-recovery](20261111-skill-market-recovery/README.md) | 原请求重试、错误原因与桌面/手机验收 |
 | 设置智能体入口整理 | [20261111-settings-agent-navigation](20261111-settings-agent-navigation/README.md) | 去掉旧模型入口、统一记忆迁入 Roami、旧链接兼容与桌面/真机验收 |
@@ -85,3 +97,5 @@
 [本次规则精简与迁移校验](20261028-agent-instructions/README.md)
 
 - [20261103-project-okr · 真实项目 OKR 工作台](20261103-project-okr/README.md)：项目入口、真实指标、Swarm 关联和验收记录。
+
+- [团队一键暂停与恢复](20261113-team-work-pause/README.md)

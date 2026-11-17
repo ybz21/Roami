@@ -13,8 +13,8 @@ import { useAgentData } from './useAgentData'
 import { notificationDestination } from './notification-destination'
 import './agent-notifications.css'
 
-function noticePreview(text = '') {
-  return text.replace(/!?\[([^\]\n]+)\]\([^\n)]*(?:\)|$)/gu, '$1').replace(/`([^`]+)`/gu, '$1').replace(/\*\*([^*\n]+)\*\*/gu, '$1')
+function noticePreview(text?: string | null) {
+  return (text ?? '').replace(/!?\[([^\]\n]+)\]\([^\n)]*(?:\)|$)/gu, '$1').replace(/`([^`]+)`/gu, '$1').replace(/\*\*([^*\n]+)\*\*/gu, '$1')
 }
 
 export default function AgentInbox({ inbox, select, onNavigate, conversationId }: { conversationId?: string; inbox: AgentInboxState; onNavigate?: () => void; select: (cid: string, branch?: string, message?: string) => void }) {

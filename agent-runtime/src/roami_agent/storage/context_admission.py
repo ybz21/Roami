@@ -61,10 +61,15 @@ def assert_context_admitted(db, turn):
         for_turn(db, turn)
     if row(
         db,
-        "SELECT 1 FROM jobs WHERE kind='control.stop' "
+        "SELECT 1 FROM jobs WHERE kind IN ('control.stop','control.pause') "
         "AND json_extract(payload_json,'$.turnId')=? LIMIT 1",
         (turn["id"],),
     ):
+        raise DomainError("TURN_INTERRUPTED", 409)
+    from roami_agent.storage.swarm_work_pause import conversation_paused
+
+    current = row(db, "SELECT conversation_id FROM turns WHERE id=?", (turn["id"],))
+    if current and conversation_paused(db, current["conversation_id"]):
         raise DomainError("TURN_INTERRUPTED", 409)
     assert_context_sources_available(db, turn)
 

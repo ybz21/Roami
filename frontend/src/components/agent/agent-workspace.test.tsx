@@ -45,7 +45,7 @@ it('resolves professional CLI identity from recorded intent and leaves unsupport
  expect(taskExecutor(task)).toBe('codex')
  expect(taskExecutor({ ...task, intent_json: '{broken' })).toBeNull()
  expect(taskExecutor({ ...task, latestAttempt: { executorKind: 'native', state: 'running' } })).toBe('native')
- expect(taskExecutor({ ...task, latestAttempt: { executorKind: 'future', state: 'running' } })).toBeNull()
+ expect(taskExecutor({ ...task, latestAttempt: { executorKind: 'future', state: 'running' } })).toBe('future')
 })
 
 

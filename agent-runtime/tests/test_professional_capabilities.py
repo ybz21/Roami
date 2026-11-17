@@ -19,6 +19,8 @@ from roami_agent.server.configuration import Settings
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
 
+pytestmark = pytest.mark.usefixtures("mock_executor_catalog")
+
 
 async def prepared(store, executor="codex"):
     settings = Settings(coding_directory=store.data_root)

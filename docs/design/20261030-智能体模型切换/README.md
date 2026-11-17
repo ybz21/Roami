@@ -88,3 +88,5 @@ CC/Codex 默认附带的厂商专用思考配置不跨协议强制注入，按�
 其他本机客户端可配置独立的网关调用 Key，智能体自动凭据继续由内部管理：[产品、接口与鉴权设计](gateway-access-key.md)。
 
 首页直连时补充网关模型，并保留另一角色配置：[问题、实现与验收](records/2026-11-11/home-gateway-models.md)。
+
+- [原生智能体默认模型与目录切换](native-model-discovery.md)

@@ -1,8 +1,9 @@
+import { usePageEffect } from '../../page-activity'
 // PWA「添加到桌面 / 主屏幕」：手机 / 平板，兼顾 Android 与 iOS（桌面浏览器也兼容）。
 // 设计：只要尚未以独立应用运行，就始终提供「安装」按钮。点击时——
 //  - 能拿到 beforeinstallprompt（Android / 桌面 Chromium 且满足条件）→ 触发系统原生安装；
 //  - 否则按平台弹出图文引导（iOS Safari 分享 / Android Chrome 菜单 / 桌面地址栏安装）。
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { Modal } from 'antd'
 import { useI18n } from '../../i18n'
 
@@ -53,7 +54,7 @@ export function usePwaInstall() {
   const [, force] = useState(0)
   const [guideOpen, setGuideOpen] = useState(false)
 
-  useEffect(() => {
+  usePageEffect(() => {
     if (standalone()) { setInstalled(true); return }
     const sync = () => force((n) => n + 1) // deferred 变化时刷新（按钮文案/行为可能切换）
     const onInstalled = () => { setInstalled(true); setGuideOpen(false) }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ybz21/Roami/internal/agent"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -191,5 +192,15 @@ func TestProjectFilesWithoutTeamDefinitionRemainReadable(t *testing.T) {
 	got, err = s.Sync("project", w.Revision)
 	if err != nil || got.Team == nil || got.Team.Roles == nil || len(got.Team.Roles) != 0 || got.ProjectFiles.PendingChanges {
 		t.Fatal("legacy sync did not create an empty desired-team file", got, err)
+	}
+}
+
+func TestTeamAcceptsEveryRegisteredHarness(t *testing.T) {
+	for _, kind := range agent.Kinds() {
+		config := testConfig()
+		config.Team = &TeamDefinition{SchemaVersion: 1, Roles: []TeamRole{{ID: "editor", Name: "Editor", Executor: kind, Duty: "Prepare evidence"}}}
+		if err := validate(&config); err != nil {
+			t.Fatalf("registered %s rejected: %v", kind, err)
+		}
 	}
 }

@@ -7,7 +7,7 @@ import { AgentSettings } from './agent-settings'
 import type { GatewayConfiguration, GatewayUsage } from './local-model-gateway'
 
 vi.mock('../../api', () => ({ api: vi.fn() }))
-vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => null }))
+vi.mock('../cluster/node-url', async importOriginal => ({ ...(await importOriginal<typeof import('../cluster/node-url')>()), useCurrentNodeId: () => null }))
 const layout = vi.hoisted(() => ({ phone: false, keyboard: false }))
 vi.mock('../../layout', () => ({ useLayout: () => layout }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
@@ -22,8 +22,9 @@ beforeEach(() => {
   currentConfig = structuredClone(config); currentUsage = structuredClone(usage)
   history.replaceState(null, '', '#/settings/agent/runtime?modelTab=proxy')
   vi.mocked(api).mockImplementation(async (method, path, body) => {
+    if (path === '/agent/registry') return { agents: [{ kind: 'opencode', displayName: 'OpenCode', command: 'opencode', interactive: true, models: true, canInstall: true }] }
     if (path === '/agent/model-settings') return { data: connection }
-    if (path === '/agent/model-gateway/settings') { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
+    if (path.startsWith('/agent/model-gateway/settings')) { if (method === 'PUT') currentConfig = body; return { data: currentConfig } }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, source: new URL(path, 'https://fixture.invalid').searchParams.get('source') || '', recentState: new URL(path, 'https://fixture.invalid').searchParams.get('recentState') || '' } }
     return { data: {} }
   })
@@ -76,7 +77,11 @@ it('preserves model and billing drafts across tabs and saves only the local gate
   tab('agent.proxy.tab')
   expect((screen.getByLabelText('agent.proxy.dailyLimit') as HTMLInputElement).value).toBe('0')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/settings', { ...config, dailyLimit: 0, pricing: { ...config.pricing, models: { fixture: { ...config.pricing.models.fixture, input_per_million: 3.123456789 } } } }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/settings?scope=limits', { ...config, dailyLimit: 0 }))
+  tab('agent.proxy.prices')
+  expect((screen.getByLabelText('agent.proxy.priceLabel', { selector: '#agent-price-0-input' }) as HTMLInputElement).value).toBe('3.123456789')
+  fireEvent.click(screen.getByRole('button',{name:'agent.models.save'}))
+  await waitFor(()=>expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/settings?scope=pricing',expect.objectContaining({dailyLimit:0,pricing:expect.objectContaining({models:{fixture:{...config.pricing.models.fixture,input_per_million:3.123456789}}})})))
   expect(vi.mocked(api).mock.calls.some(call => call[0] === 'PUT' && call[1] === '/agent/model-settings')).toBe(false)
   tab('agent.gateway.modelsTab')
   expect((screen.getByLabelText('agent.models.apiKey') as HTMLInputElement).value).toBe('fixture')
@@ -134,6 +139,7 @@ it('loads older unknown requests through the server filter without changing the 
   const call = { id: 'old-unknown', day: usage.day, model: 'old-unknown-model', role: 'main', state: 'unknown', currency: 'CNY', cost: null, startedMs: 1, inputTokens: null, outputTokens: null, cacheReadTokens: null, errorCode: 'MODEL_TRANSPORT_FAILED', httpStatus: 0, reconciliation: '' }
   currentUsage.today = [{ day: usage.day, role: 'main', model: 'fixture', currency: 'CNY', requests: 27, inputTokens: 250, outputTokens: 50, cacheReadTokens: 0, pending: 0, unknown: 1, usageUnknown: 1, failed: 0, cost: '1.000000000' }]
   vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path === '/agent/registry') return { agents: [{ kind: 'opencode', displayName: 'OpenCode', command: 'opencode', interactive: true, models: true, canInstall: true }] }
     if (path.startsWith('/agent/model-gateway/usage')) {
       const state = new URL(path, 'https://fixture.invalid').searchParams.get('recentState') || ''
       return { data: { ...currentUsage, recentState: state, recent: state ? [call] : [{ ...call, id: 'latest', model: 'latest-model', state: 'known' }] } }
@@ -216,8 +222,9 @@ it('does not present unfiltered receipts as RSI when an older node ignores the s
 it('opens a default-agent billing link with server-side attribution filtering', async () => {
   history.replaceState(null, '', '#/settings/agent/runtime?modelTab=proxy&agentKind=opencode')
   vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/registry') return { agents: [{ kind: 'opencode', displayName: 'OpenCode', command: 'opencode', interactive: true, models: true, canInstall: true }] }
     if (path === '/agent/model-settings') return { data: connection }
-    if (path === '/agent/model-gateway/settings') return { data: currentConfig }
+    if (path.startsWith('/agent/model-gateway/settings')) return { data: currentConfig }
     if (path.startsWith('/agent/model-gateway/usage')) return { data: { ...currentUsage, agentKind: 'opencode' } }
     return { data: {} }
   })

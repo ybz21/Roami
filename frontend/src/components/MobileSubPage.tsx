@@ -1,3 +1,4 @@
+import { usePageActive, usePageEffect } from '../page-activity'
 import BackButton from './BackButton'
 // 移动端二级页：Android Fragment 式全屏覆盖层——列表页点某项后，详情在上层整页展开。
 // 传 title 则带「← 返回 + 标题」顶栏；不传则无顶栏（内容自带返回入口，如 FileView 的 onBack）。
@@ -12,7 +13,7 @@ import BackButton from './BackButton'
 //   ③ **接管返回键**：安卓物理返回应该收掉这一层，而不是把整个路由退掉。
 // 层级：--z-subpage(90) 盖过底栏(50)；从会话全屏(100)里唤起时传 layer="session"
 // 换成 --z-session-sub(110)，否则 portal 之后不再嵌套在会话那个层叠上下文里，会被盖住。
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type ReactNode, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '../i18n'
 import { useEdgeSwipe } from './shell/edge-swipe'
@@ -33,10 +34,11 @@ export default function MobileSubPage({ title, onBack, action, search, dialogLab
   children: ReactNode
 }) {
   const { t } = useI18n()
+  const active = usePageActive()
   useBackDismiss(manageHistory, onBack)
   const rootRef = useRef<HTMLDivElement>(null)
   useEdgeSwipe(rootRef, { onBack })
-  useEffect(() => {
+  usePageEffect(() => {
     const root = rootRef.current
     if (!root || !dialogLabel) return
     root.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
@@ -57,7 +59,7 @@ export default function MobileSubPage({ title, onBack, action, search, dialogLab
       bottom: keepBottomNav ? 'var(--mobile-nav-offset, calc(var(--mobile-nav-h, 0px) + var(--safe-b)))' : 0,
       background: 'var(--bg-base)',
       zIndex: `var(${layer === 'session' ? '--z-session-sub' : '--z-subpage'})` as unknown as number,
-      display: 'flex', flexDirection: 'column',
+      display: active ? 'flex' : 'none', flexDirection: 'column',
       paddingTop: 'var(--safe-t)', paddingLeft: 'var(--safe-l)', paddingRight: 'var(--safe-r)',
       paddingBottom: keepBottomNav
         ? 'max(0px, calc(var(--kb) - var(--mobile-nav-offset, 0px)))'

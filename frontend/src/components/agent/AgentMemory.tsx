@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import BackButton from '../BackButton'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App, Button, Dropdown, Input, Select } from 'antd'
@@ -38,7 +39,7 @@ export default function AgentMemory({ cid = '', projects, select, fullPage = fal
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const refresh = useRef(() => {})
   refresh.current = () => { catalog.refresh(); catalog.facets.refresh(); detail.refresh(); setRevision(value => value + 1) }
-  useEffect(() => subscribeMemoryChanges(() => refresh.current()), [catalog.scope])
+  usePageEffect(() => subscribeMemoryChanges(() => refresh.current()), [catalog.scope])
   useEffect(() => { setMutationError(''); setMobileMenu(false) }, [route.id, catalog.scope])
   const items = catalog.value?.items || []
   const record = detail.value?.record?.id === route.id ? detail.value.record : items.find(item => item.id === route.id)

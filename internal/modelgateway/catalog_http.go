@@ -41,6 +41,10 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		h.sourceModels(w, r)
 		return true
 	}
+	if r.URL.Path == "/v1/model-gateway/catalog/routing" {
+		h.routingView(w, r)
+		return true
+	}
 	s := h.Catalog
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -80,8 +84,11 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			break
 		}
 		var model *CatalogModel
+		if input.Model == gatewayDefaultModel && catalogProtocol(input.Kind, "openai-completions") && input.SourceID == "" && input.UpstreamModel == "" {
+			model = s.defaultModel(s.value)
+		}
 		for _, m := range s.value.Models {
-			if m.ID == input.Model {
+			if m.ID == input.Model || containsField(m.Aliases, input.Model) {
 				copy := m
 				model = &copy
 			}
@@ -101,7 +108,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				break
 			}
 			for _, row := range s.value.Models {
-				if row.Protocol == source.Protocol && row.Candidates[0].SourceID == source.ID && row.Candidates[0].Model == upstream {
+				if !row.Aggregate && row.Protocol == source.Protocol && row.Candidates[0].SourceID == source.ID && row.Candidates[0].Model == upstream {
 					copy := row
 					model = &copy
 					break
@@ -121,7 +128,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				created = true
 			}
 		}
-		if model == nil || input.SourceID != "" && model.Candidates[0].SourceID != input.SourceID {
+		if model == nil || input.SourceID != "" && !(model.Aggregate && input.SourceID == groupSource || !model.Aggregate && model.Candidates[0].SourceID == input.SourceID) {
 			err = catalogError()
 			break
 		}
@@ -165,7 +172,15 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Kind == "claude" {
 			authMode = "bearer"
 		}
-		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: model.ID, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key})
+		selectedModel := model.ID
+		if input.Model == gatewayDefaultModel {
+			selectedModel = gatewayDefaultModel
+		}
+		var options []agentproviders.ModelOption
+		if input.Kind == "pi" || input.Kind == "opencode" {
+			options = s.modelOptions(s.value)
+		}
+		profile, e := s.agents.Save(r.Context(), input.Kind, profileID, agentproviders.ProfileInput{Name: "Roami Gateway", BaseURL: base, Model: selectedModel, ModelName: model.Name, Protocol: protocol, AuthMode: authMode, APIKey: &key, Models: options})
 		if e != nil {
 			err = e
 			break
@@ -216,9 +231,23 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == "GET" && r.URL.Path == "/v1/models" {
+		if kind == "codex" && r.URL.Query().Get("client_version") != "" {
+			writeJSON(w, 200, codexModelCatalog(s.modelOptions(snapshot)))
+			return
+		}
 		data := []map[string]any{}
+		if kind != "claude" && catalogProtocol(kind, "openai-completions") && s.defaultModel(snapshot) != nil {
+			data = append(data, map[string]any{"id": gatewayDefaultModel, "type": "model", "object": "model", "display_name": "Roami Default", "owned_by": "roami"})
+		}
 		for _, m := range snapshot.Models {
-			data = append(data, map[string]any{"id": m.ID, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
+			if m.Aggregate && !m.enabled() {
+				continue
+			}
+			id := m.ID
+			if kind == "claude" {
+				id = claudeModelPrefix + id
+			}
+			data = append(data, map[string]any{"id": id, "type": "model", "object": "model", "display_name": m.Name, "owned_by": "roami"})
 		}
 		writeJSON(w, 200, map[string]any{"object": "list", "data": data, "has_more": false})
 		return
@@ -254,8 +283,12 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	var alias string
 	_ = json.Unmarshal(payload["model"], &alias)
 	var model *CatalogModel
+	resolvedID := catalogModelID(kind, alias)
+	if resolvedID == gatewayDefaultModel && catalogProtocol(kind, protocol) {
+		model = h.Catalog.defaultModel(catalog)
+	}
 	for _, m := range catalog.Models {
-		if m.ID == alias {
+		if m.ID == resolvedID || containsField(m.Aliases, resolvedID) {
 			copy := m
 			model = &copy
 		}
@@ -263,6 +296,25 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	if model == nil {
 		reject(w, 400, "MODEL_NOT_CONFIGURED")
 		return
+	}
+	if !model.enabled() {
+		reject(w, 503, "MODEL_ROUTE_DISABLED")
+		return
+	}
+	if raw, present := payload["roami_free_only"]; present {
+		var freeOnly bool
+		if json.Unmarshal(raw, &freeOnly) != nil {
+			reject(w, 400, "INVALID_MODEL_CONFIG")
+			return
+		}
+		delete(payload, "roami_free_only")
+		body, _ = json.Marshal(payload)
+		if freeOnly {
+			model.FreeOnly, model.AllowPlan = true, false
+		}
+	}
+	if model.FreeOnly && !model.Aggregate {
+		model.Aggregate, model.Strategy = true, "order"
 	}
 	// Stateful provider IDs are not portable across sources or policy revisions.
 	if raw := payload["previous_response_id"]; len(raw) > 0 && string(raw) != "null" {
@@ -273,8 +325,43 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	for _, s := range catalog.Sources {
 		sources[s.ID] = s
 	}
+	var choice *routingChoice
+	if model.Aggregate {
+		required := ""
+		if r.URL.Path == "/v1/responses/compact" {
+			required = protocol
+		}
+		choice, err = h.newRoutingChoice(r.Context(), catalog, *model, required)
+		if err != nil {
+			reject(w, 503, "MODEL_ROUTE_UNAVAILABLE")
+			return
+		}
+	}
 	var admissionDuration time.Duration
-	for index, candidate := range model.Candidates {
+	for index := 0; ; index++ {
+		var leaf routingLeaf
+		if choice != nil {
+			var ok bool
+			leaf, ok, err = choice.Next()
+			if err != nil {
+				reject(w, 503, "MODEL_ROUTE_STATE_FAILED")
+				return
+			}
+			if !ok {
+				reject(w, 503, "MODEL_ROUTE_NO_AVAILABLE_MEMBER")
+				return
+			}
+		} else {
+			if index >= len(model.Candidates) {
+				return
+			}
+			leaf.Candidate = model.Candidates[index]
+		}
+		candidate := leaf.Candidate
+		if leaf.ChannelID == "" {
+			leaf.ChannelID = candidateIdentity(candidate) + "/"
+		}
+
 		source, exists := sources[candidate.SourceID]
 		if !exists {
 			reject(w, 400, "MODEL_NOT_CONFIGURED")
@@ -385,11 +472,14 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 		}
 		admissionStarted := time.Now()
-		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID})
+		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, Free: leaf.Free, PricingRevision: leaf.PricingRevision})
 		admissionDuration += time.Since(admissionStarted)
 		w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(admissionDuration.Milliseconds(), 10))
 		if e != nil {
 			status := 503
+			if e.Error() == "MODEL_GATEWAY_ROUTE_CHANGED" {
+				status = 409
+			}
 			if e.Error() == "MODEL_GATEWAY_UNAUTHORIZED" {
 				status = 401
 			}
@@ -406,6 +496,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		var usage *Usage
 		// Each attempted source settles independently, including zero-send connection failures.
 		attempt := func() bool {
+			observation := newResponseObservation(source.Protocol, time.Now())
+			defer func() { h.observeAttempt(r, leaf, call, status, code, usage, observation) }()
+
 			defer func() {
 				if err := h.Ledger.Settle(call, usage, status, code, notSent); err != nil {
 					log.Printf("model gateway: settlement failed call=%s", call.ID)
@@ -449,7 +542,12 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 			var response *http.Response
 			if source.PluginSourceID != "" {
-				response, e = h.Plugins.Fetch(r.Context(), pluginSource, pluginModel, pluginProvider, out, upstreamBody)
+				response, e = h.Plugins.FetchAccount(r.Context(), pluginSource, pluginModel, pluginProvider, func() string {
+					if leaf.Account != "" {
+						return leaf.Account
+					}
+					return pluginSource.ProviderID
+				}(), out, upstreamBody)
 			} else {
 				response, e = h.Client.Do(out)
 			}
@@ -457,15 +555,36 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				var op *net.OpError
 				notSent = errors.As(e, &op) && op.Op == "dial"
 				code = "MODEL_TRANSPORT_FAILED"
-				if notSent && model.Strategy == "failover" && index+1 < len(model.Candidates) && r.Context().Err() == nil {
+				if choice != nil {
+					h.restRoute(leaf, *model, 0, 0)
+				}
+				if notSent && (choice != nil || model.Strategy == "failover" && index+1 < len(model.Candidates)) && r.Context().Err() == nil {
 					return true
 				}
 				reject(w, 502, code)
 				return false
 			}
 			defer response.Body.Close()
+			response.Body = &observedResponseBody{ReadCloser: response.Body, observation: observation}
 			call.upstream = responseReceipt(response)
 			status = response.StatusCode
+			observation.stream = strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")
+			if choice != nil && status >= 400 {
+				h.restRoute(leaf, *model, status, retryDelay(response.Header.Get("Retry-After"), h.Ledger.now()))
+				retry := status >= 400
+				if status == 429 {
+					retry = model.switchLimit()
+				}
+				if status == 402 {
+					retry = model.switchExhausted()
+				}
+				if retry && r.Context().Err() == nil {
+					n, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, (4<<20)+1))
+					code = "MODEL_HTTP_" + strconv.Itoa(status)
+					notSent = readErr == nil && n <= 4<<20 && status < 500
+					return true
+				}
+			}
 			for name, values := range response.Header {
 				lower := strings.ToLower(name)
 				if strings.HasPrefix(lower, "x-roami-") || containsField([]string{"connection", "transfer-encoding", "content-length", "set-cookie", "upgrade"}, lower) {

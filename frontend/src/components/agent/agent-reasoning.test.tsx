@@ -11,7 +11,7 @@ const layout = vi.hoisted(() => ({ phone: false }))
 vi.mock('../../layout', () => ({ useLayout: () => layout }))
 vi.mock('../MobileSubPage', () => ({ default: ({ title, children, onBack, action }: any) => <section aria-label={title}><button onClick={onBack}>common.back</button>{action && <button onClick={action.onClick}>{action.label}</button>}{children}</section> }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { model?: string }) => key === 'modelIdentity.callId' ? `Model ID: ${values?.model}` : key }) }))
 vi.mock('antd', async () => { const { forwardRef } = await import('react'); return { Modal: ({ open, children, title }: any) => open ? <div role="dialog">{title}{children}</div> : null, Input: forwardRef(({ prefix: _prefix, allowClear: _clear, ...props }: any, ref: any) => <input ref={ref} {...props} />), Spin: () => null } })
 afterEach(() => { cleanup(); clearAgentDataCache(); layout.phone = false; vi.resetAllMocks() })
 const role = { model: 'glm-5.3-flash', baseUrl: '', keyConfigured: true, images: false, reasoningEffort: 'low', reasoningEfforts: ['low', 'high', 'max'], reasoningSupport: 'supported' as const }
@@ -267,7 +267,7 @@ it('keeps model selection usable when the optional gateway names cannot be read'
   render(<Composer />)
   await screen.findByText('provider-model')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
-  await screen.findByRole('option', { name: 'provider-model' })
+  expect((await screen.findByRole('option', { name: 'provider-model' })).getAttribute('aria-description')).toBe('agent.models.kind.unknown')
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
@@ -322,4 +322,52 @@ it('keeps the old selection after a failed gateway binding and retries the worke
   expect(writes).toHaveLength(2)
   expect(writes[0]).toEqual(['POST', '/agent/model-gateway/catalog/roles', { role: 'worker', model: 'hy', revision: 'revision' }])
   expect(writes[1]).toEqual(['POST', '/agent/model-gateway/catalog/roles', { role: 'worker', model: 'hy', revision: 'next-revision' }])
+})
+
+it('reads native and aggregate kinds dynamically without changing the selected model', async () => {
+  let aggregate = false
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-gateway/catalog') return { data: { revision: aggregate ? 'next' : 'initial', baseUrl: 'http://127.0.0.1:19999', defaultModel: 'live', models: [{ id: 'live', name: 'Live model', aliases: ['alias'], aggregate, strategy: aggregate ? 'order' : 'fixed', candidates: [] }] } }
+    return { data: { main: { ...role, model: 'alias', baseUrl: 'http://127.0.0.1:19999/v1' }, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null))
+  await waitFor(() => expect(view.result.current.modelKinds.alias).toBe('native'))
+  aggregate = true
+  act(() => { window.dispatchEvent(new Event(MODEL_CATALOG_CHANGED)) })
+  await waitFor(() => expect(view.result.current.modelKinds.alias).toBe('aggregate'))
+  expect(view.result.current.modelKinds['roami-default']).toBe('aggregate')
+  expect(view.result.current.settings?.main.model).toBe('alias')
+  expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
+})
+
+it('reads a model changed on another client when reopening the list', async () => {
+  let current = role.model
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/models') return { data: { models: [role.model, 'remote-model'] } }
+    if (path === '/agent/model-gateway/catalog') return { data: { models: [] } }
+    return { data: { main: { ...role, model: current }, worker: role } }
+  })
+  const view = renderHook(() => useAgentModels(null))
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe(role.model))
+  current = 'remote-model'
+  await act(async () => { await view.result.current.load() })
+  await waitFor(() => expect(view.result.current.settings?.main.model).toBe('remote-model'))
+  expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
+})
+
+it('distinguishes equal display names by call ID and saves the selected route', async () => {
+ let selected = { ...role, model: 'route-one', baseUrl: 'http://127.0.0.1:19999/v1' }
+ vi.mocked(api).mockImplementation(async (method, path, data) => {
+  if (path === '/agent/model-gateway/catalog') return { data: { baseUrl: 'http://127.0.0.1:19999', models: ['route-one', 'route-two'].map(id => ({id, name:'Office model'})) } }
+  if (path === '/agent/models') return {data:{models:['route-one','route-two']}}
+  if (method === 'PUT') selected = { ...selected, model: data.main.model }
+  return {data:{main:selected,worker:role}}
+ })
+ render(<Composer />)
+ await screen.findByText('Office model')
+ fireEvent.click(screen.getByRole('button', {name:'agent.models.trigger'}))
+ const options = await screen.findAllByRole('option', {name:'Office model'})
+ expect(options.map(option => option.textContent)).toEqual([expect.stringContaining('Model ID: route-one'),expect.stringContaining('Model ID: route-two')])
+ fireEvent.click(options[1])
+ await waitFor(() => expect(api).toHaveBeenCalledWith('PUT','/agent/model-settings',{main:{model:'route-two',reasoningEffort:null}}))
 })

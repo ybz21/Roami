@@ -93,7 +93,7 @@ func makeView(kind string, state *kindState, config nativeConfig) (View, error) 
 	for _, p := range state.Profiles {
 		view.Profiles = append(view.Profiles, ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, ModelName: p.ModelName, Protocol: p.Protocol,
 			AuthMode: p.AuthMode, KeyEnv: p.KeyEnv, ReasoningEffort: p.ReasoningEffort, HasKey: p.APIKey != "",
-			Applied: active && state.ActiveID == p.ID && digest(p) == state.ProfileDigest})
+			Applied: active && state.ActiveID == p.ID && digest(p) == state.ProfileDigest, Models: p.Models})
 		if view.Current.Provider == providerID(p) || (kind == "claude" && active && p.ID == state.ActiveID) {
 			view.Current.Provider = p.Name
 		}
@@ -197,7 +197,7 @@ func (s *Store) Save(ctx context.Context, kind, profileID string, input ProfileI
 			return err
 		}
 		result = ProfileSummary{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Model: p.Model, ModelName: p.ModelName, Protocol: p.Protocol, AuthMode: p.AuthMode,
-			KeyEnv: p.KeyEnv, HasKey: p.APIKey != "", ReasoningEffort: p.ReasoningEffort}
+			KeyEnv: p.KeyEnv, HasKey: p.APIKey != "", ReasoningEffort: p.ReasoningEffort, Models: p.Models}
 		return nil
 	})
 	return result, err

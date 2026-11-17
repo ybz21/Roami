@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useState, type ReactNode } from 'react'
 import { Button, Select, Spin } from 'antd'
 import { loadSwarmDirectory } from './swarm-directory'
 import { useI18n } from '../../i18n'
@@ -18,7 +19,7 @@ export default function Swarm({ openTerm, initialSwarm, onNav, embedded = false,
   const { t } = useI18n(), { phone } = useLayout()
   const [list, setList] = useState<SwarmSnapshot[] | null>(null), [error, setError] = useState(false), [creating, setCreating] = useState(false), [archived, setArchived] = useState(false)
   const scope = nodeApi('/agent/swarms')
-  useEffect(() => {
+  usePageEffect(() => {
     if (initialSwarm) return
     setList(null)
     return pollWhileVisible(async signal => {

@@ -12,7 +12,7 @@ import (
 
 func runAgentReminder(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent reminder ls\nroami agent reminder add --conversation ID --key KEY --text TEXT --after-seconds N\nroami agent reminder add --conversation ID --key KEY --text TEXT --daily-at HH:MM --timezone IANA\nroami agent reminder add --conversation ID --key KEY --text TEXT --when-ms EPOCH_MS\nroami agent reminder add --kind daily_brief --conversation ID --key KEY --text TEXT --daily-at HH:MM --timezone IANA\nroami agent reminder cancel --id ID")
+		_ = groupHelpPage("agent reminder").Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
@@ -20,7 +20,7 @@ func runAgentReminder(args []string) int {
 		fmt.Fprintln(os.Stderr, "unknown agent reminder command")
 		return 2
 	}
-	flags := flag.NewFlagSet("agent reminder "+sub, flag.ContinueOnError)
+	flags := newCommandFlags("agent reminder " + sub)
 	cid := flags.String("conversation", "", "original conversation ID")
 	key := flags.String("key", "", "required stable request key")
 	text := flags.String("text", "", "reminder text")
@@ -33,6 +33,9 @@ func runAgentReminder(args []string) int {
 	timezone := flags.String("timezone", "UTC", "IANA timezone for daily reminder")
 	_ = flags.Bool("json", true, "JSON output")
 	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	method, path := "GET", "/v1/reminders"
@@ -81,7 +84,7 @@ func runAgentReminder(args []string) int {
 
 func runAgentNotificationPreferences(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent notification-preferences get\nroami agent notification-preferences set --file SETTINGS.json\nset replaces the complete settings object; use get as the starting point.")
+		_ = groupHelpPage("agent notification-preferences").Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
@@ -89,10 +92,13 @@ func runAgentNotificationPreferences(args []string) int {
 		fmt.Fprintln(os.Stderr, "unknown notification preferences command")
 		return 2
 	}
-	flags := flag.NewFlagSet("agent notification-preferences "+sub, flag.ContinueOnError)
+	flags := newCommandFlags("agent notification-preferences " + sub)
 	file := flags.String("file", "", "complete settings JSON file, or - for stdin")
 	_ = flags.Bool("json", true, "JSON output")
 	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	method := "GET"

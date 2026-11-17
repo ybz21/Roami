@@ -1,0 +1,146 @@
+{
+  "desktop-check.json": {
+    "passed": true,
+    "layouts": [
+      {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "cards": [
+          {
+            "width": 532,
+            "height": 282.921875
+          },
+          {
+            "width": 532,
+            "height": 282.921875
+          },
+          {
+            "width": 532,
+            "height": 282.921875
+          }
+        ]
+      },
+      {
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "cards": [
+          {
+            "width": 562.65625,
+            "height": 282.921875
+          },
+          {
+            "width": 562.671875,
+            "height": 282.921875
+          },
+          {
+            "width": 562.671875,
+            "height": 282.921875
+          }
+        ]
+      },
+      {
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "cards": [
+          {
+            "width": 459.1875,
+            "height": 282.921875
+          },
+          {
+            "width": 459.203125,
+            "height": 282.921875
+          },
+          {
+            "width": 459.203125,
+            "height": 282.921875
+          }
+        ]
+      },
+      {
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "cards": [
+          {
+            "width": 449.140625,
+            "height": 282.921875
+          },
+          {
+            "width": 449.140625,
+            "height": 282.921875
+          },
+          {
+            "width": 449.140625,
+            "height": 282.921875
+          }
+        ]
+      }
+    ],
+    "errors": [],
+    "checks": [
+      "equal card dimensions at four widths",
+      "no list editing buttons",
+      "top creation menu",
+      "open connection from card",
+      "name editing in detail",
+      "connection/pricing/routing tabs",
+      "backup deletion guard",
+      "English light theme"
+    ]
+  },
+  "phone-check.json": {
+    "passed": true,
+    "device": "Redmi Note 8",
+    "layout": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "cards": [
+        {
+          "width": 360.727294921875,
+          "height": 314.9659118652344
+        },
+        {
+          "width": 360.727294921875,
+          "height": 314.9659118652344
+        },
+        {
+          "width": 360.727294921875,
+          "height": 314.9659118652344
+        }
+      ]
+    },
+    "detail": {
+      "width": 392.727294921875,
+      "x": 0,
+      "topBarHittable": true,
+      "nameEditable": true,
+      "tabs": [
+        "连接",
+        "模型与定价",
+        "账号调度"
+      ],
+      "deleteInside": true
+    },
+    "scrolled": 541.0908813476562,
+    "checks": [
+      "equal source cards",
+      "whole-card touch navigation",
+      "name editing inside detail",
+      "pricing and routing tabs",
+      "single full-screen return bar",
+      "scroll list by touch",
+      "top New creation/import/local source menu",
+      "new source form"
+    ]
+  }
+}

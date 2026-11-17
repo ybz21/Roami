@@ -8,6 +8,7 @@ from roami_agent.conversation.professional_activity import professional_activity
 from roami_agent.dispatch.routing import public_routing
 from roami_agent.protocol.delivery_receipts import delivery_output
 from roami_agent.protocol.errors import public_error_code
+from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.storage.database import rows
 
 
@@ -104,7 +105,7 @@ def conversation_activity(db, cid, transcript, *, task_id=None, main_only=False)
                     if spec.get("routingDecision")
                     else {}
                 ),
-                "external": spec["executor"] in {"codex", "claude", "opencode", "pi"},
+                "external": is_executor(spec["executor"]) and spec["executor"] != "native",
                 "delivered": bool(attempt.get("session_id"))
                 and bool(
                     rows(

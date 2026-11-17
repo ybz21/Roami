@@ -35,6 +35,7 @@ export function UsageRing({ percent, color = 'currentColor', size = 16 }: P & { 
 // ── 基础动作 ──
 export const CloseIcon = ({ size = 14 }: P) => line(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, size, 2)
 export const CheckIcon = ({ size = 14 }: P) => line(<path d="m5 12.5 4.5 4.5L19 7" />, size, 2.2)
+export const MinusIcon = ({ size = 14 }: P) => line(<path d="M5 12h14" />, size)
 export const PlusIcon = ({ size = 14 }: P) => line(<path d="M12 5v14M5 12h14" />, size, 2.2)
 export const CopyIcon = ({ size = 13 }: P) => line(<><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M15 5.5A2.5 2.5 0 0 0 12.5 4H6a2 2 0 0 0-2 2v6.5A2.5 2.5 0 0 0 6.5 15" /></>, size)
 export const RefreshIcon = ({ size = 14 }: P) => line(
@@ -45,6 +46,7 @@ export const PaperclipIcon = ({ size = 15 }: P) => line(
   <path d="M20 11.5 12.4 19a4.6 4.6 0 0 1-6.5-6.5l7.8-7.8a3 3 0 0 1 4.3 4.3l-7.7 7.7a1.5 1.5 0 0 1-2.1-2.1l7-7" />, size)
 /** 继续 / 恢复：原来写作 ▶ */
 export const PlayIcon = ({ size = 12 }: P) => solid(<path d="M8 5.5v13l11-6.5Z" />, size)
+export const PauseIcon = ({ size = 12 }: P) => solid(<><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></>, size)
 export const StopIcon = ({ size = 12 }: P) => solid(<rect x="6" y="6" width="12" height="12" rx="2" />, size)
 /** 进全屏 / 退全屏：四角箭头向外、向内。原来在 App.tsx 里现画一对 */
 export const FullscreenIcon = ({ size = 18 }: P) => line(
@@ -68,6 +70,7 @@ export const Disclosure = ({ open, size = 12 }: P & { open: boolean }) => (
 )
 export const ArrowUp = ({ size = 12 }: P) => line(<><path d="M12 19V5" /><path d="m6 11 6-6 6 6" /></>, size, 2.2)
 export const ArrowDown = ({ size = 12 }: P) => line(<><path d="M12 5v14" /><path d="m6 13 6 6 6-6" /></>, size, 2.2)
+export const DragHandleIcon = ({ size = 16 }: P) => line(<><path d="M8 6h.01M16 6h.01M8 12h.01M16 12h.01M8 18h.01M16 18h.01" /></>, size)
 /** 回车键：原来写作 ⏎ */
 export const EnterIcon = ({ size = 16 }: P) => line(<><path d="M20 5v6a3 3 0 0 1-3 3H4.5" /><path d="m9 9-5 5 5 5" /></>, size, 2)
 export const ArrowToBottom = ({ size = 13 }: P) => line(<><path d="M12 4v10" /><path d="m7 11 5 5 5-5" /><path d="M5 20h14" /></>, size, 2)
@@ -228,6 +231,7 @@ export const AgentLogo = ({ kind, size = 13 }: { kind: AgentKind | 'native'; siz
     <img className="dark" src={opencodeDark} width={size} height={size} alt="" />
     <img className="light" src={opencodeLight} width={size} height={size} alt="" />
   </span>
+  if (kind !== 'claude' && kind !== 'codex') return <BotIcon size={size} />
   return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden focusable="false"
     fill={kind === 'claude' ? 'var(--brand-claude)' : 'var(--brand-codex)'}>
     <path d={kind === 'claude' ? CLAUDE_MARK : CODEX_MARK} />

@@ -1,0 +1,221 @@
+{
+  "desktop": {
+    "passed": true,
+    "layouts": [
+      {
+        "open": true,
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 1280,
+          "bottom": 1055
+        },
+        "pane": {
+          "x": 779.609375,
+          "right": 1280,
+          "bottom": 1055
+        },
+        "main": {
+          "right": 779.609375,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": true,
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 1920,
+          "bottom": 1055
+        },
+        "pane": {
+          "x": 1131.609375,
+          "right": 1920,
+          "bottom": 1055
+        },
+        "main": {
+          "right": 1131.609375,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": true,
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 2560,
+          "bottom": 1055
+        },
+        "pane": {
+          "x": 1483.609375,
+          "right": 2560,
+          "bottom": 1055
+        },
+        "main": {
+          "right": 1483.609375,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": true,
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 3440,
+          "bottom": 1055
+        },
+        "pane": {
+          "x": 1967.609375,
+          "right": 3440,
+          "bottom": 1055
+        },
+        "main": {
+          "right": 1967.609375,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": false,
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 1280,
+          "bottom": 1055
+        },
+        "pane": null,
+        "main": {
+          "right": 1280,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": false,
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 1920,
+          "bottom": 1055
+        },
+        "pane": null,
+        "main": {
+          "right": 1920,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": false,
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 2560,
+          "bottom": 1055
+        },
+        "pane": null,
+        "main": {
+          "right": 2560,
+          "bottom": 1055
+        }
+      },
+      {
+        "open": false,
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "workspace": {
+          "x": 168,
+          "right": 3440,
+          "bottom": 1055
+        },
+        "pane": null,
+        "main": {
+          "right": 3440,
+          "bottom": 1055
+        }
+      }
+    ],
+    "models": 471,
+    "free": 17,
+    "savedMembers": 17,
+    "aliases": [
+      "hy4"
+    ],
+    "checks": [
+      "four desktop widths, pane open/closed",
+      "editable ID and old ID compatibility saved",
+      "all source selection blocked without silent truncation",
+      "all free source models added once",
+      "rotate and unavailable simulation",
+      "capabilities/context from recorded OpenRouter data",
+      "free/search filters",
+      "light English"
+    ]
+  },
+  "phone": {
+    "passed": true,
+    "device": "Redmi Note 8",
+    "layout": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "barWidth": 392.727294921875,
+      "barHittable": true,
+      "editable": true
+    },
+    "overflow": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    },
+    "scrolled": 856.727294921875,
+    "checks": [
+      "full screen editor and hittable return bar",
+      "editable ID",
+      "source then bulk select and add by touch",
+      "unavailable simulation",
+      "one internal editor scroll area",
+      "real touch scroll",
+      "cancel and return",
+      "gateway capability filtering",
+      "no document overflow"
+    ]
+  },
+  "checks": {
+    "go": "scripts/dev/quality/check.sh quick: passed (go test ./... included)",
+    "frontend": "typecheck, i18n, hover, vitest (252 files / 1810 tests), build: passed",
+    "latestRegression": "new aggregate preview and gateway binding: 28 tests passed",
+    "note": "The first full Go pass hit the existing TestClaudeRejectedCancellationStopsOnlyNewOwnedProcesses timing failure. The focused rerun and complete quick rerun both passed."
+  },
+  "screenshots": {
+    "desktopRouting": "/tmp/roami-aggregation-editor-20261114/desktop-edit-1920.png",
+    "desktopDirectory": "/tmp/roami-aggregation-editor-20261114/desktop-gateway-free.png",
+    "phoneRouting": "/tmp/roami-aggregation-editor-20261114/phone-strategy.png",
+    "phoneDirectory": "/tmp/roami-aggregation-editor-20261114/phone-gateway.png"
+  },
+  "fixture": "Recorded public OpenRouter directory: 471 models, 17 with zero advertised input and output token prices. No generation requests were sent to OpenRouter.",
+  "deployment": "Not deployed; production catalog and preferences were not changed."
+}

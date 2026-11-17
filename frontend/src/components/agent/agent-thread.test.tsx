@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { PageActivityProvider } from '../../page-activity'
+import type { ReactNode } from 'react'
 import { useAgentThread } from './useAgentThread'
 import { agentTimeline } from './agent-timeline'
 import { agentDataKey, clearAgentDataCache, peekAgentData, storeAgentData } from './agent-data-cache'
@@ -115,5 +117,29 @@ it('recovers a completed reply after a suspended stream returns to the foregroun
   expect(signals[0].aborted).toBe(true)
   await waitFor(() => expect(signals).toHaveLength(2), { timeout: 3500 })
   expect(openEventStream).toHaveBeenLastCalledWith('/agent/conversations/resume/events?after=4&summaries=true', expect.anything())
+  hook.unmount()
+})
+
+it('keeps loaded history when a retained conversation suspends and resumes its stream', async () => {
+  const message = (id: string, seq: number) => ({ id, branch_id: 'retained', role: 'user', status: 'completed', seq, content: { text: id } })
+  storeAgentData(agentDataKey('/agent/conversations/retained/messages?limit=50'), { ...snapshot('retained'), messages: [message('latest', 2)], page: { hasMore: true, olderCursor: 'cursor' } })
+  vi.mocked(api).mockResolvedValue({ data: { messages: [message('older', 1)], activities: [], page: { hasMore: false, olderCursor: null } } })
+  const signals: AbortSignal[] = []
+  vi.mocked(openEventStream).mockImplementation(async (_path, signal) => {
+    signals.push(signal)
+    return new Response(new ReadableStream({ start(controller) { signal.addEventListener('abort', () => controller.close(), { once: true }) } }))
+  })
+  let active = true
+  const wrapper = ({ children }: { children: ReactNode }) => <PageActivityProvider active={active}>{children}</PageActivityProvider>
+  const hook = renderHook(() => useAgentThread('retained'), { wrapper })
+  await waitFor(() => expect(hook.result.current.connected).toBe(true))
+  await act(async () => hook.result.current.loadOlder())
+  expect(hook.result.current.view?.messages.map(item => item.id)).toEqual(['older', 'latest'])
+  active = false; hook.rerender()
+  expect(signals[0].aborted).toBe(true)
+  active = true; hook.rerender()
+  await waitFor(() => expect(signals).toHaveLength(2))
+  expect(hook.result.current.view?.messages.map(item => item.id)).toEqual(['older', 'latest'])
+  expect(hook.result.current.view?.page?.hasMore).toBe(false)
   hook.unmount()
 })

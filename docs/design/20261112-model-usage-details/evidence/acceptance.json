@@ -1,0 +1,162 @@
+{
+  "version": 2,
+  "desktop": {
+    "passed": true,
+    "version": 2,
+    "layouts": [
+      {
+        "collapsed": false,
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": true,
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": false,
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": true,
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": false,
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": true,
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": false,
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      },
+      {
+        "collapsed": true,
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "contentHeight": 893
+      }
+    ],
+    "panes": [
+      {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "mainRight": 951.6875,
+        "detailLeft": 951.6875,
+        "detailRight": 1280
+      },
+      {
+        "width": 1920,
+        "scrollWidth": 1920,
+        "mainRight": 1480,
+        "detailLeft": 1480,
+        "detailRight": 1920
+      },
+      {
+        "width": 2560,
+        "scrollWidth": 2560,
+        "mainRight": 2120,
+        "detailLeft": 2120,
+        "detailRight": 2560
+      },
+      {
+        "width": 3440,
+        "scrollWidth": 3440,
+        "mainRight": 3000,
+        "detailLeft": 3000,
+        "detailRight": 3440
+      }
+    ],
+    "errors": [],
+    "apiRequests": [],
+    "checks": [
+      "sibling Overview and Audit tabs",
+      "no nested Overview/Requests navigation",
+      "usage, limits and aggregation in Overview",
+      "limit editing and preservation",
+      "aggregation drilldown into Audit",
+      "no overview modules in Audit",
+      "audit filters, search and empty state",
+      "request detail open and return",
+      "archive message",
+      "English and dark theme"
+    ]
+  },
+  "android": {
+    "passed": true,
+    "version": 2,
+    "device": "Redmi Note 8 / 216d6a43",
+    "overview": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "size": "compact"
+    },
+    "auditAndEnglish": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "size": "compact"
+    },
+    "controlHeights": [
+      44,
+      44,
+      44,
+      44
+    ],
+    "detail": {
+      "width": 392.727294921875,
+      "headers": 1
+    },
+    "realTouchScroll": {
+      "after": 419.6363525390625,
+      "restored": 419.6363525390625
+    },
+    "checks": [
+      "sibling Overview/Audit by touch",
+      "overview contains usage/limits/summary",
+      "audit omits overview modules",
+      "filter expand and collapse",
+      "real touch scrolling",
+      "full-screen detail with one title bar",
+      "back restores scroll",
+      "English and dark theme"
+    ]
+  }
+}

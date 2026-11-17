@@ -1,4 +1,5 @@
 // 分类共享同一份清单；页头固定，内容在页内滚动。
+import { useViewState } from '../../view-state'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { App as AntApp, Button } from 'antd'
 import { ChevronRight, CloseIcon, SearchIcon } from '../../icons'
@@ -76,9 +77,9 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
   const saveStatus = saveState === 'idle' ? null : <div role={saveState === 'failed' ? 'alert' : 'status'} className="tt-set-save-state">{t('settings.preference.' + saveState)}{saveState === 'failed' && <Button onClick={() => { void flushPreferences() }}>{t('agent.retry')}</Button>}</div>
   const { phone: compact } = useLayout()
   const nodeId = useCurrentNodeId()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useViewState('settings.query', '')
   const channel = useAgentData<{ developmentRsi: boolean }>('/agent/status', 60000)
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useViewState('settings.searchOpen', false)
   const searchRef = useRef<HTMLInputElement>(null)
   const lastSearchNonce = useRef(searchNonce)
   useEffect(() => {

@@ -1,3 +1,5 @@
+import { useViewState } from '../../view-state'
+import { usePageEffect } from '../../page-activity'
 import BackButton, { BackLink } from '../BackButton'
 import SessionLocation from '../sessions/SessionLocation'
 import SessionHierarchy from '../sessions/SessionHierarchy'
@@ -12,6 +14,7 @@ import { closeSession, sendSessionPrompt, sessionActionError } from '../sessions
 import { refreshSessionLists } from '../sessions/native-session-list'
 import { mergeProjectSessions, mergeWorktreeSessions } from './project-list/project-sessions'
 import { nativeSessionId, nativeSessionRecord } from '../sessions/session-record'
+import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, useAgentKinds, type AgentKind } from '../../agent-kind'
 import { agentCommand } from '../../agent-command'
 // 项目页（08 设计）——「项目 = 目录（git 可选），任务驱动」：
@@ -257,7 +260,6 @@ const FORK_TRUNK = 'hsl(212, 78%, 58%)'
 const FORK_COLOR: Record<string, string> = {
   live: 'var(--ok)', orphan: '#d29922', merged: 'rgba(139,148,158,.55)', ext: 'rgba(139,148,158,.7)',
 }
-const CLI_KINDS = ['shell', 'claude', 'codex', 'pi', 'opencode'] as const
 
 // 行尾动作钮：一行四五个动作写成汉字太吵，收成图标方钮。
 // 图标不写进文案（图标硬规则）：label 只给字，Tooltip 和 aria-label 都用它，图标在调用处传。
@@ -328,7 +330,7 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
     })
     setLoaded(true)
   }
-  useEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [])
+  usePageEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [])
 
   return (
     <>
@@ -470,11 +472,11 @@ function ProjectList({ data, loaded, openTerm, refresh }: {
 
   // 搜索 + 筛选（14 §6.1）：项目一多，「哪些还欠着事」比「一共有几个」有用得多
   const { phone: isPhone } = useLayout()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useViewState('projects.query', '')
   const [searching, setSearching] = useState(false)
   const [sortSheet, setSortSheet] = useState(false)
   const searchRef = useRef<InputRef>(null)
-  const [filter, setFilter] = useState<ProjFilter>('all')
+  const [filter, setFilter] = useViewState<ProjFilter>('projects.filter', 'all')
 
   const needsOf = (p: Proj) => projNeeds(p, swarms)
   // 排序：置顶恒在最前；需要你(默认) / 名称(稳定) / 创建时间 / 最近活跃
@@ -834,6 +836,8 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [sessions, setSessions] = useState<any[]>([])
   const [ann, setAnn] = useState<Record<string, any>>({})
   const agentKinds = useAgentKinds()
+  const agents = useRegisteredAgents()
+  const cliKinds = ['shell', ...agents.map(agent => agent.kind)]
   const [cc, setCc] = useState<Record<string, boolean>>({})
   const [cx, setCx] = useState<Record<string, boolean>>({})
   const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
@@ -865,7 +869,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const isGit = !!proj?.git
 
   // worktree 清单（含 main，用于 HEAD 展示；「已有(N)」与任务流用非 main 子集）
-  useEffect(() => {
+  usePageEffect(() => {
     if (!dir || !isGit) { setWtsAll([]); return }
     let stop = false
     const loadWts = () => api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`).then((r) => {
@@ -885,7 +889,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   }, [dir, isGit])
   // 远端轻量同步（10 §3 驻留档）：进项目页即同步一次，驻留期间每 5 分钟一次；
   // 失败静默（判定退回本地），worktree 轮询自然吃到新判定。
-  useEffect(() => {
+  usePageEffect(() => {
     if (!dir || !isGit) return
     const sync = () => api('POST', '/git/worktree/sync', { dir }).catch(() => {})
     sync()
@@ -896,7 +900,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const mainWt = useMemo(() => wtsAll.find((w: any) => w.isMain), [wtsAll])
   const mainHead = useMemo(() => (wtsAll.find((w: any) => w.isMain)?.head || '').slice(0, 7), [wtsAll])
   // 会话 + 归属注解（任务流数据源，与会话页同两条接口）
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const loadSess = () => api('GET', '/sessions?tree=1').then((roots) => {
       if (stop) return
@@ -911,7 +915,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [dir])
   // 竞赛（编队 tab + 任务计数）
-  useEffect(() => {
+  usePageEffect(() => {
     if (!isGit) return
     let stop = false
     const loadRaces = () => api('GET', '/races').then((r) => {
@@ -922,7 +926,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [dir, isGit])
   // 活动流（懒加载：切到活动 tab 才拉，60s 后端缓存）
-  useEffect(() => {
+  usePageEffect(() => {
     if (tab !== 'act' || !proj) return
     let stop = false
     // 活动流 = git log(commits) ∪ 收尾留痕(traces)，按时间合并倒序（08 §2.2）
@@ -959,7 +963,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const record = nativeSessionRecord(session)
     return { ...record, last_activity: record.lastActivity }
   })].sort((a, b) => (b.last_activity || 0) - (a.last_activity || 0) || a.name.localeCompare(b.name)), [cliMine, native.value, proj?.key])
-  useEffect(() => {
+  usePageEffect(() => {
     if (!isGit) return
     return pollWhileVisible(async signal => {
       const groups = await loadSwarmDirectory()
@@ -968,7 +972,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     }, 10000).stop
   }, [isGit, dir, proj?.key, swarmScope])
   // Agent 运行标注 + 待输入检测（仅本项目会话，量小）
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const check = () => cliMine.forEach(async (s: any) => {
       try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/claude`); if (!stop) setCc((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
@@ -980,7 +984,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     return () => { stop = true; clearInterval(i) }
   }, [cliMine])
   // 展开的 worktree 的命令行尾行预览（懒加载，5s）
-  useEffect(() => {
+  usePageEffect(() => {
     const names = wts.filter((w: any) => expanded[w.path]).flatMap((w: any) => (w.sessions || []).map((x: any) => x.session))
     if (!names.length) return
     let stop = false
@@ -1020,7 +1024,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   // 新开命令行（P4）：shell = 裸会话；agent = 会话 + 启动命令。孤儿复活/外部收编同款。
   const newCli = async (w: any, kind: 'shell' | AgentKind) => {
     const base = (w.branch || 'wt').replace(/[^a-zA-Z0-9_.-]+/g, '-')
-    const name = `${base}-${({ shell: 'sh', claude: 'cc', codex: 'cx', pi: 'pi', opencode: 'oc' } as const)[kind]}`
+    const name = `${base}-${kind === 'shell' ? 'sh' : kind}`
     try {
       const res = await api('POST', '/sessions', { name, dir: w.path })
       const actual = res.name || name
@@ -1605,7 +1609,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                         {live === 0 && <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', padding: '4px 8px' }}>{t('project.wt.noCli')}</div>}
                         <div className="prj-addline">
                           {t('project.wt.newCli')}
-                          {CLI_KINDS.map((kind) => <button key={kind} type="button" className="tt-act" onClick={() => newCli(w, kind)}>{kind === 'shell' ? 'shell' : agentName(kind)}</button>)}
+                          {cliKinds.map((kind) => <button key={kind} type="button" className="tt-act" disabled={agents.find(agent => agent.kind === kind)?.interactive === false} onClick={() => newCli(w, kind)}>{kind === 'shell' ? 'shell' : agents.find(agent => agent.kind === kind)?.interactive === false ? t('capabilities.agents.taskOnly', { name: agentName(kind) }) : agentName(kind)}</button>)}
                         </div>
                       </div>
                     )}
@@ -1620,7 +1624,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                       {cleanable && <Button size="small" onClick={() => cleanupMerged(w)}>{t('project.cleanup')}</Button>}
                       {!cleanable && !w.external && !!w.base && (
                         live === 0 && w.committedAhead === 0 && dirty === 0
-                          ? <Dropdown menu={{ items: CLI_KINDS.map((k) => ({ key: k, label: k === 'shell' ? 'shell' : agentName(k) })), onClick: ({ key }) => newCli(w, key as 'shell' | AgentKind) }}>
+                          ? <Dropdown menu={{ items: cliKinds.map((k) => ({ key: k, label: k === 'shell' ? 'shell' : agents.find(agent => agent.kind === k)?.interactive === false ? t('capabilities.agents.taskOnly', { name: agentName(k) }) : agentName(k), disabled: agents.find(agent => agent.kind === k)?.interactive === false })), onClick: ({ key }) => newCli(w, key as 'shell' | AgentKind) }}>
                               <Button size="small" iconPosition="end" icon={<ChevronDown size={11} />}>{t('project.wt.resume')}</Button>
                             </Dropdown>
                           : <Dropdown.Button size="small" type="primary" disabled={mergingWt === w.path}

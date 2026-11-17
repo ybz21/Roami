@@ -48,7 +48,7 @@ it('queues a normal busy-time send above the composer and lets the user interrup
   const page = render(<AgentChat {...props} />)
   fireEvent.change(screen.getByRole('textbox', { name: 'agent.message' }), { target: { value: 'do this next' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.outbox.add' }))
-  expect(api).not.toHaveBeenCalled()
+  expect(vi.mocked(api).mock.calls.filter(call => call[0] !== 'GET')).toHaveLength(0)
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('')
   const queue = screen.getByRole('region', { name: 'agent.outbox.title' })
   const card = page.container.querySelector('.agent-compose-card')!
@@ -57,7 +57,7 @@ it('queues a normal busy-time send above the composer and lets the user interrup
   fireEvent.click(screen.getByRole('button', { name: 'agent.outbox.interruptNow' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/conversations/main/messages', { requestKey: saved.items[0].id, text: 'do this next', attachmentIds: [] }))
   await waitFor(() => expect(screen.queryByRole('region', { name: 'agent.outbox.title' })).toBeNull())
-  expect(api).toHaveBeenCalledTimes(1)
+  expect(vi.mocked(api).mock.calls.filter(call => call[0] === 'POST')).toHaveLength(1)
   expect(state.accepted).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'urgent' }), 'do this next', undefined)
 })
 

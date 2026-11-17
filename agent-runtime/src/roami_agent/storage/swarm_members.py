@@ -1,10 +1,9 @@
 """Persistent role identities and immutable requests for each execution revision."""
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.storage.database import row, rows
-
-EXECUTORS = {"native", "codex", "claude", "opencode", "pi"}
 
 
 def member_for_plan(db, group, name, executor, duty, member_id=None):
@@ -14,7 +13,7 @@ def member_for_plan(db, group, name, executor, duty, member_id=None):
         or len(name.strip()) > 80
         or name.strip().casefold() in {"main", "leader"}
         or not isinstance(executor, str)
-        or executor not in EXECUTORS
+        or not is_executor(executor)
         or not isinstance(duty, str)
         or not duty.strip()
         or len(duty) > 8000

@@ -1,0 +1,54 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "results": [
+    {
+      "tab": "模型与连接",
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    },
+    {
+      "tab": "概况",
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    },
+    {
+      "tab": "审计",
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    },
+    {
+      "tab": "价格与记账",
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    },
+    {
+      "tab": "网关接入",
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    },
+    {
+      "tab": "语音模型",
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766
+    }
+  ],
+  "editor": {
+    "width": 392.727294921875,
+    "top": 0,
+    "bottom": 765.8181762695312,
+    "hit": true
+  }
+}

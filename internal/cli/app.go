@@ -175,14 +175,23 @@ func (a App) Run(args []string) error {
 // ShowHelp runs before storage migration or acquiring an instance lease.
 func ShowHelp(args []string, out io.Writer) bool {
 	args = stripQuiet(args)
-	if len(args) > 0 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
+	topic, requested := help.Request(args)
+	if !requested || len(args) == 0 {
+		return false
+	}
+	// sp -h has always meant horizontal splitting.
+	if len(args) == 2 && (args[0] == "sp" || args[0] == "split") && args[1] == "-h" {
+		return false
+	}
+	if topic == "" {
 		help.Show(version, out)
 		return true
 	}
-	if len(args) == 2 && args[1] == "--help" && sessionCommand(args[0]) {
-		if !help.Command(args[0], out) {
-			help.Show(version, out)
-		}
+	if help.Command(topic, out) {
+		return true
+	}
+	if sessionCommand(topic) {
+		help.Show(version, out)
 		return true
 	}
 	return false

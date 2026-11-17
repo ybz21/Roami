@@ -5,8 +5,9 @@ import { useSessionDirectory } from './useSessionDirectory'
 import { useTaskWorkspace } from './useTaskWorkspace'
 import { applyWorkspaceChange, type WorkspaceState } from './workspace-state'
 
-vi.mock('../components/shell/useWorkspaceLayout', () => ({ useWorkspaceLayout: () => ({ setDockOpen: vi.fn(), setFocus: vi.fn() }) }))
-vi.mock('../components/sessions/session-project', () => ({ useSessionProjects: () => ({}) }))
+vi.mock('../components/shell/useWorkspaceLayout', () => ({ useWorkspaceLayout: () => ({ mode: 'focus', setDockOpen: vi.fn(), setFocus: vi.fn() }) }))
+const projectState = vi.hoisted(() => ({ table: {} as Record<string, { worktree: string }> }))
+vi.mock('../components/sessions/session-project', () => ({ useSessionProjects: () => projectState.table }))
 vi.mock('../components/cluster/node-url', async importOriginal => ({ ...await importOriginal<typeof import('../components/cluster/node-url')>(), currentNodeId: () => 'node-a', useCurrentNodeId: () => 'node-a' }))
 const mock = vi.hoisted(() => ({ api: vi.fn() }))
 vi.mock('../api', () => ({ api: mock.api }))
@@ -19,6 +20,7 @@ function useWorkspace(mobile = false) {
   return { workspace: useTaskWorkspace({ directory, nodeId: 'node-a', desktop: !mobile, mobile, page: 'w', navigate: go }), directory }
 }
 beforeEach(() => {
+  projectState.table = {}
   localStorage.clear(); go.mockClear(); history.replaceState(null, '', '#/w')
   server = { revision: 1, terms: ['$1'], active: '$1', files: [], activeFile: '' }
   mock.api.mockReset().mockImplementation(async (method, path, body) => {
@@ -64,16 +66,27 @@ describe('server workspace lifecycle', () => {
     const { result } = renderHook(() => useWorkspace(true))
     await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
     expect(result.current.workspace.overlay).toBe(false)
+    expect(result.current.workspace.pageVisible).toBe(true)
     act(() => result.current.workspace.openTerm('beta'))
     await waitFor(() => expect(server.active).toBe('$2'))
     expect(result.current.workspace.terms).toEqual(['alpha', 'beta'])
     expect(result.current.workspace.overlay).toBe(true)
+    expect(result.current.workspace.pageVisible).toBe(false)
+    act(() => result.current.workspace.setOverlay(false))
+    expect(result.current.workspace.pageVisible).toBe(true)
+    expect(result.current.workspace.terms).toEqual(['alpha', 'beta'])
     act(() => result.current.workspace.closeTerm('beta'))
     await waitFor(() => expect(server.terms).toEqual(['$1']))
     act(() => result.current.workspace.closeTerm('alpha'))
     await waitFor(() => expect(server.terms).toEqual([]))
     expect(result.current.workspace.overlay).toBe(false)
     expect(result.current.workspace.active).toBeNull()
+  })
+
+  it('hides desktop pages while the task workspace has focus', async () => {
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+    expect(result.current.workspace.pageVisible).toBe(false)
   })
 
   it('dismisses the phone overlay when another device closes the last tab', async () => {
@@ -144,4 +157,55 @@ it('keeps session identities and open tabs stable when only Roami activity chang
   await waitFor(() => expect(result.current.directory.sessList.find(session => session.name === 'roami:native')).toMatchObject({ running: false }))
   expect(result.current.directory.sessIds).toBe(identities)
   expect(result.current.workspace.terms).toBe(terms)
+})
+
+
+it('activates a file in its own workspace and returns to the session that opened it', async () => {
+  projectState.table = { alpha: { worktree: '/repo' }, beta: { worktree: '/repo' } }
+  const { result } = renderHook(() => useWorkspace())
+  await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+  act(() => result.current.workspace.openFileTab('/repo/plan.md'))
+  act(() => result.current.workspace.openTerm('beta'))
+  act(() => result.current.workspace.activateFile('/repo/plan.md', 'beta'))
+  expect(result.current.workspace.active).toBe('beta')
+  expect(result.current.workspace.curFile).toBe('/repo/plan.md')
+  act(() => result.current.workspace.returnToFileSession())
+  expect(result.current.workspace.active).toBe('alpha')
+  expect(result.current.workspace.curFile).toBe('')
+  expect(result.current.workspace.fileTabs).toHaveLength(1)
+  act(() => result.current.workspace.activateFile('/repo/plan.md', 'beta'))
+  act(() => result.current.workspace.closeFileTab('/repo/plan.md'))
+  expect(result.current.workspace.active).toBe('beta')
+  expect(result.current.workspace.curFile).toBe('')
+})
+
+it('never activates an unrelated session or neighboring workspace when switching or closing files', async () => {
+  projectState.table = { alpha: { worktree: '/one' }, beta: { worktree: '/two' } }
+  const { result } = renderHook(() => useWorkspace())
+  await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+  act(() => result.current.workspace.openFileTab('/one/a.md'))
+  act(() => result.current.workspace.openFileTab('/one/b.md'))
+  act(() => result.current.workspace.openTerm('beta'))
+  act(() => result.current.workspace.openFileTab('/two/c.md'))
+  act(() => result.current.workspace.activateFile('/one/b.md', 'beta'))
+  expect(result.current.workspace.active).toBe('alpha')
+  act(() => result.current.workspace.closeFileTab('/one/b.md'))
+  expect(result.current.workspace.curFile).toBe('/one/a.md')
+  act(() => result.current.workspace.closeFileTab('/one/a.md'))
+  expect(result.current.workspace.active).toBe('alpha')
+  expect(result.current.workspace.curFile).toBe('')
+  expect(result.current.workspace.fileTabs.map(file => file.path)).toEqual(['/two/c.md'])
+})
+
+it('keeps phone files reachable after closing their last session and dismisses only after the last file closes', async () => {
+  const { result } = renderHook(() => useWorkspace(true))
+  await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+  act(() => result.current.workspace.openTerm('alpha'))
+  act(() => result.current.workspace.openFileTab('/repo/plan.md'))
+  act(() => result.current.workspace.closeTerm('alpha'))
+  await waitFor(() => expect(result.current.workspace.terms).toEqual([]))
+  expect(result.current.workspace.overlay).toBe(true)
+  expect(result.current.workspace.curFile).toBe('/repo/plan.md')
+  act(() => result.current.workspace.closeFileTab('/repo/plan.md'))
+  await waitFor(() => expect(result.current.workspace.overlay).toBe(false))
 })

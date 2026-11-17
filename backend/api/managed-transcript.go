@@ -11,7 +11,7 @@ import (
 )
 
 func managedTranscript(name, executor string) (string, bool) {
-	provider, managed, err := agentlifecycle.SessionProvider(runtime.New(), name, executor)
+	provider, managed, err := agentlifecycle.SessionTranscriptProvider(runtime.New(), name, executor)
 	if !managed {
 		return "", false
 	}

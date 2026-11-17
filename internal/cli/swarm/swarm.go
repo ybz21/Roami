@@ -19,6 +19,9 @@ func Run(rt runtime.Runtime, args []string, w io.Writer) error {
 	return runCommand(ctx, rt, args, w, os.Stdin)
 }
 func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Writer, input io.Reader) error {
+	if len(args) > 1 && args[len(args)-1] == "help" && NativeHelpTopic(args[:len(args)-1]) {
+		return showHelp(w, args[:len(args)-1])
+	}
 	command := "ls"
 	if len(args) > 0 {
 		if !strings.HasPrefix(args[0], "--") || args[0] == "--help" {
@@ -33,7 +36,11 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 			break
 		}
 		if arg == "--help" || arg == "-h" {
-			return showHelp(w, []string{command})
+			topic := []string{command}
+			if command == "member" && len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+				topic = append(topic, args[0])
+			}
+			return showHelp(w, topic)
 		}
 	}
 	if command == "--help" || command == "-h" {

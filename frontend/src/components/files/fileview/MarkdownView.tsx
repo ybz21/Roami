@@ -1,7 +1,7 @@
 // Markdown 渲染：react-markdown（懒加载）+ 本地图片/链接解析。
 import { type KeyboardEvent, type MouseEvent, useRef } from 'react'
 import Markdown from '../../markdown/Markdown'
-import { useRememberedScroll } from './view-state-memory'
+import { useRememberedScroll } from './file-view-state'
 
 export function MarkdownView({ path, content, accent, height, pad, resolveHref, onLinkClick }: {
   /** 滚动位置按它记：切走再切回来还在原处 */

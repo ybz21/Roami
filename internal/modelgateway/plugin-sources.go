@@ -2,6 +2,7 @@ package modelgateway
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -61,6 +62,7 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 	}
 	if r.Method == "POST" && r.URL.Path == route+"/sources" {
 		var input struct {
+			SourceID   string `json:"sourceId"`
 			PackageID  string `json:"packageId"`
 			ProviderID string `json:"providerId"`
 			Revision   string `json:"revision"`
@@ -71,6 +73,27 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 		}
 		h.Catalog.mu.Lock()
 		valid := h.Catalog.value.Revision == input.Revision && !h.Catalog.applying
+		if input.SourceID != "" {
+			owned := false
+			for _, row := range h.Catalog.value.Sources {
+				if row.PluginSourceID == input.SourceID {
+					owned = true
+					break
+				}
+			}
+			if !owned {
+				h.Catalog.mu.Unlock()
+				reject(w, 404, "MODEL_PLUGIN_SOURCE_NOT_FOUND")
+				return true
+			}
+			source, err := h.Plugins.ReadSource(input.SourceID)
+			if err != nil {
+				h.Catalog.mu.Unlock()
+				pluginFailure(w, err)
+				return true
+			}
+			input.PackageID, input.ProviderID = source.PackageID, source.ProviderID
+		}
 		h.Catalog.mu.Unlock()
 		if !valid {
 			reject(w, 409, "MODEL_CATALOG_CHANGED")
@@ -86,7 +109,21 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 		defer s.mu.Unlock()
 		next := s.snapshot()
 		next.Revision = input.Revision
-		next.Sources = append(next.Sources, ModelSource{ID: source.ID, PluginSourceID: source.ID, Name: provider.Name})
+		name := provider.Name
+		for number := 2; ; number++ {
+			exists := false
+			for _, row := range next.Sources {
+				if row.Name == name {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				break
+			}
+			name = fmt.Sprintf("%s %d", provider.Name, number)
+		}
+		next.Sources = append(next.Sources, ModelSource{ID: source.ID, PluginSourceID: source.ID, Name: name})
 		if err = s.update(r.Context(), next); err != nil {
 			h.Plugins.Remove(source.ID)
 			reject(w, 409, err.Error())

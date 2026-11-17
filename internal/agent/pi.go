@@ -32,3 +32,8 @@ func (pi) ResumeCommand(id string) string {
 }
 func (pi) DetectConversationID(string) string { return "" }
 func (pi) ConversationDir(string) string      { return "" }
+
+func (pi) InstallPackage() Package {
+	return Package{Name: "@earendil-works/pi-coding-agent", IgnoreScripts: true}
+}
+func (pi) ModelConfiguration() {}

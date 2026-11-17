@@ -121,3 +121,6 @@ func sessionsRoot() string {
 	}
 	return filepath.Join(home, ".codex", "sessions")
 }
+
+func (codex) InstallPackage() Package { return Package{Name: "@openai/codex"} }
+func (codex) ModelConfiguration()     {}

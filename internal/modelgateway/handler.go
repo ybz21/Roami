@@ -17,6 +17,8 @@ import (
 )
 
 type Handler struct {
+	routing        routingState
+	Monitor        *MonitorStore
 	Plugins        *modelplugins.Manager
 	Catalog        *CatalogStore
 	Ledger         *Ledger
@@ -67,7 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.modelDirectoryManagement(w, r) || h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
@@ -91,7 +93,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
 				return
 			}
-			if err := h.Ledger.Configure(c); err != nil {
+			scope := r.URL.Query().Get("scope")
+			if !containsField([]string{"", "pricing", "limits"}, scope) {
+				reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
+				return
+			}
+			if err := h.Ledger.configureScope(c, scope); err != nil {
 				if err.Error() == "MODEL_PROXY_CURRENCY_MISMATCH" {
 					reject(w, 409, err.Error())
 				} else {
@@ -100,11 +107,30 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			h.notifyAdmission()
+			c, _ = h.Ledger.Configuration()
 			writeJSON(w, 200, map[string]any{"data": c})
 			return
 		}
 	}
 	if r.Method == "GET" && r.URL.Path == "/v1/model-gateway/usage" {
+		if r.URL.Query().Get("view") != "" {
+			q, err := workspaceQuery(r.URL.Query())
+			if err != nil {
+				reject(w, 400, err.Error())
+				return
+			}
+			data, err := h.Ledger.WorkspaceUsage(q)
+			if err != nil {
+				if strings.HasPrefix(err.Error(), "INVALID_") {
+					reject(w, 400, err.Error())
+				} else {
+					reject(w, 503, "MODEL_GATEWAY_STORAGE_FAILED")
+				}
+				return
+			}
+			writeJSON(w, 200, map[string]any{"data": data})
+			return
+		}
 		days := 7
 		if raw := r.URL.Query().Get("days"); raw != "" {
 			var parseErr error
@@ -157,11 +183,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 256<<20))
 	var payload struct {
-		Model  string `json:"model"`
-		Stream bool   `json:"stream"`
+		Model    string `json:"model"`
+		Stream   bool   `json:"stream"`
+		FreeOnly bool   `json:"roami_free_only"`
 	}
 	if err != nil || json.Unmarshal(body, &payload) != nil || len(payload.Model) == 0 || len(payload.Model) > 200 {
 		reject(w, 400, "INVALID_MODEL_CONFIG")
+		return
+	}
+	if payload.FreeOnly && h.Catalog == nil {
+		reject(w, 503, "MODEL_GATEWAY_REQUIRED")
 		return
 	}
 	routingRole := r.Header.Get("X-Roami-Model-Role")
@@ -170,15 +201,16 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Catalog != nil {
 		configured, e := readNodeModels(h.Ledger.paths, routingRole)
-		if e == nil && configured.endpoint == h.Catalog.baseURL+"/v1" {
+		if e == nil && (configured.endpoint == h.Catalog.baseURL+"/v1" || payload.Model != configured.model || payload.FreeOnly) {
 			var requested map[string]any
 			_ = json.Unmarshal(body, &requested)
+			requested["model"] = configured.model
 			check := func() error {
 				current, err := readNodeModels(h.Ledger.paths, routingRole)
 				if err != nil {
 					return err
 				}
-				if current.endpoint != h.Catalog.baseURL+"/v1" || !current.accepts(requested, r.Header.Get("X-Roami-Model-Route")) {
+				if !current.accepts(requested, r.Header.Get("X-Roami-Model-Route")) {
 					return errors.New("MODEL_GATEWAY_ROUTE_CHANGED")
 				}
 				return nil

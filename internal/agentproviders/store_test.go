@@ -342,6 +342,81 @@ func containsLegacyClaudeField(key string) bool {
 	return false
 }
 
+func TestClaudeGatewayKeepsPickerSelectionAcrossLaunchesAndRestoresDefaults(t *testing.T) {
+	store, home := isolatedProviderStore(t)
+	ctx := context.Background()
+	path := filepath.Join(home, ".claude", "settings.json")
+	original := []byte(`{"env":{"ANTHROPIC_MODEL":"old","ANTHROPIC_DEFAULT_MODEL":"old-default","ANTHROPIC_DEFAULT_FABLE_MODEL":"old-fable"}}`)
+	if err := writePrivate(path, original); err != nil {
+		t.Fatal(err)
+	}
+	input := modelInput("claude")
+	input.Name = "Roami Gateway"
+	profile, err := store.Save(ctx, "claude", "", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := store.View(ctx, "claude")
+	applied, err := store.Apply(ctx, "claude", profile.ID, before.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, _ := loadNative(ctx, "claude")
+	values, _ := config.Documents[0].values()
+	if textAt(values, "env", "ANTHROPIC_MODEL") != "" || textAt(values, "env", "ANTHROPIC_DEFAULT_MODEL") != input.Model {
+		t.Fatal("gateway overrides the model chosen in Claude's picker")
+	}
+	updated, err := config.render([]field{{Document: "settings", Path: []string{"model"}, Value: jsonValue("roami-claude/another")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.current("claude").Model != "roami-claude/another" {
+		t.Fatal("next launch ignores Claude's saved selection")
+	}
+	if _, err := store.Restore(ctx, "claude", applied.Revision); err != nil {
+		t.Fatal(err)
+	}
+	restored, _ := loadNative(ctx, "claude")
+	values, _ = restored.Documents[0].values()
+	if textAt(values, "env", "ANTHROPIC_MODEL") != "old" || textAt(values, "env", "ANTHROPIC_DEFAULT_MODEL") != "old-default" || textAt(values, "env", "ANTHROPIC_DEFAULT_FABLE_MODEL") != "old-fable" {
+		t.Fatal("gateway did not restore the original defaults")
+	}
+}
+
+func TestCodexGatewayUsesRemoteCatalogAndRestoresLocalCatalog(t *testing.T) {
+	store, home := isolatedProviderStore(t)
+	ctx := context.Background()
+	path := filepath.Join(home, ".codex", "config.toml")
+	if err := writePrivate(path, []byte("model_catalog_json = '/original/models.json'\n")); err != nil {
+		t.Fatal(err)
+	}
+	input := modelInput("codex")
+	input.Name = "Roami Gateway"
+	profile, err := store.Save(ctx, "codex", "", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := store.View(ctx, "codex")
+	applied, err := store.Apply(ctx, "codex", profile.ID, before.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, _ := loadNative(ctx, "codex")
+	values, _ := config.Documents[0].values()
+	provider := textAt(values, "model_provider")
+	if textAt(values, "model_catalog_json") != "" || textAt(values, "model_providers", provider, "model_catalog_url") != input.BaseURL+"/models" {
+		t.Fatal("local catalog shadows gateway model discovery")
+	}
+	if _, err := store.Restore(ctx, "codex", applied.Revision); err != nil {
+		t.Fatal(err)
+	}
+	config, _ = loadNative(ctx, "codex")
+	values, _ = config.Documents[0].values()
+	if textAt(values, "model_catalog_json") != "/original/models.json" {
+		t.Fatal("original local catalog was not restored")
+	}
+}
+
 func TestFactoryModeClearsCustomConnectionAndKeepsOriginalBackup(t *testing.T) {
 	for _, kind := range []string{"claude", "codex", "opencode", "pi"} {
 		t.Run(kind, func(t *testing.T) {

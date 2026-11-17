@@ -1,0 +1,80 @@
+{
+  "passed": true,
+  "order": [
+    "连接",
+    "模型与定价",
+    "账号调度"
+  ],
+  "accountCount": 10,
+  "layouts": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "errors": [],
+  "checks": [
+    "card creates independent account",
+    "new instance signed out",
+    "own sign-in succeeds",
+    "connection/pricing/routing order",
+    "ten unique instances and names",
+    "four desktop widths",
+    "login and connection share one scroll container",
+    "plugin form fits its pane in four widths"
+  ],
+  "connectionLayouts": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "formLeft": 264,
+      "formRight": 1184,
+      "paneLeft": 168,
+      "paneRight": 1280
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "formLeft": 584,
+      "formRight": 1504,
+      "paneLeft": 168,
+      "paneRight": 1920
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "formLeft": 904,
+      "formRight": 1824,
+      "paneLeft": 168,
+      "paneRight": 2560
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "formLeft": 1344,
+      "formRight": 2264,
+      "paneLeft": 168,
+      "paneRight": 3440
+    }
+  ]
+}

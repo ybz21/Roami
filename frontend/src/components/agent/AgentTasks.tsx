@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import BackButton from '../BackButton'
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Modal, Spin } from 'antd'
@@ -69,7 +70,7 @@ export default function AgentTasks({ projects = [], cid, onSession, onChanged, s
     const element = container.current?.closest<HTMLElement>('.agent-mobile-page, .ant-tabs-content-holder') || container.current
     if (element) { try { element.scrollTop = Number(localStorage.getItem(scrollKey)) || 0 } catch { /* Start at the top. */ }; restored.current = scrollKey }
   }, [selected, loading, scrollKey, tasks.length])
-  useEffect(() => {
+  usePageEffect(() => {
     if (selected) { restored.current = ''; return }
     const element = container.current?.closest<HTMLElement>('.agent-mobile-page, .ant-tabs-content-holder') || container.current
     let position = element?.scrollTop || 0
@@ -204,11 +205,12 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
           {uncertain && <p className="agent-task-note" role="status">{t('agent.task.executionUnconfirmedHint')}</p>}
           {failed ? <p className="agent-task-note error" role="status">{t(reason || 'agent.task.incomplete')}</p> : outcome && <section className="agent-task-section agent-task-outcome"><h4>{t('agent.task.result')}</h4>{task.state !== 'succeeded' && <p className="agent-muted">{t('agent.task.resultPending')}</p>}<p>{outcome}</p></section>}
           {reported && <section className="agent-task-section"><h4>{t('agent.task.reportUnconfirmedTitle')}</h4><TaskDescription content={taskReportSummary(reported)} title={false} /></section>}
+          {(task.state === 'waiting_user' || uncertain && !!reported) && <section className="agent-task-section"><p>{t(uncertain ? 'agent.task.confirmUnconfirmedHint' : 'agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button type="primary" disabled={!!busy || !detailSafe || !current || sessionClosing} loading={busy === 'accept'} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: current?.id }) }}>{t(uncertain ? 'agent.task.checkAndAccept' : 'agent.task.accept')}</Button>{task.state === 'waiting_user' && <Button disabled={!!busy || !detailSafe || !current || sessionClosing} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: current?.id }) }}>{t('agent.task.reject')}</Button>}</div></section>}
           {!!reportLinks.length && <section className="agent-task-section"><h4>{t(task.state === 'succeeded' ? 'agent.task.deliveryLinks' : 'agent.task.reportedLinks')}</h4>{reportLinks.map(href => <a className="tt-act agent-task-delivery-link" key={href} href={href} target="_blank" rel="noopener noreferrer">{t('agent.task.openPullRequest', { n: href.split('/').pop()! })}</a>)}</section>}
           <div className="agent-task-actions">
             {task?.nativeSession && <Button onClick={() => sessionClosed ? openAgentPage('session', task.nativeSession!.id) : onSession(nativeSessionName(task.nativeSession!.id))}>{t(sessionClosed ? 'agent.task.sessionRecord' : 'agent.task.enterSession')}</Button>}
             {task?.projectId && <a className="tt-act" href={'#/projects/' + encodeURIComponent(task.projectId)}>{projects.find(project => project.id === task.projectId)?.name || t('agent.task.project')}</a>}
-            {sessionId && (!ended || retainedSession) && !sessionClosed && <Button type={ended ? 'default' : 'primary'} onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
+            {sessionId && (!ended || retainedSession) && !sessionClosed && <Button type={ended || uncertain || task.state === 'waiting_user' ? 'default' : 'primary'} onClick={() => onSession(sessionId)}>{t('agent.openSession')}</Button>}
             {retainedSession && (sessionId || task.nativeSession) && !sessionClosed && <Button disabled={!detailSafe || !!busy || sessionClosing} onClick={() => setCloseConfirm(true)}>{t('agent.task.closeSession')}</Button>}
             {task.parent_task_id && <Button onClick={() => select(task.parent_task_id!)}>{t('agent.task.parent')}</Button>}
             {(!terminal.has(task.state) || stopping) && !sessionClosed && <Button danger disabled={!detailSafe || !!busy || (task.state === 'cancelling' && !stopping)} onClick={() => { void mutate('cancel', '/agent/tasks/' + encodeURIComponent(id) + '/cancel') }}>{t(stopping ? 'agent.task.cancelContinuation' : 'agent.cancelTask')}</Button>}
@@ -235,7 +237,6 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
             </div>
           </section>}
           {phone && previewFile && <TaskArtifactMobilePreview artifact={previewFile} onBack={() => setPreview('')} />}
-          {task.state === 'waiting_user' && <section className="agent-task-section"><p>{t('agent.task.acceptanceHint')}</p><div className="agent-task-actions"><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('accept', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: true, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.accept')}</Button><Button disabled={!!busy || !detailSafe} onClick={() => { void mutate('reject', '/agent/tasks/' + encodeURIComponent(id) + '/verify', { accepted: false, revision: task.revision, runId: latest?.id }) }}>{t('agent.task.reject')}</Button></div></section>}
           <TaskDescription content={goal === task.id ? '' : goal} />
           {!!detail?.children.length && <section className="agent-task-section"><h4>{t('agent.task.children')}</h4>{detail.children.map((child) => <button type="button" className="agent-task-link" key={child.id} onClick={() => select(child.id)}><span><b>{taskTopic(child) || t('agent.task.untitled')}</b><small>{t('agent.state.' + child.state)}</small></span><ChevronRight /></button>)}{detail.childrenTruncated && <small className="agent-muted">{t('agent.task.moreChildren')}</small>}</section>}
           {sessionClosed && draft.trim() && <section className="agent-task-section"><h4>{t('agent.task.unsentDraft')}</h4><p className="agent-task-note">{draft}</p></section>}

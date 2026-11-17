@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // ── 独立单终端页：新浏览器标签全屏打开单个会话（hash 路由 #/term/name）──
 import { nativeSessionId } from '../sessions/session-record'
 import { useEffect, useRef, useState } from 'react'
@@ -34,7 +35,7 @@ export default function SoloTerminal({ name }: { name: string }) {
     }).catch(() => {})
   }, [name])
   useEffect(() => { document.title = `Roami · ${sessionDisplay(name) || name}` }, [name, label])
-  useEffect(() => {
+  usePageEffect(() => {
     if (nativeSessionId(name)) return
     let stop = false
     const check = async () => {

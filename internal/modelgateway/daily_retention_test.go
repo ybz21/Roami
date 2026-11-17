@@ -149,7 +149,7 @@ func TestDailyRetentionRollsBackAggregationIfDeletionFails(t *testing.T) {
 
 func TestDailyRetentionNeverRoundsOverflowingMoney(t *testing.T) {
 	l := newLedger(t)
-	_, err := l.db.Exec(`INSERT INTO gateway_daily_usage VALUES('2026-10-20','UTC','main','fixture','CNY','roami','other',1,0,0,0,9223372036854775807,0,0,0);
+	_, err := l.db.Exec(`INSERT INTO gateway_daily_usage VALUES('2026-10-20','UTC','main','fixture','CNY','roami','other',1,0,0,0,9223372036854775807,0,0,0,'');
  INSERT INTO gateway_calls(id,day,timezone,role,model,session_id,request_id,started_ms,finished_ms,state,currency,price_json,cost_nano)
  VALUES('old','2026-10-20','UTC','main','fixture','','',1,2,'known','CNY','{}',1)`)
 	if err != nil {

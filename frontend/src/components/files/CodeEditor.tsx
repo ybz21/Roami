@@ -1,8 +1,9 @@
 // Monaco 代码编辑器（VSCode 同款内核）：行号、语法高亮、编辑、查找、Ctrl+S 保存。
 // 依赖较重，仅由 FileBrowser 的 Viewer 懒加载引入，不进首屏包。
 // 用本地打包的 monaco（loader.config），不依赖 CDN，离线/局域网也能用。
+import { useI18n } from '../../i18n'
 import { useEffect, useRef } from 'react'
-import { recallEditorView, rememberEditorView } from './fileview/view-state-memory'
+import { useFileViewState } from './fileview/file-view-state'
 import Editor, { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
@@ -39,10 +40,15 @@ export default function CodeEditor({
   // 没有 nonce 就不会触发重新定位（第二次点同一处会毫无反应）。
   revealLine?: { line: number; nonce: number }
 }) {
+  const { recallEditorView, rememberEditorView } = useFileViewState()
+  const { t } = useI18n()
+  const saveRef = useRef(onSave); saveRef.current = onSave
+  const saveAction = useRef<monaco.IDisposable | null>(null)
+  useEffect(() => () => { saveAction.current?.dispose() }, [])
   const edRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   // 卸载（标签切走）时存视图状态。ref 取最新的 key：同一个编辑器实例不会换文件，但保险起见
   const keyRef = useRef(stateKey); keyRef.current = stateKey
-  useEffect(() => () => { if (keyRef.current && edRef.current) rememberEditorView(keyRef.current, edRef.current.saveViewState()) }, [])
+  useEffect(() => () => { if (keyRef.current && edRef.current) rememberEditorView(keyRef.current, edRef.current.saveViewState()) }, [rememberEditorView])
   useEffect(() => {
     const ed = edRef.current
     if (!ed || !revealLine?.line) return
@@ -69,7 +75,8 @@ export default function CodeEditor({
       onMount={(editor, m) => {
         edRef.current = editor
         // Ctrl/Cmd+S 保存（onSave 读最新 draft，见 Viewer）
-        editor.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.KeyS, () => onSave())
+        // addCommand registers globally without a disposable and retains old editors.
+        saveAction.current = editor.addAction({ id: 'roami.file.save', label: t('file.save'), keybindings: [m.KeyMod.CtrlCmd | m.KeyCode.KeyS], run: () => saveRef.current() })
         if (revealLine?.line) { editor.revealLineInCenter(revealLine.line); editor.setPosition({ lineNumber: revealLine.line, column: 1 }) }
         else if (stateKey) { const st = recallEditorView(stateKey) as monaco.editor.ICodeEditorViewState | undefined; if (st) editor.restoreViewState(st) }
       }}

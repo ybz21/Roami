@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "checks": [
+    "English labels",
+    "light theme",
+    "four desktop widths and compact bounds"
+  ],
+  "results": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440
+    },
+    {
+      "width": 392,
+      "scrollWidth": 392
+    }
+  ]
+}

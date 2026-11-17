@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
@@ -158,9 +159,7 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 			if executor == "roami" {
 				executor = "native"
 			}
-			switch executor {
-			case "native", "codex", "claude", "opencode", "pi":
-			default:
+			if runner := agent.Get(executor); executor != "native" && (runner == nil || runner.Kind() != executor) {
 				return fmt.Errorf("unsupported executor: %s", executor)
 			}
 			if command == "member-register" {

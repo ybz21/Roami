@@ -1,0 +1,74 @@
+// @vitest-environment jsdom
+import { installRadixTestEvents } from '../ui/radix-test-events'
+import {useState} from 'react'
+import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
+import {App} from 'antd'
+import {afterEach,beforeEach,expect,it,vi} from 'vitest'
+import {api} from '../../api'
+import SourcePricingSettings,{type SourcePriceDraft} from './SourcePricingSettings'
+vi.mock('../../api',()=>({api:vi.fn()}))
+vi.mock('../../i18n',()=>({useI18n:()=>({t:(key:string)=>key,locale:'en-US'})}))
+vi.mock('../../layout',()=>({useLayout:()=>({phone:false})}))
+const rule=(input:number)=>({mode:'tokens' as const,price:{input_per_million:input,output_per_million:30,cache_read_per_million:1}})
+function Harness(){const[draft,setDraft]=useState<SourcePriceDraft>();return <App><SourcePricingSettings sourceId="a" models={['gpt-5']} draft={draft} onChange={setDraft}/></App>}
+beforeEach(()=>{ installRadixTestEvents();
+ window.matchMedia=vi.fn().mockImplementation(()=>({matches:false,addListener:vi.fn(),removeListener:vi.fn(),addEventListener:vi.fn(),removeEventListener:vi.fn()}))
+ let saved={default:rule(3),models:{'gpt-5':rule(10)},multiplier:2,accountStrategy:'smart'}
+ const snapshot=()=>({data:structuredClone(saved),currency:'CNY',effective:[{model:'gpt-5',origin:'model',rule:saved.models['gpt-5'],price:{...saved.models['gpt-5'].price,input_per_million:saved.models['gpt-5'].price.input_per_million*2},known:true,multiplier:2}],summary:{model:'',origin:'source',rule:saved.default,price:saved.default.price,known:true,multiplier:2}})
+ vi.mocked(api).mockImplementation(async(method,path,body)=>{if(method==='PUT'){if(path.includes('scope=model'))saved={...saved,models:body.models};else saved={...saved,default:body.default,multiplier:body.multiplier}}return snapshot()})
+})
+afterEach(()=>{cleanup();vi.clearAllMocks()})
+it('saves one model without committing source drafts and saves defaults without committing model drafts',async()=>{
+ const {container}=render(<Harness/>)
+ const defaultButton=await screen.findByRole('button',{name:'orchestration.editDefault'})
+ fireEvent.click(defaultButton)
+ let editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'8'}})
+ fireEvent.click(within(editor).getByRole('button',{name:'common.back'}))
+ fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'12'}})
+ expect(within(editor).getByRole('region',{name:'modelInteraction.pricePreview'}).textContent).toContain('12')
+ fireEvent.click(within(editor).getByRole('button',{name:'pricing.save'}))
+ await waitFor(()=>expect(container.querySelector('.source-price-inspector')).toBeNull())
+ expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/settings/sources/a?scope=model&model=gpt-5',expect.objectContaining({default:rule(3),models:{'gpt-5':{...rule(12),confirmed:false}}}))
+ expect(container.querySelector('td[data-label="pricing.input"]')?.textContent).toBe('24')
+ fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'20'}})
+ fireEvent.click(within(editor).getByRole('button',{name:'common.back'}))
+ fireEvent.click(defaultButton)
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ expect((within(editor).getByLabelText('pricing.input') as HTMLInputElement).value).toBe('8')
+ fireEvent.click(within(editor).getByRole('button',{name:'pricing.save'}))
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('PUT','/agent/model-gateway/settings/sources/a?scope=default',expect.objectContaining({default:{...rule(8),confirmed:false},models:{'gpt-5':{...rule(12),confirmed:false}}})))
+ await waitFor(()=>expect(container.querySelector('.source-price-inspector')).toBeNull())
+ fireEvent.click(screen.getByRole('button',{name:'pricing.editModel'}))
+ editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ expect((within(editor).getByLabelText('pricing.input') as HTMLInputElement).value).toBe('20')
+})
+
+it('requires free confirmation and rejects invalid numeric prices without sending writes',async()=>{
+ const {container}=render(<Harness/>)
+ fireEvent.click(await screen.findByRole('button',{name:'pricing.editModel'}))
+ const editor=container.querySelector('.source-price-inspector')! as HTMLElement
+ fireEvent.change(within(editor).getByLabelText('pricing.input'),{target:{value:'-1'}})
+ expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(true)
+ fireEvent.keyDown(within(editor).getByRole('combobox',{name:'pricing.method'}),{key:'ArrowDown'})
+ fireEvent.keyDown(await screen.findByRole('option',{name:'pricing.free'}),{key:'Enter'})
+ expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(true)
+ fireEvent.click(within(editor).getByRole('checkbox',{name:'pricing.confirm'}))
+ expect((within(editor).getByRole('button',{name:'pricing.save'}) as HTMLButtonElement).disabled).toBe(false)
+ expect(vi.mocked(api).mock.calls.filter(([method])=>method==='PUT')).toHaveLength(0)
+})
+it('shows current prices without a form and opens editing only on request',async()=>{
+ render(<Harness/> )
+ const edit=await screen.findByRole('button',{name:'orchestration.editDefault'})
+ expect(screen.queryByRole('combobox',{name:'pricing.method'})).toBeNull()
+ fireEvent.click(edit)
+ expect(screen.getByRole('combobox',{name:'pricing.method'})).toBeTruthy()
+ fireEvent.click(screen.getByRole('button',{name:'common.cancel'}))
+ expect(screen.queryByRole('combobox',{name:'pricing.method'})).toBeNull()
+ await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole('button',{name:'orchestration.editDefault'})))
+ expect(vi.mocked(api).mock.calls.some(([method])=>method==='PUT')).toBe(false)
+})

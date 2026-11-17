@@ -91,7 +91,7 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		for _, name := range names {
 			valid := false
 			for _, model := range s.value.Models {
-				if model.ID == name {
+				if model.ID == name || containsField(model.Aliases, name) {
 					valid = true
 				}
 			}

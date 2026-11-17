@@ -35,3 +35,80 @@ PR #905 已于 2026-11-12 21:29（北京时间）squash 合入远端 main，但�
   本次未触及 Python，按范围跳过其检查。质量日志：`/tmp/roami-close-status-quality-full.log`。
 - 回归前后日志截图：`/tmp/roami-close-status-regression.png`，随 PR 上传到 `pr-shots`。
 - 本次没有前端源码变更；验证对象为实际 HTTP 预检结果。
+
+## 关闭预检耗时优化
+
+用户在部署后反馈检查接近十五秒。原实现每次关闭都顺序执行仓库级 Sync、文件快照和
+全仓 worktree 列表。一次生产 HTTP 请求实测 16.439 秒；相同目录的隔离分阶段测量中，
+Sync 为 8.921 秒、快照 0.946 秒、列表 0.080 秒、会话归属 0.012 秒。网络耗时有波动，
+不能把这些独立测量简单相加视为前一次请求的精确分解。
+
+### 产品设计与用户故事
+
+- 已有合入证据时，关闭预检不等待远端连接；尚未产生提交的工作区也不需要联网。
+- 合入后新增提交时重新检查当前 HEAD；未提交改动、忽略文件快照和其他会话占用仍保留。
+- 尚未确认合入的分支即时获取目标分支，继续覆盖“GitHub 已合入，本地主干没更新”的场景。
+
+### 技术设计
+
+新增 `backend/worktree/close-preflight.go`。`ClosePreflight` 只读取当前工作区，重新验证
+当前 HEAD 对本地目标引用的 ancestry / patch-id 证据。有确证或 HEAD 仍等于 StartOid
+则直接返回；否则仅 fetch 记录的 base，再重新计算当前状态。沿用十秒网络超时和离线
+退化行为；不再调用仓库级 ls-remote / List。未确认的分支遇到慢网络时仍可能等待。
+
+HTTP 预检复用该入口，其他占用会话按归属快照计数，避免为计数加工每一个工作区。
+文件快照及关闭时的生命周期校验保持原有语义，不用过期文件指纹缩短等待。
+
+### 验收
+
+- 隔离 HTTP 回归覆盖无联网的已合入检查、其他占用会话、新 HEAD 重新获取远端，以及
+  原 ancestry / squash、断网、本地仓库、未提交改动场景。优化前网络调用断言失败，优化后通过。
+- 空工作区带未跟踪草稿时不联网，仍返回草稿计数。
+- 同一实际工作目录（含 695 MiB 前端依赖）的隔离完整 HTTP 预检为 1.036 秒，包含有效
+  文件快照；单工作区合入检查为 0.035 秒，文件快照约 1.013 秒。这不是线上部署后的实测。
+- 原始证据：`/tmp/roami-close-latency-baseline.json`、`/tmp/roami-close-phases-before.json`、
+  `/tmp/roami-close-phases-after.json`、`/tmp/roami-close-http-after.json` 及
+  `/tmp/roami-close-latency-test-before.log`、`/tmp/roami-close-latency-test-after.log`。
+- 完整质量门禁重跑通过，日志为 `/tmp/roami-close-latency-quality-full-retry.log`。
+  首轮失败于既有 Claude 后台通知测试，该项单独复测通过，随后全套通过；未改动该测试。
+
+## 多提交 squash 识别（2026-11-14）
+
+### 产品设计与用户故事
+
+PR #920 的三个提交被 GitHub squash 为 `01073396`，关闭原会话仍提示三个未合并提交。
+已有 `git cherry` 判据逐提交比较 patch-id，不能将三个补丁与一个整体补丁对应。
+用户关闭此类已合入会话时，应沿用已有的已合入提示与清理选项；部分合入、后续提交和
+未提交改动继续保留警告。
+
+### 技术设计
+
+在 `mergeSignals` 的祖先及逐提交补丁判据之后增加 `squash-detection.go`。至少两个独占
+提交且逐提交判据仍有独有补丁时，以 HEAD 和目标的共同祖先计算分支整体 patch-id，
+与共同祖先之后目标历史中的非合并提交逐一比较。主干在 squash 前后推进也能识别。
+匹配后仍使用 `mergedKind=squash`，`aheadUnique=0`；原始提交计数不改写。
+
+Git diff 流经管道送入 `git patch-id --stable`，不在内存中保存整段目标历史补丁。
+两侧使用相同 diff 参数，禁用外部 diff / textconv，统一重命名展开与二进制补丁。
+空整体补丁、命令失败和取消均不作为合入证据。无新增网络请求、轮询、前端源码或删除入口。
+
+### 验收
+
+- 修复前，新增的隔离 HTTP 三提交 squash 回归失败，返回 `committedAhead=3` 且没有合入证据。
+- 修复后，同一回归通过；同时覆盖 ancestry、单提交 squash、本地引用滞后、离线、
+  未提交改动、其他占用会话及新 HEAD 重新联网检查。
+- 领域回归覆盖文本、二进制、重命名、部分合入、主干前后无关提交、合入后新提交、
+  空整体补丁、失败与取消。部分合入和后续提交保持未合入。
+- 原分支 `fix/page-workspace-state` 的三个逐提交 patch-id 均不匹配，但整体 patch-id
+  `0a151b079124a286aef35a84a9104d38f17f561d` 与 #920 的 squash 提交相同。
+- 隔离运行修复后的 `ClosePreflight` 读取原工作区，确认返回 `origin/main` / `squash`、
+  `aheadUnique=0`、无未提交改动；原工作区、分支和会话保留。
+- 原始证据：`/tmp/roami-squash-before.log`、`/tmp/roami-squash-after.log`、
+  `/tmp/roami-squash-acceptance/actual-status.json`。
+- 上述原工作区合入检查为 203 毫秒；这是隔离运行新代码的领域检查，不是线上 HTTP 耗时。
+- 新增领域回归的 race 检查通过。首次 quick 门禁失败于既有
+  `TestClaudeExplicitReconciliationPreservesOriginalSession` 的停止确认断言，单项复测通过；
+  日志为 `/tmp/roami-squash-quality-quick.log`、`/tmp/roami-squash-claude-retry.log`。
+- 回归前后与原工作区状态截图：`/tmp/roami-squash-acceptance/regression.png`。
+- 完整门禁随后通过，含 Go 全套、前端类型 / i18n / hover 检查与生产构建；未涉及
+  Python，按范围跳过其运行时检查。日志为 `/tmp/roami-squash-quality-full.log`。

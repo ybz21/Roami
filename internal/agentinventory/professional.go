@@ -12,6 +12,7 @@ import (
 )
 
 type ProfessionalAgent struct {
+	agent.Descriptor
 	Verified       bool       `json:"verified"`
 	Kind           string     `json:"kind"`
 	Installed      bool       `json:"installed"`
@@ -63,7 +64,7 @@ func discoverProfessionalAgent(ctx context.Context, kind string) ProfessionalAge
 	if q.Reason == "login_expired" {
 		authentication = "expired"
 	}
-	row := ProfessionalAgent{Kind: kind, Installed: installed, Binary: path, Authentication: authentication, Quota: q}
+	row := ProfessionalAgent{Descriptor: agent.Describe(agent.Get(kind)), Kind: kind, Installed: installed, Binary: path, Authentication: authentication, Quota: q}
 	if installed {
 		if plan, err := ProfessionalUpgradePlan(kind); err == nil {
 			row.CanUpgrade, row.UpgradeMethod = true, plan.Method
@@ -110,19 +111,15 @@ func probeProfessionalVersion(ctx context.Context, path string) string {
 }
 
 func ProfessionalInstallArgs(kind string) ([]string, error) {
-	packages := map[string]string{
-		"claude": "@anthropic-ai/claude-code", "codex": "@openai/codex",
-		"pi": "@earendil-works/pi-coding-agent", "opencode": "opencode-ai",
-	}
-	pkg, ok := packages[kind]
+	pkg, ok := agent.InstallPackage(kind)
 	if !ok {
 		return nil, fmt.Errorf("INVALID_AGENT_KIND")
 	}
 	args := []string{"install", "-g"}
-	if kind == "pi" {
+	if pkg.IgnoreScripts {
 		args = append(args, "--ignore-scripts")
 	}
-	return append(args, pkg), nil
+	return append(args, pkg.Spec()), nil
 }
 
 func InstallProfessionalAgent(ctx context.Context, args []string) error {

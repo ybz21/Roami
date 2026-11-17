@@ -10,6 +10,8 @@ from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row, rows
 
+pytestmark = pytest.mark.usefixtures("mock_executor_catalog")
+
 
 class RecordedExecutor(CodingExecutor):
     def __init__(self, database):

@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "selection": {
+    "source": "freea",
+    "model": "demo-free-chat",
+    "disabled": false
+  },
+  "after": {
+    "model": "",
+    "candidates": "Free API A / demo-free-chat",
+    "targets": [
+      44,
+      44,
+      44
+    ],
+    "width": 392,
+    "scrollWidth": 392,
+    "height": 766,
+    "scrollHeight": 766
+  },
+  "checks": [
+    "model disabled until source chosen",
+    "native source menu selected by touch",
+    "native model menu scoped to source",
+    "native model selection by touch",
+    "add by touch",
+    "remove by touch",
+    "44px targets",
+    "no document overflow"
+  ]
+}

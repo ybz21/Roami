@@ -13,43 +13,51 @@ import (
 	"github.com/ybz21/Roami/internal/agent"
 )
 
+type ModelOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Profile struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	BaseURL         string `json:"baseUrl"`
-	Model           string `json:"model"`
-	ModelName       string `json:"modelName,omitempty"`
-	Protocol        string `json:"protocol"`
-	AuthMode        string `json:"authMode"`
-	KeyEnv          string `json:"keyEnv,omitempty"`
-	ReasoningEffort string `json:"reasoningEffort,omitempty"`
-	APIKey          string `json:"apiKey,omitempty"`
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	BaseURL         string        `json:"baseUrl"`
+	Model           string        `json:"model"`
+	ModelName       string        `json:"modelName,omitempty"`
+	Protocol        string        `json:"protocol"`
+	AuthMode        string        `json:"authMode"`
+	KeyEnv          string        `json:"keyEnv,omitempty"`
+	ReasoningEffort string        `json:"reasoningEffort,omitempty"`
+	APIKey          string        `json:"apiKey,omitempty"`
+	Models          []ModelOption `json:"models,omitempty"`
 }
 
 type ProfileInput struct {
-	Name            string  `json:"name"`
-	BaseURL         string  `json:"baseUrl"`
-	Model           string  `json:"model"`
-	ModelName       string  `json:"modelName,omitempty"`
-	Protocol        string  `json:"protocol"`
-	AuthMode        string  `json:"authMode"`
-	KeyEnv          string  `json:"keyEnv"`
-	ReasoningEffort string  `json:"reasoningEffort"`
-	APIKey          *string `json:"apiKey"`
+	Name            string        `json:"name"`
+	BaseURL         string        `json:"baseUrl"`
+	Model           string        `json:"model"`
+	ModelName       string        `json:"modelName,omitempty"`
+	Protocol        string        `json:"protocol"`
+	AuthMode        string        `json:"authMode"`
+	KeyEnv          string        `json:"keyEnv"`
+	ReasoningEffort string        `json:"reasoningEffort"`
+	APIKey          *string       `json:"apiKey"`
+	Models          []ModelOption `json:"models,omitempty"`
 }
 
 type ProfileSummary struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	BaseURL         string `json:"baseUrl"`
-	Model           string `json:"model"`
-	ModelName       string `json:"modelName,omitempty"`
-	Protocol        string `json:"protocol"`
-	AuthMode        string `json:"authMode"`
-	KeyEnv          string `json:"keyEnv,omitempty"`
-	ReasoningEffort string `json:"reasoningEffort,omitempty"`
-	HasKey          bool   `json:"hasKey"`
-	Applied         bool   `json:"applied"`
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	BaseURL         string        `json:"baseUrl"`
+	Model           string        `json:"model"`
+	ModelName       string        `json:"modelName,omitempty"`
+	Protocol        string        `json:"protocol"`
+	AuthMode        string        `json:"authMode"`
+	KeyEnv          string        `json:"keyEnv,omitempty"`
+	ReasoningEffort string        `json:"reasoningEffort,omitempty"`
+	HasKey          bool          `json:"hasKey"`
+	Applied         bool          `json:"applied"`
+	Models          []ModelOption `json:"models,omitempty"`
 }
 
 type CurrentModel struct {
@@ -112,7 +120,7 @@ func validateKind(kind string) error {
 
 func profileFromInput(kind, id string, input ProfileInput, previous *Profile) (Profile, error) {
 	p := Profile{ID: id, Name: strings.TrimSpace(input.Name), BaseURL: strings.TrimSpace(input.BaseURL), Model: strings.TrimSpace(input.Model), ModelName: strings.TrimSpace(input.ModelName),
-		Protocol: input.Protocol, AuthMode: input.AuthMode, KeyEnv: strings.TrimSpace(input.KeyEnv), ReasoningEffort: input.ReasoningEffort}
+		Protocol: input.Protocol, AuthMode: input.AuthMode, KeyEnv: strings.TrimSpace(input.KeyEnv), ReasoningEffort: input.ReasoningEffort, Models: input.Models}
 	if previous != nil {
 		p.APIKey = previous.APIKey
 		if p.ModelName == "" && p.Model == previous.Model && p.BaseURL == previous.BaseURL {
@@ -153,6 +161,19 @@ func profileFromInput(kind, id string, input ProfileInput, previous *Profile) (P
 		return Profile{}, fmt.Errorf("INVALID_MODEL_KEY")
 	}
 	if p.ReasoningEffort != "" && (kind != "codex" || !strings.Contains("|low|medium|high|xhigh|", "|"+p.ReasoningEffort+"|")) {
+		return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
+	}
+	if len(p.Models) > 1001 {
+		return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
+	}
+	seen := map[string]bool{}
+	for _, model := range p.Models {
+		if model.ID == "" || len(model.ID) > 256 || len(model.Name) > 256 || seen[model.ID] || strings.ContainsAny(model.ID+model.Name, "\r\n\x00") || strings.Contains(model.ID+model.Name, "{env:") || strings.Contains(model.ID+model.Name, "{file:") {
+			return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
+		}
+		seen[model.ID] = true
+	}
+	if len(p.Models) > 0 && !seen[p.Model] {
 		return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
 	}
 	return p, nil

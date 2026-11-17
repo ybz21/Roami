@@ -10,6 +10,7 @@ import { useAgentKinds, type AgentKind } from '../agent-kind'
 import { api } from '../api'
 import { nativeSessionId } from '../components/sessions/session-record'
 import { NewProjectModal } from '../components/projects/Projects'
+import { NewSessionModal } from '../components/sessions/NewSessionModal'
 import RenameSessionModal from '../components/sessions/RenameSessionModal'
 import { TaskComposer } from '../components/sessions/TaskComposer'
 import { useSessionCloser } from '../components/sessions/session-closer'
@@ -54,6 +55,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   const [renameInTree, setRenameInTree] = useState<string | null>(null)
   const [renameTask, setRenameTask] = useState<{ key: TaskKey; name: string } | null>(null)
   const [renameTaskVal, setRenameTaskVal] = useState('')
+  const [newSessionOpen, setNewSessionOpen] = useState(false)
   const [newTaskDir, setNewTaskDir] = useState<string | null>(null)
   const quickTaskOpening = useRef(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
@@ -120,7 +122,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   }
   const newTerminalAt = async (kind: 'shell' | AgentKind, dir: string, baseArg?: string, key?: TaskKey, parentArg?: string) => {
     const base = baseArg || (dir ? dir.split('/').pop() : '') || 'shell'
-    const suffix = ({ shell: 'sh', claude: 'cc', codex: 'cx', pi: 'pi', opencode: 'oc' } as const)[kind]
+    const suffix = kind === 'shell' ? 'sh' : kind
     let name = `${base}-${suffix}`
     const taken = new Set(sessList.map((s) => s.label || s.name))
     for (let i = 2; taken.has(name); i++) name = `${base}-${suffix}${i}`
@@ -170,6 +172,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
     </Modal>
   </>
   const dialogs = <>
+    <NewSessionModal open={newSessionOpen} onClose={() => setNewSessionOpen(false)} onDone={name => { data.refresh(); directory.refresh(); openTerm(name) }} />
     <Modal className="tt-newtask-modal" open={!!newTaskDir} footer={null} width={860} destroyOnClose onCancel={() => setNewTaskDir(null)} title={t('tree.newTask')}>
       {newTaskDir && (
         <>
@@ -187,6 +190,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   </>
   return {
     tree, openTerm, closeTerm, renameOpenTerm, onTreeTask, onTreeProject, newTerminalInTask, newTerminalAt, activeTaskLabel, finishTask, removeProject,
+    newSession: () => setNewSessionOpen(true),
     newTask: (dir?: string) => { const d = dir || treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) },
     setNewTaskDir, addProject: () => setNewProjectOpen(true), renameSession: setRenameInTree,
     renameTask: (key: TaskKey, name: string) => { setRenameTask({ key, name }); setRenameTaskVal(prefs.taskNames?.[key] || name) },

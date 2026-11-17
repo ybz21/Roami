@@ -1,3 +1,4 @@
+import './components/capabilities/model-controls.css'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as AntApp } from 'antd'

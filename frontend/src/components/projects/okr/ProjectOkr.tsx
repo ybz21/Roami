@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../../page-activity'
 import BackButton from '../../BackButton'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Spin, Tabs } from 'antd'
@@ -91,7 +92,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
     }).catch(e => { if (!controller.signal.aborted) { setError('okr.loadFailed'); setErrorDetail(e.message) } })
     return () => controller.abort()
   }, [readWorkspace])
-  useEffect(() => {
+  usePageEffect(() => {
     if (!loaded) return
     let initialTick = !document.hidden
     const poll = pollWhileVisible(async signal => {

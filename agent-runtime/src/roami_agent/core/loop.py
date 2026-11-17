@@ -114,6 +114,8 @@ class AgentLoop:
         model = self.model if role == "main" else self.worker_model
         phase = "context"
         try:
+            if turn.get("model") or turn.get("freeOnly"):
+                model = model.with_model(turn.get("model"), free_only=turn.get("freeOnly", False))
             execution_deadline = asyncio.timeout(turn.get("executionTimeoutSeconds"))
             async with execution_deadline:
                 instructions = (

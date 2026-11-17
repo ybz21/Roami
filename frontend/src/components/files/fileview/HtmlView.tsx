@@ -3,7 +3,7 @@
 // 能被浏览器解析到同目录资源。key 绑 mtime → 文件被外部(cc/codex)改动时 iframe 自动重载。
 import { useCallback, useEffect, useRef } from 'react'
 import { useThemeMode } from '../../../theme'
-import { recallFrameScroll, rememberFrameScroll, type FrameScroll } from './view-state-memory'
+import { useFileViewState, type FrameScroll } from './file-view-state'
 
 const TRANSPARENT = new Set(['', 'transparent', 'rgba(0, 0, 0, 0)'])
 // 标记这份文档的 color-scheme 是我们改的：'derived' 按页面自己的底色定，'canvas' 是页面
@@ -25,6 +25,7 @@ export function HtmlView({ path, rawUrl, name, mtime, height }: {
   mtime?: number
   height: string
 }) {
+  const { recallFrameScroll, rememberFrameScroll } = useFileViewState()
   const { mode } = useThemeMode()
   const ref = useRef<HTMLIFrameElement>(null)
 
@@ -69,7 +70,7 @@ export function HtmlView({ path, rawUrl, name, mtime, height }: {
       return { x: win.scrollX, y: win.scrollY, els }
     } catch { return null }
   }, [])
-  const save = useCallback(() => { const s = snapshot(); if (s && (s.y > 0 || s.x > 0 || s.els.length)) rememberFrameScroll(key, s) }, [key, snapshot])
+  const save = useCallback(() => { const s = snapshot(); if (s && (s.y > 0 || s.x > 0 || s.els.length)) rememberFrameScroll(key, s) }, [key, snapshot, rememberFrameScroll])
   useEffect(() => () => save(), [save]) // 卸载（标签切走）时存最后一眼
 
   const restore = useCallback(() => {
@@ -97,7 +98,7 @@ export function HtmlView({ path, rawUrl, name, mtime, height }: {
     if (doc.body) ro.observe(doc.body)
     ro.observe(doc.documentElement)
     setTimeout(() => { done = true; ro.disconnect() }, 2000)
-  }, [key])
+  }, [key, recallFrameScroll])
 
   const onLoad = useCallback(() => {
     applyScheme()

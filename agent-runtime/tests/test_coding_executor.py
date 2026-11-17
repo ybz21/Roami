@@ -559,3 +559,38 @@ async def test_workspace_claim_diagnostics_survive_poll_verification_and_detail(
     assert failed["payload"]["result"]["failure"] == result["failure"]
     await executor.poll(tasks)
     assert calls == ["status"]
+
+
+@pytest.mark.parametrize("kind", ["deepseek", "future-harness"])
+async def test_registered_headless_executor_uses_catalog_capabilities(store, tmp_path, kind):
+    conversations = Conversations(store)
+    tasks = Tasks(store, conversations)
+    conversation = await conversations.create("alice")
+    task = await tasks.create(
+        "alice",
+        conversation["id"],
+        "Read the report",
+        key=kind,
+        executor=kind,
+        target={"kind": "new_session", "directory": str(tmp_path)},
+        record_intent=True,
+    )
+    run = await store.call(
+        lambda db: row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+    )
+    executor = CodingExecutor(store, Settings())
+    calls = []
+
+    async def catalog():
+        return {"candidates": [{"kind": kind, "installed": True, "interactive": False}]}
+
+    async def command(sub, *args, spec=None):
+        calls.append(spec)
+        return {"state": "launched", "session": "headless-session"}
+
+    executor.catalog = catalog
+    executor.command = command
+    await executor.run(task, run)
+    assert calls[0]["executor"] == kind
+    assert calls[0]["persistent"] is False
+    assert "Read the report" in calls[0]["prompt"]

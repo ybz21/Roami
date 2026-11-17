@@ -97,8 +97,17 @@ class ConversationService:
             "writerBacklog": self.db.pending,
         }
 
-    async def interrupt(self, owner, cid, request_key):
-        digest = hashlib.sha256(encoded(["stop", cid]).encode()).hexdigest()
+    async def interrupt(self, owner, cid, request_key, *, expected_turn_id=None, pause_id=None):
+        # A reversible pause preserves the original long-term goal authorization.
+        kind = "control.pause" if pause_id else "control.stop"
+        payload = (
+            ["stop", cid, expected_turn_id, pause_id]
+            if pause_id
+            else ["stop", cid, expected_turn_id]
+            if expected_turn_id
+            else ["stop", cid]
+        )
+        digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
 
         def write(db):
             c = owned(db, owner, cid)
@@ -112,15 +121,15 @@ class ConversationService:
                     raise DomainError("REQUEST_KEY_CONFLICT", 409)
                 receipt = row(
                     db,
-                    "SELECT payload_json FROM jobs WHERE kind='control.stop' AND aggregate_id=?",
-                    (old["id"],),
+                    "SELECT payload_json FROM jobs WHERE kind=? AND aggregate_id=?",
+                    (kind, old["id"]),
                 )
                 return json.loads(receipt["payload_json"])
             turn = row(
                 db,
-                "SELECT id,state FROM turns WHERE branch_id=? AND state IN ('running','queued') "
+                "SELECT id,state FROM turns WHERE branch_id=? AND state IN ('running','queued') AND (? IS NULL OR id=?) "
                 "ORDER BY CASE state WHEN 'running' THEN 0 ELSE 1 END,created_ms LIMIT 1",
-                (c["active_branch_id"],),
+                (c["active_branch_id"], expected_turn_id, expected_turn_id),
             )
             result = {"kind": "interrupt", "turnId": turn["id"] if turn else None}
             if turn and turn["state"] == "queued":
@@ -145,8 +154,8 @@ class ConversationService:
                 (rid, owner, request_key, digest, cid, now_ms()),
             )
             db.execute(
-                "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) VALUES(?,'control.stop',?,?,?,'done',?)",
-                (identity(), rid, rid, encoded(result), now_ms()),
+                "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) VALUES(?,?,?,?,?,'done',?)",
+                (identity(), kind, rid, rid, encoded(result), now_ms()),
             )
             return result
 

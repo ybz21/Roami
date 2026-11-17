@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 会话守护面板（roam.keepalive 的宿主侧面板）。界面稿：
 // docs/design/plugin/keepalive-panel.html
 //
@@ -71,7 +72,7 @@ export default function KeepalivePanel({ pluginId, enabled, t }: { pluginId: str
   useEffect(() => { reload() }, [reload])
 
   const paused = !!drawer || !!editing
-  useEffect(() => {
+  usePageEffect(() => {
     if (paused) return
     const id = setInterval(() => { setNow(Math.floor(Date.now() / 1000)); reload() }, POLL_MS)
     return () => clearInterval(id)

@@ -547,6 +547,7 @@ var mergeSignals = []mergeSignal{
 		w.AheadUnique = plus
 		return "squash", plus == 0 && strings.TrimSpace(out) != ""
 	},
+	detectCombinedSquash,
 }
 
 // ── List ─────────────────────────────────────────────────

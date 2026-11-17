@@ -106,6 +106,13 @@ class TaskDispatcher:
             if task["state"] != "queued" or run["state"] != "accepted":
                 db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
                 return None
+            from roami_agent.storage.swarm_work_pause import task_paused
+
+            if task_paused(db, task):
+                db.execute(
+                    "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 1000, job["id"])
+                )
+                return None
             try:
                 assert_dispatch_authorized(db, task, run)
             except ToolPreflightError as exc:
@@ -771,8 +778,6 @@ class TaskDispatcher:
             raise DomainError("TASK_NOT_FOUND", 404)
         if revision is not None and task["revision"] != revision:
             raise DomainError("TASK_REVISION_CHANGED", 409)
-        if task["state"] != "waiting_user":
-            raise DomainError("TASK_NOT_WAITING_VERIFICATION", 409)
         run = await self.db.call(
             lambda db: row(
                 db,
@@ -780,8 +785,37 @@ class TaskDispatcher:
                 (task_id, task["revision"]),
             )
         )
-        if run_id is not None and run["id"] != run_id:
+        if run_id is not None and (not run or run["id"] != run_id):
             raise DomainError("TASK_RESULT_SUPERSEDED", 409)
+        if (
+            accepted
+            and task["state"] in {"preparing", "running"}
+            and run
+            and run["state"] == "unknown"
+            and run["executor_kind"] == "cli"
+            and revision is not None
+            and run_id is not None
+            and getattr(self.executor, "can_reconcile", False)
+        ):
+            from roami_agent.dispatch.task_confirmation import reconcile_confirmation
+
+            await reconcile_confirmation(self, owner, task, run)
+            settled = await self.db.call(
+                lambda db: row(
+                    db,
+                    "SELECT t.state FROM tasks t JOIN task_attempts a ON a.task_id=t.id "
+                    "WHERE t.id=? AND t.revision=? AND a.id=? AND a.attempt_no="
+                    "(SELECT MAX(attempt_no) FROM task_attempts WHERE task_id=t.id)",
+                    (task_id, revision, run_id),
+                )
+            )
+            if settled and settled["state"] == "succeeded":
+                return {"taskId": task_id, "state": "succeeded"}
+            return await self.confirm(
+                owner, task_id, accepted, revision=revision, run_id=run_id, evidence=evidence
+            )
+        if task["state"] != "waiting_user":
+            raise DomainError("TASK_NOT_WAITING_VERIFICATION", 409)
         result = json.loads(run["result_json"])
         if accepted:
             from roami_agent.storage.swarm_evidence import validate_evidence

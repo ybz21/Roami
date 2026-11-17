@@ -12,6 +12,7 @@ export interface Preferences {
   browserRotate: string
   promptPopupOff: boolean
   recentDirs: string[]
+  agentCommands?: Record<string, string>
   claudeCommand: string
   codexCommand: string
   piCommand: string

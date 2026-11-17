@@ -12,6 +12,15 @@
 .agent-feedback { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); background:var(--warn-soft); color:var(--text-bright); font-size:var(--fs-sm); }
 .agent-feedback.error { background:var(--danger-soft); }
 .agent-composer { flex:none; position:relative; padding:var(--sp-2) var(--sp-4); width:100%; align-self:center; box-sizing:border-box; }
+.agent-compaction-status { max-width:calc(var(--sp-5) * 34); margin-inline:auto; }
+.agent-compaction-status > button { display:flex; align-items:center; gap:var(--sp-2); width:100%; min-height:var(--tap); padding:var(--sp-1) 0; border:0; background:transparent; color:var(--text-dim); font-size:var(--fs-sm); text-align:left; cursor:pointer; }
+.agent-compaction-status > button > svg { flex:none; }
+.agent-compaction-status > button > span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.agent-compaction-status small { flex:none; color:var(--accent); font-size:var(--fs-meta); }
+.agent-compaction-status[data-state="completed"] > button > svg { color:var(--ok); }
+.agent-compaction-status[data-state="failed"] > button > span { color:var(--danger); }
+.agent-compaction-status > button:focus-visible { outline:2px solid var(--accent-border); outline-offset:var(--sp-1); }
+:where(html[data-pointer="fine"]) .agent-compaction-status > button:hover { color:var(--text-bright); }
 .agent-compose-card.conversation-composer.tt-composer { padding:0; }
 .agent-compose-card.conversation-composer.tt-composer textarea { min-height:0; padding:var(--sp-3) var(--sp-4) var(--sp-2) !important; }
 .agent-compose-card.conversation-composer .conversation-composer-bar { padding:var(--sp-1) var(--sp-2) var(--sp-2); }
@@ -58,7 +67,8 @@
 .agent-task p { margin:0; white-space:pre-wrap; }
 .agent-task code { font-size:var(--fs-meta); overflow-wrap:anywhere; }
 .agent-task-actions { display:flex; gap:var(--sp-2); flex-wrap:wrap; }
-.agent-context { display:flex; flex-direction:column; align-items:stretch; gap:var(--sp-3); }
+.agent-context { display:flex; flex-direction:column; align-items:stretch; gap:var(--sp-3); min-width:0; overflow-wrap:anywhere; }
+.agent-context > p { margin:0; }
 .agent-command-list { display:flex; flex-direction:column; gap:var(--sp-2); }
 .agent-command-list button { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-3); min-height:var(--tap); }
 .agent-command-list span { font-size:var(--fs-meta); color:var(--text-dim); }

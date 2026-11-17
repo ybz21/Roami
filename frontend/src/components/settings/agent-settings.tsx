@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useSettingsDraft } from './settings-draft'
 import { useEffect, useRef, useState } from 'react'
 import { App, Button, Input, Select, Spin, Switch, Tabs } from 'antd'
@@ -42,7 +43,7 @@ function AgentSettingsWorkspace() {
     const frame = requestAnimationFrame(revealField)
     return () => cancelAnimationFrame(frame)
   }, [layout.phone, layout.keyboard, tab])
-  useEffect(() => { const changed = () => setTab(readModelSettingsTab()); window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed) }, [])
+  usePageEffect(() => { const changed = () => setTab(readModelSettingsTab()); window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed) }, [])
   return <div className="agent-model-settings" ref={workspace} onFocusCapture={event => { if (layout.phone && event.target instanceof HTMLElement && event.target.matches('input:not([readonly]),textarea')) requestAnimationFrame(revealField) }}><Tabs className="agent-settings-tabs" activeKey={tab} onChange={key => { setTab(key as ModelSettingsTab); writeModelSettingsTab(key as ModelSettingsTab) }} items={[
     { key: 'models', label: t('agent.gateway.modelsTab'), forceRender: true, children: <AgentSettingsForm onModelNames={setModels} /> },
     { key: 'proxy', label: t('agent.proxy.tab'), children: <GatewaySettingsForm controller={gateway} mode="proxy" active={tab === 'proxy'} models={models} /> },

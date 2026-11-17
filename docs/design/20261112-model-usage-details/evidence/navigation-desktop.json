@@ -1,0 +1,45 @@
+{
+  "passed": true,
+  "order": [
+    "模型",
+    "聚合",
+    "概况",
+    "监控",
+    "审计",
+    "本机网关",
+    "模型定价",
+    "语音输入"
+  ],
+  "layouts": [
+    {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 1920,
+      "scrollWidth": 1920,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 2560,
+      "scrollWidth": 2560,
+      "height": 1080,
+      "scrollHeight": 1080
+    },
+    {
+      "width": 3440,
+      "scrollWidth": 3440,
+      "height": 1080,
+      "scrollHeight": 1080
+    }
+  ],
+  "clicked": [
+    "usage",
+    "audit",
+    "aggregate",
+    "monitor"
+  ]
+}

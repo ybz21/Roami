@@ -1,3 +1,4 @@
+import { remainingGatewayCharge } from './local-model-gateway'
 import { expect, it } from 'vitest'
 import { gatewayConfiguration, gatewayDraft, gatewayUsage, validGatewayDraft, type GatewayConfiguration, type GatewayGroup, type GatewayUsage } from './local-model-gateway'
 
@@ -55,4 +56,9 @@ it('keeps an unset default price separate from an explicitly configured zero pri
   expect(gatewayConfiguration(draft).pricing.defaultConfigured).toBe(false)
   const free = { ...draft, defaultPrice: { ...draft.defaultPrice, input: '0', output: '0', cacheRead: '0' } }
   expect(gatewayConfiguration(free).pricing.defaultConfigured).toBe(true)
+})
+
+it('subtracts only the allowance currency without losing nanounits or showing negative remaining amounts', () => {
+  expect(remainingGatewayCharge(0.3, 'USD', [{ currency: 'USD', amount: '0.200000001' }, { currency: 'CNY', amount: '100.000000000' }])).toEqual({ currency: 'USD', amount: '0.099999999' })
+  expect(remainingGatewayCharge(0.1, 'USD', [{ currency: 'USD', amount: '0.200000001' }])).toEqual({ currency: 'USD', amount: '0.000000000' })
 })

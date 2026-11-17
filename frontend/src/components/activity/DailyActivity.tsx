@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -26,7 +27,7 @@ export default function DailyActivity() {
       if (!signal.aborted) { setData(response.data); setError(false); setNow(new Date()) }
     } catch { if (!signal.aborted) setError(true) }
   }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     const controller = new AbortController()
     const update = () => void load(controller.signal)
     update()

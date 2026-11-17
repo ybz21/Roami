@@ -1,9 +1,10 @@
+import { isAgentKind, type AgentKind } from '../../agent-kind'
 import type { OverviewItem } from '../../session-overview'
 import { taskExecutor, type TaskDetail } from '../agent/agent-task-protocol'
 import type { SwarmTeamMember } from './swarm-members'
 import type { SwarmSnapshot } from './swarm-protocol'
 
-export type MemberSession = { kind: 'native'; id: string; taskId: string; projectId?: string } | { kind: 'codex' | 'claude' | 'opencode' | 'pi' | 'terminal'; id: string }
+export type MemberSession = { kind: 'native'; id: string; taskId: string; projectId?: string } | { kind: AgentKind | 'terminal'; id: string; taskId?: never; projectId?: never }
 
 export function memberSessionIdentity(data: SwarmSnapshot, member: SwarmTeamMember) {
   return JSON.stringify([data.id, data.target.projectId, data.mainConversationId, member.id, member.executor, member.work?.id, member.work?.task_id, member.work?.revision, member.work?.attempt?.runId, member.registered?.instance])
@@ -23,5 +24,5 @@ export function memberSession(data: SwarmSnapshot, member: SwarmTeamMember, deta
     return { kind: 'native', id: task.nativeSession.id, taskId: task.id, projectId: project }
   }
   if (task.nativeSession || !live || work.attempt?.sessionId !== live.name) return null
-  return { kind: ['codex', 'claude', 'opencode', 'pi'].includes(member.executor) ? member.executor as 'codex' | 'claude' | 'opencode' | 'pi' : 'terminal', id: live.name }
+  return { kind: isAgentKind(member.executor) ? member.executor : 'terminal', id: live.name }
 }

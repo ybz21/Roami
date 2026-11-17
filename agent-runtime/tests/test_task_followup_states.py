@@ -11,6 +11,8 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row, rows
 
+pytestmark = pytest.mark.usefixtures("mock_executor_catalog")
+
 EXECUTORS = ("native", "codex", "claude", "opencode", "pi")
 STATES = (
     "queued",

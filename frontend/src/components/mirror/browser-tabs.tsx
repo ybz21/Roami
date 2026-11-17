@@ -1,3 +1,4 @@
+import { useViewState, useViewRef } from '../../view-state'
 import { useI18n } from '../../i18n'
 import { ConfigProvider, Dropdown, Input, Segmented } from 'antd'
 import { useEffect, useRef, useState } from 'react'
@@ -25,10 +26,10 @@ export function TabStrip({ tabs, active, pinned, onSelect, onClose, onCloseMany,
   onOpenTabs: () => void
 }) {
   const { t } = useI18n()
-  const [group, setGroup] = useState<'human' | 'agent'>(tabs.find(tab => tab.id === active)?.origin || 'agent')
+  const [group, setGroup] = useViewState<'human' | 'agent'>('browser.strip.group', tabs.find(tab => tab.id === active)?.origin || 'agent')
   useEffect(() => { const selected = tabs.find(tab => tab.id === active); if (selected) setGroup(selected.origin || 'agent') }, [active, tabs.find(tab => tab.id === active)?.origin])
-  const recent = useRef<Partial<Record<'human' | 'agent', string>>>({})
-  useEffect(() => { const selected = tabs.find(tab => tab.id === active); if (selected) recent.current[selected.origin || 'agent'] = selected.id }, [active, tabs.find(tab => tab.id === active)?.origin])
+  const recent = useViewRef<Partial<Record<'human' | 'agent', string>>>('browser.strip.recent', {})
+  useEffect(() => { const selected = tabs.find(tab => tab.id === active); if (selected) recent.current = { ...recent.current, [selected.origin || 'agent']: selected.id } }, [active, tabs.find(tab => tab.id === active)?.origin])
   const grouped = tabs.filter(tab => (tab.origin || 'agent') === group)
   const groups = <Segmented aria-label={t('browser.groups')} value={group} onChange={value => { onGroupChange?.(); setGroup(value as 'human' | 'agent'); const first = tabs.find(tab => tab.id === recent.current[value as 'human' | 'agent'] && (tab.origin || 'agent') === value) || tabs.find(tab => (tab.origin || 'agent') === value); if (first) onSelect(first.id) }}
     options={(['human', 'agent'] as const).map(origin => ({ value: origin, label: t('browser.groupCount', { group: t(`browser.group.${origin}`), count: tabs.filter(tab => (tab.origin || 'agent') === origin).length }) }))} />
@@ -95,8 +96,8 @@ export function TabSheet({ open, tabs, active, pinned, onClose, onSelect, onClos
   onAdd: () => void
 }) {
   const { t } = useI18n()
-  const [group, setGroup] = useState<'all' | 'human' | 'agent'>('all')
-  const [query, setQuery] = useState('')
+  const [group, setGroup] = useViewState<'all' | 'human' | 'agent'>('browser.directory.group', 'all')
+  const [query, setQuery] = useViewState('browser.directory.query', '')
   const directoryRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!open || compact) return
@@ -104,7 +105,8 @@ export function TabSheet({ open, tabs, active, pinned, onClose, onSelect, onClos
     directoryRef.current?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
     return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }) }
   }, [open, compact])
-  useEffect(() => { if (open) { setGroup('all'); setQuery('') } }, [open])
+  const wasOpen = useRef(open)
+  useEffect(() => { if (open && !wasOpen.current) { setGroup('all'); setQuery('') }; wasOpen.current = open }, [open])
   const grouped = tabs.filter(tab => (group === 'all' || (tab.origin || 'agent') === group) && `${label(tab)} ${tab.url}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   const groups = <Segmented aria-label={t('browser.groups')} value={group} onChange={value => setGroup(value as typeof group)}
     options={['all', 'human', 'agent'].map(origin => ({ value: origin, label: origin === 'all' ? t('common.all') : t(`browser.group.${origin}`) }))} />

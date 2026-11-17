@@ -29,7 +29,7 @@ func validAmount(value float64) bool {
 }
 
 func (c Configuration) validate() error {
-	if !currencyPattern.MatchString(c.Currency) || len(c.Timezone) > 100 || c.Timezone == "" || len(c.Pricing.Models) > 200 {
+	if !currencyPattern.MatchString(c.Currency) || len(c.Timezone) > 100 || c.Timezone == "" || len(c.Pricing.Models) > 200 || len(c.Pricing.Sources) > 64 {
 		return fmt.Errorf("INVALID_MODEL_PROXY_CONFIG")
 	}
 	if _, err := time.LoadLocation(c.Timezone); err != nil {
@@ -37,6 +37,11 @@ func (c Configuration) validate() error {
 	}
 	if c.DailyLimit != nil && !validAmount(*c.DailyLimit) {
 		return fmt.Errorf("INVALID_MODEL_PROXY_CONFIG")
+	}
+	for source, policy := range c.Pricing.Sources {
+		if !catalogID.MatchString(source) || !policy.validate() {
+			return fmt.Errorf("INVALID_MODEL_PROXY_CONFIG")
+		}
 	}
 	prices := []ModelPricing{c.Pricing.Default}
 	for name, price := range c.Pricing.Models {

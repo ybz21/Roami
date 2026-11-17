@@ -1,0 +1,288 @@
+{
+  "baselineCommit": "8c886c6419d1b4ea613a2173ef090a4cb03882a3",
+  "desktopFiles": {
+    "initial": {
+      "path": "",
+      "tabs": [
+        {
+          "path": "/tmp/roami-file-state-20261113/fixtures/accept_final.log",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-file-state-20261113/fixtures/rendered_01.html",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-file-state-20261113/fixtures/rendered_02.html",
+          "active": true
+        }
+      ],
+      "overflow": false
+    },
+    "returned": {
+      "path": "",
+      "tabs": [
+        {
+          "path": "/tmp/roami-file-state-20261113/fixtures/accept_final.log",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-file-state-20261113/fixtures/rendered_01.html",
+          "active": false
+        },
+        {
+          "path": "/tmp/roami-file-state-20261113/fixtures/rendered_02.html",
+          "active": true
+        }
+      ],
+      "overflow": false
+    },
+    "errors": []
+  },
+  "desktopLayouts": [
+    {
+      "width": 1280,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1000,
+        "height": 1015,
+        "top": 40,
+        "right": 1280,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 992,
+          "height": 984,
+          "top": 71,
+          "right": 1280,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1000,
+        "height": 1015,
+        "top": 40,
+        "right": 1280,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 752,
+          "height": 984,
+          "top": 71,
+          "right": 1280,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1640,
+        "height": 1015,
+        "top": 40,
+        "right": 1920,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 1632,
+          "height": 984,
+          "top": 71,
+          "right": 1920,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 1920,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 1640,
+        "height": 1015,
+        "top": 40,
+        "right": 1920,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 1392,
+          "height": 984,
+          "top": 71,
+          "right": 1920,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    },
+    {
+      "width": 2560,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 2280,
+        "height": 1015,
+        "top": 40,
+        "right": 2560,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 2272,
+          "height": 984,
+          "top": 71,
+          "right": 2560,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 2560,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 2280,
+        "height": 1015,
+        "top": 40,
+        "right": 2560,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 2032,
+          "height": 984,
+          "top": 71,
+          "right": 2560,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    },
+    {
+      "width": 3440,
+      "collapsed": true,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 3160,
+        "height": 1015,
+        "top": 40,
+        "right": 3440,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 288,
+          "y": 71,
+          "width": 3152,
+          "height": 984,
+          "top": 71,
+          "right": 3440,
+          "bottom": 1055,
+          "left": 288
+        }
+      ]
+    },
+    {
+      "width": 3440,
+      "collapsed": false,
+      "docOverflow": false,
+      "canvas": {
+        "x": 280,
+        "y": 40,
+        "width": 3160,
+        "height": 1015,
+        "top": 40,
+        "right": 3440,
+        "bottom": 1055,
+        "left": 280
+      },
+      "panes": [
+        {
+          "x": 528,
+          "y": 71,
+          "width": 2912,
+          "height": 984,
+          "top": 71,
+          "right": 3440,
+          "bottom": 1055,
+          "left": 528
+        }
+      ]
+    }
+  ],
+  "browserAndSettings": {
+    "address": "https://example.test/unfinished-address",
+    "selected": "State First",
+    "setting": "模型",
+    "hiddenBrowserRequests": 0,
+    "errors": []
+  },
+  "english": {
+    "address": "https://example.test/unfinished-address",
+    "selected": "State First",
+    "setting": "模型",
+    "hiddenBrowserRequests": 0,
+    "errors": []
+  },
+  "androidBrowser": {
+    "size": "compact",
+    "pointer": "coarse",
+    "overflow": false,
+    "address": "https://example.test/phone-draft"
+  },
+  "androidScroll": {
+    "before": 400,
+    "after": 400,
+    "sameList": true,
+    "overflow": false,
+    "size": "compact",
+    "pointer": "coarse"
+  }
+}

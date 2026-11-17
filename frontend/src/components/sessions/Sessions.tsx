@@ -1,8 +1,10 @@
+import { usePageEffect } from '../../page-activity'
 import SessionLocation from './SessionLocation'
 import { SessionLifecycleInbox } from './SessionLifecyclePanel'
 import { SessionPauseButton } from './SessionMemoryControl'
 import { useNativeSessionList } from './native-session-list'
 import { nativeSessionRecord } from './session-record'
+import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, useAgentKinds } from '../../agent-kind'
 // ── 会话（可新建/指定目录 / 进终端 / 关闭） ──
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -40,6 +42,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const overview = useSessionOverview()
   const list = useMemo(() => [...overview.value.filter(item => item.lifecycle && !cliList.some(session => session.name === item.name)).map(item => ({ ...item, created: item.lastActivity })), ...cliList.filter(item => !overview.closingNames?.has(item.name)).map(item => ({ ...item, lifecycle: overview.value.find(session => session.name === item.name)?.lifecycle })), ...native.value.map(record => ({ ...nativeSessionRecord(record), last_activity: record.lastActivity, created: Date.parse(record.createdAt || '') / 1000 }))], [cliList, native.value, overview.value, overview.closingNames])
   const agentKinds = useAgentKinds()
+  const agents = useRegisteredAgents()
   const needsInput = useMemo(() => Object.fromEntries(overview.value.map(item => [item.name, item.waiting])), [overview.value])
   const [swarmMap, setSwarmMap] = useState<Record<string, SwarmSessionMember>>({})
   const [newOpen, setNewOpen] = useState(false)
@@ -66,17 +69,17 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     setList(flat)
   }).catch(error => { if (signal) throw error })
   useEffect(() => { setSessionLabels(Object.fromEntries(list.filter(s => s.label).map(s => [s.name, s.label]))) }, [list])
-  useEffect(() => pollWhileVisible(load, 3000).stop, [])
-  useEffect(() => {
+  usePageEffect(() => pollWhileVisible(load, 3000).stop, [])
+  usePageEffect(() => {
     return pollWhileVisible(signal => api('GET', '/sessions/annotations', undefined, { signal })
       .then((r) => { if (!signal.aborted) setWtAnn(r?.data || {}) }), 8000).stop
   }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     return pollWhileVisible(signal => api('GET', '/races', undefined, { signal })
       .then((r) => { if (!signal.aborted) setRaces(Array.isArray(r?.data) ? r.data : []) }), 8000).stop
   }, [])
   const reloadRaces = () => api('GET', '/races').then((r) => setRaces(Array.isArray(r?.data) ? r.data : [])).catch(() => {})
-  useEffect(() => pollWhileVisible(async signal => {
+  usePageEffect(() => pollWhileVisible(async signal => {
     const groups = await loadSwarmDirectory()
     if (!signal.aborted) setSwarmMap(swarmSessionMembership(groups).sessions)
   }, 10000).stop, [])
@@ -85,7 +88,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const goSwarm = (sw: string) => { location.hash = '#/swarm/' + encodeURIComponent(sw) }
   // ── 筛选 / 搜索 ──
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<'all' | 'waiting' | 'claude' | 'codex' | 'opencode' | 'pi' | 'native' | 'swarm' | 'idle'>('all')
+  const [filter, setFilter] = useState<string>('all')
   const ql = q.trim().toLowerCase()
   const isSwarm = (s: any) => !!swarmMap[s.name]
   // 默认不展示蜂群会话（它们有专门的蜂群页）；仅「蜂群」筛选时才列出
@@ -95,12 +98,8 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
     if (isSwarm(s)) return false
     switch (f) {
       case 'native': return s.agent === 'native'
-      case 'claude': return agentKinds[s.name] === 'claude'
-      case 'codex': return agentKinds[s.name] === 'codex'
-      case 'opencode': return agentKinds[s.name] === 'opencode'
-      case 'pi': return agentKinds[s.name] === 'pi'
       case 'idle': return s.agent === 'native' ? !s.running : !agentKinds[s.name]
-      default: return true
+      default: return f === 'all' || (s.agent || agentKinds[s.name]) === f
     }
   }
   const filtered = list.filter((s: any) => (!ql || `${s.label || ''} ${s.name}`.toLowerCase().includes(ql)) && match(s, filter))
@@ -133,7 +132,7 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
   const repoKeys = Array.from(new Set(Object.values(wtAnn)
     .map((a: any) => (a?.primary?.linked ? a.primary.repo as string : ''))
     .filter(Boolean))).sort().join('\n')
-  useEffect(() => {
+  usePageEffect(() => {
     const repos = repoKeys.split('\n').filter(Boolean)
     if (!repos.length) { setRepoWt({}); return }
     return pollWhileVisible(async signal => {
@@ -278,11 +277,8 @@ export default function Sessions({ openTerm, closeTerm, activeTerm, embedded }: 
           <Segmented value={filter} onChange={(v) => setFilter(v as any)} size="small" options={[
             { label: `${t('common.all')} ${cnt('all')}`, value: 'all' },
             { label: `${t('session.waiting')} ${cnt('waiting')}`, value: 'waiting' },
-            { label: `Claude ${cnt('claude')}`, value: 'claude' },
-            { label: `Codex ${cnt('codex')}`, value: 'codex' },
+            ...agents.map(agent => ({ label: `${agent.displayName}${cnt(agent.kind) ? ' ' + cnt(agent.kind) : ''}`, value: agent.kind })),
             { label: `Roami ${cnt('native')}`, value: 'native' },
-            { label: `OpenCode ${cnt('opencode')}`, value: 'opencode' },
-            { label: `Pi ${cnt('pi')}`, value: 'pi' },
             { label: `${t('nav.swarm')} ${cnt('swarm')}`, value: 'swarm' },
             { label: `${t('terminal.status.idle')} ${cnt('idle')}`, value: 'idle' },
           ]} />

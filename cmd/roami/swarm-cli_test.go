@@ -38,7 +38,7 @@ func TestSwarmRootAndSessionHelpAreReadOnly(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v: %v %s", args, err, output)
 		}
-		if !strings.Contains(string(output), "roami swarm") || !strings.Contains(string(output), "--task-revision") {
+		if !strings.Contains(string(output), "roami swarm") || !strings.Contains(string(output), "\n用法\n") {
 			t.Fatalf("incomplete help: %s", output)
 		}
 		if _, err = os.Stat(root); !os.IsNotExist(err) {

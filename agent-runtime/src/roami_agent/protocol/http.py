@@ -2,6 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from roami_agent.protocol.executor_kind import EXECUTOR_PATTERN
+
 
 class Payload(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -11,6 +13,15 @@ class CreateConversation(Payload):
     requestKey: str | None = Field(default=None, min_length=1, max_length=200)
     title: str = Field(default="New conversation", max_length=200)
     projectId: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class CreateNativeSession(Payload):
+    requestKey: str = Field(min_length=1, max_length=200)
+    title: str = Field(default="", max_length=80)
+    task: str = Field(min_length=1, max_length=100_000)
+    directory: str | None = None
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    freeOnly: bool = False
 
 
 class RenameNativeSession(Payload):
@@ -50,10 +61,11 @@ class Fork(Payload):
 
 
 class CreateTask(Payload):
+    freeOnly: bool = False
     requestKey: str = Field(min_length=1, max_length=200)
     conversationId: str
     goal: str = Field(min_length=1)
-    executor: Literal["native", "codex", "claude", "opencode", "pi"] = "native"
+    executor: str = Field(default="native", pattern=EXECUTOR_PATTERN)
     model: str | None = Field(default=None, min_length=1, max_length=300)
     target: dict | None = None
     fromMessageId: str | None = None

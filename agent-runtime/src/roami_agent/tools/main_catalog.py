@@ -6,6 +6,7 @@ from roami_agent.conversation.history_read import read_history
 from roami_agent.dispatch.routing import public_routing, routing_schema
 from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import EXECUTOR_PATTERN
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import reply_text, validate_answer
@@ -354,6 +355,10 @@ def register_main_tools(
                     }[field],
                     field: args[field],
                 }
+        if args.get("target", {}).get("kind") == "session" and (
+            args.get("model") or args.get("freeOnly")
+        ):
+            raise DomainError("INVALID_SESSION_EXECUTION_SPEC")
         outcomes = await coverage(args, binding, handoff=True)
         compact = "requestComplete" not in args and "requestCoverage" not in args
         decision = (
@@ -395,6 +400,10 @@ def register_main_tools(
             if decision
             else {}
         )
+        if args.get("model") is not None:
+            if routing_args.get("model", args["model"]) != args["model"]:
+                raise DomainError("INVALID_TASK_MODEL")
+            routing_args["model"] = args["model"]
         try:
             task = await tasks.create(
                 binding["owner"],
@@ -406,6 +415,7 @@ def register_main_tools(
                 source_assistant_message_id=binding["assistantMessageId"],
                 parent_task_id=binding.get("taskId"),
                 executor=executor,
+                free_only=args.get("freeOnly", False),
                 target=decision["targetRef"]
                 if decision and decision["action"] == "new_task"
                 else args.get("target"),
@@ -748,8 +758,10 @@ def register_main_tools(
                     "routing": routing_schema(),
                     "executor": {
                         "type": "string",
-                        "enum": ["native", "codex", "claude", "opencode", "pi"],
+                        "pattern": EXECUTOR_PATTERN,
                     },
+                    "model": {"type": "string", "minLength": 1, "maxLength": 200},
+                    "freeOnly": {"type": "boolean"},
                     "directory": {"type": "string", "minLength": 1, "maxLength": 2000},
                     "projectId": {"type": "string", "minLength": 1, "maxLength": 300},
                     "sessionId": {"type": "string", "minLength": 1, "maxLength": 300},

@@ -1,7 +1,8 @@
+import { usePageEffect } from '../../../page-activity'
 // 跨项目最近活动轨（18 设计 §4⑥）——原概览页的第五层。
 // 活跃 git 项目取前 3 个，各拿头几条 commit 与合并留痕，合并倒序（60s 一轮）。
 // Canvas ≥1180 时是右侧 sticky 侧轨；窄于此它只是网格的第二行，自然落回页尾。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
 import { relTime } from '../../../time-format'
@@ -22,7 +23,7 @@ export function useRecentActivity(projects: Proj[]): Act[] {
     .slice(0, 3)
     .map((p) => p.key)
   const dep = keys.join(',')
-  useEffect(() => {
+  usePageEffect(() => {
     if (!keys.length) { setActs([]); return }
     let stop = false
     const load = async () => {

@@ -21,7 +21,7 @@ func TestProfessionalInstallArgs(t *testing.T) {
 			t.Fatalf("%s: %v, %v", kind, got, err)
 		}
 	}
-	for _, kind := range []string{"", "unknown", "codex;echo injected", "--prefix=/tmp"} {
+	for _, kind := range []string{"", "unknown", "deepseek", "codex;echo injected", "--prefix=/tmp"} {
 		if _, err := ProfessionalInstallArgs(kind); err == nil {
 			t.Fatalf("accepted unsupported kind %q", kind)
 		}

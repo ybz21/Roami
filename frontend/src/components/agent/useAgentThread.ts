@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useCallback, useRef, useState } from 'react'
 import { api, openEventStream } from '../../api'
 import { agentCacheEpoch, agentDataKey, invalidateAgentData, loadAgentData, peekAgentData, storeAgentData } from './agent-data-cache'
 import { publishMemoryEvent } from './agent-memory-events'
@@ -12,16 +13,18 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
   const scope = agentDataKey(messages)
   const cached = () => cid ? peekAgentData<AgentSnapshot>(scope) || null : null
   const [state, setState] = useState<{ scope: string; view: AgentSnapshot | null; loading: boolean; connected: boolean; failed: boolean; loadingOlder?: boolean; olderFailed?: boolean }>(() => ({ scope, view: cached(), loading: !!cid && !cached(), connected: false, failed: false }))
+  const retained = useRef(state); retained.current = state
   const refreshRef = useRef<() => void>(() => {})
   const olderRef = useRef<() => Promise<void>>(async () => {})
   const acceptedRef = useRef<(receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => void>(() => {})
-  useEffect(() => {
+  usePageEffect(() => {
     if (scope !== agentDataKey(messages)) return
-    setState({ scope, view: cached(), loading: !!cid && !cached(), connected: false, failed: false })
+    const previous = retained.current.scope === scope ? retained.current.view : cached()
+    setState({ scope, view: previous, loading: !!cid && !previous, connected: false, failed: false })
     if (!cid) { refreshRef.current = () => {}; acceptedRef.current = () => {}; return }
     const abort = new AbortController()
     const owner = agentCacheEpoch()
-    let stopped = false, view: AgentSnapshot | null = cached(), connected = false
+    let stopped = false, view: AgentSnapshot | null = previous, connected = false
     let timer: ReturnType<typeof setTimeout> | undefined, retryTimer: ReturnType<typeof setTimeout> | undefined
     let loading = false, again = false, loadingOlder = false, olderFailed = false
     let olderAbort: AbortController | undefined, streamAbort: AbortController | undefined
@@ -66,6 +69,15 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
     }
     refreshRef.current = () => { invalidateAgentData(scope); schedule() }
     acceptedRef.current = (receipt, text, context) => {
+      if (receipt.kind === 'compaction' && receipt.operationId) {
+        if (!view) { schedule(); return }
+        // Completion can arrive over SSE before the command receipt.
+        if (view.compaction?.operationId !== receipt.operationId) {
+          view = { ...view, compaction: { operationId: receipt.operationId, state: receipt.state } }
+          publish()
+        }
+        return
+      }
       if (!view || !receipt.messageId || view.messages.some((m) => m.id === receipt.messageId)) { schedule(); return }
       const first = view.messages.findIndex(message => message.turn_id === receipt.turnId)
       const index = first < 0 ? view.messages.length : first

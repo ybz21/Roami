@@ -10,6 +10,8 @@ import (
 )
 
 type ExecutorCandidate struct {
+	Interactive    bool   `json:"interactive"`
+	DisplayName    string `json:"displayName"`
 	Kind           string `json:"kind"`
 	Installed      bool   `json:"installed"`
 	Tracked        bool   `json:"tracked"`
@@ -31,7 +33,7 @@ func DiscoverExecutors() ExecutorCatalog {
 	for _, kind := range agent.Kinds() {
 		_, err := agent.ResolveBinary(kind)
 		result.Candidates = append(result.Candidates, ExecutorCandidate{
-			Kind: kind, Installed: err == nil, Tracked: true,
+			Interactive: agent.Describe(agent.Get(kind)).Interactive, DisplayName: agent.Get(kind).DisplayName(), Kind: kind, Installed: err == nil, Tracked: true,
 			Authentication: "unknown", Usage: "unknown",
 		})
 	}

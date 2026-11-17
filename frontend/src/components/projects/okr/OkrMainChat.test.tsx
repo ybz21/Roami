@@ -76,7 +76,7 @@ it('preserves input and explains a runtime that cannot bind project conversation
   fireEvent.click(screen.getByRole('button', { name: 'okr.send' }))
   await screen.findByText('okr.agentUpgradeRequired')
   expect((screen.getByLabelText('okr.chatInput') as HTMLTextAreaElement).value).toBe('Keep the goal in this project')
-  expect(state.api.mock.calls.every(call => call[0] === 'GET' && ['/agent/status', '/agent/model-settings', '/speech/config'].includes(call[1]))).toBe(true)
+  expect(state.api.mock.calls.every(call => call[0] === 'GET' && ['/agent/registry', '/agent/status', '/agent/model-settings', '/speech/config'].includes(call[1]))).toBe(true)
 })
 
 const savedWorkspace = () => ({ ...emptyConfiguration(), projectId: 'project', revision: 1, updatedAt: 'now', observations: [], reviews: [], swarm: 'sw-existing' })

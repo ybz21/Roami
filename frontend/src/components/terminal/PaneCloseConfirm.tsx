@@ -1,7 +1,7 @@
+import { usePageEffect } from '../../page-activity'
 // 危险操作目标可视化 / 就地确认：关闭 pane 之前，把要关的那个窗格用聚光灯效果套出来，
 // 确认卡直接锚定在它旁边，而不是像 tmux 原生 confirm-before 那样在终端最底部弹一行
 // 写着不透明编号的文字。见 docs/roam-product-audit-2026-07-30.html P0「危险操作目标可视化」。
-import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 import { Button } from 'antd'
 import { useI18n } from '../../i18n'
@@ -27,7 +27,7 @@ export function PaneCloseConfirm({ target, busy, error, onConfirm, onCancel }: {
   const { rect } = target
 
   // Y/N 快捷键：审计 mockup 明确要求「操作按钮为『关闭此窗格 / 取消』，同时保留 Y / N 快捷键」
-  useEffect(() => {
+  usePageEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (busy) return
       if (e.key === 'y' || e.key === 'Y') onConfirm()

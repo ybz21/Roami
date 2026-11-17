@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useSettingsRead } from './settings-read'
 // 手机/Android 后端配置：本机模拟器(AVD) / 远程设备 / 本机真机 三选一 + 设备列表(点一下换目标)。
 // 三档的分界线是「谁能起停它」：模拟器能起能停能新建，远程只能连断，真机只能连。
@@ -39,7 +40,7 @@ export function PhoneSettings() {
     setPlat({ android: { installed: !!platforms.data.android?.installed }, ios: { installed: !!platforms.data.ios?.installed, supported: !!platforms.data.ios?.supported } })
     await Promise.all([loadStatus(), loadDevices('android'), loadDevices('ios')])
   })
-  useEffect(() => {
+  usePageEffect(() => {
     const iv = setInterval(loadStatus, 3000) // 状态灯后台自动刷新
     // 设备列表也自动刷：插上 USB 真机 / 起了模拟器之后不该还要人去点「刷新设备」。
     const dv = setInterval(() => { void loadDevices('android').catch(() => {}); void loadDevices('ios').catch(() => {}) }, 6000)

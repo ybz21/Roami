@@ -1,0 +1,248 @@
+package modelgateway
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/ybz21/Roami/internal/agentproviders"
+)
+
+type CapabilityFact struct {
+	Support  string `json:"support"`
+	Evidence string `json:"evidence"`
+	Delivery string `json:"delivery"`
+}
+type ModelDirectoryRow struct {
+	ID              string                    `json:"id"`
+	Name            string                    `json:"name"`
+	Kind            string                    `json:"kind"`
+	Protocol        string                    `json:"protocol"`
+	Configured      bool                      `json:"configured"`
+	Enabled         bool                      `json:"enabled"`
+	FreeOnly        bool                      `json:"freeOnly"`
+	ContextWindow   int                       `json:"contextWindow,omitempty"`
+	MaxOutputTokens int                       `json:"maxOutputTokens,omitempty"`
+	Pricing         string                    `json:"pricing"`
+	Capabilities    map[string]CapabilityFact `json:"capabilities"`
+	Candidates      []ModelCandidate          `json:"candidates"`
+}
+type sourceDirectoryEntry struct {
+	Fingerprint string
+	Details     []agentproviders.SourceModelDetail
+	ObservedAt  time.Time
+}
+
+func sourceDirectoryFingerprint(source ModelSource) string {
+	raw, _ := json.Marshal(struct{ ID, PluginSourceID, PluginRevision, BaseURL, Protocol, AuthMode, Credential string }{source.ID, source.PluginSourceID, source.PluginRevision, source.BaseURL, source.Protocol, source.AuthMode, source.APIKey})
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+func (s *CatalogStore) rememberSourceDetails(source ModelSource, revision string, details []agentproviders.SourceModelDetail) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if revision != s.value.Revision {
+		return
+	}
+	// Unsaved discovery must never replace a configured source's evidence.
+	for _, saved := range s.value.Sources {
+		if saved.ID == source.ID && sourceDirectoryFingerprint(saved) == sourceDirectoryFingerprint(source) {
+			if s.directory == nil {
+				s.directory = map[string]sourceDirectoryEntry{}
+			}
+			s.directory[source.ID] = sourceDirectoryEntry{sourceDirectoryFingerprint(source), details, time.Now()}
+		}
+	}
+}
+func unknownCapabilities() map[string]CapabilityFact {
+	facts := map[string]CapabilityFact{}
+	for _, name := range []string{"text", "image", "audio", "video", "tools", "reasoning", "structuredOutput", "streaming"} {
+		facts[name] = CapabilityFact{"unknown", "unknown", "unknown"}
+	}
+	return facts
+}
+func advertisedCapabilities(detail agentproviders.SourceModelDetail) map[string]CapabilityFact {
+	facts := unknownCapabilities()
+	set := func(name string, value bool) {
+		support := "unsupported"
+		if value {
+			support = "supported"
+		}
+		facts[name] = CapabilityFact{support, "advertised", "unknown"}
+	}
+	if len(detail.InputModalities) > 0 {
+		for _, name := range []string{"text", "image", "audio", "video"} {
+			set(name, containsField(detail.InputModalities, name))
+		}
+	}
+	for name, value := range map[string]*bool{"tools": detail.Tools, "reasoning": detail.Reasoning, "structuredOutput": detail.StructuredOutput} {
+		if value != nil {
+			set(name, *value)
+		}
+	}
+	return facts
+}
+func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, all bool) []ModelDirectoryRow {
+	pricing, _ := s.ledger.Configuration()
+	details := map[ModelCandidate]agentproviders.SourceModelDetail{}
+	for _, source := range catalog.Sources {
+		s.mu.Lock()
+		entry := s.directory[source.ID]
+		s.mu.Unlock()
+		if entry.Fingerprint == sourceDirectoryFingerprint(source) && time.Since(entry.ObservedAt) < 15*time.Minute {
+			for _, detail := range entry.Details {
+				details[ModelCandidate{source.ID, detail.ID}] = detail
+			}
+		}
+		if source.PluginSourceID != "" && s.plugins != nil {
+			if saved, err := s.plugins.ReadSource(source.PluginSourceID); err == nil {
+				if provider, err := s.plugins.CachedProvider(saved); err == nil && !provider.FellBack {
+					for _, model := range provider.Models {
+						tools, reasoning := model.Tools, model.Reasoning
+						detail := agentproviders.SourceModelDetail{ID: model.ID, Name: model.Name, Tools: &tools, Reasoning: &reasoning, InputModalities: []string{"text"}}
+						if model.Image {
+							detail.InputModalities = append(detail.InputModalities, "image")
+						}
+						if model.Free {
+							zero := 0.0
+							detail.InputPrice = &zero
+							detail.OutputPrice = &zero
+						}
+						details[ModelCandidate{source.ID, model.ID}] = detail
+					}
+				}
+			}
+		}
+	}
+	configured := map[ModelCandidate]bool{}
+	rows := []ModelDirectoryRow{}
+	for _, model := range catalog.Models {
+		kind := "single"
+		if model.Aggregate {
+			kind = "aggregate"
+		}
+		entry := ModelDirectoryRow{ID: model.ID, Name: model.Name, Kind: kind, Protocol: model.Protocol, Configured: true, Enabled: model.enabled(), FreeOnly: model.FreeOnly, Pricing: "unknown", Capabilities: unknownCapabilities(), Candidates: model.Candidates}
+		if model.FreeOnly {
+			entry.Pricing = "free-only"
+		}
+		if !model.Aggregate && len(model.Candidates) == 1 {
+			candidate := model.Candidates[0]
+			configured[candidate] = true
+			if detail, ok := details[candidate]; ok {
+				entry.Capabilities = advertisedCapabilities(detail)
+				entry.ContextWindow, entry.MaxOutputTokens = detail.Context, detail.Output
+				if detail.InputPrice != nil && detail.OutputPrice != nil && *detail.InputPrice == 0 && *detail.OutputPrice == 0 {
+					entry.Pricing = "advertised-zero"
+				}
+			}
+			if rule, exists := pricing.Pricing.sourceRule(candidate.SourceID, candidate.Model); exists {
+				if rule.Mode == "free" && rule.Confirmed {
+					entry.Pricing = "confirmed-free"
+				} else if rule.Mode == "tokens" {
+					entry.Pricing = "metered"
+				}
+			}
+		}
+		// An aggregate's union is not a promise that the next selected member supports it.
+		rows = append(rows, entry)
+	}
+	if all {
+		for candidate, detail := range details {
+			if configured[candidate] {
+				continue
+			}
+			entry := ModelDirectoryRow{ID: candidate.Model, Name: detail.Name, Kind: "single", Pricing: "unknown", Capabilities: advertisedCapabilities(detail), Candidates: []ModelCandidate{candidate}}
+			for _, source := range catalog.Sources {
+				if source.ID == candidate.SourceID {
+					entry.Protocol = source.Protocol
+				}
+			}
+			if detail.InputPrice != nil && detail.OutputPrice != nil && *detail.InputPrice == 0 && *detail.OutputPrice == 0 {
+				entry.Pricing = "advertised-zero"
+			}
+			rows = append(rows, entry)
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Configured != rows[j].Configured {
+			return rows[i].Configured
+		}
+		return rows[i].ID < rows[j].ID
+	})
+	return rows
+}
+func (h *Handler) modelDirectoryManagement(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path != "/v1/model-gateway/models" {
+		return false
+	}
+	if r.Method != "GET" {
+		reject(w, 405, "MODEL_GATEWAY_ROUTE_NOT_FOUND")
+		return true
+	}
+	if h.Catalog == nil {
+		reject(w, 503, "MODEL_GATEWAY_UNAVAILABLE")
+		return true
+	}
+	s := h.Catalog
+	s.mu.Lock()
+	catalog := s.snapshot()
+	s.mu.Unlock()
+	failures := []string{}
+	if r.URL.Query().Get("refresh") == "true" {
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		var wait sync.WaitGroup
+		var mu sync.Mutex
+		gate := make(chan struct{}, 4)
+		for _, source := range catalog.Sources {
+			wait.Add(1)
+			go func(source ModelSource) {
+				defer wait.Done()
+				select {
+				case gate <- struct{}{}:
+					defer func() { <-gate }()
+				case <-ctx.Done():
+					mu.Lock()
+					failures = append(failures, source.ID)
+					mu.Unlock()
+					return
+				}
+				_, details, err := h.fetchSourceModels(ctx, source)
+				if err != nil {
+					mu.Lock()
+					failures = append(failures, source.ID)
+					mu.Unlock()
+				} else {
+					s.rememberSourceDetails(source, catalog.Revision, details)
+				}
+			}(source)
+		}
+		wait.Wait()
+		sort.Strings(failures)
+	}
+	rows := s.directoryRows(r.Context(), catalog, r.URL.Query().Get("all") == "true")
+	filtered := []ModelDirectoryRow{}
+	for _, row := range rows {
+		if r.URL.Query().Get("free") == "true" && !row.FreeOnly && row.Pricing != "confirmed-free" {
+			continue
+		}
+		if capability := r.URL.Query().Get("capability"); capability != "" && row.Capabilities[capability].Support != "supported" {
+			continue
+		}
+		filtered = append(filtered, row)
+	}
+	s.mu.Lock()
+	changed := s.value.Revision != catalog.Revision
+	s.mu.Unlock()
+	if changed {
+		reject(w, 409, "MODEL_CATALOG_CHANGED")
+		return true
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"revision": catalog.Revision, "models": filtered, "refreshFailures": failures}})
+	return true
+}

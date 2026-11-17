@@ -2,6 +2,8 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from './api'
+import { PageActivityProvider } from './page-activity'
+import type { ReactNode } from 'react'
 import { createSessionPoll } from './session-poll'
 
 const machine = vi.hoisted(() => ({ id: null as string | null }))
@@ -150,4 +152,22 @@ it('retains the last snapshot during errors and backs off repeated failures', as
   await advance(24_000)
   expect(hook.result.current.failed).toBe(false)
   expect(hook.result.current.value).toEqual({ two: 'claude' })
+})
+
+it('suspends a retained page subscription without replacing its last snapshot', async () => {
+  vi.mocked(api).mockResolvedValue({ data: { one: 'codex' } })
+  const useKinds = poll()
+  let active = true
+  const wrapper = ({ children }: { children: ReactNode }) => <PageActivityProvider active={active}>{children}</PageActivityProvider>
+  const hook = renderHook(() => useKinds(), { wrapper })
+  await advance(0)
+  const value = hook.result.current.value
+  active = false; hook.rerender()
+  expect(hook.result.current.value).toBe(value)
+  await advance(60_000)
+  expect(api).toHaveBeenCalledTimes(1)
+  active = true; hook.rerender()
+  await advance(0)
+  expect(api).toHaveBeenCalledTimes(2)
+  expect(hook.result.current.value).toBe(value)
 })

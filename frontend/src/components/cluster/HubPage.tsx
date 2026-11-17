@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 // 中心页（#/hub）：让中心自己能被看见。
 //
 // 2026-08-11 中心因为一个 goroutine 泄漏卡死了十几个小时，是部署时碰巧撞见的——界面上
@@ -6,7 +7,7 @@
 //
 // 它**不是切换器里的第 N 台机器**：中心不跑会话/项目/文件/终端，切过去大半个应用是空的。
 // 所以入口是「去看中心」，当前机器不变（见 Navigation 的 hubEntry）。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { App as AntApp, Modal } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -145,7 +146,7 @@ function NodeRow({ n, current, hubVersion, onEnter, onMonitor }: {
   const { t } = useI18n()
   // 宿主概况按需拉，失败就当没有——插件可能没装、没开，或者那台正忙
   const [host, setHost] = useState<{ cpu: number; mem: number } | null>(null)
-  useEffect(() => {
+  usePageEffect(() => {
     if (!n.online) return
     let stop = false
     const load = () => nodeHostSummary(n.id).then((h) => { if (!stop) setHost(h) })
@@ -208,7 +209,7 @@ export default function HubPage() {
   const [diagOpen, setDiagOpen] = useState(false)
   const [monitorNode, setMonitorNode] = useState<ClusterNode | null>(null)
 
-  useEffect(() => {
+  usePageEffect(() => {
     let stop = false
     const load = () => getSelf().then((d) => { if (!stop) { setSelf(d); setLoading(false) } })
     load()

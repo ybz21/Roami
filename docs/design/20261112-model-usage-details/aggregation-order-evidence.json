@@ -1,0 +1,197 @@
+{
+  "desktop": {
+    "passed": true,
+    "layouts": [
+      {
+        "open": true,
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "paneRight": 1280,
+        "workspaceRight": 1280,
+        "listRight": 763.609375,
+        "previewRight": 779.609375
+      },
+      {
+        "open": true,
+        "width": 1920,
+        "scrollWidth": 1920,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "paneRight": 1920,
+        "workspaceRight": 1920,
+        "listRight": 1115.609375,
+        "previewRight": 1131.609375
+      },
+      {
+        "open": true,
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "paneRight": 2560,
+        "workspaceRight": 2560,
+        "listRight": 1467.609375,
+        "previewRight": 1483.609375
+      },
+      {
+        "open": true,
+        "width": 3440,
+        "scrollWidth": 3440,
+        "height": 1080,
+        "scrollHeight": 1080,
+        "paneRight": 3440,
+        "workspaceRight": 3440,
+        "listRight": 1951.609375,
+        "previewRight": 1967.609375
+      },
+      {
+        "open": false,
+        "width": 1280,
+        "scrollWidth": 1280,
+        "detail": false,
+        "mainRight": 1280,
+        "workspaceRight": 1280
+      },
+      {
+        "open": false,
+        "width": 1920,
+        "scrollWidth": 1920,
+        "detail": false,
+        "mainRight": 1920,
+        "workspaceRight": 1920
+      },
+      {
+        "open": false,
+        "width": 2560,
+        "scrollWidth": 2560,
+        "detail": false,
+        "mainRight": 2560,
+        "workspaceRight": 2560
+      },
+      {
+        "open": false,
+        "width": 3440,
+        "scrollWidth": 3440,
+        "detail": false,
+        "mainRight": 3440,
+        "workspaceRight": 3440
+      }
+    ],
+    "original": [
+      "openrouter/inclusionai/ling-3.2-flash:free",
+      "legacy/legacy-model",
+      "openrouter/baidu/ernie-5.5-flash-preview:free",
+      "openrouter/thinkingmachines/inkling-2-small:free"
+    ],
+    "saved": [
+      "openrouter/baidu/ernie-5.5-flash-preview:free",
+      "openrouter/inclusionai/ling-3.2-flash:free",
+      "openrouter/thinkingmachines/inkling-2-small:free",
+      "legacy/legacy-model"
+    ],
+    "weights": [
+      {
+        "key": "openrouter/baidu/ernie-5.5-flash-preview:free",
+        "weight": "1"
+      },
+      {
+        "key": "openrouter/inclusionai/ling-3.2-flash:free",
+        "weight": "3"
+      },
+      {
+        "key": "openrouter/thinkingmachines/inkling-2-small:free",
+        "weight": "1"
+      },
+      {
+        "key": "legacy/legacy-model",
+        "weight": "2"
+      }
+    ],
+    "checks": [
+      "mouse handle drag from first to third",
+      "Escape cancel",
+      "stable source grouping",
+      "keyboard End",
+      "weights remain attached",
+      "save preserves order",
+      "four widths open/closed"
+    ]
+  },
+  "phone": {
+    "passed": true,
+    "device": "Redmi Note 8",
+    "pane": {
+      "width": 392,
+      "scrollWidth": 392,
+      "height": 766,
+      "scrollHeight": 766,
+      "pointer": "coarse",
+      "barWidth": 392.727294921875,
+      "handleWidth": 71.19318389892578,
+      "handleHeight": 36
+    },
+    "scrolled": 1084,
+    "dragDestination": 9,
+    "original": [
+      "openrouter/baidu/ernie-5.5-flash-preview:free",
+      "openrouter/inclusionai/ling-3.2-flash:free",
+      "openrouter/thinkingmachines/inkling-2-small:free",
+      "legacy/legacy-model",
+      "openrouter/liquid/lfm-3-1.7b:free",
+      "openrouter/particle-ai/particle-1:free",
+      "openrouter/recursive/flint-v1.0:free",
+      "openrouter/nvidia/nemotron-3.5-super-vl:free",
+      "openrouter/dots-studio/dots-3-note-preview:free",
+      "openrouter/nvidia/nemotron-3.5-lightning:free",
+      "openrouter/cohere/north-mini-code:free",
+      "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "openrouter/google/gemma-4-26b-a4b-it:free",
+      "openrouter/google/gemma-4-31b-it:free",
+      "openrouter/google/lyria-3-pro-preview",
+      "openrouter/google/lyria-3-clip-preview"
+    ],
+    "saved": [
+      "openrouter/baidu/ernie-5.5-flash-preview:free",
+      "legacy/legacy-model",
+      "openrouter/thinkingmachines/inkling-2-small:free",
+      "openrouter/liquid/lfm-3-1.7b:free",
+      "openrouter/particle-ai/particle-1:free",
+      "openrouter/recursive/flint-v1.0:free",
+      "openrouter/nvidia/nemotron-3.5-super-vl:free",
+      "openrouter/dots-studio/dots-3-note-preview:free",
+      "openrouter/nvidia/nemotron-3.5-lightning:free",
+      "openrouter/inclusionai/ling-3.2-flash:free",
+      "openrouter/cohere/north-mini-code:free",
+      "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "openrouter/google/gemma-4-26b-a4b-it:free",
+      "openrouter/google/gemma-4-31b-it:free",
+      "openrouter/google/lyria-3-pro-preview",
+      "openrouter/google/lyria-3-clip-preview"
+    ],
+    "checks": [
+      "real touch handle drag",
+      "touch cancel leaves order intact",
+      "edge autoscroll while held",
+      "source grouping by touch",
+      "move buttons by touch",
+      "normal list scroll does not reorder",
+      "save preserves dragged order",
+      "no document overflow"
+    ]
+  },
+  "checks": {
+    "frontend": "253 files / 1815 tests passed; typecheck, i18n, hover, production build passed",
+    "latestRegression": "5 aggregation workspace tests passed after restoring correct false/omitted free-only checkbox rendering",
+    "go": "go test ./internal/modelgateway passed; complete quick quality gate passed"
+  },
+  "screenshots": {
+    "desktop": "/tmp/roami-aggregation-editor-20261114/order-desktop-final.png",
+    "phone": "/tmp/roami-aggregation-editor-20261114/order-phone-drag.png",
+    "phoneSourceGrouping": "/tmp/roami-aggregation-editor-20261114/order-phone-source-sort.png"
+  },
+  "deployment": "Not deployed. Production configuration was not changed."
+}

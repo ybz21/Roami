@@ -1,0 +1,106 @@
+{
+  "passed": true,
+  "checks": [
+    "source required before model selection",
+    "models scoped to source",
+    "pending model reset on source change",
+    "cross-source added candidates preserved",
+    "duplicate and paid candidates disabled",
+    "plan eligibility follows opt-in",
+    "remove and reorder",
+    "draft across tabs",
+    "save and dispatch",
+    "English labels"
+  ],
+  "layouts": [
+    {
+      "width": 961,
+      "collapsed": false,
+      "x": 280,
+      "right": 1241,
+      "scrollWidth": 961,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 1280,
+      "documentScroll": 1280
+    },
+    {
+      "width": 1089,
+      "collapsed": true,
+      "x": 152,
+      "right": 1241,
+      "scrollWidth": 1089,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 1280,
+      "documentScroll": 1280
+    },
+    {
+      "width": 1601,
+      "collapsed": false,
+      "x": 280,
+      "right": 1881,
+      "scrollWidth": 1601,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 1920,
+      "documentScroll": 1920
+    },
+    {
+      "width": 1729,
+      "collapsed": true,
+      "x": 152,
+      "right": 1881,
+      "scrollWidth": 1729,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 1920,
+      "documentScroll": 1920
+    },
+    {
+      "width": 2241,
+      "collapsed": false,
+      "x": 280,
+      "right": 2521,
+      "scrollWidth": 2241,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 2560,
+      "documentScroll": 2560
+    },
+    {
+      "width": 2369,
+      "collapsed": true,
+      "x": 152,
+      "right": 2521,
+      "scrollWidth": 2369,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 2560,
+      "documentScroll": 2560
+    },
+    {
+      "width": 3121,
+      "collapsed": false,
+      "x": 280,
+      "right": 3401,
+      "scrollWidth": 3121,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 3440,
+      "documentScroll": 3440
+    },
+    {
+      "width": 3249,
+      "collapsed": true,
+      "x": 152,
+      "right": 3401,
+      "scrollWidth": 3249,
+      "height": 1080,
+      "scrollHeight": 1080,
+      "documentWidth": 3440,
+      "documentScroll": 3440
+    }
+  ],
+  "errors": []
+}

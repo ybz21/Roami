@@ -1,0 +1,251 @@
+{
+  "date": "2026-11-16",
+  "scope": "Production implementation, verified on isolated instance; no deployment",
+  "baseCommit": "b45efaa2e8571a347b1c80f582605bbe78e9564a",
+  "desktop": {
+    "checks": [
+      "Actual named key POST; generated credential shown once and removed on close",
+      "Actual rename, confirmed disable and enable with current revisions",
+      "Actual rotation returns a different one-time key",
+      "Actual fixed key appears once in unified list; replacement requires confirmation",
+      "Actual source discovery, public gateway versus upstream identity, and retained directory search",
+      "Create draft survives actual top-level tab navigation"
+    ],
+    "bounds": [
+      {
+        "name": "1280-closed",
+        "w": 1280,
+        "sw": 1280,
+        "h": 1080,
+        "sh": 1080,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "1280-open",
+        "w": 1280,
+        "sw": 1280,
+        "h": 1080,
+        "sh": 1080,
+        "panelRight": 1280,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "1920-closed",
+        "w": 1920,
+        "sw": 1920,
+        "h": 1080,
+        "sh": 1080,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "1920-open",
+        "w": 1920,
+        "sw": 1920,
+        "h": 1080,
+        "sh": 1080,
+        "panelRight": 1920,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "2560-closed",
+        "w": 2560,
+        "sw": 2560,
+        "h": 1080,
+        "sh": 1080,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "2560-open",
+        "w": 2560,
+        "sw": 2560,
+        "h": 1080,
+        "sh": 1080,
+        "panelRight": 2560,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "3440-closed",
+        "w": 3440,
+        "sw": 3440,
+        "h": 1080,
+        "sh": 1080,
+        "scrollBottom": 1055
+      },
+      {
+        "name": "3440-open",
+        "w": 3440,
+        "sw": 3440,
+        "h": 1080,
+        "sh": 1080,
+        "panelRight": 3440,
+        "scrollBottom": 1055
+      }
+    ],
+    "errors": []
+  },
+  "phone": {
+    "device": "Redmi Note 8",
+    "checks": [
+      "Real phone native keyboard, create key, once-only plaintext removed on close; screenshots redact plaintext",
+      "Real touch menu and confirmed disable",
+      "Directory filtering, full-screen model details, source identity and retained search",
+      "Fixed key error preserves draft, bottom actions and return remain reachable"
+    ],
+    "bounds": [
+      {
+        "name": "phone-access",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "phone-example",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "create",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "footerBottom": 741.8182144165039
+      },
+      {
+        "name": "phone-create",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "footerBottom": 741.8182144165039
+      },
+      {
+        "name": "phone-issued-redacted",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "footerBottom": 741.8182144165039
+      },
+      {
+        "name": "phone-confirm",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "phone-directory",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      },
+      {
+        "name": "phone-model",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "footerBottom": 741.8182144165039
+      },
+      {
+        "name": "phone-fixed-error",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse",
+        "footerBottom": 741.8182144165039
+      },
+      {
+        "name": "scrolled",
+        "w": 392,
+        "sw": 392,
+        "h": 766,
+        "sh": 766,
+        "size": "compact",
+        "pointer": "coarse"
+      }
+    ],
+    "scroll": {
+      "before": 0,
+      "after": 199.63636779785156
+    }
+  },
+  "pluginDesktop": {
+    "fixture": "Browser transport stub for plugin account creation; live plugin login not invoked",
+    "calls": [
+      {
+        "sourceId": "qa-plugin-one",
+        "revision": "a80977111bf1acbda9cc77c566e0c6a8d29b2d03707892bf"
+      }
+    ],
+    "originalAccountPreserved": true,
+    "authorizationExpanded": true,
+    "cardHitVerified": true
+  },
+  "pluginPhone": {
+    "device": "Redmi Note 8",
+    "transport": "Synthetic plugin transport; no live account created or login invoked",
+    "calls": [
+      {
+        "sourceId": "qa-plugin-one",
+        "revision": "2d3d91339f41b39a4e1c99b741dbcf091c39b0ad6bedb5e2"
+      }
+    ],
+    "hit": {
+      "x": 310.2727470397949,
+      "y": 627.0056762695312,
+      "hit": true
+    },
+    "authorizationExpanded": true,
+    "errors": []
+  },
+  "checks": {
+    "fullFrontend": {
+      "files": 257,
+      "tests": 1880,
+      "result": "passed"
+    },
+    "finalAffectedFrontend": {
+      "files": 5,
+      "tests": 45,
+      "result": "passed"
+    },
+    "typecheck": "passed",
+    "i18n": "passed",
+    "hover": "passed",
+    "goModelGateway": "passed",
+    "qualityFull": "passed",
+    "qualityQuick": "passed",
+    "finalProductionBuild": "passed"
+  },
+  "evidenceRoot": "/tmp/roami-local-gateway-design-20261116",
+  "limits": [
+    "Plugin shortcut browser tests use synthetic transport; no real plugin account was created or signed in.",
+    "Actual gateway API tests use isolated configuration and local mock source endpoints.",
+    "Generated plaintext key is redacted from phone screenshots; list screenshots show suffixes only."
+  ],
+  "productionServicesChanged": false
+}

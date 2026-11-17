@@ -45,7 +45,23 @@ CREATE TABLE gateway_daily_usage(
   AND typeof(unknown)='integer' AND typeof(usage_unknown)='integer' AND typeof(failed)='integer')
 );
 CREATE INDEX gateway_calls_retention ON gateway_calls(COALESCE(finished_ms,started_ms)) WHERE state!='pending';
-`}}
+`}, {Version: 6, Name: "daily-model-source-attribution", SQL: `
+ALTER TABLE gateway_daily_usage RENAME TO gateway_daily_usage_v5;
+CREATE TABLE gateway_daily_usage(
+ day TEXT NOT NULL, timezone TEXT NOT NULL, role TEXT NOT NULL, model TEXT NOT NULL,
+ currency TEXT NOT NULL, agent_kind TEXT NOT NULL, source TEXT NOT NULL,
+ requests INTEGER NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+ cache_read_tokens INTEGER NOT NULL, cost_nano INTEGER NOT NULL,
+ unknown INTEGER NOT NULL, usage_unknown INTEGER NOT NULL, failed INTEGER NOT NULL,
+ source_id TEXT NOT NULL DEFAULT '',
+ PRIMARY KEY(day,timezone,role,model,currency,agent_kind,source,source_id),
+ CHECK(typeof(requests)='integer' AND typeof(input_tokens)='integer' AND typeof(output_tokens)='integer'
+  AND typeof(cache_read_tokens)='integer' AND typeof(cost_nano)='integer'
+  AND typeof(unknown)='integer' AND typeof(usage_unknown)='integer' AND typeof(failed)='integer')
+);
+INSERT INTO gateway_daily_usage SELECT *,'' FROM gateway_daily_usage_v5;
+DROP TABLE gateway_daily_usage_v5;
+`}, {Version: 7, Name: "model-route-anchors", SQL: `CREATE TABLE gateway_route_anchors(model_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,anchor TEXT NOT NULL);`}}
 
 type Ledger struct {
 	paths metadb.Paths
@@ -90,7 +106,9 @@ func configuration(q queryRow) (Configuration, error) {
 
 func (l *Ledger) Configuration() (Configuration, error) { return configuration(l.db) }
 
-func (l *Ledger) Configure(c Configuration) error {
+func (l *Ledger) Configure(c Configuration) error { return l.configureScope(c, "") }
+
+func (l *Ledger) configureScope(c Configuration, scope string) error {
 	if err := c.validate(); err != nil {
 		return err
 	}
@@ -98,6 +116,16 @@ func (l *Ledger) Configure(c Configuration) error {
 		previous, err := configuration(tx)
 		if err != nil {
 			return err
+		}
+		switch scope {
+		case "pricing":
+			c.Currency, c.Timezone, c.DailyLimit = previous.Currency, previous.Timezone, previous.DailyLimit
+			c.Pricing.Sources = previous.Pricing.Sources
+		case "limits":
+			c.Pricing = previous.Pricing
+		}
+		if c.Pricing.Sources == nil {
+			c.Pricing.Sources = previous.Pricing.Sources
 		}
 		if previous.Currency != c.Currency || previous.Timezone != c.Timezone {
 			var count int
@@ -139,7 +167,11 @@ type Call struct {
 	Price       ModelPricing `json:"price"`
 }
 
-type CallAttribution struct{ AgentKind, KeyID, SourceID, RouteID string }
+type CallAttribution struct {
+	AgentKind, KeyID, SourceID, RouteID string
+	Free                                bool
+	PricingRevision                     string
+}
 type gatewayKeyContext struct{}
 
 func (l *Ledger) Admit(role, model, session, request string, attribution ...CallAttribution) (Call, error) {
@@ -154,14 +186,24 @@ func (l *Ledger) Admit(role, model, session, request string, attribution ...Call
 		if err != nil {
 			return err
 		}
+		if len(attribution) > 0 && attribution[0].Free && attribution[0].PricingRevision != "" && attribution[0].PricingRevision != routingPriceRevision(c) {
+			return fmt.Errorf("MODEL_GATEWAY_ROUTE_CHANGED")
+		}
 		zone, err := time.LoadLocation(c.Timezone)
 		if err != nil {
 			return err
 		}
 		call.Day, call.Timezone, call.Currency = l.now().In(zone).Format("2006-01-02"), c.Timezone, c.Currency
-		call.Price = c.Pricing.LookupExit(call.RouteID, call.SourceID, model)
+		var priced bool
+		call.Price, priced = c.Pricing.exitPriceAt(call.RouteID, call.SourceID, model, time.UnixMilli(call.Started))
+		if len(attribution) > 0 && attribution[0].Free {
+			if _, explicit := c.Pricing.lookup(call.RouteID); !explicit {
+				call.Price = ModelPricing{}
+				priced = true
+			}
+		}
 		call.PriceStatus = "priced"
-		if !c.Pricing.configured(call.RouteID, call.SourceID, model) {
+		if !priced {
 			call.PriceStatus = "unpriced"
 		}
 		if c.DailyLimit != nil {

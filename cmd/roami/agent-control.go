@@ -11,7 +11,7 @@ import (
 
 func runAgentControl(args []string) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent control ls --task ID\nroami agent control show|pause|resume --resource ID\nPause returns takeoverReady only after actual input stop and lease release; poll show while pausing.")
+		_ = groupHelpPage("agent control").Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
@@ -19,11 +19,14 @@ func runAgentControl(args []string) int {
 		fmt.Fprintln(os.Stderr, "unknown agent control command")
 		return 2
 	}
-	flags := flag.NewFlagSet("agent control "+sub, flag.ContinueOnError)
+	flags := newCommandFlags("agent control " + sub)
 	task := flags.String("task", "", "root task ID")
 	resource := flags.String("resource", "", "resource ID")
 	_ = flags.Bool("json", true, "JSON output")
 	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	method, path := "GET", ""

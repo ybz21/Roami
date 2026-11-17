@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useEffect, useRef, useState } from 'react'
 import { Popconfirm, Spin } from 'antd'
 import { api } from '../../api'
@@ -15,7 +16,7 @@ export default function AgentReminders({ select, conversationId }: { conversatio
   const [items, setItems] = useState<Reminder[] | null>(null), [failed, setFailed] = useState(false), [version, setVersion] = useState(0), [busy, setBusy] = useState('')
   const alive = useRef(true), pending = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  useEffect(() => { const timer = setInterval(() => { if (!pending.current && document.visibilityState === 'visible') setVersion((value) => value + 1) }, 15000); return () => clearInterval(timer) }, [])
+  usePageEffect(() => { const timer = setInterval(() => { if (!pending.current && document.visibilityState === 'visible') setVersion((value) => value + 1) }, 15000); return () => clearInterval(timer) }, [])
   useEffect(() => {
     let cancelled = false
     const abort = new AbortController(), timer = setTimeout(() => abort.abort(), 10000)

@@ -1,6 +1,7 @@
+import { usePageEffect } from '../../page-activity'
 // 会话通知记录：需要你 / 刚做完 / 出错了。
 // 数据来自 GET /inbox（后端从台账 plugin_notifications 里筛 source=roam.web）。
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { App as AntApp, Button, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
@@ -42,7 +43,7 @@ export default function InboxPage({ onOpenSession }: { onOpenSession: (name: str
       setLoadError(false)
     } catch { setLoadError(true); setItems((cur) => cur || []) }
   }
-  useEffect(() => {
+  usePageEffect(() => {
     void load()
     const i = setInterval(load, 10000)
     return () => clearInterval(i)

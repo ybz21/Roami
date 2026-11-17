@@ -20,5 +20,5 @@ it('replaces a Pi branch window and retains it on an unchanged poll', async () =
   expect(hook.result.current.msgs.map(m => m.id)).toEqual(['current-branch'])
   const query = new URL('http://fixture' + state.api.mock.calls[1][1]).searchParams
   expect(query.get('offset')).toBe('100')
-  expect(query.get('tail')).toBe('200')
+  expect(query.get('tail')).toBe('50')
 })

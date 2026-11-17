@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Alert, Button, Popconfirm, Spin } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { gatewayAgentNames } from './gateway-agent'
+import { useGatewayAgentNames } from './gateway-agent'
 import { catalogFailure } from './model-hub-api'
 
 type LocalSource = { id: string; revision: string; agentKind: string; name: string; baseUrl: string; protocol: string; model: string; hasKey: boolean; unavailable: boolean }
 export default function LocalModelSources({ onImported }: { onImported: () => void }) {
+  const gatewayAgentNames = useGatewayAgentNames()
   const { t } = useI18n()
   const [value, setValue] = useState<{ revision: string; sources: LocalSource[] } | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(''), [version, setVersion] = useState(0)
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function LocalModelSources({ onImported }: { onImported: () => vo
     {!value && !error && <Spin />}
     {value && !value.sources.length && <p>{t('hub.local.empty')}</p>}
     {value?.sources.map(row => <article key={row.id} className="tt-model-hub-row" aria-label={row.name}>
-      <div><strong>{row.name}</strong><small>{gatewayAgentNames[row.agentKind]}</small><small>{row.baseUrl}</small>{row.unavailable && <small>{t('hub.local.unsupported')}</small>}</div>
+      <div><strong>{row.name}</strong><small>{gatewayAgentNames[row.agentKind] || row.agentKind}</small><small>{row.baseUrl}</small>{row.unavailable && <small>{t('hub.local.unsupported')}</small>}</div>
       <Popconfirm classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.local.confirm')} description={t('hub.local.scope')} onConfirm={() => importSource(row)} okText={t('hub.local.import')} cancelText={t('common.cancel')}><Button disabled={!!busy || row.unavailable} loading={busy === row.id}>{t('hub.local.import')}</Button></Popconfirm>
     </article>)}
   </section>

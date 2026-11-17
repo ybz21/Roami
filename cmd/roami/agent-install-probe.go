@@ -15,9 +15,12 @@ import (
 
 // This command always uses disposable storage and never reads a user's model configuration.
 func runAgentInstallProbe(args []string) int {
-	fs := flag.NewFlagSet("agent install-probe", flag.ContinueOnError)
+	fs := newCommandFlags("agent install-probe")
 	dir := fs.String("runtime-dir", "", "prepared runtime directory")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if *dir == "" || fs.NArg() != 0 {

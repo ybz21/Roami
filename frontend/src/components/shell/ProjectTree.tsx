@@ -1,3 +1,4 @@
+import { useRegisteredAgents } from '../../agent-registry'
 // 项目下按会话的派生关系组织导航，目录归属只用于打开目标。
 import { useState, type ReactNode } from 'react'
 import { Dropdown, Tooltip } from 'antd'
@@ -57,6 +58,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
   /** 项目行「…」菜单里的「移除项目」（只动台账，不动目录和会话） */
   onRemoveProject?: (key: string) => void
 }) {
+  const agents = useRegisteredAgents()
   const { t } = useI18n()
   const [closed, setClosed] = useState<Set<string>>(readClosed)
   const toggle = (key: string) => setClosed((cur) => {
@@ -74,10 +76,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
   const derive = (task: TaskKey, parent: string) => onNewInTask
     ? [{ type: 'group' as const, label: t('tree.menu.deriveHere'), children: [
       { key: 'sh', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: () => onNewInTask(task, 'shell', parent) },
-      { key: 'cc', icon: <AgentLogo kind="claude" size={14} />, label: t('tabs.newClaude'), onClick: () => onNewInTask(task, 'claude', parent) },
-      { key: 'cx', icon: <AgentLogo kind="codex" size={14} />, label: t('tabs.newCodex'), onClick: () => onNewInTask(task, 'codex', parent) },
-      { key: 'pi', icon: <AgentLogo kind="pi" size={14} />, label: t('tabs.newPi'), onClick: () => onNewInTask(task, 'pi', parent) },
-      { key: 'oc', icon: <AgentLogo kind="opencode" size={14} />, label: t('tabs.newOpenCode'), onClick: () => onNewInTask(task, 'opencode', parent) },
+      ...agents.map(agent => ({ key: agent.kind, icon: <AgentLogo kind={agent.kind} size={14} />, label: agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName }), disabled: !agent.interactive, onClick: () => onNewInTask(task, agent.kind, parent) })),
     ] }] : []
   const killSession = (s: TreeSession) => onKill
     ? [{ type: 'divider' as const }, { key: 'kill', icon: <CloseIcon size={14} />, label: t('tree.menu.close'), danger: true, onClick: () => onKill(s.name) }] : []

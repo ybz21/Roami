@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "device": "Redmi Note 8",
+  "bounds": {
+    "width": 392,
+    "height": 766,
+    "scrollWidth": 392,
+    "scrollHeight": 766,
+    "pointer": "coarse"
+  },
+  "order": [
+    "连接",
+    "模型与定价",
+    "账号调度"
+  ],
+  "form": {
+    "left": 16,
+    "right": 376.727294921875,
+    "paneLeft": 0,
+    "paneRight": 392.727294921875
+  },
+  "checks": [
+    "add account by real touch",
+    "new instance starts signed out",
+    "independent login by touch",
+    "connection/pricing/routing order",
+    "price tab and back to cards",
+    "no document overflow"
+  ]
+}

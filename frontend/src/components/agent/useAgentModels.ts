@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { MODEL_CATALOG_CHANGED, type ModelCatalog } from '../capabilities/model-hub-api'
@@ -21,7 +22,7 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   const endpoint = settings?.[role]?.baseUrl
   const catalog = useAgentData<ModelCatalog>('/agent/model-gateway/catalog', 30_000)
   const refreshCatalog = catalog.refresh
-  useEffect(() => { window.addEventListener(MODEL_CATALOG_CHANGED, refreshCatalog); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, refreshCatalog) }, [refreshCatalog])
+  usePageEffect(() => { window.addEventListener(MODEL_CATALOG_CHANGED, refreshCatalog); return () => window.removeEventListener(MODEL_CATALOG_CHANGED, refreshCatalog) }, [refreshCatalog])
   // An identical model ID at another provider does not identify this gateway's route.
   const throughGateway = !!catalog.value?.baseUrl && endpoint?.replace(/\/$/, '') === catalog.value.baseUrl.replace(/\/$/, '') + '/v1'
   const gatewayModels = catalog.value?.models || []
@@ -33,7 +34,7 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   })
   const modelNames = Object.fromEntries((throughGateway ? gatewayModels : additionalModels).map(model => [throughGateway ? model.id : gatewayChoice + model.id, model.name]))
   const refresh = useCallback(() => setVersion(v => v + 1), [])
-  useEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
+  usePageEffect(() => { window.addEventListener(MODEL_SETTINGS_CHANGED, refresh); return () => window.removeEventListener(MODEL_SETTINGS_CHANGED, refresh) }, [refresh])
   useEffect(() => {
     const abort = new AbortController()
     const revision = settingsRevision.current
@@ -45,8 +46,8 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
     if (loadingRef.current) return
     const requestedEpoch = epoch.current
     loadingRef.current = true
+    refreshCatalog(); refresh()
     setLoading(true); setError(null)
-    if (!settings) refresh()
     try { const { data } = await api('GET', '/agent/models' + (role === 'worker' ? '?role=worker' : '')); if (epoch.current === requestedEpoch) { setModels(data.models); setEfforts(data.reasoningEfforts || {}) } }
     catch (e) { if (epoch.current === requestedEpoch) setError(e) } finally { if (epoch.current === requestedEpoch) { loadingRef.current = false; setLoading(false) } }
   }
@@ -74,5 +75,10 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   }
   const apply = (model: string, effort: string) => model.trim() ? configure({ model: model.trim(), reasoningEffort: effort === 'default' ? null : effort }) : Promise.resolve(false)
   const choices = throughGateway && gatewayModels.length ? gatewayModels.map(model => model.id) : [...models, ...additionalModels.map(model => gatewayChoice + model.id)]
-  return { role, settings, models: choices, modelNames, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
+  const modelKinds: Record<string, 'native' | 'aggregate'> = Object.fromEntries(catalog.value ? models.map(id => [id, 'native']) : [])
+  for (const entry of throughGateway ? gatewayModels : additionalModels) {
+    for (const id of throughGateway ? [entry.id, ...(entry.aliases || [])] : [gatewayChoice + entry.id]) modelKinds[id] = entry.aggregate ? 'aggregate' : 'native'
+  }
+  if (throughGateway && catalog.value?.defaultModel && modelKinds[catalog.value.defaultModel]) modelKinds['roami-default'] = modelKinds[catalog.value.defaultModel]
+  return { role, settings, models: choices, modelNames, modelKinds, efforts, loading, busy, error, load, apply, clearError: () => setError(null) }
 }

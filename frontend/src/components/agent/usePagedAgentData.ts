@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { api } from '../../api'
 import { agentCacheEpoch, agentDataKey, peekAgentData, storeAgentData } from './agent-data-cache'
 import { useAgentData } from './useAgentData'
@@ -41,11 +42,11 @@ export function usePagedAgentData<T extends { id: string | number }>(path: strin
       if (pending.current === controller) pending.current = null
     }
   }, [path, cursor, scope, epoch, cacheKey, state, items])
-  useEffect(() => {
+  usePageEffect(() => {
     setExtra(previous => previous.scope === scope ? previous : cached() || { scope, items: [], failed: false, loading: false })
     const cancel = () => { if (document.hidden) { pending.current?.abort(); pending.current = null; setExtra(previous => ({ ...previous, loading: false })) } }
     document.addEventListener('visibilitychange', cancel)
-    return () => { pending.current?.abort(); pending.current = null; document.removeEventListener('visibilitychange', cancel) }
+    return () => { pending.current?.abort(); pending.current = null; setExtra(previous => ({ ...previous, loading: false })); document.removeEventListener('visibilitychange', cancel) }
   }, [scope])
   const refresh = useCallback(() => {
     pending.current?.abort(); pending.current = null

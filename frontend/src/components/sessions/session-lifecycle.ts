@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { api } from '../../api'
 import { createSessionPoll } from '../../session-poll'
@@ -53,7 +54,7 @@ function subscribeEvents() {
 
 export function useSessionLifecycle(enabled = true) {
   const node = useCurrentNodeId()
-  useEffect(() => enabled ? subscribeEvents() : undefined, [node, enabled])
+  usePageEffect(() => enabled ? subscribeEvents() : undefined, [node, enabled])
   const snapshot = useOperations(enabled)
   const revision = useSyncExternalStore(acceptedSubscribe, acceptedSnapshot, acceptedSnapshot)
   const scope = nodeApi('/session-lifecycle/operations')

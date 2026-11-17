@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../page-activity'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Dropdown, Modal, Spin } from 'antd'
 import { RoamiLogo, ChevronRight, PlusIcon } from '../../icons'
@@ -42,6 +43,8 @@ function SessionConversation({ embedded, metadata, refreshMetadata, node, projec
   const sessionName = nativeSessionName(metadata.nativeSessionId), savedLabel = useSessionLabel(sessionName)
   const title = savedLabel !== sessionName ? savedLabel : metadata.title || 'Roami'
   const detail = snapshot.detail.value, task = detail?.task
+  const intent = task?.intent_json ? JSON.parse(task.intent_json) : {}
+  const hasModelOverride = !!(intent.model && intent.model !== 'auto' || intent.freeOnly)
   const closed = detail?.sessionClosure?.state === 'closed'
   const closing = detail?.sessionClosure?.state === 'closing'
   const closeError = ['failed', 'unknown'].includes(detail?.sessionClosure?.state || '') ? taskSessionError(detail?.sessionClosure?.error_code || undefined, t) : ''
@@ -59,7 +62,7 @@ function SessionConversation({ embedded, metadata, refreshMetadata, node, projec
   const pending = useRef<{ text: string; revision: number; key: string } | null>(null), sending = useRef(false), alive = useRef(true)
   const olderRequest = useRef<AbortController | null>(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  useEffect(() => {
+  usePageEffect(() => {
     const hidden = () => { if (document.hidden) olderRequest.current?.abort() }
     document.addEventListener('visibilitychange', hidden)
     return () => { olderRequest.current?.abort(); document.removeEventListener('visibilitychange', hidden) }
@@ -159,7 +162,7 @@ function SessionConversation({ embedded, metadata, refreshMetadata, node, projec
         send={{ label: t('agent.send'), pending: busy, onClick: () => { void send() } }}
         stop={active ? { label: t('chat.stop'), disabled, onClick: () => { void mutation('cancel', {}) } } : undefined}
         leading={<Dropdown trigger={['click']} menu={{ items: [{ key: 'rename', label: t('session.rename'), disabled: closed || closing }, { key: 'details', label: t('agent.task.details') }, { key: 'artifacts', label: t('agent.task.sessionTab.artifacts') }, ...(!closed ? [{ key: 'close', label: t('session.close'), disabled: busy || !task || snapshot.detail.failed || closing || !detail?.attempts[0] }] : [])], onClick: ({ key }) => { if (key === 'rename') setRenaming(true); else if (key === 'details') openAgentPage('tasks', metadata.taskId); else if (key === 'artifacts') switchTab('artifacts'); else setConfirm(true) } }}><button type="button" className="tt-pill ico" aria-label={t('chat.more')}><PlusIcon size={16} /></button></Dropdown>}
-        settings={<AgentModelPicker models={models} disabled={disabled || active} node={node} />}
+        settings={hasModelOverride ? undefined : <AgentModelPicker models={models} disabled={disabled || active} node={node} />}
         voice={<VoiceInput inline scope={metadata.nativeSessionId + ':' + node} hotkey disabled={disabled} accent="var(--accent)" onResult={text => setDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />}
     </div>
     {renaming && <RenameSessionModal session={renaming ? nativeSessionName(metadata.nativeSessionId) : null} onClose={() => setRenaming(false)} onDone={() => { refreshMetadata(); onChanged() }} />}

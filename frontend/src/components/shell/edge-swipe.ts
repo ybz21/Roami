@@ -1,7 +1,8 @@
+import { usePageEffect } from '../../page-activity'
 // 手机上的边缘横滑（24 稿 §3 #5）：左边缘右滑 = 返回，右边缘左滑 = 下一面（会话页的「改动」）。
 // 安卓手势导航自己吃掉边缘、走的是物理返回（useBackDismiss 那条），这里管的是三键导航的机器
 // 和 iOS 主屏 PWA（没有 Safari 的侧滑）。捕获阶段截住，起手在边缘的那根手指终端就不再当滚动处理。
-import { useEffect, type RefObject } from 'react'
+import { type RefObject } from 'react'
 
 const EDGE = 24
 const THRESHOLD = 70
@@ -9,7 +10,7 @@ const SLOP = 40
 
 export function useEdgeSwipe(ref: RefObject<HTMLElement | null>, opts: { onBack?: () => void; onForward?: () => void; enabled?: boolean }) {
   const { onBack, onForward, enabled = true } = opts
-  useEffect(() => {
+  usePageEffect(() => {
     const el = ref.current
     if (!el || !enabled || (!onBack && !onForward)) return
     let track: { x: number; y: number; side: 'l' | 'r' } | null = null

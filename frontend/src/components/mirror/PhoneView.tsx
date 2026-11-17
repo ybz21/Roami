@@ -1,3 +1,5 @@
+import { useViewState } from '../../view-state'
+import { usePageEffect } from '../../page-activity'
 // 手机镜像页：把后端手机（Linux→Android adb）的画面实时渲染到 <img>，并转发点按/滑动/输入。
 // 协议见 backend/phone/screencast.go：
 //   收 二进制帧 [w:u16][h:u16][seq:u16][jpeg...] | {type:'pong'|'error'|'level'}
@@ -38,8 +40,8 @@ export default function PhoneView() {
   })
   const [levelName, setLevelName] = useState('') // 自适应当前档名（auto 时显示）
   const [apps, setApps] = useState<PhoneApp[]>([])
-  const [appsOpen, setAppsOpen] = useState(false)
-  const [appQuery, setAppQuery] = useState('')
+  const [appsOpen, setAppsOpen] = useViewState('phone.appsOpen', false)
+  const [appQuery, setAppQuery] = useViewState('phone.appQuery', '')
   // 设备身份：型号 + 系统 + 分辨率。devbox 只显示，不可编辑——它是身份不是输入（设计 17 §6）
   const [devName, setDevName] = useState('')
   const [devOs, setDevOs] = useState('')
@@ -160,7 +162,7 @@ export default function PhoneView() {
   const pressKey = (name: string) => api('POST', '/phone/key', { name }).catch(() => {})
 
   // quality 变化才重建连接；断开(掉线/切设备/模拟器停起)自动重连，画面自愈无需刷新。
-  useEffect(() => {
+  usePageEffect(() => {
     let stopped = false
     let tp: DuplexTransport | null = null
     let objURL: string | null = null
@@ -217,6 +219,7 @@ export default function PhoneView() {
       stopped = true
       clearInterval(ping); clearInterval(meter); clearTimeout(retry)
       if (objURL) URL.revokeObjectURL(objURL)
+      imgRef.current?.removeAttribute('src')
       if (tp) { tp.onmessage = () => {}; tp.onclose = () => {} } // 卸载后忽略在途回调
       tp?.close()
       if (tpRef.current === tp) tpRef.current = null

@@ -1,3 +1,4 @@
+import { usePageActive, usePageEffect } from '../../page-activity'
 // 一棵组件树，两种容器（13 §6 手机 / 14 panels-desktop.html 桌面）。
 //
 // Git 面板和 Worktree 的问题从来不在面板本体，全在**容器**：
@@ -11,7 +12,7 @@
 //
 // 桌面不带遮罩是有意的：遮罩 = 模态 = 「先关掉才能干别的」，而 Git 面板恰恰要边看边干。
 // 代价是「点外面不会关」，所以面板必须常驻一个关闭入口（GitPanel/WorktreePanel 都有）。
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
@@ -28,6 +29,7 @@ export default function AdaptivePanel({ open, title, onClose, layer, children, d
   desktopHeader?: ReactNode
 }) {
   const { phone } = useLayout()
+  const active = usePageActive()
 
   // 登记槽位：只有栈顶那个可见。从 Git 面板里还能唤起 Worktree（WorktreePanel 就渲染在
   // GitPanel 的子树里），两个都 portal 进同一个槽会叠在一起——所以非栈顶的**藏起来**。
@@ -37,7 +39,7 @@ export default function AdaptivePanel({ open, title, onClose, layer, children, d
   // 藏起来还顺带保住了滚动位置与展开态，**关掉栈顶自然露出下面那个**，
   // 「从 Git 跳 Worktree 再回来」因此是免费的。
   const [id, setId] = useState(0)
-  useEffect(() => {
+  usePageEffect(() => {
     if (!open || phone) return
     const claimed = claimInspector()
     setId(claimed)
@@ -56,7 +58,7 @@ export default function AdaptivePanel({ open, title, onClose, layer, children, d
   return createPortal(
     <div style={{
       flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'column',
-      display: isTop ? 'flex' : 'none',
+      display: active && isTop ? 'flex' : 'none',
     }}>
       {desktopHeader}
       {children}

@@ -1,3 +1,7 @@
+import { usePageEffect } from '../../page-activity'
+import { useRegisteredAgents } from '../../agent-registry'
+import { agentLaunch } from '../../agent-command'
+import { agentName } from '../../agent-kind'
 // 竞赛（设计 docs/design/web/07-worktree.md §3 W5/W6）：
 // W5 创建弹窗 = 一个 prompt × N 选手，提交一次调 POST /races（后端逐选手编排）。
 // W6 对比台 = 全屏浮层，横排选手 lane + 下半屏 diff；「选为赢家」走 crown 状态机。
@@ -42,6 +46,7 @@ export function RaceCreateModal({ open, onClose, onDone }: {
   const [branches, setBranches] = useState<string[]>([])
   const [defBranch, setDefBranch] = useState('')
   const [prompt, setPrompt] = useState('')
+  const registered = useRegisteredAgents(open)
   const [agents, setAgents] = useState<string[]>(['claude', 'codex'])
   const [creating, setCreating] = useState(false)
   const { message } = AntApp.useApp()
@@ -82,7 +87,7 @@ export function RaceCreateModal({ open, onClose, onDone }: {
         ...(base ? { base } : {}),
         contestants: agents.map((a) => ({
           agent: a,
-          cmd: a === 'claude' ? (prefs.claudeCommand || 'claude') : (prefs.codexCommand || 'codex'),
+          cmd: agentLaunch(a, prefs),
         })),
       })
       const race: Race = res.data
@@ -126,7 +131,7 @@ export function RaceCreateModal({ open, onClose, onDone }: {
               }}>
                 <span style={{ position: 'absolute', top: 3, right: 8, color: 'var(--text-dimmer)', fontSize: 11, cursor: 'pointer' }}
                   onClick={() => setAgents((xs) => xs.filter((_, j) => j !== i))}><CloseIcon size={12} /></span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: AGENT_COLOR[a] }}>{a === 'claude' ? 'Claude' : 'Codex'}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: AGENT_COLOR[a] }}>{agentName(a)}</span>
                 <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'var(--text-dimmer)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {slug}-{String.fromCharCode(97 + i)}
                 </span>
@@ -134,10 +139,7 @@ export function RaceCreateModal({ open, onClose, onDone }: {
             ))}
             {agents.length < MAX_CONTESTANTS && (
               <Dropdown trigger={['click']} menu={{
-                items: [
-                  { key: 'claude', label: 'Claude' },
-                  { key: 'codex', label: 'Codex' },
-                ],
+                items: registered.map(agent => ({ key: agent.kind, label: agent.displayName })),
                 onClick: ({ key }) => setAgents((xs) => [...xs, key]),
               }}>
                 <div style={{
@@ -188,7 +190,7 @@ export function RaceComparePanel({ race, onClose, openTerm, onChanged }: {
   raceRef.current = race
 
   // 5s 轮询实况：worktree 状态 + diff 统计 + agent 进程
-  useEffect(() => {
+  usePageEffect(() => {
     const r = race
     if (!r) { setLanes([]); setSel(''); setFile(''); setFileDiff(''); return }
     let stop = false

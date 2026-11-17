@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { PageActivityProvider } from '../../../page-activity'
 import OkrHtmlDashboard from './OkrHtmlDashboard'
 import type { Workspace } from './okr-workspace'
 
@@ -88,4 +89,14 @@ it('fails closed when metadata belongs to a different configuration and keeps re
  fireEvent.click(screen.getByRole('button', { name: 'agent.retry' }))
  expect(refresh).toHaveBeenCalledOnce()
  await screen.findByTitle('okr.tab.dashboard')
+})
+
+it('releases its frame when the owning page hides even if its dashboard tab stays selected', async () => {
+ const view = (active: boolean) => <PageActivityProvider active={active}><OkrHtmlDashboard workspace={workspace} active /></PageActivityProvider>
+ const rendered = render(view(true)); await open(); const channel = Channel.all[0]
+ rendered.rerender(view(false))
+ expect(screen.queryByTitle('okr.tab.dashboard')).toBeNull()
+ expect(channel.port1.close).toHaveBeenCalled()
+ rendered.rerender(view(true)); await open()
+ expect(state.api).toHaveBeenCalledTimes(2)
 })

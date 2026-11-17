@@ -1,6 +1,7 @@
 """Discoverable Main coordination and task-bound member discussion."""
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import EXECUTOR_PATTERN
 from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.tools.connector_batch_receipts import connector_batch_receipt
 from roami_agent.tools.project_memory_edit import (
@@ -270,7 +271,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         {
             "member": string,
             "memberId": string,
-            "executor": {"type": "string", "enum": ["native", "codex", "claude", "opencode", "pi"]},
+            "executor": {"type": "string", "pattern": EXECUTOR_PATTERN},
             "title": string,
             "goal": string,
             "acceptance": string,
@@ -308,7 +309,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
                                 "name": string,
                                 "executor": {
                                     "type": "string",
-                                    "enum": ["native", "codex", "claude", "opencode", "pi"],
+                                    "pattern": EXECUTOR_PATTERN,
                                 },
                                 "duty": string,
                             },

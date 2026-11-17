@@ -250,29 +250,25 @@ func (a *API) SessionWorktreeStatus(c *gin.Context) {
 		return
 	}
 	hit := ann.Primary
-	// 关闭前同步远端合入证据，避免沿用项目页尚未刷新的 origin/<base>。
-	_, _ = a.WT.Sync(ctx, hit.Worktree)
-	res := gin.H{"inWorktree": true, "path": hit.Worktree, "branch": hit.Branch, "repo": hit.Repo}
+	w, err := a.WT.ClosePreflight(ctx, hit.Worktree)
+	if err != nil {
+		wtErr(c, err)
+		return
+	}
+	res := gin.H{"inWorktree": true, "path": hit.Worktree, "branch": w.Branch, "repo": hit.Repo,
+		"base": w.Base, "dirty": w.Dirty, "untracked": w.Untracked, "committedAhead": w.CommittedAhead,
+		"external": w.External, "pushed": w.Pushed, "mergedInto": w.MergedInto, "mergedKind": w.MergedKind}
 	res["sessionIdentity"] = identity
 	if snapshot, err := a.WT.Snapshot(ctx, hit.Worktree); err == nil {
 		res["snapshot"] = snapshot
 	}
-	if list, err := a.WT.List(ctx, hit.Worktree); err == nil {
-		for _, w := range list {
-			if w.Path == hit.Worktree {
-				res["base"] = w.Base
-				res["dirty"] = w.Dirty
-				res["untracked"] = w.Untracked
-				res["committedAhead"] = w.CommittedAhead
-				res["external"] = w.External
-				res["pushed"] = w.Pushed         // 三态细化：已提交/已推送
-				res["mergedInto"] = w.MergedInto // 合入检测（10 §5）：W7 弹窗按此改文案
-				res["mergedKind"] = w.MergedKind
-				// 这个 worktree 里除了自己还有几个会话：>0 时前端只关会话、不碰 worktree
-				res["others"] = len(otherSessions(w, name))
-			}
+	others := 0
+	for other, ann := range a.WT.Annotations(ctx) {
+		if other != name && ann.Primary != nil && ann.Primary.Worktree == hit.Worktree {
+			others++
 		}
 	}
+	res["others"] = others
 	c.JSON(http.StatusOK, gin.H{"data": res})
 }
 

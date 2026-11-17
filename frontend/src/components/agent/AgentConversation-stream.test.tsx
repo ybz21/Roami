@@ -34,11 +34,62 @@ beforeEach(() => {
   })
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
-afterEach(() => { cleanup(); clearAgentDataCache(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); clearAgentDataCache(); vi.restoreAllMocks(); vi.useRealTimers() })
 async function emit(cid: string, event: AgentEvent) {
   state.snapshots.set(cid, projectAgentEvent(state.snapshots.get(cid), event).view)
   await act(async () => { state.streams.get(cid)!.enqueue(new TextEncoder().encode('data: ' + JSON.stringify(event) + '\n\n')) })
 }
+it.each([false, true])('keeps /compact inline, reads context only on click and never polls the summary (phone=%s)', async phone => {
+  state.phone = phone
+  const original = state.api.getMockImplementation()!
+  state.api.mockImplementation(async (method, path, body) => {
+    if (method === 'POST' && body?.text === '/compact') {
+      const compaction = { operationId: 'compact-one', state: 'queued' }
+      state.snapshots.set('home', { ...state.snapshots.get('home'), compaction })
+      return { data: { kind: 'compaction', ...compaction } }
+    }
+    if (path.endsWith('/context')) return { data: { estimatedTokens: 100, contextWindow: 128000, snapshotId: 'snapshot-one' } }
+    if (path.endsWith('/context/snapshots/snapshot-one')) return { data: { summary: { text: 'Stable compacted context' } } }
+    return original(method, path, body)
+  })
+  render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.has('home')).toBe(true))
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.message' }), { target: { value: '/compact' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.send' }))
+  await screen.findByRole('button', { name: /agent.compacting.*agent.context.view/ })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(state.api.mock.calls.filter(call => call[1].includes('/context/snapshots/'))).toHaveLength(0)
+  await emit('home', { id: 1, kind: 'context.compaction.started', branchId: 'branch', payload: { operationId: 'compact-one' } })
+  await emit('home', { id: 2, kind: 'context.compaction.completed', branchId: 'branch', payload: { operationId: 'compact-one', snapshotId: 'snapshot-one' } })
+  const status = await screen.findByRole('button', { name: /agent.compaction.completed.*agent.context.view/ })
+  expect(screen.queryByText('Stable compacted context')).toBeNull()
+  expect(state.api.mock.calls.filter(call => call[1].includes('/context/snapshots/'))).toHaveLength(0)
+  fireEvent.click(status)
+  const content = await screen.findByText('Stable compacted context')
+  const reads = state.api.mock.calls.filter(call => call[1].includes('/context/snapshots/')).length
+  vi.useFakeTimers()
+  await act(async () => { await vi.advanceTimersByTimeAsync(12000) })
+  expect(state.api.mock.calls.filter(call => call[1].includes('/context/snapshots/'))).toHaveLength(reads)
+  expect(screen.getByText('Stable compacted context')).toBe(content)
+  expect(phone ? document.querySelector('.tt-mobile-subpage-head') : screen.getByRole('dialog')).toBeTruthy()
+})
+
+it('keeps SSE completion when the queued /compact receipt arrives later', async () => {
+  const original = state.api.getMockImplementation()!
+  state.api.mockImplementation(async (method, path, body) => {
+    if (method === 'POST' && body?.text === '/compact') {
+      await emit('home', { id: 1, kind: 'context.compaction.completed', branchId: 'branch', payload: { operationId: 'fast', snapshotId: 'snapshot-fast' } })
+      return { data: { kind: 'compaction', operationId: 'fast', state: 'queued' } }
+    }
+    return original(method, path, body)
+  })
+  render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.has('home')).toBe(true))
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.message' }), { target: { value: '/compact' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.send' }))
+  await screen.findByRole('button', { name: /agent.compaction.completed.*agent.context.view/ })
+  expect(screen.queryByRole('button', { name: /agent.compacting.*agent.context.view/ })).toBeNull()
+})
 it.each([false, true])('hides delegated execution from snapshot and SSE while keeping Main calls and results (phone=%s)', async phone => {
   state.phone = phone
   const main: AgentActivityItem = { id: 'tool:delegate', kind: 'tool', name: 'delegate', state: 'succeeded', anchorMessageId: '', startedMs: 1, updatedMs: 1 }

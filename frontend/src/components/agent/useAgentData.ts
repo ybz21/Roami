@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useCallback, useState } from 'react'
 import { agentDataKey, invalidateAgentData, loadAgentData, peekAgentData } from './agent-data-cache'
 
 export function useAgentData<T>(path: string | null, freshFor: number, pollMs = 0, method = 'GET', enabled = true) {
@@ -6,7 +7,7 @@ export function useAgentData<T>(path: string | null, freshFor: number, pollMs = 
   const [state, setState] = useState<{ key: string; value?: T; failed: boolean; errorCode?: string }>({ key: '', failed: false })
   const [revision, setRevision] = useState(0)
   const value = state.key === key ? state.value : key ? peekAgentData<T>(key) : undefined
-  useEffect(() => {
+  usePageEffect(() => {
     if (!path || !enabled) return
     let stopped = false, reading = false, failures = 0, ticks = 0
     const read = async (ttl: number) => {

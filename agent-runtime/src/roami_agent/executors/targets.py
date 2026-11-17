@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.protocol.serialization import encoded
 from roami_agent.tools.process import execute
 
@@ -208,7 +209,7 @@ class TargetDirectory:
             "label": self._text(entry, "name")[:160],
             "archived": entry.get("archived") is True,
         }
-        if entry.get("defaultAgent") in {"codex", "claude", "opencode", "pi", "native"}:
+        if is_executor(entry.get("defaultAgent")):
             result["defaultExecutor"] = entry["defaultAgent"]
         return result
 
@@ -222,7 +223,7 @@ class TargetDirectory:
             "state": "live",
         }
         executor = entry.get("executor") or entry.get("agent")
-        if executor in {"codex", "claude", "opencode", "pi"}:
+        if is_executor(executor) and executor != "native":
             result["executor"] = executor
         return result
 
@@ -274,7 +275,7 @@ class TargetDirectory:
             item = self._project(entry) if project else self._session(entry)
             if project_id:
                 item["projectId"] = project_id
-                if entry.get("agent") in {"codex", "claude", "opencode", "pi"}:
+                if is_executor(entry.get("agent")):
                     item["executor"] = entry["agent"]
             identifier = item["projectId" if project else "sessionId"]
             if (

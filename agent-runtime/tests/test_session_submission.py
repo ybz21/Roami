@@ -13,6 +13,8 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row, rows
 
+pytestmark = pytest.mark.usefixtures("mock_executor_catalog")
+
 
 @pytest.fixture(
     params=[

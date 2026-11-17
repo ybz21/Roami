@@ -35,3 +35,8 @@ func openCodePermissionArgs(permission string) []string {
 func (opencode) ResumeCommand(string) string        { return "" }
 func (opencode) DetectConversationID(string) string { return "" }
 func (opencode) ConversationDir(string) string      { return "" }
+
+func (opencode) InstallPackage() Package { return Package{Name: "opencode-ai"} }
+func (opencode) ModelConfiguration()     {}
+
+func (opencode) PromptFlag() string { return "--prompt" }

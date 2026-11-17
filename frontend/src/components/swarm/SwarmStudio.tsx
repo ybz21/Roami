@@ -1,3 +1,4 @@
+import { usePageActive } from '../../page-activity'
 import { useEffect, useRef, useState } from 'react'
 import { useLayout } from '../../layout'
 import { useI18n } from '../../i18n'
@@ -5,6 +6,7 @@ import type { StudioNode } from './swarm-protocol'
 import type { createStudio } from './studio/studio-scene'
 
 export default function SwarmStudio({ nodes, selected, onSelect, active = true, historical = false, compactHeader = false }: { nodes: StudioNode[]; selected: string; onSelect: (id: string) => void; active?: boolean; historical?: boolean; compactHeader?: boolean }) {
+  const pageActive = usePageActive()
   const { t } = useI18n(), layout = useLayout()
   const host = useRef<HTMLDivElement>(null), labels = useRef<HTMLDivElement>(null), scene = useRef<ReturnType<typeof createStudio> | null>(null)
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false), [motion, setMotion] = useState(() => localStorage.getItem('roami.swarm.motion') !== 'off')
@@ -12,7 +14,7 @@ export default function SwarmStudio({ nodes, selected, onSelect, active = true, 
   const [retry, setRetry] = useState(0)
   useEffect(() => {
     setReady(false)
-    if (!active) return
+    if (!active || !pageActive) return
     let disposed = false; setFailed(false)
     void import('./studio/studio-scene').then(({ createStudio }) => {
       if (disposed || !host.current || !labels.current) return
@@ -22,7 +24,7 @@ export default function SwarmStudio({ nodes, selected, onSelect, active = true, 
       } catch { setFailed(true) }
     }).catch(() => { if (!disposed) setFailed(true) })
     return () => { disposed = true; scene.current?.dispose(); scene.current = null }
-  }, [layout.coarse, retry, active])
+  }, [layout.coarse, retry, active, pageActive])
   useEffect(() => { scene.current?.update(nodes) }, [nodes])
   useEffect(() => { scene.current?.select(selected) }, [selected])
   useEffect(() => { scene.current?.motion(motion, layout.reducedMotion, historical) }, [motion, layout.reducedMotion, historical])

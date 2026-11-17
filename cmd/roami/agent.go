@@ -62,11 +62,11 @@ func runAgent(args []string) int {
 		return runAgentTrace(args[1:])
 	}
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("roami agent setup|init|serve|status|installed-status|install-bundle|install-probe|prepare-upgrade|resume-upgrade|conversations|identity|wake|new|send|history|report|reply|notify|steer|steering|task|memory|target|control|reminder|notification-preferences|execution|capability|mcp|trace|gateway [flags]\n  --runtime-dir PATH  Python project (setup/init/serve)\n  send --conversation ID --text TEXT [--key IDEMPOTENCY_KEY]\n  report --task ID --run ID --revision N --file RESULT.json\n  reply --dispatch ID --file RESULT.json (session executor report to originating Main)\n  notify --conversation ID --source SOURCE --key KEY --file MESSAGE.txt\n  steer --task ID --revision N --key KEY --text TEXT\n  steering --task ID --operation ID\n  control ls --task ID; control show|pause|resume --resource ID\n  trace --turn ID|--task ID [--format json|chrome]\n  gateway settings|usage|configure|reconcile: local Go model billing and daily quota\n  serve uses the private Unix socket; public HTTP/SSE goes through roami server")
+		_ = groupHelpPage("agent").Render(os.Stdout)
 		return 0
 	}
 	sub := args[0]
-	fs := flag.NewFlagSet("agent "+sub, flag.ContinueOnError)
+	fs := newCommandFlags("agent " + sub)
 	runtimeDir := fs.String("runtime-dir", "", "Python runtime project")
 	project := fs.String("project", "", "bound project for an external Main wakeup")
 	conversation := fs.String("conversation", "", "conversation ID")
@@ -85,6 +85,9 @@ func runAgent(args []string) int {
 	branch := fs.String("branch", "", "history branch ID")
 	_ = fs.Bool("json", true, "JSON output")
 	if err := fs.Parse(args[1:]); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {

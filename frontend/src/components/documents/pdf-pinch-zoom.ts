@@ -1,7 +1,8 @@
-import { useEffect, type RefObject } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { type RefObject } from 'react'
 
 export function usePdfPinchZoom(container: RefObject<HTMLDivElement>, canvas: RefObject<HTMLCanvasElement>, scale: number, enabled: boolean, onScale: (scale: number) => void) {
-  useEffect(() => {
+  usePageEffect(() => {
     const element = container.current, paper = canvas.current
     if (!element || !paper || !enabled) return
     let gesture: { span: number; width: number; height: number; x: number; y: number; next: number; left: number; top: number } | undefined

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
+import { WorkspaceStateStore, type ViewStateScope } from '../../workspace-state'
 import { App as AntApp } from 'antd'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FileWorkspace from './FileWorkspace'
+import { FileWorkspaceStateProvider } from './file-workspace-state'
 import { I18nProvider } from '../../i18n'
 import { requestIntent, OPEN_FILE_INTENT } from '../../intents'
 
@@ -43,13 +45,31 @@ describe('FileWorkspace resize shield', () => {
     vi.unstubAllGlobals()
   })
 
-  const renderWorkspace = () => render(
+  const renderWorkspace = (memory?: ViewStateScope) => render(
     <I18nProvider>
       <AntApp>
-        <FileWorkspace dir="/workspace" />
+        <FileWorkspaceStateProvider scope={memory}><FileWorkspace dir="/workspace" /></FileWorkspaceStateProvider>
       </AntApp>
     </I18nProvider>,
   )
+
+  it('restores tab order, selection and closed tabs after navigation', () => {
+    const memory = new WorkspaceStateStore().scope('files')
+    const first = renderWorkspace(memory)
+    act(() => requestIntent(OPEN_FILE_INTENT, { path: '/workspace/one.txt' }))
+    act(() => requestIntent(OPEN_FILE_INTENT, { path: '/workspace/two.txt' }))
+    const firstTab = first.container.querySelector<HTMLElement>('[data-tab-key="/workspace/one.txt"]')!
+    fireEvent.click(firstTab)
+    first.unmount()
+    const second = renderWorkspace(memory)
+    expect([...second.container.querySelectorAll('[data-tab-key]')].map(tab => tab.getAttribute('data-tab-key'))).toEqual(['/workspace/one.txt', '/workspace/two.txt'])
+    expect(memory.get('workspace.activeA')).toBe('/workspace/one.txt')
+    const tab = second.container.querySelector<HTMLElement>('[data-tab-key="/workspace/one.txt"]')!
+    fireEvent.click(tab.querySelector('.cc-tabx')!)
+    second.unmount()
+    const third = renderWorkspace(memory)
+    expect([...third.container.querySelectorAll('[data-tab-key]')].map(tab => tab.getAttribute('data-tab-key'))).toEqual(['/workspace/two.txt'])
+  })
 
   it('keeps dock resize events above iframe previews until pointerup', () => {
     const { container } = renderWorkspace()

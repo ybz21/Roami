@@ -1,3 +1,4 @@
+import { usePageEffect } from '../../../page-activity'
 // 图片展示：适应窗口起步，能放大、能拖、能滚。
 //
 // 从前这里是一行 `<img maxWidth/maxHeight:100%>` 摆在 `display:grid; place-items:center` 里。
@@ -84,7 +85,7 @@ export function ImageView({ rawUrl, name, height = '100%' }: { rawUrl: string; n
   const toggleActual = (at?: Pt) => { if (atActual) setScale(null); else zoomTo(1, at || center()) }
 
   // 滚轮与捏合都要 preventDefault，React 的 onWheel/onTouchMove 是被动监听，改不了默认行为。
-  useEffect(() => {
+  usePageEffect(() => {
     const el = boxRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {

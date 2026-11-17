@@ -1,3 +1,4 @@
+import { usePageActive, usePageEffect } from '../../../page-activity'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Spin } from 'antd'
 import { api } from '../../../api'
@@ -20,10 +21,12 @@ const tokens = [
 const same = (a: string[], b: string[]) => JSON.stringify(a) === JSON.stringify(b)
 
 export default function OkrHtmlDashboard({ workspace, active, onRefresh }: { workspace: Workspace; active: boolean; onRefresh?: () => void }) {
+  const pageActive = usePageActive()
   const [visible, setVisible] = useState(() => !document.hidden)
-  const running = active && visible
-  useEffect(() => {
+  const running = active && pageActive && visible
+  usePageEffect(() => {
     const update = () => setVisible(!document.hidden)
+    update()
     document.addEventListener('visibilitychange', update)
     return () => document.removeEventListener('visibilitychange', update)
   }, [])
@@ -48,7 +51,7 @@ export default function OkrHtmlDashboard({ workspace, active, onRefresh }: { wor
     return () => cancelAnimationFrame(frame)
   }, [theme.mode, layout.size])
   useEffect(() => {
-    if (!running || !html) return
+    if (!running || !html) { setLoaded(null); return }
     let stopped = false
     const controller = new AbortController()
     setError(''); setReady(false)

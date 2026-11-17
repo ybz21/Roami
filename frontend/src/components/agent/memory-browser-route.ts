@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../page-activity'
+import { useState } from 'react'
 import { getHashParams } from '../../route-hash'
 import type { MemoryScope, MemoryView } from './memory-record'
 
@@ -23,7 +24,7 @@ export function writeMemoryRoute(next: MemoryRoute, push = false) {
 }
 export function useMemoryRoute(defaultScope: MemoryScope = 'all') {
   const [value, setValue] = useState(() => readMemoryRoute(defaultScope))
-  useEffect(() => { const read = () => setValue(readMemoryRoute(defaultScope)); window.addEventListener('hashchange', read); window.addEventListener('popstate', read); read(); return () => { window.removeEventListener('hashchange', read); window.removeEventListener('popstate', read) } }, [defaultScope])
+  usePageEffect(() => { const read = () => setValue(readMemoryRoute(defaultScope)); window.addEventListener('hashchange', read); window.addEventListener('popstate', read); read(); return () => { window.removeEventListener('hashchange', read); window.removeEventListener('popstate', read) } }, [defaultScope])
   const change = (patch: Partial<MemoryRoute>, push = false) => writeMemoryRoute({ ...readMemoryRoute(defaultScope), ...patch }, push)
   const back = () => {
     const parent = history.state?.roamiMemoryFrom

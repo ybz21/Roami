@@ -449,7 +449,9 @@ class TaskRevisions:
             ):
                 payload = json.loads(job["payload_json"])
                 task = row(db, "SELECT * FROM tasks WHERE id=?", (job["aggregate_id"],))
-                if task["state"] not in STABLE:
+                from roami_agent.storage.swarm_work_pause import task_paused
+
+                if task["state"] not in STABLE or task_paused(db, task):
                     continue
                 if row(
                     db,

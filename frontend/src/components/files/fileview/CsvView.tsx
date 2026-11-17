@@ -1,6 +1,6 @@
 // CSV / TSV 展示：解析成表格（截前 80 行 × 12 列，见 parseDelimited）。
 import { type CSSProperties } from 'react'
-import { useRememberedScroll } from './view-state-memory'
+import { useRememberedScroll } from './file-view-state'
 import { parseDelimited } from '../file-utils'
 import { PreviewShell } from './PreviewShell'
 import { useI18n } from '../../../i18n'

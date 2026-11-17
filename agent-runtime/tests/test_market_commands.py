@@ -15,6 +15,8 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.server import market_catalogs
 from roami_agent.server.http import create_app
 
+pytestmark = pytest.mark.usefixtures("mock_executor_catalog")
+
 
 def fixture_entry(kind="skills"):
     entry = {

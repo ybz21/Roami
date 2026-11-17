@@ -5,7 +5,7 @@ import { agentReadiness, nextOnboardingStep, onboardingChanged, useOnboardingSta
 
 const fixture = vi.hoisted(() => ({ node: 'a', loaded: true, prefs: {} as any, api: vi.fn(), agents: vi.fn(), save: vi.fn() }))
 vi.mock('../../api', () => ({ api: (...args: any[]) => fixture.api(...args) }))
-vi.mock('../../agent-registry', () => ({ discoverAgents: () => fixture.agents() }))
+vi.mock('../../agent-registry', async importOriginal => ({ ...(await importOriginal<typeof import('../../agent-registry')>()), discoverAgents: () => fixture.agents() }))
 vi.mock('../cluster/node-url', () => ({ useCurrentNodeId: () => fixture.node, nodeApi: (path: string) => fixture.node + path }))
 vi.mock('../../preferences', () => ({ usePreferences: () => [fixture.prefs, fixture.save], getPreferences: () => fixture.prefs, preferencesLoaded: () => fixture.loaded }))
 const model = (name = '') => ({ main: { model: name, baseUrl: name ? 'https://example.test/v1' : '', keyConfigured: false }, worker: { model: name }, verified: false })

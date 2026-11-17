@@ -28,11 +28,11 @@ func ProfessionalUpgradePlan(kind string) (UpgradePlan, error) {
 	if kind == "opencode" {
 		return UpgradePlan{Method: "native", Program: path, Args: []string{"upgrade"}}, nil
 	}
-	packages := map[string]string{"claude": "@anthropic-ai/claude-code", "codex": "@openai/codex", "pi": "@earendil-works/pi-coding-agent"}
-	pkg, ok := packages[kind]
+	installation, ok := agent.InstallPackage(kind)
 	if !ok {
-		return UpgradePlan{}, fmt.Errorf("INVALID_AGENT_KIND")
+		return UpgradePlan{}, fmt.Errorf("AGENT_UPGRADE_UNSUPPORTED")
 	}
+	pkg := installation.Name
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return UpgradePlan{}, fmt.Errorf("AGENT_UPGRADE_UNSUPPORTED")
@@ -62,10 +62,10 @@ func ProfessionalUpgradePlan(kind string) (UpgradePlan, error) {
 			return UpgradePlan{}, fmt.Errorf("AGENT_UPGRADE_UNSUPPORTED")
 		}
 		args := []string{"install", "-g", "--prefix", prefix}
-		if kind == "pi" {
+		if installation.IgnoreScripts {
 			args = append(args, "--ignore-scripts")
 		}
-		return UpgradePlan{Method: "npm", Program: program, Args: append(args, pkg)}, nil
+		return UpgradePlan{Method: "npm", Program: program, Args: append(args, installation.Spec())}, nil
 	}
 	if kind == "claude" {
 		return UpgradePlan{Method: "native", Program: path, Args: []string{"update"}}, nil

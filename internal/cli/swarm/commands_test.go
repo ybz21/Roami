@@ -75,7 +75,7 @@ func commandResult(t *testing.T, rt runtime.Runtime, args ...string) string {
 func TestHelpCannotDispatchOrResolveRuntime(t *testing.T) {
 	for _, args := range [][]string{{"help"}, {"help", "member"}, {"new", "anything", "--help"}, {"member", "add", fixtureID, "--help"}, {"pause", fixtureID, "--help"}, {"chat", "--help"}} {
 		output := commandResult(t, runtime.Runtime{}, args...)
-		if !strings.Contains(output, "roami swarm") || !strings.Contains(output, "--follow") {
+		if !strings.Contains(output, "roami swarm") || !strings.Contains(output, "\n用法\n") {
 			t.Fatalf("incomplete help: %s", output)
 		}
 	}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePageEffect } from '../../../page-activity'
+import { useState } from 'react'
 import { nodeApi } from '../../cluster/node-url'
 import { pollWhileVisible } from '../../../visible-poll'
 import { loadSwarmDirectory } from '../../swarm/swarm-directory'
@@ -11,7 +12,7 @@ export function swarmProjectMatches(target: { projectId?: string; directory?: st
 export function useSwarmProjection(projects: Proj[]): ProjSwarm[] {
   const [swarms, setSwarms] = useState<ProjSwarm[]>([])
   const scope = nodeApi('/agent/swarms'), dirsKey = projects.map(project => `${project.key}\t${project.dir}\t${project.name}`).join('\n')
-  useEffect(() => pollWhileVisible(async signal => {
+  usePageEffect(() => pollWhileVisible(async signal => {
     const groups = await loadSwarmDirectory()
     const result = groups.filter(group => !group.archived).flatMap(group => {
       const project = projects.find(item => swarmProjectMatches(group.target, item))

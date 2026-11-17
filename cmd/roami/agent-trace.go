@@ -11,7 +11,7 @@ import (
 )
 
 func runAgentTrace(args []string) int {
-	flags := flag.NewFlagSet("agent trace", flag.ContinueOnError)
+	flags := newCommandFlags("agent trace")
 	turn := flags.String("turn", "", "turn ID from a send receipt")
 	task := flags.String("task", "", "background task ID")
 	format := flags.String("format", "json", "json or chrome (Perfetto/Chrome trace-event file)")

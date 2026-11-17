@@ -11,8 +11,8 @@ import (
 )
 
 func runAgentMarket(args []string) int {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("roami agent capability market sources\nroami agent capability market search --input '{\"source\":\"skills-sh\",\"query\":\"find-skills\"}'\nroami agent capability market preview --input '{\"source\":\"skills-sh\",\"id\":\"OWNER/REPO/SKILL\",\"version\":\"\"}'\nroami agent capability market install --input '{\"previewId\":\"RETURNED_ID\",\"option\":0}'\nPreview pins the downloaded option for ten minutes; install is separate and never overwrites an existing name. MCP is registered disconnected. npm CLI downloads its fixed package on first invocation. Agent contexts use the same role and receipt checks; professional tasks may add --context FILE and --call REQUEST_ID.")
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		_ = groupHelpPage("agent capability market").Render(os.Stdout)
 		return 0
 	}
 	verb := args[0]
@@ -20,7 +20,7 @@ func runAgentMarket(args []string) int {
 		fmt.Fprintln(os.Stderr, "unknown marketplace command")
 		return 2
 	}
-	flags := flag.NewFlagSet("agent capability market "+verb, flag.ContinueOnError)
+	flags := newCommandFlags("agent capability market " + verb)
 	input := flags.String("input", "{}", "JSON arguments")
 	contextFile := flags.String("context", "", "private professional task context file")
 	requestID := flags.String("call", "", "professional request ID")

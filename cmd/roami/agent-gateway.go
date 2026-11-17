@@ -15,16 +15,19 @@ import (
 )
 
 func runAgentGateway(args []string) int {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("roami agent gateway settings|usage|configure|reconcile|binding [--file JSON] [--days 7] [--call ID]\n  configure replaces local pricing and daily limit; reconcile records a verified amount for an unknown call\n  requires roami server or roami agent serve")
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		_ = groupHelpPage("agent gateway").Render(os.Stdout)
 		return 0
 	}
-	flags := flag.NewFlagSet("agent gateway", flag.ContinueOnError)
+	flags := newCommandFlags("agent gateway " + args[0])
 	file := flags.String("file", "", "configuration/reconciliation JSON file, or - for stdin")
 	dataRoot := flags.String("data-root", "", "local node data directory (binding only)")
 	days := flags.Int("days", 7, "usage window, 1-90 days; 0 for lifetime")
 	call := flags.String("call", "", "unknown call ID")
-	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 {
+	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if args[0] == "binding" {

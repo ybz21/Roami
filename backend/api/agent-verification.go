@@ -47,7 +47,7 @@ func (a *API) verificationSignature(ctx context.Context, row agentinventory.Prof
 		return "", err
 	}
 	revision, model := "", ""
-	if a.AgentProviders != nil {
+	if a.AgentProviders != nil && agent.Describe(agent.Get(row.Kind)).Models {
 		view, e := a.AgentProviders.View(ctx, row.Kind)
 		if e != nil {
 			return "", e
