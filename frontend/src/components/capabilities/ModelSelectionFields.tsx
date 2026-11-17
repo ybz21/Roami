@@ -3,10 +3,10 @@ import { Alert, Checkbox, Select, Spin } from 'antd'
 import { api } from '../../api'
 import { useCurrentNodeId } from '../cluster/node-url'
 import { useI18n } from '../../i18n'
-import { MODEL_CATALOG_CHANGED } from './model-hub-api'
+import { MODEL_CATALOG_CHANGED, type ModelDirectoryEntry } from './model-hub-api'
+export type { ModelDirectoryEntry } from './model-hub-api'
 
 export type ModelChoice = { model: string; freeOnly: boolean }
-export type ModelDirectoryEntry = { id: string; name: string; kind: string; protocol: string; configured: boolean; enabled: boolean; freeOnly: boolean; pricing?: string; capabilities: Record<string, { support: string; evidence: string; delivery: string }> }
 export const modelCapabilities = ['text', 'image', 'audio', 'video', 'tools', 'reasoning', 'structuredOutput', 'streaming'] as const
 
 export default function ModelSelectionFields({ value, onChange, disabled = false }: { value: ModelChoice; onChange: (choice: ModelChoice) => void; disabled?: boolean }) {

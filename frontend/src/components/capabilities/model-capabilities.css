@@ -1,2 +1,6 @@
-.tt-model-capabilities { display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-3); color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; }
+.tt-model-option-facts { display:flex; flex-direction:column; gap:var(--sp-1); color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; min-width:0; overflow-wrap:anywhere; }
+.tt-model-option-separator { display:inline-block; width:var(--sp-3); }
+.tt-model-option-features { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); }
+.tt-model-price { color:var(--text-dim); }
+.tt-model-price.is-free { color:var(--ok); }
 .tt-model-evidence { color:var(--text-dim); }

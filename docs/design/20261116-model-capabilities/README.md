@@ -66,3 +66,5 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 - [名称与访问密钥：用词和验收](naming-acceptance.md)
 
 - [聚合优先与网关目录统一：实现与验收](catalog-picker-acceptance.md)
+
+- [网关统一选模与能力展示](gateway-options-acceptance.md)

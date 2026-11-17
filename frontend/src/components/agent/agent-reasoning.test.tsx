@@ -267,7 +267,7 @@ it('keeps model selection usable when the optional gateway names cannot be read'
   render(<Composer />)
   await screen.findByText('provider-model')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
-  expect((await screen.findByRole('option', { name: 'provider-model' })).getAttribute('aria-description')).toContain('agent.models.kind.unknown')
+  expect((await screen.findByRole('option', { name: 'provider-model' })).getAttribute('aria-description')).toBe('agent.models.kind.unknown')
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
@@ -372,6 +372,29 @@ it('distinguishes equal display names by call ID and saves the selected route', 
  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT','/agent/model-settings',{main:{model:'route-two',reasoningEffort:null}}))
 })
 
+it.each(['native', 'roami-default'])('prioritizes gateway aggregates and resolves current route %s without changing it', async currentModel => {
+ const models = [
+  {id:'native',name:'Native',kind:'single',protocol:'openai-completions',configured:true,enabled:true,pricing:'metered',capabilities:{tools:{support:'supported'}},inputModalities:['text','image'],outputModalities:['text'],candidates:[]},
+  {id:'pool',name:'Auto pool',kind:'aggregate',aggregate:true,protocol:'openai-completions',configured:true,enabled:true,freeOnly:true,capabilities:{},candidates:[]},
+  {id:'disabled',name:'Disabled',kind:'single',configured:true,enabled:false,capabilities:{},candidates:[]},
+ ]
+ vi.mocked(api).mockImplementation(async (_method,path) => {
+  if(path === '/agent/model-gateway/catalog') return {data:{revision:'r1',defaultModel:'native',baseUrl:'http://127.0.0.1:19999',models}}
+  if(path.startsWith('/agent/model-gateway/models?')) return {data:{revision:'r1',models}}
+  return {data:{main:{...role,model:currentModel,baseUrl:'http://127.0.0.1:19999/v1'},worker:role}}
+ })
+ render(<Composer />)
+ await screen.findByText('Native')
+ fireEvent.click(screen.getByRole('button',{name:'agent.models.trigger'}))
+ await waitFor(()=>expect(screen.getByText('gatewayOptions.price.metered')).toBeTruthy())
+ expect(screen.getAllByRole('option').map(row=>row.getAttribute('aria-label'))).toEqual(['Auto pool','Native'])
+ expect(screen.getByText(/directory.inputs.*directory.modality.text.*directory.modality.image/)).toBeTruthy()
+ expect(screen.getByText('modelSelection.capability.tools')).toBeTruthy()
+ expect(vi.mocked(api).mock.calls.some(([,path])=>path==='/agent/models')).toBe(false)
+ fireEvent.click(screen.getByRole('option', {name:'Native'}))
+ await waitFor(()=>expect(screen.queryByRole('option', {name:'Native'})).toBeNull())
+ expect(vi.mocked(api).mock.calls.some(([method])=>method!=='GET')).toBe(false)
+})
 
 it('puts aggregates first and uses gateway input/output evidence without changing the selection', async () => {
   const baseUrl = 'http://127.0.0.1:19999'
@@ -391,8 +414,7 @@ it('puts aggregates first and uses gateway input/output evidence without changin
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
   await waitFor(() => expect(screen.getByRole('option', { name: 'Vision' }).textContent).toContain('directory.modality.image'))
   expect(screen.getAllByRole('option').map(row => row.getAttribute('aria-label'))).toEqual(['Auto', 'Vision'])
-  expect(screen.getByRole('option', { name: 'Auto' }).textContent).toContain('modelCapabilities.byMember')
-  expect(screen.getByRole('option', { name: 'Auto' }).textContent).toContain('modelCapabilities.unknown')
+  expect(screen.getByRole('option', { name: 'Auto' }).textContent).toContain('gatewayOptions.byMember')
   expect(screen.getByRole('option', { name: 'Vision' }).getAttribute('aria-selected')).toBe('true')
   expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
 })

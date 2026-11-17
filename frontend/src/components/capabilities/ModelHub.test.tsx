@@ -353,7 +353,7 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/gateway')
   page.rerender(<App><ModelHub sub="gateway" onNav={navigate} /></App>)
   expect(await screen.findByText(catalog.baseUrl + '/v1')).toBeTruthy()
-  expect(screen.queryByRole('region', { name: 'directory.title' })).toBeNull()
+  expect(screen.getByRole('region', { name: 'directory.title' })).toBeTruthy()
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'modelInteraction.gateway.directory' }))
   expect(screen.getByRole('region', { name: 'directory.title' })).toBeTruthy()
   expect(document.querySelector('.tt-model-connection')).toBeNull()
@@ -469,6 +469,7 @@ it('renames a native gateway ID without changing its upstream identity or duplic
 
 it('preserves a key creation draft across top-level model tabs',async()=>{
  const page=mount('gateway')
+ fireEvent.mouseDown(await screen.findByRole('tab',{name:'modelInteraction.gateway.access'}))
  fireEvent.click(await screen.findByRole('button',{name:'gatewayWorkspace.newKey'}))
  fireEvent.change(screen.getByLabelText('hub.gateway.keyName'),{target:{value:'My caller'}})
  page.rerender(<App><ModelHub sub="catalog" onNav={()=>{}}/></App>)
@@ -531,4 +532,13 @@ it('changes a model display name while preserving its call ID and upstream ident
  fireEvent.change(await screen.findByLabelText('hub.displayName'), {target:{value:'Office model'}})
  fireEvent.click(screen.getByRole('button', {name:'agent.models.save'}))
  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({models:[expect.objectContaining({id:'coding',name:'Office model',aliases:[],candidates:catalog.models[0].candidates})]})))
+})
+
+it('keeps model source configuration separate from gateway consumers even when usage exists', async () => {
+ const original = vi.mocked(api).getMockImplementation()!
+ vi.mocked(api).mockImplementation(async (method,path,body,options) => path === '/agent/model-gateway/catalog' ? {data:{...catalog,uses:{coding:['roami','claude']}}} : original(method,path,body,options))
+ mount('catalog')
+ await screen.findByRole('region', {name:'Saved source'})
+ expect(screen.queryByText('hub.consumers')).toBeNull()
+ expect(document.querySelector('.tt-model-hub-consumers')).toBeNull()
 })

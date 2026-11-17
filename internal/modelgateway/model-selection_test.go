@@ -16,7 +16,7 @@ func TestModelDirectoryEvidenceIsCachedScopedAndNeverInvented(t *testing.T) {
 	var hits atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
-		_, _ = w.Write([]byte(`{"data":[{"id":"vision","architecture":{"input_modalities":["text","image"]},"supported_parameters":["tools","structured_outputs"],"pricing":{"prompt":"0","completion":"0"}},{"id":"unknown"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"id":"vision","architecture":{"input_modalities":["text","image"],"output_modalities":["text"]},"supported_parameters":["tools","structured_outputs"],"pricing":{"prompt":"0","completion":"0"}},{"id":"unknown"},{"id":"paid-claude","architecture":{"input_modalities":["text","image"],"output_modalities":["text"]},"pricing":{"prompt":"0.001","completion":"0.002"}}]}`))
 	}))
 	defer upstream.Close()
 	h := catalogHandler(t, upstream.URL, "openai-completions")
@@ -43,6 +43,26 @@ func TestModelDirectoryEvidenceIsCachedScopedAndNeverInvented(t *testing.T) {
 	if hits.Load() != 1 || !strings.Contains(after, `"id":"unknown"`) || strings.Contains(after, "upstream-secret") || strings.Contains(after, `"evidence":"verified"`) {
 		t.Fatal(after)
 	}
+	var directory struct {
+		Data struct {
+			Models []ModelDirectoryRow `json:"models"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(after), &directory); err != nil {
+		t.Fatal(err)
+	}
+	if directory.Data.Models[0].Kind != "aggregate" {
+		t.Fatal("aggregates must be first", after)
+	}
+	for _, row := range directory.Data.Models {
+		if row.ID == "paid-claude" && (row.Pricing != "metered" || row.Configured || len(row.InputModalities) != 2 || len(row.OutputModalities) != 1) {
+			t.Fatal("paid upstream pricing or modalities lost", row)
+		}
+		if row.ID == "coding-main" && (len(row.InputModalities) != 2 || len(row.OutputModalities) != 1) {
+			t.Fatal("configured route lost input/output metadata", row)
+		}
+	}
+
 	image := query("/v1/model-gateway/models?capability=image")
 	if !strings.Contains(image, `"id":"coding-main"`) || strings.Contains(image, `"id":"pool"`) || hits.Load() != 1 {
 		t.Fatal("aggregate union advertised as guaranteed", image)
