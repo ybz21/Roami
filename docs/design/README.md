@@ -13,6 +13,7 @@
 | 旧会话记录分批加载 | [20261113-transcript-paging](20261113-transcript-paging/README.md) | 最新 50 条首屏、向前游标分页、只读历史身份校验与桌面/真机验收 |
 | 移除独立 DeepSeek Harness | [20261114-remove-deepseek-harness](20261114-remove-deepseek-harness/README.md) | 撤下执行器与适配，保留 API 模型和通用注册机制 |
 | CLI 帮助统一 | [20261113-cli-help](20261113-cli-help/README.md) | 同一帮助结构、子命令参数与隔离回归 |
+| 首页上下文自动整理与历史检索（草案） | [20261112-home-context-lifecycle](20261112-home-context-lifecycle/README.md) | 近期原文、当前工作简报、日周月年归档与按需回源；未启用定时任务 |
 | DeepSeek Harness 与 Agent 注册（历史） | [20261112-deepseek-harness](20261112-deepseek-harness/README.md) | 主机统一列表、单次执行能力与桌面/真机验收 |
 | 压缩状态反馈 | [20261112-compact-status](20261112-compact-status/README.md) | 状态行反馈、按需读取摘要与手机全屏详情，修复重复清空造成的闪烁 |
 | 浏览器导航等待与卡死检测 | [20261112-browser-navigation-recovery](20261112-browser-navigation-recovery/README.md) | 慢导航保留连接、超时恢复、新标签回执与桌面/手机验收 |
