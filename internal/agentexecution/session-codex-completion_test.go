@@ -151,7 +151,7 @@ func TestCodexCompletionIgnoresEarlierCompletedTurns(t *testing.T) {
 }
 
 func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
-	for _, mode := range []string{"unknown", "busy", "cancelled", "cancelled-manual-input", "lost-post-hook", "pending-subagent", "evidence-conflict", "aborted", "aborted-without-request", "aborted-other-turn", "aborted-live-process", "aborted-manual-input", "aborted-pending-hook", "aborted-pending-hook-unbound", "aborted-pending-subagent", "native-completed-hook", "native-failed-hook", "native-cancelled-hook", "native-foreign-provider", "native-foreign-turn", "native-running-hook", "native-missing-exit", "native-future-hook", "native-missing-process", "native-duplicate-hook", "native-noncommand", "native-unobserved-hook", "native-pending-subagent", "native-live-process", "native-multiple-commands", "native-partial-commands", "native-reversed-time", "native-no-thread-id", "native-no-turn-id"} {
+	for _, mode := range []string{"unknown", "busy", "cancelled", "cancelled-manual-input", "lost-post-hook", "pending-subagent", "evidence-conflict", "aborted", "aborted-without-request", "aborted-other-turn", "aborted-live-process", "aborted-manual-input", "aborted-pending-hook", "aborted-pending-hook-unbound", "aborted-pending-subagent", "native-completed-hook", "native-failed-hook", "native-cancelled-hook", "native-foreign-provider", "native-foreign-turn", "native-running-hook", "native-missing-exit", "native-future-hook", "native-missing-process", "native-duplicate-hook", "native-noncommand", "native-unobserved-hook", "native-pending-subagent", "native-live-process", "native-multiple-commands", "native-partial-commands", "native-reversed-time", "native-no-thread-id", "native-no-turn-id", "native-mcp-completed", "native-mcp-failed", "native-mcp-running", "native-mcp-missing-server", "native-mcp-missing-tool", "native-mcp-foreign-provider", "native-mcp-foreign-turn", "native-mcp-future", "native-mcp-duplicate", "native-mcp-live-process", "native-mcp-pending-subagent"} {
 		t.Run(mode, func(t *testing.T) {
 			cancelled := strings.HasPrefix(mode, "cancelled") || strings.HasPrefix(mode, "aborted") && mode != "aborted-without-request" || mode == "native-cancelled-hook"
 			s, binding := sessionFixture(t)
@@ -214,7 +214,7 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 				if mode == "native-multiple-commands" || mode == "native-partial-commands" {
 					state.Tools["exec-00000000-0000-4000-8000-000000000003"] = true
 				}
-				if mode == "native-pending-subagent" {
+				if mode == "native-pending-subagent" || mode == "native-mcp-pending-subagent" {
 					state.Tools["subagent:child"] = true
 				}
 			}
@@ -227,18 +227,32 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 			if native && mode != "native-unobserved-hook" {
 				item := map[string]any{"type": "CommandExecution", "id": commandID, "process_id": "123", "status": "completed", "exit_code": 0}
 				payload := map[string]any{"type": "item_completed", "thread_id": completionThread, "turn_id": "turn-1", "started_at_ms": int64(1793013335000), "completed_at_ms": int64(1793013335600), "item": item}
+				if strings.HasPrefix(mode, "native-mcp-") {
+					item = map[string]any{"type": "McpToolCall", "id": commandID, "server": "fixture", "tool": "read", "status": "completed"}
+					payload["item"] = item
+					state.UnknownReason = "SESSION_COMPLETION_MISMATCH"
+					if err := writeJSON(path, state); err != nil {
+						t.Fatal(err)
+					}
+				}
 				switch mode {
+				case "native-mcp-failed":
+					item["status"] = "failed"
+				case "native-mcp-missing-server":
+					delete(item, "server")
+				case "native-mcp-missing-tool":
+					delete(item, "tool")
 				case "native-failed-hook":
 					item["status"], item["exit_code"] = "failed", 143
-				case "native-foreign-provider":
+				case "native-foreign-provider", "native-mcp-foreign-provider":
 					payload["thread_id"] = "other-provider"
-				case "native-foreign-turn":
+				case "native-foreign-turn", "native-mcp-foreign-turn":
 					payload["turn_id"] = "other-turn"
-				case "native-running-hook":
+				case "native-running-hook", "native-mcp-running":
 					item["status"] = "inProgress"
 				case "native-missing-exit":
 					delete(item, "exit_code")
-				case "native-future-hook":
+				case "native-future-hook", "native-mcp-future":
 					payload["completed_at_ms"] = int64(1793013336000)
 				case "native-missing-process":
 					delete(item, "process_id")
@@ -253,7 +267,7 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 				}
 				command := map[string]any{"type": "event_msg", "timestamp": "2026-10-26T11:15:35.600Z", "payload": payload}
 				inserted := []map[string]any{command}
-				if mode == "native-duplicate-hook" {
+				if mode == "native-duplicate-hook" || mode == "native-mcp-duplicate" {
 					inserted = append(inserted, command)
 				}
 				if mode == "native-multiple-commands" {
@@ -283,7 +297,7 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if mode == "aborted-live-process" || mode == "native-live-process" {
+			if mode == "aborted-live-process" || mode == "native-live-process" || mode == "native-mcp-live-process" {
 				var receipt Receipt
 				if err := readJSON(filepath.Join(dir, "receipt.json"), &receipt); err != nil {
 					t.Fatal(err)
@@ -307,7 +321,7 @@ func TestCodexCompletionReconcilesWithoutResubmission(t *testing.T) {
 				return
 			}
 			status, err := s.Status(spec.Key)
-			invalidNative := native && mode != "native-completed-hook" && mode != "native-failed-hook" && mode != "native-cancelled-hook" && mode != "native-multiple-commands"
+			invalidNative := native && mode != "native-completed-hook" && mode != "native-failed-hook" && mode != "native-cancelled-hook" && mode != "native-multiple-commands" && mode != "native-mcp-completed" && mode != "native-mcp-failed"
 			if invalidNative || mode == "lost-post-hook" || mode == "pending-subagent" || mode == "aborted-without-request" || mode == "aborted-other-turn" || mode == "aborted-live-process" || mode == "aborted-manual-input" || mode == "cancelled-manual-input" || mode == "aborted-pending-hook-unbound" || mode == "aborted-pending-subagent" {
 				if err != nil || status.Result != nil || status.State != "unknown" {
 					t.Fatalf("pending work accepted: %v", err)

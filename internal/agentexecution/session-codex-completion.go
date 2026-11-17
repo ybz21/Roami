@@ -33,6 +33,8 @@ type codexCommandItem struct {
 	ProcessID string `json:"process_id"`
 	Status    string `json:"status"`
 	ExitCode  *int   `json:"exit_code"`
+	Server    string `json:"server"`
+	Tool      string `json:"tool"`
 }
 
 type codexPayload struct {
@@ -171,11 +173,12 @@ func codexObservedTerminal(binding SessionBinding, turn, promptHash string, canc
 				finalAnswer, aborted = false, false
 				calls = map[string]bool{}
 				commands = map[string]int64{}
-			} else if active == turn && value.Type == "item_completed" && value.Item != nil && value.Item.Type == "CommandExecution" && codexCommandID.MatchString(value.Item.ID) {
+			} else if active == turn && value.Type == "item_completed" && value.Item != nil && (value.Item.Type == "CommandExecution" || value.Item.Type == "McpToolCall") && codexCommandID.MatchString(value.Item.ID) {
 				item := value.Item
 				_, duplicate := commands[item.ID]
 				commands[item.ID] = 0
-				if !duplicate && value.ThreadID == binding.ProviderID && value.TurnID == turn && value.StartedMS > 0 && value.CompletedMS >= value.StartedMS && item.ProcessID != "" && item.ExitCode != nil && (item.Status == "completed" || item.Status == "failed") {
+				stopped := item.Type == "CommandExecution" && item.ProcessID != "" && item.ExitCode != nil || item.Type == "McpToolCall" && item.Server != "" && item.Tool != ""
+				if !duplicate && value.ThreadID == binding.ProviderID && value.TurnID == turn && value.StartedMS > 0 && value.CompletedMS >= value.StartedMS && stopped && (item.Status == "completed" || item.Status == "failed") {
 					commands[item.ID] = value.CompletedMS
 				}
 			} else if active == turn && (value.Type == "turn_aborted" || value.Type == "task_failed") {
