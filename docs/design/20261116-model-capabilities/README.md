@@ -68,3 +68,5 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 - [聚合优先与网关目录统一：实现与验收](catalog-picker-acceptance.md)
 
 - [网关统一选模与能力展示](gateway-options-acceptance.md)
+
+- [发布停止核对与 MCP 完成证据](deployment-acceptance.md)
