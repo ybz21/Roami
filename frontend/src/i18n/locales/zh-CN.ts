@@ -1,4 +1,11 @@
 const zhCN = {
+  'modelCapabilities.unknown': '未知',
+  'modelCapabilities.advertised': '（源声明）',
+  'modelCapabilities.byMember': '能力随调度成员变化',
+  'modelCapabilities.callable': '已添加',
+  'modelCapabilities.aggregates': '聚合模型',
+  'modelCapabilities.models': '单模型',
+  'modelCapabilities.loadFailed': '能力信息暂不可用，仍可选择模型。',
   'modelIdentity.callId': '调用 ID：{model}',
   'modelIdentity.upstreamId': '上游模型 ID：{model}',
   'modelIdentity.nameHint': '名称用于显示；CLI、API 和委派时使用调用 ID。',

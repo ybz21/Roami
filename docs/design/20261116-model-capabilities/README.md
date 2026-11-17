@@ -64,3 +64,5 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 首页模型选择器动态显示模型与原生/聚合类型；Agent 委派复用原有 `delegate.model` / `freeOnly` 参数和任务记录。参见 [当前实现](implementation.md)。
 
 - [名称与访问密钥：用词和验收](naming-acceptance.md)
+
+- [聚合优先与网关目录统一：实现与验收](catalog-picker-acceptance.md)

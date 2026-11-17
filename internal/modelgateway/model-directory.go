@@ -19,18 +19,22 @@ type CapabilityFact struct {
 	Delivery string `json:"delivery"`
 }
 type ModelDirectoryRow struct {
-	ID              string                    `json:"id"`
-	Name            string                    `json:"name"`
-	Kind            string                    `json:"kind"`
-	Protocol        string                    `json:"protocol"`
-	Configured      bool                      `json:"configured"`
-	Enabled         bool                      `json:"enabled"`
-	FreeOnly        bool                      `json:"freeOnly"`
-	ContextWindow   int                       `json:"contextWindow,omitempty"`
-	MaxOutputTokens int                       `json:"maxOutputTokens,omitempty"`
-	Pricing         string                    `json:"pricing"`
-	Capabilities    map[string]CapabilityFact `json:"capabilities"`
-	Candidates      []ModelCandidate          `json:"candidates"`
+	ID               string                    `json:"id"`
+	Name             string                    `json:"name"`
+	Kind             string                    `json:"kind"`
+	Protocol         string                    `json:"protocol"`
+	Configured       bool                      `json:"configured"`
+	Enabled          bool                      `json:"enabled"`
+	FreeOnly         bool                      `json:"freeOnly"`
+	ContextWindow    int                       `json:"contextWindow,omitempty"`
+	MaxOutputTokens  int                       `json:"maxOutputTokens,omitempty"`
+	InputModalities  []string                  `json:"inputModalities,omitempty"`
+	OutputModalities []string                  `json:"outputModalities,omitempty"`
+	InputPrice       *float64                  `json:"inputPrice,omitempty"`
+	OutputPrice      *float64                  `json:"outputPrice,omitempty"`
+	Pricing          string                    `json:"pricing"`
+	Capabilities     map[string]CapabilityFact `json:"capabilities"`
+	Candidates       []ModelCandidate          `json:"candidates"`
 }
 type sourceDirectoryEntry struct {
 	Fingerprint string
@@ -136,6 +140,8 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 			if detail, ok := details[candidate]; ok {
 				entry.Capabilities = advertisedCapabilities(detail)
 				entry.ContextWindow, entry.MaxOutputTokens = detail.Context, detail.Output
+				entry.InputModalities, entry.OutputModalities = detail.InputModalities, detail.OutputModalities
+				entry.InputPrice, entry.OutputPrice = detail.InputPrice, detail.OutputPrice
 				if detail.InputPrice != nil && detail.OutputPrice != nil && *detail.InputPrice == 0 && *detail.OutputPrice == 0 {
 					entry.Pricing = "advertised-zero"
 				}
@@ -157,6 +163,9 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 				continue
 			}
 			entry := ModelDirectoryRow{ID: candidate.Model, Name: detail.Name, Kind: "single", Pricing: "unknown", Capabilities: advertisedCapabilities(detail), Candidates: []ModelCandidate{candidate}}
+			entry.ContextWindow, entry.MaxOutputTokens = detail.Context, detail.Output
+			entry.InputModalities, entry.OutputModalities = detail.InputModalities, detail.OutputModalities
+			entry.InputPrice, entry.OutputPrice = detail.InputPrice, detail.OutputPrice
 			for _, source := range catalog.Sources {
 				if source.ID == candidate.SourceID {
 					entry.Protocol = source.Protocol
@@ -171,6 +180,9 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].Configured != rows[j].Configured {
 			return rows[i].Configured
+		}
+		if rows[i].Kind != rows[j].Kind {
+			return rows[i].Kind == "aggregate"
 		}
 		return rows[i].ID < rows[j].ID
 	})
@@ -194,7 +206,7 @@ func (h *Handler) modelDirectoryManagement(w http.ResponseWriter, r *http.Reques
 	s.mu.Unlock()
 	failures := []string{}
 	if r.URL.Query().Get("refresh") == "true" {
-		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 		defer cancel()
 		var wait sync.WaitGroup
 		var mu sync.Mutex

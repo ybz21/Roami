@@ -1,0 +1,2 @@
+.tt-model-capabilities { display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-3); color:var(--text-dim); font-size:var(--fs-meta); font-weight:400; }
+.tt-model-evidence { color:var(--text-dim); }
