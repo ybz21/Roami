@@ -55,7 +55,7 @@ async def test_monitor_waits_for_launch_and_preserves_unknown_outcome(store):
     assert current["latestAttempt"]["state"] == "unknown"
     events = await conversations.events("alice", conversation["id"])
     assert sum(e["kind"] == "task.observation_unknown" for e in events) == 1
-    assert all(call[0] == "status" for call in calls)
+    assert all(call[0] in {"status", "reconcile-session"} for call in calls)
     await tasks.cancel("alice", task["id"])
     await executor.poll(tasks)
     assert (await tasks.list("alice"))[0]["state"] == "cancelling"
@@ -464,7 +464,7 @@ async def test_observation_recovery_updates_feed_and_later_uncertainty_without_r
     unknown = [e for e in events if e["kind"] == "task.observation_unknown"]
     assert len(unknown) == 2 and unknown[-1]["id"] > resumed[0]["id"]
     assert unknown[-1]["payload"]["activity"]["state"] == "unknown"
-    assert all(call[0] == "status" for call in calls)
+    assert all(call[0] in {"status", "reconcile-session"} for call in calls)
     assert (await tasks.list("alice"))[0]["state"] == "running"
 
 

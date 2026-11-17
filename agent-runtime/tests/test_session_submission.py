@@ -222,8 +222,9 @@ async def test_cancellation_stops_a_pending_followup_without_sending(
     assert (await runtime.tasks.list("alice"))[0]["state"] == "cancelled"
 
 
-async def test_uncertain_submission_is_observed_instead_of_retried(store, followup):
-    runtime, executor, _task, _old = followup
+async def test_uncertain_submission_is_observed_instead_of_retried(store, followup, monkeypatch):
+    monkeypatch.setattr("roami_agent.executors.roami_cli.monotonic", lambda: 100)
+    runtime, executor, task, _old = followup
     calls = []
 
     async def command(sub, *args, **kwargs):
@@ -236,7 +237,10 @@ async def test_uncertain_submission_is_observed_instead_of_retried(store, follow
     await runtime.scheduler._job(await latest_job(store))
     await executor.poll(runtime.tasks)
     await executor.poll(runtime.tasks)
-    assert calls == ["launch", "status", "status"]
+    expected = ["launch", "status"]
+    if json.loads(task["intent_json"])["executor"] in {"codex", "claude"}:
+        expected.append("reconcile-session")
+    assert calls == [*expected, "status"]
     assert (await latest_job(store))["state"] == "done"
     assert (await runtime.tasks.list("alice"))[0]["latestAttempt"]["state"] == "unknown"
 
