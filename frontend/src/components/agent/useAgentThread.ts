@@ -2,6 +2,7 @@ import { usePageEffect } from '../../page-activity'
 import { useCallback, useRef, useState } from 'react'
 import { api, openEventStream } from '../../api'
 import { agentCacheEpoch, agentDataKey, invalidateAgentData, loadAgentData, peekAgentData, storeAgentData } from './agent-data-cache'
+import { MODEL_SETTINGS_CHANGED } from './agent-models'
 import { publishMemoryEvent } from './agent-memory-events'
 import { publishTaskEvent } from './agent-task-events'
 import { agentEvents, projectAgentEvent, type AgentSnapshot, type AgentMessage } from './agent-protocol'
@@ -124,6 +125,7 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
         for await (const event of agentEvents(response)) {
           if (stopped || !view) break
           if (event.id > view.snapshotCursor && scope === agentDataKey(messages)) { publishTaskEvent(event); publishMemoryEvent(event) }
+          if (event.kind === 'model.changed' && event.id > view.snapshotCursor && scope === agentDataKey(messages)) window.dispatchEvent(new Event(MODEL_SETTINGS_CHANGED))
           const projected = projectAgentEvent(view, event)
           view = projected.view; publish()
           if (event.kind === 'memory.forgotten') {

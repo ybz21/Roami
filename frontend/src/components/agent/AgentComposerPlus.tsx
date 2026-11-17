@@ -10,11 +10,11 @@ import type { useAgentModels } from './useAgentModels'
 
 type SkillChoice = { name: string; description?: string; enabled: boolean }
 
-export default function AgentComposerPlus({ models, disabled, canCompact, onFiles, onCompact, onCommands, onSkill, onTask, canDelegate = false, node = null, modelTrigger = false, contextUsage, onContext, mode, options }: {
+export default function AgentComposerPlus({ models, disabled, canCompact, onFiles, onCompact, onCommands, onSkill, onTask, canDelegate = false, node = null, modelTrigger = false, modelRequest = 0, contextUsage, onContext, mode, options }: {
   mode?: { task: boolean; onChange: (task: boolean) => void }; options?: ReactNode
   contextUsage?: { cid: string; model: string; revision: string; active: boolean }; onContext?: () => void
   models: ReturnType<typeof useAgentModels>; disabled: boolean; canCompact: boolean
-  onFiles: () => void; onCompact: () => void; onCommands: () => void; modelTrigger?: boolean
+  onFiles: () => void; onCompact: () => void; onCommands: () => void; modelTrigger?: boolean; modelRequest?: number
   onSkill?: (name: string) => void; onTask?: () => void; canDelegate?: boolean; node?: string | null
 }) {
   const { t } = useI18n(), [open, setOpen] = useState(false)
@@ -51,7 +51,7 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
   const close = (action: () => void) => { setOpen(false); action() }
   const row = (label: string, icon: ReactNode, action: () => void, description?: string, blocked = false) => <button key={label} type="button" className="agent-plus-row agent-plus-action" role="menuitem" disabled={blocked} onClick={action}>{icon}<span><strong>{label}</strong>{description && <small>{description}</small>}</span></button>
   const show = () => { measure(); setOpen(true) }
-  if (modelTrigger) return <AgentModelPicker models={models} disabled={disabled} node={node} />
+  if (modelTrigger) return <AgentModelPicker models={models} disabled={disabled} node={node} openRequest={modelRequest} />
   return <>
     <button ref={trigger} type="button" className="tt-pill ico agent-plus-trigger" aria-label={t('agent.composer.more')} disabled={disabled} aria-haspopup="dialog" aria-expanded={open} onClick={show}><PlusIcon size={20} /></button>
     <Modal open={open} onCancel={() => setOpen(false)} footer={null} title={null} closable={false} destroyOnClose maskClosable keyboard width={geometry?.width} className="agent-composer-dialog" wrapClassName="agent-composer-dialog-wrap" style={{ left: geometry?.left, bottom: geometry?.bottom, top: 'auto', margin: 0, padding: 0 }} afterClose={() => trigger.current?.focus({ preventScroll: true })}>

@@ -53,6 +53,7 @@ from roami_agent.observability.prompt_manifests import PromptManifests
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.improvement import policy_binding
 from roami_agent.providers.factory import configured_provider
+from roami_agent.providers.live_model import LiveModel
 from roami_agent.replies.delivery_outbox import DeliveryOutbox
 from roami_agent.replies.notification_policy import NotificationPolicy
 from roami_agent.replies.notifications import Notifications
@@ -113,11 +114,13 @@ class Runtime:
         require_final_tool=False,
         execution_deadline: Callable[[], int | None] | None = None,
     ):
+        original_model = model
+        model = LiveModel(model)
         self.db, self.model = database, model
         self.settings = RuntimeSettings(settings or Settings())
         self.reconfiguring = False
         self.memory_uses_worker = memory_model is None
-        self.worker_model = worker_model or model
+        self.worker_model = worker_model or original_model
         self.executor, self.verifier = executor, verifier
         self.conversations = Conversations(database)
         self.tasks = Tasks(
@@ -364,6 +367,7 @@ class Runtime:
         )
         self.swarms.chat = self.chat
         self.model_settings = ModelSettings(self, configured_provider)
+        self.chat.model_settings = self.model_settings
         if self.improvement is not None:
             self.improvement.ledger.shared_daily_limit = True
             self.improvement.provider_factory = self.improvement_provider

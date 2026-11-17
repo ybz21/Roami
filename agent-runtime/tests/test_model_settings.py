@@ -65,7 +65,7 @@ async def test_private_save_reload_and_all_generation_routes_update(store, monke
             == runtime.proactive.model.model
             == "strong-fixture"
         )
-        first = runtime.model
+        first = runtime.model.current
         await runtime.model_settings.save("local", {"main": {"model": "another-fixture"}})
         assert first.closed
         assert runtime.settings.credentials() == "private-unit-key"
@@ -81,14 +81,18 @@ async def test_busy_configuration_never_changes_file_or_clients(store):
     try:
         runtime.turn_tasks["busy"] = asyncio.current_task()
         with pytest.raises(DomainError, match="MODEL_CONFIGURATION_BUSY"):
-            await runtime.model_settings.save("local", {"main": {"model": "changed"}})
+            await runtime.model_settings.save(
+                "local", {"connection": {"baseUrl": "http://127.0.0.1:2/v1"}}
+            )
         assert not settings_path(store.data_root).exists()
         assert runtime.model.model == "initial" and not runtime.reconfiguring
         runtime.turn_tasks.clear()
         await runtime.briefs.lock.acquire()
         try:
             with pytest.raises(DomainError, match="MODEL_CONFIGURATION_BUSY"):
-                await runtime.model_settings.save("local", {"main": {"model": "changed"}})
+                await runtime.model_settings.save(
+                    "local", {"connection": {"baseUrl": "http://127.0.0.1:2/v1"}}
+                )
         finally:
             runtime.briefs.lock.release()
     finally:

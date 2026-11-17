@@ -39,6 +39,7 @@ import AgentActivity from './AgentActivity'
 import { mainTaskActivities, groupExecutionSteps } from './main-task-activity'
 import { useAgentAttachments } from './useAgentAttachments'
 import { useAgentModels } from './useAgentModels'
+import { MODEL_SETTINGS_CHANGED } from './agent-models'
 import { useAgentOutbox } from './useAgentOutbox'
 import AgentOutbox from './AgentOutbox'
 import './agent-chat.css'
@@ -88,6 +89,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const [jumpLatest, setJumpLatest] = useState(false), [dragging, setDragging] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const models = useAgentModels(node)
+  const [modelRequest, setModelRequest] = useState(0)
   const scroll = useRef<HTMLDivElement>(null), stick = useRef(true), sendingRef = useRef(false)
   const activeCID = useRef(cid); activeCID.current = cid
   const pending = useRef<{ text: string; payload?: string; okrContext?: AgentMessage['content']['okrContext']; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
@@ -207,7 +209,9 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
         const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: request.payload ?? value, attachmentIds: request.attachmentIds, ...(request.okrContext ? { okrContext: request.okrContext } : {}) })
         if (request.attachmentIds.length) attachments.clear(request.scope)
         if (!current()) { inbox?.refresh(); return }
-        if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
+        if (data.kind === 'ui_action' && data.action === 'model') setModelRequest(value => value + 1)
+        else if (data.kind === 'model') { window.dispatchEvent(new Event(MODEL_SETTINGS_CHANGED)); message.success(t('agent.models.switched', { name: data.model })) }
+        else if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
         else if (data.kind === 'commands') showPanel('context')
         else if (data.kind === 'compaction') { thread.accepted(data, ''); setPanel(null) }
         else if (data.kind === 'status') showPanel('context')
@@ -238,7 +242,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     try { await api('POST', '/agent/memories', { title: memoryTitle, body: memoryBody, sourceMessageId: source.id, conversationId: cid }); setSource(null); message.success(t('agent.memorySaved')) } catch (reason) { message.error(agentFailure(reason, t)) }
   }
   const slash = !commandsDismissed && (commandsOpen || (draft.startsWith('/') && !draft.includes(' ') && !draft.includes('\n')))
-    ? ['compact', 'status', 'tasks', 'memory', 'stop', 'help'].filter(name => commandsOpen || ('/' + name).startsWith(draft)) : []
+    ? ['compact', 'model', 'status', 'tasks', 'memory', 'stop', 'help'].filter(name => commandsOpen || ('/' + name).startsWith(draft)) : []
   const addFiles = async (files: File[]) => {
     if (sending || readOnly || project && !project.isCurrent() || !files.length) return
     setTarget('direct')
@@ -255,7 +259,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const composerActions = {
     contextUsage: { cid: historical ? '' : cid, model: `${models.settings?.main?.model || ''}:${models.settings?.main?.contextWindow || ''}`, revision: `${thread.view?.turns.map(turn => turn.id + ':' + turn.state).join(',')}:${thread.view?.messages[thread.view.messages.length - 1]?.id}:${thread.view?.messages[thread.view.messages.length - 1]?.status}:${compact?.state}`, active: running || compacting },
     onContext: () => showPanel('context'),
-    models, node, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
+    models, node, modelRequest, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
     canDelegate: !project && !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: project ? undefined : () => setTarget('loose'),
     onCompact: () => { void submit('/compact', false) },
     onCommands: () => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) },

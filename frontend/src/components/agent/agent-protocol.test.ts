@@ -104,3 +104,12 @@ it('shows a streamed choice question even when the assistant has no text', () =>
   expect(completed.messages[0].content.question).toEqual(question)
   expect(completed.turns[0].state).toBe('completed')
 })
+
+
+it('discards an unadmitted empty response without settling the active turn', () => {
+  const view = projectAgentEvent(snapshot(), { id: 2, kind: 'message.started', payload: { messageId: 'rejected', turnId: 'active' } }).view
+  const discarded = projectAgentEvent(view, { id: 3, kind: 'message.discarded', payload: { messageId: 'rejected' } })
+  expect(discarded.view.messages).toEqual([])
+  expect(discarded.view.turns).toEqual([{ id: 'active', state: 'running' }])
+  expect(discarded.reload).toBe(false)
+})

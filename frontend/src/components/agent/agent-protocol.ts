@@ -21,6 +21,7 @@ export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { vie
   const next = { ...view, snapshotCursor: event.id }
   if (event.branchId && event.branchId !== view.branchId) return { view: next, reload: false }
   const data = event.payload
+  if (event.kind === 'message.discarded') { next.messages = view.messages.filter(message => message.id !== data.messageId); return { view: next, reload: false } }
   if ((event.kind.startsWith('tool.') || event.kind.startsWith('task.')) && data.activity) {
     const item = data.activity as AgentActivityItem
     next.activities = mainTaskActivities([...(view.activities || []).filter(existing => existing.id !== item.id), item])

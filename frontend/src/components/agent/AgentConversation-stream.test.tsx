@@ -241,3 +241,38 @@ it('recovers a phone reply announced by notifications when the chat stream misse
   await screen.findByText('Reply already delivered')
   expect(screen.queryByLabelText('agent.responding')).toBeNull()
 })
+
+it.each([false, true])('opens /model while Main is running, preserves the turn and updates from SSE (phone=%s)', async phone => {
+  state.phone = phone
+  const original = state.api.getMockImplementation()!
+  let current = 'saved-model'
+  state.api.mockImplementation(async (method, path, body) => {
+    if (method === 'POST' && body?.text === '/model') return { data: { kind: 'ui_action', action: 'model' } }
+    if (path === '/agent/model-settings') {
+      if (method === 'PUT') current = body.main.model
+      return { data: { main: { model: current, images: true } } }
+    }
+    if (path === '/agent/models') return { data: { models: ['saved-model', 'next-model'] } }
+    return original(method, path, body)
+  })
+  state.snapshots.set('home', { ...snapshot('home'), turns: [{ id: 'running', state: 'running' }], messages: [
+    { id: 'partial', branch_id: 'branch', turn_id: 'running', role: 'assistant', status: 'streaming', seq: 1, content: { text: 'Existing partial reply' } },
+  ] })
+  render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.has('home')).toBe(true))
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.message' }), { target: { value: '/model' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.send' }))
+  const option = await screen.findByRole('option', { name: 'next-model' })
+  expect(screen.getByText('Existing partial reply')).toBeTruthy()
+  fireEvent.click(option)
+  await waitFor(() => expect(state.api).toHaveBeenCalledWith('PUT', '/agent/model-settings', { main: { model: 'next-model', reasoningEffort: null } }))
+  await waitFor(() => expect(screen.queryByRole('option', { name: 'next-model' })).toBeNull())
+  expect(screen.getByText('Existing partial reply')).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.message' }), { target: { value: 'Unsaved draft' } })
+  current = 'changed-elsewhere'
+  await emit('home', { id: 1, kind: 'model.changed', payload: { model: current } })
+  await screen.findByText('changed-elsewhere')
+  expect(screen.getByRole('textbox', { name: 'agent.message' })).toHaveProperty('value', 'Unsaved draft')
+  expect(state.api.mock.calls.filter(call => call[0] === 'POST' && call[1].endsWith('/messages'))).toHaveLength(1)
+  expect(state.api.mock.calls.some(call => call[1].includes('/fork') || call[1].includes('/interrupt'))).toBe(false)
+})

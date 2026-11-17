@@ -148,6 +148,24 @@ class TurnJournal:
 
         return await self.db.call(write, write=True)
 
+    async def discard_request(self, turn, mid):
+        def write(db):
+            assert_context_admitted(db, turn)
+            db.execute(
+                "UPDATE messages SET status='interrupted',deleted_ms=? WHERE id=?",
+                (now_ms(), mid),
+            )
+            event(
+                db,
+                turn["conversation_id"],
+                "message.discarded",
+                {"messageId": mid},
+                turn_id=turn["id"],
+                message_id=mid,
+            )
+
+        await self.db.call(write, write=True)
+
     async def delta(self, turn, mid, text, delta):
         def write(db):
             assert_context_admitted(db, turn)

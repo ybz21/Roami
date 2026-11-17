@@ -4,6 +4,11 @@ COMMANDS = [
         "description": "Compact current context; optional focus",
         "arguments": True,
     },
+    {
+        "name": "model",
+        "description": "Switch Main model for subsequent requests; optional model ID",
+        "arguments": True,
+    },
     {"name": "status", "description": "Current conversation and runtime status"},
     {"name": "tasks", "description": "Open delegated tasks"},
     {"name": "memory", "description": "Open scoped memories"},

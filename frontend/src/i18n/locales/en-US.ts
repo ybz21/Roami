@@ -4264,6 +4264,8 @@ const enUS = {
   'agent.save': 'Save',
   'agent.retry': 'Retry',
   'agent.command.compact': 'Compact context, optionally specifying what to retain',
+  'agent.command.model': 'Switch Main model; optionally enter a model ID',
+  'agent.models.switched': 'Subsequent requests will use {name}',
   'agent.command.status': 'View model, context and task status',
   'agent.command.tasks': 'View delegated tasks',
   'agent.command.memory': 'Find and manage memories',
@@ -4524,7 +4526,7 @@ const enUS = {
   'agent.models.settings': 'Models & connections',
   'agent.models.settingsNote': "Configure the shared model service and models for the main conversation and built-in background tasks.",
   'agent.models.notConfigured': "Not configured",
-  'agent.models.busy': "The agent is working. Switch models or save settings after the current work finishes.",
+  'agent.models.busy': "This setting requires current work to finish. You can switch the Main model and reasoning effort while working.",
   'agent.models.newEndpointKey': "Enter the new service’s API key when changing its URL.",
   'agent.models.httpsRequired': "Use HTTPS for the model service. Local development addresses may use HTTP.",
   'agent.models.failed': "Could not reach the model service. Check the URL, key and model name.",
@@ -5083,7 +5085,7 @@ const enUS = {
   'composer.transcribing': 'Transcribing…',
   'composer.transcribingHint': 'The transcript will be added to your draft',
 
-  'composer.mainModelHint': 'Used by all Main conversations on this node.',
+  'composer.mainModelHint': 'Shared by all Main conversations on this node. Changes apply to the next request; the current reply continues.',
   'composer.taskPlaceholder': 'Describe the task to delegate…',
   'composer.createTask': 'Create task',
 

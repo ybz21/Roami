@@ -3,10 +3,10 @@
 import asyncio
 import hashlib
 import json
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager, nullcontext
 from itertools import count
 
-from roami_agent.protocol.errors import DomainError, ToolPreflightError
+from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected, ToolPreflightError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.model_tool_selection import select_final_reply
 from roami_agent.protocol.models import Model
@@ -111,11 +111,27 @@ class AgentLoop:
     async def run(self, turn, role, *, task_id=None, completion=None):
         tid, cid, owner = (turn[k] for k in ["id", "conversation_id", "owner_id"])
         self.turn_tasks[tid] = asyncio.current_task()
-        model = self.model if role == "main" else self.worker_model
+        leases = ExitStack()
+
+        selected_source = None
+
+        def select_model():
+            nonlocal selected_source
+            leases.close()
+            source = self.model if role == "main" else self.worker_model
+            selected = leases.enter_context(
+                source.lease() if hasattr(source, "lease") else nullcontext(source)
+            )
+            selected_source = selected
+            if turn.get("model") or turn.get("freeOnly"):
+                selected = selected.with_model(
+                    turn.get("model"), free_only=turn.get("freeOnly", False)
+                )
+            return selected
+
         phase = "context"
         try:
-            if turn.get("model") or turn.get("freeOnly"):
-                model = model.with_model(turn.get("model"), free_only=turn.get("freeOnly", False))
+            model = select_model()
             execution_deadline = asyncio.timeout(turn.get("executionTimeoutSeconds"))
             async with execution_deadline:
                 instructions = (
@@ -126,12 +142,34 @@ class AgentLoop:
                 catalog = await self.tools.turn_catalog(turn, role)
                 if role == "main" and await self.journal.defer(turn, only_if_pending=True):
                     return None
-                plan, prompt = await self.build_context(turn, instructions, catalog, completion)
                 origin = await self.journal.origin(turn)
                 offset = await self.journal.attempt_offset(turn)
                 seen_rejections = set()
                 finalizing = False
                 finalization_error = None
+
+                async def prepare_context():
+                    nonlocal catalog
+                    plan, prompt = await self.build_context(turn, instructions, catalog, completion)
+                    if finalizing:
+                        catalog = []
+                        plan = dict(
+                            plan,
+                            historyView="finalization",
+                            requestBasis=hashlib.sha256(
+                                encoded([plan.get("requestBasis"), "finalization"]).encode()
+                            ).hexdigest(),
+                        )
+                        prompt.insert(
+                            1 + plan["currentTurnStart"],
+                            {
+                                "role": "system",
+                                "content": "This attempt is closing after an unchanged blocker. No further tools or inputs are allowed. Report only findings verified from sources already read in this attempt, with their URLs and limitations. Mark everything else unconfirmed. Do not invent missing facts or restart work.",
+                            },
+                        )
+                    return plan, prompt
+
+                plan, prompt = await prepare_context()
                 for step in count(offset):
                     if role == "main" and self.reply_reviewer is not None:
                         self.reply_reviewer.observe_context(
@@ -184,57 +222,76 @@ class AgentLoop:
                     phase = "model"
                     if role == "main":
                         self.preemptible.add(tid)
-                    async with (
-                        self.measured_request(turn, step + 1, plan["timing"], role) as (
-                            timing,
-                            model_started,
-                        ),
-                        select_final_reply(False),
-                    ):
-                        async for part in model.stream(prompt, catalog):
-                            elapsed = (self.clock() - model_started) * 1000
-                            if part.kind == "telemetry":
-                                if part.value.get("phase") == "retry":
-                                    await preview.reset()
-                                if len(timing["providerEvents"]) < 16:
-                                    timing["providerEvents"].append(
-                                        dict(part.value, elapsedMs=elapsed)
-                                    )
-                                    if part.value.get("phase") in {
-                                        "headers",
-                                        "first_delta",
-                                        "retry",
-                                        "transport_error",
-                                        "upstream_transport_error",
-                                    }:
-                                        await self.manifests.timing(turn, step + 1, timing)
-                            elif part.kind == "text" and part.value and "firstTextMs" not in timing:
-                                timing["firstTextMs"] = elapsed
-                                await self.manifests.timing(turn, step + 1, timing)
-                            if part.kind == "text":
-                                text += part.value
-                                buffer += part.value
-                                await preview.observe_text(text)
-                                if (
-                                    first_delta
-                                    or len(buffer.encode()) >= 1024
-                                    or self.clock() - flushed >= 0.1
-                                ) and (
-                                    not tool_final
-                                    and (
-                                        role != "main"
-                                        or not await self.gateway.reply_error(turn, text)
-                                    )
+                    try:
+                        async with (
+                            self.measured_request(turn, step + 1, plan["timing"], role) as (
+                                timing,
+                                model_started,
+                            ),
+                            select_final_reply(False),
+                        ):
+                            async for part in model.stream(prompt, catalog):
+                                elapsed = (self.clock() - model_started) * 1000
+                                if part.kind == "telemetry":
+                                    if part.value.get("phase") == "retry":
+                                        await preview.reset()
+                                    if len(timing["providerEvents"]) < 16:
+                                        timing["providerEvents"].append(
+                                            dict(part.value, elapsedMs=elapsed)
+                                        )
+                                        if part.value.get("phase") in {
+                                            "headers",
+                                            "first_delta",
+                                            "retry",
+                                            "transport_error",
+                                            "upstream_transport_error",
+                                        }:
+                                            await self.manifests.timing(turn, step + 1, timing)
+                                elif (
+                                    part.kind == "text"
+                                    and part.value
+                                    and "firstTextMs" not in timing
                                 ):
-                                    await self.journal.delta(turn, mid, text, buffer)
-                                    buffer, flushed = "", self.clock()
-                                    first_delta = False
-                            elif part.kind == "tool_delta":
-                                await preview.observe(part.value)
-                            elif part.kind == "tool":
-                                calls.append(part.value)
-                            elif part.kind == "usage":
-                                usage = part.value
+                                    timing["firstTextMs"] = elapsed
+                                    await self.manifests.timing(turn, step + 1, timing)
+                                if part.kind == "text":
+                                    text += part.value
+                                    buffer += part.value
+                                    await preview.observe_text(text)
+                                    if (
+                                        first_delta
+                                        or len(buffer.encode()) >= 1024
+                                        or self.clock() - flushed >= 0.1
+                                    ) and (
+                                        not tool_final
+                                        and (
+                                            role != "main"
+                                            or not await self.gateway.reply_error(turn, text)
+                                        )
+                                    ):
+                                        await self.journal.delta(turn, mid, text, buffer)
+                                        buffer, flushed = "", self.clock()
+                                        first_delta = False
+                                elif part.kind == "tool_delta":
+                                    await preview.observe(part.value)
+                                elif part.kind == "tool":
+                                    calls.append(part.value)
+                                elif part.kind == "usage":
+                                    usage = part.value
+                    except ModelAdmissionRejected as exc:
+                        if (
+                            role != "main"
+                            or exc.code != "MODEL_GATEWAY_ROUTE_CHANGED"
+                            or getattr(self.model, "current", self.model) is selected_source
+                            or text
+                            or calls
+                        ):
+                            raise
+                        await self.journal.discard_request(turn, mid)
+                        model = select_model()
+                        self.preemptible.discard(tid)
+                        plan, prompt = await prepare_context()
+                        continue
                     await preview.finish(calls, text)
                     self.preemptible.discard(tid)
                     phase = "tools"
@@ -479,25 +536,11 @@ class AgentLoop:
                         return text
                     if role == "main" and await self.journal.defer(turn, only_if_pending=True):
                         return None
+                    model = select_model()
                     catalog = await self.tools.turn_catalog(turn, role)
                     phase = "context"
-                    plan, prompt = await self.build_context(turn, instructions, catalog, completion)
-                    if finalizing:
-                        catalog = []
-                        plan = dict(
-                            plan,
-                            historyView="finalization",
-                            requestBasis=hashlib.sha256(
-                                encoded([plan.get("requestBasis"), "finalization"]).encode()
-                            ).hexdigest(),
-                        )
-                        prompt.insert(
-                            1 + plan["currentTurnStart"],
-                            {
-                                "role": "system",
-                                "content": "This attempt is closing after an unchanged blocker. No further tools or inputs are allowed. Report only findings verified from sources already read in this attempt, with their URLs and limitations. Mark everything else unconfirmed. Do not invent missing facts or restart work.",
-                            },
-                        )
+                    plan, prompt = await prepare_context()
+
         except TimeoutError as exc:
             code = (
                 "MODEL_DEADLINE"
@@ -527,6 +570,7 @@ class AgentLoop:
             await self.journal.fail(turn, state, code, completion=completion)
             raise
         finally:
+            leases.close()
             self.preemptible.discard(tid)
             if self.reply_reviewer is not None:
                 self.reply_reviewer.forget_turn(turn)
