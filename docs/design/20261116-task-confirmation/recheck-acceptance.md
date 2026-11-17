@@ -27,3 +27,12 @@
 - 机械设计检测无新增问题。截图保留在上述目录，PR 图片通过 pr-shots 上传，不提交到 main。
 
 本次尚未替换运行中的服务；源码修复与原任务线上状态恢复分别验收。
+
+## 最终门禁
+
+同步主线 `4e10eab1` 后，代码提交为 `19239baa`，quick 与 full 均通过：
+
+- Go 全仓测试通过，使用独立 `tmux-spawn-*.scope` 及隔离 tmux 实例；首轮未分离进程 scope 时，既有取消证据回归出现一次观测不确定，分离 scope 后完整门禁通过，未放宽停止判定。
+- Python 全量两次均为 4,937 passed、48 skipped、6 subtests passed；quick 耗时 1,954.09 秒，full 耗时 2,001.85 秒。跳过项不算作验收成功。
+- 最终前端全量 259 文件、1,897 项通过；typecheck、i18n（6,001 keys）、hover、Vite 生产构建与压缩产物检查、秘密扫描、暂存文件策略均通过。
+- 原始日志：`/tmp/task-execution-recheck-20261117/commit-integrated.log`、`quality-integrated-full.log`、`vitest-integrated.log`；截图与 `ui-results.json` 同目录保留。
