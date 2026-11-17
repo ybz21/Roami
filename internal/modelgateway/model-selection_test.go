@@ -163,3 +163,38 @@ func TestFreeSelectionRejectsPricingChangesDuringAdmission(t *testing.T) {
 		t.Fatal("stale free decision admitted after pricing changed", err)
 	}
 }
+
+func TestDirectoryPreservesInputOutputEvidenceAndAggregatePriority(t *testing.T) {
+	h := catalogHandler(t, "https://example.test/v1", "openai-completions")
+	s := h.Catalog
+	next := s.snapshot()
+	next.Models[0].Candidates[0].Model = "vision"
+	next.Models = append(next.Models, CatalogModel{ID: "z-pool", Name: "Pool", Protocol: "openai-completions", Aggregate: true, Strategy: "order", Candidates: []ModelCandidate{{"work", "vision"}}})
+	if err := s.update(context.Background(), next); err != nil {
+		t.Fatal(err)
+	}
+	s.rememberSourceDetails(s.value.Sources[0], s.value.Revision, []agentproviders.SourceModelDetail{
+		{ID: "vision", InputModalities: []string{"text", "image"}, OutputModalities: []string{"text"}, Context: 64000, Output: 8000},
+		{ID: "upstream", InputModalities: []string{"audio"}, OutputModalities: []string{"text"}, Context: 32000, Output: 4000},
+	})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/v1/model-gateway/models?all=true", nil))
+	var result struct {
+		Data struct {
+			Models []ModelDirectoryRow `json:"models"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	rows := result.Data.Models
+	if len(rows) != 3 || rows[0].ID != "z-pool" || rows[0].InputModalities != nil || rows[0].OutputModalities != nil {
+		t.Fatal("aggregate order or unsupported union", rows)
+	}
+	if rows[1].ID != "coding-main" || strings.Join(rows[1].InputModalities, ",") != "text,image" || strings.Join(rows[1].OutputModalities, ",") != "text" || rows[1].ContextWindow != 64000 || rows[1].MaxOutputTokens != 8000 {
+		t.Fatal("configured evidence lost", rows[1])
+	}
+	if rows[2].Configured || strings.Join(rows[2].InputModalities, ",") != "audio" || rows[2].MaxOutputTokens != 4000 {
+		t.Fatal("upstream evidence lost", rows[2])
+	}
+}

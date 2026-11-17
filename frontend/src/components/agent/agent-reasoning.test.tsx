@@ -267,7 +267,7 @@ it('keeps model selection usable when the optional gateway names cannot be read'
   render(<Composer />)
   await screen.findByText('provider-model')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
-  expect((await screen.findByRole('option', { name: 'provider-model' })).getAttribute('aria-description')).toBe('agent.models.kind.unknown')
+  expect((await screen.findByRole('option', { name: 'provider-model' })).getAttribute('aria-description')).toContain('agent.models.kind.unknown')
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
@@ -370,4 +370,29 @@ it('distinguishes equal display names by call ID and saves the selected route', 
  expect(options.map(option => option.textContent)).toEqual([expect.stringContaining('Model ID: route-one'),expect.stringContaining('Model ID: route-two')])
  fireEvent.click(options[1])
  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT','/agent/model-settings',{main:{model:'route-two',reasoningEffort:null}}))
+})
+
+
+it('puts aggregates first and uses gateway input/output evidence without changing the selection', async () => {
+  const baseUrl = 'http://127.0.0.1:19999'
+  const fixed = { id: 'vision', name: 'Vision', aggregate: false, candidates: [{ sourceId: 'source', model: 'upstream-vision' }] }
+  const pool = { id: 'pool', name: 'Auto', aggregate: true, candidates: [{ sourceId: '@group', model: 'vision' }] }
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path === '/agent/model-gateway/catalog') return { data: { revision: 'live', baseUrl, models: [fixed, pool] } }
+    if (path.startsWith('/agent/model-gateway/models?')) return { data: { revision: 'live', refreshFailures: [], models: [
+      { ...pool, configured: true, enabled: true, kind: 'aggregate', capabilities: {} },
+      { ...fixed, configured: true, enabled: true, kind: 'single', inputModalities: ['text', 'image'], outputModalities: ['text'], capabilities: { tools: { support: 'supported', evidence: 'advertised' } } },
+    ] } }
+    if (path === '/agent/models') return { data: { models: ['vision', 'pool'] } }
+    return { data: { main: { ...role, model: 'vision', baseUrl: baseUrl + '/v1' }, worker: role } }
+  })
+  render(<Composer />)
+  await screen.findByText('Vision')
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.trigger' }))
+  await waitFor(() => expect(screen.getByRole('option', { name: 'Vision' }).textContent).toContain('directory.modality.image'))
+  expect(screen.getAllByRole('option').map(row => row.getAttribute('aria-label'))).toEqual(['Auto', 'Vision'])
+  expect(screen.getByRole('option', { name: 'Auto' }).textContent).toContain('modelCapabilities.byMember')
+  expect(screen.getByRole('option', { name: 'Auto' }).textContent).toContain('modelCapabilities.unknown')
+  expect(screen.getByRole('option', { name: 'Vision' }).getAttribute('aria-selected')).toBe('true')
+  expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
 })

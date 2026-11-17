@@ -29,7 +29,7 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-directory-filters>.ui-in
 html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model{grid-template-columns:minmax(0,1fr) var(--tap);gap:var(--sp-2);padding:var(--sp-4) 0}
 html:is([data-size="compact"],[data-size="medium"]) .tt-directory-model-source{grid-column:1;grid-row:2}
 html:is([data-size="compact"],[data-size="medium"]) .tt-directory-model-context{grid-column:1;grid-row:3}
-html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model>.tt-directory-capabilities{grid-column:1/-1}
+html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model>.tt-model-capabilities{grid-column:1/-1}
 html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model>button:last-child{grid-column:2;grid-row:1/4}
 html[data-pointer="coarse"] .tt-directory-model-name{min-height:var(--tap);position:relative}
 html[data-pointer="coarse"] .tt-directory-model-name::after{content:'';position:absolute;inset:0 calc(var(--sp-1)*-1)}

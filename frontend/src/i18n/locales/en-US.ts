@@ -1,4 +1,11 @@
 const enUS = {
+  'modelCapabilities.unknown': 'Unknown',
+  'modelCapabilities.advertised': '(provider declared)',
+  'modelCapabilities.byMember': 'Capabilities vary by selected member',
+  'modelCapabilities.callable': 'Configured',
+  'modelCapabilities.aggregates': 'Aggregates',
+  'modelCapabilities.models': 'Models',
+  'modelCapabilities.loadFailed': 'Capabilities unavailable. You can still choose a model.',
   'modelIdentity.callId': 'Model ID: {model}',
   'modelIdentity.upstreamId': 'Upstream model ID: {model}',
   'modelIdentity.nameHint': 'The name is for display. Use the model ID in CLI, API and delegation requests.',
