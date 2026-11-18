@@ -355,7 +355,7 @@ it('reads a model changed on another client when reopening the list', async () =
   expect(vi.mocked(api).mock.calls.every(([method]) => method === 'GET')).toBe(true)
 })
 
-it('distinguishes equal display names by call ID and saves the selected route', async () => {
+it('finds equal display names by hidden call ID and saves the selected route', async () => {
  let selected = { ...role, model: 'route-one', baseUrl: 'http://127.0.0.1:19999/v1' }
  vi.mocked(api).mockImplementation(async (method, path, data) => {
   if (path === '/agent/model-gateway/catalog') return { data: { baseUrl: 'http://127.0.0.1:19999', models: ['route-one', 'route-two'].map(id => ({id, name:'Office model'})) } }
@@ -367,8 +367,10 @@ it('distinguishes equal display names by call ID and saves the selected route', 
  await screen.findByText('Office model')
  fireEvent.click(screen.getByRole('button', {name:'agent.models.trigger'}))
  const options = await screen.findAllByRole('option', {name:'Office model'})
- expect(options.map(option => option.textContent)).toEqual([expect.stringContaining('Model ID: route-one'),expect.stringContaining('Model ID: route-two')])
- fireEvent.click(options[1])
+ expect(options).toHaveLength(2)
+ expect(options.every(option => !option.textContent?.includes('Model ID:'))).toBe(true)
+ fireEvent.change(screen.getByRole('textbox', { name: 'agent.models.search' }), { target: { value: 'route-two' } })
+ fireEvent.click(screen.getByRole('option', { name: 'Office model' }))
  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT','/agent/model-settings',{main:{model:'route-two',reasoningEffort:null}}))
 })
 

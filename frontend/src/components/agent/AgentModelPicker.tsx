@@ -85,7 +85,6 @@ export default function AgentModelPicker({ models, disabled, node, openRequest =
     buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length].focus()
   }
   const content = <div className="agent-model-picker-body" aria-busy={models.busy}>
-    {open === 'model' && <p className="agent-menu-note">{t(roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>}
     {open === 'reasoning' && <>
       {reasoningCustom(effort) && <p className="agent-reasoning-note">{t('agent.reasoning.customCurrent')}</p>}
       {!reasoningKnown(role) && <p className="agent-reasoning-note">{t('agent.reasoning.unknown')}</p>}
@@ -101,7 +100,12 @@ export default function AgentModelPicker({ models, disabled, node, openRequest =
     <div ref={choices} className="agent-model-picker-list" role={open === 'model' ? 'listbox' : 'menu'} aria-label={title} onKeyDown={move}>
       {open === 'model' ? <>
         {names.map(name => <button type="button" role="option" aria-selected={name === selectedModel} aria-label={displayName(name)} aria-describedby={optionPrefix + encodeURIComponent(name) + '-facts ' + optionPrefix + encodeURIComponent(name) + '-kind'} aria-description={displayName(name) !== callId(name) ? [kindLabel(name), t('modelIdentity.callId', { model: callId(name) })].join(', ') : kindLabel(name)} key={name} disabled={models.busy || !role} onClick={() => chooseModel(name)}>
-          <span className="agent-model-identity"><span>{displayName(name)}</span><span className="agent-model-detail" id={optionPrefix + encodeURIComponent(name) + '-facts'}>{displayName(name) !== callId(name) && <small className="agent-model-call-id" title={callId(name)}>{t('modelIdentity.callId', { model: callId(name) })}</small>}<ModelCapabilities model={models.modelDetails?.[name]} /></span></span><small id={optionPrefix + encodeURIComponent(name) + '-kind'} className="agent-model-kind">{kindLabel(name)}</small>{pending?.model === name ? <Spin size="small" /> : name === selectedModel && <CheckIcon size={18} />}
+          <span className="agent-model-identity">
+            <span>{displayName(name)}</span>
+            <span id={optionPrefix + encodeURIComponent(name) + '-facts'}><ModelCapabilities model={models.modelDetails?.[name]} /></span>
+          </span>
+          <small id={optionPrefix + encodeURIComponent(name) + '-kind'} className="agent-model-kind">{kindLabel(name)}</small>
+          {pending?.model === name ? <Spin size="small" /> : name === selectedModel && <CheckIcon size={18} />}
         </button>)}
         {!models.catalogAvailable && !names.length && !!query.trim() && <button type="button" role="option" aria-selected={false} disabled={models.busy || !role} onClick={() => chooseModel(query.trim())}><span>{t('agent.models.use', { name: query.trim() })}</span>{pending && <Spin size="small" />}</button>}
         {models.catalogAvailable && !names.length && !models.loading && !models.error && <p className="agent-menu-note">{t('directory.noMatches')}</p>}
@@ -110,6 +114,7 @@ export default function AgentModelPicker({ models, disabled, node, openRequest =
         <span className="agent-reasoning-copy"><span>{t(reasoningLabel(value))}</span><small>{t('agent.reasoning.description.' + value)}</small></span><span className="agent-reasoning-mark">{pending?.effort === value ? <Spin size="small" /> : effort === value && <CheckIcon size={18} />}</span>
       </button>)}
     </div>
+    {open === 'model' && <p className="agent-menu-note">{t(roleKey === 'worker' ? 'composer.nativeModelHint' : 'composer.mainModelHint')}</p>}
   </div>
   return <>
     <button type="button" ref={modelTrigger} className="tt-pill agent-model-trigger" disabled={disabled || models.busy} aria-label={t('agent.models.trigger', { name: displayName(selectedModel) || t('agent.models.notConfigured') })} aria-haspopup="dialog" aria-expanded={open === 'model'} onClick={() => show('model')}><span>{displayName(selectedModel) || t('agent.composer.model')}</span>{model && <small className="agent-model-kind">{kindLabel(selectedModel)}</small>}<ChevronDown size={14} /></button>
