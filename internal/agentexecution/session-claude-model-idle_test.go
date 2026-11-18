@@ -31,6 +31,15 @@ func TestClaudeIdleModelSelectionRequiresSameModelAndNoNewWork(t *testing.T) {
 	if !verify(encode(records)) {
 		t.Fatal("same-model local command rejected")
 	}
+	wrapped := append([]map[string]any{}, records...)
+	wrapped[0] = user("task", "\n\n<pasted_content id=\"fixture\">\ninitial input\n</pasted_content id=\"fixture\">\n")
+	if !verify(encode(wrapped)) {
+		t.Fatal("same-model local command after an exact wrapped input rejected")
+	}
+	wrapped[0] = user("task", "\n\n<pasted_content id=\"fixture\">\nchanged input\n</pasted_content id=\"fixture\">\n")
+	if verify(encode(wrapped)) {
+		t.Fatal("changed wrapped input accepted")
+	}
 	for _, name := range []string{"different model", "new user", "tool activity", "new request", "partial picker", "foreign provider", "invalid JSON"} {
 		t.Run(name, func(t *testing.T) {
 			rs := append([]map[string]any{}, records...)

@@ -36,7 +36,7 @@ func claudeSameModelSuffix(data []byte, binding SessionBinding, turn, promptHash
 			return false
 		}
 		if !matched {
-			if r.Type == "user" && !r.Meta && !r.Compact && r.PromptID == turn && workspaceHash(claudeReportText(r.Message.Content)) == promptHash {
+			if r.Type == "user" && !r.Meta && !r.Compact && r.PromptID == turn && claudeInputHash(claudeReportText(r.Message.Content), promptHash) == promptHash {
 				matched = true
 			}
 			continue
