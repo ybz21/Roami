@@ -88,6 +88,8 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             "```\n"
             "Use discovered capability names, never placeholders. Keep the same request ID and "
             "arguments when recovering an uncertain response; unknown outcomes cannot be replayed. "
+            "Each response includes toolCallId: use that registered ID, not requestId, when a "
+            "checkpoint requires failedToolCallId. "
             "The context is private and expires when this turn stops or its lease/provider changes. "
             "Do not export it, invent task/run IDs, use human swarm say to impersonate Main, or "
             "bypass the registered verification and publication rules. Return your final answer "
@@ -243,6 +245,7 @@ class NativeMainCapabilities(ProfessionalCapabilities):
                 if stored and stored["result"]
                 else {"error": "TOOL_OUTCOME_UNKNOWN"},
                 "requestId": request_id,
+                "toolCallId": call_id,
                 "finishedMs": now_ms(),
             }
             event(

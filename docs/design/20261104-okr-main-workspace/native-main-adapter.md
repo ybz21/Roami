@@ -153,3 +153,17 @@ Main turn c380067f76a34d999dbbc9339b73a89a 在新版本执行41次签名能力�
 原 Swarm 已正式恢复为 revision54、paused=false，原 delegation84b1ee9c3d4241108f7398af936ce539 保持 revision3 且 active=true。原每日09:00 Asia/Shanghai job 仍启用，全局 cron tick active；项目重复 timer inactive。未来自然触发尚未观察，不记为已验证。团队记忆明确继续使用原 Claude/free 成员，并保留不触手机、不部署或重启线上、不改路由参数/费用额度/busy 的当前边界。
 
 这是接管运行验收：X旧 handoff 未送达的事实保留；B站预览不是投稿、运营没有新回复、数据 rev80 候选未入账，原未知项仍未知。桌面独立 QA 读取原 Swarm 并核验原 Main 的 Claude/free 绑定，实际显示共用原生聊天与实时工具过程；本轮没有手机触控验收声明。验收记录归档在本主题，原五实例、历史及工作区保留。
+
+
+### 恢复后的共享调度器证明
+
+恢复持续目标后的真实等待调用暴露了调度器契约差异：现有 roami-cron-tick.timer 通过单调时钟每分钟调用全局 roami cron tick，原 SystemdCronRunner 只接受专用 OnCalendar 项目 timer 与单一 --name 参数，因此活跃的已有运行器被拒绝。不能伪造探针结果、改动全局运行器，或再启一个并行项目 timer；两个 tick 可能同时处理同一 cron job。已暂以正式 pause 将原 Swarm 置为 revision55，保留四项已验收结果、原实例、原目标与每日 job。
+
+方案为项目日程显式选择 runnerScope=shared；未配置时保留原 project 模式及全部严格校验。共享模式只读核验当前用户的实际 systemd Unit/Timer/ExecStart：运行中、有效单调分钟周期、近期下一 tick、同一受信 CLI，以及无额外作用域或 shell 包装的全局 tick 命令。既有 job、时区、下一次未来执行时间、项目/Main/Swarm/delegation 和 wake driver 校验不变。验证不执行 tick、不启动服务，也不改其他项目的日程。代码拆分为 systemd_cron_runner 的显式分派、shared_cron_runner 的共享运行器证明，以及 project_goal_schedule 的配置与证明绑定。
+
+同一回归中，原生 Main 把 requestId 当 failedToolCallId，无法登记真实等待失败。签名能力响应补充真实注册 toolCallId，并明确它与幂等 requestId 的区别；检查点仍只接受同一 turn 下已有失败工具记录，不接受任意阻塞声明。恢复后需在原 Main 中重新观察日程并成功等待或记录真实失败，不能用手改 batch/busy 代替。
+
+
+本轮共享运行器验证：91项专项通过，覆盖显式共享模式、默认项目作用域不放宽、真实项目/job 绑定、无启动或 tick 副作用，以及真实失败工具引用与幂等。另以新探针对本机现有全局单调分钟 timer 只读验证成功；未启项目重复 timer。完整检查通过：Go 全套、Python 5120 passed / 48 skipped / 6 subtests passed、前端 typecheck/i18n/hover/构建及扫描。检查后只补本验收记录，快检查与提交钩子通过官方比较范围复用同一已完整验证的运行时代码。
+
+部署后需显式设置项目 runnerScope=shared，再由原 Main 恢复同一目标，并在真正的目标协调批次中取得 swarm_goal_wait 回执；普通用户回合不能冒充协调批次。维护期间不操作设备，不代表撤销用户后来已明确给出的 Chrome/ADB 运营授权，后续应由正式团队记忆入口校正这一范围。线上等待与范围校正尚待实际验证，不以配置或投递成功代替。

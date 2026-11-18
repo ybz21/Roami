@@ -8,6 +8,7 @@ import shutil
 import time
 from pathlib import Path
 
+from roami_agent.executors.shared_cron_runner import observe_shared_runner
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.tools.process import execute
@@ -57,11 +58,13 @@ class SystemdCronRunner:
             raise DomainError("GOAL_SCHEDULE_RUNNER_UNAVAILABLE", 503)
         return result.get("data")
 
-    async def probe(self, unit, job, *, allow_short_command):
+    async def probe(self, unit, job, *, allow_short_command, shared=False):
         if not isinstance(unit, str) or not re.fullmatch(
             r"[A-Za-z0-9][A-Za-z0-9_.@:-]*\.timer", unit
         ):
             raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
+        if shared:
+            return await observe_shared_runner(self, unit)
         path = await self.unit_path(unit)
         state, service, next_tick, calendars = await asyncio.gather(
             self.property(path, "Unit", "ActiveState", "s"),

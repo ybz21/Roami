@@ -223,3 +223,31 @@ async def test_script_and_configuration_are_checked_again_after_live_probe(sched
     f.source.runner.probe = changed
     with pytest.raises(DomainError, match="GOAL_SCHEDULE_CHANGED"):
         await f.source.read(f.scope)
+
+
+async def test_explicit_shared_runner_stays_bound_to_the_original_project_job(scheduled_project):
+    f = scheduled_project
+    f.config["runnerScope"] = "shared"
+    f.plan.write_text(json.dumps(f.config))
+    original = f.source.runner.probe
+    seen = []
+
+    async def probe(unit, job, **options):
+        seen.append(options)
+        return {**await original(unit, job, **options), "runnerScope": "shared"}
+
+    f.source.runner.probe = probe
+    proof = await f.source.read(f.scope)
+    assert seen == [{"allow_short_command": True, "shared": True}]
+    assert proof["runnerScope"] == "shared" and proof["jobName"] == f.config["schedulerJob"]
+    assert proof["scheduleSha256"] == hashlib.sha256(f.plan.read_bytes()).hexdigest()
+    assert f.calls == [("plugin", "ls", "--json"), ("plugin", "run", "roam.cron:list")]
+
+
+@pytest.mark.parametrize("scope", ["global", None, [], {}])
+async def test_invalid_runner_scope_cannot_fall_back_to_shared(scheduled_project, scope):
+    f = scheduled_project
+    f.config["runnerScope"] = scope
+    f.plan.write_text(json.dumps(f.config))
+    with pytest.raises(DomainError, match="GOAL_SCHEDULE_CONFIGURATION_CONFLICT"):
+        await f.source.read(f.scope)

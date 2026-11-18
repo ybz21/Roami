@@ -174,8 +174,14 @@ class ProjectGoalSchedule:
             raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409) from None
         if not int(time.time() * 1000) < due_ms <= int(time.time() * 1000) + 26 * 3600000:
             raise DomainError("GOAL_SCHEDULE_NOT_FUTURE", 409)
+        runner_scope = config.get("runnerScope", "project")
+        if not isinstance(runner_scope, str) or runner_scope not in {"project", "shared"}:
+            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
         runner = await self.runner.probe(
-            config.get("runnerUnit"), job["name"], allow_short_command=True
+            config.get("runnerUnit"),
+            job["name"],
+            allow_short_command=True,
+            **({"shared": True} if runner_scope == "shared" else {}),
         )
         if (
             await self.targets.project_workspace(scope["projectId"]) != workspace
