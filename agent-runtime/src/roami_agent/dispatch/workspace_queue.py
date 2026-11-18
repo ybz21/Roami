@@ -5,6 +5,17 @@ import os
 
 
 def directory_key(task):
+    if task.get("native_binding_json") is not None:
+        try:
+            binding = json.loads(task["native_binding_json"])
+            directory = binding.get("directory") if isinstance(binding, dict) else None
+        except (ValueError, TypeError):
+            return None
+        return (
+            ("local", os.path.realpath(directory))
+            if isinstance(directory, str) and os.path.isabs(directory)
+            else None
+        )
     try:
         target = json.loads(task.get("target_json") or "null")
         intent = json.loads(task.get("intent_json") or "{}")
@@ -31,6 +42,12 @@ def occupied_directories(running, active):
     occupied = {key for key in current.values() if key is not None}
     preparing = False
     for item in active.values():
+        if item.get("kind") == "turn.run" and item.get("native_main"):
+            if item.get("directory") is None:
+                preparing = True
+            else:
+                occupied.add(item["directory"])
+            continue
         if item.get("kind") != "task.run":
             continue
         key = current.get(item.get("task")) or item.get("directory")

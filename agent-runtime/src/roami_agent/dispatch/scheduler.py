@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 
+from roami_agent.dispatch.native_workspace_queue import native_job_binding, running_native_mains
 from roami_agent.dispatch.workspace_queue import directory_key, occupied_directories
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -76,8 +77,21 @@ class Scheduler:
                 "WHERE t.state IN ('preparing','running','cancelling')",
             )
         )
+
+        def native_directories(db):
+            for job in queued:
+                binding = native_job_binding(db, job)
+                if binding is not None:
+                    job["native_binding_json"] = binding
+            for task in running:
+                binding = native_job_binding(db, {"kind": "task.run", "aggregate_id": task["id"]})
+                if binding is not None:
+                    task["native_binding_json"] = binding
+            return running_native_mains(db)
+
+        native_mains = await self.db.call(native_directories)
         external_running = sum(task["executor_kind"] == "cli" for task in running)
-        occupied, preparing = occupied_directories(running, self.active)
+        occupied, preparing = occupied_directories([*running, *native_mains], self.active)
         for job in queued:
             if getattr(self.settings, "updating", False):
                 return
@@ -110,8 +124,10 @@ class Scheduler:
             if sum(v["group"] == group for v in self.active.values()) >= capacity:
                 continue
             task_run = job["kind"] == "task.run"
-            directory = directory_key(job) if task_run else None
-            if task_run and (preparing or (directory is not None and directory in occupied)):
+            native_main = job["kind"] == "turn.run" and job.get("native_binding_json") is not None
+            workspace_job = task_run or native_main
+            directory = directory_key(job) if workspace_job else None
+            if workspace_job and (preparing or (directory is not None and directory in occupied)):
                 continue
             if job.get("executor_kind") == "cli" and external_running >= self.settings.workers:
                 continue
@@ -122,7 +138,7 @@ class Scheduler:
                 continue
             if branch:
                 self.active_branches.add(branch)
-            if task_run:
+            if workspace_job:
                 if directory is None:
                     preparing = True
                 else:
@@ -138,6 +154,7 @@ class Scheduler:
                 "kind": job["kind"],
                 "memory": memory_job,
                 "directory": directory,
+                "native_main": native_main,
             }
             handle.add_done_callback(lambda _, key=job["id"]: self._finished(key))
 
