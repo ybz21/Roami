@@ -34,6 +34,7 @@ type Spec struct {
 	ProjectID           string `json:"projectId,omitempty"`
 	WorkspaceID         string `json:"workspaceId,omitempty"`
 	SessionID           string `json:"sessionId,omitempty"`
+	PreparedFrom        string `json:"preparedFrom,omitempty"`
 	ResumeFrom          string `json:"resumeFrom,omitempty"`
 	ResumeProvider      string `json:"resumeProviderId,omitempty"`
 	Base                string `json:"base,omitempty"`
@@ -156,7 +157,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if spec.SessionID != "" {
 		return s.continueSession(ctx, spec)
 	}
-	if spec.ResumeFrom != "" || spec.ResumeProvider != "" {
+	if spec.ResumeFrom != "" || spec.ResumeProvider != "" || spec.PreparedFrom != "" {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)

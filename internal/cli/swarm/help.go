@@ -35,6 +35,7 @@ type helpSpec struct {
 }
 
 var helpSpecs = map[string]helpSpec{
+	"migrate":         {"迁移已停止成员的执行器与模型", "SWARM_ID --file JSON|- [--json]", "roami swarm migrate SWARM_ID --file migration.json", []string{"须先暂停并取得成员停止证明；保留身份和历史，不自动派发。"}},
 	"new":             {"创建蜂群", "NAME --key KEY --goal TEXT [--main-conversation ID] [--dir PATH]", `roami swarm new review --key review-1 --goal "检查项目"`, []string{"默认复用节点 Main；成员由受管任务执行。"}},
 	"ls":              {"列出蜂群", "[--archived] [--json]", "roami swarm ls --json", nil},
 	"status":          {"查看蜂群状态与计划修订", "SWARM_ID [--follow] [--json]", "roami swarm status SWARM_ID --follow", nil},

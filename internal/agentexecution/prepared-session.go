@@ -65,3 +65,22 @@ func (s Service) PreparedSession(key string) (PreparedSession, error) {
 	}
 	return selected, nil
 }
+
+func preparedOriginMatches(current Spec, state sessionLifecycle, initial Spec, receipt Receipt, result Result) bool {
+	return current.PreparedFrom != "" && initial.Key == current.PreparedFrom && initial.Persistent && initial.SessionID == "" && initial.Model != "" && initial.Executor == current.Executor && state.Executor == initial.Executor && state.Model == initial.Model && receipt.Binding != nil && receipt.Workspace != nil && receipt.Session == current.SessionID && reflect.DeepEqual(*receipt.Binding, state.Binding) && receipt.Workspace.Directory == state.Binding.Directory && result.State == "succeeded" && result.InputStopped != nil && *result.InputStopped && result.OutcomeKnown != nil && *result.OutcomeKnown
+}
+
+// A later task must not silently attach to a restarted provider under the same label.
+func (s Service) preparedContinuation(current Spec, state sessionLifecycle) error {
+	dir, err := s.directory(current.PreparedFrom)
+	if err != nil {
+		return fmt.Errorf("SESSION_PROVIDER_BINDING_CHANGED")
+	}
+	var initial Spec
+	var receipt Receipt
+	var result Result
+	if readJSON(filepath.Join(dir, "spec.json"), &initial) != nil || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || readJSON(filepath.Join(dir, "result.json"), &result) != nil || !preparedOriginMatches(current, state, initial, receipt, result) {
+		return fmt.Errorf("SESSION_PROVIDER_BINDING_CHANGED")
+	}
+	return nil
+}

@@ -39,3 +39,38 @@ func TestPreparedSelectionRequiresOriginalConfiguredModelAndKnownIdleStop(t *tes
 		})
 	}
 }
+
+func TestPreparedContinuationPinsOriginalProviderAndModelAcrossRounds(t *testing.T) {
+	yes := true
+	binding := SessionBinding{ID: "session", ProviderID: "provider", Directory: "/project", PID: 11}
+	initial := Spec{Key: "prepared", Executor: "claude", Model: "free", Persistent: true}
+	current := Spec{Key: "work-round-2", Executor: "claude", SessionID: "session", PreparedFrom: "prepared"}
+	state := sessionLifecycle{Executor: "claude", Model: "free", Binding: binding, CompletedKey: "work-round-1"}
+	receipt := Receipt{Session: "session", Binding: &binding, Workspace: &Workspace{Directory: "/project"}}
+	result := Result{State: "succeeded", InputStopped: &yes, OutcomeKnown: &yes}
+	if !preparedOriginMatches(current, state, initial, receipt, result) {
+		t.Fatal("later round lost original provider")
+	}
+	for _, change := range []string{"model", "provider", "pid", "executor", "session", "unsettled"} {
+		t.Run(change, func(t *testing.T) {
+			a, b, c, d, e := current, state, initial, receipt, result
+			switch change {
+			case "model":
+				b.Model = "paid"
+			case "provider":
+				b.Binding.ProviderID = "other"
+			case "pid":
+				b.Binding.PID = 12
+			case "executor":
+				a.Executor = "codex"
+			case "session":
+				a.SessionID = "other"
+			case "unsettled":
+				e.OutcomeKnown = nil
+			}
+			if preparedOriginMatches(a, b, c, d, e) {
+				t.Fatal("changed binding accepted")
+			}
+		})
+	}
+}

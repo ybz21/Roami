@@ -80,7 +80,7 @@ def instance_summaries(db, swarm_id):
 
     values = rows(
         db,
-        "SELECT i.id,i.member_id AS memberId,i.conversation_id AS conversationId,i.branch_id AS branchId,i.task_id AS taskId,n.id AS nativeSessionId,c.deleted_ms,x.state AS closureState FROM swarm_member_instances i JOIN swarm_members m ON m.id=i.member_id JOIN conversations c ON c.id=i.conversation_id LEFT JOIN native_sessions n ON n.task_id=i.task_id LEFT JOIN task_session_closures x ON x.task_id=i.task_id WHERE m.swarm_id=?",
+        "SELECT i.id,i.member_id AS memberId,i.conversation_id AS conversationId,i.branch_id AS branchId,i.task_id AS taskId,n.id AS nativeSessionId,c.deleted_ms,x.state AS closureState FROM swarm_member_instances i JOIN swarm_members m ON m.id=i.member_id JOIN conversations c ON c.id=i.conversation_id LEFT JOIN native_sessions n ON n.task_id=i.task_id LEFT JOIN task_session_closures x ON x.task_id=i.task_id WHERE m.swarm_id=? AND m.executor='native'",
         (swarm_id,),
     )
     result = {}

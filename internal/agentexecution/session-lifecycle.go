@@ -411,6 +411,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Status{}, err
 	}
+	if spec.PreparedFrom != "" && (spec.ResumeFrom != "" || spec.ResumeProvider != "") {
+		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
+	}
 	if spec.ResumeFrom != "" || spec.ResumeProvider != "" {
 		return s.restoreProviderSession(ctx, dir, spec)
 	}
@@ -430,6 +433,11 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	var state sessionLifecycle
 	if readJSON(path, &state) != nil || state.Executor != spec.Executor || state.Binding.ProviderID == "" {
 		return Status{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
+	}
+	if spec.PreparedFrom != "" {
+		if err = s.preparedContinuation(spec, state); err != nil {
+			return Status{}, err
+		}
 	}
 	if structuredExecutor(spec.Executor) && (!state.Structured || !sessionProcessesStopped(state.Binding)) {
 		return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
