@@ -65,6 +65,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
 	if spec.Executor == "claude" {
+		if recovered, handled, problem := s.reconcileClaudeAdmissionRejection(ctx, key, dir, path, spec, receipt, &state); handled || problem != nil {
+			return recovered, problem
+		}
 		if state.UnknownReason == "SESSION_TOOL_EVENT_MISMATCH" && state.LaunchKey == key {
 			return s.reconcileClaudeMissedSubmit(ctx, key, dir, path, spec, receipt, &state)
 		}

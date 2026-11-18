@@ -245,8 +245,14 @@ func (s Service) reconcileClaudePastedCompletion(ctx context.Context, key, dir, 
 }
 
 func (s Service) settleClaudeRecordedCompletion(ctx context.Context, key, dir, path string, receipt Receipt, state *sessionLifecycle, turn, hash string, since int64) (Status, error) {
+	return s.settleClaudeObservedOutcome(ctx, key, dir, path, receipt, state, turn, hash, func() (*Result, string, map[string]int64) {
+		return claudeCompletedEvidence(state.Binding, turn, hash, since)
+	})
+}
+
+func (s Service) settleClaudeObservedOutcome(ctx context.Context, key, dir, path string, receipt Receipt, state *sessionLifecycle, turn, hash string, observe func() (*Result, string, map[string]int64)) (Status, error) {
 	empty := Status{}
-	result, digest, completed := claudeCompletedEvidence(state.Binding, turn, hash, since)
+	result, digest, completed := observe()
 	for tool := range state.Tools {
 		if completed[tool] == 0 {
 			return empty, fmt.Errorf("SESSION_RECONCILIATION_STOP_UNCONFIRMED")
@@ -266,7 +272,7 @@ func (s Service) settleClaudeRecordedCompletion(ctx context.Context, key, dir, p
 	if readJSON(filepath.Join(root, "writer.json"), &writer) != nil || writer.Key != key {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_WORKSPACE_CHANGED")
 	}
-	checked, again, confirmed := claudeCompletedEvidence(state.Binding, turn, hash, since)
+	checked, again, confirmed := observe()
 	for tool := range state.Tools {
 		if confirmed[tool] == 0 {
 			return empty, fmt.Errorf("SESSION_RECONCILIATION_EVIDENCE_CHANGED")
