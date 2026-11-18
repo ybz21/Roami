@@ -38,6 +38,7 @@ from roami_agent.protocol.http import (
     WakeProject,
 )
 from roami_agent.server.installation import Installation
+from roami_agent.server.main_execution_routes import mount_main_execution_routes
 from roami_agent.server.market_preview_stream import preview_stream
 from roami_agent.server.model_settings import ModelSettings
 from roami_agent.server.skill_package import MAX_PACKAGE_PAYLOAD_BYTES
@@ -61,6 +62,7 @@ def create_app(runtime, *, manage_lifecycle=True):
     )
 
     mount_swarm_routes(app, runtime)
+    mount_main_execution_routes(app, runtime)
     installation = Installation(runtime)
 
     @app.middleware("http")
