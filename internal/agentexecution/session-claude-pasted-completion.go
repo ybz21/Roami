@@ -72,7 +72,8 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 				continue
 			}
 			stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)
-			if err != nil || stamp.UnixMilli() < since || record.SessionID != binding.ProviderID || record.UUID == "" || record.Cwd != binding.Directory {
+			_, directoryOK := reportDirectory(binding.Directory, record.Cwd)
+			if err != nil || stamp.UnixMilli() < since || record.SessionID != binding.ProviderID || record.UUID == "" || !filepath.IsAbs(record.Cwd) || !directoryOK {
 				return nil, "", nil
 			}
 			matched, reachable[record.UUID] = true, true
@@ -217,7 +218,8 @@ func ownedClaudePromptTurn(binding SessionBinding, promptHash string, since int6
 			continue
 		}
 		stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
-		if problem != nil || stamp.UnixMilli() < since || r.SessionID != binding.ProviderID || r.Cwd != binding.Directory || r.PromptID == "" || turn != "" {
+		_, directoryOK := reportDirectory(binding.Directory, r.Cwd)
+		if problem != nil || stamp.UnixMilli() < since || r.SessionID != binding.ProviderID || !filepath.IsAbs(r.Cwd) || !directoryOK || r.PromptID == "" || turn != "" {
 			return ""
 		}
 		turn = r.PromptID

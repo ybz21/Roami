@@ -36,7 +36,7 @@ func claudeDeniedCompletionTrace(binding SessionBinding, prompt string, since in
 
 func TestClaudeMissingToolHookRequiresCompleteBoundTranscriptAndStoppedProcesses(t *testing.T) {
 	for _, unlimited := range []bool{false, true} {
-		for _, scenario := range []string{"complete", "cancelled", "missing result", "unseen pending tool", "wrong input", "wrong provider", "blocked stop", "later input", "async tool", "live process", "other writer", "changed reason", "stale input"} {
+		for _, scenario := range []string{"complete", "cancelled", "missing result", "unseen pending tool", "wrong input", "wrong provider", "blocked stop", "later input", "async tool", "live process", "other writer", "changed reason", "stale input", "owned subdirectory", "owned symlink", "sibling directory", "escaping symlink", "relative directory"} {
 			t.Run(fmt.Sprintf("%s/unlimited=%v", scenario, unlimited), func(t *testing.T) {
 				s, binding, spec, transcript, _ := rejectedClaudeTask(t)
 				dir, _ := s.directory(spec.Key)
@@ -67,6 +67,45 @@ func TestClaudeMissingToolHookRequiresCompleteBoundTranscriptAndStoppedProcesses
 				state.State, state.UnknownReason = "unknown", ""
 				state.Tools = map[string]bool{"denied-bash": true}
 				records := claudeDeniedCompletionTrace(binding, sessionPrompt(dir, spec), since)
+				directoryCase := false
+				acceptedDirectory := false
+				cwd := ""
+				switch scenario {
+				case "owned subdirectory", "owned symlink":
+					directoryCase, acceptedDirectory = true, true
+					cwd = filepath.Join(binding.Directory, "materials")
+					if err := os.Mkdir(cwd, 0700); err != nil {
+						t.Fatal(err)
+					}
+					if scenario == "owned symlink" {
+						link := filepath.Join(binding.Directory, "materials-link")
+						if err := os.Symlink(cwd, link); err != nil {
+							t.Fatal(err)
+						}
+						cwd = link
+					}
+				case "sibling directory":
+					directoryCase = true
+					cwd = binding.Directory + "-sibling"
+					if err := os.Mkdir(cwd, 0700); err != nil {
+						t.Fatal(err)
+					}
+					defer os.RemoveAll(cwd)
+				case "escaping symlink":
+					directoryCase = true
+					cwd = filepath.Join(binding.Directory, "escape")
+					if err := os.Symlink(t.TempDir(), cwd); err != nil {
+						t.Fatal(err)
+					}
+				case "relative directory":
+					directoryCase = true
+					cwd = "."
+				}
+				if directoryCase {
+					for _, record := range records {
+						record["cwd"] = cwd
+					}
+				}
 				switch scenario {
 				case "stale input":
 					records[0]["timestamp"] = time.UnixMilli(since - 1).UTC().Format(time.RFC3339Nano)
@@ -102,6 +141,13 @@ func TestClaudeMissingToolHookRequiresCompleteBoundTranscriptAndStoppedProcesses
 					}
 				}
 				writeReportRecords(t, transcript, records)
+				if directoryCase {
+					owned := ownedClaudePromptTurn(binding, workspaceHash(sessionPrompt(dir, spec)), since, false)
+					if (owned != "") != acceptedDirectory {
+						t.Fatalf("owned directory boundary accepted=%v got=%q", acceptedDirectory, owned)
+					}
+				}
+
 				if err := writeJSON(path, state); err != nil {
 					t.Fatal(err)
 				}
@@ -117,7 +163,7 @@ func TestClaudeMissingToolHookRequiresCompleteBoundTranscriptAndStoppedProcesses
 					t.Fatalf("implicit status settled pending hook: %+v %v", before, err)
 				}
 				result, err := s.ReconcileSession(context.Background(), spec.Key)
-				if scenario != "complete" && scenario != "cancelled" {
+				if scenario != "complete" && scenario != "cancelled" && !acceptedDirectory {
 					if err == nil || result.Result != nil {
 						t.Fatalf("accepted %s: %+v %v", scenario, result, err)
 					}
