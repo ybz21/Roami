@@ -140,3 +140,16 @@ B站原实例在项目素材子目录接续同一任务，完成媒体校验并�
 
 
 本轮独立验证：50项专项全部通过，包含真实签名能力桥接后的读后验收、缺少读取拒绝、并行读取拒绝、重放不增加步骤，以及原最终回复和工具历史保留。完整检查通过：Go 全套、Python 5095 passed / 48 skipped / 6 subtests passed、前端 typecheck/i18n/hover/生产构建和最终扫描。完整检查之后仅补充本段验收记录，运行时代码保持同一已验证树；快检查和提交钩子通过官方比较范围复用完整检查，仍执行其余门禁。生产部署与原 Swarm 正式验收尚待完成，不将专项或成员回传当作生产验收。
+
+
+### 2026-11-19 原宣传团队运行验收
+
+PR965 已合入 577a9704d3ff5e5cad40bf8fab83c31883c0fc39；合入树 e48bc8e6f840f6ec0c2000d304a91838a6f291ae 与已完整检查的发布源码一致。正式部署 okr-main-review-9668c429 前，原五实例均空闲并完成离线 schema32 备份。部署后核验实际 Python 子进程的新 CLI 路径、同环境模块来源与源码 SHA，四项受保护的路由、环境及 provider preset 文件哈希未变。项目仅补四条新发布目录的精确能力/原群 post 允许项，保留其他配置。
+
+原项目 2026-1103-1155-3q0c、Swarm sw-63020cb635af47eeb76d1025a865aa56、Main 对话 5c1902b96d5c4fea83980354fbca0736 均保留。Main 及 X、B站、评论运营、数据分析五个长期实例配置与真实响应模型均为 Claude/free；四成员为既有 generation2 provider，后续轮次复用同一实例。原 Codex 历史保留，不以侧栏新会话代替团队。
+
+Main turn c380067f76a34d999dbbc9339b73a89a 在新版本执行41次签名能力调用，并通过宿主最终回复审核送达。它完整读取本轮留存产物，包含大文件连续 UTF-8 分页，随后四次 swarm_verify 均 accepted=true：X task1e7691c6642649a0969307f65f8247c8/rev2、B站 taskb6a7bead3f8944fb96a85250dc03d061/rev2、运营 task8b00d14daa5b419fb631e3234570fd48/rev3、数据 task26da094ea533422081b259f577bd48f0/rev2，均与各自最新 run 匹配并变为 succeeded。原群验收回告449、团队记忆更新后 SHA4fa394c77a18bcaa95a747ec5d836622d8c84dd9f85da87c5c678ff54f23fd95 均有实际注册调用回执。读取、验收、记忆写回、最终回复分别核对，没有直接改任务状态或清 writer/busy。
+
+原 Swarm 已正式恢复为 revision54、paused=false，原 delegation84b1ee9c3d4241108f7398af936ce539 保持 revision3 且 active=true。原每日09:00 Asia/Shanghai job 仍启用，全局 cron tick active；项目重复 timer inactive。未来自然触发尚未观察，不记为已验证。团队记忆明确继续使用原 Claude/free 成员，并保留不触手机、不部署或重启线上、不改路由参数/费用额度/busy 的当前边界。
+
+这是接管运行验收：X旧 handoff 未送达的事实保留；B站预览不是投稿、运营没有新回复、数据 rev80 候选未入账，原未知项仍未知。桌面独立 QA 读取原 Swarm 并核验原 Main 的 Claude/free 绑定，实际显示共用原生聊天与实时工具过程；本轮没有手机触控验收声明。验收记录归档在本主题，原五实例、历史及工作区保留。
