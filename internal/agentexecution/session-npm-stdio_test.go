@@ -8,7 +8,7 @@ import (
 )
 
 func TestNpmStdioHostKeepsBackgroundCommandsVisible(t *testing.T) {
-	for _, scenario := range []string{"host", "shell", "background child", "extra shell child", "untracked launcher", "foreign launcher", "wrong package", "wrong bin", "shell injection", "node arguments", "recycled host", "modified launcher", "path escape"} {
+	for _, scenario := range []string{"host", "shell", "background child", "extra shell child", "untracked launcher", "foreign launcher", "wrong package", "wrong bin", "shell injection", "node arguments", "recycled host", "modified launcher", "path escape", "fake node", "fake shell"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
 			proc := filepath.Join(root, "proc")
@@ -64,6 +64,18 @@ func TestNpmStdioHostKeepsBackgroundCommandsVisible(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err := os.WriteFile(filepath.Join(dir, "cmdline"), []byte(command), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			nodeExecutable := filepath.Join(root, "node-executable")
+			if err := os.WriteFile(nodeExecutable, []byte("node identity"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			for id, target := range map[int]string{2: nodeExecutable, 3: "/bin/sh", 4: nodeExecutable} {
+				if scenario == "fake node" && id == 4 || scenario == "fake shell" && id == 3 {
+					target = filepath.Join(pkg, "server.js")
+				}
+				if err := os.Symlink(target, filepath.Join(proc, strconv.Itoa(id), "exe")); err != nil {
 					t.Fatal(err)
 				}
 			}

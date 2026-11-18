@@ -116,6 +116,13 @@ func npmStdioHostAt(proc string, binding SessionBinding, snapshot map[int]panePr
 	if err != nil || actualPath != expected {
 		return false
 	}
+	launcherExe, launcherErr := os.Stat(filepath.Join(proc, strconv.Itoa(shell.Parent), "exe"))
+	nodeExe, nodeErr := os.Stat(filepath.Join(proc, strconv.Itoa(nodePID), "exe"))
+	shellExe, shellErr := os.Stat(filepath.Join(proc, strconv.Itoa(shellPID), "exe"))
+	expectedShell, expectedErr := os.Stat("/bin/sh")
+	if launcherErr != nil || nodeErr != nil || shellErr != nil || expectedErr != nil || !os.SameFile(launcherExe, nodeExe) || !os.SameFile(shellExe, expectedShell) {
+		return false
+	}
 	for _, id := range []int{shellPID, nodePID, shell.Parent} {
 		if snapshot[id].Token == "" || token(id) != snapshot[id].Token {
 			return false
