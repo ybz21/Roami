@@ -213,7 +213,7 @@ func runAgentExecution(args []string) int {
 		if *file == "" {
 			return fail(fmt.Errorf("--file is required"))
 		}
-		content, err := agentInput(*file, "")
+		content, err := executionSpecInput(*file)
 		if err != nil {
 			return fail(err)
 		}
