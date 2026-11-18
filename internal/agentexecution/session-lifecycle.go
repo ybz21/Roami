@@ -296,13 +296,21 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 		}
 	case event.Hook == "UserPromptSubmit":
 		promptHash := workspaceHash(event.Prompt)
+		if executor == "claude" {
+			promptHash = claudeInputHash(event.Prompt, state.PromptHash)
+		}
 		if state.State == "busy" && state.TurnID == event.TurnID && state.PromptHash == promptHash {
 			return nil
 		}
 		if state.LaunchKey != "" {
 			dir, _ := s.directory(state.LaunchKey)
 			var spec Spec
-			if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || promptHash != workspaceHash(sessionPrompt(dir, spec)) || state.State != "submitting" {
+			specError := readJSON(filepath.Join(dir, "spec.json"), &spec)
+			expected := workspaceHash(sessionPrompt(dir, spec))
+			if executor == "claude" {
+				promptHash = claudeInputHash(event.Prompt, expected)
+			}
+			if specError != nil || promptHash != expected || state.State != "submitting" {
 				markSessionUnknown(&state, "SESSION_PROMPT_MISMATCH")
 				return writeJSON(path, state)
 			}
@@ -435,8 +443,14 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 		return Status{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
 	}
 	if spec.PreparedFrom != "" {
+		if normalized, _, ok := s.provenClaudeModelIdle(state); ok {
+			state = normalized
+		}
 		if err = s.preparedContinuation(spec, state); err != nil {
 			return Status{}, err
+		}
+		if !sessionProcessesStopped(state.Binding) {
+			return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 		}
 	}
 	if structuredExecutor(spec.Executor) && (!state.Structured || !sessionProcessesStopped(state.Binding)) {

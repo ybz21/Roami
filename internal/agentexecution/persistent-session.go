@@ -78,6 +78,7 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	spawn.RecordAgentSession(s.Runtime, receipt.Session, ac)
 	lease()
 	// The TUI owns the pane and remains alive after each completion callback.
+	ac.Model = s.nativeModelID(ctx, spec.Executor, ac.Model)
 	command := ac.InteractiveFromPromptFile(promptFile)
 	if state.Resuming {
 		command = ac.ResumeInteractiveFromPromptFile(spec.ResumeProvider, promptFile)

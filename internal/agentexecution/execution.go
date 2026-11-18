@@ -403,7 +403,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if a == nil {
 		return fmt.Errorf("INVALID_EXECUTOR")
 	}
-	args := a.OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission, MaxTurns: ""})
+	args := a.OneShotArgs(agent.StartOpts{Model: s.nativeModelID(ctx, spec.Executor, spec.Model), Permission: spec.Permission, MaxTurns: ""})
 	if promptArg, ok := a.(interface{ OneShotPromptArg() bool }); ok && promptArg.OneShotPromptArg() {
 		args = append(args, spec.Prompt)
 	}

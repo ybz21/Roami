@@ -16,14 +16,43 @@ type PreparedSession struct {
 	Ready           bool           `json:"ready"`
 }
 
-func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLifecycle, result Result) (PreparedSession, error) {
-	if spec.Key != key || !spec.Persistent || spec.SessionID != "" || spec.Executor == "" || spec.Model == "" || receipt.Binding == nil || receipt.Workspace == nil || receipt.Session != state.Binding.ID || state.State != "idle" || state.LaunchKey != "" || state.CompletedKey != key || len(state.Tools) != 0 || state.Executor != spec.Executor || state.Model != spec.Model || !reflect.DeepEqual(state.Binding, *receipt.Binding) || receipt.Workspace.Directory != state.Binding.Directory || result.State != "succeeded" || result.InputStopped == nil || !*result.InputStopped || result.OutcomeKnown == nil || !*result.OutcomeKnown {
+func samePreparedProvider(a, b SessionBinding) bool {
+	if a.PID <= 0 || a.Processes[a.PID] == "" || a.Processes[a.PID] != b.Processes[b.PID] {
+		return false
+	}
+	a.Processes, b.Processes = nil, nil
+	a.ForeignProcesses, b.ForeignProcesses = nil, nil
+	return reflect.DeepEqual(a, b)
+}
+
+type preparedTurnProof struct {
+	Spec       Spec
+	Receipt    Receipt
+	Result     Result
+	NativeIdle bool
+}
+
+func preparedTurnMatches(state sessionLifecycle, proof preparedTurnProof) bool {
+	r := proof.Result
+	return state.CompletedKey != "" && proof.Spec.Key == state.CompletedKey && proof.Spec.SessionID == state.Binding.ID && proof.Spec.Executor == state.Executor && proof.Spec.Model == "" && proof.Receipt.Session == state.Binding.ID && proof.Receipt.Binding != nil && reflect.DeepEqual(*proof.Receipt.Binding, state.Binding) && proof.Receipt.Workspace != nil && proof.Receipt.Workspace.Directory == state.Binding.Directory && (r.State == "succeeded" || r.State == "failed" || r.State == "cancelled") && r.InputStopped != nil && *r.InputStopped && r.OutcomeKnown != nil && *r.OutcomeKnown
+}
+
+func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLifecycle, result Result, later ...preparedTurnProof) (PreparedSession, error) {
+	settledKey := key
+	if state.CompletedKey != key {
+		if len(later) != 1 || !(state.CompletedKey == "" && later[0].NativeIdle || preparedTurnMatches(state, later[0])) {
+			return PreparedSession{}, fmt.Errorf("SESSION_PREPARATION_UNCONFIRMED")
+		}
+		settledKey = state.CompletedKey
+	}
+
+	if spec.Key != key || !spec.Persistent || spec.SessionID != "" || spec.Executor == "" || spec.Model == "" || receipt.Binding == nil || receipt.Workspace == nil || receipt.Session != state.Binding.ID || state.State != "idle" || state.LaunchKey != "" || state.CompletedKey != settledKey || state.UnknownReason != "" || state.ProviderConflict != nil || state.EndedIdle || len(state.Tools) != 0 || state.Executor != spec.Executor || state.Model != spec.Model || !samePreparedProvider(*receipt.Binding, state.Binding) || receipt.Workspace.Directory != state.Binding.Directory || result.State != "succeeded" || result.InputStopped == nil || !*result.InputStopped || result.OutcomeKnown == nil || !*result.OutcomeKnown {
 		return PreparedSession{}, fmt.Errorf("SESSION_PREPARATION_UNCONFIRMED")
 	}
 	return PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.Model, Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true}, nil
 }
 
-// Preparation identifies a stopped initial turn; it never grants a new task or replays input.
+// Preserve the original provider while checking its latest settled turn.
 func (s Service) PreparedSession(key string) (PreparedSession, error) {
 	dir, err := s.directory(key)
 	if err != nil {
@@ -52,7 +81,25 @@ func (s Service) PreparedSession(key string) (PreparedSession, error) {
 	if readJSON(path, &state) != nil {
 		return PreparedSession{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
 	}
-	selected, err := preparedSelection(key, spec, receipt, state, result)
+	if normalized, _, ok := s.provenClaudeModelIdle(state); ok {
+		state = normalized
+	}
+	var later []preparedTurnProof
+	if state.CompletedKey == "" && provenClaudeNativeIdle(state) {
+		later = append(later, preparedTurnProof{NativeIdle: true})
+	}
+	if state.CompletedKey != key && state.CompletedKey != "" {
+		latestDir, problem := s.directory(state.CompletedKey)
+		if problem != nil {
+			return PreparedSession{}, fmt.Errorf("SESSION_PREPARATION_UNCONFIRMED")
+		}
+		var current preparedTurnProof
+		if readJSON(filepath.Join(latestDir, "spec.json"), &current.Spec) != nil || readJSON(filepath.Join(latestDir, "receipt.json"), &current.Receipt) != nil || readJSON(filepath.Join(latestDir, "result.json"), &current.Result) != nil {
+			return PreparedSession{}, fmt.Errorf("SESSION_PREPARATION_UNCONFIRMED")
+		}
+		later = append(later, current)
+	}
+	selected, err := preparedSelection(key, spec, receipt, state, result, later...)
 	if err != nil {
 		return PreparedSession{}, err
 	}
@@ -67,7 +114,7 @@ func (s Service) PreparedSession(key string) (PreparedSession, error) {
 }
 
 func preparedOriginMatches(current Spec, state sessionLifecycle, initial Spec, receipt Receipt, result Result) bool {
-	return current.PreparedFrom != "" && initial.Key == current.PreparedFrom && initial.Persistent && initial.SessionID == "" && initial.Model != "" && initial.Executor == current.Executor && state.Executor == initial.Executor && state.Model == initial.Model && receipt.Binding != nil && receipt.Workspace != nil && receipt.Session == current.SessionID && reflect.DeepEqual(*receipt.Binding, state.Binding) && receipt.Workspace.Directory == state.Binding.Directory && result.State == "succeeded" && result.InputStopped != nil && *result.InputStopped && result.OutcomeKnown != nil && *result.OutcomeKnown
+	return current.PreparedFrom != "" && initial.Key == current.PreparedFrom && initial.Persistent && initial.SessionID == "" && initial.Model != "" && initial.Executor == current.Executor && state.Executor == initial.Executor && state.Model == initial.Model && receipt.Binding != nil && receipt.Workspace != nil && receipt.Session == current.SessionID && samePreparedProvider(*receipt.Binding, state.Binding) && receipt.Workspace.Directory == state.Binding.Directory && result.State == "succeeded" && result.InputStopped != nil && *result.InputStopped && result.OutcomeKnown != nil && *result.OutcomeKnown
 }
 
 // A later task must not silently attach to a restarted provider under the same label.
