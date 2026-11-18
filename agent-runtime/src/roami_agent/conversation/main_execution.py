@@ -53,8 +53,9 @@ def main_configuration(db, owner, cid):
 
 
 class MainExecutions:
-    def __init__(self, database, settings, executor):
+    def __init__(self, database, settings, executor, *, capabilities=None):
         self.db, self.settings, self.executor = database, settings, executor
+        self.capabilities = capabilities
 
     async def configure(self, owner, cid, spec):
         project = spec["projectId"]
@@ -151,5 +152,7 @@ class MainExecutions:
             return loop
         binding["binding"] = json.loads(binding.pop("binding_json"))
         selected = copy(loop)
-        selected.model = NativeMain(binding, turn, self.executor.command)
+        selected.model = NativeMain(
+            binding, turn, self.executor.command, capabilities=self.capabilities
+        )
         return selected

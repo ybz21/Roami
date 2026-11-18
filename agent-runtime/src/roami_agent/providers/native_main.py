@@ -9,8 +9,9 @@ from roami_agent.protocol.serialization import encoded
 
 
 class NativeMain:
-    def __init__(self, binding, turn, command, *, sleep=asyncio.sleep):
+    def __init__(self, binding, turn, command, *, sleep=asyncio.sleep, capabilities=None):
         self.binding, self.turn, self.command, self.sleep = binding, turn, command, sleep
+        self.capabilities = capabilities
         self.model = binding["model"]
         self.provider_key = "native-cli:" + binding["executor"] + ":" + binding["provider_id"]
         self.settings_hash = hashlib.sha256(encoded(binding).encode()).hexdigest()
@@ -76,6 +77,8 @@ class NativeMain:
             + "\nThe following is the host-prepared conversation context, with its original roles:\n"
             + payload
         )
+        if self.capabilities:
+            prompt += await self.capabilities.brief(self.binding, self.turn)
         spec = {
             "key": key,
             "executor": self.binding["executor"],

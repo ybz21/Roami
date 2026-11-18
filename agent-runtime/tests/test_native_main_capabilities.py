@@ -1,0 +1,396 @@
+"""Native Main capabilities use the original turn, gateway and immutable provider."""
+
+import asyncio
+import json
+from pathlib import Path
+
+import httpx
+import pytest
+from test_project_main_execution import setup_main
+
+from roami_agent.conversation.main_execution import main_binding
+from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.server.http import create_app
+from roami_agent.storage.database import row
+
+pytest_plugins = ["test_project_main_wakeup"]
+
+
+@pytest.fixture
+async def native_main(wake_runtime, monkeypatch):
+    runtime, main, spec, _, _ = await setup_main(wake_runtime, monkeypatch)
+    await runtime.main_executions.configure("alice", main["id"], spec)
+    accepted = await runtime.conversations.accept(
+        "alice", main["id"], "native-work", "Coordinate the original project team"
+    )
+
+    def running(db):
+        db.execute(
+            "UPDATE turns SET state='running',lease_epoch=1 WHERE id=?", (accepted["turnId"],)
+        )
+        return row(
+            db,
+            "SELECT t.*,c.owner_id FROM turns t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=?",
+            (accepted["turnId"],),
+        )
+
+    turn = await runtime.db.call(running, write=True)
+    await runtime.journal.start(turn)
+    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
+    brief = await runtime.main_capabilities.brief(binding, turn)
+    files = list((runtime.db.data_root / "agents/capability-contexts").glob("*.json"))
+    assert len(files) == 1 and files[0].stat().st_mode & 0o777 == 0o600
+    context = json.loads(files[0].read_text())
+    assert context["signature"] not in brief and str(files[0]) in brief
+    assert "taskId" not in context and "runId" not in context
+    return runtime, main, turn, context
+
+
+def request(context, args=None, key="one"):
+    return {"executionContext": context, "requestId": key, "arguments": args or {}}
+
+
+async def group_for(runtime, main, turn):
+    runtime.swarms.chat = None
+    return await runtime.swarms.create(
+        "alice",
+        {
+            "commandKey": "native-team",
+            "name": "Original project team",
+            "goal": "Read and verify",
+            "mainConversationId": main["id"],
+            "target": {"kind": "project", "projectId": "project"},
+        },
+        binding={"turnId": turn["id"]},
+    )
+
+
+async def test_native_main_uses_actual_registry_gateway_and_original_team(native_main):
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    payload = request(context, {"swarmId": group["id"]})
+    result = await runtime.main_capabilities.call("swarm_status", payload, "alice")
+    assert result["state"] == "succeeded" and result["result"]["mainConversationId"] == main["id"]
+    assert await runtime.main_capabilities.call("swarm_status", payload, "alice") == result
+    calls = await runtime.db.call(
+        lambda db: db.execute(
+            "SELECT tool_name,state FROM tool_calls WHERE turn_id=?", (turn["id"],)
+        ).fetchall()
+    )
+    assert (
+        len(calls) == 1
+        and calls[0]["tool_name"] == "swarm_status"
+        and calls[0]["state"] == "succeeded"
+    )
+    with pytest.raises(DomainError, match="CAPABILITY_REQUEST_CONFLICT"):
+        await runtime.main_capabilities.call("swarm_memory_read", payload, "alice")
+
+
+async def test_signed_native_main_can_register_and_plan_without_worker_impersonation(native_main):
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    registered = await runtime.main_capabilities.call(
+        "swarm_members_register",
+        request(
+            context,
+            {
+                "swarmId": group["id"],
+                "expectedRevision": 1,
+                "members": [
+                    {"name": "content", "executor": "claude", "duty": "Maintain project content"}
+                ],
+            },
+            "register",
+        ),
+        "alice",
+    )
+    assert registered["state"] == "succeeded", registered
+    member = registered["result"]["members"][0]
+    result = await runtime.main_capabilities.call(
+        "swarm_plan",
+        request(
+            context,
+            {
+                "swarmId": group["id"],
+                "expectedRevision": 2,
+                "items": [
+                    {
+                        "memberId": member["id"],
+                        "member": "content",
+                        "executor": "claude",
+                        "title": "Read source",
+                        "goal": "Read and report source facts",
+                        "acceptance": "Cite the real source",
+                    }
+                ],
+            },
+            "plan",
+        ),
+        "alice",
+    )
+    assert result["state"] == "succeeded", result
+    current = await runtime.swarms.snapshot("alice", group["id"])
+    assert (
+        current["mainConversationId"] == main["id"] and current["members"][0]["id"] == member["id"]
+    )
+    assert current["work"][0]["executor"] == "claude"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "owner",
+        "project",
+        "conversation",
+        "provider",
+        "generation",
+        "lease",
+        "completed",
+        "signature",
+    ],
+)
+async def test_native_main_context_rejects_changed_identity_or_finished_turn(native_main, change):
+    runtime, _, turn, original = native_main
+    context = dict(original)
+    if change in {"project", "conversation", "provider"}:
+        context[
+            {"project": "projectId", "conversation": "conversationId", "provider": "providerId"}[
+                change
+            ]
+        ] = "foreign"
+    if change == "owner":
+        context["owner"] = "bob"
+    if change == "generation":
+        context["generation"] += 1
+    if change == "lease":
+        await runtime.db.call(
+            lambda db: db.execute("UPDATE turns SET lease_epoch=2 WHERE id=?", (turn["id"],)),
+            write=True,
+        )
+    if change == "completed":
+        await runtime.db.call(
+            lambda db: db.execute("UPDATE turns SET state='completed' WHERE id=?", (turn["id"],)),
+            write=True,
+        )
+    context["signature"] = runtime.main_capabilities.signature(
+        {k: v for k, v in context.items() if k != "signature"}
+    )
+    if change == "signature":
+        context["signature"] = "0" * 64
+    with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED"):
+        await runtime.main_capabilities.call(
+            "skill_read", request(context, {"name": "missing"}), "alice"
+        )
+    assert (
+        await runtime.db.call(
+            lambda db: db.execute("SELECT count(*) FROM tool_calls").fetchone()[0]
+        )
+        == 0
+    )
+
+
+async def test_native_main_http_routes_signed_context_without_accepting_worker_shape(native_main):
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime)),
+        base_url="http://agent",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        path = "/v1/tool-directory/swarm_status/call"
+        response = await client.post(path, json=request(context, {"swarmId": group["id"]}))
+        assert response.status_code == 200 and response.json()["data"]["state"] == "succeeded"
+        worker_shape = {**context, "kind": "worker"}
+        response = await client.post(path, json=request(worker_shape, {"swarmId": group["id"]}))
+        assert response.status_code == 409
+    with pytest.raises(DomainError, match="TOOL_UNAVAILABLE"):
+        await runtime.main_capabilities.call(
+            "reply",
+            request(context, {"text": "Must not duplicate final delivery"}, "reply"),
+            "alice",
+        )
+
+
+async def test_native_main_does_not_replay_pending_or_unknown_capabilities(native_main):
+    runtime, _, _, context = native_main
+    entered, release = asyncio.Event(), asyncio.Event()
+    hits = []
+
+    async def operation(args, binding):
+        hits.append(binding)
+        entered.set()
+        await release.wait()
+        raise DomainError("TOOL_OUTCOME_UNKNOWN")
+
+    runtime.tools.add(
+        Tool(
+            "native_main_effect",
+            "Bound effect",
+            object_schema({}),
+            operation,
+            effect="write",
+            main=True,
+        )
+    )
+    payload = request(context)
+    call = asyncio.create_task(
+        runtime.main_capabilities.call("native_main_effect", payload, "alice")
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        with pytest.raises(DomainError, match="TOOL_OUTCOME_UNKNOWN"):
+            await runtime.main_capabilities.call("native_main_effect", payload, "alice")
+        release.set()
+        result = await asyncio.wait_for(call, 5)
+        assert result["state"] == "unknown"
+        assert (
+            await runtime.main_capabilities.call("native_main_effect", payload, "alice") == result
+        )
+        assert len(hits) == 1 and hits[0]["taskId"] is None and hits[0]["runId"] is None
+    finally:
+        release.set()
+        await asyncio.gather(call, return_exceptions=True)
+
+
+async def test_stop_revokes_inflight_main_capability_and_cancels_handler(native_main):
+    runtime, main, turn, context = native_main
+    entered, stopped = asyncio.Event(), asyncio.Event()
+
+    async def operation(args, binding):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    runtime.tools.add(
+        Tool(
+            "native_main_wait", "Bound read", object_schema({}), operation, effect="read", main=True
+        )
+    )
+    call = asyncio.create_task(
+        runtime.main_capabilities.call("native_main_wait", request(context), "alice")
+    )
+    await asyncio.wait_for(entered.wait(), 5)
+    await runtime.chat.interrupt("alice", main["id"], "native-stop", expected_turn_id=turn["id"])
+    result = await asyncio.wait_for(call, 5)
+    assert stopped.is_set() and result["state"] in {"cancelled", "unknown"}
+    with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED|TURN_INTERRUPTED"):
+        await runtime.main_capabilities.call("native_main_wait", request(context), "alice")
+
+
+async def test_final_main_message_retains_gateway_calls_without_executing_again(native_main):
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    result = await runtime.main_capabilities.call(
+        "swarm_status", request(context, {"swarmId": group["id"]}), "alice"
+    )
+    assert result["state"] == "succeeded"
+    mid = await runtime.db.call(
+        lambda db: row(
+            db,
+            "SELECT id FROM messages WHERE turn_id=? AND role='assistant' ORDER BY seq DESC LIMIT 1",
+            (turn["id"],),
+        )
+    )
+    await runtime.journal.finish(
+        turn, mid["id"], "Actual native final answer", [], None, 1, final=True, completion=None
+    )
+    saved = await runtime.conversations.messages("alice", main["id"])
+    assistant = next(m for m in saved["messages"] if m["id"] == mid["id"])
+    calls = assistant["content"]["tool_calls"]
+    assert len(calls) == 1 and calls[0]["function"]["name"] == "swarm_status"
+    assert assistant["content"]["text"] == "Actual native final answer"
+    results = [m for m in saved["messages"] if m["role"] == "tool"]
+    assert len(results) == 1 and results[0]["content"]["tool_call_id"] == calls[0]["id"]
+    assert (
+        await runtime.db.call(
+            lambda db: db.execute("SELECT count(*) FROM tool_calls").fetchone()[0]
+        )
+        == 1
+    )
+
+
+@pytest.mark.parametrize("final_tool", [False, True])
+async def test_real_main_queue_delivers_signed_context_to_native_cli_and_keeps_tool_history(
+    wake_runtime, monkeypatch, final_tool
+):
+    from types import SimpleNamespace
+
+    from test_native_main import stopped
+    from test_runtime import until
+
+    runtime, main, spec, proof, _ = await setup_main(wake_runtime, monkeypatch)
+    await runtime.main_executions.configure("alice", main["id"], spec)
+    runtime.swarms.chat = None
+    group = await runtime.swarms.create(
+        "alice",
+        {
+            "commandKey": "queued-team",
+            "name": "Queued native team",
+            "goal": "Read status",
+            "mainConversationId": main["id"],
+            "target": {"kind": "project", "projectId": "project"},
+        },
+    )
+    await runtime.swarms.control(
+        "alice", group["id"], {"commandKey": "pause-team", "expectedRevision": 1, "action": "pause"}
+    )
+    launches = []
+
+    async def command(sub, *args, spec=None):
+        assert sub == "launch"
+        launches.append(spec)
+        context_file = next(
+            line.partition("=")[2]
+            for line in spec["prompt"].splitlines()
+            if line.startswith("ROAMI_MAIN_CONTEXT=")
+        )
+        context = json.loads(Path(context_file).read_text())
+        assert context["signature"] not in spec["prompt"]
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(runtime)),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "alice"},
+        ) as client:
+            result = await client.post(
+                "/v1/tool-directory/swarm_status/call",
+                json=request(context, {"swarmId": group["id"]}),
+            )
+            assert result.status_code == 200 and result.json()["data"]["state"] == "succeeded"
+            assert result.json()["data"]["result"]["mainConversationId"] == main["id"]
+        return stopped({"session_id": proof["sessionId"], "binding": proof["sessionBinding"]})
+
+    runtime.main_executions.executor = SimpleNamespace(command=command)
+    runtime.loop.require_final_tool = final_tool
+    await runtime.start()
+    accepted = await runtime.chat.submit(
+        "alice", main["id"], "main-cli-context", "Read original team status"
+    )
+
+    await until(
+        runtime.db,
+        lambda db: row(
+            db, "SELECT * FROM turns WHERE id=? AND state='completed'", (accepted["turnId"],)
+        ),
+    )
+    assert len(launches) == 1 and launches[0]["sessionId"] == proof["sessionId"]
+    saved = await runtime.conversations.messages("alice", main["id"])
+    calls = [call for m in saved["messages"] for call in m["content"].get("tool_calls", [])]
+    native_calls = [call for call in calls if call["function"]["name"] == "swarm_status"]
+    replies = [call for call in calls if call["function"]["name"] == "reply"]
+    assert len(native_calls) == 1 and len(replies) == int(final_tool)
+    assert any(m["content"].get("text") == "Actual native answer" for m in saved["messages"])
+
+
+async def test_signed_main_discovers_main_only_operations_through_tool_list(native_main):
+    runtime, _, _, context = native_main
+    result = await runtime.main_capabilities.call(
+        "tool_list", request(context, {"query": "swarm_plan", "limit": 20}, "discover"), "alice"
+    )
+    assert result["state"] == "succeeded", result
+    entries = result["result"]["items"]
+    assert any(entry["name"] == "swarm_plan" and entry.get("inputSchema") for entry in entries), (
+        result
+    )

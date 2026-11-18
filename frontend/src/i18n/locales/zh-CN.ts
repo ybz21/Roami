@@ -282,6 +282,8 @@ const zhCN = {
   'okr.chatOpen': "主智能体",
   'okr.chatHint': "本目标的固定负责人，负责规划、分工和协作。",
   'okr.chatEmpty': "说说你想达成什么，或让 Main Agent 帮你拆解和复盘。",
+  'okr.mainModelBound': '此对话使用项目绑定的模型。',
+  'okr.nativeCommand': '请切到原生终端执行此命令。',
   'okr.chatInput': "与 Main Agent 对话",
   'okr.chatPlaceholder': "例如：帮我分析这组 KR，下一步先做什么？",
   'okr.endChat': "收起对话",

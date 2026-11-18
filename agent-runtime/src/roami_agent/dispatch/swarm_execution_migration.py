@@ -66,7 +66,7 @@ def migrate_members(db, owner, sid, spec, *, prepared=None):
                     raise DomainError("SWARM_MEMBER_STOP_REQUIRED", 409)
                 if row(
                     db,
-                    "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) SELECT 1 FROM jobs WHERE aggregate_id IN (SELECT id FROM tree) AND state IN ('queued','running') LIMIT 1",
+                    "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) SELECT 1 FROM jobs WHERE aggregate_id IN (SELECT id FROM tree) AND state IN ('queued','running') AND kind!='swarm.coordinate' LIMIT 1",
                     (task["id"],),
                 ):
                     raise DomainError("SWARM_MEMBER_STOP_REQUIRED", 409)

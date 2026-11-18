@@ -518,7 +518,13 @@ def create_app(runtime, *, manage_lifecycle=True):
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
         if isinstance(payload, dict) and "executionContext" in payload:
-            return {"data": await runtime.professional_capabilities.call(name, payload, owner)}
+            context = payload["executionContext"]
+            capabilities = (
+                runtime.main_capabilities
+                if isinstance(context, dict) and context.get("kind") == "project_main"
+                else runtime.professional_capabilities
+            )
+            return {"data": await capabilities.call(name, payload, owner)}
         return {"data": await runtime.cli_commands.call(name, payload, owner)}
 
     @app.get("/v1/capability-settings")
@@ -690,6 +696,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "configured": bool(runtime.model.model),
                 "projectOkr": True,
                 "projectOkrMain": True,
+                "projectMainExecution": True,
                 "okrMessageContext": True,
                 "conversationIdentity": True,
                 "projectMainWake": True,

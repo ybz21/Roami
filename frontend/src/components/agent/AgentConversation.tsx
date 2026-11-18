@@ -53,6 +53,7 @@ export type HomeConversationProps = {
   mobileActionsHost?: HTMLElement | null
 }
 export type ProjectConversationBinding = {
+  nativeModel?: string; modelControlsDisabled?: boolean
   draftKey: string; ensureConversation: () => Promise<string>; isCurrent: () => boolean
   prepareContext: (text: string) => AgentMessage['content']['okrContext']; displayText: (text: string, content?: AgentMessage['content']) => string
   onUpdated?: () => void; onCurrentBranch?: () => void
@@ -210,7 +211,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
         if (request.attachmentIds.length) attachments.clear(request.scope)
         if (!current()) { inbox?.refresh(); return }
         if (data.kind === 'ui_action' && data.action === 'model') setModelRequest(value => value + 1)
-        else if (data.kind === 'model') { window.dispatchEvent(new Event(MODEL_SETTINGS_CHANGED)); message.success(t('agent.models.switched', { name: data.model })) }
+        else if (data.kind === 'model') { if (data.executor) message.info(data.model); else { window.dispatchEvent(new Event(MODEL_SETTINGS_CHANGED)); message.success(t('agent.models.switched', { name: data.model })) } }
         else if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
         else if (data.kind === 'commands') showPanel('context')
         else if (data.kind === 'compaction') { thread.accepted(data, ''); setPanel(null) }
@@ -259,7 +260,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const composerActions = {
     contextUsage: { cid: historical ? '' : cid, model: `${models.settings?.main?.model || ''}:${models.settings?.main?.contextWindow || ''}`, revision: `${thread.view?.turns.map(turn => turn.id + ':' + turn.state).join(',')}:${thread.view?.messages[thread.view.messages.length - 1]?.id}:${thread.view?.messages[thread.view.messages.length - 1]?.status}:${compact?.state}`, active: running || compacting },
     onContext: () => showPanel('context'),
-    models, node, modelRequest, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running,
+    models, node, modelRequest, disabled: readOnly || sending, canCompact: !!cid && !readOnly && !compacting && !running && !project?.nativeModel && !project?.modelControlsDisabled,
     canDelegate: !project && !attachments.items.length, onFiles: () => fileInput.current?.click(), onTask: project ? undefined : () => setTarget('loose'),
     onCompact: () => { void submit('/compact', false) },
     onCommands: () => { setCommandsDismissed(false); setCommandsOpen(value => !value); setCommandIndex(0) },
@@ -334,7 +335,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
         leading={<AgentComposerPlus {...composerActions} mode={project ? undefined : { task: target !== 'direct', onChange: task => setTarget(task ? 'loose' : 'direct') }} options={<>
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
           <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: agents.map(({ kind }) => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
-        settings={<AgentComposerPlus {...composerActions} modelTrigger />}
+        settings={project?.modelControlsDisabled ? undefined : project?.nativeModel ? <span className="tt-pill">{project.nativeModel}</span> : <AgentComposerPlus {...composerActions} modelTrigger />}
         voice={<VoiceInput inline scope={draftKey} hotkey={pageActive && !inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>

@@ -84,3 +84,18 @@ func TestProjectShortHelpNeedsNoServer(t *testing.T) {
 		}
 	}
 }
+
+func TestProjectIdentitySkipsAggregateDiscovery(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/projects" || r.URL.Query().Get("identity") != "p & 1" {
+			t.Errorf("unexpected identity query: %s", r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"projects":[{"key":"p & 1","dir":"/projects/one","archived":false}],"loose":[]}}`))
+	}))
+	defer server.Close()
+	t.Setenv("ROAMI_HOME", t.TempDir())
+	if code := runAPICommand("project", []string{"show", "--identity", "p & 1", "--json", "--server", server.URL}); code != 0 {
+		t.Fatalf("identity exit=%d", code)
+	}
+}

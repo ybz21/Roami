@@ -198,3 +198,44 @@ async def test_stopped_generation_is_retained_and_next_assignment_keeps_model(te
     )
     await runtime.swarms.advance({"id": "repeat", "aggregate_id": group["id"]})
     assert (await runtime.db.call(lambda db: row(db, "SELECT count(*) AS n FROM tasks")))["n"] == 2
+
+
+@pytest.mark.parametrize(
+    "kind", ["swarm.coordinate", "task.run", "task.verify", "task.steer", "task.close_session"]
+)
+@pytest.mark.parametrize("state", ["queued", "running"])
+async def test_result_notifications_do_not_count_as_native_execution(team, kind, state):
+    runtime, group = team
+    member, work = await assigned(runtime, group)
+    task_id = work["task_id"]
+
+    def stopped(db):
+        db.execute("UPDATE tasks SET state='cancelled' WHERE id=?", (task_id,))
+        db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (task_id,))
+        db.execute(
+            "UPDATE task_attempts SET state='cancelled',result_json=? WHERE task_id=?",
+            (
+                json.dumps({"state": "cancelled", "inputStopped": True, "outcomeKnown": True}),
+                task_id,
+            ),
+        )
+        db.execute(
+            "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) VALUES(?,?,?,?,?,?,?)",
+            ("pending-old-result", kind, task_id, "pending-old-result", "{}", state, 0),
+        )
+
+    await runtime.db.call(stopped, write=True)
+    await pause(runtime, group, 3)
+    if kind != "swarm.coordinate":
+        with pytest.raises(DomainError, match="SWARM_MEMBER_STOP_REQUIRED"):
+            await runtime.swarms.migrate_execution("alice", group["id"], request(member, 4))
+        return
+    await runtime.swarms.migrate_execution("alice", group["id"], request(member, 4))
+    notification = await runtime.db.call(
+        lambda db: row(db, "SELECT * FROM jobs WHERE id='pending-old-result'")
+    )
+    assert notification["state"] == state
+    assert notification["aggregate_id"] == task_id
+    assert (
+        await runtime.db.call(lambda db: row(db, "SELECT state FROM tasks WHERE id=?", (task_id,)))
+    )["state"] == "cancelled"

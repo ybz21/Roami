@@ -1,0 +1,6 @@
+.executor-session-chat { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; overflow:hidden; }
+.executor-session-actions { display:flex; flex-shrink:0; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.executor-session-actions > .tt-act { margin-left:auto; }
+.executor-session-view { position:relative; display:flex; flex:1; min-width:0; min-height:0; overflow:hidden; }
+.executor-session-view > .session-chat-shell { flex:1; min-width:0; min-height:0; width:100%; height:auto; }
+.executor-session-terminal { position:absolute; inset:0; }

@@ -31,9 +31,10 @@ import type { AgentStatus } from './status'
 // 数量很小（几条文本），且已发出的会话消息很快就会被转录对账掉，不会无限增长。
 const outboxStore = new Map<string, { id: number; text: string }[]>()
 
-export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend }: {
+export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend, onCommand }: {
   /** 这条 composer 发给谁：左端那枚亮着的 agent pill（22 设计 §3.3） */
   onSend?: (text: string) => Promise<void>
+  onCommand?: (text: string) => Promise<void>
   agent?: string
   /** 还没有对话文件（agent 刚起、一句没说）：显示这句而不是「加载中」 */
   emptyHint?: string
@@ -343,6 +344,12 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
 
   const stop = () => {
     if (stopCooling) return
+    if (onCommand) {
+      setStopCooling(true)
+      void onCommand('/stop').catch((error: Error) => setSendErr(error.message))
+      coolTimer.current = setTimeout(() => setStopCooling(false), 2500)
+      return
+    }
     if (!forceStop) { sendKeys(['Escape']); setForceStop(true); return }
     sendKeys(['C-c'])
     setStopCooling(true)
@@ -360,7 +367,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   // 又有滚动容器（能定位到某条消息），再往上传反而绕。
   // 发一条斜杠命令给 agent（/model /compact /review /goal /approvals）：
   // TUI 自己弹选择框，PromptPanel 在页面里接住。状态条和「+」面板共用这一份。
-  const sendCommand = (cmd: string) => { api('POST', '/tasks/_/send', { sess: name, msg: cmd }).catch(() => {}) }
+  const sendCommand = (cmd: string) => { (onCommand ? onCommand(cmd) : api('POST', '/tasks/_/send', { sess: name, msg: cmd })).catch((error: Error) => setSendErr(error.message)) }
 
   const statusActions: StatusActions = useMemo(() => ({
     onOpenGit,
@@ -374,7 +381,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     } : undefined,
     onCompact: () => sendCommand('/compact'),
     onPickModel: () => sendCommand('/model'),
-  }), [name, onOpenGit, lastErrorId])
+  }), [name, onOpenGit, lastErrorId, onCommand])
 
   // 「+」面板要用的两件事：Shift+Tab 换权限模式，以及上传（走隐藏的 file input）。
   // 换模型 / 压缩上下文与状态条同一份实现（statusActions），面板只是换一种问法。

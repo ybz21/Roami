@@ -48,6 +48,18 @@ describe('对话输入框：终止按钮', () => {
     </AntApp></I18nProvider>,
   )
 
+  it('managed Main stop and model commands use the host without native key injection', async () => {
+    const command = vi.fn(async () => {})
+    render(<I18nProvider><AntApp><ChatShell name="managed-main" accent="var(--accent)" placeholder="message" busy
+      agent="claude" status={{ model: 'free' }} messages={[]} renderMessage={() => null} onCommand={command} /></AntApp></I18nProvider>)
+    fireEvent.click(await screen.findByLabelText('停止'))
+    await waitFor(() => expect(command).toHaveBeenCalledWith('/stop'))
+    fireEvent.click(screen.getByLabelText('点击切换模型'))
+    await waitFor(() => expect(command).toHaveBeenCalledWith('/model'))
+    expect(injectedKeys(fetchMock)).toEqual([])
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/tasks/_/send'))).toBe(false)
+  })
+
   it('第一下发 Esc，第二下发 Ctrl+C', async () => {
     renderShell()
     fireEvent.click(await screen.findByLabelText('停止'))

@@ -42,4 +42,41 @@
 
 ### 正式绑定前的入口隔离
 
-现有 `ConversationService` 的 `/model`、`/status` 和 `AgentConversation` 模型菜单仍读取全局 ModelSettings。需要接到当前项目 Main execution binding：显示 Claude/free，模型操作不得修改首页 Main。原生展示复用实际存在的 `ClaudeChat`/`CodexChat`、`AgentViewToggle` 与终端组件，通过 onSend 继续投递原 Main 队列。上述入口隔离及原生过程展示未完成前，不正式绑定线上项目 Main；后端首版不能当作全部切换完成。
+`ConversationService` 的 `/model`、`/status` 已按当前项目 Main execution binding 显示 Claude/free；绑定后的模型命令不写全局设置，其他模型拒绝并保留当前实例。原生 `/compact` 引导到原生终端。首页模型未配置也不阻断已经绑定的项目 Main。
+
+`ExecutorSessionChat` 复用 `ClaudeChat`/`CodexChat`、`AgentViewToggle` 与原终端组件；Swarm 成员和项目 Main 使用同一组件。发送仍通过原 Main CID 的队列，不直接写终端绕过群聊与宿主。共用聊天组件支持命令处理端口：Main 的模型和停止按钮进入原宿主命令入口；仅原生可执行的压缩、推理参数等命令引导到原生终端，不把它们当普通任务提交。成员及首页未指定该端口时沿用现有原生行为。前端核对项目、CID、provider、generation 及共享 overview 中的真实活动会话，失配不回退首页。历史引用继续打开原宿主消息。草稿迁移不覆盖已有原生草稿，未知发送的请求键和原 OKR 上下文跨重挂载冻结保存。
+
+### 暂停迁移与目录发现
+
+生产只读审计发现原 X/数据任务已经终止且有真实停止证明，但 `swarm.coordinate` 通知在暂停期间反复排队。迁移不把该通知视为原生执行，保留通知及原始回执；`task.run`、`task.verify`、`task.steer`、`task.close_session` 等实际任务控制仍然阻止迁移。迁移后通知桥通过当前 work/task 关联复核，旧通知不能指向新 generation。
+
+`roami project show ID --identity --json` 直接读取登记项目身份、目录、归档与默认执行器，不扫描全机 worktree/session，也不使用项目列表缓存。宿主的 5 秒目录发现使用此通道，避免把慢速全列表扫描误报为目录不可用；身份与绝对路径校验保持。
+
+### 补充验证进度
+
+本轮 scoped commands、原生 UI 和草稿恢复已有专项及前端全量验证；通知迁移专项 18 项、目录发现与迁移合计 36 项通过，Go 身份 API/CLI 专项通过。此前首版 full 为 5052 passed；本轮新增实现仍须最终 full、PR 更新与部署，不能沿用首版通过结论宣称已上线。手机未操作，真实触控尚不计通过。
+
+
+### 原生 Main 的注册能力桥接（已实现，待线上运行验证）
+
+真实 CLI 核验表明 `swarm goal/verify/memory/connector` 是需要受管 Agent 身份的注册能力，普通终端不能直接执行；`agent capability --turn/--call` 还必须匹配真实运行中的宿主 tool_call。原生 Main 不能伪造 worker task/run 或冒用普通用户消息取得这些权限。当前按 turn 的执行适配只证明排队和原生调用，不代表已经能承担完整 Main 派工验收。
+
+实现应给原生 Main 签发单轮私有能力上下文，绑定 owner、project、原 Main CID、turnId、leaseEpoch、provider generation 和真实 provider ID。通过现有 `agent capability --context` 入口携带，原生进程无需重启或注入全局环境。能力服务必须在每次调用与执行期间重新校验原 turn 仍在运行、lease 和 provider generation 未变、来源上下文仍被接纳，拒绝跨项目、旧轮次、换实例和停止后的调用。该上下文与 worker 的 task/run 上下文分型并签名，不能相互转换。
+
+通过原工具注册表以 Main 角色调用，保留原 source message、turn、toolCall 和项目身份；幂等键固定为 turn + requestId，参数变更拒绝，已知结果复用、未知结果不重放。仍由现有工具执行派工、记忆、数据和验收约束；不得新增直接数据库写入口或放宽发布授权。实际原生 Main 完成注册能力读取、一次原成员派工、读产物和独立验收后，才能认定接管机制跑通。
+
+
+实现模块为 `tools/native_main_capabilities.py`。复用现有私有上下文目录与签名基础设施，但独立验证 Main 的原 CID、project、running turn、leaseEpoch、provider generation；worker 上下文不能取得 Main 身份。`NativeMain` 每轮把私有文件路径加入实际原生提示，HTTP 入口按带签名的上下文类型分派。调用进入原 `ToolGateway`，保留策略、来源、工具记录、进度与结果，不另造数据库写入口。`TurnJournal.finish` 保留已实际执行的能力调用及对应工具结果，不把它们交还 Core 二次执行。
+
+已验证实际 Runtime 原 Main 队列→受控 CLI 端口→HTTP 签名上下文→真实 Swarm 状态→原 Main 最终回复，普通正文和强制 reply 两种模式均覆盖。Native Main 不直接调用最终 reply，最终交付仍由宿主完成。身份变化/结束/停止会拒绝新调用并取消运行中的能力；未知回执保留且不重放。原生最终回复、能力成功、成员成果与独立验收仍是不同事实。
+
+前端模型/停止命令与正文消息使用分开的幂等存储，点击模型按钮不会丢掉正文未知发送的旧键或冻结 OKR 上下文；前端全量现为1914项通过。最初完整检查在旧 CLI 参数测试夹具处失败，已独立复现并更新期望为 `--identity`；该次未计通过。本轮能力桥接、原生 Main、宿主命令、协作策略及旧专业成员能力合计78项专项通过；重新执行最终 full。
+
+
+### 最终接线补充
+
+公共 `agent capability list/show` 面向 worker，不能作为 Main 专属操作的发现入口。原生 Main 的交接提示改为先用签名上下文调用现有 `tool_list`，按 Main 角色返回真实名称和 inputSchema；专项实际发现 `swarm_plan` 后再按相同上下文调用。该能力桥接当前17项专项通过，包含目录发现、两种最终交付模式、原工具回执及幂等、真实 stop 的撤权和取消。
+
+浏览器的390px粗指针模拟发现 flex 子项的最小内容宽度会裁切回复和发送按钮，已在共用执行器聊天视图约束 `min-width:0` 与宽度。四档桌面宽度重新验证通过；compact 中聊天容器宽390px，输入框和发送按钮右边界361px，中心命中正常。只是浏览器模拟，不是真机触控验收。
+
+原 Main 的同一候选实例 `2026-1118-1216-00ym` 已完成实际 Read×3 / Write 交接准备，文件为 `materials/2026-11-18/main/claude-takeover/takeover.md`，3740B、SHA256 `0e003864fe7b322a853d199c49046ddc3a59043d3e019c9cc58ddd7af03f276a`；Go 回执 succeeded、inputStopped=true、outcomeKnown=true，原初始化键再次 prepared=true。正式 Main 绑定仍未进行。

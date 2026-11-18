@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Spin } from 'antd'
+import { App, Button, Spin } from 'antd'
 import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
 import { useLayout } from '../../../layout'
@@ -7,6 +7,10 @@ import { CloseIcon } from '../../../icons'
 import { currentNodeId, useCurrentNodeId } from '../../cluster/node-url'
 import type { OkrMessageReference } from '../../agent/notification-destination'
 import AgentConversation from '../../agent/AgentConversation'
+import { agentFailure } from '../../agent/agent-request-failure'
+import ExecutorSessionChat from '../../chat/ExecutorSessionChat'
+import { useSessionOverview } from '../../../session-overview'
+import { nativeMainRequest, transferMainDraft, type NativeMainRequest } from './okr-main-native-draft'
 import MobileSubPage from '../../MobileSubPage'
 import type { SwarmSnapshot } from '../../swarm/swarm-protocol'
 import type { Configuration, Workspace } from './okr-workspace'
@@ -23,6 +27,10 @@ export default function OkrMainChat(props: Props) {
 }
 function OkrMainInstance({ embedded = false, expectedConversationId, reference: sourceReference, onClearReference, projectId, draft, workspace, onClose, onUpdated, onSession }: Props) {
   const { t } = useI18n()
+  const { message } = App.useApp()
+  const [execution, setExecution] = useState<{ executor: 'claude' | 'codex'; model: string; sessionId: string; generation: number } | null>()
+  const sessions = useSessionOverview(!!execution)
+  const nativePending = useRef<Record<string, NativeMainRequest>>({})
   const { phone, size } = useLayout()
   const secondaryPage = !embedded && (phone || size !== 'large')
   const node = useCurrentNodeId()
@@ -72,6 +80,17 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
         throw new Error('Project Main upgrade required')
       }
       if (!id || !current() || expectedConversationId && id !== expectedConversationId) throw new Error('Project Main unavailable')
+      if (status.data?.projectMainExecution === true) {
+        const response = await api('GET', '/agent/conversations/' + encodeURIComponent(id) + '/execution')
+        if (!current() || response.data?.conversationId !== id) throw new Error('Project Main changed')
+        const value = response.data
+        if (value.executor === 'roami') setExecution(null)
+        else {
+          if (!['claude', 'codex'].includes(value.executor) || value.projectId !== projectId || typeof value.sessionId !== 'string' || !value.sessionId || typeof value.model !== 'string' || !value.model || !Number.isInteger(value.generation) || value.generation < 1) throw new Error('Project Main unavailable')
+          transferMainDraft(draftKey, value.sessionId)
+          setExecution(value)
+        }
+      } else setExecution(null)
       conversation.current = id; setCID(id)
       return id
     })().finally(() => { acquiring.current = null })
@@ -82,16 +101,48 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
     void acquire().catch(() => { if (alive.current) setFailed(true) }).finally(() => { if (alive.current) setRestoring(false) })
     return () => { alive.current = false }
   }, [acquire])
+  const sendNative = async (text: string, command = false) => {
+    const id = await acquire()
+    if (!current() || !execution) throw new Error(t('agent.requestFailed'))
+    const scope = command ? draftKey + ':command:' + text : draftKey
+    let request = nativePending.current[scope]
+    try {
+      if (!request || request.cid !== id || request.text !== text) request = nativeMainRequest(scope, id, text, command ? undefined : prepareOkrContext(text, draft, workspace, contextSupported.current))
+      nativePending.current[scope] = request
+    } catch (error) { throw new Error(agentFailure(error, t)) }
+    try { localStorage.setItem(scope + ':native-pending', JSON.stringify(request)) } catch { /* Keep the retry identity in memory. */ }
+    let data: any
+    try {
+      const response = await api('POST', '/agent/conversations/' + encodeURIComponent(id) + '/messages', { requestKey: request.key, text, ...(request.okrContext ? { okrContext: request.okrContext } : {}) })
+      data = response.data
+    } catch (error) { throw new Error(agentFailure(error, t)) }
+    if (!current()) return
+    if (data.kind === 'model' || data.kind === 'status') message.info(data.model)
+    delete nativePending.current[scope]
+    try {
+      localStorage.removeItem(scope + ':native-pending')
+      if (!command && localStorage.getItem(draftKey) === text) localStorage.removeItem(draftKey)
+      const old = JSON.parse(localStorage.getItem(scope + ':pending') || 'null')
+      if (old?.key === request.key) localStorage.removeItem(scope + ':pending')
+    } catch { /* The successful host request remains idempotent. */ }
+    onUpdated?.()
+  }
+  const nativeSession = execution && sessions.value.filter(session => session.name === execution.sessionId && session.agent === execution.executor && session.projectKey === projectId && !session.dormant && !session.lifecycle)
+  const nativeReady = !!nativeSession && nativeSession.length === 1 && !sessions.failed
   const content = <aside className="okr-main-chat" data-embedded={embedded} data-conversation-id={cid}>
     {!secondaryPage && !embedded && <header className="okr-chat-head"><strong>{t('okr.chatTitle')}</strong><button type="button" className="tt-act" aria-label={t('okr.endChat')} onClick={onClose}><CloseIcon /></button></header>}
     {restoring && <Spin />}
     {(failed || upgradeRequired) && <div className="okr-error" role="alert"><p>{t(upgradeRequired ? 'okr.agentUpgradeRequired' : 'agent.requestFailed')}</p><Button onClick={() => { setFailed(false); setUpgradeRequired(false); void acquire().catch(() => setFailed(true)) }}>{t('inbox.retry')}</Button></div>}
-    <AgentConversation cid={cid} branch={reference?.branchId || ''} focusMessage={reference?.messageId || ''} node={node} onSession={onSession} select={(conversationId, branchId = '', messageId = '') => { if (conversationId === cid) setLocalReference({ conversationId, branchId, messageId }) }} project={{
+    {execution && !reference?.messageId ? nativeReady ? <ExecutorSessionChat key={execution.sessionId} sessionId={execution.sessionId} executor={execution.executor} onSend={sendNative} onCommand={async command => {
+      if (!['/model', '/status', '/stop', '/help', '/tasks', '/memory'].includes(command)) throw new Error(t('okr.nativeCommand'))
+      await sendNative(command, true)
+    }} onSession={onSession} /> : !sessions.loaded ? <Spin /> : <p role="status">{t('swarm.member.sessionUnavailable')}</p> : <AgentConversation cid={cid} branch={reference?.branchId || ''} focusMessage={reference?.messageId || ''} node={node} onSession={onSession} select={(conversationId, branchId = '', messageId = '') => { if (conversationId === cid) setLocalReference({ conversationId, branchId, messageId }) }} project={{
+      nativeModel: execution?.model, modelControlsDisabled: execution === undefined,
       draftKey, ensureConversation: acquire, isCurrent: current,
       prepareContext: text => prepareOkrContext(text, draft, workspace, contextSupported.current), displayText: displayOkrMessage,
       onUpdated, onCurrentBranch: () => { setLocalReference(undefined); onClearReference?.() }, inputLabel: t('okr.chatInput'), sendLabel: t('okr.send'),
       placeholder: t('chat.sendTo', { name: t('swarm.conversation.main') }),
-    }} />
+    }} />}
   </aside>
   return secondaryPage ? <MobileSubPage title={t('okr.chatTitle')} onBack={onClose}>{content}</MobileSubPage> : content
 }

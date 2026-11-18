@@ -282,6 +282,8 @@ const enUS = {
   'okr.chatOpen': "Coordinator",
   'okr.chatHint': "This goal’s persistent coordinator for planning, tasks and collaboration.",
   'okr.chatEmpty': "Describe your goal, or ask Main Agent to break it down and review it.",
+  'okr.mainModelBound': 'This conversation uses the model bound to the project.',
+  'okr.nativeCommand': 'Switch to the terminal to run this command.',
   'okr.chatInput': "Message Main Agent",
   'okr.chatPlaceholder': "For example: review these KRs and suggest the next action.",
   'okr.endChat': "Close conversation view",

@@ -215,3 +215,51 @@ async def test_native_provider_cannot_be_reused_by_another_project(wake_runtime,
             other["id"],
             {**spec, "commandKey": "other-binding", "projectId": "other-project"},
         )
+
+
+async def test_project_model_commands_never_write_home_model_settings(wake_runtime, monkeypatch):
+    runtime, main, spec, _, _ = await setup_main(wake_runtime, monkeypatch)
+    await runtime.main_executions.configure("alice", main["id"], spec)
+    writes = []
+
+    async def save(owner, value):
+        writes.append(value)
+        return {"main": value["main"]}
+
+    monkeypatch.setattr(runtime.model_settings, "save", save)
+    for command in ["/model", "/model free", "/model roami-claude/free"]:
+        result = await runtime.chat.submit("alice", main["id"], command, command)
+        assert result == {
+            "kind": "model",
+            "model": "free",
+            "executor": "claude",
+            "conversationId": main["id"],
+        }
+    with pytest.raises(DomainError, match="PROJECT_MAIN_MODEL_CONFLICT"):
+        await runtime.chat.submit("alice", main["id"], "other-model", "/model paid")
+    with pytest.raises(DomainError, match="PROJECT_MAIN_NATIVE_COMMAND_REQUIRED"):
+        await runtime.chat.submit("alice", main["id"], "compact", "/compact")
+    status = await runtime.chat.status("alice", main["id"])
+    assert status["model"] == "free" and status["executor"] == "claude"
+    assert status["sessionId"] == "native-session" and not writes
+    home = await runtime.conversations.main("alice")
+    with pytest.raises(DomainError, match="MODEL_SETTINGS_FORBIDDEN"):
+        await runtime.chat.submit("alice", home["id"], "home-model", "/model homepage-model")
+    local_home = await runtime.conversations.main("local")
+    await runtime.chat.submit("local", local_home["id"], "home-model", "/model homepage-model")
+    assert writes == [{"main": {"model": "homepage-model", "reasoningEffort": None}}]
+
+
+@pytest.mark.parametrize("scheduled", [False, True])
+async def test_bound_main_admission_does_not_require_home_model(
+    wake_runtime, monkeypatch, scheduled
+):
+    runtime, main, spec, _, _ = await setup_main(wake_runtime, monkeypatch)
+    await runtime.main_executions.configure("alice", main["id"], spec)
+    runtime.chat.model.model = ""
+    result = (
+        await runtime.chat.wake_project("alice", main["id"], "project", "wake", "Continue the team")
+        if scheduled
+        else await runtime.chat.submit("alice", main["id"], "direct", "Continue the team")
+    )
+    assert result["kind"] == "message"

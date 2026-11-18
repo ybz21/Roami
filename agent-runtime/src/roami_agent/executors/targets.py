@@ -14,7 +14,7 @@ class TargetDirectory:
         self.settings, self.dispatches = settings, dispatches
 
     async def project_workspace(self, project_id):
-        payload = await self._query("project", "show", project_id, "--json")
+        payload = await self._query("project", "show", project_id, "--identity", "--json")
         entry = payload.get("data") if isinstance(payload, dict) else None
         identity = self._project(entry)
         directory = entry.get("dir")
