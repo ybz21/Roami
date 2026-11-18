@@ -290,7 +290,7 @@ async def test_final_main_message_retains_gateway_calls_without_executing_again(
     mid = await runtime.db.call(
         lambda db: row(
             db,
-            "SELECT id FROM messages WHERE turn_id=? AND role='assistant' ORDER BY seq DESC LIMIT 1",
+            "SELECT id FROM messages WHERE turn_id=? AND role='assistant' AND status='streaming' ORDER BY seq DESC LIMIT 1",
             (turn["id"],),
         )
     )
@@ -299,9 +299,11 @@ async def test_final_main_message_retains_gateway_calls_without_executing_again(
     )
     saved = await runtime.conversations.messages("alice", main["id"])
     assistant = next(m for m in saved["messages"] if m["id"] == mid["id"])
-    calls = assistant["content"]["tool_calls"]
+    step = next(m for m in saved["messages"] if m["content"].get("tool_calls"))
+    calls = step["content"]["tool_calls"]
     assert len(calls) == 1 and calls[0]["function"]["name"] == "swarm_status"
     assert assistant["content"]["text"] == "Actual native final answer"
+    assert step["id"] != assistant["id"] and not assistant["content"].get("tool_calls")
     results = [m for m in saved["messages"] if m["role"] == "tool"]
     assert len(results) == 1 and results[0]["content"]["tool_call_id"] == calls[0]["id"]
     assert (

@@ -14,6 +14,7 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row
+from roami_agent.storage.transcript_repository import message
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 
 
@@ -168,6 +169,23 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             )
             if not assistant:
                 raise DomainError("ACTIVE_MAIN_CONTEXT_REQUIRED", 409)
+            calls = [{**wire, "type": "function"}]
+            mid = message(
+                db,
+                turn["conversation_id"],
+                turn["branch_id"],
+                "assistant",
+                {"text": "", "tool_calls": calls},
+                turn_id=turn["id"],
+            )
+            event(
+                db,
+                turn["conversation_id"],
+                "message.tool_calls",
+                {"messageId": mid, "calls": calls},
+                turn_id=turn["id"],
+                message_id=mid,
+            )
             event(
                 db,
                 turn["conversation_id"],
@@ -176,7 +194,7 @@ class NativeMainCapabilities(ProfessionalCapabilities):
                 key=key + ":start",
                 turn_id=turn["id"],
             )
-            return turn, assistant["id"], None
+            return turn, mid, None
 
         turn, mid, previous = await self.db.call(plan, write=True)
         if previous is not None:
