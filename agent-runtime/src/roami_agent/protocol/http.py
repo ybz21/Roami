@@ -133,6 +133,11 @@ class ConfirmTask(Confirm):
     runId: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class ReconcileTask(Payload):
+    revision: int = Field(ge=1)
+    runId: str = Field(min_length=1, max_length=200)
+
+
 class SaveMemory(Payload):
     title: str = Field(max_length=200)
     body: str = Field(min_length=1, max_length=20_000)

@@ -765,9 +765,9 @@ it('shows existing reports and downloads while execution remains unconfirmed', a
   expect(screen.getByText('index.html')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'agent.task.download' }).getAttribute('href')).toBe('/n/selected/api/agent/artifacts/report-html/content')
   expect(screen.queryByRole('button', { name: 'agent.task.accept' })).toBeNull()
-  const confirm = screen.getByRole('button', { name: 'agent.task.checkAndAccept' })
+  const confirm = screen.getByRole('button', { name: 'agent.task.checkExecution' })
   fireEvent.click(confirm)
-  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/pending/verify', { accepted: true, revision: 1, runId: 'attempt-pending' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/pending/reconcile', { revision: 1, runId: 'attempt-pending' }))
   fireEvent.click(screen.getByRole('button', { name: 'agent.openSession' }))
   expect(session).toHaveBeenCalledWith('work-session')
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.viewRecord' }))
@@ -800,7 +800,7 @@ it('accepts closing a running session and shows asynchronous cleanup failures wi
 
 it('keeps reports, files and drafts after confirmation cannot establish a stop', async () => {
   const progress = { source: 'provider_transcript', summary: 'Review this report', directory: '/workspace', observedMs: 123 }
-  const pending = { ...task('pending'), state: 'running', latestAttempt: { state: 'unknown', sessionId: 'work', executorKind: 'claude' } }
+  const pending = { ...task('pending'), state: 'running', latestAttempt: { state: 'unknown', sessionId: 'work', executorKind: 'cli' } }
   vi.mocked(api).mockImplementation(async (method, path) => {
     if (method === 'POST') throw { apiError: { code: 'TASK_STOP_UNCONFIRMED' } }
     if (path.endsWith('/resources')) return { data: controls() }
@@ -810,10 +810,57 @@ it('keeps reports, files and drafts after confirmation cannot establish a stop',
   render(<AgentTasks selectedTask="pending" cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
   await screen.findByText('Review this report')
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep my next request' } })
-  fireEvent.click(screen.getByRole('button', { name: 'agent.task.checkAndAccept' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.task.checkExecution' }))
   expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'agent.task.stopUnconfirmed')
   expect(screen.getByRole('textbox')).toHaveProperty('value', 'Keep my next request')
   expect(screen.getByText('Review this report')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'agent.task.download' })).toBeTruthy()
-  await waitFor(() => expect(screen.getByRole('button', { name: 'agent.task.checkAndAccept' }).hasAttribute('disabled')).toBe(false))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'agent.task.checkExecution' }).hasAttribute('disabled')).toBe(false))
+})
+
+it.each(['running', 'preparing'])('can reconcile %s without a report or files, then asks for acceptance separately', async initialState => {
+  let checked = false, finish!: () => void
+  const checking = new Promise<void>(resolve => { finish = resolve })
+  const pending = { ...task('pending'), state: 'running', latestAttempt: { state: 'unknown', sessionId: 'work', executorKind: 'cli' } }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') { await checking; checked = true; return { data: { state: 'waiting_user' } } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('pending'), task: { ...pending, state: checked ? 'waiting_user' : initialState }, attempts: [{ id: 'attempt-pending', revision: 1, state: checked ? 'succeeded' : 'unknown', result: checked ? { summary: 'Recovered result' } : null }] } }
+  })
+  render(<AgentTasks selectedTask="pending" cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  const check = await screen.findByRole('button', { name: 'agent.task.checkExecution' })
+  expect(screen.queryByText('agent.task.reportUnconfirmedTitle')).toBeNull()
+  expect(screen.queryByRole('link', { name: 'agent.task.download' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'agent.task.accept' })).toBeNull()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep my draft' } })
+  fireEvent.click(check)
+  fireEvent.click(check)
+  expect(check.hasAttribute('disabled')).toBe(true)
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')).toHaveLength(1)
+  expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/pending/reconcile', { revision: 1, runId: 'attempt-pending' })
+  await act(async () => { finish(); await checking })
+  await screen.findByText('Recovered result')
+  expect(await screen.findByRole('button', { name: 'agent.task.accept' })).toBeTruthy()
+  expect(screen.getByRole('textbox')).toHaveProperty('value', 'Keep my draft')
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/verify'))).toBe(false)
+})
+
+it.each(['unknown', 'stopping'])('lets a cancelling task with %s observation reconcile without accepting or sending another cancellation', async observation => {
+  let checked = false
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (method === 'POST') { checked = true; return { data: { state: 'cancelled' } } }
+    if (path.endsWith('/resources')) return { data: controls() }
+    if (path.startsWith('/agent/artifacts')) return { data: [] }
+    return { data: { ...detail('stopping'), task: { ...task('stopping'), state: checked ? 'cancelled' : 'cancelling', latestAttempt: { state: observation, executorKind: 'cli' } }, attempts: [{ id: 'attempt-stopping', revision: 1, state: checked ? 'cancelled' : observation, result: null }] } }
+  })
+  render(<AgentTasks selectedTask="stopping" cid="conversation" onSession={vi.fn()} onChanged={vi.fn()} />)
+  const check = await screen.findByRole('button', { name: 'agent.task.checkExecution' })
+  expect(screen.getByText('agent.task.stopUnconfirmed')).toBeTruthy()
+  expect(screen.getByText('agent.state.cancelling')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'agent.task.accept' })).toBeNull()
+  fireEvent.click(check)
+  await screen.findByText('agent.state.cancelled')
+  expect(api).toHaveBeenCalledWith('POST', '/agent/tasks/stopping/reconcile', { revision: 1, runId: 'attempt-stopping' })
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')).toHaveLength(1)
 })

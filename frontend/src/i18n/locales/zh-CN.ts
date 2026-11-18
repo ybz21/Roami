@@ -414,7 +414,9 @@ const zhCN = {
   'agent.pagination.fullMessage': '展开全文',
 
   'agent.task.executionUnconfirmed': "执行待确认",
-  'agent.task.executionUnconfirmedHint': "执行状态待核对，已有回报和文件可查看。",
+  'agent.task.executionUnconfirmedHint': '尚未确认执行状态，请查看工作会话或执行记录。',
+  'agent.task.checkExecution': '核对执行状态',
+  'agent.task.checkUnavailable': '当前执行器不支持状态核对，请查看工作会话或执行记录。',
   'agent.task.checkAndAccept': '核对并确认',
   'agent.task.confirmUnconfirmedHint': '查看结果后确认，系统会先核对执行是否停止。',
   'agent.task.stopUnconfirmed': '暂未确认执行停止，请打开工作会话查看，稍后重试。',

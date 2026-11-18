@@ -80,6 +80,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/native-sessions"}, {"GET", "/agent/native-sessions"}, {"GET", "/agent/native-sessions/:session"}, {"PATCH", "/agent/native-sessions/:session"}, {"GET", "/agent/native-sessions/:session/conversation"}, {"GET", "/agent/native-sessions/:session/events"},
 		{"POST", "/agent/tasks/:task/close-session"},
 		{"POST", "/agent/tasks/:task/cancel"}, {"POST", "/agent/tasks/:task/verify"},
+		{"POST", "/agent/tasks/:task/reconcile"},
 		{"GET", "/agent/tasks/:task/activities"}, {"GET", "/agent/tasks/:task/activities/:activity"}, {"GET", "/agent/tasks/:task/conversation"},
 		{"GET", "/agent/tasks/:task/resources"}, {"GET", "/agent/resources/:resource"},
 		{"POST", "/agent/resources/:resource/pause"}, {"POST", "/agent/resources/:resource/resume"},

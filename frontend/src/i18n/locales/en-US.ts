@@ -414,7 +414,9 @@ const enUS = {
   'agent.pagination.fullMessage': 'Read full message',
 
   'agent.task.executionUnconfirmed': "Execution unconfirmed",
-  'agent.task.executionUnconfirmedHint': "Execution needs checking. Reports and files are available to review.",
+  'agent.task.executionUnconfirmedHint': 'Execution status is unconfirmed. Check the work session or execution records.',
+  'agent.task.checkExecution': 'Check execution status',
+  'agent.task.checkUnavailable': 'This executor cannot reconcile status. Check the work session or execution records.',
   'agent.task.checkAndAccept': 'Check and confirm',
   'agent.task.confirmUnconfirmedHint': 'Review the result and confirm. Execution will be checked for completion first.',
   'agent.task.stopUnconfirmed': 'Execution has not been confirmed stopped. Open the work session and try again later.',

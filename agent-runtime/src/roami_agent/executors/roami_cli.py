@@ -3,6 +3,7 @@
 import json
 import math
 from pathlib import Path
+from time import monotonic
 
 from roami_agent.context.execution_brief import (
     execution_guide,
@@ -66,6 +67,56 @@ class CodingExecutor:
         self.capabilities = None
         self.catalog = None
         self.project_workspace = None
+        self._reconciliation_retries = {}
+        self._reconciliation_budget = 0
+
+    async def reconcile_observation(self, task, run, receipt):
+        if (
+            receipt.get("result") is not None
+            or receipt.get("state") not in {"unknown", "cancelling"}
+            or json.loads(task["intent_json"]).get("executor") not in {"codex", "claude"}
+        ):
+            self._reconciliation_retries.pop(run["id"], None)
+            return receipt
+        due, delay = self._reconciliation_retries.get(run["id"], (0, 0))
+        if monotonic() < due or self._reconciliation_budget <= 0:
+            return receipt
+
+        def bound_run(db):
+            return row(
+                db,
+                "SELECT a.id FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
+                "WHERE a.id=? AND t.revision=a.task_revision "
+                "AND a.attempt_no=(SELECT MAX(attempt_no) FROM task_attempts WHERE task_id=t.id) "
+                "AND t.state IN ('preparing','running','cancelling','interrupted') "
+                "AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind='task.run' "
+                "AND j.aggregate_id=t.id AND j.state IN ('queued','running'))",
+                (run["id"],),
+            )
+
+        if not await self.db.call(bound_run):
+            self._reconciliation_retries.pop(run["id"], None)
+            return receipt
+        self._reconciliation_budget -= 1
+        delay = min(delay * 2, 60) if delay else 5
+        self._reconciliation_retries[run["id"]] = (monotonic() + delay, delay)
+        try:
+            checked = await self.command("reconcile-session", "--key", run["launch_id"])
+            result = self.result(checked)
+            if result and result.get("inputStopped") is True and result.get("outcomeKnown") is True:
+                if not await self.db.call(bound_run):
+                    self._reconciliation_retries.pop(run["id"], None)
+                    return receipt
+                await self.record(task, run, checked)
+                self._reconciliation_retries.pop(run["id"], None)
+                return checked
+        except (DomainError, OSError, TimeoutError):
+            # Keep the status observation's reason; a failed check is not new execution evidence.
+            pass
+        finally:
+            if run["id"] in self._reconciliation_retries:
+                self._reconciliation_retries[run["id"]] = (monotonic() + delay, delay)
+        return receipt
 
     async def command(self, sub, *args, spec=None):
         response = await execute(
@@ -451,20 +502,29 @@ class CodingExecutor:
                 "WHERE a.executor_kind='cli' AND a.task_revision=t.revision AND ("
                 "(a.result_json IS NULL AND t.state IN ('preparing','running','cancelling')) OR "
                 "(t.state='interrupted' AND a.state='unknown' AND json_extract(a.result_json,'$.outcomeKnown')=0)) "
+                "AND a.attempt_no=(SELECT MAX(attempt_no) FROM task_attempts WHERE task_id=t.id) "
                 "AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind='task.run' AND j.aggregate_id=t.id AND j.state IN ('queued','running')) "
                 "ORDER BY CASE WHEN t.state='interrupted' THEN 1 ELSE 0 END,a.started_ms LIMIT 100",
             )
         )
+        pending_ids = {run["id"] for run in pending}
+        self._reconciliation_retries = {
+            key: retry for key, retry in self._reconciliation_retries.items() if key in pending_ids
+        }
+        self._reconciliation_budget = 2
         expired = []
         for run in pending:
             task = await self.db.call(
                 lambda db, run=run: row(db, "SELECT * FROM tasks WHERE id=?", (run["task_id"],))
             )
+            if task["revision"] != run["task_revision"]:
+                continue
             try:
                 if task["state"] == "cancelling":
                     await self.cancel(task, run)
                 receipt = await self.command("status", "--key", run["launch_id"])
                 await self.record(task, run, receipt)
+                receipt = await self.reconcile_observation(task, run, receipt)
                 result = self.result(receipt)
                 if result is not None:
                     await tasks.report(
