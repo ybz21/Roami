@@ -25,17 +25,24 @@ func (s Service) reconcileMissingClaudeRejection(ctx context.Context, key, dir s
 	}
 	defer unlock()
 	var state sessionLifecycle
-	if readJSON(path, &state) != nil || state.Executor != "claude" || state.Structured || state.ProviderConflict != nil || !reflect.DeepEqual(state.Binding, binding) || state.Workspace == nil || receipt.Workspace == nil || *state.Workspace != *receipt.Workspace || len(state.Tools) != 0 || state.PromptHash != workspaceHash(sessionPrompt(dir, spec)) {
+	if readJSON(path, &state) != nil || state.Executor != "claude" || state.Structured || state.ProviderConflict != nil || !reflect.DeepEqual(state.Binding, binding) || state.Workspace == nil || receipt.Workspace == nil || *state.Workspace != *receipt.Workspace || len(state.Tools) != 0 {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_BINDING_REQUIRED")
 	}
 	if hasResult && state.CompletedKey == key && state.LaunchKey == "" {
 		receipt.State = previous.State
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
-	if state.LaunchKey != key || state.State != "unknown" || (state.UnknownReason != "" && state.UnknownReason != "SESSION_PROMPT_MISMATCH" && state.UnknownReason != "SESSION_INTERRUPTED") {
+	unsubmitted := state.UnknownReason == "SESSION_START_UNTRACKED" && receipt.State == "submitting" && spec.Persistent && spec.SessionID != ""
+	if state.LaunchKey != key || state.State != "unknown" || (!unsubmitted && (state.PromptHash != workspaceHash(sessionPrompt(dir, spec)) || (state.UnknownReason != "" && state.UnknownReason != "SESSION_PROMPT_MISMATCH" && state.UnknownReason != "SESSION_INTERRUPTED"))) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
 	}
-	result, digest := claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
+	observe := func() (*Result, string) {
+		if unsubmitted {
+			return s.claudeUnsubmittedCompaction(state, spec, receipt)
+		}
+		return claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
+	}
+	result, digest := observe()
 	if result == nil || (hasResult && previous.StopEvidence != digest) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_STOP_UNCONFIRMED")
 	}
@@ -53,7 +60,7 @@ func (s Service) reconcileMissingClaudeRejection(ctx context.Context, key, dir s
 	if readJSON(filepath.Join(root, "writer.json"), &writer) != nil || (!hasResult && writer.Key != key) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_WORKSPACE_CHANGED")
 	}
-	checked, again := claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
+	checked, again := observe()
 	if checked == nil || again != digest || !s.sessionExecutionMissing(binding) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_EVIDENCE_CHANGED")
 	}

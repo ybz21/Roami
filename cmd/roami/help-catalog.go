@@ -94,6 +94,7 @@ var commandGuides = map[string]commandGuide{
 	"agent execution context":            {"查看当前执行上下文", "[--json]", "roami agent execution context --json", "json", []string{"只读当前原生运行；不授予发布权限。"}},
 	"agent execution launch":             {"启动执行器任务", "--file SPEC.json", "roami agent execution launch --file SPEC.json", "file", []string{"SPEC.json 中 persistent=true 保留交互会话，直到显式 close；默认是一次性执行。", "projectId 创建新的项目 worktree；同时指定 workspaceId 时复用已登记工作区，不 fetch/reset。", "续接已有 sessionId 需可验证的生命周期回调。"}},
 	"agent execution send-message":       {"投递执行器消息", "--file JSON|-", "roami agent execution send-message --file JSON|-", "file", []string{"回执只表示投递结果，仍需核对执行与交付结果。"}},
+	"agent execution prepared":           {"核验待绑定的已就绪原生实例", "--key LAUNCH_KEY", "roami agent execution prepared --key LAUNCH_KEY", "key", []string{"只读核验初始轮次、模型配置、原生身份和空闲证明，不派发任务。"}},
 	"agent execution status":             {"查看执行器任务状态", "--key LAUNCH_KEY", "roami agent execution status --key LAUNCH_KEY", "key", nil},
 	"agent execution cancel":             {"取消执行器任务", "--key LAUNCH_KEY", "roami agent execution cancel --key LAUNCH_KEY", "key", nil},
 	"agent execution close":              {"关闭执行器任务", "--key LAUNCH_KEY", "roami agent execution close --key LAUNCH_KEY", "key", nil},
