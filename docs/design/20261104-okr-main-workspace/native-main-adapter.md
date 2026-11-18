@@ -80,3 +80,23 @@
 浏览器的390px粗指针模拟发现 flex 子项的最小内容宽度会裁切回复和发送按钮，已在共用执行器聊天视图约束 `min-width:0` 与宽度。四档桌面宽度重新验证通过；compact 中聊天容器宽390px，输入框和发送按钮右边界361px，中心命中正常。只是浏览器模拟，不是真机触控验收。
 
 原 Main 的同一候选实例 `2026-1118-1216-00ym` 已完成实际 Read×3 / Write 交接准备，文件为 `materials/2026-11-18/main/claude-takeover/takeover.md`，3740B、SHA256 `0e003864fe7b322a853d199c49046ddc3a59043d3e019c9cc58ddd7af03f276a`；Go 回执 succeeded、inputStopped=true、outcomeKnown=true，原初始化键再次 prepared=true。正式 Main 绑定仍未进行。
+
+
+### 同目录派工与当轮回执审核
+
+目标是让原宣传 Swarm 的原 Main 与四个长期成员继续协作，而不是另建侧栏实例替代团队。用户在原团队中向 Main 发需求，Main 按原成员身份派工并及时结束当前执行轮；成员随后接续原任务，Main 再读取真实交付进行验收。
+
+调度器在准备任务之前读取持久 provider 绑定目录。原生 Main 与成员都按规范化后的实际目录排队，包含进程内已接纳工作和数据库中的运行轮次；尚未准备 target 的原生成员也使用绑定目录，避免误闯 Main 的独占租约。普通首页 Main 不占该目录，独立目录仍可并行。Go 的工作区租约保留为最终保护，不清理未知结果或强行释放 writer。
+
+原生 Main 的签名能力执行发生在宿主模型提示构建之后。回复审核从同一 turn、conversation、branch 的已完成工具结果补齐当轮真实观察，要求对应 capability.started 认证事件；不重新执行工具，不将投递认作完成。被删除、遗漏或失去认证的记录不作为新增依据，审核期间证据变化仍拒绝提交。审核投影去重已有工具调用，证据指纹保留原始观察以检测变化。
+
+实现位于 dispatch/native_workspace_queue.py、dispatch/workspace_queue.py、dispatch/scheduler.py 和 replies/native_main_observations.py、replies/source_review.py。专项覆盖 Main/成员互相等待、固定 provider 的未准备任务、同物理目录符号链接、普通首页不阻塞，以及真实签名能力结果首次审核可见、去重、删除和认证事件缺失。完整检查及线上恢复结果在完成后补录；当前不宣称四成员工作已完成。
+
+
+#### 本轮独立验证（2026-11-18）
+
+- 完整检查通过：Go 全套，Python 5093 passed / 48 skipped / 6 subtests passed，以及前端 typecheck、i18n、hover、生产构建和最终扫描。专项105项通过；最终能力桥接20项通过。
+- 对生产数据库只读执行新目录解析：原 Main 与四条真实任务均解析到原 provider 和宣传项目目录；无运行中的原生 Main。没有向数据库写入或清除工作区租约。
+- 对生产本轮消息只读执行新观察解析：实际取得20次已完成认证调用与20条对应结果，包含原 Swarm 恢复、四成员派工与群聊消息；没有重执行工具。
+- 原五个准备键均正式核验 ready=true、executor=claude、configuredModel=free；原 Main 和四成员实例 ID 保持不变。两次原生 Main 执行使用完整工具及终止证据正式对账。宿主最终回复因审核模型无效输出失败，四条成员任务仍是执行前失败，不能据此宣称接管业务完成。
+- 本段验收记录是完整检查之后唯一的源码树变化；后续快检查以已完整验证的源码树为基准，复核差异只包含本记录，再运行其余门禁。线上部署、原任务续派与独立交付验收仍待完成。

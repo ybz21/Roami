@@ -18,10 +18,49 @@ class QueueDatabase:
         self.connection.row_factory = sqlite3.Row
         self.connection.executescript(
             "CREATE TABLE jobs(id,kind,aggregate_id,payload_json,state,available_ms);"
-            "CREATE TABLE turns(id,branch_id,trigger_kind);"
+            "CREATE TABLE turns(id,branch_id,trigger_kind,owner_id,conversation_id,state);"
             "CREATE TABLE branches(id);"
+            "CREATE TABLE conversations(id,owner_id);"
             "CREATE TABLE tasks(id,revision,state,target_json,intent_json);"
             "CREATE TABLE task_attempts(id,task_id,task_revision,executor_kind,native_branch_id);"
+            "CREATE TABLE project_okr_mains(owner_id,project_id,conversation_id);"
+            "CREATE TABLE project_okr_main_providers(owner_id,project_id,conversation_id,generation,binding_json);"
+            "CREATE TABLE swarm_members(id,current_work_id,execution_generation);"
+            "CREATE TABLE swarm_member_work(member_id,work_id);"
+            "CREATE TABLE swarm_work_items(id,task_id,execution_generation,executor,model);"
+            "CREATE TABLE swarm_member_provider_generations(member_id,generation,executor,model,binding_json);"
+        )
+
+    def main(self, name, directory, *, state="queued", native=True):
+        cid, branch = name + "-conversation", name + "-branch"
+        self.connection.execute("INSERT INTO branches VALUES(?)", (branch,))
+        self.connection.execute("INSERT INTO conversations VALUES(?,'alice')", (cid,))
+        self.connection.execute(
+            "INSERT INTO turns VALUES(?,?,'user','alice',?,?)", (name, branch, cid, state)
+        )
+        if native:
+            self.connection.execute(
+                "INSERT INTO project_okr_mains VALUES('alice',?,?)", (name, cid)
+            )
+            self.connection.execute(
+                "INSERT INTO project_okr_main_providers VALUES('alice',?,?,1,?)",
+                (name, cid, json.dumps({"directory": str(directory)})),
+            )
+        if state == "queued":
+            self.connection.execute(
+                "INSERT INTO jobs VALUES(?,'turn.run',?,'{}','queued',0)", (name, name)
+            )
+
+    def pin(self, task, directory):
+        member, work = task + "-member", task + "-work"
+        self.connection.execute("INSERT INTO swarm_members VALUES(?,?,2)", (member, work))
+        self.connection.execute("INSERT INTO swarm_member_work VALUES(?,?)", (member, work))
+        self.connection.execute(
+            "INSERT INTO swarm_work_items VALUES(?,?,2,'claude','free')", (work, task)
+        )
+        self.connection.execute(
+            "INSERT INTO swarm_member_provider_generations VALUES(?,2,'claude','free',?)",
+            (member, json.dumps({"directory": str(directory)})),
         )
 
     async def call(self, operation, **kwargs):
@@ -164,3 +203,83 @@ def test_directory_scope_and_invalid_targets(tmp_path):
         "local",
         str(tmp_path),
     )
+
+
+@pytest.mark.asyncio
+async def test_native_main_reserves_directory_before_member_target_preparation(tmp_path):
+    queue = Admission()
+    try:
+        queue.db.main("main", tmp_path)
+        queue.db.add("x", None, executor="cli")
+        queue.db.pin("x", tmp_path)
+        queue.db.add("bili", None, executor="cli")
+        queue.db.pin("bili", tmp_path)
+        queue.db.add("other", tmp_path / "elsewhere", executor="cli")
+        await queue.scan()
+        assert queue.started == ["main", "other"]
+        assert (
+            queue.db.connection.execute("SELECT state FROM tasks WHERE id='x'").fetchone()[0]
+            == "queued"
+        )
+        assert (
+            queue.db.connection.execute("SELECT state FROM jobs WHERE id='bili'").fetchone()[0]
+            == "queued"
+        )
+        queue.db.connection.execute("UPDATE jobs SET state='done' WHERE id IN ('main','other')")
+        queue.db.connection.execute("UPDATE turns SET state='completed' WHERE id='main'")
+        queue.release.set()
+        await asyncio.gather(*(item["handle"] for item in queue.active.values()))
+        await asyncio.sleep(0)
+        await queue.scan()
+        assert queue.started == ["main", "other", "x"]
+    finally:
+        await queue.close()
+
+
+@pytest.mark.asyncio
+async def test_native_main_waits_for_worker_but_home_main_stays_available(tmp_path):
+    queue = Admission()
+    try:
+        queue.db.add("active", tmp_path, state="running", executor="cli")
+        queue.db.main("project-main", tmp_path)
+        queue.db.main("home-main", None, native=False)
+        queue.db.add("other", tmp_path / "elsewhere")
+        await queue.scan()
+        assert queue.started == ["home-main", "other"]
+        queue.db.connection.execute("UPDATE tasks SET state='succeeded' WHERE id='active'")
+        await queue.scan()
+        assert queue.started == ["home-main", "other", "project-main"]
+    finally:
+        await queue.close()
+
+
+@pytest.mark.asyncio
+async def test_running_native_main_is_occupied_without_an_in_memory_handle(tmp_path):
+    queue = Admission()
+    try:
+        queue.db.main("detached-main", tmp_path, state="running")
+        queue.db.add("data", None, executor="cli")
+        queue.db.pin("data", tmp_path)
+        await queue.scan()
+        assert queue.started == []
+        queue.db.connection.execute("UPDATE turns SET state='completed' WHERE id='detached-main'")
+        await queue.scan()
+        assert queue.started == ["data"]
+    finally:
+        await queue.close()
+
+
+@pytest.mark.asyncio
+async def test_native_main_and_pinned_member_resolve_the_same_physical_directory(tmp_path):
+    actual, alias = tmp_path / "actual", tmp_path / "alias"
+    actual.mkdir()
+    alias.symlink_to(actual, target_is_directory=True)
+    queue = Admission()
+    try:
+        queue.db.main("main", actual)
+        queue.db.add("ops", None, executor="cli")
+        queue.db.pin("ops", alias)
+        await queue.scan()
+        assert queue.started == ["main"]
+    finally:
+        await queue.close()

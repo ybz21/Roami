@@ -394,3 +394,138 @@ async def test_signed_main_discovers_main_only_operations_through_tool_list(nati
     assert any(entry["name"] == "swarm_plan" and entry.get("inputSchema") for entry in entries), (
         result
     )
+
+
+async def test_first_reply_review_sees_actual_native_receipts_without_reexecution(native_main):
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.replies.native_main_observations import review_native_context
+    from roami_agent.replies.source_review import SourceReplyReview
+
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    result = await runtime.main_capabilities.call(
+        "swarm_control",
+        request(
+            context, {"swarmId": group["id"], "expectedRevision": 1, "action": "pause"}, "pause"
+        ),
+        "alice",
+    )
+    assert result["state"] == "succeeded"
+
+    class ReviewModel:
+        model = "saved-review-route"
+        settings_hash = "same-saved-parameters"
+
+        def __init__(self):
+            self.requests = []
+
+        async def stream(self, messages, tools):
+            self.requests.append(messages)
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "review",
+                    "function": {
+                        "name": "source_review_verdict",
+                        "arguments": json.dumps({"accepted": True, "feedback": ""}),
+                    },
+                },
+            )
+
+    model = ReviewModel()
+    reviewer = SourceReplyReview(runtime.db, lambda: model)
+    prompt = [{"role": "user", "content": "Coordinate the original project team"}]
+    reviewer.observe_context(turn, prompt)
+    binding = {"owner": "alice", "conversation": main["id"], "turnId": turn["id"], "leaseEpoch": 1}
+    verdict = await reviewer.evaluate(
+        {"text": "The original Swarm is paused at revision 2."}, binding, "answer"
+    )
+    assert verdict.accepted and len(model.requests) == 1
+    pieces = []
+    for message in model.requests[0]:
+        content = message.get("content")
+        pieces.extend(
+            [content]
+            if isinstance(content, str)
+            else [part.get("text", "") for part in content or []]
+        )
+    objects = []
+    for piece in pieces:
+        try:
+            objects.append(json.loads(piece))
+        except ValueError:
+            pass
+    receipts = [
+        json.loads(message["content"])
+        for value in objects
+        if isinstance(value, dict)
+        for message in value.get("currentMainContext", [])
+        if isinstance(message, dict) and message.get("role") == "tool"
+    ]
+    assert result["result"] in receipts
+    _, source = await reviewer.sources(binding)
+    observed = source["nativeMainObservations"]
+    assert observed and review_native_context([*prompt, *observed], observed) == [
+        *prompt,
+        *observed,
+    ]
+    calls = await runtime.db.call(
+        lambda db: db.execute(
+            "SELECT tool_name FROM tool_calls WHERE turn_id=?", (turn["id"],)
+        ).fetchall()
+    )
+    assert [call["tool_name"] for call in calls] == ["swarm_control"]
+
+
+@pytest.mark.parametrize("change", ["deleted result", "unattested call"])
+async def test_reply_review_rejects_changed_or_unattested_native_evidence(native_main, change):
+    from roami_agent.protocol.models import ModelEvent
+    from roami_agent.replies.source_review import SourceReplyReview
+
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    await runtime.main_capabilities.call(
+        "swarm_status", request(context, {"swarmId": group["id"]}, "status"), "alice"
+    )
+
+    class ReviewModel:
+        model = "saved-review-route"
+        settings_hash = "same-saved-parameters"
+
+        async def stream(self, messages, tools):
+            await runtime.db.call(
+                lambda db: db.execute(
+                    "UPDATE messages SET deleted_ms=1 WHERE id IN (SELECT result_message_id FROM tool_calls WHERE turn_id=?)",
+                    (turn["id"],),
+                ),
+                write=True,
+            )
+            yield ModelEvent(
+                "tool",
+                {
+                    "id": "review",
+                    "function": {
+                        "name": "source_review_verdict",
+                        "arguments": json.dumps({"accepted": True, "feedback": ""}),
+                    },
+                },
+            )
+
+    model = ReviewModel()
+    reviewer = SourceReplyReview(runtime.db, lambda: model)
+    reviewer.observe_context(
+        turn, [{"role": "user", "content": "Coordinate the original project team"}]
+    )
+    binding = {"owner": "alice", "conversation": main["id"], "turnId": turn["id"], "leaseEpoch": 1}
+    if change == "unattested call":
+        await runtime.db.call(
+            lambda db: db.execute(
+                "DELETE FROM events WHERE turn_id=? AND kind='capability.started'", (turn["id"],)
+            ),
+            write=True,
+        )
+        _, source = await reviewer.sources(binding)
+        assert source["nativeMainObservations"] == []
+    else:
+        with pytest.raises(DomainError, match="REPLY_REVIEW_SOURCE_CHANGED"):
+            await reviewer.evaluate({"text": "The Swarm has been inspected."}, binding, "answer")
