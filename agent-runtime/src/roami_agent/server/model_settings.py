@@ -21,6 +21,7 @@ from roami_agent.providers.reasoning_effort import (
     reasoning_support,
     with_reasoning_effort,
 )
+from roami_agent.storage.database import event, rows
 
 KEY_NAMES = {"main": "ROAMI_AGENT_SAVED_MAIN_KEY", "worker": "ROAMI_AGENT_SAVED_WORKER_KEY"}
 
@@ -169,7 +170,9 @@ async def load_runtime_model_settings(base, root):
 class ModelSettings:
     def __init__(self, runtime, factory):
         self.runtime, self.factory = runtime, factory
+        self.main_model = runtime.model
         self.lock = asyncio.Lock()
+        self.command_lock = asyncio.Lock()
         self.base = runtime.settings.current
         self.saved = read_saved(runtime.db.data_root)
         self.owned_providers = []
@@ -317,6 +320,12 @@ class ModelSettings:
         self.owner(owner)
         async with self.lock:
             saved = self.merge(patch)
+            live_main = set(patch) == {"main"} and not set(patch["main"]) - {
+                "model",
+                "reasoningEffort",
+                "images",
+                "contextWindow",
+            }
             for role, change in patch.items():
                 if role == "proxy":
                     continue
@@ -340,7 +349,7 @@ class ModelSettings:
                         "SELECT 1 FROM jobs WHERE state='running' LIMIT 1"
                     ).fetchone()
                 )
-                if (
+                if not live_main and (
                     busy
                     or self.runtime.turn_tasks
                     or self.runtime.active
@@ -355,9 +364,12 @@ class ModelSettings:
                     temporary = await prepare
                     raise
                 settings = await self.resolve_capacity(effective_settings(self.base, saved))
-                for role in ("main", "worker"):
+                for role in ("main",) if live_main else ("main", "worker"):
                     candidates.append(self.factory(settings, role))
-                main, worker = candidates
+                main = candidates[0]
+                worker = self.runtime.worker_model if live_main else candidates[1]
+                if live_main:
+                    settings = replace(settings, worker_route=self.runtime.settings.route("worker"))
                 path = settings_path(self.runtime.db.data_root)
                 os.replace(temporary, path)
                 temporary = None
@@ -368,23 +380,33 @@ class ModelSettings:
                     os.close(directory)
                 runtime = self.runtime
                 runtime.settings.current = settings
-                runtime.model, runtime.worker_model = main, worker
-                runtime.loop.model, runtime.loop.worker_model = main, worker
-                from roami_agent.context.vision_inputs import VisionInputs
+                if not live_main:
+                    runtime.worker_model = worker
+                    runtime.loop.worker_model = worker
+                    from roami_agent.context.vision_inputs import VisionInputs
 
-                runtime.loop.context.vision = (
-                    VisionInputs(runtime.db, runtime.artifacts, runtime.settings)
-                    if settings.route("worker").capabilities.get("images") is True
-                    else None
-                )
-                runtime.chat.model, runtime.context.model = main, main
-                if runtime.memory_uses_worker:
-                    runtime.memory_jobs.model = worker
-                runtime.briefs.model, runtime.proactive.model = worker, worker
+                    runtime.loop.context.vision = (
+                        VisionInputs(runtime.db, runtime.artifacts, runtime.settings)
+                        if settings.route("worker").capabilities.get("images") is True
+                        else None
+                    )
+                    if runtime.memory_uses_worker:
+                        runtime.memory_jobs.model = worker
+                    runtime.briefs.model, runtime.proactive.model = worker, worker
                 self.saved = saved
                 published = True
-                previous = self.owned_providers
-                self.owned_providers = [main, worker]
+                previous = [] if live_main else self.owned_providers
+                if not live_main:
+                    self.owned_providers = [worker]
+                await self.main_model.replace(main)
+
+                def changed(db):
+                    for conversation in rows(
+                        db, "SELECT id FROM conversations WHERE owner_id=?", (owner,)
+                    ):
+                        event(db, conversation["id"], "model.changed", {"model": main.model})
+
+                await runtime.db.call(changed, write=True)
                 for provider in previous:
                     with suppress(Exception):
                         await provider.close()
@@ -447,5 +469,6 @@ class ModelSettings:
         self.runtime.settings.current = await self.resolve_capacity(self.runtime.settings.current)
 
     async def close(self):
+        await self.main_model.close()
         for provider in self.owned_providers:
             await provider.close()

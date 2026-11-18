@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from roami_agent.conversation.model_commands import switch_model
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -23,6 +24,7 @@ class ConversationService:
         )
         self.model, self.wakeup, self.turn_tasks = model, wakeup, turn_tasks
         self.preempt = preempt
+        self.model_settings = None
 
     async def submit(self, owner, cid, request_key, text, attachment_ids=None, *, okr_context=None):
         native = await self.db.call(
@@ -44,9 +46,16 @@ class ConversationService:
             name = command[1:]
             if name not in {c["name"] for c in COMMANDS}:
                 raise DomainError("UNKNOWN_COMMAND")
-            if name != "compact" and arguments.strip():
+            if name not in {"compact", "model"} and arguments.strip():
                 raise DomainError("UNEXPECTED_COMMAND_ARGUMENTS")
             await self.conversations.get(owner, cid)
+            if name == "model":
+                self.model_settings.owner(owner)
+                if not arguments.strip():
+                    return {"kind": "ui_action", "action": "model", "conversationId": cid}
+                return await switch_model(
+                    self.model_settings, owner, cid, request_key, arguments.strip()
+                )
             if name == "compact":
                 job = await self.context.request(owner, cid, request_key, arguments.strip())
                 self.wakeup.set()

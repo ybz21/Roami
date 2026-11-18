@@ -134,7 +134,7 @@ async def test_http_owner_scope_slash_commands_and_task_intent(store):
                 json={"requestKey": "help", "text": "/help"},
             )
             assert response.status_code == 202
-            assert len(response.json()["data"]["commands"]) == 6
+            assert len(response.json()["data"]["commands"]) == 7
             assert (await client.get(f"/v1/conversations/{c['id']}/messages")).json()["data"][
                 "messages"
             ] == []

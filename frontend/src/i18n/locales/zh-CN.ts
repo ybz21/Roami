@@ -4295,6 +4295,8 @@ const zhCN = {
   'agent.save': '保存',
   'agent.retry': '重试',
   'agent.command.compact': '压缩上下文，可补充保留重点',
+  'agent.command.model': '切换主模型，可补充模型 ID',
+  'agent.models.switched': '后续请求将使用 {name}',
   'agent.command.status': '查看模型、上下文和任务状态',
   'agent.command.tasks': '查看委派任务',
   'agent.command.memory': '查找和管理记忆',
@@ -4555,7 +4557,7 @@ const zhCN = {
   'agent.models.settings': "模型与连接",
   'agent.models.settingsNote': "统一配置模型服务，以及主对话与内置后台任务使用的模型。",
   'agent.models.notConfigured': "未配置",
-  'agent.models.busy': "智能体正在处理任务，请等当前处理结束后再切换模型或保存配置",
+  'agent.models.busy': "此配置需要等待当前任务结束；主模型和思考强度可在工作中切换",
   'agent.models.newEndpointKey': "更换服务地址时，请填写新服务的 API Key",
   'agent.models.httpsRequired': "模型服务请使用 HTTPS；本机调试地址可使用 HTTP",
   'agent.models.failed': "模型服务请求失败，请检查地址、密钥和模型名称",
@@ -5114,7 +5116,7 @@ const zhCN = {
   'composer.transcribing': '转写中…',
   'composer.transcribingHint': '识别结果会加入草稿',
 
-  'composer.mainModelHint': '当前节点的所有 Main 对话共用此模型。',
+  'composer.mainModelHint': '当前节点的所有 Main 对话共用此模型。切换后从下一次请求生效，当前回复继续完成。',
   'composer.taskPlaceholder': '描述要交办的任务…',
   'composer.createTask': '创建任务',
 

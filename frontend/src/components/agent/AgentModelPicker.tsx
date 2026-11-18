@@ -15,13 +15,14 @@ import './agent-model-picker.css'
 type Panel = 'model' | 'reasoning'
 type Choice = { model: string; effort: string }
 
-export default function AgentModelPicker({ models, disabled, node }: {
-  models: ReturnType<typeof useAgentModels>; disabled: boolean; node: string | null
+export default function AgentModelPicker({ models, disabled, node, openRequest = 0 }: {
+  models: ReturnType<typeof useAgentModels>; disabled: boolean; node: string | null; openRequest?: number
 }) {
   const { t } = useI18n(), { phone } = useLayout(), optionPrefix = useId()
   const [open, setOpen] = useState<Panel | null>(null), [query, setQuery] = useState('')
   const [pending, setPending] = useState<Choice | null>(null)
   const [geometry, setGeometry] = useState<{ left: number; bottom: number; width: number; height: number }>()
+  const handledRequest = useRef(0)
   const modelTrigger = useRef<HTMLButtonElement>(null), effortTrigger = useRef<HTMLButtonElement>(null)
   const search = useRef<InputRef>(null), returnFocus = useRef<HTMLButtonElement | null>(null)
   const choices = useRef<HTMLDivElement>(null)
@@ -55,6 +56,11 @@ export default function AgentModelPicker({ models, disabled, node }: {
     retry.current = null; models.clearError(); setPending(null); setQuery(''); setOpen(panel)
     if (panel === 'model') void models.load()
   }
+  useEffect(() => {
+    if (!openRequest || openRequest === handledRequest.current || disabled || models.busy) return
+    handledRequest.current = openRequest
+    show('model')
+  }, [openRequest, disabled, models.busy])
   const choose = async (choice: Choice) => {
     if (saving.current || models.busy) return
     if (choice.model === model && choice.effort === effort) { close(); return }
