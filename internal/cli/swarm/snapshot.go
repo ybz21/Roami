@@ -60,11 +60,21 @@ type memberInstance struct {
 	NativeSessionID string `json:"nativeSessionId,omitempty"`
 	State           string `json:"state"`
 }
+type memberProvider struct {
+	Generation int    `json:"generation"`
+	SessionID  string `json:"sessionId"`
+	Executor   string `json:"executor"`
+	Model      string `json:"model"`
+	LaunchKey  string `json:"launchKey"`
+}
+
 type member struct {
+	Provider     *memberProvider `json:"provider,omitempty"`
 	Instance     *memberInstance `json:"instance,omitempty"`
 	ID           string          `json:"id"`
 	Name         string          `json:"name"`
 	Executor     string          `json:"executor"`
+	Model        string          `json:"model,omitempty"`
 	Duty         string          `json:"duty,omitempty"`
 	DutyPreview  string          `json:"dutyPreview,omitempty"`
 	State        string          `json:"state"`

@@ -135,6 +135,7 @@ def facts(db):
 async def test_schema22_upgrade_keeps_all_facts_and_old_unknown_message_receipt(
     tmp_path, monkeypatch
 ):
+    current_schema = migrations.SCHEMA_VERSION
     monkeypatch.setattr(migrations, "SCHEMA_VERSION", 28)
     monkeypatch.setattr(database_module, "SCHEMA_VERSION", 28)
     root, path, groups, sent = await legacy_database(tmp_path, monkeypatch)
@@ -207,6 +208,9 @@ async def test_schema22_upgrade_keeps_all_facts_and_old_unknown_message_receipt(
             )
             == "legacy_team_goal"
         )
+        # Historical facts are checked at v28; current services require the latest schema.
+        monkeypatch.setattr(migrations, "SCHEMA_VERSION", current_schema)
+        await upgraded.call(lambda db: migrations.upgrade_schema(db, 28))
         conv = Conversations(upgraded)
         swarms = SwarmPlans(upgraded, Tasks(upgraded, conv), conv, asyncio.Event())
         assert await swarms.create("alice", groups[0]["spec"]) == groups[0]["receipt"]

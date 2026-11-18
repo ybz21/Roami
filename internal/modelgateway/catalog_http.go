@@ -173,6 +173,9 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			authMode = "bearer"
 		}
 		selectedModel := model.ID
+		if input.Kind == "claude" {
+			selectedModel = agentproviders.ClaudeGatewayModelID(selectedModel)
+		}
 		if input.Model == gatewayDefaultModel {
 			selectedModel = gatewayDefaultModel
 		}

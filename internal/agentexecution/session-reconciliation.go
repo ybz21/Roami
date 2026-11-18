@@ -30,6 +30,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 	var previous Result
 	hasResult := false
 	if err = readJSON(filepath.Join(dir, "result.json"), &previous); err == nil {
+		if spec.Executor == "claude" && previous.State == "succeeded" && previous.InputStopped != nil && *previous.InputStopped && previous.OutcomeKnown != nil && *previous.OutcomeKnown {
+			return s.reconcileClaudeModelIdle(ctx, key, receipt, previous)
+		}
 		if previous.Summary != "SESSION_SCOPE_CHANGED_STOPPED" || previous.InputStopped == nil || !*previous.InputStopped || previous.OutcomeKnown == nil || !*previous.OutcomeKnown || previous.State != "failed" || !nativeEvidenceDigest.MatchString(previous.StopEvidence) {
 			return empty, fmt.Errorf("SESSION_RECONCILIATION_RESULT_CONFLICT")
 		}
@@ -62,6 +65,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
 	if spec.Executor == "claude" {
+		if spec.PreparedFrom != "" && state.UnknownReason == "SESSION_PROMPT_MISMATCH" && state.LaunchKey == key {
+			return s.reconcileClaudePastedCompletion(ctx, key, dir, path, spec, receipt, &state)
+		}
 		status := Status{Receipt: receipt}
 		if recovered, ok, problem := s.reconcileClaudeCompletion(key, status, &state, path, true); ok || problem != nil {
 			return recovered, problem

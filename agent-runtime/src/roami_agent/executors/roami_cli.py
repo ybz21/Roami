@@ -24,6 +24,7 @@ from roami_agent.storage.task_reports import retain_reported_progress
 from roami_agent.tools.process import execute
 
 SESSION_REJECTIONS = {
+    "SESSION_PROVIDER_BINDING_CHANGED",
     "SESSION_LIFECYCLE_UNAVAILABLE",
     "SESSION_NOT_IDLE",
     "SESSION_DIRECTORY_CHANGED",
@@ -232,6 +233,8 @@ class CodingExecutor:
             if any(target.get(key) for key in ["directory", "workspaceId", "base", "remote"]):
                 raise DomainError("CODING_SESSION_TARGET_CONFLICT")
             launch["sessionId"] = target["sessionId"]
+            if target.get("providerLaunchKey"):
+                launch["preparedFrom"] = target["providerLaunchKey"]
         elif target["kind"] == "project":
             if not isinstance(target.get("projectId"), str) or not target["projectId"]:
                 raise DomainError("CODING_PROJECT_ID_REQUIRED")

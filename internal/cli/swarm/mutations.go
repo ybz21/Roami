@@ -15,7 +15,7 @@ import (
 
 func isMutation(command string) bool {
 	switch command {
-	case "plan", "control", "member-add", "member-register", "dependencies", "say", "post", "pause", "resume", "stop", "archive":
+	case "migrate", "plan", "control", "member-add", "member-register", "dependencies", "say", "post", "pause", "resume", "stop", "archive":
 		return true
 	}
 	return false
@@ -119,7 +119,7 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 	}
 	var body map[string]any
 	var err error
-	suffix := map[string]string{"member-register": "members", "member-add": "plan", "plan": "plan", "dependencies": "dependencies", "control": "control", "say": "messages", "post": "member-posts", "pause": "control", "resume": "control", "stop": "control", "archive": "control"}[command]
+	suffix := map[string]string{"migrate": "execution-migrations", "member-register": "members", "member-add": "plan", "plan": "plan", "dependencies": "dependencies", "control": "control", "say": "messages", "post": "member-posts", "pause": "control", "resume": "control", "stop": "control", "archive": "control"}[command]
 	if file := o.value("file"); file != "" {
 		if len(o.values) > 1 || o.switches["integration"] || o.switches["clear"] {
 			return fmt.Errorf("--file contains the full request; do not mix it with other request options")
@@ -133,7 +133,7 @@ func mutateSwarm(ctx context.Context, rt runtime.Runtime, command, path string, 
 		}
 	}
 	if body == nil {
-		if command == "plan" || command == "control" {
+		if command == "migrate" || command == "plan" || command == "control" {
 			return fmt.Errorf("%s requires --file <request.json>", command)
 		}
 		key, err := o.required("key")

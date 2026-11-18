@@ -232,6 +232,28 @@ class SwarmPlans:
         async with self.lock(sid):
             return await self.db.call(write, write=True)
 
+    async def migrate_execution(self, owner, sid, spec):
+        from roami_agent.dispatch.swarm_execution_migration import migrate_members
+        from roami_agent.dispatch.swarm_provider_generations import (
+            PreparationRequired,
+            prepared_members,
+            prior_migration,
+        )
+
+        async with self.lock(sid):
+            try:
+                return await self.db.call(lambda db: prior_migration(db, owner, sid, spec))
+            except PreparationRequired:
+                pass
+            value = await self.db.call(lambda db: group(db, owner, sid))
+            self.mutable(value, spec)
+            if not value["paused"]:
+                raise DomainError("SWARM_MIGRATION_REQUIRES_PAUSE", 409)
+            proofs = await prepared_members(self.db, self.settings, value, spec)
+            return await self.db.call(
+                lambda db: migrate_members(db, owner, sid, spec, prepared=proofs), write=True
+            )
+
     async def member(self, owner, sid, member_id, *, before=None, limit=20):
         if (
             type(limit) is not int
@@ -307,6 +329,13 @@ class SwarmPlans:
                 self.mutable(value, spec)
                 existing = rows(db, "SELECT * FROM swarm_work_items WHERE swarm_id=?", (sid,))
                 by_name = {item["member_name"]: item["id"] for item in existing}
+                retired_names = {
+                    item["member_name"]
+                    for item in existing
+                    if item["task_id"] is None
+                    and item["dispatch_error"] == "SWARM_MEMBER_REASSIGN_REQUIRED"
+                }
+                seen_names = set()
                 for item in items:
                     if (
                         not isinstance(item, dict)
@@ -325,13 +354,16 @@ class SwarmPlans:
                     name = item["member"].strip()
                     if (
                         name.casefold() in {"leader", "main"}
+                        or name in seen_names
                         or name in by_name
+                        and name not in retired_names
                         or len(name) > 80
                         or len(item["title"]) > 80
                         or len(item["goal"]) > 30000
                         or len(item["acceptance"]) > 8000
                     ):
                         raise DomainError("INVALID_SWARM_MEMBER")
+                    seen_names.add(name)
                     from roami_agent.storage.swarm_members import member_for_plan
 
                     if value["member_protocol"] and not item.get("memberId"):
@@ -339,6 +371,31 @@ class SwarmPlans:
                     member = member_for_plan(
                         db, value, name, item["executor"], item["title"], item.get("memberId")
                     )
+                    previous_work = row(
+                        db,
+                        "SELECT * FROM swarm_work_items WHERE id=?",
+                        (member["current_work_id"],),
+                    )
+                    if (
+                        previous_work
+                        and previous_work["task_id"] is None
+                        and previous_work["dispatch_error"] == "SWARM_MEMBER_REASSIGN_REQUIRED"
+                    ):
+                        ident = previous_work["id"]
+                        by_name[name] = ident
+                        db.execute("DELETE FROM swarm_dependencies WHERE work_id=?", (ident,))
+                        db.execute(
+                            "UPDATE swarm_work_items SET title=?,goal=?,acceptance=?,integration=?,deliverables_json=?,dispatch_error=NULL WHERE id=?",
+                            (
+                                item["title"],
+                                item["goal"],
+                                item["acceptance"],
+                                int(item.get("integration") is True),
+                                encoded(item.get("deliverables", [])),
+                                ident,
+                            ),
+                        )
+                        continue
                     if row(
                         db,
                         "SELECT work_id FROM swarm_member_work WHERE member_id=?",
@@ -360,6 +417,10 @@ class SwarmPlans:
                             int(item.get("integration") is True),
                             encoded(item.get("deliverables", [])),
                         ),
+                    )
+                    db.execute(
+                        "UPDATE swarm_work_items SET model=?,execution_generation=? WHERE id=?",
+                        (member["model"], member["execution_generation"], ident),
                     )
                     db.execute("INSERT INTO swarm_member_work VALUES(?,?)", (member["id"], ident))
                     db.execute(
@@ -675,6 +736,21 @@ class SwarmPlans:
                         + item["member_name"]
                         + ". Share coordination through swarm_post when available. Never claim verification from your own success report."
                     )
+                    member_identity = await self.db.call(
+                        lambda db, item=item: row(
+                            db,
+                            "SELECT m.id,m.duty FROM swarm_members m JOIN swarm_member_work b ON b.member_id=m.id WHERE b.work_id=?",
+                            (item["id"],),
+                        )
+                    )
+                    if member_identity:
+                        goal += (
+                            "\nPersistent member identity: "
+                            + member_identity["id"]
+                            + ". Read project AGENTS.md and this member's existing memory (members/"
+                            + member_identity["id"]
+                            + "/memory.md under the configured team memory root). Preserve its history and prior evidence; memory is reference context, not new authorization."
+                        )
                     goal += (
                         "\nDeclared deliverables (plans and links alone are not completion):\n"
                         + item["deliverables_json"]
@@ -717,14 +793,36 @@ class SwarmPlans:
                         )
                         changed(db, info, "swarm.assigned")
 
+                    from roami_agent.dispatch.swarm_provider_generations import provider_for_work
+
+                    provider = await self.db.call(
+                        lambda db, item=item: provider_for_work(db, item["id"])
+                    )
+                    task_target = (
+                        {
+                            "kind": "session",
+                            "sessionId": provider["session_id"],
+                            "providerLaunchKey": provider["launch_key"],
+                            "projectId": target.get("projectId"),
+                        }
+                        if provider
+                        else target
+                    )
                     try:
                         await self.tasks.create(
                             info["owner_id"],
                             info["conversation_id"],
                             goal,
-                            key="swarm.work:" + item["id"],
+                            key="swarm.work:"
+                            + item["id"]
+                            + (
+                                ":generation:" + str(item["execution_generation"])
+                                if item["execution_generation"] > 1
+                                else ""
+                            ),
                             executor=item["executor"],
-                            target=target,
+                            model=None if provider else item["model"],
+                            target=task_target,
                             title=item["title"],
                             origin_message_id=info["origin_message_id"],
                             member_instance_id=(

@@ -67,7 +67,10 @@ async def test_schema_29_upgrade_is_atomic_and_backfills_stable_text_only(tmp_pa
             db.execute("SELECT 1 FROM sqlite_master WHERE name='context_briefs'").fetchone() is None
         )
         migrations.upgrade_schema(db, 28)
-        assert db.execute("SELECT max(version) FROM schema_meta").fetchone()[0] == 29
+        assert (
+            db.execute("SELECT max(version) FROM schema_meta").fetchone()[0]
+            == migrations.SCHEMA_VERSION
+        )
         assert {
             value[0] for value in db.execute("SELECT message_id FROM conversation_search_pending")
         } == {mids[0], mids[2]}

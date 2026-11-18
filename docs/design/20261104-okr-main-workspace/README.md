@@ -309,3 +309,5 @@
 - [团队、协作场景与会话入口一致](team-projection.md)
 - [恢复时保留配置目录模式](provider-profile.md)
 - [Claude 首次模型失败与显式输入对账](claude-api-failure.md)
+
+- [执行器迁移与 free 模型](executor-migration.md)：保留成员身份和旧执行证据，明确 Main 适配与实际项目迁移边界。

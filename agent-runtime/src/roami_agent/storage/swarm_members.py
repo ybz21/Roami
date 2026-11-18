@@ -63,18 +63,21 @@ def member_list(db, sid, work):
     by_id = {item["id"]: item for item in work}
     members = rows(
         db,
-        "SELECT m.id,m.swarm_id,m.name,m.executor,m.created_ms,m.legacy,substr(m.duty,1,200) AS dutyPreview,b.work_id AS workId,(SELECT COUNT(*) FROM swarm_member_rounds r WHERE r.member_id=m.id) AS roundCount "
+        "SELECT m.id,m.swarm_id,m.name,m.executor,m.model,m.execution_generation,m.created_ms,m.legacy,substr(m.duty,1,200) AS dutyPreview,b.work_id AS workId,(SELECT COUNT(*) FROM swarm_member_rounds r WHERE r.member_id=m.id) AS roundCount "
         "FROM swarm_members m LEFT JOIN swarm_member_work b ON b.member_id=m.id AND b.work_id=m.current_work_id WHERE m.swarm_id=? ORDER BY m.rowid",
         (sid,),
     )
     for member in members:
         item = by_id.get(member["workId"])
+        from roami_agent.dispatch.swarm_provider_generations import provider_summary
+
         member.update(
             taskId=item["task_id"] if item else None,
             taskRevision=item["revision"] if item else None,
             state=item["state"] if item else "unassigned",
             memoryPath="members/" + member["id"] + "/memory.md",
             instance=instances.get(member["id"]),
+            provider=provider_summary(db, member),
         )
         if item:
             item["memberId"] = member["id"]

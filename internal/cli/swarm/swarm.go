@@ -84,7 +84,7 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 	case "daily":
 		valueFlags = "delegation project main-conversation timezone date slot"
 		switchFlags = "dry-run"
-	case "plan", "control":
+	case "plan", "control", "migrate":
 		valueFlags = "file"
 	case "member-register":
 		valueFlags = "file key revision executor duty"

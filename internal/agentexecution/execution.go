@@ -34,6 +34,7 @@ type Spec struct {
 	ProjectID           string `json:"projectId,omitempty"`
 	WorkspaceID         string `json:"workspaceId,omitempty"`
 	SessionID           string `json:"sessionId,omitempty"`
+	PreparedFrom        string `json:"preparedFrom,omitempty"`
 	ResumeFrom          string `json:"resumeFrom,omitempty"`
 	ResumeProvider      string `json:"resumeProviderId,omitempty"`
 	Base                string `json:"base,omitempty"`
@@ -156,7 +157,7 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if spec.SessionID != "" {
 		return s.continueSession(ctx, spec)
 	}
-	if spec.ResumeFrom != "" || spec.ResumeProvider != "" {
+	if spec.ResumeFrom != "" || spec.ResumeProvider != "" || spec.PreparedFrom != "" {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)
@@ -402,7 +403,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	if a == nil {
 		return fmt.Errorf("INVALID_EXECUTOR")
 	}
-	args := a.OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission, MaxTurns: ""})
+	args := a.OneShotArgs(agent.StartOpts{Model: s.nativeModelID(ctx, spec.Executor, spec.Model), Permission: spec.Permission, MaxTurns: ""})
 	if promptArg, ok := a.(interface{ OneShotPromptArg() bool }); ok && promptArg.OneShotPromptArg() {
 		args = append(args, spec.Prompt)
 	}

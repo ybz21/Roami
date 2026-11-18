@@ -66,6 +66,21 @@ class RegisterMembers(Payload):
     members: list[RoleSpec] = Field(min_length=1, max_length=100)
 
 
+class ExecutionMember(Payload):
+    memberId: str = Field(min_length=1, max_length=200)
+    executor: str = Field(pattern=EXECUTOR_PATTERN)
+    model: str | None = Field(default=None, min_length=1, max_length=300)
+    preparedLaunchKey: str | None = Field(
+        default=None, min_length=1, max_length=200, exclude_if=lambda value: value is None
+    )
+
+
+class MigrateExecution(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    expectedRevision: int = Field(ge=1)
+    members: list[ExecutionMember] = Field(min_length=1, max_length=100)
+
+
 class PlanSwarm(Payload):
     commandKey: str = Field(min_length=1, max_length=200)
     expectedRevision: int = Field(ge=1)
@@ -197,6 +212,10 @@ def mount_swarm_routes(app, runtime):
     @app.post("/v1/swarms/{sid}/members")
     async def register_members(sid: str, body: RegisterMembers, owner: Owner):
         return {"data": await runtime.swarms.register_members(owner, sid, body.model_dump())}
+
+    @app.post("/v1/swarms/{sid}/execution-migrations")
+    async def migrate_execution(sid: str, body: MigrateExecution, owner: Owner):
+        return {"data": await runtime.swarms.migrate_execution(owner, sid, body.model_dump())}
 
     @app.get("/v1/swarms/{sid}/members/{member_id}")
     async def member(

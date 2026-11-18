@@ -88,7 +88,7 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 		}
 		text := claudeReportText(record.Message.Content)
 		if !matched {
-			if record.Type != "user" || record.Meta || record.Compact || record.PromptID != turn || workspaceHash(text) != promptHash {
+			if record.Type != "user" || record.Meta || record.Compact || record.PromptID != turn || claudeInputHash(text, promptHash) != promptHash {
 				continue
 			}
 			stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)

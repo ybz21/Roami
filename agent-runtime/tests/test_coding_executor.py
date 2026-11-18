@@ -279,8 +279,9 @@ async def test_new_delegated_tasks_launch_in_auto_mode(
 
 
 @pytest.mark.parametrize("provider", ["codex", "claude", "opencode", "pi"])
+@pytest.mark.parametrize("prepared", [False, True])
 async def test_session_continuation_keeps_provider_identity_and_rejects_rebinding(
-    store, tmp_path, provider
+    store, tmp_path, provider, prepared
 ):
     import pytest
 
@@ -295,7 +296,12 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
         "Continue",
         key="session",
         executor=provider,
-        target={"kind": "session", "sessionId": "stable-session", "projectId": "context-only"},
+        target={
+            "kind": "session",
+            "sessionId": "stable-session",
+            "projectId": "context-only",
+            **({"providerLaunchKey": "prepared-role"} if prepared else {}),
+        },
         record_intent=True,
     )
     run = await store.call(
@@ -313,7 +319,8 @@ async def test_session_continuation_keeps_provider_identity_and_rejects_rebindin
         assert spec["executor"] == provider
         assert spec["sessionId"] == "stable-session"
         assert "directory" not in spec and "projectId" not in spec
-        assert "permission" not in spec
+        assert "permission" not in spec and "model" not in spec
+        assert spec.get("preparedFrom") == ("prepared-role" if prepared else None)
         return receipt
 
     executor.command = command
