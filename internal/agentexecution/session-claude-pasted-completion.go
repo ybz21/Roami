@@ -191,6 +191,10 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 }
 
 func ownedClaudePastedTurn(binding SessionBinding, promptHash string, since int64) string {
+	return ownedClaudePromptTurn(binding, promptHash, since, true)
+}
+
+func ownedClaudePromptTurn(binding SessionBinding, promptHash string, since int64, pastedOnly bool) string {
 	path, info := claudeTranscriptPath(binding)
 	if info == nil || info.Size() > 64<<20 {
 		return ""
@@ -209,7 +213,7 @@ func ownedClaudePastedTurn(binding SessionBinding, promptHash string, since int6
 			return ""
 		}
 		text := claudeReportText(r.Message.Content)
-		if r.Type != "user" || r.Meta || r.Compact || workspaceHash(text) == promptHash || claudeInputHash(text, promptHash) != promptHash {
+		if r.Type != "user" || r.Meta || r.Compact || (pastedOnly && workspaceHash(text) == promptHash) || claudeInputHash(text, promptHash) != promptHash {
 			continue
 		}
 		stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
