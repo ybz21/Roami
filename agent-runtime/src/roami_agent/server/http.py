@@ -38,6 +38,7 @@ from roami_agent.protocol.http import (
     WakeProject,
 )
 from roami_agent.server.installation import Installation
+from roami_agent.server.main_execution_routes import mount_main_execution_routes
 from roami_agent.server.market_preview_stream import preview_stream
 from roami_agent.server.model_settings import ModelSettings
 from roami_agent.server.skill_package import MAX_PACKAGE_PAYLOAD_BYTES
@@ -61,6 +62,7 @@ def create_app(runtime, *, manage_lifecycle=True):
     )
 
     mount_swarm_routes(app, runtime)
+    mount_main_execution_routes(app, runtime)
     installation = Installation(runtime)
 
     @app.middleware("http")
@@ -516,7 +518,13 @@ def create_app(runtime, *, manage_lifecycle=True):
         except ValueError:
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
         if isinstance(payload, dict) and "executionContext" in payload:
-            return {"data": await runtime.professional_capabilities.call(name, payload, owner)}
+            context = payload["executionContext"]
+            capabilities = (
+                runtime.main_capabilities
+                if isinstance(context, dict) and context.get("kind") == "project_main"
+                else runtime.professional_capabilities
+            )
+            return {"data": await capabilities.call(name, payload, owner)}
         return {"data": await runtime.cli_commands.call(name, payload, owner)}
 
     @app.get("/v1/capability-settings")
@@ -688,6 +696,7 @@ def create_app(runtime, *, manage_lifecycle=True):
                 "configured": bool(runtime.model.model),
                 "projectOkr": True,
                 "projectOkrMain": True,
+                "projectMainExecution": True,
                 "okrMessageContext": True,
                 "conversationIdentity": True,
                 "projectMainWake": True,

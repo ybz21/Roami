@@ -311,3 +311,5 @@
 - [Claude 首次模型失败与显式输入对账](claude-api-failure.md)
 
 - [执行器迁移与 free 模型](executor-migration.md)：保留成员身份和旧执行证据，明确 Main 适配与实际项目迁移边界。
+
+- [项目 Main 原生执行器接入](native-main-adapter.md)

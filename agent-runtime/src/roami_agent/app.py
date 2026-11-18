@@ -21,6 +21,7 @@ from roami_agent.context.vision_inputs import VisionInputs
 from roami_agent.context.workflow_instructions import workflow_instructions
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
+from roami_agent.conversation.main_execution import MainExecutions
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.session_dispatches import SessionDispatches
 from roami_agent.conversation.transcript import Conversations
@@ -83,6 +84,7 @@ from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.mcp_broker import MCPBroker, node_socket
+from roami_agent.tools.native_main_capabilities import NativeMainCapabilities
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 from roami_agent.tools.project_file_scope import ProjectFileScope
 from roami_agent.tools.project_okr import register_project_okr_tools
@@ -389,6 +391,10 @@ class Runtime:
         self.capability_markets = CapabilityMarkets(self)
         register_market_commands(self.tools, self.capability_markets)
         self.professional_capabilities = ProfessionalCapabilities(self)
+        self.main_capabilities = NativeMainCapabilities(self)
+        self.main_executions = MainExecutions(
+            self.db, self.settings, self.executor, capabilities=self.main_capabilities
+        )
         if isinstance(self.executor, CodingExecutor):
             self.executor.capabilities = self.professional_capabilities
 
@@ -397,8 +403,9 @@ class Runtime:
         return configured_provider(settings, actual)
 
     async def run_turn(self, turn, *args, **kwargs):
+        loop = await self.main_executions.loop_for(self.loop, turn)
         if self.improvement is None or not self.improvement.ledger.path.exists():
-            return await self.loop.run(turn, *args, **kwargs)
+            return await loop.run(turn, *args, **kwargs)
 
         def scope(db):
             root = origin_turn(db, turn["owner_id"], turn_id=turn["id"])
@@ -420,7 +427,7 @@ class Runtime:
         )
         token = policy_binding.set(binding)
         try:
-            return await self.loop.run(turn, *args, **kwargs)
+            return await loop.run(turn, *args, **kwargs)
         finally:
             policy_binding.reset(token)
 
@@ -620,6 +627,7 @@ class Runtime:
             handle.cancel()
         await asyncio.gather(*running, return_exceptions=True)
         await self.native_sessions.flush()
+        await self.main_capabilities.close()
         await self.professional_capabilities.close()
         await self.capability_markets.close()
         await self.mcp.close()

@@ -27,7 +27,7 @@ var commandGuides = map[string]commandGuide{
 	"chrome title":                       {"读取当前页面标题", "[--target TAB_ID]", "roami chrome title --target TAB_ID", "", nil},
 	"plugin config":                      {"查看或修改插件配置", "PLUGIN_ID [set KEY VALUE | unset KEY]", "roami plugin config PLUGIN_ID", "", nil},
 	"project ls":                         {"列出项目", "[--json] [--server URL]", "roami project ls --json", "server json", nil},
-	"project show":                       {"查看项目详情", "PROJECT_ID [--json] [--server URL]", "roami project show PROJECT_ID --json", "server json", nil},
+	"project show":                       {"查看项目详情", "PROJECT_ID [--identity] [--json] [--server URL]", "roami project show PROJECT_ID --identity --json", "server json identity", nil},
 	"project sessions":                   {"查看项目会话", "PROJECT_ID [--json] [--server URL]", "roami project sessions PROJECT_ID --json", "server json", nil},
 	"project create":                     {"登记目录或克隆项目", "[PATH] [选项]", "roami project create . --name demo", "server json name clone provision-key base-dir", []string{"省略 PATH 时必须提供 --provision-key；--base-dir 指定新项目的父目录。"}},
 	"project prefs":                      {"修改项目偏好", "PROJECT_ID [选项]", "roami project prefs PROJECT_ID --pinned true", "server json name pinned agent base", nil},

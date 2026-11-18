@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+from roami_agent.conversation.main_execution import main_binding
 from roami_agent.conversation.model_commands import switch_model
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
@@ -36,6 +37,7 @@ class ConversationService:
         )
         if native:
             raise DomainError("NATIVE_SESSION_USE_TASK_CHANNEL", 409)
+        provider = await self.db.call(lambda db: main_binding(db, owner, cid))
         parts = text.strip().split(maxsplit=1)
         command, arguments = (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
         if text.strip().startswith("/") and "\n" not in text.strip():
@@ -50,6 +52,19 @@ class ConversationService:
                 raise DomainError("UNEXPECTED_COMMAND_ARGUMENTS")
             await self.conversations.get(owner, cid)
             if name == "model":
+                if provider:
+                    model = arguments.strip()
+                    if model and model not in {
+                        provider["model"],
+                        "roami-claude/" + provider["model"],
+                    }:
+                        raise DomainError("PROJECT_MAIN_MODEL_CONFLICT", 409)
+                    return {
+                        "kind": "model",
+                        "model": provider["model"],
+                        "executor": provider["executor"],
+                        "conversationId": cid,
+                    }
                 self.model_settings.owner(owner)
                 if not arguments.strip():
                     return {"kind": "ui_action", "action": "model", "conversationId": cid}
@@ -57,6 +72,8 @@ class ConversationService:
                     self.model_settings, owner, cid, request_key, arguments.strip()
                 )
             if name == "compact":
+                if provider:
+                    raise DomainError("PROJECT_MAIN_NATIVE_COMMAND_REQUIRED", 409)
                 job = await self.context.request(owner, cid, request_key, arguments.strip())
                 self.wakeup.set()
                 return {"kind": "compaction", "operationId": job["id"], "state": job["state"]}
@@ -67,7 +84,7 @@ class ConversationService:
             if name == "status":
                 return await self.status(owner, cid)
             return {"kind": "ui_action", "action": name, "conversationId": cid}
-        if not self.model.model:
+        if not self.model.model and not provider:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         result = await self.conversations.accept(
             owner, cid, request_key, text, attachment_ids, okr_context=okr_context
@@ -87,7 +104,8 @@ class ConversationService:
         return {"kind": "message", **result}
 
     async def wake_project(self, owner, cid, project_id, request_key, text):
-        if not self.model.model:
+        provider = await self.db.call(lambda db: main_binding(db, owner, cid))
+        if not self.model.model and not provider:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         result = await self.conversations.accept(
             owner, cid, request_key, text, wake_project=project_id
@@ -97,9 +115,15 @@ class ConversationService:
 
     async def status(self, owner, cid):
         plan = await self.context.project(owner, cid)
+        provider = await self.db.call(lambda db: main_binding(db, owner, cid))
         return {
             "kind": "status",
-            "model": self.model.model,
+            "model": provider["model"] if provider else self.model.model,
+            **(
+                {"executor": provider["executor"], "sessionId": provider["session_id"]}
+                if provider
+                else {}
+            ),
             "conversationId": cid,
             "context": {k: v for k, v in plan.items() if k != "messages"},
             "tasks": await self.tasks.list(owner, cid),

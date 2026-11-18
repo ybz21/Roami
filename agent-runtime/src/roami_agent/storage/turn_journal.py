@@ -240,7 +240,33 @@ class TurnJournal:
                 delivery = deliverable_links(text, completion_artifacts(db, turn, completion))
             previous = row(db, "SELECT content_json FROM messages WHERE id=?", (mid,))
             preview = json.loads(previous["content_json"]).get("replyPreview") if previous else None
-            content = {"text": delivery, **({"tool_calls": calls} if calls else {})}
+            recorded = rows(
+                db,
+                "SELECT t.tool_name,t.arguments_json,substr(t.idempotency_key,length(?)+2) AS call_id "
+                "FROM tool_calls t WHERE t.turn_id=? AND t.assistant_message_id=? "
+                "AND t.idempotency_key LIKE ? AND EXISTS(SELECT 1 FROM events e "
+                "WHERE e.turn_id=t.turn_id AND e.kind='capability.started' "
+                "AND e.event_key='capability:'||substr(t.idempotency_key,length(?)+2)||':start') "
+                "ORDER BY t.rowid",
+                (turn["id"], turn["id"], mid, turn["id"] + ":native-main-%", turn["id"]),
+            )
+            retained_calls = list(calls)
+            for item in recorded:
+                if not any(call["id"] == item["call_id"] for call in retained_calls):
+                    retained_calls.append(
+                        {
+                            "id": item["call_id"],
+                            "type": "function",
+                            "function": {
+                                "name": item["tool_name"],
+                                "arguments": item["arguments_json"],
+                            },
+                        }
+                    )
+            content = {
+                "text": delivery,
+                **({"tool_calls": retained_calls} if retained_calls else {}),
+            }
             if (
                 preview
                 and not final

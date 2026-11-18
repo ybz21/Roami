@@ -211,7 +211,7 @@ async def test_file_read_uses_host_project_root_and_ignores_supplied_workspace(
     targets = runtime.tools.admission.__self__.targets
 
     async def query(*args):
-        assert args == ("project", "show", "project-a", "--json")
+        assert args == ("project", "show", "project-a", "--identity", "--json")
         return {"data": {"key": "project-a", "name": "Project", "dir": str(folder)}}
 
     monkeypatch.setattr(targets, "_query", query)

@@ -163,6 +163,22 @@ func (a *API) noteArchived(key string, e project.Entry, roamWts, sessions int) b
 }
 
 func (a *API) ProjectsList(c *gin.Context) {
+	if key := c.Query("identity"); key != "" {
+		entry, ok := a.Projects.Entry(key)
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "UNKNOWN_PROJECT"}})
+			return
+		}
+		name := entry.DisplayName
+		if name == "" {
+			name = filepath.Base(entry.Dir)
+		}
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"projects": []gin.H{{
+			"key": entry.ID, "name": name, "dir": entry.Dir,
+			"defaultAgent": entry.DefaultAgent, "archived": entry.ArchivedAt != 0,
+		}}, "loose": []any{}}})
+		return
+	}
 	sessionProject := c.Query("sessionProject")
 	projRespMu.Lock()
 	if sessionProject == "" && projResp != nil && time.Since(projRespAt) < 5*time.Second {

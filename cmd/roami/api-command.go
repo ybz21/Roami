@@ -144,6 +144,7 @@ func runAPICommand(group string, args []string) int {
 	server := fs.String("server", "", "Roami 服务地址")
 	asJSON := fs.Bool("json", false, "JSON 输出")
 	stdin := fs.Bool("stdin", false, "从 stdin 读取登录 JSON")
+	identityOnly := fs.Bool("identity", false, "只读取登记项目身份，不扫描会话和工作树")
 	provisionKey := fs.String("provision-key", "", "idempotent exclusive new-project key")
 	baseDir := fs.String("base-dir", "", "parent directory for a provisioned project")
 	name := fs.String("name", "", "显示名")
@@ -156,7 +157,7 @@ func runAPICommand(group string, args []string) int {
 	for i := 1; i < len(args); i++ {
 		if strings.HasPrefix(args[i], "-") {
 			options = append(options, args[i])
-			if !strings.Contains(args[i], "=") && args[i] != "--json" && args[i] != "--stdin" && i+1 < len(args) {
+			if !strings.Contains(args[i], "=") && args[i] != "--json" && args[i] != "--stdin" && args[i] != "--identity" && i+1 < len(args) {
 				i++
 				options = append(options, args[i])
 			}
@@ -276,7 +277,11 @@ func runAPICommand(group string, args []string) int {
 		if target == "" {
 			return fail(fmt.Errorf("需要 project ID"))
 		}
-		raw, err = a.request("GET", "/api/projects", nil)
+		path := "/api/projects"
+		if *identityOnly {
+			path += "?identity=" + url.QueryEscape(target)
+		}
+		raw, err = a.request("GET", path, nil)
 		if err == nil {
 			var envelope struct {
 				Data struct {

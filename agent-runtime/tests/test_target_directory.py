@@ -30,7 +30,7 @@ async def test_project_workspace_rejects_untrusted_or_unavailable_host_directory
     directory = TargetDirectory(Settings())
 
     async def query(*args):
-        assert args == ("project", "show", "project-a", "--json")
+        assert args == ("project", "show", "project-a", "--identity", "--json")
         return {"data": {"key": "project-a", "name": "Project", "dir": str(tmp_path), **change}}
 
     monkeypatch.setattr(directory, "_query", query)

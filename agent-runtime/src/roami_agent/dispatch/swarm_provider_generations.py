@@ -80,6 +80,12 @@ def bind_prepared_member(db, value, member, generation, proof):
         return
     if row(
         db,
+        "SELECT conversation_id FROM project_okr_main_providers WHERE session_id=? OR provider_id=?",
+        (proof["sessionId"], proof["sessionBinding"]["providerConversationId"]),
+    ):
+        raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
+    if row(
+        db,
         "SELECT member_id FROM swarm_member_provider_generations WHERE session_id=? OR launch_key=? OR (provider_id=? AND member_id!=?)",
         (
             proof["sessionId"],

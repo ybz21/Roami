@@ -1,7 +1,7 @@
 from importlib.resources import files
 from pathlib import Path
 
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 UPGRADES = {
     2: "0002_artifact_metadata.sql",
     3: "0003_resource_controls.sql",
@@ -33,6 +33,7 @@ UPGRADES = {
     29: "0029_context_lifecycle.sql",
     30: "0030_swarm_execution_models.sql",
     31: "0031_swarm_provider_generations.sql",
+    32: "0032_project_main_providers.sql",
 }
 
 
