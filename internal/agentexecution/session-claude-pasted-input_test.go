@@ -15,3 +15,16 @@ func TestClaudePastedInputPreservesExactHostPrompt(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudePastedInputRetainsOneTransportConsumedFinalNewline(t *testing.T) {
+	raw := "original complete task\n"
+	wrapped := "\n\n<pasted_content id=\"transport\">\noriginal complete task\n</pasted_content id=\"transport\">\n"
+	if claudeInputHash(wrapped, workspaceHash(raw)) != workspaceHash(raw) {
+		t.Fatal("owned pasted newline was not recognized")
+	}
+	for _, changed := range []string{"original complete task", wrapped + "extra", "\n\n<pasted_content id=\"transport\">\noriginal complete task \n</pasted_content id=\"transport\">\n"} {
+		if claudeInputHash(changed, workspaceHash(raw)) == workspaceHash(raw) {
+			t.Fatal("input change accepted outside exact paste transport")
+		}
+	}
+}

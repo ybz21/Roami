@@ -602,7 +602,7 @@ func DecodeSessionEvent(content []byte) (SessionEvent, error) {
 	return ReadSessionEvent(bytes.NewReader(content))
 }
 
-// Tool responses are not lifecycle evidence and can be much larger than the event metadata.
+// Prompt text and tool output are payloads; identity metadata keeps its smaller bound.
 func ReadSessionEvent(input io.Reader) (SessionEvent, error) {
 	var event SessionEvent
 	bounded := &io.LimitedReader{R: input, N: (64 << 20) + 1}
@@ -613,7 +613,14 @@ func ReadSessionEvent(input io.Reader) (SessionEvent, error) {
 	if decoder.Decode(new(any)) != io.EOF || bounded.N == 0 {
 		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
 	}
-	metadata, err := json.Marshal(event)
+	metadataEvent := event
+	if event.Hook == "UserPromptSubmit" {
+		if len(event.Prompt) > 8<<20 {
+			return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
+		}
+		metadataEvent.Prompt = ""
+	}
+	metadata, err := json.Marshal(metadataEvent)
 	if err != nil || len(metadata) > 100000 {
 		return SessionEvent{}, fmt.Errorf("INVALID_SESSION_EVENT")
 	}

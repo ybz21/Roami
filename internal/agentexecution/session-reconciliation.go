@@ -65,6 +65,9 @@ func (s Service) ReconcileSession(ctx context.Context, key string) (Status, erro
 		return Status{Receipt: receipt, Result: &previous}, nil
 	}
 	if spec.Executor == "claude" {
+		if state.UnknownReason == "SESSION_TOOL_EVENT_MISMATCH" && state.LaunchKey == key {
+			return s.reconcileClaudeMissedSubmit(ctx, key, dir, path, spec, receipt, &state)
+		}
 		if spec.PreparedFrom != "" && state.UnknownReason == "SESSION_PROMPT_MISMATCH" && state.LaunchKey == key {
 			return s.reconcileClaudePastedCompletion(ctx, key, dir, path, spec, receipt, &state)
 		}
