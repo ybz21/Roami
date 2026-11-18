@@ -235,7 +235,17 @@ func (s Service) reconcileClaudePastedCompletion(ctx context.Context, key, dir, 
 	if turn == "" {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
 	}
-	result, digest, _ := claudeCompletedEvidence(state.Binding, turn, hash, since)
+	return s.settleClaudeRecordedCompletion(ctx, key, dir, path, receipt, state, turn, hash, since)
+}
+
+func (s Service) settleClaudeRecordedCompletion(ctx context.Context, key, dir, path string, receipt Receipt, state *sessionLifecycle, turn, hash string, since int64) (Status, error) {
+	empty := Status{}
+	result, digest, completed := claudeCompletedEvidence(state.Binding, turn, hash, since)
+	for tool := range state.Tools {
+		if completed[tool] == 0 {
+			return empty, fmt.Errorf("SESSION_RECONCILIATION_STOP_UNCONFIRMED")
+		}
+	}
 	if result == nil || !sessionProcessesStopped(state.Binding) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_STOP_UNCONFIRMED")
 	}
@@ -250,12 +260,20 @@ func (s Service) reconcileClaudePastedCompletion(ctx context.Context, key, dir, 
 	if readJSON(filepath.Join(root, "writer.json"), &writer) != nil || writer.Key != key {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_WORKSPACE_CHANGED")
 	}
-	checked, again, _ := claudeCompletedEvidence(state.Binding, turn, hash, since)
+	checked, again, confirmed := claudeCompletedEvidence(state.Binding, turn, hash, since)
+	for tool := range state.Tools {
+		if confirmed[tool] == 0 {
+			return empty, fmt.Errorf("SESSION_RECONCILIATION_EVIDENCE_CHANGED")
+		}
+	}
 	if checked == nil || again != digest || !sessionProcessesStopped(state.Binding) {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_EVIDENCE_CHANGED")
 	}
 	if err = ctx.Err(); err != nil {
 		return empty, err
+	}
+	if _, err := os.Stat(filepath.Join(dir, "cancel.json")); err == nil {
+		result.State = "cancelled"
 	}
 	yes := true
 	result.InputStopped, result.OutcomeKnown, result.StopEvidence = &yes, &yes, digest
@@ -264,6 +282,7 @@ func (s Service) reconcileClaudePastedCompletion(ctx context.Context, key, dir, 
 	}
 	state.State, state.UnknownReason, state.LaunchKey, state.CompletedKey = "idle", "", "", key
 	state.TurnID, state.PromptHash, state.ClaudeStop = turn, hash, nil
+	state.Tools = map[string]bool{}
 	state.UpdatedMS = time.Now().UnixMilli()
 	if err = writeJSON(path, *state); err != nil {
 		return empty, err
