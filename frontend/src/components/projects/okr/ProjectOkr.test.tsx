@@ -109,6 +109,7 @@ it('creates a workspace with an arbitrary manual metric and key result at revisi
     return { data: null }
   })
   render(<ProjectOkr projectId="new-project" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'okr.edit' }))
   fireEvent.change(await screen.findByLabelText('okr.objective'), { target: { value: 'Meet the community' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.addMetric' }))
   fireEvent.change(screen.getByLabelText('okr.metricName'), { target: { value: 'Event attendees' } })
@@ -218,6 +219,7 @@ it.each([false, true])('adopts a goal saved by the discussion without silently o
   let saved = false
   state.api.mockImplementation(async (_method, path) => path === '/agent/swarms' ? { data: [] } : { data: saved ? { ...initial, revision: 1 } : null })
   render(<ProjectOkr projectId="new-project" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'okr.edit' }))
   await screen.findByLabelText('okr.objective')
   if (dirty) fireEvent.change(screen.getByLabelText('okr.objective'), { target: { value: 'My unsaved goal' } })
   fireEvent.click(screen.getByRole('button', { name: 'okr.chatOpen' }))
