@@ -3,7 +3,7 @@
 .agent-model-picker-wrap .agent-model-picker-dialog { position:absolute; top:auto; margin:0; padding:0; max-width:calc(100% - var(--sp-4) * 2); }
 .agent-model-picker-dialog .ant-modal-content { display:flex; flex-direction:column; max-height:min(calc(var(--tap) * 15),var(--agent-picker-available,100dvh)); padding:0; background:var(--bg-elevated); border-radius:var(--r-card); overflow:hidden; }
 .agent-model-picker-dialog .ant-modal-header { flex:none; padding:0; margin:0; background:transparent; }
-.agent-model-picker-head { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); border-bottom:1px solid var(--border-subtle); }
+.agent-model-picker-head { display:flex; align-items:center; gap:var(--sp-2); padding-inline:var(--sp-4); border-bottom:1px solid var(--border-subtle); }
 .agent-model-picker-head > strong { flex:1; font-size:var(--fs-body); font-weight:500; }
 .agent-model-picker-head > button { display:grid; place-items:center; width:var(--tap); height:var(--tap); }
 .agent-model-picker-dialog .ant-modal-body { display:flex; flex:1; min-height:0; padding:0; }
@@ -34,13 +34,8 @@ html:is([data-size="compact"],[data-size="medium"]) .agent-model-picker-content 
 .agent-model-kind { flex:none; color:var(--text-dim); font-size:var(--fs-meta); white-space:nowrap; }
 
 .agent-model-identity { display:flex; flex-direction:column; gap:var(--sp-1); }
-.agent-model-identity > small { color:var(--text-dim); font-size:var(--fs-meta); overflow-wrap:anywhere; }
-
-.agent-model-call-id { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .agent-model-picker-body > .agent-menu-note { flex:none; margin:0; padding:var(--sp-1) var(--sp-2); font-size:var(--fs-meta); }
 
-.agent-model-detail { display:flex; flex-direction:column; gap:var(--sp-1); min-width:0; }
-.agent-model-detail > .agent-model-call-id { color:var(--text-dim); font-size:var(--fs-meta); }
 .agent-model-picker-warning { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2); font-size:var(--fs-meta); color:var(--text-dim); }
 .agent-model-picker-warning > span { flex:1; }
 .agent-model-picker-warning > button { flex:none; min-height:var(--tap); }

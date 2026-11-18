@@ -70,3 +70,5 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 - [网关统一选模与能力展示](gateway-options-acceptance.md)
 
 - [发布停止核对与 MCP 完成证据](deployment-acceptance.md)
+
+- [Main 选模列表与 /model 验收](picker-display.md)
