@@ -142,3 +142,89 @@ async def test_native_main_cancellation_calls_real_go_cancel(known):
     with pytest.raises(asyncio.CancelledError if known else DomainError):
         await task
     assert calls == ["launch", "cancel"]
+
+
+@pytest.mark.parametrize("poll_error", [False, True])
+async def test_native_main_waits_for_initial_unknown_and_reuses_the_same_launch(poll_error):
+    binding = fixture_binding()
+    pending = {
+        "session": binding["session_id"],
+        "sessionBinding": binding["binding"],
+        "state": "unknown",
+        "observationErrorCode": "SESSION_LIFECYCLE_UNKNOWN",
+    }
+    receipts = [pending, {**pending, "state": "running"}, stopped(binding)]
+    calls = []
+    errors = poll_error
+
+    async def command(sub, *args, **kwargs):
+        nonlocal errors
+        calls.append((sub, args, kwargs))
+        if sub == "launch":
+            return copy.deepcopy(pending)
+        if sub == "reconcile-session":
+            raise DomainError("CODING_EXECUTOR_UNAVAILABLE", 503)
+        if sub == "status":
+            if errors:
+                errors = False
+                raise DomainError("CODING_EXECUTOR_UNAVAILABLE", 503)
+            return copy.deepcopy(receipts.pop(0))
+        raise AssertionError(sub)
+
+    async def sleep(_):
+        pass
+
+    model = NativeMain(binding, fixture_turn(), command, sleep=sleep)
+    parts = [part async for part in model.stream([{"role": "user", "content": "Continue"}], [])]
+    assert [(part.kind, part.value) for part in parts] == [("text", "Actual native answer")]
+    launches = [call for call in calls if call[0] == "launch"]
+    assert len(launches) == 1
+    key = launches[0][2]["spec"]["key"]
+    assert all(call[1] == ("--key", key) for call in calls if call[0] != "launch")
+
+
+async def test_native_main_reconciles_unknown_only_from_the_same_execution_proof():
+    binding = fixture_binding()
+    pending = {
+        "session": binding["session_id"],
+        "sessionBinding": binding["binding"],
+        "state": "unknown",
+    }
+    calls = []
+
+    async def command(sub, *args, **kwargs):
+        calls.append((sub, args, kwargs))
+        return stopped(binding) if sub == "reconcile-session" else pending
+
+    async def sleep(_):
+        pass
+
+    parts = [
+        part
+        async for part in NativeMain(binding, fixture_turn(), command, sleep=sleep).stream([], [])
+    ]
+    assert [(part.kind, part.value) for part in parts] == [("text", "Actual native answer")]
+    assert [call[0] for call in calls].count("launch") == 1
+    assert [call[0] for call in calls].count("reconcile-session") == 1
+    key = calls[0][2]["spec"]["key"]
+    assert all(call[1] == ("--key", key) for call in calls[1:])
+
+
+async def test_native_main_rejects_provider_change_while_waiting_for_startup():
+    binding = fixture_binding()
+    pending = {
+        "session": binding["session_id"],
+        "sessionBinding": binding["binding"],
+        "state": "unknown",
+    }
+
+    async def command(sub, *args, **kwargs):
+        if sub == "launch":
+            return pending
+        return {**pending, "session": "another-session"}
+
+    async def sleep(_):
+        pass
+
+    with pytest.raises(DomainError, match="SESSION_PROVIDER_BINDING_CHANGED"):
+        await anext(NativeMain(binding, fixture_turn(), command, sleep=sleep).stream([], []))

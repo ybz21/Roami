@@ -89,6 +89,7 @@ class NativeMain:
         }
         try:
             receipt = await self.command("launch", "--file", "-", spec=spec)
+            unknown_polls = 0
             while True:
                 self.verify(receipt)
                 result = receipt.get("result")
@@ -105,10 +106,23 @@ class NativeMain:
                         raise DomainError("PROJECT_MAIN_EMPTY_RESULT", 409)
                     yield ModelEvent("text", text)
                     return
-                if receipt.get("state") in {"unknown", "failed", "cancelled"}:
+                if receipt.get("state") in {"failed", "cancelled"}:
                     raise DomainError("SESSION_STOP_UNCONFIRMED", 409)
-                await self.sleep(1)
-                receipt = await self.command("status", "--key", key)
+                unknown_polls = unknown_polls + 1 if receipt.get("state") == "unknown" else 0
+                await self.sleep(min(1 + unknown_polls, 10))
+                try:
+                    # Startup hooks and terminal proofs can arrive after the launch receipt.
+                    sub = (
+                        "reconcile-session"
+                        if unknown_polls and unknown_polls % 10 == 0
+                        else "status"
+                    )
+                    receipt = await self.command(sub, "--key", key)
+                except DomainError as error:
+                    if error.code != "CODING_EXECUTOR_UNAVAILABLE":
+                        raise
+                except (TimeoutError, OSError):
+                    pass
         except asyncio.CancelledError:
             # Cancellation of the host await alone does not stop a native provider.
             receipt = await asyncio.shield(self.command("cancel", "--key", key))
