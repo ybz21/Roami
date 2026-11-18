@@ -135,6 +135,8 @@ def facts(db):
 async def test_schema22_upgrade_keeps_all_facts_and_old_unknown_message_receipt(
     tmp_path, monkeypatch
 ):
+    monkeypatch.setattr(migrations, "SCHEMA_VERSION", 28)
+    monkeypatch.setattr(database_module, "SCHEMA_VERSION", 28)
     root, path, groups, sent = await legacy_database(tmp_path, monkeypatch)
     with sqlite3.connect(path) as before:
         original = facts(before)

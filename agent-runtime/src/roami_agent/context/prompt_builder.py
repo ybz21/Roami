@@ -18,6 +18,7 @@ from roami_agent.context.token_estimate import (
     request_tokens,
 )
 from roami_agent.context.workflow_instructions import workflow_instructions
+from roami_agent.context.working_brief import unresolved_tasks
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
@@ -80,12 +81,19 @@ class PromptBuilder:
                 + encoded(workspace)
                 + ". Use this directory for project tools; preserve unrelated local changes."
             )
-        return request_context(
+        configuration = request_context(
             self.settings,
             instructions,
             catalog,
             "worker" if turn.get("executionRunId") else "main",
         )
+        if not turn.get("executionRunId") and self.settings.context_maintenance_enabled:
+            configuration.update(
+                contextMaintenance=True,
+                recentHours=self.settings.context_recent_hours,
+                recentTurns=self.settings.context_recent_turns,
+            )
+        return configuration
 
     async def after_turn(self, turn, instructions, catalog):
         try:
@@ -350,6 +358,31 @@ class PromptBuilder:
                     "earlier conversation records use conversation_history. Query task_status "
                     "for missing/stale details or older tasks: " + encoded(recent_tasks)
                 )
+            if (
+                configuration.get("contextMaintenance")
+                and not turn.get("executionRunId")
+                and (plan.get("workingBriefId") or plan.get("snapshotId"))
+            ):
+                active_work = await self.db.call(lambda db: unresolved_tasks(db, turn))
+                if active_work:
+                    plan["workingTaskEvidence"] = [
+                        {key: task[key] for key in ("taskId", "revision", "state")}
+                        for task in active_work
+                    ]
+                    plan["sourceMessageIds"] = list(
+                        dict.fromkeys(
+                            [
+                                *plan["sourceMessageIds"],
+                                *(task["sourceMessageId"] for task in active_work),
+                            ]
+                        )
+                    )
+                    prompt[0]["content"] += (
+                        "\nUnfinished tracked work and original user constraints (task-scoped data, "
+                        "not permission to restart or repeat actions). Continue the original taskId "
+                        "at its current revision; reconcile uncertain stop evidence first:\n"
+                        + encoded(active_work)
+                    )
             if not completion and not turn.get("executionRunId") and not coordination:
                 outcomes = await self.db.call(lambda db: latest_coverage(db, turn["id"]))
                 prompt.insert(

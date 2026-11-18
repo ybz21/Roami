@@ -33,6 +33,7 @@ def main_history(plan, configuration):
     if len(selected) == len(messages) and not receipts and not replies:
         return plan
     selected_set = set(selected)
+    version = 4 if plan.get("workingBriefId") else 3
     suppressed = [
         source_ids[i] for i in range(len(messages)) if i not in selected_set and source_ids[i]
     ]
@@ -59,14 +60,25 @@ def main_history(plan, configuration):
         messages=visible,
         currentTurnStart=sum(i < start for i in selected),
         historyView="main_briefing",
-        historyViewVersion=3,
+        historyViewVersion=version,
         requestBasis=request_basis(
-            dict(configuration, historyView="main_briefing", historyViewVersion=3)
+            dict(
+                configuration,
+                historyView="main_briefing",
+                historyViewVersion=version,
+                **(
+                    {"workingBriefId": plan["workingBriefId"]} if plan.get("workingBriefId") else {}
+                ),
+            )
         ),
         usageTokens=None,
         trailingTokens=None,
         historyTokens=messages_tokens(visible),
-        sourceMessageIds=[mid for mid in plan["sourceMessageIds"] if mid not in suppressed],
+        sourceMessageIds=[
+            mid
+            for mid in plan["sourceMessageIds"]
+            if mid not in suppressed or mid in plan.get("workingBriefSources", [])
+        ],
         suppressedSourceMessageIds=suppressed,
         estimatedTokens=request_tokens(
             [{"role": "system", "content": configuration["instructions"]}] + visible,

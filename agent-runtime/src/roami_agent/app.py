@@ -13,6 +13,7 @@ from pathlib import Path
 import uvicorn
 
 from roami_agent.context.chat_images import ChatImages
+from roami_agent.context.maintenance import ContextMaintenance
 from roami_agent.context.projection import Context
 from roami_agent.context.prompt_builder import PromptBuilder
 from roami_agent.context.token_estimate import request_context
@@ -173,6 +174,7 @@ class Runtime:
             model,
             keep_recent_tokens=self.settings.keep_recent_tokens,
         )
+        self.context.maintenance = ContextMaintenance(database, self.context, self.settings)
         self.tools = Tools(self.artifacts)
         self.reply_review = (
             SourceReplyReview(
@@ -276,13 +278,23 @@ class Runtime:
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 
-        self.context.request_context = lambda: request_context(
-            self.settings,
-            workflow_instructions(
-                self.settings.main_instructions, self.tools.optional_skill_metadata()
-            ),
-            self.tools.catalog("main"),
-        )
+        def main_context():
+            configuration = request_context(
+                self.settings,
+                workflow_instructions(
+                    self.settings.main_instructions, self.tools.optional_skill_metadata()
+                ),
+                self.tools.catalog("main"),
+            )
+            if self.settings.context_maintenance_enabled:
+                configuration.update(
+                    contextMaintenance=True,
+                    recentHours=self.settings.context_recent_hours,
+                    recentTurns=self.settings.context_recent_turns,
+                )
+            return configuration
+
+        self.context.request_context = main_context
 
         self.mailbox = TurnMailbox(database)
         self.journal = TurnJournal(database)
@@ -415,6 +427,7 @@ class Runtime:
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
+        await self.context.maintenance.recover()
         await self.resources.recover()
         await self.dispatch.recover()
         await self.swarms.recover()

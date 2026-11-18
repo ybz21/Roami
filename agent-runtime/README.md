@@ -98,6 +98,40 @@ The runtime schema started from the dated design's candidate schema, and additio
 
 ## Memory lifecycle
 
+Home context maintenance uses a complete recent-turn window plus a source-quoted working brief.
+The initial defaults are 48 hours / 20 complete turns, with the current tool round always intact.
+Only completed rounds whose stable sources are indexed and handed off to a validated brief and
+semantic daily archive can leave the automatic raw-history window. Original messages remain available through
+`conversation_history` (`query`, inclusive `sinceMs`, exclusive `untilMs`); `archiveDay` reads
+semantic day parts with their actual timezone and original source IDs. Incomplete indexing and
+partial day coverage are explicit. Existing daily activity counts remain a separate feature.
+
+The supervisor queues idle work after 10 minutes and catches up closed local days from 02:10,
+including after restart and below the capacity compaction threshold. Jobs use the saved Main
+route through the Go gateway, retry with backoff, and atomically activate the brief and archives
+only after source/branch/memory checks. Unfinished tasks keep their original user requirements
+and real task IDs/revisions independently of the recent-three-task view. One-off constraints
+do not become permanent preferences. The existing capacity compaction remains the fallback.
+
+These instance-local TOML settings take effect on runtime restart:
+
+```toml
+[runtime]
+context_maintenance_enabled = true
+context_recent_hours = 48
+context_recent_turns = 20
+context_idle_seconds = 600
+
+[memory]
+timezone = "UTC" # Use the node's intended IANA timezone; existing settings are preserved.
+```
+
+Disabling maintenance stops new model jobs and brief projection; original-text indexing remains
+available. This first implementation covers Home, not task execution sessions. Weekly/monthly/yearly
+archives, dependency repair for late results, and configuration/status UI remain subsequent phases.
+See [implementation](../docs/design/20261112-home-context-lifecycle/implementation.md) and
+[acceptance](../docs/design/20261112-home-context-lifecycle/acceptance.md).
+
 Background extraction uses the Worker model with a separate injectable test port, a durable event cursor, bounded jobs and one low-priority memory slot. It never occupies a Main slot. Model output proposes candidates; owner/scope/hash validation happens again inside the write transaction. Candidates and conflicts remain outside recall until explicitly confirmed. Conflicts do not overwrite active records. Restart requeues interrupted extraction without changing its deduplication key.
 
 The memory panel provides daily, task, conversation, project and preference views, source inspection and candidate review. Ordinary deletion removes a memory from recall and invalidates derived summaries. Complete forgetting additionally excludes traced transcript sources, memory tool blocks and dependent replies from future context while retaining visible history. Queued tasks with forgotten origins cannot dispatch; completion prompts redact their content. Input already delivered to an external model/process cannot be recalled. Older prompt manifests are reconstructed conservatively and can exclude additional dependent context.

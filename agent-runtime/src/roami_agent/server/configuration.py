@@ -203,6 +203,10 @@ class Settings:
     context_window: int | None = None
     reserve_tokens: int = 16_384
     keep_recent_tokens: int = 20_000
+    context_maintenance_enabled: bool = True
+    context_recent_hours: int = 48
+    context_recent_turns: int = 20
+    context_idle_seconds: int = 600
     memory_recall_limit: int = 8
     memory_recall_tokens: int = 2000
     tool_directory_page_size: int = 10
@@ -253,6 +257,10 @@ class Settings:
             context_window=model.get("context_window", runtime.get("context_window")),
             reserve_tokens=runtime.get("reserve_tokens", 16_384),
             keep_recent_tokens=runtime.get("keep_recent_tokens", 20_000),
+            context_maintenance_enabled=runtime.get("context_maintenance_enabled", True),
+            context_recent_hours=runtime.get("context_recent_hours", 48),
+            context_recent_turns=runtime.get("context_recent_turns", 20),
+            context_idle_seconds=runtime.get("context_idle_seconds", 600),
             compaction_ratio=runtime.get("compaction_ratio", 0.75),
             timeout_seconds=runtime.get("timeout_seconds", 0),
             shell_roots=tuple(Path(p).expanduser().resolve() for p in tools.get("shell_roots", [])),
@@ -283,6 +291,15 @@ class Settings:
         ]:
             if not isinstance(value, int) or not 1 <= value <= 1_000_000:
                 raise DomainError("INVALID_RUNTIME_CONFIG")
+        if type(result.context_maintenance_enabled) is not bool or any(
+            type(value) is not int or not 1 <= value <= maximum
+            for value, maximum in [
+                (result.context_recent_hours, 8760),
+                (result.context_recent_turns, 1000),
+                (result.context_idle_seconds, 86400),
+            ]
+        ):
+            raise DomainError("INVALID_CONTEXT_MAINTENANCE_CONFIG")
         if (
             type(result.proactive_enabled) is not bool
             or type(result.proactive_timeout_seconds) is not int
