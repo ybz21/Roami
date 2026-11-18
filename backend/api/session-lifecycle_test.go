@@ -84,8 +84,11 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 	}
 	git("add", ".")
 	git("commit", "-m", "initial")
+	capturePrompt := func(marker string) string {
+		return "python3 -c " + shellQuote("import pathlib,sys;p=pathlib.Path("+fmt.Sprintf("%q", marker)+");tmp=p.with_suffix('.pending');tmp.write_text(sys.argv[1]);tmp.replace(p)")
+	}
 	marker := filepath.Join(repo, "launch-result")
-	command := "python3 -c " + shellQuote("import pathlib,sys;pathlib.Path("+fmt.Sprintf("%q", marker)+").write_text(sys.argv[1])")
+	command := capturePrompt(marker)
 	intent := life.Intent{Name: "async fixture", Dir: repo, Worktree: true, Launch: &life.Launch{Command: command, Agent: "codex", Task: "Keep 'quotes' and $(literal) intact", Preamble: "{{PATH}}\n{{SESSION}}", TaskHeading: "Task", SetupHeading: "Setup"}}
 	request := map[string]any{"kind": "create", "requestKey": "create-e2e-unique", "intent": intent}
 	accepted := call("POST", "/operations", request)
@@ -241,7 +244,7 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	customMarker := filepath.Join(repo, "custom-launch-result")
-	customCommand := "python3 -c " + shellQuote("import pathlib,sys;pathlib.Path("+fmt.Sprintf("%q", customMarker)+").write_text(sys.argv[1])")
+	customCommand := capturePrompt(customMarker)
 	custom := newFixture("custom-guide-fixture", &life.Launch{Command: customCommand, Agent: "codex", Task: "生成项目报告", FileBase: "/n/fixture-node/api/file", TaskHeading: "Task", SetupHeading: "Setup"})
 	deadline = time.Now().Add(5 * time.Second)
 	for {

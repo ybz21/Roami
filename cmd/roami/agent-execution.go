@@ -68,7 +68,7 @@ func runAgentExecution(args []string) int {
 		return 0
 	}
 	sub := args[0]
-	if sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "close" && sub != "cleanup" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" && sub != "reconcile-session" {
+	if sub != "prepared" && sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "close" && sub != "cleanup" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" && sub != "reconcile-session" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -225,6 +225,15 @@ func runAgentExecution(args []string) int {
 		if err != nil {
 			return fail(err)
 		}
+	case "prepared":
+		result, err := service.PreparedSession(*key)
+		if err != nil {
+			return fail(err)
+		}
+		if err = json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			return fail(err)
+		}
+		return 0
 	case "status":
 		status, err = service.Status(*key)
 	case "cancel":

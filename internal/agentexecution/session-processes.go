@@ -108,7 +108,7 @@ func sessionProcessesStopped(binding SessionBinding) bool {
 	}
 	for pid, token := range scoped {
 		if !ancestors[pid] && binding.Processes[pid] != token {
-			if codexCodeModeHost(binding, snapshot, pid) {
+			if codexCodeModeHost(binding, snapshot, pid) || npmStdioHost(binding, snapshot, pid) {
 				continue
 			}
 			foreign := false
