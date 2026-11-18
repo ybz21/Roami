@@ -531,3 +531,31 @@ async def test_reply_review_rejects_changed_or_unattested_native_evidence(native
     else:
         with pytest.raises(DomainError, match="REPLY_REVIEW_SOURCE_CHANGED"):
             await reviewer.evaluate({"text": "The Swarm has been inspected."}, binding, "answer")
+
+
+async def test_native_failure_returns_registered_call_id_for_real_blocker_evidence(native_main):
+    from roami_agent.storage.swarm_goal_checkpoint import failed_step
+
+    runtime, main, turn, context = native_main
+
+    async def unavailable(args, binding):
+        raise DomainError("RESOURCE_UNAVAILABLE", 503)
+
+    runtime.tools.add(
+        Tool(
+            "native_unavailable",
+            "Actual dependency failure",
+            object_schema({}),
+            unavailable,
+            main=True,
+        )
+    )
+    payload = request(context, key="dependency-refusal")
+    result = await runtime.main_capabilities.call("native_unavailable", payload, "alice")
+    assert result["state"] == "failed" and result["toolCallId"].startswith("native-main-")
+    binding = {"owner": "alice", "conversation": main["id"], "turnId": turn["id"]}
+    proof = await runtime.db.call(lambda db: failed_step(db, binding, result["toolCallId"]))
+    assert proof["error"] == "RESOURCE_UNAVAILABLE" and proof["tool"] == "native_unavailable"
+    with pytest.raises(DomainError, match="SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED"):
+        await runtime.db.call(lambda db: failed_step(db, binding, result["requestId"]))
+    assert await runtime.main_capabilities.call("native_unavailable", payload, "alice") == result
