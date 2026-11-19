@@ -11,7 +11,6 @@ import { dropDeadTokens, type FileTab } from '../components/terminal/term-tabs-s
 import { nativeSessionId } from '../components/sessions/session-record'
 import { TASK_ROUTE } from '../route-hash'
 import { useWorkspaceState } from './useWorkspaceState'
-import { useWorkspaceStateStore } from '../view-state'
 
 import type { SessionDirectory } from './useSessionDirectory'
 type TaskWorkspaceOptions = {
@@ -26,8 +25,6 @@ type TaskWorkspaceOptions = {
 export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: hasSider, mobile: isMobile, page: tab, navigate: go }: TaskWorkspaceOptions) {
   const { sessIds, sessList } = data
   const saved = useWorkspaceState(curNodeId, data)
-  const viewStore = useWorkspaceStateStore()
-  const fileNavigation = useMemo(() => viewStore.node(curNodeId).child('page', 'workspace').child('files'), [viewStore, curNodeId])
   useEffect(() => {
     if (!sessIds || !data.sessListLoaded || !saved.loaded) return
     saved.update(state => {
@@ -49,6 +46,17 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     const k = taskKeyOf(n, projTable[n]?.worktree)
     return isLooseTask(k) && taskHint.current[n] ? taskHint.current[n] : k
   }
+  useEffect(() => {
+    if (!saved.loaded) return
+    saved.update(state => {
+      const files = state.files.filter(file => !file.session || state.terms.includes(file.session)).map(file => {
+        if (file.session) return file
+        const owners = state.terms.filter(id => keyOf(toName(id)) === file.task)
+        return owners.length === 1 ? { ...file, session: owners[0] } : file
+      })
+      return { ...state, files, activeFile: files.some(file => file.path === state.activeFile) ? state.activeFile : '' }
+    })
+  }, [saved.loaded, saved.state.terms, saved.state.files, sessIds, projTable, saved.update])
   const fileTabs = saved.state.files
   const setFileTabs = (action: SetStateAction<FileTab[]>) => saved.update(state => ({ ...state, files: valueOf(action, state.files) }))
   const fileTabsRef = useRef<FileTab[]>([])
@@ -74,8 +82,8 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   const openFileTab = (path: string, line?: number) => {
     const key = activeTaskRef.current || ''
     const existing = fileTabsRef.current.find(file => file.path === path)
-    if (active && keyOf(active) === (existing?.task || key)) fileNavigation.child('file', path).set('source', toId(active))
-    saved.update(state => ({ ...state, files: state.files.some(file => file.path === path) ? state.files : [...state.files, { path, preview: false, mode: isMd(path) ? 'preview' : 'source', task: key }], activeFile: path }))
+    const session = active && keyOf(active) === (existing?.task || key) ? toId(active) : undefined
+    saved.update(state => ({ ...state, files: state.files.some(file => file.path === path) ? state.files.map(file => file.path === path && session ? { ...file, session } : file) : [...state.files, { path, preview: false, mode: isMd(path) ? 'preview' : 'source', task: key, session }], activeFile: path }))
     if (line && line > 0) setReveal((prev) => ({ path, line, nonce: (prev?.nonce || 0) + 1 }))
   }
   const pinFileTab = (path: string) => setFileTabs((list) => list.map((f) => (f.path === path ? { ...f, preview: false } : f)))
@@ -86,8 +94,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     const i = siblings.findIndex(file => file.path === path)
     const files = state.files.filter(file => file.path !== path)
     const remaining = siblings.filter(file => file.path !== path)
-    const source = fileNavigation.child('file', path).get<string>('source')
-    fileNavigation.child('file', path).clear()
+    const source = closing?.session
     const session = [state.active && toName(state.active), source && toName(source), ...terms].find(name => name && terms.includes(name) && keyOf(name) === closing?.task)
     return { ...state, files, ...(state.activeFile === path ? { activeFile: (remaining[i - 1] || remaining[i])?.path || '', active: session ? toId(session) : state.active } : {}) }
   })
@@ -95,7 +102,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   const fileSession = (path: string) => {
     const file = fileTabsRef.current.find(file => file.path === path)
     if (!file) return undefined
-    const source = fileNavigation.child('file', path).get<string>('source')
+    const source = file.session
     return [source && toName(source), active, ...terms].find(name => !!name && terms.includes(name) && keyOf(name) === file.task) || undefined
   }
   const activateFile = (path: string, session?: string) => {
@@ -110,7 +117,7 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
   const taskView = hasSider && tab === TASK_ROUTE
   const space = useWorkspaceLayout(terms.length > 0 || fileTabs.length > 0 || taskView, taskView)
   const pageVisible = isMobile ? !overlay : !taskView && space.mode !== 'focus'
-  useEffect(() => { if (saved.loaded && !terms.length && !fileTabs.length) setOverlay(false) }, [saved.loaded, terms.length, fileTabs.length])
+  useEffect(() => { if (saved.loaded && !terms.length && !fileTabs.length) { setOverlay(false); space.setFocus('none') } }, [saved.loaded, terms.length, fileTabs.length])
 
   useEffect(() => {
     pruneTabInspector([...saved.state.terms.map(id => `s:${id}`), ...fileTabs.map(file => `f:${file.path}`)])
@@ -134,11 +141,13 @@ export function useTaskWorkspace({ directory: data, nodeId: curNodeId, desktop: 
     data.rename(oldName, newName)
   }
   const closeTerm = (name: string) => {
-    const next = terms.filter(t => t !== name)
-    const current = activeTaskRef.current
-    const pool = current ? next.filter(n => keyOf(n) === current) : next
-    saved.update(state => ({ ...state, terms: state.terms.filter(id => id !== toId(name)), active: state.active === toId(name) ? toId(pool[pool.length - 1] || next[next.length - 1] || '') : state.active }))
-    if (!next.length && !fileTabsRef.current.length) { setOverlay(false); space.setFocus('none') }
+    saved.update(state => {
+      const next = state.terms.filter(id => id !== toId(name))
+      const current = activeTaskRef.current
+      const pool = current ? next.filter(id => keyOf(toName(id)) === current) : next
+      const files = state.files.filter(file => file.session ? file.session !== toId(name) : file.task !== keyOf(name) || next.some(id => keyOf(toName(id)) === file.task))
+      return { ...state, terms: next, files, activeFile: files.some(file => file.path === state.activeFile) ? state.activeFile : '', active: state.active === toId(name) ? pool[pool.length - 1] || next[next.length - 1] || '' : state.active }
+    })
   }
   const reorderTerm = (name: string, to: number) => setTerms((ts) => {
     const cur = activeTaskRef.current

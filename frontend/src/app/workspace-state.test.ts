@@ -17,6 +17,24 @@ function backend(initial = empty()) {
 }
 
 describe('workspace synchronization', () => {
+  it('removes session files opened by another client after the closing client last refreshed', async () => {
+    const remote = backend({ ...empty(), revision: 1, terms: ['one', 'two'], active: 'one' })
+    const desktop = createWorkspaceState(remote.request, empty, vi.fn())
+    const phone = createWorkspaceState(remote.request, empty, vi.fn())
+    await Promise.all([desktop.refresh(), phone.refresh()])
+    phone.update(state => ({ ...state, files: [
+      { path: '/repo/one.md', task: '/repo', session: 'one', mode: 'preview', preview: false },
+      { path: '/repo/two.md', task: '/repo', session: 'two', mode: 'preview', preview: false },
+    ], activeFile: '/repo/one.md' }))
+    await phone.refresh()
+    desktop.update(state => ({ ...state, terms: ['two'] }))
+    await desktop.refresh()
+    await phone.refresh()
+    expect(remote.state().files.map(file => file.path)).toEqual(['/repo/two.md'])
+    expect(phone.getSnapshot().state.activeFile).toBe('')
+    expect(phone.getSnapshot().state.active).toBe('two')
+  })
+
   it('merges edits from stale clients, shares selection, and restores a clean client', async () => {
     const remote = backend({ ...empty(), revision: 1, terms: ['base'], active: 'base' })
     const desktop = createWorkspaceState(remote.request, empty, vi.fn())

@@ -2,7 +2,7 @@
 const KEY = 'roam.terms'
 
 /** 文件标签：task 是从哪个任务（worktree）开的——路径条的根、右栏跟着它走 */
-export type FileTab = { path: string; preview: boolean; mode: 'source' | 'preview' | 'changes'; task: string }
+export type FileTab = { path: string; preview: boolean; mode: 'source' | 'preview' | 'changes'; task: string; session?: string }
 /** 标签条不按任务隔离（用户拍板）：会话标签全显示，文件标签一条平铺列表；diff 类标签不存 */
 export type TabSet = {
   terms: string[]; active: string
