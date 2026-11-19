@@ -42,6 +42,29 @@ async def test_initial_goal_waits_for_real_user_turn_and_replays_one_original_ma
     )
 
 
+async def test_snapshot_reports_real_coordination_turn_and_prefers_running_to_queued(
+    delegated_team,
+):
+    runtime, service, team, _, turn, binding, spec = delegated_team
+    first = await service.enable("alice", team["id"], spec, binding=binding, bootstrap=True)
+    await finish(runtime, turn)
+    result = await step(runtime, first["startJobId"])
+    assert (await runtime.swarms.snapshot("alice", team["id"]))["mainState"] == "queued"
+    job = await runtime.db.call(
+        lambda db: row(
+            db, "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?", (result["turnId"],)
+        )
+    )
+    current = await runtime.mailbox.claim(job)
+    assert (await runtime.swarms.snapshot("alice", team["id"]))["mainState"] == "running"
+    await runtime.conversations.accept("alice", team["mainConversationId"], "next", "下一步")
+    other = await runtime.conversations.create("alice", project_id="project-b")
+    await runtime.conversations.accept("alice", other["id"], "other", "其他项目")
+    assert (await runtime.swarms.snapshot("alice", team["id"]))["mainState"] == "running"
+    await runtime.journal.fail(current, "failed", "MODEL_FAILED")
+    assert (await runtime.swarms.snapshot("alice", team["id"]))["mainState"] == "queued"
+
+
 @pytest.mark.parametrize("change", ["stop", "revoke", "forget", "archive"])
 async def test_start_cannot_outlive_its_source(delegated_team, change):
     runtime, service, team, _, _, binding, spec = delegated_team
