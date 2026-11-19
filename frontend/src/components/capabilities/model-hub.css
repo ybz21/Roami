@@ -159,6 +159,9 @@ html[data-pointer="coarse"] .tt-model-plugin-import .ant-select-selector { min-h
 .tt-model-catalog-filters { display:flex; flex:1; min-width:0; flex-wrap:wrap; gap:var(--sp-3); }
 .tt-model-catalog-filters > .ui-input-wrap { flex:1; max-width:var(--content-form); min-width:0; }
 .tt-model-catalog-filters > .ui-select-trigger { max-width:var(--content-form); }
+.ui-menu-content:has(.tt-model-source-choice) { max-height:var(--radix-dropdown-menu-content-available-height); overflow-y:auto; }
+.tt-model-source-choice { display:grid; gap:var(--sp-1); max-width:min(var(--content-form),calc(100vw - var(--sp-5) * 3)); }
+.tt-model-source-choice small { color:var(--text-dim); font-size:var(--fs-meta); }
 .tt-model-directory-name { flex:1; min-width:0; font-size:var(--fs-sm); font-weight:500; overflow-wrap:anywhere; padding-block:var(--sp-3); }
 .tt-model-source-footer-actions { display:flex; flex-shrink:0; gap:var(--sp-2); }
 .tt-model-source-authorization > summary { display:flex; align-items:center; min-height:var(--tap); cursor:pointer; font-size:var(--fs-sm); }

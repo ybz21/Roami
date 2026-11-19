@@ -26,6 +26,12 @@ import '../settings/agent-settings.css'
 import './model-hub.css'
 
 const tabs = ['catalog', 'aggregate', 'usage', 'monitor', 'audit', 'gateway', 'speech']
+const sourceCreation = [
+  { key: 'source/new/openrouter', label: 'hub.openRouter.name', hint: 'hub.create.openRouter' },
+  { key: 'source/new', label: 'hub.addSource', hint: 'hub.create.api' },
+  { key: 'import', label: 'hub.plugin.import', hint: 'hub.create.plugin' },
+  { key: 'local', label: 'hub.local.title', hint: 'hub.create.local' },
+] as const
 const newID = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36)
 export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: string; onNav: (path: string) => void; embedded?: boolean }) {
   const { t, locale } = useI18n(), { message, modal } = App.useApp(), layout = useLayout()
@@ -167,7 +173,25 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       {tab==='aggregate'||tab==='monitor'||tab==='gateway'?null:fullDetail ? null : tab === 'usage' || tab === 'audit' ? <GatewayReconciliation controller={billing} /> : <div className="tt-model-hub-scroll">
       {tab !== 'speech' && error}{accountError&&<Alert type="error" role="alert" message={t(accountError)} action={<Button onClick={()=>{setAccountError('');controller.retry()}}>{t('capabilities.models.reread')}</Button>}/>}
       {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><header className="tt-pagehead"><h2>{t('hub.tab.speech')}</h2></header><SpeechSettings /></section>
-        : <>{loaded ? <><header className="tt-pagehead"><h2>{t('hub.tab.catalog')}</h2></header><div className="tt-model-hub-actions tt-model-catalog-actions"><div className="tt-model-catalog-filters"><Input aria-label={t('modelInteraction.sourceSearch')} placeholder={t('modelInteraction.sourceSearch')} prefix={<SearchIcon />} value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} /><Select<string> aria-label={t('modelInteraction.sourceType')} value={sourceType} options={['','openrouter-free','api','plugin'].map(value=>({value,label:t('modelInteraction.sourceType.'+(value||'all'))}))} onChange={setSourceType}/></div><Dropdown trigger={['click']} disabled={controller.busy} menu={{ items: [{ key: 'source/new/openrouter', label: t('hub.openRouter.name') }, { key: 'source/new', label: t('hub.addSource') }, { key: 'import', label: t('hub.plugin.import') }, { key: 'local', label: t('hub.local.title') }], onClick: ({ key }) => navigate('catalog/' + key) }}><Button type="primary" icon={<PlusIcon />} disabled={controller.busy}>{t('common.create')}</Button></Dropdown></div>{rows.length ? <div className="tt-model-connections">{rows}</div> : <p className="agent-settings-hint">{t(sources.length ? 'hub.directory.noMatches' : 'hub.empty.connections')}</p>}</> : !error && <Spin />}
+        : <>{loaded ? <>
+          <header className="tt-pagehead"><h2>{t('hub.tab.catalog')}</h2></header>
+          <div className="tt-model-hub-actions tt-model-catalog-actions">
+            <div className="tt-model-catalog-filters">
+              <Input aria-label={t('modelInteraction.sourceSearch')} placeholder={t('modelInteraction.sourceSearch')} prefix={<SearchIcon />} value={sourceQuery} onChange={event => setSourceQuery(event.target.value)} />
+              <Select<string> aria-label={t('modelInteraction.sourceType')} value={sourceType} options={['', 'openrouter-free', 'api', 'plugin'].map(value => ({ value, label: t('modelInteraction.sourceType.' + (value || 'all')) }))} onChange={setSourceType} />
+            </div>
+            <Dropdown trigger={['click']} align="end" disabled={controller.busy} menu={{
+              items: sourceCreation.map(({ key, label, hint }) => ({
+                key,
+                label: <span className="tt-model-source-choice"><strong>{t(label)}</strong><small>{t(hint)}</small></span>,
+              })),
+              onClick: ({ key }) => navigate('catalog/' + key),
+            }}>
+              <Button type="primary" icon={<PlusIcon />} disabled={controller.busy}>{t('common.create')}</Button>
+            </Dropdown>
+          </div>
+          {rows.length ? <div className="tt-model-connections">{rows}</div> : <p className="agent-settings-hint">{t(sources.length ? 'hub.directory.noMatches' : 'hub.empty.connections')}</p>}
+        </> : !error && <Spin />}
         </>}
     </div>}</div>}
     {detail && (layout.phone ? <MobileSubPage title={editorTitle} search={false} onBack={back} manageHistory={false}>{editor}</MobileSubPage> : !fullDetail && <aside className="tt-model-hub-detail"><div className="tt-model-hub-detail-head"><BackButton onClick={back} /><h3>{editorTitle}</h3></div>{editor}</aside>)}

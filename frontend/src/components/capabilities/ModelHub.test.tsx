@@ -103,6 +103,7 @@ it('shows connections and their models together and accepts old source-page link
 it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
+  expect(screen.getByRole('combobox', { name: 'capabilities.models.protocol' }).closest('details')).toBeNull()
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
   fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'first-model\nsecond-model\nfirst-model\n' } })
@@ -385,7 +386,7 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(document.querySelector('.tt-model-connection')).toBeNull()
 })
 
-it('opens creation and import choices from the top New button without a pricing shortcut', async () => {
+it('routes each named choice in the New menu to its own creation flow', async () => {
   const navigate = vi.fn()
   const { container } = mount('', navigate)
   const create = await screen.findByRole('button', { name: 'common.create' })
@@ -393,9 +394,18 @@ it('opens creation and import choices from the top New button without a pricing 
   expect(container.querySelector('.tt-model-connection-new')).toBeNull()
   expect(screen.queryByRole('button', { name: 'agent.gateway.defaultPrice' })).toBeNull()
   expect(container.querySelector('.tt-model-connection-footer button')).toBeNull()
-  fireEvent.keyDown(create, { key: 'ArrowDown' })
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
-  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
+  for (const [name, path] of [
+    ['hub.openRouter.name hub.create.openRouter', 'source/new/openrouter'],
+    ['hub.addSource hub.create.api', 'source/new'],
+    ['hub.plugin.import hub.create.plugin', 'import'],
+    ['hub.local.title hub.create.local', 'local'],
+  ]) {
+    fireEvent.keyDown(create, { key: 'ArrowDown' })
+    expect((await screen.findAllByRole('menuitem'))).toHaveLength(4)
+    fireEvent.click(screen.getByRole('menuitem', { name }))
+    expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/' + path)
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  }
 })
 
 it('keeps the card read-only and opens editing, pricing, routing and deletion inside its detail', async () => {
