@@ -25,7 +25,7 @@ type PreparedRouteRefusal struct {
 	FinishedMS   int64  `json:"finishedMs"`
 }
 
-var originalMainLaunchKey = regexp.MustCompile(`^project-main:[a-f0-9]{32}:[a-f0-9]{24}$`)
+var projectMainLaunchKey = regexp.MustCompile(`^project-main:[a-f0-9]{32}:[a-f0-9]{24}(:retry-[1-9][0-9]{0,18})?$`)
 var routeRefusalDigest = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func samePreparedProvider(a, b SessionBinding) bool {
@@ -63,7 +63,7 @@ func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLife
 	}
 	selected := PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.Model, Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true}
 	if spec.Executor == "claude" && settledKey != key && settledKey != "" && later[0].Spec.Persistent &&
-		later[0].Spec.PreparedFrom == key && originalMainLaunchKey.MatchString(settledKey) {
+		later[0].Spec.PreparedFrom == key && projectMainLaunchKey.MatchString(settledKey) {
 		r := later[0].Result
 		if r.State == "failed" && r.FinishedMS > 0 && routeRefusalDigest.MatchString(r.StopEvidence) &&
 			(r.ErrorCode == "MODEL_ROUTE_NO_AVAILABLE_MEMBER" || r.ErrorCode == "CLAUDE_COMPACTION_FAILED") {

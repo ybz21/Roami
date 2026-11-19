@@ -13,7 +13,7 @@ func TestPreparedSessionExposesOnlySettledRouteRefusalFromSamePreparedMain(t *te
 	prepared := Result{State: "succeeded", InputStopped: &yes, OutcomeKnown: &yes}
 	key := "project-main:" + strings.Repeat("a", 32) + ":" + strings.Repeat("b", 24)
 	digest := strings.Repeat("c", 64)
-	for _, scenario := range []string{"compaction", "route", "unknown", "wrong prepared", "different launch", "missing digest"} {
+	for _, scenario := range []string{"compaction", "route", "retry", "unknown", "wrong prepared", "different launch", "invalid retry", "missing digest"} {
 		t.Run(scenario, func(t *testing.T) {
 			state := sessionLifecycle{Executor: "claude", Model: "free", Binding: binding, State: "idle", CompletedKey: key}
 			later := preparedTurnProof{
@@ -24,12 +24,18 @@ func TestPreparedSessionExposesOnlySettledRouteRefusalFromSamePreparedMain(t *te
 			switch scenario {
 			case "route":
 				later.Result.ErrorCode = "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
+			case "retry":
+				state.CompletedKey += ":retry-4"
+				later.Spec.Key = state.CompletedKey
 			case "unknown":
 				later.Result.ErrorCode = "CLAUDE_API_REQUEST_FAILED"
 			case "wrong prepared":
 				later.Spec.PreparedFrom = "other"
 			case "different launch":
-				state.CompletedKey += ":retry-1"
+				state.CompletedKey += ":resume-1"
+				later.Spec.Key = state.CompletedKey
+			case "invalid retry":
+				state.CompletedKey += ":retry-0"
 				later.Spec.Key = state.CompletedKey
 			case "missing digest":
 				later.Result.StopEvidence = ""
@@ -38,13 +44,13 @@ func TestPreparedSessionExposesOnlySettledRouteRefusalFromSamePreparedMain(t *te
 			if err != nil || !selected.Ready {
 				t.Fatalf("readiness changed: %+v %v", selected, err)
 			}
-			if scenario != "compaction" && scenario != "route" {
+			if scenario != "compaction" && scenario != "route" && scenario != "retry" {
 				if selected.RouteRefusal != nil {
 					t.Fatalf("unexpected route refusal: %+v", selected.RouteRefusal)
 				}
 				return
 			}
-			want := PreparedRouteRefusal{LaunchKey: key, Code: later.Result.ErrorCode, FinishedMS: 2, StopEvidence: digest}
+			want := PreparedRouteRefusal{LaunchKey: state.CompletedKey, Code: later.Result.ErrorCode, FinishedMS: 2, StopEvidence: digest}
 			if selected.RouteRefusal == nil || *selected.RouteRefusal != want {
 				t.Fatalf("missing route refusal: %+v", selected.RouteRefusal)
 			}
