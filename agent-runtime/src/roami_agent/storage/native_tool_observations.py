@@ -102,3 +102,73 @@ def tool_diagnostic(db, task_id, run_id, revision):
         return None
     payload = json.loads(latest["payload_json"])
     return {"eventId": latest["id"], "diagnosticOnly": True, "reported": payload["reported"]}
+
+
+def retain_tool_activity(db, task, run, receipt):
+    activity = receipt.get("nativeToolActivity")
+    if (
+        activity is None
+        or receipt.get("reportedToolError") is None
+        or receipt.get("result") is not None
+    ):
+        return
+    latest = row(
+        db,
+        "SELECT a.id,a.result_json FROM tasks t JOIN task_attempts a ON a.task_id=t.id AND a.task_revision=t.revision "
+        "WHERE t.id=? AND t.owner_id=? AND t.state IN ('preparing','running','cancelling') "
+        "ORDER BY a.attempt_no DESC LIMIT 1",
+        (task["id"], task["owner_id"]),
+    )
+    if not latest or latest["id"] != run["id"] or latest["result_json"] is not None:
+        return
+    diagnostic = receipt["reportedToolError"]
+    if (
+        not isinstance(activity, dict)
+        or any(
+            activity.get(key) != diagnostic[key] for key in ("providerConversationId", "promptId")
+        )
+        or activity.get("classifierTool") != diagnostic["tool"]
+        or not isinstance(activity.get("sourceDigest"), str)
+        or not re.fullmatch(r"[a-f0-9]{64}", activity["sourceDigest"])
+        or any(
+            type(activity.get(key)) is not int or activity[key] < 0
+            for key in ("lastToolResultMs", "pendingTools", "consecutiveClassifierErrors")
+        )
+        or activity["lastToolResultMs"] < diagnostic["observedMs"]
+        or type(activity.get("lastSuccessfulToolResultMs", 0)) is not int
+        or not 0 <= activity.get("lastSuccessfulToolResultMs", 0) <= activity["lastToolResultMs"]
+    ):
+        raise DomainError("INVALID_EXECUTOR_TOOL_ACTIVITY")
+    fields = (
+        "providerConversationId",
+        "promptId",
+        "sourceDigest",
+        "classifierTool",
+        "lastToolResultMs",
+        "lastSuccessfulToolResultMs",
+        "pendingTools",
+        "consecutiveClassifierErrors",
+    )
+    observation = {key: activity[key] for key in fields if key in activity}
+    key = "native-tool-activity:" + run["id"] + ":" + activity["sourceDigest"]
+    payload = {
+        "taskId": task["id"],
+        "runId": run["id"],
+        "revision": run["task_revision"],
+        "observationOnly": True,
+        "diagnosticDigest": diagnostic["sourceDigest"],
+        "activity": observation,
+    }
+    previous = row(db, "SELECT payload_json FROM events WHERE event_key=?", (key,))
+    if previous:
+        if json.loads(previous["payload_json"]) != payload:
+            raise DomainError("EXECUTOR_TOOL_ACTIVITY_CONFLICT", 409)
+        return
+    event(
+        db,
+        task["origin_conversation_id"],
+        "task.execution_tool_activity",
+        payload,
+        task_id=task["id"],
+        key=key,
+    )

@@ -48,6 +48,65 @@ async def model_status(runtime, task, *, include=False):
     )
 
 
+async def test_same_run_activity_retains_failure_and_later_recovery_without_a_terminal_result(
+    store, tmp_path
+):
+    runtime, task, run, receipt = await diagnostic_task(store, tmp_path)
+    executor = CodingExecutor(store, Settings())
+    activity = {
+        "providerConversationId": "provider-report",
+        "promptId": "original-prompt",
+        "sourceDigest": "e" * 64,
+        "classifierTool": "Bash",
+        "lastToolResultMs": 123456,
+        "pendingTools": 0,
+        "consecutiveClassifierErrors": 3,
+    }
+
+    async def observations():
+        return await store.call(
+            lambda db: [
+                json.loads(row[0])
+                for row in db.execute(
+                    "SELECT payload_json FROM events WHERE task_id=? AND kind='task.execution_tool_activity' ORDER BY id",
+                    (task["id"],),
+                )
+            ]
+        )
+
+    try:
+        receipt["nativeToolActivity"] = activity
+        await executor.record(task, run, receipt)
+        await executor.record(task, run, receipt)
+        recovery = {
+            **activity,
+            "sourceDigest": "f" * 64,
+            "lastToolResultMs": 123457,
+            "lastSuccessfulToolResultMs": 123457,
+            "consecutiveClassifierErrors": 0,
+        }
+        await executor.record(task, run, {**receipt, "nativeToolActivity": recovery})
+        saved = await observations()
+        assert [item["activity"] for item in saved] == [activity, recovery]
+        assert all(
+            item["runId"] == run["id"]
+            and item["revision"] == run["task_revision"]
+            and item["observationOnly"]
+            for item in saved
+        )
+        detail = await runtime.tasks.get("alice", task["id"])
+        assert detail["attempts"][0]["result"] is None
+        with pytest.raises(DomainError, match="INVALID_EXECUTOR_TOOL_ACTIVITY"):
+            await executor.record(
+                task,
+                run,
+                {**receipt, "nativeToolActivity": {**activity, "promptId": "different-input"}},
+            )
+        assert await observations() == saved
+    finally:
+        await runtime.close()
+
+
 async def test_diagnostic_is_idempotent_historical_and_never_an_execution_result(store, tmp_path):
     runtime, task, run, receipt = await diagnostic_task(store, tmp_path)
     executor = CodingExecutor(store, Settings())

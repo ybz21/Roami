@@ -74,10 +74,11 @@ type Result struct {
 
 type Status struct {
 	Receipt
-	Result               *Result            `json:"result,omitempty"`
-	Progress             *ReportedProgress  `json:"progress,omitempty"`
-	ReportedToolError    *ReportedToolError `json:"reportedToolError,omitempty"`
-	ObservationErrorCode string             `json:"observationErrorCode,omitempty"`
+	Result               *Result             `json:"result,omitempty"`
+	Progress             *ReportedProgress   `json:"progress,omitempty"`
+	ReportedToolError    *ReportedToolError  `json:"reportedToolError,omitempty"`
+	NativeToolActivity   *NativeToolActivity `json:"nativeToolActivity,omitempty"`
+	ObservationErrorCode string              `json:"observationErrorCode,omitempty"`
 }
 
 type Service struct {

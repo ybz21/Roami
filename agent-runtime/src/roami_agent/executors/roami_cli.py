@@ -19,7 +19,10 @@ from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
-from roami_agent.storage.native_tool_observations import retain_tool_diagnostic
+from roami_agent.storage.native_tool_observations import (
+    retain_tool_activity,
+    retain_tool_diagnostic,
+)
 from roami_agent.storage.swarm_coordination_tasks import prepared_authority
 from roami_agent.storage.task_instruction import current_instruction
 from roami_agent.storage.task_reports import retain_reported_progress
@@ -347,6 +350,7 @@ class CodingExecutor:
                 return
             retain_reported_progress(db, task, run, receipt)
             retain_tool_diagnostic(db, task, current, receipt)
+            retain_tool_activity(db, task, current, receipt)
             if current["result_json"]:
                 return
             binding = receipt.get("sessionBinding")

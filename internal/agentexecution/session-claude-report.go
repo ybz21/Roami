@@ -45,17 +45,18 @@ type claudeReportRecord struct {
 }
 
 type claudeReportSnapshot struct {
-	Format     int                `json:"format"`
-	Path       string             `json:"path"`
-	Size       int64              `json:"size"`
-	ModifiedNS int64              `json:"modifiedNs"`
-	Inode      uint64             `json:"inode"`
-	ProviderID string             `json:"providerId"`
-	PromptID   string             `json:"promptId"`
-	PromptHash string             `json:"promptHash"`
-	Directory  string             `json:"directory"`
-	Progress   *ReportedProgress  `json:"progress"`
-	ToolError  *ReportedToolError `json:"toolError,omitempty"`
+	Format       int                 `json:"format"`
+	Path         string              `json:"path"`
+	Size         int64               `json:"size"`
+	ModifiedNS   int64               `json:"modifiedNs"`
+	Inode        uint64              `json:"inode"`
+	ProviderID   string              `json:"providerId"`
+	PromptID     string              `json:"promptId"`
+	PromptHash   string              `json:"promptHash"`
+	Directory    string              `json:"directory"`
+	Progress     *ReportedProgress   `json:"progress"`
+	ToolError    *ReportedToolError  `json:"toolError,omitempty"`
+	ToolActivity *NativeToolActivity `json:"toolActivity,omitempty"`
 }
 
 func claudeReportText(raw json.RawMessage) string {
@@ -133,35 +134,40 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 }
 
 func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir string) (*ReportedProgress, *ReportedToolError) {
+	progress, report, _ := claudeReport(binding, turn, promptHash, launchDir)
+	return progress, report
+}
+
+func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*ReportedProgress, *ReportedToolError, *NativeToolActivity) {
 	if turn == "" || promptHash == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	path, info := claudeTranscriptPath(binding)
 	if info == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	owner := info.Sys().(*syscall.Stat_t)
 
-	snapshot := claudeReportSnapshot{Format: 2, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
+	snapshot := claudeReportSnapshot{Format: 3, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
 	cache := filepath.Join(launchDir, "reported-progress.json")
 	var previous claudeReportSnapshot
 	if readJSON(cache, &previous) == nil && previous.Format == snapshot.Format && previous.Path == snapshot.Path && previous.Size == snapshot.Size && previous.ModifiedNS == snapshot.ModifiedNS && previous.Inode == snapshot.Inode && previous.ProviderID == snapshot.ProviderID && previous.PromptID == snapshot.PromptID && previous.PromptHash == snapshot.PromptHash && previous.Directory == snapshot.Directory {
-		return previous.Progress, previous.ToolError
+		return previous.Progress, previous.ToolError, previous.ToolActivity
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	defer file.Close()
 	opened, err := file.Stat()
 	if err != nil || !os.SameFile(info, opened) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	hash := sha256.New()
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), hash))
 	matched := false
 	var progress *ReportedProgress
-	observation := claudeToolErrorState{tools: map[string]string{}}
+	observation := claudeToolErrorState{tools: map[string]string{}, classifierErrors: map[string]int{}}
 	valid := true
 	activityKnown, activityMS := true, int64(0)
 	for {
@@ -185,6 +191,9 @@ func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir str
 			}
 		}
 		if record.Sidechain || record.Type != "user" && record.Type != "assistant" {
+			if matched && record.Sidechain {
+				observation.incomplete = true
+			}
 			continue
 		}
 		if record.SessionID != binding.ProviderID {
@@ -196,6 +205,9 @@ func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir str
 			if matched && record.PromptID != turn {
 				valid = false
 				break
+			}
+			if matched {
+				observation.incomplete = true
 			}
 			if matched && claudeInputHash(text, promptHash) != promptHash {
 				observation.discarded = true
@@ -210,8 +222,10 @@ func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir str
 				matched = true
 			}
 		}
-		if matched {
+		if matched && (record.PromptID == "" || record.PromptID == turn) {
 			observation.observe(binding, turn, record)
+		} else if matched {
+			observation.incomplete = true
 		}
 		if matched && record.Type == "assistant" && record.Message.StopReason == "end_turn" && text != "" {
 			directory, ok := reportDirectory(binding.Directory, record.Cwd)
@@ -224,20 +238,32 @@ func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir str
 	}
 	after, err := file.Stat()
 	if err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if !valid {
 		progress = nil
 		observation.report = nil
 	}
+	digest := hex.EncodeToString(hash.Sum(nil))
 	if progress != nil {
-		progress.SourceDigest = hex.EncodeToString(hash.Sum(nil))
+		progress.SourceDigest = digest
 		if activityKnown {
 			progress.ActivityMS = activityMS
 		}
 	}
 	snapshot.Progress = progress
 	snapshot.ToolError = observation.report
+	if valid && matched && !observation.discarded && !observation.incomplete && observation.activity.LastToolResultMS > 0 {
+		observation.activity.ProviderID = binding.ProviderID
+		observation.activity.PromptID = turn
+		observation.activity.SourceDigest = digest
+		observation.activity.PendingTools = len(observation.tools)
+		if observation.report != nil {
+			observation.activity.ClassifierTool = observation.report.Tool
+			observation.activity.ConsecutiveClassifierErrors = observation.classifierErrors[observation.report.Tool]
+		}
+		snapshot.ToolActivity = &observation.activity
+	}
 	_ = writeJSON(cache, snapshot)
-	return progress, observation.report
+	return progress, observation.report, snapshot.ToolActivity
 }
