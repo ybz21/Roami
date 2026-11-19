@@ -1549,7 +1549,7 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
 }
 :where(html[data-pointer="fine"]) .tt-tab:hover { background: var(--list-hover); color: var(--text-bright); }
 /* 底线贴近内容区；标题与中性底色共同标识当前页，不挪动标签和操作按钮。 */
-.tt-tab.on { background: var(--sel-bg); color: var(--accent); font-weight: 600; }
+.tt-tab.on { background: var(--sel-bg); color: var(--text-bright); font-weight: 600; }
 .tt-tab.on::after {
   content: ''; position: absolute; inset: auto 0 0; height: var(--sp-1);
   background: var(--accent); pointer-events: none;
