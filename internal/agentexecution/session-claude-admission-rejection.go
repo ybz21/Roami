@@ -63,7 +63,8 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 		switch r.Type {
 		case "assistant":
 			usage := r.Message.Usage
-			if result != nil || r.ParentUUID != root || r.UUID == "" || r.SessionID != binding.ProviderID || r.APIStatus != 402 || !r.APIError || !r.NoToolCall || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
+			compaction := claudeCompactionRefusal(r)
+			if result != nil || r.ParentUUID != root || r.UUID == "" || r.SessionID != binding.ProviderID || (!compaction && (r.APIStatus != 402 || !r.NoToolCall)) || !r.APIError || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
 				return nil, "", nil
 			}
 			var blocks []struct {
@@ -73,23 +74,27 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 			if json.Unmarshal(r.Message.Content, &blocks) != nil || len(blocks) != 1 || blocks[0].Type != "text" {
 				return nil, "", nil
 			}
-			body, ok := strings.CutPrefix(blocks[0].Text, "API Error: 402 ")
-			if !ok {
-				return nil, "", nil
-			}
-			var rejection struct {
-				Error struct {
-					Code string `json:"code"`
-				} `json:"error"`
-			}
-			if json.Unmarshal([]byte(body), &rejection) != nil || rejection.Error.Code != "MODEL_PROXY_DAILY_LIMIT" {
-				return nil, "", nil
+			code := "CLAUDE_COMPACTION_FAILED"
+			if !compaction {
+				body, ok := strings.CutPrefix(blocks[0].Text, "API Error: 402 ")
+				if !ok {
+					return nil, "", nil
+				}
+				var rejection struct {
+					Error struct {
+						Code string `json:"code"`
+					} `json:"error"`
+				}
+				if json.Unmarshal([]byte(body), &rejection) != nil || rejection.Error.Code != "MODEL_PROXY_DAILY_LIMIT" {
+					return nil, "", nil
+				}
+				code = rejection.Error.Code
 			}
 			stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
 			if problem != nil || stamp.Before(promptTime) || stamp.After(time.Now().Add(time.Second)) {
 				return nil, "", nil
 			}
-			result = &Result{State: "failed", ErrorCode: rejection.Error.Code, Summary: rejection.Error.Code, ExitCode: -1, FinishedMS: stamp.UnixMilli()}
+			result = &Result{State: "failed", ErrorCode: code, Summary: code, ExitCode: -1, FinishedMS: stamp.UnixMilli()}
 		case "api-request", "api-request-blob", "api-request-shape", "file-history-snapshot":
 			if result != nil {
 				return nil, "", nil
@@ -128,4 +133,27 @@ func (s Service) reconcileClaudeAdmissionRejection(ctx context.Context, key, dir
 	}
 	result, err := s.settleClaudeObservedOutcome(ctx, key, dir, path, receipt, state, state.TurnID, state.PromptHash, observe)
 	return result, true, err
+}
+
+func claudeCompactionRefusal(r claudeFailureRecord) bool {
+	if r.APIStatus != 0 || r.Failure != "invalid_request" {
+		return false
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(r.Message.Content, &blocks) != nil || len(blocks) != 1 || blocks[0].Type != "text" {
+		return false
+	}
+	body, ok := strings.CutPrefix(blocks[0].Text, "Prompt is too long · automatic compaction failed: API Error: 503 ")
+	if !ok {
+		return false
+	}
+	var refusal struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	return json.NewDecoder(strings.NewReader(body)).Decode(&refusal) == nil && refusal.Error.Code == "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
 }
