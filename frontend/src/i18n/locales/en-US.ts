@@ -5305,7 +5305,6 @@ const enUS = {
   'hub.create.openRouter': "Use an OpenRouter API key",
   'hub.create.api': "Enter a service URL and protocol",
   'hub.create.plugin': "Use a ZIP file or folder",
-  'hub.create.local': "Reuse a model connection from this device",
   'hub.addModel': "Add model",
   'hub.empty.sources': "No model sources yet",
   'hub.empty.catalog': "No models yet",

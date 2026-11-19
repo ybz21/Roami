@@ -398,10 +398,9 @@ it('routes each named choice in the New menu to its own creation flow', async ()
     ['hub.openRouter.name hub.create.openRouter', 'source/new/openrouter'],
     ['hub.addSource hub.create.api', 'source/new'],
     ['hub.plugin.import hub.create.plugin', 'import'],
-    ['hub.local.title hub.create.local', 'local'],
   ]) {
     fireEvent.keyDown(create, { key: 'ArrowDown' })
-    expect((await screen.findAllByRole('menuitem'))).toHaveLength(4)
+    expect((await screen.findAllByRole('menuitem'))).toHaveLength(3)
     fireEvent.click(screen.getByRole('menuitem', { name }))
     expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/' + path)
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
