@@ -29,6 +29,7 @@ type claudeInterruptedBlock struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`
 	ToolUseID string         `json:"tool_use_id"`
+	IsError   bool           `json:"is_error"`
 	Input     map[string]any `json:"input"`
 }
 
