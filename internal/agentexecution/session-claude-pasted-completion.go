@@ -15,6 +15,9 @@ import (
 )
 
 type claudeCompletionRecord struct {
+	SourceToolUseID string          `json:"sourceToolUseID"`
+	TurnCompanion   bool            `json:"turnCompanion"`
+	ToolUseResult   json.RawMessage `json:"toolUseResult"`
 	claudeInterruptedRecord
 	SnakeSessionID        string             `json:"session_id"`
 	PreventedContinuation *bool              `json:"preventedContinuation"`
@@ -40,6 +43,7 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 	digest := sha256.New()
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
 	matched, terminal, compact := false, false, false
+	companions := newClaudeCompanions(binding)
 	reachable, pending, completed := map[string]bool{}, map[string]bool{}, map[string]int64{}
 	finished := int64(0)
 	finalText := ""
@@ -61,13 +65,17 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 		// Earlier deferred work must not disappear behind the selected prompt or compaction.
 		if record.Type == "assistant" {
 			for _, block := range blocks {
-				if block.Type == "tool_use" && !synchronousClaudeTool(block) {
+				if !companions.call(block) {
 					return nil, "", nil
 				}
 			}
 		}
 		text := claudeReportText(record.Message.Content)
+		companions.observe(record, blocks)
 		if !matched {
+			if record.Type == "user" && record.Meta {
+				companions.accept(record, record.PromptID)
+			}
 			if record.Type != "user" || record.Meta || record.Compact || record.PromptID != turn || claudeInputHash(text, promptHash) != promptHash {
 				continue
 			}
@@ -108,7 +116,7 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 			switch record.Type {
 			case "system":
 				if record.Subtype == "stop_hook_summary" {
-					if !linked || finalText == "" || len(pending) != 0 || record.SnakeSessionID != binding.ProviderID || record.PreventedContinuation == nil || *record.PreventedContinuation || record.HookErrors == nil || len(*record.HookErrors) != 0 || record.FailedHooks == nil || len(*record.FailedHooks) != 0 || record.AddedContext == nil || len(*record.AddedContext) != 0 {
+					if !linked || finalText == "" || len(pending) != 0 || !companions.settled() || record.SnakeSessionID != binding.ProviderID || record.PreventedContinuation == nil || *record.PreventedContinuation || record.HookErrors == nil || len(*record.HookErrors) != 0 || record.FailedHooks == nil || len(*record.FailedHooks) != 0 || record.AddedContext == nil || len(*record.AddedContext) != 0 {
 						return nil, "", nil
 					}
 					stamp, problem := time.Parse(time.RFC3339Nano, record.Timestamp)
@@ -168,6 +176,9 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 			continue
 		}
 
+		if companions.accept(record, turn) {
+			continue
+		}
 		if text != "" || len(blocks) == 0 {
 			return nil, "", nil
 		}
