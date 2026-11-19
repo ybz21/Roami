@@ -39,6 +39,26 @@ async def invoke(runtime, binding, name, args):
     )
 
 
+async def test_large_status_overview_uses_admitted_original_members(coordinated_tools, monkeypatch):
+    runtime, team, _, _, actor, binding = coordinated_tools
+    snapshot = await runtime.swarms.snapshot("alice", team["id"])
+    snapshot["mainMessages"] = [{"text": "old history " * 20000}]
+    snapshot["members"].append({"id": "retired", "taskId": "retired-task"})
+    snapshot["work"].append({"id": "retired-work", "memberId": "retired"})
+
+    async def large_snapshot(owner, sid):
+        assert owner == "alice" and sid == team["id"]
+        return snapshot
+
+    monkeypatch.setattr(runtime.swarms, "snapshot", large_snapshot)
+    result = await invoke(runtime, binding, "swarm_status", {"swarmId": team["id"]})
+    overview = result["overview"]
+    assert overview["selection"] == "admitted_goal_members"
+    assert overview["members"]["items"]
+    assert "retired" not in {item["id"] for item in overview["members"]["items"]}
+    assert actor["taskId"] in {item["task_id"] for item in overview["work"]["items"]}
+
+
 async def test_original_main_can_reply_once_via_actual_registered_cli_alias(coordinated_tools):
     runtime, team, _, question, actor, binding = coordinated_tools
     args = {

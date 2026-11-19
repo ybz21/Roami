@@ -314,8 +314,9 @@ def snapshot(db, owner, swarm_id):
     )[::-1]
     main_turn = row(
         db,
-        "SELECT state FROM turns WHERE id IN (SELECT turn_id FROM swarm_posts WHERE swarm_id=? AND turn_id IS NOT NULL UNION SELECT aggregate_id FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId') IN (SELECT task_id FROM swarm_work_items WHERE swarm_id=?)) ORDER BY created_ms DESC LIMIT 1",
-        (swarm_id, swarm_id),
+        "SELECT state FROM turns WHERE conversation_id=? "
+        "ORDER BY CASE state WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,created_ms DESC,rowid DESC LIMIT 1",
+        (value["conversation_id"],),
     )
     from roami_agent.storage.swarm_members import member_list
 

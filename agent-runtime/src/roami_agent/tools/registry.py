@@ -204,9 +204,14 @@ class Tools:
             and isinstance(item, (bool, int, float, str, type(None)))
             and len(encoded(item)) <= 1000
         }
-        return {
+        result = {
             **essential,
             "preview": body[:4000].decode(errors="ignore"),
             "artifactRefs": [reference],
             "outputExternalized": True,
         }
+        if tool.name == "swarm_status" and isinstance(value, dict):
+            from roami_agent.tools.swarm_status_overview import overview
+
+            result["overview"] = overview(value, binding.get("coordinationMemberIds"))
+        return result

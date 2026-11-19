@@ -482,7 +482,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_status",
-            "Read your swarm group chat, work items, dependencies and authoritative task state; reports are not verification. Main may inspect only its bound conversation; workers only their own group.",
+            "Read your swarm group chat, work items, dependencies and authoritative task state; reports are not verification. Large histories include a bounded overview of current member/task/revision/run identities; use task_status for results, swarm_inbox_read for pending messages and swarm_member for history rather than paging the whole snapshot. Main may inspect only its bound conversation; workers only their own group.",
             object_schema({"swarmId": string}, ["swarmId"]),
             status,
             True,

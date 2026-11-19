@@ -218,6 +218,11 @@ class SwarmCoordinationPolicy:
         if value is None:
             return args, binding
         args = await self.db.call(lambda db: self.scope(db, value, tool.name, args))
+        if tool.name == "swarm_status":
+            binding = {
+                **binding,
+                "coordinationMemberIds": json.loads(value["delegation"]["member_ids_json"]),
+            }
         if tool.name == "project_okr_context":
             binding = {**binding, "coordinationProjectId": value["delegation"]["projectId"]}
         if tool.name == "file_read":
