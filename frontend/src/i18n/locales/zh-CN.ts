@@ -5272,6 +5272,8 @@ const zhCN = {
   'hub.directory.fetch': "拉取所有模型",
   'hub.directory.refetch': "重新拉取",
   'hub.directory.readHint': "仅读取目录，不调用模型",
+  'hub.directory.publicHTTP': "公网模型源需要 HTTPS。请填服务商提供的 HTTPS 地址，或给自建服务配置 HTTPS。",
+  'hub.directory.invalidURL': "请填写完整的服务地址，去掉地址中的凭据、查询参数和片段。",
   'hub.directory.title': "可选模型",
   'hub.directory.total': "共 {count} 个",
   'hub.directory.search': "搜索模型",

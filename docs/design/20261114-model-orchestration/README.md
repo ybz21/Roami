@@ -1,8 +1,12 @@
 # 模型源与聚合：工作台重构
 
-2026-11-19 [当前设计（HTML）](model-monitoring-and-aggregation.html) · [最新设计（HTML）](latest-design.html) · [历史设计、原型和验收（HTML）](history/index.html)。当前保留七个独立页面。最新设计汇总网关分层、请求级观测与聚合降级，并引用对应的交互原型和技术章节。
+2026-11-19 [统一交互原型（HTML）](gateway-prototype.html#/aggregate) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
 
-桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 验证了三个入口之间的导航，以及从降级原型进入审计再返回。37 个 HTML 页面和 549 条本地引用通过检查。截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
+后续交互在 `gateway-prototype/` 增量维护。保留旧网关原型的模型目录与接入密钥，七个工作台页面由同一导航切换。调度顺位图、请求链路和监控图表使用演示数据。单独查方案时，从下表打开对应设计子页。旧版原型在[历史快照](history/model-workspace.html)。
+
+原型的工作台、局部交互、排序和来源创建分别维护在 `entry.tsx`、`workspace-samples.js`、`order-drag.js` 和 `source-creation.js`。加场景时复用现有路由和审计入口。执行 `node docs/design/20261114-model-orchestration/gateway-prototype/build.mjs` 可重新生成可离线打开的 HTML。
+
+桌面 1280、1920、2560、3440 CSS px 与 Redmi Note 8 验证了调度拖动和应用、四条调用路径、监控筛选到审计的往返，以及新建来源后在网关目录查看模型。截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
 
 归档验收覆盖桌面四档宽度与 Redmi Note 8。逐卷打开九个历史专题，核对正文锚点、动态原型和旧账本快照返回。检查 36 个 HTML 和 528 条本地引用，在隔离目录重建三个迁移后的原型。15 条旧临时链接匹配到已有归档副本，其余临时证据在对应记录中标明。
 
@@ -28,17 +32,17 @@
 
 2026-11-19 聚合调度调整。把现有聚合详情的「运行状态」并入「调度」，在策略卡片上方显示可展开的「当前调度顺序」。生效顺位来自同一份网关状态。沿用原来的排序手柄、落点和「保存并应用」。用同一份测试配置对照桌面与安卓真机，核对生效顺位、跳过原因、拖动草稿及保存后重开。截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
 
-2026-11-19：[合并调度状态、统一模型源类型与 Magpie 插件更新](routing-status-and-sources.html)。可交互 HTML 含原型和技术设计。
+2026-11-19：[合并调度状态、统一模型源类型与 Magpie 插件更新](./history/prototypes/routing-status-and-sources.html)。可交互 HTML 含原型和技术设计。
 
 原型已在桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 真机验证。覆盖调度顺位、跳过状态和规则应用，来源筛选和创建，直接填写插件目录链接或仓库相对路径，以及模型选择和更新回退。插件安装和回退使用演示数据。
 
 拖动交互以现有 Roami 调度页的浏览器 DOM 和计算样式为依据。原型验证了拖动阈值、上下落点、取消、列表外释放、草稿和应用。桌面验证键盘及边缘自动滚动，安卓真机验证触屏拖动与列表滚动。
 
-2026-11-16：本机网关第二轮设计：[设计说明](gateway-design.md) · [可交互 HTML](gateway-prototype.html)。[正式实现与验收](gateway-implementation.md)。
+2026-11-16：本机网关第二轮设计：[设计说明](gateway-design.md) · [可交互 HTML](./history/prototypes/gateway-prototype.html)。[正式实现与验收](gateway-implementation.md)。
 
 2026-11-16：[交互稿正式实现与验收](interaction-implementation.md)。
 
-最新交互评审稿：[完整交互设计](interaction-design.md) · [打开可交互 HTML](interaction-prototype.html)。覆盖大模型七个页面及主要详情流程，使用演示数据，尚未接入生产页面。
+历史交互评审稿：[完整交互设计](interaction-design.md) · [打开当时原型](./history/prototypes/interaction-prototype.html)。覆盖大模型七个页面及主要详情流程，使用演示数据。
 
 ## Product Design
 

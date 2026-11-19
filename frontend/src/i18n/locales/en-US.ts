@@ -5263,6 +5263,8 @@ const enUS = {
   'hub.directory.fetch': "Fetch all models",
   'hub.directory.refetch': "Fetch again",
   'hub.directory.readHint': "Reads the directory without running models",
+  'hub.directory.publicHTTP': "Public model sources require HTTPS. Use the provider's HTTPS address or configure HTTPS for your service.",
+  'hub.directory.invalidURL': "Enter a complete service URL without credentials, query parameters, or fragments.",
   'hub.directory.title': "Available models",
   'hub.directory.total': "{count} models",
   'hub.directory.search': "Search models",

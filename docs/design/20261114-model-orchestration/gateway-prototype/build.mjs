@@ -13,8 +13,10 @@ function visit(node) { if (ts.isVariableDeclaration(node) && node.name.getText()
 visit(theme)
 const light = themeObject.properties.find(row => row.name.getText() === 'light').initializer.properties.find(row => row.name.getText() === 'css').initializer
 const lightCss = light.properties.map(row => `${row.name.text}:${row.initializer.text};`).join('')
-const result = await build({ entryPoints: [path.join(here, 'entry.tsx')], bundle: true, write: false, platform: 'browser', loader: { '.svg': 'dataurl' }, format: 'iife', jsx: 'automatic', minify: true, define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent', nodePaths: [path.join(root, 'frontend/node_modules')] })
+const result = await build({ entryPoints: [path.join(here, 'entry.tsx')], bundle: true, write: false, platform: 'browser', loader: { '.svg': 'dataurl', '.template': 'text' }, format: 'iife', jsx: 'automatic', minify: true, define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent', nodePaths: [path.join(root, 'frontend/node_modules')] })
 const css = await fs.readFile(path.join(here, 'styles.css'), 'utf8')
+const sampleCss = await fs.readFile(path.join(here, 'workspace-samples.css'), 'utf8')
 const script = result.outputFiles[0].text.replaceAll('</script', '<\\/script')
-await fs.writeFile(path.join(here, '../gateway-prototype.html'), `<!doctype html><html lang="zh-CN" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content"><title>Roami · Gateway prototype</title><style>/* Generated tokens from index.css and theme.tsx. */${roots}html[data-theme="light"]{color-scheme:light;${lightCss}}${css}</style></head><body><div id="app"></div><script>${script}</script></body></html>`)
+await fs.writeFile(path.join(here, '../gateway-prototype.html'), `<!doctype html><html lang="zh-CN" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content"><title>Roami · 大模型工作台原型</title><style>/* Generated tokens from index.css and theme.tsx. */${roots}html[data-theme="light"]{color-scheme:light;${lightCss}}${css}
+${sampleCss}</style></head><body><div id="app"></div><script>${script}</script></body></html>`)
 console.log('Built gateway-prototype.html')

@@ -1,4 +1,5 @@
 export const gatewayCopy = {
+  prototypeTitle: ['大模型工作台', 'Model workspace'], designOverview: ['设计总览', 'Design overview'], design: ['本页设计', 'Page design'], troubleshoot: ['调用排查', 'Troubleshooting'],
   capability: ['能力', 'Capabilities'], models: ['大模型', 'Models'], agents: ['智能体', 'Agents'], plugins: ['插件', 'Plugins'], tools: ['基础工具', 'Core tools'], market: ['市场', 'Market'],
   catalog: ['模型源', 'Model sources'], aggregate: ['聚合', 'Pools'], overview: ['概况', 'Overview'], monitoring: ['监控', 'Monitoring'], audit: ['审计', 'Audit'], gateway: ['本机网关', 'Local gateway'], speech: ['语音输入', 'Speech input'],
   demo: ['交互稿 · 演示数据', 'Prototype · Sample data'], scene: ['数据场景', 'Data state'], normal: ['正常', 'Normal'], empty: ['空状态', 'Empty'], loading: ['加载中', 'Loading'], failed: ['加载失败', 'Load failed'], theme: ['切换主题', 'Switch theme'], language: ['切换语言', 'Switch language'], collapse: ['收起侧栏', 'Collapse navigation'], expand: ['展开侧栏', 'Expand navigation'],

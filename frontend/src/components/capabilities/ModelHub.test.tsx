@@ -119,6 +119,19 @@ it('saves a LAN HTTP source and manual models without fetching the directory', a
   expect((writes[0][2] as ModelCatalog).models[0]).toEqual(catalog.models[0])
 })
 
+it('explains why public HTTP discovery is disabled and enables it after changing to HTTPS', async () => {
+  mount('catalog/source/new')
+  const address = await screen.findByLabelText('agent.models.baseUrl')
+  const fetchDirectory = screen.getByRole('button', { name: 'hub.directory.fetch' }) as HTMLButtonElement
+  fireEvent.change(address, { target: { value: 'http://api.example.com/v1' } })
+  const warning = screen.getByText('hub.directory.publicHTTP')
+  expect(address.getAttribute('aria-describedby')).toBe(warning.id)
+  expect(fetchDirectory.disabled).toBe(true)
+  fireEvent.change(address, { target: { value: 'https://api.example.com/v1' } })
+  expect(screen.queryByText('hub.directory.publicHTTP')).toBeNull()
+  expect(fetchDirectory.disabled).toBe(false)
+})
+
 it('opens a dedicated OpenRouter connector and only adds models selected from its directory', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')

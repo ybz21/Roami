@@ -21,6 +21,6 @@ try {
   const result = await build({ entryPoints: [path.join(here, 'entry.tsx')], bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic', minify: true, define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent', nodePaths: [path.join(root, 'frontend/node_modules')] })
   const css = await fs.readFile(path.join(here, 'styles.css'), 'utf8'), script = result.outputFiles[0].text.replaceAll('</script', '<\\/script')
   const html = `<!doctype html><html lang="zh-CN" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Roami · Model interaction prototype</title><style>/* Tokens copied from frontend/src/index.css and theme.tsx; do not edit generated values. */${roots}html[data-theme="light"]{color-scheme:light;${lightCss}}${css}</style></head><body><div id="layout-observer" hidden></div><div id="app"></div><div id="notice" role="status" aria-live="polite"></div><script>/* Icons serialized from frontend/src/icons.tsx. */window.roamiDesignIcons=${JSON.stringify(icons)};</script><script>${script}</script></body></html>`
-  await fs.writeFile(path.join(here, '../interaction-prototype.html'), html)
+  await fs.writeFile(path.join(here, '../history/prototypes/interaction-prototype.html'), html)
   console.log(`Built offline prototype (${Math.round(Buffer.byteLength(html) / 1024)} KiB)`)
 } finally { await fs.rm(work, { recursive: true, force: true }) }

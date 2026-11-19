@@ -1,6 +1,6 @@
 # 大模型工作区交互落地
 
-2026-11-16。依据 [已确认交互稿](interaction-design.md) 和 [离线原型](interaction-prototype.html)，沿用 Roami 的设计令牌、antd 与现有 Radix 控件。保留能力导航和大模型的七个 Tab。
+2026-11-16。依据 [已确认交互稿](interaction-design.md) 和 [离线原型](./history/prototypes/interaction-prototype.html)，沿用 Roami 的设计令牌、antd 与现有 Radix 控件。保留能力导航和大模型的七个 Tab。
 
 ## Product Design
 

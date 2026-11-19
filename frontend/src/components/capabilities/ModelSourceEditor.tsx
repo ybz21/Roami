@@ -51,7 +51,14 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const openRouter = source.connector === openRouterConnection.connector
   const canChangeConnector = !!existing && normalizedURL === openRouterConnection.baseUrl && source.protocol === openRouterConnection.protocol
   let validURL = false
-  try { const url = new URL(normalizedURL); validURL = normalizedURL.length <= 2000 && !url.username && !url.password && !url.search && !url.hash && (url.protocol === 'https:' || url.protocol === 'http:' && (['localhost', '[::1]'].includes(url.hostname) || /^(127|10)\.\d+\.\d+\.\d+$|^192\.168\.\d+\.\d+$|^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$|^\[f[cd][\da-f]{2}:/i.test(url.hostname))) } catch { /* Validated before reading or saving. */ }
+  let publicHTTP = false
+  try {
+    const url = new URL(normalizedURL)
+    const local = ['localhost', '[::1]'].includes(url.hostname) || /^(127|10)\.\d+\.\d+\.\d+$|^192\.168\.\d+\.\d+$|^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$|^\[f[cd][\da-f]{2}:/i.test(url.hostname)
+    publicHTTP = url.protocol === 'http:' && !local
+    validURL = normalizedURL.length <= 2000 && !url.username && !url.password && !url.search && !url.hash && (url.protocol === 'https:' || url.protocol === 'http:' && local)
+  } catch { /* Validated before reading or saving. */ }
+  const urlError = !validURL && normalizedURL ? t(publicHTTP ? 'hub.directory.publicHTTP' : 'hub.directory.invalidURL') : ''
   const needsKey = !!existing?.hasKey && normalizedURL !== existing.baseUrl && !source.apiKey
   const validConnection = validURL && !needsKey
   const attached = configuredSourceModels(catalog.models, source.id)
@@ -125,7 +132,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
         {source.pluginSourceId && draft.editing ? <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} onChange={event => updateSource({ name: event.target.value })} /></label> : draft.editing ? <>
           {canChangeConnector && <label className="agent-settings-field">{t('modelInteraction.sourceType')}<Select virtual={false} aria-label={t('modelInteraction.sourceType')} value={source.connector || 'api'} options={[{ value: 'api', label: t('modelInteraction.sourceType.api') }, { value: 'openrouter-free', label: t('hub.openRouter.name') }]} onChange={value => updateSource(value === 'openrouter-free' ? openRouterConnection : { connector: undefined })} /></label>}
-          <label className="agent-settings-field">{t('agent.models.baseUrl')}<Input aria-label={t('agent.models.baseUrl')} type="url" value={source.baseUrl} readOnly={openRouter} maxLength={2000} placeholder="https://api.example.com/v1" onChange={event => updateSource({ baseUrl: event.target.value })} /></label>
+          <label className="agent-settings-field">{t('agent.models.baseUrl')}<Input aria-label={t('agent.models.baseUrl')} aria-invalid={!!urlError} aria-describedby={urlError ? 'model-source-url-error' : undefined} type="url" value={source.baseUrl} readOnly={openRouter} maxLength={2000} placeholder="https://api.example.com/v1" onChange={event => updateSource({ baseUrl: event.target.value })} />{urlError && <span id="model-source-url-error" className="tt-model-source-warning" role="status">{urlError}</span>}</label>
           {!openRouter && <label className="agent-settings-field">{t('capabilities.models.protocol')}<Select virtual={false} aria-label={t('capabilities.models.protocol')} value={source.protocol} options={modelProtocols.map(value => ({ value, label: t('capabilities.models.protocol.' + value) }))} onChange={protocol => updateSource({ protocol })} /></label>}
           <label className="agent-settings-field">{t('modelIdentity.providerKey')}<Input.Password aria-label={t('modelIdentity.providerKey')} autoComplete="new-password" visibilityToggle={false} value={source.apiKey} maxLength={8192} placeholder={t(source.hasKey ? 'agent.models.keyKept' : 'agent.models.keyPlaceholder')} onChange={event => updateSource({ apiKey: event.target.value })} /></label>
           {needsKey && <p className="tt-model-source-warning" role="alert">{t('agent.models.newEndpointKey')}</p>}

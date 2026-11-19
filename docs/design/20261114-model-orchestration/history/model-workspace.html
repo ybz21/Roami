@@ -19,9 +19,9 @@
 <h2 id="record-heading">设计与验收记录</h2>
 <p class="copy">七页工作台、拖动交互、网关目录与观测方案。记录按原版本归档，实施状态以当时的记录为准。</p>
 <p class="muted"><a href="index.html">返回历史目录</a> · <a href="../model-monitoring-and-aggregation.html">查看现行设计</a></p>
-<details><summary>原型和历史 HTML（3）</summary><ul class="record-list"><li><a href="../gateway-prototype.html">Roami · Gateway prototype</a></li>
-<li><a href="../interaction-prototype.html">Roami · Model interaction prototype</a></li>
-<li><a href="../routing-status-and-sources.html">Roami · 聚合调度与模型源设计</a></li>
+<details><summary>原型和历史 HTML（3）</summary><ul class="record-list"><li><a href="./prototypes/gateway-prototype.html">Roami · Gateway prototype</a></li>
+<li><a href="./prototypes/interaction-prototype.html">Roami · Model interaction prototype</a></li>
+<li><a href="./prototypes/routing-status-and-sources.html">Roami · 聚合调度与模型源设计</a></li>
 </ul></details>
 <details open><summary>文档（9）</summary><ul class="record-list"><li><a href="#design-readme">模型源与聚合：工作台重构</a></li>
 <li><a href="#design-design">DESIGN</a></li>
@@ -91,12 +91,12 @@
 <p>2026-11-19 免费筛选与删除验收。隔离网关中复现旧配置对唯一积分成员的费用拦截，升级后可调度数从 0 变为 1。桌面四档宽度和 Redmi Note 8 验证筛选只作用于候选，已选成员保留。来源详情列出引用的聚合，未被引用的来源可通过确认框删除。七个 HTML 通过 Roami 文件预览打开，跨页审计保留时段与失败原因。截图见 <a href="https://github.com/ybz21/Roami/pull/989">PR #989</a>。</p>
 <p>2026-11-19 Magpie 社区导入验收。桌面和 Redmi Note 8 能搜索 <code>packages/workbuddy</code>，显示线上与本机版本。隔离节点从发布索引下载并校验 WorkBuddy 0.2.37，识别出 WorkBuddy 和 WorkBuddy AI。GitHub 官方、jsDelivr 和 gh-hk 选项通过目录读取验证，其中香港节点失败后回退成功。用模拟响应验证包摘要不匹配时拒绝导入。截图见 <a href="https://github.com/ybz21/Roami/pull/989">PR #989</a>。</p>
 <p>2026-11-19 聚合调度调整。把现有聚合详情的「运行状态」并入「调度」，在策略卡片上方显示可展开的「当前调度顺序」。生效顺位来自同一份网关状态。沿用原来的排序手柄、落点和「保存并应用」。用同一份测试配置对照桌面与安卓真机，核对生效顺位、跳过原因、拖动草稿及保存后重开。截图见 <a href="https://github.com/ybz21/Roami/pull/989">PR #989</a>。</p>
-<p>2026-11-19：<a href="../routing-status-and-sources.html">合并调度状态、统一模型源类型与 Magpie 插件更新</a>。可交互 HTML 含原型和技术设计。</p>
+<p>2026-11-19：<a href="./prototypes/routing-status-and-sources.html">合并调度状态、统一模型源类型与 Magpie 插件更新</a>。可交互 HTML 含原型和技术设计。</p>
 <p>原型已在桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 真机验证。覆盖调度顺位、跳过状态和规则应用，来源筛选和创建，直接填写插件目录链接或仓库相对路径，以及模型选择和更新回退。插件安装和回退使用演示数据。</p>
 <p>拖动交互以现有 Roami 调度页的浏览器 DOM 和计算样式为依据。原型验证了拖动阈值、上下落点、取消、列表外释放、草稿和应用。桌面验证键盘及边缘自动滚动，安卓真机验证触屏拖动与列表滚动。</p>
-<p>2026-11-16：本机网关第二轮设计：<a href="#design-gateway-design">设计说明</a> · <a href="../gateway-prototype.html">可交互 HTML</a>。<a href="#design-gateway-implementation">正式实现与验收</a>。</p>
+<p>2026-11-16：本机网关第二轮设计：<a href="#design-gateway-design">设计说明</a> · <a href="./prototypes/gateway-prototype.html">可交互 HTML</a>。<a href="#design-gateway-implementation">正式实现与验收</a>。</p>
 <p>2026-11-16：<a href="#design-interaction-implementation">交互稿正式实现与验收</a>。</p>
-<p>最新交互评审稿：<a href="#design-interaction-design">完整交互设计</a> · <a href="../interaction-prototype.html">打开可交互 HTML</a>。覆盖大模型七个页面及主要详情流程，使用演示数据，尚未接入生产页面。</p>
+<p>最新交互评审稿：<a href="#design-interaction-design">完整交互设计</a> · <a href="./prototypes/interaction-prototype.html">打开可交互 HTML</a>。覆盖大模型七个页面及主要详情流程，使用演示数据，尚未接入生产页面。</p>
 <h3 id="design-readme--product-design">Product Design</h3>
 <p>本阶段只重构模型源和聚合。参考 Linear 的紧凑导航与对齐、Vercel Geist 的中性表面和明确对比。React + Tailwind CSS + shadcn/Radix 控件承载新页面，沿用 Roami 已有 token、国际化、手机导航与手势约束。其他能力页继续使用既有组件。</p>
 <p>按用户最终确认，能力顶部 Tabs 和模型功能左侧 Tabs 保持原有形式；手机继续使用原有能力选择和顶部模型 Tabs。聚合调度采用上下结构：紧凑策略配置与预览卡在上，完整优先成员列表在下，编辑和预览不再分居两栏。成员用卡片式可排序行展示；鼠标悬停/键盘聚焦显示置顶和移除，触屏始终可见。</p>
@@ -364,7 +364,7 @@ padding: &quot;var(--sp-4)&quot;</h3>
 <article class="record" id="design-gateway-design">
 <p class="muted">原稿 <code>gateway-design.md</code></p>
 <h2 id="design-gateway-design--本机网关接入与-key-管理">本机网关：接入与 Key 管理</h2>
-<p><a href="../gateway-prototype.html">打开可交互稿</a>。使用合成模型和凭据；所有保存、生成、轮换、停用与删除均只影响当前页面内存，不连接网关，不发送模型请求。顶部与左侧导航保留现有形式。本轮只设计本机网关，未修改正式页面或线上服务。</p>
+<p><a href="./prototypes/gateway-prototype.html">打开可交互稿</a>。使用合成模型和凭据；所有保存、生成、轮换、停用与删除均只影响当前页面内存，不连接网关，不发送模型请求。顶部与左侧导航保留现有形式。本轮只设计本机网关，未修改正式页面或线上服务。</p>
 <h3 id="design-gateway-design--product-design">Product Design</h3>
 <p>截图中的问题是接入地址、生成 Key 与固定 Key 编辑分散在通栏区块里：操作离对象过远，低频表单一直占据主流程，且“服务商提供的 API Key”会使用户混淆网关调用凭据与上游源凭据。</p>
 <p>默认页保留“接入与密钥 / 模型目录”两个任务入口。接入页先给 Base URL 和可复制的调用示例，再展示独立调用方的 Key 列表。地址和复制按钮紧邻；调用模型切换会同步更新 curl / Python 示例。复制示例只引用环境变量，不写入明文 Key。</p>
@@ -451,7 +451,7 @@ padding: &quot;var(--sp-4)&quot;</h3>
 <h2 id="design-interaction-design--大模型工作区交互设计">大模型工作区交互设计</h2>
 <h3 id="design-interaction-design--product-design">Product Design</h3>
 <p>面向管理多个 API、插件账号和聚合路由的用户。目标是在桌面和手机上都能看清当前配置、完成一个明确操作、核对生效范围，并能返回继续未完成的编辑。模式为 Operate；沿用 Roami 的中性深浅主题、字号、间距、控件和触摸规则，不替换现有视觉系统。</p>
-<p><a href="../interaction-prototype.html">打开可交互 HTML</a>。文件可以离线打开。所有模型能力、价格、账号、请求和监控均为合成示例；授权、保存、Key 生成与质量检查只修改当前页面的演示状态，不连接真实服务。界面支持中英文与深浅主题。</p>
+<p><a href="./prototypes/interaction-prototype.html">打开可交互 HTML</a>。文件可以离线打开。所有模型能力、价格、账号、请求和监控均为合成示例；授权、保存、Key 生成与质量检查只修改当前页面的演示状态，不连接真实服务。界面支持中英文与深浅主题。</p>
 <p>能力顶部 Tabs、模型左侧 Tabs 及七个目的地保持：模型源、聚合、概况、监控、审计、本机网关、语音输入。手机使用原有的顶部模型导航，内容详情用全屏返回页。</p>
 <h3 id="design-interaction-design--走查结论">走查结论</h3>
 <table>
@@ -615,7 +615,7 @@ padding: &quot;var(--sp-4)&quot;</h3>
 <article class="record" id="design-interaction-implementation">
 <p class="muted">原稿 <code>interaction-implementation.md</code></p>
 <h2 id="design-interaction-implementation--大模型工作区交互落地">大模型工作区交互落地</h2>
-<p>2026-11-16。依据 <a href="#design-interaction-design">已确认交互稿</a> 和 <a href="../interaction-prototype.html">离线原型</a>，沿用 Roami 的设计令牌、antd 与现有 Radix 控件。保留能力导航和大模型的七个 Tab。</p>
+<p>2026-11-16。依据 <a href="#design-interaction-design">已确认交互稿</a> 和 <a href="./prototypes/interaction-prototype.html">离线原型</a>，沿用 Roami 的设计令牌、antd 与现有 Radix 控件。保留能力导航和大模型的七个 Tab。</p>
 <h3 id="design-interaction-implementation--product-design">Product Design</h3>
 <table>
 <thead>

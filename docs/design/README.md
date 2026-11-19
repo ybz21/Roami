@@ -4,7 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
-| 大模型设计汇编 | [当前设计（HTML）](20261114-model-orchestration/model-monitoring-and-aggregation.html) · [最新设计（HTML）](20261114-model-orchestration/latest-design.html) | [历史设计、原型与验收（HTML）](20261114-model-orchestration/history/index.html) |
+| 大模型设计汇编 | [最新图解（HTML）](20261114-model-orchestration/latest-design.html) · [统一原型（HTML）](20261114-model-orchestration/gateway-prototype.html#/aggregate) · [当前设计（HTML）](20261114-model-orchestration/model-monitoring-and-aggregation.html) | [历史设计、原型与验收（HTML）](20261114-model-orchestration/history/index.html) |
 | 顶部标签选中态 | [20261119-active-workspace-tab](20261119-active-workspace-tab/README.md) | 内容侧强调线、标题强调与桌面/真机验收 |
 | Agent 渲染视图宽度统一 | [20261119-agent-render-width](20261119-agent-render-width/README.md) | 所有 Agent 消息、输入及附属状态铺满可用宽度与桌面/真机验收 |
 | 会话标签行尾间距 | [20261116-session-tab-spacing](20261116-session-tab-spacing/README.md) | 鼠标端动作紧邻排列、统一尺寸与桌面/真机验收 |

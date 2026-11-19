@@ -1,0 +1,155 @@
+<section data-prototype-view="catalog" hidden>
+  <details id="source-create">
+    <summary>新建模型源</summary>
+    <form id="source-form" class="source-form">
+      <label>来源类型<select id="source-type"><option value="api">API / 本地服务</option><option value="openrouter">OpenRouter 免费模型</option><option value="magpie">Magpie 插件</option></select></label>
+      <label id="source-address-row">Base URL<input id="source-address" type="url" placeholder="https://api.example.com/v1" aria-describedby="source-create-status"></label>
+      <label id="source-protocol-row">协议<select id="source-protocol"><option>OpenAI Chat Completions</option><option>OpenAI Responses</option><option>Anthropic Messages</option></select></label>
+      <label id="source-plugin-row" hidden>插件目录链接或仓库路径<input id="source-plugin" type="text" placeholder="packages/workbuddy" aria-describedby="source-create-status"></label>
+      <label>来源名称（选填）<input id="source-name" type="text" maxlength="100"></label>
+      <div class="actions"><button id="source-discover" type="button">拉取所有模型</button><small id="source-create-status" role="status">演示目录 · 选择模型后保存</small></div>
+      <div id="source-directory" hidden>
+        <label>查找模型<input id="source-search" type="search"></label>
+        <fieldset><legend>发现的模型</legend><div id="source-matches"></div></fieldset>
+      </div>
+      <button id="source-save" type="submit" disabled>保存所选模型</button>
+    </form>
+  </details>
+  <div class="source-list">
+    <h3>已接入来源</h3>
+    <ul id="saved-sources" aria-label="已接入来源"><li>OpenRouter 免费模型</li><li>WorkBuddy</li></ul>
+    <p id="source-saved" class="muted" role="status"></p>
+    <a class="page-reference" href="#directory">打开网关目录</a>
+  </div>
+  <div class="sample" aria-label="插件账号局部样例">
+    <div class="sample-head"><h3>账号 A</h3><small>国内版账号 · 演示数据</small></div>
+    <dl class="account">
+      <div><dt>周期积分</dt><dd>120 / 500 已用 · 11 天后重置</dd></div>
+      <div><dt>额外积分</dt><dd><span id="bonus">40</span> 可用</dd></div>
+    </dl>
+    <div class="actions"><button type="button" id="claim">立即签到</button><span id="claim-status" class="muted" role="status">今日未签</span></div>
+    <details class="recent" id="plugin-management">
+      <summary>Magpie 插件</summary>
+      <dl class="account">
+        <div><dt>已安装</dt><dd id="plugin-version">0.2.26</dd></div>
+        <div><dt>兼容更新 · 演示</dt><dd id="plugin-available">0.2.27</dd></div>
+      </dl>
+      <div class="actions">
+        <button type="button" id="plugin-update">应用更新</button>
+        <button type="button" id="plugin-rollback" hidden>回退</button>
+        <small id="plugin-update-status" role="status"></small>
+      </div>
+      <form class="plugin-form" id="plugin-import">
+        <label for="plugin-path">插件目录链接或仓库路径</label>
+        <div class="actions"><input id="plugin-path" type="text" placeholder="packages/workbuddy" required><button type="submit">预览</button></div>
+        <p id="plugin-preview" class="muted" role="status"></p>
+      </form>
+    </details>
+  </div>
+</section>
+<section data-prototype-view="aggregate" hidden>
+  <div class="sample" id="strategy-observation" aria-label="聚合局部样例">
+    <div class="sample-head"><div class="sample-title"><h3>生效调度</h3><small>近 1 小时 · 演示数据</small></div><label class="muted">演示状态<select id="route-scenario"><option value="ready">有可用成员</option><option value="blocked">无可用成员</option><option value="unknown">状态未检测</option><option value="empty">暂无调用</option></select></label></div>
+    <div class="route-policy"><span>已生效策略 <strong>按顺序</strong></span><span>可调度来源 <strong id="route-sources-ready"></strong></span><span>冷却成员 <strong id="route-cooling"></strong></span></div>
+    <dl class="metrics">
+      <div><dt>当前可调度</dt><dd id="route-ready"></dd><small id="route-first"></small></div>
+      <div><dt>已完成请求</dt><dd id="route-total">200</dd></div>
+      <div><dt>最终失败率</dt><dd id="route-failure">2.0%</dd><small id="route-failure-note">4 次最终失败</small></div>
+      <div><dt>故障切换</dt><dd id="route-fallback">3 次</dd><small>按逻辑请求去重</small></div>
+    </dl>
+
+    <ol class="request-flow route-flow" aria-label="当前候选顺位">
+      <li><small>调用名</small><strong>free</strong></li>
+      <li><small>首选</small><strong id="route-flow-first"></strong></li>
+      <li id="route-flow-next-node"><small>备选</small><strong id="route-flow-next"></strong></li>
+    </ol>
+    <a class="page-reference" id="route-path-action" href="#/troubleshoot?case=fallback">查看故障路径</a>
+    <div class="grid-title"><h3>成员状态与负载</h3><small>近 1 小时成功承载</small></div>
+    <p id="route-message" class="muted" role="status" hidden></p>
+    <ol class="member-list" id="route-members"></ol>
+    <details id="route-order" class="recent">
+      <summary>调整成员顺序</summary>
+      <ol id="draft-order" class="draft-order" aria-label="成员顺序草稿"></ol>
+      <p class="muted order-status" id="order-status" role="status"></p>
+      <button type="button" id="apply-order" disabled>保存并应用</button>
+    </details>
+    <div class="recent">
+      <p id="route-latest" class="muted">最近命中 16:39 · ERNIE 5.5 Flash · 成功</p>
+      <details id="route-events"><summary>最近故障切换</summary><p>16:35 · OpenRouter 免费模型限流，切换到 WorkBuddy，最终成功。</p><a href="#/audit?demo=route" id="route-audit">查看这次调用</a></details>
+      <p id="route-no-events" class="muted" hidden>暂无切换记录。</p>
+      <details id="route-resilience"><summary>故障转移与来源健康</summary>
+        <p id="route-switch-scope" class="muted"></p>
+        <ul class="route-source-health" id="route-source-health"></ul>
+        <a class="page-reference" href="#/troubleshoot?case=fallback">查看跨源切换路径</a>
+      </details>
+      <details id="route-draft"><summary>策略草稿预览</summary><div class="draft-preview">
+          <p>草稿策略 · 加权</p>
+          <div class="draft-bar" aria-hidden="true"><span></span><span></span></div>
+          <p><small>ERNIE 5.5 Flash 75% · Hy4 Flash 25%</small></p>
+        </div></details>
+    </div>
+  </div>
+<details class="sample" aria-label="聚合候选筛选样例">
+      <summary>WorkBuddy 候选筛选</summary><div class="sample-head"><label><input type="checkbox" id="free-candidates"> 仅看免费模型</label></div>
+      <p class="muted">已选成员 · DeepSeek V4.1 Flash（积分）</p>
+      <ul>
+        <li id="metered-candidate">DeepSeek V4.1 Flash · 积分</li>
+        <li>Hy4 Flash · 已确认免费</li>
+      </ul>
+    </details>
+</section>
+<section data-prototype-view="monitoring" hidden data-design="model-monitoring.html>
+  <div class="sample" aria-label="监控局部样例">
+    <div class="sample-head"><h3>调用趋势</h3><label class="muted">演示范围<select id="monitor-range"><option value="1">最近 1 小时</option><option value="6">最近 6 小时</option><option value="24">最近 24 小时</option><option value="0">暂无调用</option></select></label></div>
+    <dl class="metrics">
+      <div><dt>已完成请求</dt><dd id="monitor-total"></dd></div>
+      <div><dt>调用成功率</dt><dd id="monitor-success"></dd><small id="monitor-count"></small></div>
+      <div><dt>首字延迟 P95</dt><dd id="monitor-first"></dd><small>成功流式请求</small></div>
+      <div><dt>输出速度 P50</dt><dd id="monitor-speed"></dd><small>单请求样本 · Token/s</small></div>
+    </dl>
+    <div class="monitor-layout">
+      <figure aria-labelledby="chart-heading">
+        <h3 id="chart-heading">请求量</h3>
+        <figcaption class="legend"><span><i class="swatch succeeded"></i>成功</span><span><i class="swatch failed"></i>失败</span><span>点柱查看时段</span></figcaption>
+        <div class="chart" id="monitor-chart" role="group" aria-label="请求量分时样例"></div>
+        <div class="chart-result"><span id="monitor-selection" class="muted" role="status"></span><a id="monitor-audit" href="#/audit">查看失败调用</a></div>
+      </figure>
+      <section aria-labelledby="failure-heading"><h3 id="failure-heading">失败构成</h3><small id="failure-scope"></small><ul class="failures" id="failure-list"></ul></section>
+    </div>
+  </div>
+</section>
+<section data-prototype-view="audit" hidden>
+  <details id="audit-example" class="step">
+    <summary>请求详情</summary>
+    <p id="audit-context" class="muted" role="status">从聚合或监控点进来，可查看带入的条件。</p>
+    <dl class="call" id="audit-record" hidden><dt>最终结果</dt><dd>成功</dd><dt>故障切换</dt><dd>OpenRouter 免费模型限流，随后由 WorkBuddy 接续。</dd><dt>费用</dt><dd>已确认免费</dd></dl>
+    <a id="audit-return" class="page-reference" href="#/monitoring" hidden>返回筛选</a>
+    <div id="gateway-audit-record" hidden>
+      <dl class="call"><dt>最终结果</dt><dd id="gateway-audit-outcome"></dd><dt>对外响应</dt><dd id="gateway-audit-response"></dd></dl>
+      <ol class="request-flow" id="gateway-audit-timeline" aria-label="调度记录"></ol>
+      <a class="page-reference" id="gateway-audit-return" href="#/troubleshoot">返回网关样例</a>
+    </div>
+  </details>
+</section>
+<section data-prototype-view="troubleshoot" hidden>
+  <div id="troubleshoot" class="sample" aria-label="网关排查样例">
+    <div class="sample-head"><h3>调用路径</h3><label>演示场景<select id="gateway-scenario"><option value="blocked">OKR 免费模型 · 无可用成员</option><option value="exhausted">聚合 · 切换后仍失败</option><option value="fallback">聚合 · 切换后恢复</option><option value="stream">聚合 · 输出中断</option></select></label></div>
+    <div class="gateway-request" role="status">
+      <div><small id="gateway-caller">OKR · Claude Code · free</small><strong id="gateway-outcome">请求失败 · 503</strong><p id="gateway-explanation">网关在发送前找不到可用成员。</p></div>
+      <a id="gateway-audit-link" class="page-reference" href="#/audit?demo=gateway&amp;case=blocked">打开审计样例</a>
+    </div>
+    <h3 class="step" id="gateway-timeline-title">调度记录</h3>
+    <ol id="gateway-timeline" class="request-flow" aria-labelledby="gateway-timeline-title"><li>网关选路：暂无可用成员。</li></ol>
+    <details class="recent"><summary>技术详情</summary><dl class="call"><dt>对外结果</dt><dd id="gateway-response">503 MODEL_ROUTE_NO_AVAILABLE_MEMBER</dd><dt>上游尝试</dt><dd id="gateway-attempts">0 次</dd></dl></details>
+    <small class="gateway-sample-note">调用结果与原因均为演示数据。</small>
+  </div>
+</section>
+<section data-prototype-view="overview" hidden>
+  <dl class="metrics"><div><dt>今日已用</dt><dd>¥ 2.40</dd></div><div><dt>剩余额度</dt><dd>¥ 7.60</dd></div><div><dt>每日限额</dt><dd>¥ 10.00</dd></div><div><dt>结算时区</dt><dd>Asia/Shanghai</dd></div></dl>
+  <label class="sample-head">今日用量 <meter min="0" max="10" value="2.4">24%</meter></label>
+  <a class="page-reference" href="#/audit?demo=usage">查看今日审计</a>
+</section>
+<section data-prototype-view="speech" hidden>
+  <dl class="metrics"><div><dt>识别服务</dt><dd>当前服务</dd></div><div><dt>最近测试</dt><dd id="speech-status" role="status">未测试</dd></div></dl>
+  <button type="button" id="speech-test">测试识别</button>
+</section>

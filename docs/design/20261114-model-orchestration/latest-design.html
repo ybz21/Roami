@@ -5,56 +5,67 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Roami 大模型 · 最新设计</title>
 <link rel="stylesheet" href="./assets/model-workspace-design.css">
+<link rel="stylesheet" href="./assets/model-design-diagrams.css">
 </head>
 <body>
 <header class="page-head"><h1>Roami 大模型 · 最新设计</h1></header>
 <div class="workspace">
-<nav class="contents" aria-label="设计版本">
+<nav class="contents" aria-label="设计与原型">
   <a href="./model-monitoring-and-aggregation.html">当前设计</a>
   <a href="./latest-design.html" aria-current="page">最新设计</a>
   <a href="./history/index.html">历史设计</a>
+  <a href="./gateway-prototype.html">交互原型</a>
 </nav>
-<main class="document gateway-design" id="document">
-<section aria-labelledby="latest-title" id="overview">
-  <header class="section-head"><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-19">2026 年 11 月 19 日</time></header>
-  <p class="copy">本轮方案围绕一次调用完成接入、排查和处理。OKR 免费模型返回 503 时，能核对是首次选路失败，还是尝试了候选后仍失败。发生降级时，能看到实际切换的来源、模型和最终结果。</p>
-  <nav class="gateway-jump" aria-label="最新设计目录">
-    <a href="#technical">技术设计</a><a href="#prototypes">交互原型</a><a href="#sequence">实施与验收</a>
+<main class="document gateway-overview" id="document">
+<section id="technical" aria-labelledby="latest-title">
+  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-19">2026 年 11 月 19 日</time></div><a class="diagram-action" href="./gateway-prototype.html#/aggregate">打开交互原型</a></header>
+  <figure class="layer-diagram" aria-label="网关三层设计">
+    <div class="diagram-lane">
+      <h3><a href="./model-gateway.html#interaction">人机交互</a></h3>
+      <ol aria-label="排查路径">
+        <li><a href="./model-monitoring.html#gateway-observation">监控<small>找到异常</small></a></li>
+        <li><a href="./model-audit.html">审计<small>查看尝试和终态</small></a></li>
+        <li><a href="./model-aggregation.html">来源与聚合<small>处理原因</small></a></li>
+      </ol>
+    </div>
+    <div class="diagram-lane">
+      <h3><a href="./model-gateway.html#public-api">对外接口</a></h3>
+      <ol aria-label="调用路径">
+        <li><span>OKR / Agent<small>发现可用模型</small></span></li>
+        <li class="gateway-node"><a href="./model-gateway.html">本机网关<small>调用名 · 请求关联</small></a></li>
+        <li><a href="./model-sources.html">原生 / 聚合<small>转发或切换成员</small></a></li>
+      </ol>
+    </div>
+    <div class="diagram-lane">
+      <h3><a href="./model-gateway.html#control-api">控制接口</a></h3>
+      <ol aria-label="配置与观测">
+        <li><a href="./model-gateway.html#control-api">配置发布<small>目录 · 凭据 · 版本</small></a></li>
+        <li><a href="./model-aggregation.html#strategy-observation">策略预览<small>草稿 · 生效 · 历史命中</small></a></li>
+        <li><a href="./model-gateway.html#control-api">请求观测<small>请求终态 · 上游尝试</small></a></li>
+      </ol>
+    </div>
+  </figure>
+</section>
+<section id="prototypes" aria-labelledby="prototype-title">
+  <header class="section-head"><h2 id="prototype-title">一次请求怎么结束</h2><small>交互原型 · 演示数据</small></header>
+  <ul class="scenario-diagram">
+    <li><a href="./gateway-prototype.html#/troubleshoot?case=blocked"><small>0 次上游尝试</small><strong>选路被拒</strong><span class="error-result">503</span></a></li>
+    <li><a href="./gateway-prototype.html#/troubleshoot?case=exhausted"><small>2 次上游尝试</small><strong>候选用尽</strong><span class="error-result">503</span></a></li>
+    <li><a href="./gateway-prototype.html#/troubleshoot?case=fallback"><small>首选 429 · 备选接续</small><strong>切换后恢复</strong><span class="success-result">200</span></a></li>
+    <li><a href="./gateway-prototype.html#/troubleshoot?case=stream"><small>已经发送部分内容</small><strong>输出中断</strong><span class="error-result">HTTP 200 · 最终失败</span></a></li>
+  </ul>
+  <nav class="gateway-jump" aria-label="观测原型">
+    <a href="./gateway-prototype.html#/aggregate">调度顺位与来源健康</a>
+    <a href="./gateway-prototype.html#/monitoring">趋势与失败构成</a>
   </nav>
 </section>
-<section aria-labelledby="technical-title" id="technical">
-  <header class="section-head"><h2 id="technical-title">技术设计</h2></header>
-  <table class="guide-table">
-    <thead><tr><th scope="col">层次</th><th scope="col">本轮设计</th></tr></thead>
-    <tbody>
-      <tr><th scope="row"><a href="./model-gateway.html#interaction">人机交互</a></th><td>从监控按调用方、网关模型和最终结果筛选，再进审计看有序尝试与未发送原因。从对应记录进入来源、聚合或限额处理。</td></tr>
-      <tr><th scope="row"><a href="./model-gateway.html#public-api">对外接口</a></th><td>沿用发现、调用和流式响应契约。拟给被接受且已识别模型的请求返回统一关联号，覆盖成功、503 拒绝与候选切换。</td></tr>
-      <tr><th scope="row"><a href="./model-gateway.html#control-api">控制接口</a></th><td>沿用目录、配置、密钥和当前调度入口。拟增加策略预览、请求级监控查询与单次请求详情。按请求记录终态，保留每次上游尝试。</td></tr>
-    </tbody>
-  </table>
-  <p class="copy step">聚合保留已选成员与生效策略，候选免费筛选只负责缩小选模范围。观测里区分策略草稿、当前生效顺位和历史实际命中。按请求统计最终失败与切换恢复，来源侧继续统计每次尝试。<a href="./model-aggregation.html#strategy-observation">聚合调度设计</a></p>
-</section>
-<section aria-labelledby="prototype-title" id="prototypes">
-  <header class="section-head"><h2 id="prototype-title">交互原型</h2></header>
-  <table class="guide-table">
-    <thead><tr><th scope="col">场景</th><th scope="col">可查看的状态</th></tr></thead>
-    <tbody>
-      <tr><th scope="row"><a href="./model-gateway.html?case=blocked#troubleshoot">OKR 免费模型 503</a></th><td>零次上游尝试的拒绝。可以切到「切换后仍失败」，对照候选耗尽时同样的 503。</td></tr>
-      <tr><th scope="row"><a href="./model-gateway.html?case=fallback#troubleshoot">切换后恢复</a></th><td>首选返回 429，备选完成请求。打开审计可以查看两次尝试，从审计返回保留所选场景。</td></tr>
-      <tr><th scope="row"><a href="./model-gateway.html?case=stream#troubleshoot">输出中断</a></th><td>客户端已收到 HTTP 200 和部分内容，审计记录最终失败与尝试次数。</td></tr>
-      <tr><th scope="row"><a href="./model-aggregation.html#strategy-observation">聚合策略和来源健康</a></th><td>查看生效策略、可调度来源、冷却成员、同源换模型和跨源切换。展开草稿可对照预览与生效顺位。</td></tr>
-      <tr><th scope="row"><a href="./model-monitoring.html#gateway-observation">监控与审计</a></th><td>从最终失败和降级结果进入单次调用。来源趋势与失败构成保留原有样例。</td></tr>
-    </tbody>
-  </table>
-</section>
-<section aria-labelledby="sequence-title" id="sequence">
-  <header class="section-head"><h2 id="sequence-title">实施与验收</h2></header>
-  <ol class="copy">
-    <li>先覆盖请求终态与关联号。零尝试拒绝、候选耗尽和输出中断都能查到。来源、尝试和计费记录沿用各自口径。</li>
-    <li>接通聚合观测与监控审计。单次请求切换后成功只计一次成功，保留首选失败和备选结果。草稿预览、冷却状态和历史命中分别可查。</li>
-    <li>补齐 OKR 的宿主归因和故障入口。来源授权、额度和调度问题能跳到对应设置。账号体验沿用<a href="./model-sources.html#workbuddy">WorkBuddy 来源设计</a>。</li>
+<section id="sequence" aria-labelledby="sequence-title">
+  <header class="section-head"><h2 id="sequence-title">实施顺序</h2><a class="page-reference" href="./model-gateway.html#control-api">接口和验收条件</a></header>
+  <ol class="delivery-sequence">
+    <li><strong>记录请求终态</strong><small>请求可关联，零尝试也有记录</small></li>
+    <li><strong>串通监控、聚合和审计</strong><small>切换恢复按请求去重</small></li>
+    <li><strong>接入 OKR 归因</strong><small>从异常进入对应配置</small></li>
   </ol>
-  <p class="copy step">本页所列新增接口和请求级观测为方案，原型中的调用与原因使用演示数据。<a href="./model-gateway.html#control-api">完整接口和验收契约</a></p>
 </section>
 </main>
 </div>
