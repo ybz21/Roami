@@ -306,3 +306,67 @@ async def test_queued_main_turn_cannot_start_after_its_local_date(delegated_team
         lambda db: row(db, "SELECT * FROM turns WHERE id=?", (result["turnId"],))
     )
     assert actual["state"] == "interrupted" and actual["lease_epoch"] == 0
+
+
+async def test_started_daily_turn_retries_after_midnight_then_runs_new_slot(
+    delegated_team, monkeypatch
+):
+    runtime, service, team, _, initial, binding, spec = delegated_team
+    goal = await service.enable("alice", team["id"], spec, binding=binding)
+    await finish(runtime, initial)
+    today = DAY
+
+    class LocalClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return today.astimezone(tz)
+
+    monkeypatch.setattr("roami_agent.storage.swarm_coordination_admission.datetime", LocalClock)
+
+    async def job(turn_id):
+        return await runtime.db.call(
+            lambda db: row(
+                db, "SELECT * FROM jobs WHERE kind='turn.run' AND aggregate_id=?", (turn_id,)
+            )
+        )
+
+    first_tick = await tick(runtime, team, goal)
+    first_batch = await step(runtime, first_tick)
+    started = await runtime.mailbox.claim(await job(first_batch["turnId"]))
+    assert await runtime.journal.defer_native_route(
+        started, "MODEL_ROUTE_NO_AVAILABLE_MEMBER", "a" * 64
+    )
+    original_job = await job(started["id"])
+    tomorrow = today + timedelta(days=1)
+    today = tomorrow
+    monkeypatch.setattr(
+        "roami_agent.conversation.mailbox.now_ms", lambda: original_job["available_ms"]
+    )
+    next_tick = await tick(runtime, team, goal, clock=tomorrow)
+    assert (
+        await runtime.db.call(
+            lambda db: advance(db, next_tick["jobId"], clock=tomorrow), write=True
+        )
+    )["waiting"] == "MAIN_BUSY"
+
+    resumed = await runtime.mailbox.claim(original_job)
+    assert (resumed["id"], resumed["conversation_id"], resumed["lease_epoch"]) == (
+        started["id"],
+        team["mainConversationId"],
+        started["lease_epoch"] + 1,
+    )
+    recovered = await runtime.db.call(
+        lambda db: admitted_batch(db, "alice", resumed["id"], lease_epoch=resumed["lease_epoch"])
+    )
+    assert recovered["id"] == first_batch["batchId"]
+    assert recovered["dailySlot"] == first_tick["dailySlot"]
+    assert resumed["native_route_retry"] == 1
+    await finish(runtime, resumed)
+
+    next_batch = await runtime.db.call(
+        lambda db: advance(db, next_tick["jobId"], clock=tomorrow), write=True
+    )
+    assert next_batch["batchId"] != first_batch["batchId"]
+    next_turn = await runtime.mailbox.claim(await job(next_batch["turnId"]))
+    assert next_turn["conversation_id"] == started["conversation_id"]
+    assert next_turn["native_route_retry"] == 0
