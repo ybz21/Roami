@@ -70,6 +70,65 @@ async def test_native_main_reuses_same_provider_and_never_reexecutes_native_tool
     assert calls[1][2]["spec"]["key"] == spec["key"]
 
 
+async def test_native_main_defers_proven_unsubmitted_busy_input_with_identical_identity():
+    binding = fixture_binding()
+    calls, delays = [], []
+
+    async def command(sub, *args, **kwargs):
+        calls.append((sub, args, copy.deepcopy(kwargs)))
+        if len(calls) < 3:
+            raise DomainError("SESSION_NOT_IDLE", 409)
+        return stopped(binding)
+
+    async def wait(delay):
+        delays.append(delay)
+
+    model = NativeMain(binding, fixture_turn(), command, sleep=wait)
+    assert (await anext(model.stream([{"role": "user", "content": "continue"}], []))).value
+    assert len(calls) == 3 and all(call == calls[0] for call in calls)
+    assert delays == [1, 2]
+
+
+async def test_cancelling_unsubmitted_main_wait_does_not_cancel_previous_provider_input():
+    calls, waiting = [], asyncio.Event()
+
+    async def command(sub, *args, **kwargs):
+        calls.append(sub)
+        raise DomainError("SESSION_NOT_IDLE", 409)
+
+    async def wait(_):
+        waiting.set()
+        await asyncio.Event().wait()
+
+    model = NativeMain(fixture_binding(), fixture_turn(), command, sleep=wait)
+    task = asyncio.create_task(anext(model.stream([], [])))
+    await waiting.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert calls == ["launch"]
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "SESSION_PROVIDER_BINDING_CHANGED",
+        "CODING_EXECUTOR_UNAVAILABLE",
+        "EXECUTION_LAUNCH_UNCERTAIN",
+    ],
+)
+async def test_native_main_never_replays_uncertain_launch_or_changed_binding(code):
+    calls = []
+
+    async def command(sub, *args, **kwargs):
+        calls.append(sub)
+        raise DomainError(code, 409)
+
+    with pytest.raises(DomainError, match=code):
+        await anext(NativeMain(fixture_binding(), fixture_turn(), command).stream([], []))
+    assert calls == ["launch"]
+
+
 @pytest.mark.parametrize(
     "change",
     [
