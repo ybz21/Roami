@@ -20,6 +20,7 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination_tasks import prepared_authority
+from roami_agent.storage.task_instruction import current_instruction
 from roami_agent.storage.task_reports import retain_reported_progress
 from roami_agent.tools.process import execute
 
@@ -182,11 +183,7 @@ class CodingExecutor:
             "title": spec.get("title")
             or spec.get("initialIntent", {}).get("title")
             or spec["goal"].splitlines()[0][:80],
-            "prompt": (
-                spec["continuation"]["text"]
-                if target["kind"] == "session" and spec.get("continuation", {}).get("text")
-                else spec["goal"]
-            ),
+            "prompt": current_instruction(spec),
             "timeoutSeconds": max(
                 1, math.ceil((json.loads(task["budget_json"])["deadlineMs"] - now_ms()) / 1000)
             )

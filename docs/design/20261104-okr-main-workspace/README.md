@@ -2,6 +2,10 @@
 
 [可视设计说明](index.html)
 
+[长期团队的自动推进机制](autonomous-operation.md)：当前指令、回执、续派、阻塞恢复与验收边界。
+
+[运行中监督与成员让出](member-supervision.md)：解决成员等待 Main 与同目录排队之间的互等；当前为设计。
+
 [旧会话的有界原文读取](history-restoration.md)（#898）。
 
 [长期 Main 的聊天历史读取](history-loading.md)（#892）。
