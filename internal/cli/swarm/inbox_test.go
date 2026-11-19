@@ -3,6 +3,8 @@ package swarm
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -59,4 +61,34 @@ func TestMemberPostPreservesBusinessMessageAndThread(t *testing.T) {
 		apiReply(w, map[string]any{"id": 8})
 	})
 	commandResult(t, rt, "post", fixtureID, "Here is the answer", "--key", "transport", "--task", "task-api", "--run", "run-api", "--task-revision", "2", "--kind", "reply", "--message-key", "daily-answer", "--reply-to", "7", "--recipient-member", "receiver", "--json")
+}
+
+func TestMemberFilePostCarriesExplicitYieldWithoutClaimingStop(t *testing.T) {
+	rt := fixtureRuntime(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/v1/swarms/"+fixtureID+"/member-posts" {
+			t.Fatalf("unexpected yield route %s %s", r.Method, r.URL)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["yieldToMain"] != true || body["kind"] != "question" || body["taskId"] != "task-api" || body["runId"] != "run-api" || body["taskRevision"] != float64(2) {
+			t.Fatal(body)
+		}
+		apiReply(w, map[string]any{"id": 8, "acceptedOnly": true, "yieldState": "requested"})
+	})
+	input := filepath.Join(t.TempDir(), "question.json")
+	if err := os.WriteFile(input, []byte(`{"commandKey":"yield-transport","messageKey":"yield-question","kind":"question","text":"Need Main decision","taskId":"task-api","runId":"run-api","taskRevision":2,"yieldToMain":true}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	output := commandResult(t, rt, "post", fixtureID, "--file", input, "--json")
+	var result struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Data["acceptedOnly"] != true || result.Data["yieldState"] != "requested" || result.Data["inputStopped"] != nil {
+		t.Fatal(output)
+	}
 }

@@ -345,6 +345,7 @@ def snapshot(db, owner, swarm_id):
         "work": work,
         "members": members,
         "memberProtocol": value["member_protocol"],
+        "memberYieldSupported": True,
         "posts": posts,
         "mainMessages": main_messages,
         "mainState": main_turn["state"] if main_turn else "idle",

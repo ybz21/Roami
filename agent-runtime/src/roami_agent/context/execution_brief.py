@@ -65,6 +65,14 @@ def swarm_handoff(cli, swarm, task, run):
         .replace(
             "{{STATUS_COMMAND}}", shlex.join([cli, "swarm", "status", swarm["swarm_id"], "--json"])
         )
+        + "\n\nIf the current task must wait for Main, check memberYieldSupported in the actual "
+        "swarm status. When supported, post kind=question or blocker with yieldToMain=true "
+        "through the same bound member post command. Describe the precise decision needed. "
+        "The receipt only accepts the request: the host stops this input with real proof before "
+        "Main runs, preserving this session. Do not keep a shell/chat-follow process waiting "
+        "for Main in the shared workspace. Ordinary progress and nonblocking questions do not "
+        "request yield. Unknown publication attempts must be identified for reconciliation, "
+        "never retried as new submissions. Missing support is a capability gap, not approval."
     )
 
 

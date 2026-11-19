@@ -580,6 +580,14 @@ class SwarmPlans:
         text = spec.get("text", "").strip()
         if not text or len(text) > 8000:
             raise DomainError("INVALID_SWARM_MESSAGE")
+        if type(spec.get("yieldToMain", False)) is not bool:
+            raise DomainError("INVALID_SWARM_MESSAGE")
+        if spec.get("yieldToMain") and (
+            not binding
+            or not binding.get("taskId")
+            or spec.get("kind") not in {"question", "blocker"}
+        ):
+            raise DomainError("SWARM_MEMBER_REQUIRED", 403)
         identity_binding = (
             {
                 key: binding[key]
@@ -631,6 +639,10 @@ class SwarmPlans:
                 result, created = record_post(
                     db, value, spec, author, task_id, binding, delivery_key
                 )
+                if spec.get("yieldToMain"):
+                    from roami_agent.storage.swarm_member_yield import request
+
+                    result.update(request(db, value, binding, spec, result["id"]))
                 if created:
                     changed(db, value, "swarm.message")
                 return result

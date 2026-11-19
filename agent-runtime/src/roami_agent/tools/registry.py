@@ -187,7 +187,15 @@ class Tools:
         }
         if tool.name == "swarm_status":
             essential_keys.update(
-                {"revision", "paused", "archived", "mainState", "mainConversationId", "sequence"}
+                {
+                    "revision",
+                    "paused",
+                    "archived",
+                    "mainState",
+                    "mainConversationId",
+                    "sequence",
+                    "memberYieldSupported",
+                }
             )
         essential = {
             key: item

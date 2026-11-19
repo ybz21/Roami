@@ -763,6 +763,19 @@ class Tasks:
             )
             if not task or not run:
                 raise DomainError("TASK_RUN_NOT_FOUND", 404)
+            from roami_agent.storage.swarm_member_yield import yield_stop_request
+
+            yielding = (
+                task["state"] == "cancelling"
+                and run["executor_kind"] == "cli"
+                and yield_stop_request(db, task, run) is not None
+            )
+            stop_unconfirmed = unconfirmed or (
+                yielding
+                and (
+                    result.get("inputStopped") is not True or result.get("outcomeKnown") is not True
+                )
+            )
             if run["result_json"]:
                 previous = json.loads(run["result_json"])
                 if previous == result:
@@ -772,8 +785,13 @@ class Tasks:
                     or not (
                         previous.get("outcomeKnown") is False
                         or previous.get("inputStopped") is False
+                        or yielding
+                        and (
+                            previous.get("inputStopped") is not True
+                            or previous.get("outcomeKnown") is not True
+                        )
                     )
-                    or unconfirmed
+                    or stop_unconfirmed
                 ):
                     raise DomainError("TASK_RESULT_CONFLICT", 409)
                 event(
@@ -786,9 +804,15 @@ class Tasks:
                 )
             db.execute(
                 "UPDATE task_attempts SET state=?,result_json=?,finished_ms=? WHERE id=?",
-                ("unknown" if unconfirmed else result["state"], encoded(result), now_ms(), run_id),
+                (
+                    "unknown" if stop_unconfirmed else result["state"],
+                    encoded(result),
+                    now_ms(),
+                    run_id,
+                ),
             )
-            record_execution_result(db, task_id, run_id)
+            execution_receipt = record_execution_result(db, task_id, run_id)
+            result_suffix = ":" + str(execution_receipt["receiptId"]) if run["result_json"] else ""
             # A late old revision is evidence, never authority over the current task.
             if task["revision"] == revision and task["state"] not in TERMINAL:
                 state = "cancelling" if task["state"] == "cancelling" else "verifying"
@@ -800,13 +824,19 @@ class Tasks:
                     task["origin_conversation_id"],
                     "task.result",
                     {"taskId": task_id, "runId": run_id, "state": state},
-                    key="result:" + run_id,
+                    key="result:" + run_id + result_suffix,
                     task_id=task_id,
                 )
                 db.execute(
                     "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms) "
                     "VALUES(?,'task.verify',?,?,?,'queued',?)",
-                    (identity(), task_id, "verify:" + run_id, encoded({"runId": run_id}), now_ms()),
+                    (
+                        identity(),
+                        task_id,
+                        "verify:" + run_id + result_suffix,
+                        encoded({"runId": run_id}),
+                        now_ms(),
+                    ),
                 )
             current = row(db, "SELECT * FROM tasks WHERE id=?", (task_id,))
             if current["state"] in {

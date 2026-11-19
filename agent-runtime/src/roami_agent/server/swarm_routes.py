@@ -115,6 +115,7 @@ class MemberPost(PostSwarm):
     taskId: str = Field(min_length=1, max_length=200)
     runId: str = Field(min_length=1, max_length=200)
     taskRevision: int = Field(ge=1)
+    yieldToMain: bool = Field(default=False, strict=True, exclude_if=lambda value: value is False)
 
 
 class MemberInbox(Payload):
