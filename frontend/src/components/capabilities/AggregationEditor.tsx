@@ -20,11 +20,11 @@ export default function AggregationEditor({ model, original, catalog, active, bu
   const nameError = !model.name.trim() ? t('orchestration.nameRequired') : ''
   const idError = model.id === 'roami-default' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) ? t('orchestration.idInvalid') : catalog.models.some(row => row.id !== original && (row.id === model.id || row.aliases?.includes(model.id))) ? t('orchestration.idTaken') : ''
   const saved = catalog.models.find(row => row.id === original)
-  const { facts } = useModelMemberFacts(model, saved, catalog, active && tab === 'routing')
+  const { facts, status } = useModelMemberFacts(model, saved, catalog, active && tab === 'routing')
   useEffect(() => { if (scroll.current) scroll.current.scrollTop = 0 }, [tab])
   useEffect(() => { if (attempted && !valid) scroll.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus() }, [attempted, tab])
   return <form className="tt-aggregate-editor" onSubmit={event => { event.preventDefault(); if (valid) onSave(); else { setAttempted(true); if (idError && more.current) more.current.open = true; setTab(nameError || idError || !model.candidates.length ? 'members' : 'routing') } }}>
-    <TabBar className="tt-aggregate-tabs" activeKey={tab} onChange={setTab} items={[...['members', 'routing'].map(key => ({ key, label: t('pool.section.' + key) })), ...(saved ? [{ key: 'runtime', label: t('pool.runtime') }] : [])]} />
+    <TabBar className="tt-aggregate-tabs" activeKey={tab} onChange={setTab} items={['members', 'routing'].map(key => ({ key, label: t('pool.section.' + key) }))} />
     <div className={"tt-routing-editor tt-aggregate-editor-content" + (tab === 'members' ? ' is-members' : '')} ref={scroll}>
       {error && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
       <section hidden={tab !== 'members'} aria-label={t('pool.section.members')}>
@@ -42,6 +42,7 @@ export default function AggregationEditor({ model, original, catalog, active, bu
         </details>
       </section>
       <section hidden={tab !== 'routing'} aria-label={t('pool.section.routing')}>
+        {saved && <AggregationRuntime model={saved} catalog={catalog} status={status} hasDraft={JSON.stringify(saved) !== JSON.stringify(model)} />}
         <RoutingStrategyPreview model={model} sources={catalog.sources} pools={catalog.models.filter(row => row.aggregate)} onChange={onChange} disabled={busy || !active || tab !== 'routing'} facts={facts} configuration={<>
           <label className="agent-settings-field"><span>{t('pool.strategy')}</span><Select aria-label={t('pool.strategy')} virtual={false} disabled={busy} value={model.strategy} options={routingStrategies.map(value => ({ value, label: t('pool.strategy.' + value) }))} onChange={(strategy: RoutingStrategy) => onChange({ strategy })} /></label>
           <p className="agent-settings-hint">{t('pool.strategy.' + model.strategy + '.summary')}</p>
@@ -53,7 +54,6 @@ export default function AggregationEditor({ model, original, catalog, active, bu
           <div className="tt-routing-flags"><Checkbox disabled={busy} checked={model.onLimit !== false} onChange={event => onChange({ onLimit: event.target.checked })}>{t('pool.onLimit')}</Checkbox><Checkbox disabled={busy} checked={model.onExhausted !== false} onChange={event => onChange({ onExhausted: event.target.checked })}>{t('pool.onExhausted')}</Checkbox><p className="agent-settings-hint">{t('pool.noReplay')}</p></div>
         </details>
       </section>
-      {saved && tab === 'runtime' && <section aria-label={t('pool.runtime')}><p className="agent-settings-hint">{t('pool.savedRuntime')}</p><AggregationRuntime model={saved} sources={catalog.sources} revision={catalog.revision} active={active} /></section>}
     </div>
     <footer className="tt-model-source-footer tt-aggregate-footer"><span role="status">{t('pool.memberSummary', { count: new Intl.NumberFormat(locale).format(model.candidates.length), max: MAX_AGGREGATE_MEMBERS })}{attempted && !valid && !nameError && !idError && !!model.candidates.length && <small role="alert">{t('pool.invalid')}</small>}</span><div><Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={busy} loading={busy}>{t('agent.models.save')}</Button></div></footer>
   </form>

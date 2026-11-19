@@ -93,21 +93,28 @@ it('updates the routing preview and persists manual priority without detaching w
 })
 
 
-it('uses only the saved ID for live member status and runtime while editing', async () => {
- const a = { id: 'pool-a', name: 'Pool Alpha', aggregate: true, protocol: 'openai-completions', strategy: 'smart' as const, candidates: [{ sourceId: 'a', model: 'native-a' }] }
- const b = { ...a, id: 'pool-b', name: 'Pool Beta', candidates: [{ sourceId: 'b', model: 'native-b' }] }
- vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.includes('/routing?') ? { now: Date.now(), available: 1, channels: [{ sourceId: 'a', model: 'live-native-a', account: '', kind: 'key', ready: true, remaining: 100, resetAt: null, expiresAt: null, restUntil: null, measuredAt: null, recentTokens: 0 }] } : { models: [] } }))
- render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, a, b] }} busy={false} error="" save={vi.fn(async () => true)} retry={vi.fn()} onSource={vi.fn()} /></App>)
+it('shows saved routing order alongside the existing editor with one status request', async () => {
+ const a = { sourceId: 'a', model: 'native-a' }, b = { sourceId: 'b', model: 'native-b' }, blocked = { sourceId: 'a', model: 'no-tools' }
+ const pool = { id: 'pool-a', name: 'Pool Alpha', aggregate: true, protocol: 'openai-completions', strategy: 'smart' as const, candidates: [a, b, blocked] }
+ const channel = { kind: 'key', ready: true, remaining: 100, resetAt: null, expiresAt: null, restUntil: null, measuredAt: null, recentTokens: 0 }
+ vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.includes('/routing?') ? {
+   now: Date.now(), available: 3, members: [a, b, { ...blocked, block: 'tools' }],
+   channels: [{ ...channel, ...b, account: 'first' }, { ...channel, ...b, account: 'second' }, { ...channel, ...a, account: '' }],
+ } : { models: [] } }))
+ render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, pool] }} busy={false} error="" save={vi.fn(async () => true)} retry={vi.fn()} onSource={vi.fn()} /></App>)
  expect(api).not.toHaveBeenCalled()
  fireEvent.click(within(screen.getByRole('region', { name: 'Pool Alpha' })).getByRole('button', { name: 'pool.open' }))
  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?'))).toHaveLength(1)
  fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'unsaved-name' } })
- fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.runtime' }))
- expect(await screen.findByText('live-native-a')).toBeTruthy()
- expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?')).map(([, path]) => path)).toEqual(expect.arrayContaining(['/agent/model-gateway/catalog/routing?model=pool-a']))
- expect(vi.mocked(api).mock.calls.some(([, path]) => path.includes('model=unsaved-name'))).toBe(false)
- fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
- expect(screen.queryByText('live-native-a')).toBeNull()
+ expect(screen.queryByRole('tab', { name: 'pool.runtime' })).toBeNull()
+ const status = (await screen.findByText('pool.runtimeOrder')).closest('details')!
+ status.open = true
+ expect([...status.querySelectorAll('strong')].map(row => row.textContent)).toEqual(['native-b', 'native-a', 'no-tools'])
+ expect(within(status).getAllByText('pool.runtimeRank')).toHaveLength(2)
+ expect(within(status).getByText('orchestration.routingBlock.tools')).toBeTruthy()
+ expect(within(status).getByText('pool.savedRuntime')).toBeTruthy()
+ expect(document.querySelector('.tt-member-identity>strong')?.textContent).toBe('native-a')
+ expect(vi.mocked(api).mock.calls.filter(([, path]) => path.includes('/routing?')).map(([, path]) => path)).toEqual(['/agent/model-gateway/catalog/routing?model=pool-a'])
  fireEvent.click(document.querySelector('.tt-aggregate-detail .tt-back')!)
  expect(screen.queryByRole('region', { name: 'pool.preview' })).toBeNull()
 })
