@@ -98,8 +98,21 @@ class NativeMain:
             "persistent": True,
             "prompt": prompt,
         }
+        may_have_submitted = False
         try:
-            receipt = await self.command("launch", "--file", "-", spec=spec)
+            admission_waits = 0
+            while True:
+                may_have_submitted = True
+                try:
+                    receipt = await self.command("launch", "--file", "-", spec=spec)
+                    break
+                except DomainError as error:
+                    if error.code != "SESSION_NOT_IDLE":
+                        raise
+                    # Go rejects this before writing the launch spec or submitting input.
+                    may_have_submitted = False
+                    admission_waits += 1
+                    await self.sleep(min(admission_waits, 10))
             unknown_polls = 0
             while True:
                 self.verify(receipt)
@@ -135,6 +148,8 @@ class NativeMain:
                 except (TimeoutError, OSError):
                     pass
         except asyncio.CancelledError:
+            if not may_have_submitted:
+                raise
             # Cancellation of the host await alone does not stop a native provider.
             receipt = await asyncio.shield(self.command("cancel", "--key", key))
             self.verify(receipt)
