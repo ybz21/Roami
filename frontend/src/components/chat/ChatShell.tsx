@@ -441,8 +441,8 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
             {/* 实时回显自带「正在生成」那颗脉冲点，扒不到东西时才退回省略号气泡——
                 两个都画等于同一件事说两遍（见截图里那块重复） */}
             {outbox.map((q) => (
-              <div key={q.id} className="cc-msg cc-queued" style={{ display: 'flex', justifyContent: 'flex-end', margin: 'var(--sp-1) 0' }}>
-                <div style={{ maxWidth: '86%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <div key={q.id} className="cc-msg cc-queued" style={{ display: 'flex', justifyContent: 'flex-start', margin: 'var(--sp-1) 0' }}>
+                <div style={{ maxWidth: '86%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--sp-1)' }}>
                   <div style={{ background: accent, borderRadius: 'var(--r-card)', padding: 'var(--sp-2) var(--sp-3)', color: '#fff', opacity: .55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{q.text}</div>
                   <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-dimmer)' }}>{t('chat.queued')}</span>
                 </div>
