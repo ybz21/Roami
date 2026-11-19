@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN" data-pointer="fine" data-size="large">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>顶部标签选中态 · Roami 设计对比</title>
+<link rel="stylesheet" href="../../../frontend/src/index.css">
+<style>
+body { margin:0; background:var(--bg-base); color:var(--text-bright); font-size:var(--fs-body); }
+main { box-sizing:border-box; height:100dvh; overflow:auto; padding:var(--sp-5); }
+h1 { font-size:var(--fs-title); margin:0 0 var(--sp-3); }
+h2 { font-size:var(--fs-lg); margin:0 0 var(--sp-3); }
+p { color:var(--text-dim); line-height:1.6; margin:0 0 var(--sp-5); max-width:65ch; }
+section { margin-bottom:var(--sp-5); }
+.tt-tabs-wrap { width:100%; }
+.tt-tabs { height:100%; }
+.tt-tab { gap:var(--sp-2); padding-inline:var(--sp-3); }
+.before .tt-tab.on { color:var(--text-bright); box-shadow:inset 0 2px 0 var(--accent); }
+.before .tt-tab.on::after { display:none; }
+.tt-tab:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+a { color:var(--accent); }
+</style>
+</head>
+<body><main>
+<h1>一眼找到当前标签</h1>
+<p>内容侧的强调线、蓝色标题和中性选中底色一起标识当前位置。点选任一标签，对比切换前后的辨识度。</p>
+<section class="before"><h2>改前</h2><div class="tt-tabs-wrap"><nav class="tt-tabs" aria-label="改前标签"></nav></div></section>
+<section><h2>改后</h2><div class="tt-tabs-wrap"><nav class="tt-tabs" aria-label="改后标签"></nav></div></section>
+<p>强调线不占布局空间，长标题、固定标签和行尾操作的原有尺寸保持稳定。</p>
+<a href="README.md">查看产品与技术设计</a>
+</main>
+<script>
+const names=['项目概览','会话文件导航','模型能力调度','顶部标签辨识','长期记录整理','输入交互修复'];
+for(const nav of document.querySelectorAll('nav')) names.forEach((name,index)=>{
+ const button=document.createElement('button');button.type='button';button.className='tt-tab';button.textContent=name;
+ button.addEventListener('click',()=>select(index));nav.append(button);
+});
+function select(index){for(const nav of document.querySelectorAll('nav')) [...nav.children].forEach((button,i)=>{button.classList.toggle('on',i===index);if(i===index)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});}
+select(3);
+</script></body></html>
