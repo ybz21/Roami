@@ -95,7 +95,9 @@ class NativeMain:
                 + encoded(schemas)
                 + "\nEnd host capability schemas.\n"
             )
-            prompt += await self.capabilities.brief(self.binding, self.turn)
+            prompt += await self.capabilities.brief(
+                self.binding, {**self.turn, "native_launch_key": key}
+            )
         spec = {
             "key": key,
             "executor": self.binding["executor"],

@@ -7,13 +7,13 @@ from roami_agent.storage.database import row, rows
 from roami_agent.storage.publication_review_context import review_turn
 
 
-def reviewed_images(db, binding, required):
+def reviewed_images(db, binding, required, *, native_input=None):
     turn = review_turn(db, binding)
     matches = []
     for item in required:
         original = row(
             db,
-            "SELECT id,sha256 FROM artifacts WHERE id=? AND owner_id=? AND sha256=? "
+            "SELECT id,sha256,mime_type FROM artifacts WHERE id=? AND owner_id=? AND sha256=? "
             "AND mime_type IN ('image/png','image/jpeg','image/webp') AND deleted_ms IS NULL "
             "AND purged_ms IS NULL AND NOT EXISTS(SELECT 1 FROM memory_tombstones f "
             "WHERE f.owner_id=artifacts.owner_id AND f.source_fingerprint=artifacts.sha256)",
@@ -21,6 +21,20 @@ def reviewed_images(db, binding, required):
         )
         if not original:
             raise DomainError("PUBLICATION_IMAGE_UNAVAILABLE", 409)
+        if native_input is not None:
+            if not any(
+                image == {"sha256": original["sha256"], "mime": original["mime_type"]}
+                for image in native_input["images"]
+            ):
+                raise DomainError("PUBLICATION_IMAGE_NOT_REVIEWED", 409)
+            matches.append(
+                {
+                    "artifactId": original["id"],
+                    "sha256": original["sha256"],
+                    "source": "claude_model_input",
+                }
+            )
+            continue
         found = None
         for manifest in rows(
             db,

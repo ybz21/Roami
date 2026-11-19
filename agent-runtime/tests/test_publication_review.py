@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import pytest
@@ -8,8 +9,9 @@ from test_swarm_delegations import delegated_team as delegated_team_fixture
 from roami_agent.dispatch.publication_review import PublicationReview
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
+from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.source_review import SourceReplyReview
-from roami_agent.storage.database import row
+from roami_agent.storage.database import event, row
 from roami_agent.storage.publication_versions import freeze_version
 from roami_agent.storage.transcript_repository import message
 
@@ -109,3 +111,84 @@ async def test_approval_does_not_accept_author_claim_or_stale_main(coordination,
         lambda db: db.execute("SELECT count(*) FROM swarm_publication_reviews").fetchone()[0]
     )
     assert count == 0
+
+
+@pytest.mark.parametrize("fault", [None, "receipt_mismatch", "request_changed"])
+async def test_native_approval_requires_current_input_matching_signed_receipt(coordination, fault):
+    runtime, binding, version = await review_fixture(coordination)
+
+    def capability_receipt(db):
+        record = row(
+            db,
+            "SELECT native_content(m.content_json) AS body FROM tool_calls t "
+            "JOIN messages m ON m.id=t.result_message_id WHERE t.turn_id=? AND t.tool_name='artifact_read'",
+            (binding["turnId"],),
+        )
+        body = json.loads(record["body"])
+        call = body["tool_call_id"]
+        payload = {
+            "toolCallId": call,
+            "requestId": "exact-read",
+            "state": "succeeded",
+            "result": json.loads(body["text"]),
+            "finishedMs": 17,
+        }
+        event(
+            db,
+            binding["conversation"],
+            "capability.completed",
+            payload,
+            turn_id=binding["turnId"],
+            key="capability:" + call + ":result",
+        )
+        return call, hashlib.sha256(encoded({"data": payload}).encode()).hexdigest()
+
+    call, sha = await runtime.db.call(capability_receipt, write=True)
+    binding["nativeCapabilityCall"] = {"requestId": "the-review"}
+    calls = 0
+
+    async def native_input(actual):
+        nonlocal calls
+        assert actual is binding
+        calls += 1
+        return {
+            "providerId": "original-provider",
+            "promptId": "current-prompt",
+            "requestSha256": "b" * 64 if calls > 1 and fault == "request_changed" else "a" * 64,
+            "capabilities": [
+                {
+                    "toolCallId": call,
+                    "responseSha256": "0" * 64 if fault == "receipt_mismatch" else sha,
+                }
+            ],
+            "images": [],
+        }
+
+    service = PublicationReview(
+        runtime.db, runtime.artifacts, None, native_review_input=native_input
+    )
+    if fault:
+        with pytest.raises(
+            DomainError,
+            match=(
+                "PUBLICATION_TEXT_NOT_REVIEWED"
+                if fault == "receipt_mismatch"
+                else "PUBLICATION_PROMPT_REVIEW_CHANGED"
+            ),
+        ):
+            await service.decide(
+                binding, version["versionId"], "approved", "Checked the exact text."
+            )
+    else:
+        result = await service.decide(
+            binding, version["versionId"], "approved", "Checked the exact text."
+        )
+        assert (
+            calls == 2
+            and result["decision"] == "approved"
+            and result["publicationAuthorized"] is False
+        )
+        stored = await runtime.db.call(
+            lambda db: row(db, "SELECT proof_json FROM swarm_publication_reviews")
+        )
+        assert json.loads(stored["proof_json"])["nativeInput"]["requestSha256"] == "a" * 64
