@@ -597,6 +597,25 @@ it('uses the actual private Main turn for the scene and releases it outside the 
   expect(screen.queryByTestId('studio-selection')).toBeNull()
 })
 
+it.each([false, true])('shows a queued model retry in team chats and clears it after recovery (phone=%s)', phone => {
+  test.phone = phone
+  test.data!.mainState = 'queued'
+  test.data!.mainModelWait = { retryAtMs: 1795080000000 }
+  const view = <ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />
+  const { rerender } = render(view)
+  expect(screen.getByText('swarm.chat.mainModelWait').getAttribute('role')).toBe('status')
+  if (!phone) {
+    chooseConversation('main')
+    expect(screen.getByText('swarm.chat.mainModelWait')).toBeTruthy()
+    chooseConversation('work')
+    expect(screen.queryByText('swarm.chat.mainModelWait')).toBeNull()
+    chooseConversation('main')
+  }
+  test.data = { ...test.data!, mainState: 'running', mainModelWait: null }
+  rerender(<ManagedSwarm id="sw-one" onBack={vi.fn()} openTerm={vi.fn()} />)
+  expect(screen.queryByText('swarm.chat.mainModelWait')).toBeNull()
+})
+
 it.each(['executor', 'project', 'unknown closure'])('keeps a %s mismatch on task details instead of opening a session', async mismatch => {
   test.data!.target = { projectId: 'bound-project' }
   const task = { id: 'task', revision: 1, executor: mismatch === 'executor' ? 'claude' : 'codex', projectId: mismatch === 'project' ? 'another-project' : 'bound-project' }
