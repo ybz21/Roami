@@ -310,7 +310,8 @@ def read_trace(db, owner, *, turn_id=None, task_id=None, chrome=False):
             )
         for deferred in rows(
             db,
-            "SELECT id,created_ms FROM events WHERE turn_id=? AND kind='turn.deferred' ORDER BY id",
+            "SELECT id,created_ms,COALESCE(json_extract(payload_json,'$.reason'),'NEW_USER_INTENT') AS reason "
+            "FROM events WHERE turn_id=? AND kind='turn.deferred' ORDER BY id",
             (tid,),
         ):
             resumed = next(
@@ -331,7 +332,7 @@ def read_trace(db, owner, *, turn_id=None, task_id=None, chrome=False):
                 deferred["created_ms"],
                 wait_end,
                 "resumed" if resumed is not None else "interrupted" if wait_end else "queued",
-                reason="NEW_USER_INTENT",
+                reason=deferred["reason"],
             )
         for tool in rows(db, "SELECT * FROM tool_calls WHERE turn_id=?", (tid,)):
             terminal = tool["state"] not in {"running", "planned"}

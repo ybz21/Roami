@@ -51,14 +51,14 @@ def assert_context_sources_available(db, turn):
         raise DomainError("CONTEXT_SOURCE_FORGOTTEN", 409)
 
 
-def assert_context_admitted(db, turn):
+def assert_context_admitted(db, turn, *, allow_coordination_paused=False):
     if turn.get("trigger_kind") == "continuation" and row(
         db,
         "SELECT name FROM sqlite_master WHERE type='table' AND name='swarm_coordination_batches'",
     ):
         from roami_agent.storage.swarm_coordination_admission import for_turn
 
-        for_turn(db, turn)
+        for_turn(db, turn, allow_paused=allow_coordination_paused)
     if row(
         db,
         "SELECT 1 FROM jobs WHERE kind IN ('control.stop','control.pause') "

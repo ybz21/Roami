@@ -6,7 +6,12 @@ import json
 from contextlib import ExitStack, asynccontextmanager, nullcontext
 from itertools import count
 
-from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected, ToolPreflightError
+from roami_agent.protocol.errors import (
+    DomainError,
+    ModelAdmissionRejected,
+    NativeRouteUnavailable,
+    ToolPreflightError,
+)
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.model_tool_selection import select_final_reply
 from roami_agent.protocol.models import Model
@@ -550,6 +555,12 @@ class AgentLoop:
             await self.journal.fail(turn, "failed", code, completion=completion)
             raise DomainError(code, 504) from exc
         except BaseException as exc:
+            if (
+                role == "main"
+                and isinstance(exc, NativeRouteUnavailable)
+                and await self.journal.defer_native_route(turn, exc.code, exc.stop_evidence)
+            ):
+                return None
             if (
                 isinstance(exc, asyncio.CancelledError)
                 and exc.args == ("NEW_USER_INTENT",)

@@ -12,6 +12,7 @@ from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.reply_previews import assert_preview_current, clear_reply_previews
 from roami_agent.storage.swarm_coordination import origin as coordination_origin
 from roami_agent.storage.swarm_goal_checkpoint import validate_final_checkpoint
+from roami_agent.storage.swarm_model_wait import defer_native_route
 from roami_agent.storage.transcript_repository import message
 
 
@@ -89,6 +90,14 @@ class TurnJournal:
 
         try:
             return await self.db.call(write, write=True)
+        except DomainError:
+            return False
+
+    async def defer_native_route(self, turn, code, stop_evidence):
+        try:
+            return await self.db.call(
+                lambda db: defer_native_route(db, turn, code, stop_evidence), write=True
+            )
         except DomainError:
             return False
 

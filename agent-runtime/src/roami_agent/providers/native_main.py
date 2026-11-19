@@ -2,8 +2,9 @@
 
 import asyncio
 import hashlib
+import re
 
-from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.errors import DomainError, NativeRouteUnavailable
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.serialization import encoded
 
@@ -12,6 +13,7 @@ class NativeMain:
     def __init__(self, binding, turn, command, *, sleep=asyncio.sleep, capabilities=None):
         self.binding, self.turn, self.command, self.sleep = binding, turn, command, sleep
         self.capabilities = capabilities
+        self.stream_count = 0
         self.model = binding["model"]
         self.provider_key = "native-cli:" + binding["executor"] + ":" + binding["provider_id"]
         self.settings_hash = hashlib.sha256(encoded(binding).encode()).hexdigest()
@@ -53,12 +55,16 @@ class NativeMain:
         ):
             raise DomainError("PROJECT_MAIN_IDENTITY_MISMATCH", 409)
         payload = encoded(messages)
+        self.stream_count += 1
         key = (
             "project-main:"
             + self.turn["id"]
             + ":"
             + hashlib.sha256(payload.encode()).hexdigest()[:24]
         )
+        retry = self.turn.get("native_route_retry", 0)
+        if retry:
+            key += ":retry-" + str(retry)
         prompt = (
             "You are the existing project's Main, using its bound persistent native CLI. "
             "Preserve the original Main, team, task, memory and publication identities. "
@@ -124,6 +130,19 @@ class NativeMain:
                     ):
                         raise DomainError("SESSION_STOP_UNCONFIRMED", 409)
                     if result.get("state") != "succeeded":
+                        # The CLI only emits this compaction code for proven route exhaustion.
+                        if (
+                            self.binding["executor"] == "claude"
+                            and self.stream_count == 1
+                            and result.get("state") == "failed"
+                            and result.get("errorCode")
+                            in ("MODEL_ROUTE_NO_AVAILABLE_MEMBER", "CLAUDE_COMPACTION_FAILED")
+                            and isinstance(result.get("stopEvidenceSha256"), str)
+                            and re.fullmatch(r"[a-f0-9]{64}", result["stopEvidenceSha256"])
+                        ):
+                            raise NativeRouteUnavailable(
+                                result["errorCode"], result["stopEvidenceSha256"]
+                            )
                         raise DomainError("PROJECT_MAIN_EXECUTION_FAILED", 409)
                     text = result.get("summary")
                     if not isinstance(text, str) or not text.strip():
