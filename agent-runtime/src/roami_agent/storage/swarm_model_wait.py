@@ -36,17 +36,22 @@ def defer_native_route(db, turn, code, stop_evidence):
     ):
         return False
     generation = json.loads(job["payload_json"]).get("nativeRouteRetry", 0)
-    retry_at = now_ms() + RETRY_DELAYS_MS[min(generation, len(RETRY_DELAYS_MS) - 1)]
     db.execute(
         "UPDATE messages SET status='interrupted' WHERE turn_id=? AND status='streaming'",
         (turn["id"],),
     )
     clear_reply_previews(db, turn["id"])
-    db.execute("UPDATE turns SET state='queued' WHERE id=?", (turn["id"],))
+    queue_route_retry(db, turn, job["id"], generation, code, stop_evidence)
+    return True
+
+
+def queue_route_retry(db, turn, job_id, generation, code, stop_evidence):
+    retry_at = now_ms() + RETRY_DELAYS_MS[min(generation, len(RETRY_DELAYS_MS) - 1)]
+    db.execute("UPDATE turns SET state='queued',finished_ms=NULL WHERE id=?", (turn["id"],))
     db.execute(
         "UPDATE jobs SET state='queued',available_ms=?,"
         "payload_json=json_set(payload_json,'$.nativeRouteRetry',?) WHERE id=?",
-        (retry_at, generation + 1, job["id"]),
+        (retry_at, generation + 1, job_id),
     )
     event(
         db,
@@ -61,4 +66,3 @@ def defer_native_route(db, turn, code, stop_evidence):
         },
         turn_id=turn["id"],
     )
-    return True

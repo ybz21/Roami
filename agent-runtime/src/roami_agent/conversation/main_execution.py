@@ -1,6 +1,7 @@
 """Project Main provider bindings keep the existing conversation and team identity."""
 
 import json
+import logging
 from copy import copy
 
 from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
@@ -12,7 +13,10 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.providers.native_main import NativeMain
 from roami_agent.storage.database import event, row
 from roami_agent.storage.swarm_repository import receipt
+from roami_agent.storage.swarm_settled_route_recovery import recover_route_wait, recovery_candidates
 from roami_agent.storage.transcript_repository import owned
+
+log = logging.getLogger(__name__)
 
 
 class NeedMainPreparation(Exception):
@@ -156,3 +160,37 @@ class MainExecutions:
             binding, turn, self.executor.command, capabilities=self.capabilities
         )
         return selected
+
+    async def recover_settled_route_waits(self):
+        for turn in await self.db.call(recovery_candidates):
+            try:
+                await self._recover_settled_route_wait(turn)
+            except (DomainError, OSError, TimeoutError):
+                log.debug("Original Main route wait could not be recovered", exc_info=True)
+
+    async def _recover_settled_route_wait(self, turn):
+        owner, cid = turn["owner_id"], turn["conversation_id"]
+        binding = await self.db.call(lambda db: main_binding(db, owner, cid))
+        if not binding or binding["executor"] != "claude":
+            return
+        proof = await self.executor.command("prepared", "--key", binding["launch_key"])
+        if (
+            proof.get("ready") is not True
+            or proof.get("executor") != binding["executor"]
+            or proof.get("configuredModel") != binding["model"]
+            or proof.get("launchKey") != binding["launch_key"]
+            or not isinstance(proof.get("sessionBinding"), dict)
+            or not proof.get("routeRefusal")
+        ):
+            return
+        native = dict(binding)
+        native["binding"] = json.loads(native.pop("binding_json"))
+        model = NativeMain(native, turn, self.executor.command)
+        model.verify({"session": proof.get("sessionId"), "sessionBinding": proof["sessionBinding"]})
+        await self.db.call(
+            lambda db: (
+                main_binding(db, owner, cid) == binding
+                and recover_route_wait(db, turn["id"], model, proof)
+            ),
+            write=True,
+        )
