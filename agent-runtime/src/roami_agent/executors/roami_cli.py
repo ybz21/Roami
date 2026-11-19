@@ -501,7 +501,12 @@ class CodingExecutor:
                 "SELECT a.*,t.owner_id FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
                 "WHERE a.executor_kind='cli' AND a.task_revision=t.revision AND ("
                 "(a.result_json IS NULL AND t.state IN ('preparing','running','cancelling')) OR "
-                "(t.state='interrupted' AND a.state='unknown' AND json_extract(a.result_json,'$.outcomeKnown')=0)) "
+                "(t.state='interrupted' AND a.state='unknown' AND json_extract(a.result_json,'$.outcomeKnown')=0) OR "
+                "(t.state='cancelling' AND a.state='unknown' AND EXISTS(SELECT 1 FROM jobs y "
+                "WHERE y.kind='task.yield' AND y.state='done' AND y.aggregate_id=t.id "
+                "AND json_extract(y.payload_json,'$.runId')=a.id "
+                "AND EXISTS(SELECT 1 FROM events e WHERE e.id=json_extract(y.payload_json,'$.cancellationEventId') "
+                "AND e.task_id=t.id AND e.kind='task.cancelling')))) "
                 "AND a.attempt_no=(SELECT MAX(attempt_no) FROM task_attempts WHERE task_id=t.id) "
                 "AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.kind='task.run' AND j.aggregate_id=t.id AND j.state IN ('queued','running')) "
                 "ORDER BY CASE WHEN t.state='interrupted' THEN 1 ELSE 0 END,a.started_ms LIMIT 100",

@@ -664,6 +664,21 @@ class TaskDispatcher:
                 )
                 record_execution_result(db, task["id"], run["id"])
             elif current["state"] == "cancelling":
+                proven_yield_stop = (
+                    result.get("inputStopped") is True and result.get("outcomeKnown") is True
+                )
+                from roami_agent.storage.swarm_member_yield import (
+                    current_yield_request,
+                    yield_stop_request,
+                )
+
+                yielding = yield_stop_request(db, current, run)
+                if yielding and not proven_yield_stop:
+                    # Keep directory admission reserved until the original input is proven stopped.
+                    db.execute("UPDATE task_attempts SET state='unknown' WHERE id=?", (run["id"],))
+                    if job_id:
+                        db.execute("UPDATE jobs SET state='done' WHERE id=?", (job_id,))
+                    return
                 children = rows(
                     db,
                     "SELECT state FROM tasks WHERE parent_task_id=? AND COALESCE(json_extract(intent_json,'$.parentTaskRevision'),1)=?",
@@ -683,6 +698,13 @@ class TaskDispatcher:
                     or result.get("outcomeKnown") is False
                     or result.get("inputStopped") is False
                 )
+                if yielding and uncertain:
+                    if job_id:
+                        db.execute(
+                            "UPDATE jobs SET state='queued',available_ms=? WHERE id=?",
+                            (now_ms() + 1000, job_id),
+                        )
+                    return
                 state = "interrupted" if uncertain else "cancelled"
                 result = {
                     **result,
@@ -691,6 +713,12 @@ class TaskDispatcher:
                 }
                 if uncertain:
                     result.update(outcomeKnown=False, retryable=False)
+                else:
+                    if proven_yield_stop and (
+                        current_yield := current_yield_request(db, current, run)
+                    ):
+                        state = "interrupted"
+                        result.update(yieldedToMain=current_yield)
             if state == "succeeded":
                 from roami_agent.storage.swarm_repository import task_dependencies_ready
 
@@ -894,6 +922,25 @@ class TaskDispatcher:
 
     async def recover(self):
         def write(db):
+            for task in rows(db, "SELECT * FROM tasks WHERE state='cancelling'"):
+                run = row(
+                    db,
+                    "SELECT * FROM task_attempts WHERE task_id=? AND task_revision=? "
+                    "ORDER BY attempt_no DESC LIMIT 1",
+                    (task["id"], task["revision"]),
+                )
+                if (
+                    not run
+                    or run["executor_kind"] != "cli"
+                    or not getattr(self.executor, "can_reconcile", False)
+                ):
+                    continue
+                # The native runner survives; discard only its interrupted Python admission job.
+                db.execute(
+                    "UPDATE jobs SET state='done' WHERE kind='task.run' AND aggregate_id=? "
+                    "AND json_extract(payload_json,'$.runId')=? AND state IN ('queued','running')",
+                    (task["id"], run["id"]),
+                )
             for task in rows(db, "SELECT * FROM tasks WHERE state IN ('preparing','running')"):
                 submission = row(
                     db,

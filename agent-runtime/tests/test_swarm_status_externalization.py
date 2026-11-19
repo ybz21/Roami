@@ -19,6 +19,7 @@ async def test_large_status_keeps_current_control_state_and_exact_history_artifa
         "mainState": "completed",
         "mainConversationId": "original-main",
         "sequence": 42,
+        "memberYieldSupported": True,
         "mainMessages": [{"text": "historical message " * 10000}],
         "members": [{"id": "original-member"}],
     }
@@ -34,7 +35,15 @@ async def test_large_status_keeps_current_control_state_and_exact_history_artifa
     )
     assert result["outputExternalized"] is True
     assert len(json.dumps(result)) < 10000
-    for key in ["revision", "paused", "archived", "mainState", "mainConversationId", "sequence"]:
+    for key in [
+        "revision",
+        "paused",
+        "archived",
+        "mainState",
+        "mainConversationId",
+        "sequence",
+        "memberYieldSupported",
+    ]:
         if name == "swarm_status":
             assert result[key] == value[key]
         else:
