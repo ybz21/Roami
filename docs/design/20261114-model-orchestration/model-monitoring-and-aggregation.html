@@ -54,6 +54,7 @@ code { overflow-wrap:anywhere; }
 .section-head,.sample-head,.actions,.legend { display:flex; gap:var(--sp-2) var(--sp-3); align-items:center; flex-wrap:wrap; }
 .section-head,.sample-head { justify-content:space-between; }
 .section-head { margin-bottom:var(--sp-3); }
+.page-reference,.overview-table a { display:inline-flex; align-items:center; min-height:var(--tap); }
 .copy { max-width:76ch; }
 .copy ul { padding-inline-start:var(--sp-5); }
 .copy li + li { margin-top:var(--sp-2); }
@@ -105,6 +106,7 @@ code { overflow-wrap:anywhere; }
 .guide-table th,.guide-table td { border-bottom:1px solid var(--border-subtle); text-align:start; padding:var(--sp-2) var(--sp-3) var(--sp-2) 0; vertical-align:top; }
 .guide-table th:first-child,.guide-table td:first-child { width:25%; }
 .guide-table th { color:var(--text-dim); font-size:var(--fs-meta); }
+.overview-table td,.overview-table th { vertical-align:middle; }
 .step { margin-top:var(--sp-4); min-width:0; }
 .flow { padding:0; margin:var(--sp-2) 0; list-style:none; display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-3); }
 .flow li { border-inline-start:1px solid var(--border); padding-inline-start:var(--sp-2); }
@@ -138,21 +140,41 @@ code { overflow-wrap:anywhere; }
 <header class="page-head"><h1>Roami 大模型页面改进</h1><p class="muted">设计评审 · 聚合调度、服务监控与插件账号</p></header>
 <div class="workspace">
 <nav class="contents" aria-label="设计目录">
-  <a href="#overview" aria-current="location">设计范围</a><a href="#aggregate">聚合</a><a href="#monitor">监控</a><a href="#pages">其他五页</a><a href="#workbuddy">WorkBuddy</a><a href="#delivery">技术与验收</a>
+  <a href="#overview" aria-current="location">页面总览</a><a href="#catalog">模型源</a><a href="#aggregate">聚合</a><a href="#usage">概况</a><a href="#monitor">监控</a><a href="#audit">审计</a><a href="#gateway">本机网关</a><a href="#speech">语音输入</a><a href="#workbuddy">WorkBuddy</a><a href="#delivery">技术与验收</a>
 </nav>
 <main class="document" id="document">
 <section id="overview" aria-labelledby="overview-title">
-  <header class="section-head"><h2 id="overview-title">设计范围</h2><small>2026 年 11 月 19 日</small></header>
+  <header class="section-head"><h2 id="overview-title">页面总览</h2><small>2026 年 11 月 19 日</small></header>
   <p class="copy">在 Roami 现有「大模型」页签内改进七页。聚合借鉴参考图中的成员承载、健康状态与故障切换。监控借鉴请求走势、失败分布与延迟。下面的可点样例只演示新增区块，使用虚构数据。</p>
+  <table class="guide-table overview-table step" aria-label="七个子页的设计和入口">
+    <thead><tr><th scope="col">子页设计</th><th scope="col">主要用途</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#catalog">模型源</a></th><td>连接、授权和启用模型</td></tr>
+      <tr><th scope="row"><a href="#aggregate">聚合</a></th><td>配置成员和顺位，查看当前与实际调度</td></tr>
+      <tr><th scope="row"><a href="#usage">概况</a></th><td>看用量、记账费用和每日限额</td></tr>
+      <tr><th scope="row"><a href="#monitor">监控</a></th><td>看成功率、延迟和失败分布</td></tr>
+      <tr><th scope="row"><a href="#audit">审计</a></th><td>定位某次调用、命中模型与费用</td></tr>
+      <tr><th scope="row"><a href="#gateway">本机网关</a></th><td>找已启用模型、能力、调用示例和凭据</td></tr>
+      <tr><th scope="row"><a href="#speech">语音输入</a></th><td>配置和验证转写服务</td></tr>
+    </tbody>
+  </table>
+  <p class="copy step">在 Roami 内打开本文时，每章的「打开现有页面」使用当前节点地址。</p>
+  <h3 class="step">跨页流程</h3>
   <ul class="copy">
-    <li>配置聚合时，我要看当前会用谁、为什么跳过，以及刚才切到了谁。</li>
-    <li>排查故障时，我要从异常时间段定位到源、模型和具体调用。</li>
-    <li>管理 WorkBuddy 时，我要在插件里看各账号的积分与签到结果。</li>
+    <li>接入模型，从<a href="#catalog">模型源</a>启用模型，按需配置<a href="#aggregate">聚合</a>，到<a href="#gateway">本机网关</a>复制调用方式。</li>
+    <li>排查故障，从<a href="#aggregate">聚合</a>的切换记录或<a href="#monitor">监控</a>的异常时段进入<a href="#audit">审计</a>，保留筛选。</li>
+    <li>核对费用，从<a href="#usage">概况</a>查看额度和用量，再到<a href="#audit">审计</a>核对明细。账号积分在 <a href="#workbuddy">WorkBuddy 插件</a>里看。</li>
   </ul>
 </section>
 
+<section id="catalog" aria-labelledby="catalog-title">
+  <header class="section-head"><h2 id="catalog-title">模型源 · 启用需要的模型</h2><a class="page-reference" href="/#/capabilities/models/catalog" target="_blank" rel="noopener">打开现有模型源</a></header>
+  <p class="copy">新建、筛选和来源列表统一用「OpenRouter 免费模型 / API 连接 / Magpie 插件」。协议单列。新建 Magpie 直接填社区插件目录链接或仓库路径，旁边链接目录和说明。为已启用模型和供应商目录提供各自的入口。</p>
+  <p class="copy">启用的模型可在<a href="#gateway">本机网关</a>查看或加入<a href="#aggregate">聚合</a>。插件来源可进入对应<a href="#workbuddy">账号详情</a>，看积分、授权状态和版本。</p>
+</section>
+
 <section id="aggregate" aria-labelledby="aggregate-title">
-  <header class="section-head"><h2 id="aggregate-title">聚合 · 当前成员和实际调用</h2><small>大模型 / 聚合 / 调度</small></header>
+  <header class="section-head"><h2 id="aggregate-title">聚合 · 当前成员和实际调用</h2><a class="page-reference" href="/#/capabilities/models/aggregate" target="_blank" rel="noopener">打开现有聚合</a></header>
   <p class="copy">在现有策略卡片上方复用「当前调度顺序」，首屏给出首选和可调度数。展开看成员状态与实际承载。策略预览、拖动、蓝色插入线和「保存并应用」沿用现有交互。拖动只改草稿，保存成功后才用新顺位刷新这一块。<a href="https://github.com/ybz21/Roami/pull/989">Roami 现有页面对照</a></p>
   <div class="sample" aria-label="聚合局部样例">
     <div class="sample-head"><h3>当前调度顺序</h3><label class="muted">演示状态<select id="route-scenario"><option value="ready">有可用成员</option><option value="blocked">无可用成员</option><option value="unknown">状态未检测</option><option value="empty">暂无调用</option></select></label></div>
@@ -167,7 +189,7 @@ code { overflow-wrap:anywhere; }
     <ol class="member-list" id="route-members"></ol>
     <div class="recent">
       <p id="route-latest" class="muted">最近命中 16:39 · ERNIE 5.5 Flash · 成功</p>
-      <details id="route-events"><summary>最近故障切换</summary><p>16:35 · OpenRouter 免费模型限流，切换到 WorkBuddy，最终成功。</p><a href="#audit" id="route-audit">查看这次调用</a></details>
+      <details id="route-events"><summary>最近故障切换</summary><p>16:35 · OpenRouter 免费模型限流，切换到 WorkBuddy，最终成功。</p><a href="#audit-example" id="route-audit">查看这次调用</a></details>
       <p id="route-no-events" class="muted" hidden>暂无切换记录。</p>
     </div>
   </div>
@@ -178,8 +200,14 @@ code { overflow-wrap:anywhere; }
   </ul>
 </section>
 
+<section id="usage" aria-labelledby="usage-title">
+  <header class="section-head"><h2 id="usage-title">概况 · 用量与限额</h2><a class="page-reference" href="/#/capabilities/models/usage" target="_blank" rel="noopener">打开现有概况</a></header>
+  <p class="copy">把今日已用、剩余额度、每日限额、结算时区和「调整限额」放在同一处。趋势展示自己的分析区间和时区。费用未知或仍在结算时显示「待核对」。</p>
+  <p class="copy">从用量趋势或来源分组进入<a href="#audit">审计</a>，带入所选时段和来源。返回概况时恢复原筛选和位置。</p>
+</section>
+
 <section id="monitor" aria-labelledby="monitor-title">
-  <header class="section-head"><h2 id="monitor-title">监控 · 从失败走势找到原因</h2><small>大模型 / 监控</small></header>
+  <header class="section-head"><h2 id="monitor-title">监控 · 从失败走势找到原因</h2><a class="page-reference" href="/#/capabilities/models/monitor" target="_blank" rel="noopener">打开现有监控</a></header>
   <p class="copy">保留现有来源、模型和 1 / 6 / 24 小时筛选。首屏看请求数、调用成功率和首字延迟。请求趋势与失败构成使用同一范围，桌面并排，手机依次纵向浏览。源对比与既有抽检入口放在趋势之后。</p>
   <div class="sample" aria-label="监控局部样例">
     <div class="sample-head"><h3>调用趋势</h3><label class="muted">演示范围<select id="monitor-range"><option value="1">最近 1 小时</option><option value="6">最近 6 小时</option><option value="24">最近 24 小时</option><option value="0">暂无调用</option></select></label></div>
@@ -194,7 +222,7 @@ code { overflow-wrap:anywhere; }
         <h3 id="chart-heading">请求量</h3>
         <figcaption class="legend"><span><i class="swatch succeeded"></i>成功</span><span><i class="swatch failed"></i>失败</span><span>点柱查看时段</span></figcaption>
         <div class="chart" id="monitor-chart" role="group" aria-label="请求量分时样例"></div>
-        <div class="chart-result"><span id="monitor-selection" class="muted" role="status"></span><a id="monitor-audit" href="#audit">查看失败调用</a></div>
+        <div class="chart-result"><span id="monitor-selection" class="muted" role="status"></span><a id="monitor-audit" href="#audit-example">查看失败调用</a></div>
       </figure>
       <section aria-labelledby="failure-heading"><h3 id="failure-heading">失败构成</h3><small id="failure-scope"></small><ul class="failures" id="failure-list"></ul></section>
     </div>
@@ -207,23 +235,25 @@ code { overflow-wrap:anywhere; }
   </ul>
 </section>
 
-<section id="pages" aria-labelledby="pages-title">
-  <header class="section-head"><h2 id="pages-title">其余五页</h2></header>
-  <table class="guide-table">
-    <thead><tr><th scope="col">现有入口</th><th scope="col">改动</th></tr></thead>
-    <tbody>
-      <tr><th scope="row">模型源</th><td>新建、筛选、列表统一用「OpenRouter 免费模型 / API 连接 / Magpie 插件」。协议单列。新建 Magpie 直接填官方插件目录链接或仓库路径，旁边链接目录和说明。已启用模型和供应商目录各有明确入口。</td></tr>
-      <tr><th scope="row">概况</th><td>今日已用、剩余额度、每日限额、结算时区和「调整限额」放在同一处。趋势展示自己的分析区间和时区。费用未知或仍在结算时显示「待核对」。</td></tr>
-      <tr><th scope="row">审计</th><td>明细第一屏看结果、命中模型、来源、用时、费用和失败原因。记录 ID、上游请求 ID 等放入技术详情，提供复制。保留来自聚合、监控、概况的筛选和返回位置。</td></tr>
-      <tr><th scope="row">本机网关</th><td>已接入默认打开、聚合优先。行上显示聚合或原生、输入输出能力和已确认免费、套餐、按量、待确认等价格状态。调用 ID 放在复制操作与接入示例。修复「查看聚合」直接打开对应聚合。</td></tr>
-      <tr><th scope="row">语音输入</th><td>服务摘要展示当前配置和最近测试结果。通过用户触发的「测试识别」区分麦克风权限、鉴权失败与转写失败。</td></tr>
-    </tbody>
-  </table>
-  <details id="audit" class="step">
+<section id="audit" aria-labelledby="audit-title">
+  <header class="section-head"><h2 id="audit-title">审计 · 查看调用明细</h2><a class="page-reference" href="/#/capabilities/models/audit" target="_blank" rel="noopener">打开现有审计</a></header>
+  <p class="copy">明细第一屏看结果、命中模型、来源、用时、费用和失败原因。记录 ID、上游请求 ID 放入技术详情，提供复制。保留来自<a href="#aggregate">聚合</a>、<a href="#monitor">监控</a>和<a href="#usage">概况</a>的筛选与返回位置。</p>
+  <details id="audit-example" class="step">
     <summary>查看审计跳转样例</summary>
     <p id="audit-context" class="muted" role="status">从聚合或监控点进来，可查看带入的条件。</p>
     <dl class="call" id="audit-record" hidden><dt>最终结果</dt><dd>成功</dd><dt>故障切换</dt><dd>OpenRouter 免费模型限流，随后由 WorkBuddy 接续。</dd><dt>费用</dt><dd>已确认免费</dd></dl>
   </details>
+</section>
+
+<section id="gateway" aria-labelledby="gateway-title">
+  <header class="section-head"><h2 id="gateway-title">本机网关 · 找到可调用模型</h2><a class="page-reference" href="/#/capabilities/models/gateway" target="_blank" rel="noopener">打开现有本机网关</a></header>
+  <p class="copy">默认打开已接入目录，聚合优先。列表显示聚合或原生、输入输出能力，以及已确认免费、套餐、按量、待确认等价格状态。调用 ID 放在复制操作与接入示例。</p>
+  <p class="copy">「查看来源」打开对应<a href="#catalog">模型源</a>。「查看聚合」直接打开对应<a href="#aggregate">聚合</a>，返回时保留目录筛选和选中项。</p>
+</section>
+
+<section id="speech" aria-labelledby="speech-title">
+  <header class="section-head"><h2 id="speech-title">语音输入 · 验证识别服务</h2><a class="page-reference" href="/#/capabilities/models/speech" target="_blank" rel="noopener">打开现有语音输入</a></header>
+  <p class="copy">服务摘要展示当前配置和最近测试结果。用户触发「测试识别」后，分别呈现麦克风权限、服务鉴权和识别结果。测试通过后保留配置摘要与结果时间。</p>
 </section>
 
 <section id="workbuddy" aria-labelledby="workbuddy-title">
@@ -369,7 +399,7 @@ function renderMonitor() {
   }).join('') : ''
 }
 function openAudit(text, showRecord) {
-  const panel = byId('audit')
+  const panel = byId('audit-example')
   panel.open = true
   byId('audit-context').textContent = text
   byId('audit-record').hidden = !showRecord
@@ -410,10 +440,12 @@ byId('claim').addEventListener('click', () => {
   byId('bonus').textContent = '50'
 })
 function indicateAnchor() {
-  const hash = location.hash === '#audit' ? '#pages' : location.hash || '#overview'
+  const hash = location.hash === '#audit-example' ? '#audit' : location.hash || '#overview'
   document.querySelectorAll('.contents a').forEach(link => {
-    if (link.hash === hash) link.setAttribute('aria-current','location')
-    else link.removeAttribute('aria-current')
+    if (link.hash === hash) {
+      link.setAttribute('aria-current','location')
+      link.scrollIntoView({block:'nearest',inline:'nearest'})
+    } else link.removeAttribute('aria-current')
   })
 }
 window.addEventListener('hashchange', indicateAnchor)
