@@ -12,7 +12,6 @@
 .agent-feedback { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); padding:var(--sp-2) var(--sp-4); background:var(--warn-soft); color:var(--text-bright); font-size:var(--fs-sm); }
 .agent-feedback.error { background:var(--danger-soft); }
 .agent-composer { flex:none; position:relative; padding:var(--sp-2) var(--sp-4); width:100%; align-self:center; box-sizing:border-box; }
-.agent-compaction-status { max-width:calc(var(--sp-5) * 34); margin-inline:auto; }
 .agent-compaction-status > button { display:flex; align-items:center; gap:var(--sp-2); width:100%; min-height:var(--tap); padding:var(--sp-1) 0; border:0; background:transparent; color:var(--text-dim); font-size:var(--fs-sm); text-align:left; cursor:pointer; }
 .agent-compaction-status > button > svg { flex:none; }
 .agent-compaction-status > button > span { flex:1; min-width:0; overflow-wrap:anywhere; }
@@ -158,7 +157,6 @@ html[data-pointer="coarse"] .agent-executor-menu .ant-dropdown-menu-item { posit
 html[data-pointer="coarse"] .agent-executor-menu .ant-dropdown-menu-item::before { content:""; position:absolute; inset-inline:calc(-1 * var(--sp-1)); top:50%; height:var(--tap); transform:translateY(-50%); }
 
 .agent-message.user { width:100%; min-width:0; }
-.agent-composer > .agent-outbox { max-width:calc(var(--sp-5) * 34); margin-inline:auto; }
 
 .agent-plus-modes { display:flex; gap:var(--sp-2); }
 .agent-plus-modes > button { display:flex; flex:1; justify-content:space-between; align-items:center; gap:var(--sp-2); min-height:var(--tap); padding:var(--sp-2); border:0; border-radius:var(--r-sm); background:transparent; color:var(--text-dim); font-size:var(--fs-sm); cursor:pointer; }

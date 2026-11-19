@@ -62,10 +62,10 @@ function messageText(m: Msg): string {
 }
 
 // 消息尾巴：时间 + 复制。工具段不给尾巴——那不是「谁说的话」。
-function Footer({ m, align, actions, compact = false }: { m: Msg; align: 'flex-start' | 'flex-end'; actions?: ReactNode; compact?: boolean }) {
+function Footer({ m, actions, compact = false }: { m: Msg; actions?: ReactNode; compact?: boolean }) {
   const { t } = useI18n()
   return (
-    <span className="conversation-message-footer" style={{ display: 'inline-flex', alignSelf: align, alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', padding: '0 var(--sp-1)' }}>
+    <span className="conversation-message-footer" style={{ display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', padding: '0 var(--sp-1)' }}>
       {m.ts && <time dateTime={m.ts}>{fmtTs(m.ts)}</time>}
       <button type="button" className={'cc-msg-copy' + (compact ? ' conversation-copy-icon' : '')} aria-label={t('common.copy')} onClick={() => copyText(messageText(m))}>{compact ? <CopyIcon size={16} /> : t('common.copy')}</button>{actions}
     </span>
@@ -88,7 +88,7 @@ function Prose({ blocks, accent, side, resolveHref, allowImages }: { allowImages
   )
 }
 
-// 用户气泡：右侧实心块。命令小标、命令回显、系统提醒都挪到气泡外，
+// 用户气泡：左侧实心块。命令小标、命令回显、系统提醒都挪到气泡外，
 // 免得白字压在实心底色上再套一层折叠框。
 const isImagePath = (p: string) => IMG_EXT.includes((p.split('.').pop() || '').toLowerCase())
 
@@ -136,7 +136,7 @@ function UserMessage({ m, accent, compactActions = false }: { m: Msg; accent: st
   const reminders = extras.flatMap((p) => p.reminders)
   const hasBubble = m.blocks.some((b, i) => (parsed[i] ? !!(parsed[i]!.body || parsed[i]!.command) : !!b.text))
   return (
-    <div className="cc-msg" data-msg-id={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', margin: 'var(--sp-1) 0', gap: 2 }}>
+    <div className="cc-msg" data-msg-id={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', margin: 'var(--sp-1) 0', gap: 'var(--sp-1)' }}>
       {hasBubble && (
         <div style={{ maxWidth: '86%', background: accent, borderRadius: 'var(--r-card)', padding: 'var(--sp-2) var(--sp-3)', color: '#fff', display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
           {m.blocks.map((b, i) => {
@@ -158,7 +158,7 @@ function UserMessage({ m, accent, compactActions = false }: { m: Msg; accent: st
       )}
       {stdout.map((sOut, i) => <Collapsible key={`o${i}`} label={t('chat.commandOutput')} text={sOut} color="var(--text-dim)" />)}
       {reminders.map((r, i) => <Collapsible key={`r${i}`} label={t('chat.systemReminder')} text={r} color="var(--text-dimmer)" />)}
-      <Footer m={m} align="flex-end" compact={compactActions} />
+      <Footer m={m} compact={compactActions} />
     </div>
   )
 }
@@ -190,7 +190,7 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side, resolve
           <Prose blocks={sg.blocks} accent={accent} side={side} resolveHref={resolveHref} allowImages={allowImages} />
         </div>
       )))}
-      {hasProse && <Footer m={m} align="flex-start" actions={footerActions} compact={side === 'native'} />}
+      {hasProse && <Footer m={m} actions={footerActions} compact={side === 'native'} />}
     </div>
   )
 })
