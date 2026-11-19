@@ -4,20 +4,32 @@ import { api } from '../../api'
 import { nodeApi } from '../cluster/node-url'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
+import { useAgentData } from '../agent/useAgentData'
 import { catalogFailure } from './model-hub-api'
 
 export type PluginProvider = { id: string; name: string; signedIn: boolean; fellBack?: boolean; methods: { type: string; label: string; keyless?: boolean; labels?: Record<string, string> }[]; options: { key: string; label: string; description: string; default: boolean; labels?: Record<string, string> }[]; models: { id: string; name: string }[] }
 type Package = { id: string; name: string; version: string }
 type InspectedPackage = { pkg: Package; providers?: PluginProvider[]; error?: string }
+type CommunityPlugin = { package: string; name: string; providers: string[]; version: string }
+const communityPath = '/agent/model-gateway/plugins/community'
+const communityChannels = ['github', 'china', 'gh-hk'] as const
+const registryURL = 'https://github.com/magpie-community/plugins/blob/main/registry.json'
 export const pluginFailure = (cause: any) => {
   const code = cause?.apiError?.code || cause?.message
-  return ({ INVALID_MODEL_PLUGIN_PACKAGE: 'hub.plugin.invalid', MODEL_PLUGIN_DESKTOP_UNAVAILABLE: 'hub.plugin.desktopUnavailable', MODEL_PLUGIN_DESKTOP_APP_MISSING: 'hub.plugin.desktopMissing', MODEL_PLUGIN_DESKTOP_PACKAGE_UNTRUSTED: 'hub.plugin.desktopPackageUntrusted', MODEL_PLUGIN_BUN_UNAVAILABLE: 'hub.plugin.bunUnavailable', MODEL_PLUGIN_SANDBOX_UNAVAILABLE: 'hub.plugin.sandboxUnavailable', MODEL_PLUGIN_MODELS_REQUIRED: 'hub.plugin.refreshRequired', MODEL_PLUGIN_BUSY: 'hub.plugin.busy', MODEL_PLUGIN_FAILED: 'hub.plugin.failed' } as Record<string, string>)[code] || catalogFailure(cause)
+  return ({ INVALID_MODEL_PLUGIN_PACKAGE: 'hub.plugin.invalid', MODEL_PLUGIN_DESKTOP_UNAVAILABLE: 'hub.plugin.desktopUnavailable', MODEL_PLUGIN_DESKTOP_APP_MISSING: 'hub.plugin.desktopMissing', MODEL_PLUGIN_DESKTOP_PACKAGE_UNTRUSTED: 'hub.plugin.desktopPackageUntrusted', MODEL_PLUGIN_BUN_UNAVAILABLE: 'hub.plugin.bunUnavailable', MODEL_PLUGIN_SANDBOX_UNAVAILABLE: 'hub.plugin.sandboxUnavailable', MODEL_PLUGIN_MODELS_REQUIRED: 'hub.plugin.refreshRequired', MODEL_PLUGIN_BUSY: 'hub.plugin.busy', MODEL_PLUGIN_FAILED: 'hub.plugin.failed', MODEL_PLUGIN_COMMUNITY_UNAVAILABLE: 'hub.plugin.communityUnavailable', MODEL_PLUGIN_COMMUNITY_INTEGRITY: 'hub.plugin.communityIntegrity' } as Record<string, string>)[code] || catalogFailure(cause)
 }
 export default function MagpiePluginImport({ revision, onImported, onRetry }: { revision: string; onImported: () => void; onRetry?: () => void }) {
   const { t } = useI18n(), layout = useLayout()
   const folder = useRef<HTMLInputElement>(null), zip = useRef<HTMLInputElement>(null)
   const [packages, setPackages] = useState<Package[]>([]), [selected, setSelected] = useState(''), [batch, setBatch] = useState<string[]>([]), [inspected, setInspected] = useState<InspectedPackage[]>([]), [skipped, setSkipped] = useState<string[]>([]), [scanning, setScanning] = useState(false)
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [version, setVersion] = useState(0)
+  const [channel, setChannel] = useState<(typeof communityChannels)[number]>('github')
+  const [communityPackage, setCommunityPackage] = useState('')
+  const registry = useAgentData<CommunityPlugin[]>(communityPath + '?channel=' + channel, 300_000)
+  const communityPlugins = Array.isArray(registry.value) ? registry.value : []
+  const available = communityPlugins.find(row => row.package === communityPackage)
+  const downloaded = available ? packages.filter(row => row.name === available.package) : []
+  const matchedDownload = downloaded.find(row => row.version === available?.version)
   useEffect(() => {
     const abort = new AbortController()
     void api('GET', '/agent/model-gateway/plugins/packages', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setPackages(previous => [...new Map<string, Package>([...data, ...previous].map((row: Package) => [row.id, row])).values()]) }).catch(cause => { if (!abort.signal.aborted) setError(pluginFailure(cause)) })
@@ -44,6 +56,22 @@ export default function MagpiePluginImport({ revision, onImported, onRetry }: { 
     })()
     return () => abort.abort()
   }, [selected, version, inspectionKey])
+  const acceptPackages = (imported: Package[], nextSkipped: string[]) => {
+    setSkipped(nextSkipped); setBatch(imported.map(pkg => pkg.id))
+    setPackages(previous => [...new Map([...previous, ...imported].map(pkg => [pkg.id, pkg])).values()])
+    setSelected(imported.length > 1 ? '*' : imported[0].id)
+    setVersion(previous => previous + 1)
+  }
+  const download = async () => {
+    if (!available?.version || busy) return
+    if (matchedDownload) { setSelected(matchedDownload.id); return }
+    setBusy(true); setError('')
+    try {
+      const { data } = await api('POST', communityPath, { channel, package: available.package, version: available.version })
+      acceptPackages([data], [])
+    } catch (cause) { setError(pluginFailure(cause)) }
+    finally { setBusy(false) }
+  }
   const upload = async (files: FileList | null, isFolder: boolean) => {
     if (!files?.length || busy) return
     const list = Array.from(files).filter(file => !isFolder || !file.webkitRelativePath.split('/').some(part => part === '.git' || part === 'node_modules' || part === '.env' || part.startsWith('.env.')))
@@ -57,8 +85,7 @@ export default function MagpiePluginImport({ revision, onImported, onRetry }: { 
       const result = await response.json()
       if (!response.ok) throw { apiError: result.error }
       const imported = (result.data.packages || [result.data]) as Package[]
-      setSkipped(result.data.skipped || []); setBatch(imported.map(pkg => pkg.id))
-      setPackages(previous => [...new Map([...previous, ...imported].map(pkg => [pkg.id, pkg])).values()]); setSelected(imported.length > 1 ? '*' : imported[0].id); setVersion(previous => previous + 1)
+      acceptPackages(imported, result.data.skipped || [])
     } catch (cause) { setError(pluginFailure(cause)) }
     finally { setBusy(false); if (folder.current) folder.current.value = ''; if (zip.current) zip.current.value = '' }
   }
@@ -69,12 +96,33 @@ export default function MagpiePluginImport({ revision, onImported, onRetry }: { 
     finally { setBusy(false) }
   }
   return <section className="tt-model-hub-scroll tt-model-plugin-import">
-    <p className="agent-settings-hint">{t('hub.plugin.importHint')}</p>
-    <div className="tt-model-hub-actions"><Button disabled={busy} onClick={() => folder.current?.click()}>{t('hub.plugin.folder')}</Button><Button disabled={busy} loading={busy} onClick={() => zip.current?.click()}>{t('hub.plugin.zip')}</Button></div>
+    <section className="tt-magpie-community" aria-label={t('hub.plugin.community')}>
+      <div className="tt-model-directory-heading"><h3>{t('hub.plugin.community')}</h3><a className="tt-act" href={registryURL} target="_blank" rel="noopener noreferrer">{t('hub.plugin.viewRegistry')}</a></div>
+      <div className="tt-magpie-community-fields">
+        <label className="agent-settings-field">{t('hub.plugin.communityPackage')}<Select
+          aria-label={t('hub.plugin.communityPackage')} showSearch loading={registry.loading} disabled={busy || registry.loading}
+          value={available?.package} placeholder={t('hub.plugin.communitySearch')}
+          options={communityPlugins.map(row => ({ value: row.package, label: row.name, search: [row.name, row.package, ...row.providers].join(' ').toLowerCase() }))}
+          filterOption={(query, option) => {
+            const term = query.trim().toLowerCase().replace(/^https:\/\/github\.com\/magpie-community\/plugins\/tree\/[^/]+\//, '').replace(/^packages\//, '').replace(/\/$/, '')
+            return !!option?.search.includes(term)
+          }}
+          onChange={setCommunityPackage}
+        /></label>
+        <label className="agent-settings-field">{t('hub.plugin.communityChannel')}<Select
+          aria-label={t('hub.plugin.communityChannel')} disabled={busy} value={channel}
+          options={communityChannels.map(value => ({ value, label: t('hub.plugin.channel.' + value) }))} onChange={setChannel}
+        /></label>
+      </div>
+      {registry.failed && <div className="tt-model-hub-actions"><span role="status">{t('hub.plugin.communityUnavailable')}</span><Button disabled={busy} onClick={registry.refresh}>{t('agent.retry')}</Button></div>}
+      {available && <div className="tt-magpie-community-release">
+        <small>{t(available.version ? 'hub.plugin.onlineVersion' : 'hub.plugin.noOnlineVersion', { version: available.version })}{downloaded.length > 0 && ' · ' + t('hub.plugin.downloadedVersions', { versions: [...new Set(downloaded.map(row => row.version))].join(', ') })}</small>
+        <Button type="primary" disabled={busy || !available.version} onClick={() => void download()}>{t(matchedDownload ? 'hub.plugin.inspectDownload' : 'hub.plugin.download')}</Button>
+      </div>}
+    </section>
     <input hidden ref={folder} type="file" multiple {...{ webkitdirectory: '' }} onChange={event => void upload(event.target.files, true)} />
     <input hidden ref={zip} type="file" accept=".zip,application/zip" onChange={event => void upload(event.target.files, false)} />
-    {layout.phone && <p className="agent-settings-hint">{t('hub.plugin.phoneZIP')}</p>}
-    {packages.length > 0 && <label className="agent-settings-field">{t('hub.plugin.package')}<Select classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.plugin.package')} virtual={false} disabled={busy} value={selected || undefined} options={[...(batch.length > 1 ? [{ value: '*', label: t('hub.plugin.importedBatch', { count: batch.length }) }] : []), ...packages.map(row => ({ value: row.id, label: row.name + (row.version ? ' · ' + row.version : '') }))]} onChange={setSelected} /></label>}
+    {packages.length > 0 && <label className="agent-settings-field">{t('hub.plugin.package')}<Select classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.plugin.package')} virtual={false} disabled={busy} value={selected || undefined} options={[...(batch.length > 1 ? [{ value: '*', label: t('hub.plugin.importedBatch', { count: batch.length }) }] : []), ...packages.map(row => ({ value: row.id, label: (communityPlugins.find(plugin => plugin.package === row.name)?.name || row.name) + (row.version ? ' · ' + row.version : '') }))]} onChange={setSelected} /></label>}
     {error && <Alert type="error" role="alert" message={t(error)} action={<Button disabled={busy} onClick={() => { setVersion(previous => previous + 1); onRetry?.() }}>{t('capabilities.models.reread')}</Button>} />}
     {!!skipped.length && <details><summary>{t('hub.plugin.skipped', { count: skipped.length })}</summary><ul>{skipped.map(name => <li key={name}>{name}</li>)}</ul></details>}
     {scanning && <Spin />}
@@ -84,5 +132,9 @@ export default function MagpiePluginImport({ revision, onImported, onRetry }: { 
       {row.providers?.map(provider => <article className="tt-model-hub-row" key={provider.id}><div><strong>{provider.name}</strong><small>{provider.id}</small></div><Button type="primary" disabled={busy} onClick={() => void add(row.pkg.id, provider)}>{t('hub.plugin.addSource')}</Button></article>)}
       {row.providers?.length === 0 && <p>{t('hub.plugin.noProviders')}</p>}
     </section>)}
+    <details className="tt-magpie-upload"><summary>{t('hub.plugin.manualImport')}</summary>
+      <p className="agent-settings-hint">{t(layout.phone ? 'hub.plugin.phoneZIP' : 'hub.plugin.importHint')}</p>
+      <div className="tt-model-hub-actions"><Button disabled={busy} onClick={() => folder.current?.click()}>{t('hub.plugin.folder')}</Button><Button disabled={busy} onClick={() => zip.current?.click()}>{t('hub.plugin.zip')}</Button></div>
+    </details>
   </section>
 }

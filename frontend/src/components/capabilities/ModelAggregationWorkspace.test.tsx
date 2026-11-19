@@ -32,7 +32,7 @@ it('requires source before model and saves a smart pool with cross-source candid
   mounted.rerender(<App><ModelAggregationWorkspace {...props} active={false} /></App>); mounted.rerender(<App><ModelAggregationWorkspace {...props} /></App>)
   expect((screen.getByLabelText('pool.name') as HTMLInputElement).value).toBe('Free pool')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'free-main', aggregate: true, strategy: 'smart', freeOnly: true, candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'b', model: 'native-b' }] })]) })))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'free-main', aggregate: true, strategy: 'smart', candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'b', model: 'native-b' }] })]) })))
 })
 it('does not send probes until requested and keeps unknown quality out of the pass rate', async () => {
   const mounted = render(<App><ModelMonitoringWorkspace active={false} catalog={catalog} /></App>); expect(api).not.toHaveBeenCalled()
@@ -73,7 +73,7 @@ it('only selects models saved in the source, never an upstream directory or aggr
  expect(api).not.toHaveBeenCalled()
  fireEvent.click(screen.getByRole('checkbox', { name: 'pool.selectAll' }))
  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
- await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ name: 'Free pool', id: expect.any(String), strategy: 'smart', freeOnly: true, candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'a', model: 'approved' }] })]) })))
+ await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ name: 'Free pool', id: expect.any(String), strategy: 'smart', candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'a', model: 'approved' }] })]) })))
 })
 
 it('updates the routing preview and persists manual priority without detaching weights', async () => {
@@ -84,12 +84,34 @@ it('updates the routing preview and persists manual priority without detaching w
  fireEvent.click(screen.getByRole('button', { name: 'pool.open' }))
  fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
  fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
- expect(screen.getByRole('checkbox', { name: 'pool.freeOnly' }).getAttribute('aria-checked')).toBe('false')
+ expect(screen.getByRole('checkbox', { name: 'pool.filterFree' }).getAttribute('aria-checked')).toBe('false')
  fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.routing' }))
  fireEvent.keyDown(screen.getAllByRole('button', { name: 'pool.dragMember' })[0], { key: 'ArrowDown' })
  expect(document.querySelector('.tt-member-identity>strong')?.textContent).toBe('second')
  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'ordered', candidates: [candidates[1], candidates[0]], weights: { 'a/first': 3 } })]) })))
+})
+
+it('filters member choices by confirmed free models while keeping selected paid members', async () => {
+ const paid = { sourceId: 'a', model: 'native-a' }, free = { sourceId: 'a', model: 'free-model' }
+ const approved = { ...catalog.models[0], id: 'confirmed-free', candidates: [free] }
+ vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.includes('/models?free=true') ? {
+   revision: catalog.revision, models: [{ ...approved, kind: 'single', configured: true, enabled: true }],
+ } : { models: [] } }))
+ const save = vi.fn(async (_catalog: ModelCatalog) => true)
+ render(<App><ModelAggregationWorkspace active catalog={{ ...catalog, models: [...catalog.models, approved] }} busy={false} error="" save={save} retry={vi.fn()} onSource={vi.fn()} /></App>)
+ fireEvent.click(screen.getByRole('button', { name: 'pool.create' }))
+ fireEvent.change(screen.getByLabelText('pool.name'), { target: { value: 'WB DS' } })
+ fireEvent.click(screen.getByRole('checkbox', { name: 'native-a' }))
+ fireEvent.click(screen.getByRole('checkbox', { name: 'pool.filterFree' }))
+ expect(await screen.findByRole('checkbox', { name: 'free-model' })).toBeTruthy()
+ expect(screen.queryByRole('checkbox', { name: 'native-a' })).toBeNull()
+ expect(within(screen.getByRole('list', { name: 'orchestration.selectedPool' })).getByText('native-a')).toBeTruthy()
+ fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+ await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+ const pool = save.mock.calls[0][0].models.find(row => row.name === 'WB DS')
+ expect(pool?.candidates).toEqual([paid])
+ expect(pool).not.toHaveProperty('freeOnly')
 })
 
 

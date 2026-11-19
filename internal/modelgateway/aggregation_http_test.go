@@ -21,7 +21,6 @@ func aggregateFixture(t *testing.T, first, second http.HandlerFunc) *Handler {
 	value := h.Catalog.snapshot()
 	value.Sources = append(value.Sources, ModelSource{ID: "backup", Name: "Backup", BaseURL: b.URL, Protocol: "openai-responses", AuthMode: "bearer"})
 	value.Models[0].Aggregate = true
-	value.Models[0].FreeOnly = true
 	value.Models[0].Strategy = "smart"
 	value.Models[0].Candidates = append(value.Models[0].Candidates, ModelCandidate{"backup", "fixture"})
 	if err := h.Catalog.update(context.Background(), value); err != nil {
@@ -149,7 +148,7 @@ func TestAggregateNeverReplaysAfterStreamStartsAndRejectsPaidZeroPrice(t *testin
 	if err := h.Ledger.Configure(config); err != nil {
 		t.Fatal(err)
 	}
-	w = catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`)
+	w = catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello","roami_free_only":true}`)
 	if w.Code != 503 || backup.Load() != 0 {
 		t.Fatal("zero price entered free pool")
 	}

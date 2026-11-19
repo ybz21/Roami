@@ -68,8 +68,16 @@ func TestModelDirectoryEvidenceIsCachedScopedAndNeverInvented(t *testing.T) {
 		t.Fatal("aggregate union advertised as guaranteed", image)
 	}
 	free := query("/v1/model-gateway/models?free=true")
-	if !strings.Contains(free, `"id":"pool"`) || strings.Contains(free, `"id":"coding-main"`) {
-		t.Fatal("zero token price confused with free policy", free)
+	if strings.Contains(free, `"id":"pool"`) || strings.Contains(free, `"id":"coding-main"`) {
+		t.Fatal("zero advertised price or legacy policy mistaken for confirmed free", free)
+	}
+	cfg := testConfiguration(nil)
+	cfg.Pricing.Sources = map[string]SourcePricing{"work": {Default: PriceRule{Mode: "free", Confirmed: true}}}
+	if err := h.Ledger.Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if free := query("/v1/model-gateway/models?free=true"); !strings.Contains(free, `"id":"pool"`) || !strings.Contains(free, `"id":"coding-main"`) {
+		t.Fatal("confirmed free routes missing", free)
 	}
 	source := s.value.Sources[0]
 	display := source
@@ -104,7 +112,7 @@ func TestSelectedNativeModelUsesFreeRoutesWithoutChangingDefaults(t *testing.T) 
 	s := h.Catalog
 	next := s.snapshot()
 	next.Sources = append(next.Sources, ModelSource{ID: "free", Name: "Free", BaseURL: b.URL, Protocol: "openai-completions", AuthMode: "bearer"})
-	next.Models = append(next.Models, CatalogModel{ID: "pool", Name: "Pool", Protocol: "openai-completions", Aggregate: true, Strategy: "order", Candidates: []ModelCandidate{{"work", "paid"}, {"free", "free"}}})
+	next.Models = append(next.Models, CatalogModel{ID: "pool", Name: "Pool", Protocol: "openai-completions", Aggregate: true, FreeOnly: true, Strategy: "order", Candidates: []ModelCandidate{{"work", "paid"}, {"free", "free"}}})
 	if err := s.update(context.Background(), next); err != nil {
 		t.Fatal(err)
 	}
@@ -118,15 +126,19 @@ func TestSelectedNativeModelUsesFreeRoutesWithoutChangingDefaults(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	call := func(identity string) *httptest.ResponseRecorder {
+	call := func(identity string, freeOnly bool) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"pool","roami_free_only":true,"messages":[{"role":"user","content":"hello"}]}`))
+		body := `{"model":"pool","messages":[{"role":"user","content":"hello"}]}`
+		if freeOnly {
+			body = `{"roami_free_only":true,` + body[1:]
+		}
+		r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(body))
 		r.Header.Set("X-Roami-Model-Role", "worker")
 		r.Header.Set("X-Roami-Model-Route", identity)
 		h.ServeHTTP(w, r)
 		return w
 	}
-	w := call(route.identity())
+	w := call(route.identity(), true)
 	if w.Code != 200 || paid.Load() != 0 || free.Load() != 1 {
 		t.Fatal("free-only leaked into paid route", w.Code, w.Body.String(), paid.Load(), free.Load())
 	}
@@ -134,18 +146,21 @@ func TestSelectedNativeModelUsesFreeRoutesWithoutChangingDefaults(t *testing.T) 
 	if unchanged.model != "default-worker" {
 		t.Fatal("global role changed")
 	}
-	if w := call("stale-route"); w.Code != 409 || free.Load() != 1 {
+	if w := call("stale-route", true); w.Code != 409 || free.Load() != 1 {
 		t.Fatal("stale role settings were forwarded", w.Code)
 	}
 	cfg.Pricing.Sources["free"] = SourcePricing{Default: PriceRule{Mode: "unknown"}}
 	if err := h.Ledger.Configure(cfg); err != nil {
 		t.Fatal(err)
 	}
-	if w := call(route.identity()); w.Code != 503 || paid.Load() != 0 || free.Load() != 1 {
+	if w := call(route.identity(), true); w.Code != 503 || paid.Load() != 0 || free.Load() != 1 {
 		t.Fatal("unknown pricing entered free route", w.Code, w.Body.String())
 	}
+	if w := call(route.identity(), false); w.Code != 200 || paid.Load() != 1 || free.Load() != 1 {
+		t.Fatal("legacy member filter blocked the saved paid member", w.Code, w.Body.String())
+	}
 	h.Catalog = nil
-	if w := call(route.identity()); w.Code != 503 || paid.Load() != 0 {
+	if w := call(route.identity(), true); w.Code != 503 || paid.Load() != 1 {
 		t.Fatal("free-only bypassed the unavailable catalog", w.Code, w.Body.String())
 	}
 }

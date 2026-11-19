@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roami 大模型设计 · 本机网关</title>
+<link rel="stylesheet" href="./assets/model-workspace-design.css">
+</head>
+<body>
+<header class="page-head"><h1>Roami 大模型设计 · 本机网关</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计目录">
+  <a href="./model-monitoring-and-aggregation.html">总览</a>
+  <a href="./model-sources.html">模型源</a>
+  <a href="./model-aggregation.html">聚合</a>
+  <a href="./model-usage.html">概况</a>
+  <a href="./model-monitoring.html">监控</a>
+  <a href="./model-audit.html">审计</a>
+  <a href="./model-gateway.html" aria-current="page">本机网关</a>
+  <a href="./model-speech.html">语音输入</a>
+</nav>
+<main class="document" id="document">
+<section id="gateway" aria-labelledby="gateway-title">
+  <header class="section-head"><h2 id="gateway-title">本机网关 · 找到可调用模型</h2><a class="page-reference" href="/#/capabilities/models/gateway" target="_blank" rel="noopener">打开现有本机网关</a></header>
+  <p class="copy">默认打开已接入目录，聚合优先。列表显示聚合或原生、输入输出能力，以及已确认免费、套餐、按量、待确认等价格状态。调用 ID 放在复制操作与接入示例。</p>
+  <p class="copy">「查看来源」打开对应<a href="./model-sources.html">模型源</a>。「查看聚合」直接打开对应<a href="./model-aggregation.html">聚合</a>，返回时保留目录筛选和选中项。</p>
+  <div class="copy step"><h3>接入信息和凭据</h3><p>保留「模型目录」及「接入与密钥」。调用示例沿用选中的网关模型，固定显示 Base URL 和认证方式。源 Key 用于访问上游，网关访问密钥用于客户端。新增、轮换和停用采用现有流程。</p><ul class="references"><li><a href="./gateway-design.md">本机网关设计</a></li><li><a href="./gateway-implementation.md">网关目录代码与验收</a></li><li><a href="../20261030-智能体模型切换/gateway-access-key.md">网关访问密钥设计</a></li></ul></div>
+</section>
+</main>
+</div>
+</body>
+</html>

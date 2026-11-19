@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roami 大模型设计 · 模型源</title>
+<link rel="stylesheet" href="./assets/model-workspace-design.css">
+<script src="./assets/model-workspace-design.js" defer></script>
+</head>
+<body>
+<header class="page-head"><h1>Roami 大模型设计 · 模型源</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计目录">
+  <a href="./model-monitoring-and-aggregation.html">总览</a>
+  <a href="./model-sources.html" aria-current="page">模型源</a>
+  <a href="./model-aggregation.html">聚合</a>
+  <a href="./model-usage.html">概况</a>
+  <a href="./model-monitoring.html">监控</a>
+  <a href="./model-audit.html">审计</a>
+  <a href="./model-gateway.html">本机网关</a>
+  <a href="./model-speech.html">语音输入</a>
+</nav>
+<main class="document" id="document">
+<section id="catalog" aria-labelledby="catalog-title">
+  <header class="section-head"><h2 id="catalog-title">模型源 · 启用需要的模型</h2><a class="page-reference" href="/#/capabilities/models/catalog" target="_blank" rel="noopener">打开现有模型源</a></header>
+  <p class="copy">新建、筛选和来源列表统一用「OpenRouter 免费模型 / API 连接 / Magpie 插件」。协议单列。为已启用模型和供应商目录提供各自的入口。</p>
+  <p class="copy">启用的模型可在<a href="./model-gateway.html">本机网关</a>查看或加入<a href="./model-aggregation.html">聚合</a>。插件来源可进入对应<a href="#workbuddy">账号详情</a>，看积分、授权状态和版本。</p>
+  <div class="copy step"><h3>连接、模型与定价</h3><p>来源详情默认显示连接摘要和已启用模型。「修改连接」处理连接字段，「管理模型」显示本次新增和移除。源默认价、模型级规则和当前生效价各自可查。</p><ul class="references"><li><a href="./interaction-design.md">原模型源与定价交互</a></li><li><a href="../20261116-model-capabilities/openrouter-connector.md">OpenRouter 免费连接器</a></li><li><a href="./gateway-design.md">模型目录与来源管理</a></li></ul></div>
+  <div class="copy step" id="delete-source"><h3>移除模型与删除来源</h3>
+    <p>在「管理模型」取消勾选即可移除单个模型。应用前展示变更数量并确认。来源详情的「连接」首屏提供「删除来源」，确认显示来源名称，并提示将同时移除已启用模型。删除成功后回到来源列表。</p>
+    <p>有聚合、备用路由、草稿或模型绑定引用时，详情列出相关模型，用户解除引用后再删除。服务端保存时再次校验引用。Magpie 来源删除沿用账号解绑逻辑，插件安装和版本操作仍在插件详情。</p>
+  </div>
+  <div class="copy step" id="magpie-registry"><h3>导入 Magpie 社区插件</h3>
+    <p>进入「新建 Magpie 插件」自动读取上游目录。按插件名、供应商或 <code>packages/workbuddy</code> 搜索，也可粘贴对应 GitHub 目录链接。选中后可对照线上版本和本机已经下载的版本。点「下载并查看供应商」，确认供应商后再创建模型源。ZIP 和文件夹上传保留在「从文件导入」。</p>
+    <p>下载来源可选 GitHub 官方、国内加速（jsDelivr）或 gh-hk。加速节点失败时尝试备用地址。包的版本与 SHA-512 来自分发索引，索引优先直连 GitHub。包校验通过后沿用只读插件包和现有宿主检查，账号授权在创建来源后进行。</p>
+    <ul class="references"><li><a href="https://github.com/magpie-community/plugins/blob/main/registry.json">Magpie 社区目录</a></li><li><a href="https://github.com/magpie-community/plugins/blob/dist/index.json">发布索引</a></li></ul>
+  </div>
+</section>
+
+<section id="workbuddy" aria-labelledby="workbuddy-title">
+  <header class="section-head"><h2 id="workbuddy-title">WorkBuddy · 在插件里管理账号</h2><small>插件 / WorkBuddy</small></header>
+  <p class="copy">模型源的「查看插件」定位到已授权账号，在插件详情看套餐、周期积分、额外积分、重置时间和读取时间。「管理模型」回到原有模型源筛选和启用流程。「仅免费模型」沿用插件选项。</p>
+  <div class="sample" aria-label="插件账号局部样例">
+    <div class="sample-head"><h3>账号 A</h3><small>国内版账号 · 演示数据</small></div>
+    <dl class="account">
+      <div><dt>周期积分</dt><dd>120 / 500 已用 · 11 天后重置</dd></div>
+      <div><dt>额外积分</dt><dd><span id="bonus">40</span> 可用</dd></div>
+    </dl>
+    <div class="actions"><button type="button" id="claim">立即签到</button><span id="claim-status" class="muted" role="status">今日未签</span></div>
+    <div class="recent"><small>当前版本、检查时间、兼容新版和更新回退沿用已安装插件入口。</small></div>
+  </div>
+  <ul class="copy">
+    <li>本机装包 WorkBuddy 0.2.26 的国内版账号有签到钩子。Roami 的插件宿主支持对应调用。仅在插件与当前授权账号都支持时开放签到。<a href="https://github.com/yetone/magpie/blob/main/docs/subsystems/provider-plugins.md">Magpie 插件接口说明</a></li>
+    <li>用户点击后按账号去重，回执区分已领取、今日已签、需重新授权和需在官方客户端操作。只有收到成功回执才更新积分，并重新读取该账号额度。原型中的积分变化用于演示。<a href="https://raw.githubusercontent.com/magpie-community/plugins/main/packages/workbuddy/README.md">WorkBuddy 插件说明</a></li>
+  </ul>
+  <div class="step"><h3>技术设计</h3><table class="guide-table"><thead><tr><th scope="col">数据</th><th scope="col">来源与处理</th></tr></thead><tbody><tr><th scope="row">插件账号</th><td>保留现有包、供应商和账号引用。复用 Go 网关的 <code>AccountQuota</code> 与配额缓存，按账号开放受控签到动作，结果回到同一账号。安装版本与兼容性沿用插件管理。插件包和授权凭据各有独立生命周期。</td></tr></tbody></table></div>
+  <div class="copy step"><h3>账号入口</h3><p>同一个插件可以管理多个已授权账号，入口定位到对应账号。读取积分和签到分别使用该账号自己的权限，沿用账号现有模型范围。</p><ul class="references"><li><a href="./routing-status-and-sources.html#technical">Magpie 导入、更新和回退设计</a></li></ul></div>
+</section>
+</main>
+</div>
+</body>
+</html>

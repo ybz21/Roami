@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roami 大模型设计 · 监控</title>
+<link rel="stylesheet" href="./assets/model-workspace-design.css">
+<script src="./assets/model-workspace-design.js" defer></script>
+</head>
+<body>
+<header class="page-head"><h1>Roami 大模型设计 · 监控</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计目录">
+  <a href="./model-monitoring-and-aggregation.html">总览</a>
+  <a href="./model-sources.html">模型源</a>
+  <a href="./model-aggregation.html">聚合</a>
+  <a href="./model-usage.html">概况</a>
+  <a href="./model-monitoring.html" aria-current="page">监控</a>
+  <a href="./model-audit.html">审计</a>
+  <a href="./model-gateway.html">本机网关</a>
+  <a href="./model-speech.html">语音输入</a>
+</nav>
+<main class="document" id="document">
+<section id="monitor" aria-labelledby="monitor-title">
+  <header class="section-head"><h2 id="monitor-title">监控 · 从失败走势找到原因</h2><a class="page-reference" href="/#/capabilities/models/monitor" target="_blank" rel="noopener">打开现有监控</a></header>
+  <p class="copy">保留现有来源、模型和 1 / 6 / 24 小时筛选。首屏看请求数、调用成功率和首字延迟。请求趋势与失败构成使用同一范围，桌面并排，手机依次纵向浏览。源对比与既有抽检入口放在趋势之后。</p>
+  <div class="sample" aria-label="监控局部样例">
+    <div class="sample-head"><h3>调用趋势</h3><label class="muted">演示范围<select id="monitor-range"><option value="1">最近 1 小时</option><option value="6">最近 6 小时</option><option value="24">最近 24 小时</option><option value="0">暂无调用</option></select></label></div>
+    <dl class="metrics">
+      <div><dt>已完成请求</dt><dd id="monitor-total"></dd></div>
+      <div><dt>调用成功率</dt><dd id="monitor-success"></dd><small id="monitor-count"></small></div>
+      <div><dt>首字延迟 P95</dt><dd id="monitor-first"></dd><small>成功流式请求</small></div>
+      <div><dt>输出速度 P50</dt><dd id="monitor-speed"></dd><small>单请求样本 · Token/s</small></div>
+    </dl>
+    <div class="monitor-layout">
+      <figure aria-labelledby="chart-heading">
+        <h3 id="chart-heading">请求量</h3>
+        <figcaption class="legend"><span><i class="swatch succeeded"></i>成功</span><span><i class="swatch failed"></i>失败</span><span>点柱查看时段</span></figcaption>
+        <div class="chart" id="monitor-chart" role="group" aria-label="请求量分时样例"></div>
+        <div class="chart-result"><span id="monitor-selection" class="muted" role="status"></span><a id="monitor-audit" href="./model-audit.html#audit-example">查看失败调用</a></div>
+      </figure>
+      <section aria-labelledby="failure-heading"><h3 id="failure-heading">失败构成</h3><small id="failure-scope"></small><ul class="failures" id="failure-list"></ul></section>
+    </div>
+  </div>
+  <ul class="copy">
+    <li>先标出限流、鉴权、超时、流中断、连接失败和其他。点柱或类别时带入时间、来源、模型及失败条件。首版跳转使用审计现有的日期或小时范围，并标明实际查询范围。分钟级范围和细分错误类别等查询支持就绪后再启用。</li>
+    <li>没流量显示「该时段暂无调用」，指标无法计算时显示「样本不足」。图例、计数和文字一起表达成功与失败。最后一个未结束的桶标为「进行中」。</li>
+    <li>现有趋势可切到首字延迟 P95。采集齐全后再加入 P50/P99 和整体耗时切换。吞吐单独用 Token/s，进程 CPU、内存与在途请求放在诊断详情。</li>
+    <li>保留可见时自动更新。查看某一时段后固定选中的时间范围，返回实时视图时再跟随最新数据。</li>
+  </ul>
+  <div class="step"><h3>技术设计</h3><table class="guide-table"><thead><tr><th scope="col">数据</th><th scope="col">来源与处理</th></tr></thead><tbody><tr><th scope="row">监控统计</th><td><code>monitorManagement</code> 已有时间范围、分桶计数、首字 P95、单请求输出速度 P50。首版按监控记录展示样本和成功率，接入逻辑请求关联后才能统计去重请求。抽检样本单列。失败构成需基于窗口内完整计数，最近异常列表的上限为 100 条。P50/P99 延迟、整体耗时分位、在途和进程指标按各自观测字段接入。吞吐按窗口内 Token / 秒计量。</td></tr><tr><th scope="row">跨页定位</th><td>统一可返回的时间、来源、模型、聚合与错误条件。外部调用别名取本机网关。内部 ID 用于查询和关联，详情首屏呈现用户认识的名称。模型源和网关展示同一已启用目录。</td></tr></tbody></table></div>
+  <div class="copy step"><h3>核对样本边界</h3><p>用同一窗口核对图表与失败计数。切换来源后清理不适用的模型筛选。抽检由用户发起，样本单列并保留费用提示。</p><ul class="references"><li><a href="./interaction-design.md">原监控与抽检交互</a></li><li><a href="./interaction-implementation.md">已实现页面与验收</a></li></ul></div>
+</section>
+</main>
+</div>
+</body>
+</html>

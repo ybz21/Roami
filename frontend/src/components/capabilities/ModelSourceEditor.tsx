@@ -136,6 +136,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         </> : <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy || draft.managing} onClick={() => patch({ editing: true, managing: false })}>{t('hub.directory.changeConnection')}</button></div>}
         {!connectionOnly && <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!canRead || busy} onClick={() => void read()}>{t(openRouter ? 'hub.openRouter.fetch' : existing && !draft.managing ? 'modelInteraction.manageModels' : existing && draft.directory === null ? 'hub.directory.updateModels' : draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{!existing && draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>}
         {readError && <Alert type="warning" role="alert" message={t(readError)} />}
+        {management}
       </section>
       {pricing}
       {!connectionOnly && (draft.directory !== null || !!existing) && <section className="tt-model-directory" aria-label={t('hub.directory.title')} aria-busy={loading}>
@@ -154,7 +155,6 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         {draft.manualOpen && <label className="agent-settings-field">{t('hub.directory.manualHint')}<Input.TextArea aria-label={t('hub.directory.manual')} rows={4} value={draft.manual} onChange={event => patch({ manual: event.target.value })} />{invalidManual && <span className="tt-model-source-warning" role="alert">{t('hub.directory.invalidManual')}</span>}</label>}
       </section>}
       {overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
-            {management}
     </div>
     {(draft.editing || draft.managing || !existing) && <footer className="tt-model-source-footer"><span role="status">{t(connectionOnly ? 'modelInteraction.connectionScope' : removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing ? 'hub.directory.unchanged' : 'hub.directory.choose', { count: number(additions.length), removed: number(removedCount) })}</span><div className="tt-model-source-footer-actions">{existing && <Button disabled={busy || loading} onClick={() => onChange(initialSourceDraft(existing, true))}>{t('common.cancel')}</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(!connectionOnly && existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : !connectionOnly && additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></div></footer>}
   </form>

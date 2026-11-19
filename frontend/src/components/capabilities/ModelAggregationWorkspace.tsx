@@ -12,7 +12,7 @@ import MobileSubPage from '../MobileSubPage'
 import type { CatalogModel, ModelCatalog, ModelCandidate } from './model-hub-api'
 import './model-routing.css'
 const identity = (candidate: ModelCandidate) => candidate.sourceId + '/' + candidate.model
-const emptyPool = (): CatalogModel => ({ id: globalThis.crypto?.randomUUID?.() || 'pool-' + Date.now().toString(36), name: '', aggregate: true, enabled: true, freeOnly: true, allowPlan: false, protocol: 'openai-completions', strategy: 'smart', candidates: [], cooldownSeconds: 60, onLimit: true, onExhausted: true, minContext: 0, weights: {} })
+const emptyPool = (): CatalogModel => ({ id: globalThis.crypto?.randomUUID?.() || 'pool-' + Date.now().toString(36), name: '', aggregate: true, enabled: true, protocol: 'openai-completions', strategy: 'smart', candidates: [], cooldownSeconds: 60, onLimit: true, onExhausted: true, minContext: 0, weights: {} })
 export default function ModelAggregationWorkspace({ active, catalog, busy, error, save, retry, onSource }: { active: boolean; catalog: ModelCatalog | null; busy: boolean; error: string; save: (value: ModelCatalog) => Promise<boolean>; retry: () => void; onSource: (source: string) => void }) {
   const { t } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
   const [drafts, setDrafts] = useState<Record<string, CatalogModel>>({}), [original, setOriginal] = useState<string | null>(null), [editorOpen, setEditorOpen] = useState(false), [query,setQuery]=useState('')

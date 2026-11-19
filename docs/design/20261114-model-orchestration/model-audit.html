@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roami 大模型设计 · 审计</title>
+<link rel="stylesheet" href="./assets/model-workspace-design.css">
+<script src="./assets/model-workspace-design.js" defer></script>
+</head>
+<body>
+<header class="page-head"><h1>Roami 大模型设计 · 审计</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计目录">
+  <a href="./model-monitoring-and-aggregation.html">总览</a>
+  <a href="./model-sources.html">模型源</a>
+  <a href="./model-aggregation.html">聚合</a>
+  <a href="./model-usage.html">概况</a>
+  <a href="./model-monitoring.html">监控</a>
+  <a href="./model-audit.html" aria-current="page">审计</a>
+  <a href="./model-gateway.html">本机网关</a>
+  <a href="./model-speech.html">语音输入</a>
+</nav>
+<main class="document" id="document">
+<section id="audit" aria-labelledby="audit-title">
+  <header class="section-head"><h2 id="audit-title">审计 · 查看调用明细</h2><a class="page-reference" href="/#/capabilities/models/audit" target="_blank" rel="noopener">打开现有审计</a></header>
+  <p class="copy">明细第一屏看结果、命中模型、来源、用时、费用和失败原因。记录 ID、上游请求 ID 放入技术详情，提供复制。保留来自<a href="./model-aggregation.html">聚合</a>、<a href="./model-monitoring.html">监控</a>和<a href="./model-usage.html">概况</a>的筛选与返回位置。</p>
+  <details id="audit-example" class="step">
+    <summary>查看审计跳转样例</summary>
+    <p id="audit-context" class="muted" role="status">从聚合或监控点进来，可查看带入的条件。</p>
+    <dl class="call" id="audit-record" hidden><dt>最终结果</dt><dd>成功</dd><dt>故障切换</dt><dd>OpenRouter 免费模型限流，随后由 WorkBuddy 接续。</dd><dt>费用</dt><dd>已确认免费</dd></dl>
+  </details>
+  <div class="copy step"><h3>调用结果与计费状态</h3><p>复用 <code>ModelUsageWorkspace</code> 的明细和保留窗口。区分请求结果、费用未知和进行中。桌面沿用侧栏，手机沿用全屏详情。超出明细保留期时解释可查范围。</p><ul class="references"><li><a href="../20261026-本地模型代理与每日限额/records/2026-11-03/daily-retention.md">调用记录留存</a></li><li><a href="../20261026-本地模型代理与每日限额/records/2026-11-03/request-token-records.md">请求和 Token 记录口径</a></li></ul></div>
+</section>
+</main>
+</div>
+</body>
+</html>

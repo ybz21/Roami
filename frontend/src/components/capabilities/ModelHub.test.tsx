@@ -421,7 +421,7 @@ it('keeps the card read-only and opens editing, pricing, routing and deletion in
   expect(screen.queryByLabelText('hub.name')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
   expect(screen.getByLabelText('hub.name')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'capabilities.models.deleteAction' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'hub.deleteSource' })).toBeTruthy()
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'pricing.section.prices' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream/prices')
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'pricing.section.routing' }))
@@ -431,10 +431,24 @@ it('keeps the card read-only and opens editing, pricing, routing and deletion in
 it('deletes a source from its connection settings and returns to the catalog', async () => {
   const navigate = vi.fn()
   mount('catalog/source/upstream', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.deleteSource' }))
   fireEvent.click(await screen.findByRole('button', { name: 'capabilities.models.deleteAction' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'common.confirm' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [], models: [] })))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog')
+})
+
+it('shows the referencing aggregate and preserves the source until it is released', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  const pool = { ...catalog.models[0], id: 'wb-ds', name: 'WB DS', aggregate: true }
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (method === 'GET' && path === '/agent/model-gateway/catalog') return { data: { ...catalog, models: [...catalog.models, pool] } }
+    return original(method, path, body, options)
+  })
+  mount('catalog/source/upstream')
+  const remove = await screen.findByRole('button', { name: 'hub.deleteSource' }) as HTMLButtonElement
+  expect(remove.disabled).toBe(true)
+  expect(within(remove.closest('.tt-model-source-connection')!).getByText('hub.sourceInUse')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.some(([method]) => method === 'PUT')).toBe(false)
 })
 
 it('offers published pools as a source and does not discover an upstream for a routing group', async () => {

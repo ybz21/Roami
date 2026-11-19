@@ -3,289 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roami 大模型 · 页面改进设计</title>
-<style>
-:root {
-  color-scheme:dark;
-  --bg-base:#0d1117; --bg-container:#161b22; --border:#30363d; --border-subtle:#21262d;
-  --text-bright:#e6edf3; --text-dim:#8b949e; --accent:#58a6ff; --accent-solid:#1f6feb;
-  --ok:#3fb950; --danger:#f85149; --warn:#d29922; --sel-bg:#ffffff11;
-  --fs-meta:12px; --fs-sm:13px; --fs-body:14px; --fs-lg:16px; --fs-title:22px;
-  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
-  --r-xs:4px; --r-sm:8px; --r-pill:9999px; --tap:44px;
-  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
-  font-size:var(--fs-body); line-height:1.55;
-  color:var(--text-bright); background:var(--bg-base);
-}
-@media (prefers-color-scheme:light) {
-  :root {
-    color-scheme:light;
-    --bg-base:#f6f8fa; --bg-container:#fff; --border:#d0d7de; --border-subtle:#e6e9ec;
-    --text-bright:#1f2328; --text-dim:#57606a; --accent:#0969da; --accent-solid:#1f6feb;
-    --ok:#1a7f37; --danger:#cf222e; --warn:#9a6700; --sel-bg:#1b1f240d;
-  }
-}
-* { box-sizing:border-box; }
-[hidden] { display:none !important; }
-html,body { height:100%; margin:0; overflow:hidden; }
-body { display:flex; flex-direction:column; }
-h1,h2,h3,p,dd,figure { margin:0; }
-h1 { font-size:var(--fs-title); }
-h2 { font-size:var(--fs-lg); }
-h3 { font-size:var(--fs-body); }
-p,li,dd,td { overflow-wrap:anywhere; }
-p + p { margin-top:var(--sp-2); }
-a { color:var(--accent); text-underline-offset:3px; }
-button,select,summary { font:inherit; color:inherit; min-height:var(--tap); cursor:pointer; }
-button,select { padding:var(--sp-2) var(--sp-3); border:1px solid var(--border); border-radius:var(--r-xs); background:var(--bg-container); }
-button:disabled { color:var(--text-dim); cursor:default; }
-summary { padding-block:var(--sp-2); align-content:center; }
-:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-small,.muted { color:var(--text-dim); font-size:var(--fs-meta); }
-code { overflow-wrap:anywhere; }
-.page-head { padding:var(--sp-3) var(--sp-5); border-bottom:1px solid var(--border-subtle); }
-.workspace { min-height:0; flex:1; display:flex; }
-.contents { flex:none; width:calc(var(--sp-5) * 7); padding:var(--sp-3); border-right:1px solid var(--border-subtle); display:flex; flex-direction:column; overflow:auto; }
-.contents a { color:var(--text-bright); min-height:var(--tap); padding:var(--sp-2) var(--sp-3); align-content:center; text-decoration:none; }
-.contents a[aria-current] { background:var(--sel-bg); border-inline-start:2px solid var(--accent); }
-.document { flex:1; min-width:0; overflow:auto; padding:0 var(--sp-5); }
-.document > section { padding:var(--sp-5) 0; border-top:1px solid var(--border-subtle); scroll-margin-top:var(--sp-2); }
-.document > section:first-child { border-top:0; }
-.section-head,.sample-head,.actions,.legend { display:flex; gap:var(--sp-2) var(--sp-3); align-items:center; flex-wrap:wrap; }
-.section-head,.sample-head { justify-content:space-between; }
-.section-head { margin-bottom:var(--sp-3); }
-.page-reference,.overview-table a { display:inline-flex; align-items:center; min-height:var(--tap); }
-.copy { max-width:76ch; }
-.copy ul { padding-inline-start:var(--sp-5); }
-.copy li + li { margin-top:var(--sp-2); }
-.sample { margin:var(--sp-4) 0; border-block:1px solid var(--border-subtle); }
-.sample-head { min-height:var(--tap); padding:var(--sp-2) 0; }
-.sample-head label { display:flex; align-items:center; gap:var(--sp-2); }
-.metrics { margin:0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--sp-3); padding:var(--sp-3) 0; border-block:1px solid var(--border-subtle); }
-.metrics > div { min-width:0; }
-.metrics dt { color:var(--text-dim); font-size:var(--fs-meta); }
-.metrics dd { font-variant-numeric:tabular-nums; font-weight:650; font-size:var(--fs-lg); }
-.grid-title { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); min-height:var(--tap); }
-.member-list { list-style:none; margin:0; padding:0; }
-.member-list > li { border-top:1px solid var(--border-subtle); }
-.member summary { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap:var(--sp-2) var(--sp-3); align-items:center; list-style:none; }
-.member summary::-webkit-details-marker { display:none; }
-.member[open] summary { background:var(--sel-bg); }
-.member strong,.member small { display:block; }
-.member .position { font-variant-numeric:tabular-nums; }
-.member .status { color:var(--text-dim); }
-.member .ready { color:var(--ok); }
-.member .problem { color:var(--warn); }
-.member-info { padding:var(--sp-2) 0 var(--sp-3); max-width:76ch; }
-.meter { height:var(--sp-1); background:var(--border-subtle); border-radius:var(--r-pill); overflow:hidden; margin-top:var(--sp-1); }
-.meter > span { display:block; height:100%; background:var(--accent-solid); }
-.recent { border-top:1px solid var(--border-subtle); padding:var(--sp-3) 0; }
-.recent a { display:inline-flex; align-items:center; min-height:var(--tap); }
-.monitor-layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); }
-.monitor-layout > * { min-width:0; padding-block:var(--sp-3); }
-.monitor-layout > :first-child { padding-inline-end:var(--sp-4); }
-.monitor-layout > :last-child { border-inline-start:1px solid var(--border-subtle); padding-inline-start:var(--sp-4); }
-.legend { color:var(--text-dim); font-size:var(--fs-meta); margin:var(--sp-2) 0; }
-.swatch { display:inline-block; width:var(--sp-2); height:var(--sp-2); margin-inline-end:var(--sp-1); border-radius:var(--r-xs); }
-.succeeded { background:var(--accent-solid); }
-.failed { background:var(--danger); }
-.chart { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--sp-2); align-items:end; min-height:calc(var(--tap) * 3); border-bottom:1px solid var(--border-subtle); }
-.chart button { display:flex; flex-direction:column; align-items:center; justify-content:end; gap:var(--sp-1); padding:var(--sp-1); border:1px solid transparent; background:transparent; height:100%; }
-.chart button[aria-pressed=true] { background:var(--sel-bg); border-color:var(--border); }
-.chart .stack { height:calc(var(--tap) * 2.5); width:100%; display:flex; flex-direction:column-reverse; justify-content:flex-start; }
-.chart .stack > span { display:block; flex:none; }
-.chart time { color:var(--text-dim); font-variant-numeric:tabular-nums; font-size:var(--fs-meta); }
-.chart-result { display:flex; gap:var(--sp-1) var(--sp-4); align-items:center; flex-wrap:wrap; margin-top:var(--sp-2); }
-.chart-result a { display:inline-flex; align-items:center; min-height:var(--tap); }
-.failures { margin:var(--sp-2) 0 0; padding:0; list-style:none; }
-.failures button { display:grid; grid-template-columns:minmax(0,1fr) auto; width:100%; text-align:start; gap:var(--sp-1) var(--sp-2); background:transparent; border-color:transparent; }
-.failures button[aria-pressed=true] { background:var(--sel-bg); border-color:var(--border); }
-.failures .meter { grid-column:1/-1; margin-top:0; }
-.failures .meter span { background:var(--danger); }
-.guide-table { width:100%; border-collapse:collapse; text-align:start; }
-.guide-table th,.guide-table td { border-bottom:1px solid var(--border-subtle); text-align:start; padding:var(--sp-2) var(--sp-3) var(--sp-2) 0; vertical-align:top; }
-.guide-table th:first-child,.guide-table td:first-child { width:25%; }
-.guide-table th { color:var(--text-dim); font-size:var(--fs-meta); }
-.overview-table td,.overview-table th { vertical-align:middle; }
-.step { margin-top:var(--sp-4); min-width:0; }
-.flow { padding:0; margin:var(--sp-2) 0; list-style:none; display:flex; flex-wrap:wrap; gap:var(--sp-1) var(--sp-3); }
-.flow li { border-inline-start:1px solid var(--border); padding-inline-start:var(--sp-2); }
-.call { padding:var(--sp-3) 0; }
-.call dt { color:var(--text-dim); font-size:var(--fs-meta); }
-.call dd { margin-bottom:var(--sp-2); }
-.account { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-2) var(--sp-3); padding:var(--sp-3) 0; margin:0; }
-.account dt { color:var(--text-dim); font-size:var(--fs-meta); }
-.account dd { font-variant-numeric:tabular-nums; }
-@media (max-width:730px) {
-  .workspace { flex-direction:column; }
-  .contents { width:auto; flex-direction:row; gap:var(--sp-1); border-right:0; border-bottom:1px solid var(--border-subtle); padding:0 var(--sp-2); }
-  .contents a { white-space:nowrap; padding-inline:var(--sp-2); }
-  .contents a[aria-current] { border-inline-start:0; border-bottom:2px solid var(--accent); }
-  .page-head,.document { padding-inline:var(--sp-4); }
-  .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .member summary { grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); }
-  .monitor-layout { grid-template-columns:minmax(0,1fr); }
-  .monitor-layout > :first-child { padding-inline-end:0; }
-  .monitor-layout > :last-child { padding-inline-start:0; border-inline-start:0; border-top:1px solid var(--border-subtle); }
-  .chart { gap:var(--sp-1); }
-}
-@media print {
-  html,body { height:auto; overflow:visible; }
-  .workspace,.document { display:block; overflow:visible; }
-  .contents { display:none; }
-}
-</style>
+<title>Roami 大模型设计 · 总览</title>
+<link rel="stylesheet" href="./assets/model-workspace-design.css">
 </head>
 <body>
-<header class="page-head"><h1>Roami 大模型页面改进</h1><p class="muted">设计评审 · 聚合调度、服务监控与插件账号</p></header>
+<header class="page-head"><h1>Roami 大模型设计 · 总览</h1></header>
 <div class="workspace">
 <nav class="contents" aria-label="设计目录">
-  <a href="#overview" aria-current="location">页面总览</a><a href="#catalog">模型源</a><a href="#aggregate">聚合</a><a href="#usage">概况</a><a href="#monitor">监控</a><a href="#audit">审计</a><a href="#gateway">本机网关</a><a href="#speech">语音输入</a><a href="#workbuddy">WorkBuddy</a><a href="#delivery">技术与验收</a>
+  <a href="./model-monitoring-and-aggregation.html" aria-current="page">总览</a>
+  <a href="./model-sources.html">模型源</a>
+  <a href="./model-aggregation.html">聚合</a>
+  <a href="./model-usage.html">概况</a>
+  <a href="./model-monitoring.html">监控</a>
+  <a href="./model-audit.html">审计</a>
+  <a href="./model-gateway.html">本机网关</a>
+  <a href="./model-speech.html">语音输入</a>
 </nav>
 <main class="document" id="document">
 <section id="overview" aria-labelledby="overview-title">
   <header class="section-head"><h2 id="overview-title">页面总览</h2><small>2026 年 11 月 19 日</small></header>
-  <p class="copy">在 Roami 现有「大模型」页签内改进七页。聚合借鉴参考图中的成员承载、健康状态与故障切换。监控借鉴请求走势、失败分布与延迟。下面的可点样例只演示新增区块，使用虚构数据。</p>
+  <p class="copy">七个页面各有一份设计，包含在现有 Roami 页面中的改动、数据口径与历史依据。聚合、监控、审计与 WorkBuddy 提供可点样例。</p>
   <table class="guide-table overview-table step" aria-label="七个子页的设计和入口">
     <thead><tr><th scope="col">子页设计</th><th scope="col">主要用途</th></tr></thead>
     <tbody>
-      <tr><th scope="row"><a href="#catalog">模型源</a></th><td>连接、授权和启用模型</td></tr>
-      <tr><th scope="row"><a href="#aggregate">聚合</a></th><td>配置成员和顺位，查看当前与实际调度</td></tr>
-      <tr><th scope="row"><a href="#usage">概况</a></th><td>看用量、记账费用和每日限额</td></tr>
-      <tr><th scope="row"><a href="#monitor">监控</a></th><td>看成功率、延迟和失败分布</td></tr>
-      <tr><th scope="row"><a href="#audit">审计</a></th><td>定位某次调用、命中模型与费用</td></tr>
-      <tr><th scope="row"><a href="#gateway">本机网关</a></th><td>找已启用模型、能力、调用示例和凭据</td></tr>
-      <tr><th scope="row"><a href="#speech">语音输入</a></th><td>配置和验证转写服务</td></tr>
+      <tr id="catalog"><th scope="row"><a href="./model-sources.html">模型源</a></th><td>连接、授权和启用模型</td></tr>
+      <tr id="aggregate"><th scope="row"><a href="./model-aggregation.html">聚合</a></th><td>配置成员和顺位，查看当前与实际调度</td></tr>
+      <tr id="usage"><th scope="row"><a href="./model-usage.html">概况</a></th><td>看用量、记账费用和每日限额</td></tr>
+      <tr id="monitor"><th scope="row"><a href="./model-monitoring.html">监控</a></th><td>看成功率、延迟和失败分布</td></tr>
+      <tr id="audit"><th scope="row"><a href="./model-audit.html">审计</a></th><td>定位某次调用、命中模型与费用</td></tr>
+      <tr id="gateway"><th scope="row"><a href="./model-gateway.html">本机网关</a></th><td>找已启用模型、能力、调用示例和凭据</td></tr>
+      <tr id="speech"><th scope="row"><a href="./model-speech.html">语音输入</a></th><td>配置和验证转写服务</td></tr>
     </tbody>
   </table>
-  <p class="copy step">在 Roami 内打开本文时，每章的「打开现有页面」使用当前节点地址。</p>
+  <p class="copy step">在 Roami 内打开本文时，各设计页的「打开现有页面」使用当前节点地址。</p>
   <h3 class="step">跨页流程</h3>
   <ul class="copy">
-    <li>接入模型，从<a href="#catalog">模型源</a>启用模型，按需配置<a href="#aggregate">聚合</a>，到<a href="#gateway">本机网关</a>复制调用方式。</li>
-    <li>排查故障，从<a href="#aggregate">聚合</a>的切换记录或<a href="#monitor">监控</a>的异常时段进入<a href="#audit">审计</a>，保留筛选。</li>
-    <li>核对费用，从<a href="#usage">概况</a>查看额度和用量，再到<a href="#audit">审计</a>核对明细。账号积分在 <a href="#workbuddy">WorkBuddy 插件</a>里看。</li>
+    <li>接入模型，从<a href="./model-sources.html">模型源</a>启用模型，按需配置<a href="./model-aggregation.html">聚合</a>，到<a href="./model-gateway.html">本机网关</a>复制调用方式。</li>
+    <li>排查故障，从<a href="./model-aggregation.html">聚合</a>的切换记录或<a href="./model-monitoring.html">监控</a>的异常时段进入<a href="./model-audit.html">审计</a>，保留筛选。</li>
+    <li>核对费用，从<a href="./model-usage.html">概况</a>查看额度和用量，再到<a href="./model-audit.html">审计</a>核对明细。账号积分在 <a id="workbuddy" href="./model-sources.html#workbuddy">WorkBuddy 插件</a>里看。</li>
   </ul>
-</section>
-
-<section id="catalog" aria-labelledby="catalog-title">
-  <header class="section-head"><h2 id="catalog-title">模型源 · 启用需要的模型</h2><a class="page-reference" href="/#/capabilities/models/catalog" target="_blank" rel="noopener">打开现有模型源</a></header>
-  <p class="copy">新建、筛选和来源列表统一用「OpenRouter 免费模型 / API 连接 / Magpie 插件」。协议单列。新建 Magpie 直接填社区插件目录链接或仓库路径，旁边链接目录和说明。为已启用模型和供应商目录提供各自的入口。</p>
-  <p class="copy">启用的模型可在<a href="#gateway">本机网关</a>查看或加入<a href="#aggregate">聚合</a>。插件来源可进入对应<a href="#workbuddy">账号详情</a>，看积分、授权状态和版本。</p>
-</section>
-
-<section id="aggregate" aria-labelledby="aggregate-title">
-  <header class="section-head"><h2 id="aggregate-title">聚合 · 当前成员和实际调用</h2><a class="page-reference" href="/#/capabilities/models/aggregate" target="_blank" rel="noopener">打开现有聚合</a></header>
-  <p class="copy">在现有策略卡片上方复用「当前调度顺序」，首屏给出首选和可调度数。展开看成员状态与实际承载。策略预览、拖动、蓝色插入线和「保存并应用」沿用现有交互。拖动只改草稿，保存成功后才用新顺位刷新这一块。<a href="https://github.com/ybz21/Roami/pull/989">Roami 现有页面对照</a></p>
-  <div class="sample" aria-label="聚合局部样例">
-    <div class="sample-head"><h3>当前调度顺序</h3><label class="muted">演示状态<select id="route-scenario"><option value="ready">有可用成员</option><option value="blocked">无可用成员</option><option value="unknown">状态未检测</option><option value="empty">暂无调用</option></select></label></div>
-    <dl class="metrics">
-      <div><dt>当前可调度</dt><dd id="route-ready"></dd><small id="route-first"></small></div>
-      <div><dt>近 1 小时已完成请求</dt><dd id="route-total">200</dd></div>
-      <div><dt>近 1 小时请求失败率</dt><dd id="route-failure">2.0%</dd><small id="route-failure-note">4 次最终失败</small></div>
-      <div><dt>近 1 小时故障切换</dt><dd id="route-fallback">3 次</dd><small>按逻辑请求去重</small></div>
-    </dl>
-    <div class="grid-title"><h3>成员状态与负载</h3><small>点成员看详情 · 承载按近 1 小时最终成功请求计算</small></div>
-    <p id="route-message" class="muted" role="status" hidden></p>
-    <ol class="member-list" id="route-members"></ol>
-    <div class="recent">
-      <p id="route-latest" class="muted">最近命中 16:39 · ERNIE 5.5 Flash · 成功</p>
-      <details id="route-events"><summary>最近故障切换</summary><p>16:35 · OpenRouter 免费模型限流，切换到 WorkBuddy，最终成功。</p><a href="#audit-example" id="route-audit">查看这次调用</a></details>
-      <p id="route-no-events" class="muted" hidden>暂无切换记录。</p>
-    </div>
-  </div>
-  <ul class="copy">
-    <li>可调度顺位沿用网关排序，同一成员的多个账户合并成一行。展开看各账户额度、重置时间和冷却原因。手机首行只放成员、顺位和状态，承载放第二行。</li>
-    <li>权重只在加权策略下显示，历史承载单列。首选来自当前快照，最近命中来自已记录的调用。规则草稿使用原来的保存入口。</li>
-    <li>无可用成员时展示受限原因。只有能确认约束同时满足的时间才显示「预计可尝试」。状态未检测时显示未知。空事件区用一行「暂无切换记录」。</li>
-  </ul>
-</section>
-
-<section id="usage" aria-labelledby="usage-title">
-  <header class="section-head"><h2 id="usage-title">概况 · 用量与限额</h2><a class="page-reference" href="/#/capabilities/models/usage" target="_blank" rel="noopener">打开现有概况</a></header>
-  <p class="copy">把今日已用、剩余额度、每日限额、结算时区和「调整限额」放在同一处。趋势展示自己的分析区间和时区。费用未知或仍在结算时显示「待核对」。</p>
-  <p class="copy">从用量趋势或来源分组进入<a href="#audit">审计</a>，带入所选时段和来源。返回概况时恢复原筛选和位置。</p>
-</section>
-
-<section id="monitor" aria-labelledby="monitor-title">
-  <header class="section-head"><h2 id="monitor-title">监控 · 从失败走势找到原因</h2><a class="page-reference" href="/#/capabilities/models/monitor" target="_blank" rel="noopener">打开现有监控</a></header>
-  <p class="copy">保留现有来源、模型和 1 / 6 / 24 小时筛选。首屏看请求数、调用成功率和首字延迟。请求趋势与失败构成使用同一范围，桌面并排，手机依次纵向浏览。源对比与既有抽检入口放在趋势之后。</p>
-  <div class="sample" aria-label="监控局部样例">
-    <div class="sample-head"><h3>调用趋势</h3><label class="muted">演示范围<select id="monitor-range"><option value="1">最近 1 小时</option><option value="6">最近 6 小时</option><option value="24">最近 24 小时</option><option value="0">暂无调用</option></select></label></div>
-    <dl class="metrics">
-      <div><dt>已完成请求</dt><dd id="monitor-total"></dd></div>
-      <div><dt>调用成功率</dt><dd id="monitor-success"></dd><small id="monitor-count"></small></div>
-      <div><dt>首字延迟 P95</dt><dd id="monitor-first"></dd><small>成功流式请求</small></div>
-      <div><dt>输出速度 P50</dt><dd id="monitor-speed"></dd><small>单请求样本 · Token/s</small></div>
-    </dl>
-    <div class="monitor-layout">
-      <figure aria-labelledby="chart-heading">
-        <h3 id="chart-heading">请求量</h3>
-        <figcaption class="legend"><span><i class="swatch succeeded"></i>成功</span><span><i class="swatch failed"></i>失败</span><span>点柱查看时段</span></figcaption>
-        <div class="chart" id="monitor-chart" role="group" aria-label="请求量分时样例"></div>
-        <div class="chart-result"><span id="monitor-selection" class="muted" role="status"></span><a id="monitor-audit" href="#audit-example">查看失败调用</a></div>
-      </figure>
-      <section aria-labelledby="failure-heading"><h3 id="failure-heading">失败构成</h3><small id="failure-scope"></small><ul class="failures" id="failure-list"></ul></section>
-    </div>
-  </div>
-  <ul class="copy">
-    <li>先标出限流、鉴权、超时、流中断、连接失败和其他。点柱或类别时带入时间、来源、模型及失败条件。首版跳转使用审计现有的日期或小时范围，并标明实际查询范围。分钟级范围和细分错误类别等查询支持就绪后再启用。</li>
-    <li>没流量显示「该时段暂无调用」，指标无法计算时显示「样本不足」。图例、计数和文字一起表达成功与失败。最后一个未结束的桶标为「进行中」。</li>
-    <li>现有趋势可切到首字延迟 P95。采集齐全后再加入 P50/P99 和整体耗时切换。吞吐单独用 Token/s，进程 CPU、内存与在途请求放在诊断详情。</li>
-    <li>保留可见时自动更新。查看某一时段后固定选中的时间范围，返回实时视图时再跟随最新数据。</li>
-  </ul>
-</section>
-
-<section id="audit" aria-labelledby="audit-title">
-  <header class="section-head"><h2 id="audit-title">审计 · 查看调用明细</h2><a class="page-reference" href="/#/capabilities/models/audit" target="_blank" rel="noopener">打开现有审计</a></header>
-  <p class="copy">明细第一屏看结果、命中模型、来源、用时、费用和失败原因。记录 ID、上游请求 ID 放入技术详情，提供复制。保留来自<a href="#aggregate">聚合</a>、<a href="#monitor">监控</a>和<a href="#usage">概况</a>的筛选与返回位置。</p>
-  <details id="audit-example" class="step">
-    <summary>查看审计跳转样例</summary>
-    <p id="audit-context" class="muted" role="status">从聚合或监控点进来，可查看带入的条件。</p>
-    <dl class="call" id="audit-record" hidden><dt>最终结果</dt><dd>成功</dd><dt>故障切换</dt><dd>OpenRouter 免费模型限流，随后由 WorkBuddy 接续。</dd><dt>费用</dt><dd>已确认免费</dd></dl>
-  </details>
-</section>
-
-<section id="gateway" aria-labelledby="gateway-title">
-  <header class="section-head"><h2 id="gateway-title">本机网关 · 找到可调用模型</h2><a class="page-reference" href="/#/capabilities/models/gateway" target="_blank" rel="noopener">打开现有本机网关</a></header>
-  <p class="copy">默认打开已接入目录，聚合优先。列表显示聚合或原生、输入输出能力，以及已确认免费、套餐、按量、待确认等价格状态。调用 ID 放在复制操作与接入示例。</p>
-  <p class="copy">「查看来源」打开对应<a href="#catalog">模型源</a>。「查看聚合」直接打开对应<a href="#aggregate">聚合</a>，返回时保留目录筛选和选中项。</p>
-</section>
-
-<section id="speech" aria-labelledby="speech-title">
-  <header class="section-head"><h2 id="speech-title">语音输入 · 验证识别服务</h2><a class="page-reference" href="/#/capabilities/models/speech" target="_blank" rel="noopener">打开现有语音输入</a></header>
-  <p class="copy">服务摘要展示当前配置和最近测试结果。用户触发「测试识别」后，分别呈现麦克风权限、服务鉴权和识别结果。测试通过后保留配置摘要与结果时间。</p>
-</section>
-
-<section id="workbuddy" aria-labelledby="workbuddy-title">
-  <header class="section-head"><h2 id="workbuddy-title">WorkBuddy · 在插件里管理账号</h2><small>插件 / WorkBuddy</small></header>
-  <p class="copy">模型源的「查看插件」定位到已授权账号，在插件详情看套餐、周期积分、额外积分、重置时间和读取时间。「管理模型」回到原有模型源筛选和启用流程。「仅免费模型」沿用插件选项。</p>
-  <div class="sample" aria-label="插件账号局部样例">
-    <div class="sample-head"><h3>账号 A</h3><small>国内版账号 · 演示数据</small></div>
-    <dl class="account">
-      <div><dt>周期积分</dt><dd>120 / 500 已用 · 11 天后重置</dd></div>
-      <div><dt>额外积分</dt><dd><span id="bonus">40</span> 可用</dd></div>
-    </dl>
-    <div class="actions"><button type="button" id="claim">立即签到</button><span id="claim-status" class="muted" role="status">今日未签</span></div>
-    <div class="recent"><small>当前版本、检查时间、兼容新版和更新回退沿用已安装插件入口。</small></div>
-  </div>
-  <ul class="copy">
-    <li>本机装包 WorkBuddy 0.2.26 的国内版账号有签到钩子。Roami 的插件宿主支持对应调用。仅在插件与当前授权账号都支持时开放签到。<a href="https://github.com/yetone/magpie/blob/main/docs/subsystems/provider-plugins.md">Magpie 插件接口说明</a></li>
-    <li>用户点击后按账号去重，回执区分已领取、今日已签、需重新授权和需在官方客户端操作。只有收到成功回执才更新积分，并重新读取该账号额度。原型中的积分变化用于演示。<a href="https://raw.githubusercontent.com/magpie-community/plugins/main/packages/workbuddy/README.md">WorkBuddy 插件说明</a></li>
-  </ul>
+  <div class="copy step"><h3>历史设计</h3><p>交互稿和验收记录保留原位置。各子页引用与当前方案相关的原稿。</p><ul class="references"><li><a href="./interaction-design.md">原工作区交互设计</a></li><li><a href="./interaction-implementation.md">已实现页面与验收</a></li><li><a href="./README.md">模型编排设计索引</a></li></ul></div>
 </section>
 
 <section id="delivery" aria-labelledby="delivery-title">
   <header class="section-head"><h2 id="delivery-title">技术设计与验收</h2></header>
-  <table class="guide-table">
-    <thead><tr><th scope="col">数据或交互</th><th scope="col">现有依据与新增工作</th></tr></thead>
-    <tbody>
-      <tr><th scope="row">当前可调度</th><td>复用 <code>AggregationRuntime</code>、<code>AggregationMemberOrder</code>、<code>useModelMemberFacts</code> 与 <code>routingView</code>。按来源和上游模型对已保存成员去重，状态只取当前生效配置。聚合列表复用已有信息，避免逐条轮询。</td></tr>
-      <tr><th scope="row">聚合统计和切换</th><td><code>MonitorRecord</code> 已记录 <code>routeId</code>、来源、模型和结果。先补按聚合的筛选。请求总数、最终失败率、切换数与成员承载需要逻辑请求关联和终态。记录同一调用的尝试顺序、最终成员与切换原因。同渠道重试单列。旧数据无法建立关联时，显示「历史记录未统计」，保留真实快照。</td></tr>
-      <tr><th scope="row">监控统计</th><td><code>monitorManagement</code> 已有时间范围、分桶计数、首字 P95、单请求输出速度 P50。首版按监控记录展示样本和成功率，接入逻辑请求关联后才能统计去重请求。抽检样本单列。失败构成需基于窗口内完整计数，最近异常列表的上限为 100 条。P50/P99 延迟、整体耗时分位、在途和进程指标按各自观测字段接入。吞吐按窗口内 Token / 秒计量。</td></tr>
-      <tr><th scope="row">跨页定位</th><td>统一可返回的时间、来源、模型、聚合与错误条件。外部调用别名取本机网关。内部 ID 用于查询和关联，详情首屏呈现用户认识的名称。模型源和网关展示同一已启用目录。</td></tr>
-      <tr><th scope="row">插件账号</th><td>保留现有包、供应商和账号引用。复用 Go 网关的 <code>AccountQuota</code> 与配额缓存，按账号开放受控签到动作，结果回到同一账号。安装版本与兼容性沿用插件管理。插件包和授权凭据各有独立生命周期。</td></tr>
-    </tbody>
-  </table>
   <div class="copy step">
     <h3>实施顺序</h3>
     <ol>
@@ -303,155 +64,5 @@ code { overflow-wrap:anywhere; }
 </section>
 </main>
 </div>
-<script>
-const byId = id => document.getElementById(id)
-const fmt = new Intl.NumberFormat('zh-CN')
-const members = [
-  { name:'ERNIE 5.5 Flash', source:'OpenRouter 免费模型', handled:116, note:'账号额度可用。近 1 小时 116 次最终成功。' },
-  { name:'Hy4 Flash', source:'WorkBuddy', handled:80, note:'账号 B 可用。账号 A 额度已用尽，18:00 重置。' },
-  { name:'Gemma 4 26B', source:'OpenRouter 免费模型', handled:0, note:'此聚合要求工具调用，目前跳过该成员。' },
-]
-const routeCases = {
-  ready: { count:'2 / 3', first:'首选 ERNIE 5.5 Flash', state:['可调度','可调度','工具能力不符'], positions:['第 1 位','第 2 位','跳过'], message:'' },
-  blocked: { count:'0 / 3', first:'暂无首选', state:['限流冷却','额度耗尽','工具能力不符'], positions:['跳过','跳过','跳过'], message:'预计 16:45 可尝试。以最新渠道状态为准。' },
-  unknown: { count:'待检测', first:'等待渠道状态', state:['未检测','未检测','未检测'], positions:['待定','待定','待定'], message:'历史承载仍可查看。' },
-}
-function renderRoute() {
-  const mode = byId('route-scenario').value
-  const empty = mode === 'empty'
-  const view = empty ? routeCases.ready : routeCases[mode]
-  byId('route-ready').textContent = view.count
-  byId('route-first').textContent = view.first
-  byId('route-total').textContent = empty ? '0' : '200'
-  byId('route-failure').textContent = empty ? '暂无样本' : '2.0%'
-  byId('route-failure-note').hidden = empty
-  byId('route-fallback').textContent = empty ? '0 次' : '3 次'
-  byId('route-latest').textContent = empty ? '暂无调用。' : '最近命中 16:39 · ERNIE 5.5 Flash · 成功'
-  byId('route-events').hidden = empty
-  byId('route-no-events').hidden = !empty
-  const message = byId('route-message')
-  message.hidden = !view.message
-  message.textContent = view.message
-  byId('route-members').innerHTML = members.map((row, index) => {
-    const share = Math.round(row.handled / 196 * 100)
-    const state = view.state[index]
-    const tone = state === '可调度' ? 'ready' : mode === 'blocked' ? 'problem' : ''
-    const note = mode === 'unknown' ? '暂未取得当前渠道状态。' : mode !== 'blocked' || index === 2 ? row.note : ['冷却至 16:45。','额度将在 18:00 重置。'][index]
-    const load = empty ? '<small>暂无承载样本</small>' : `<small>承载 ${row.handled} 次 · ${share}%</small><div class="meter" aria-hidden="true"><span style="width:${share}%"></span></div>`
-    return `<li><details class="member"><summary><div><strong>${row.name}</strong><small>${row.source}</small></div><span class="position">${view.positions[index]}</span><span class="status ${tone}">${state}</span><div>${load}</div></summary><p class="member-info muted">${empty && index === 0 ? '账号额度可用。' : note}</p></details></li>`
-  }).join('')
-}
-const counts = {
-  0: [],
-  1: [[34,7,1,3],[43,12,2,4],[58,9,1,4],[51,15,3,4],[48,20,2,5],[43,8,1,3]],
-  6: [[216,38,4,12],[283,46,7,14],[264,53,4,22],[299,61,4,33],[379,78,6,18],[277,71,10,23]],
-  24: [[818,84,27,64],[721,58,31,24],[963,102,20,55],[949,113,36,87],[1216,220,38,95],[1024,183,26,77]],
-}
-const metricValues = {
-  1: { p95:'5.38 s', speed:'82' },
-  6: { p95:'7.12 s', speed:'74' },
-  24: { p95:'8.10 s', speed:'71' },
-}
-const failureTypes = ['限流 429','鉴权失败','其他']
-let selectedBucket = -1
-let selectedFailure = -1
-const total = row => row.reduce((sum,n) => sum + n,0)
-function clock(minutes) {
-  const h = (Math.floor(minutes / 60) + 24) % 24
-  const m = (minutes % 60 + 60) % 60
-  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0')
-}
-function interval(hours, index) {
-  if (index < 0) return '最近 ' + hours + ' 小时'
-  const end = 16 * 60 + 40
-  const minutes = hours * 60 / 6
-  const start = end - minutes * (6 - index)
-  return clock(start) + ' 至 ' + clock(start + minutes) + (start < 0 ? (start + minutes < 0 ? ' · 昨日' : ' · 跨日') : '')
-}
-function renderMonitor() {
-  const hours = Number(byId('monitor-range').value)
-  const buckets = counts[hours]
-  const rows = selectedBucket < 0 ? buckets : [buckets[selectedBucket]]
-  const sums = cols => cols.reduce((a,row) => a.map((n,index) => n + row[index]),[0,0,0,0])
-  const full = sums(buckets), local = sums(rows)
-  const requests = total(full)
-  const failed = total(local.slice(1))
-  const peak = Math.max(1,...buckets.map(total))
-  const window = interval(hours,selectedBucket)
-  byId('monitor-total').textContent = fmt.format(requests)
-  byId('monitor-success').textContent = requests ? (full[0] / requests * 100).toFixed(1) + '%' : '暂无样本'
-  byId('monitor-count').textContent = fmt.format(requests) + ' 个完成样本'
-  byId('monitor-first').textContent = metricValues[hours]?.p95 || '样本不足'
-  byId('monitor-speed').textContent = metricValues[hours]?.speed || '样本不足'
-  byId('monitor-selection').textContent = requests ? window + ' · 成功 ' + fmt.format(local[0]) + ' · 失败 ' + fmt.format(failed) : '该时段暂无调用'
-  byId('failure-scope').textContent = requests ? window + ' · 共 ' + fmt.format(failed) + ' 次失败' : '暂无失败样本'
-  byId('monitor-chart').hidden = !requests
-  byId('monitor-audit').hidden = !failed
-  byId('monitor-chart').innerHTML = buckets.map((row,index) => {
-    const errors = total(row.slice(1))
-    const label = interval(hours,index) + '，成功 ' + row[0] + '，失败 ' + errors
-    return `<button type="button" data-bucket="${index}" aria-label="${label}" aria-pressed="${selectedBucket===index}"><span class="stack" aria-hidden="true"><span class="succeeded" style="height:${row[0] / peak * 100}%"></span><span class="failed" style="height:${errors / peak * 100}%"></span></span><time>${interval(hours,index).slice(0,5)}</time></button>`
-  }).join('')
-  byId('failure-list').innerHTML = failed ? failureTypes.map((label,index) => {
-    const count = local[index + 1]
-    const percent = failed ? (count / failed * 100) : 0
-    return `<li><button type="button" data-failure="${index}" aria-pressed="${selectedFailure===index}"><span>${label}</span><small>${fmt.format(count)} 次 · ${percent.toFixed(1)}%</small><span class="meter" aria-hidden="true"><span style="width:${percent}%"></span></span></button></li>`
-  }).join('') : ''
-}
-function openAudit(text, showRecord) {
-  const panel = byId('audit-example')
-  panel.open = true
-  byId('audit-context').textContent = text
-  byId('audit-record').hidden = !showRecord
-  panel.querySelector('summary').focus({preventScroll:true})
-}
-byId('route-scenario').addEventListener('change', renderRoute)
-byId('monitor-range').addEventListener('change', () => {
-  selectedBucket = -1
-  selectedFailure = -1
-  renderMonitor()
-})
-byId('monitor-chart').addEventListener('click', event => {
-  const button = event.target.closest('[data-bucket]')
-  if (!button) return
-  const index = Number(button.dataset.bucket)
-  selectedBucket = selectedBucket === index ? -1 : index
-  selectedFailure = -1
-  renderMonitor()
-  byId('monitor-chart').querySelector('[data-bucket="'+index+'"]').focus({preventScroll:true})
-})
-byId('failure-list').addEventListener('click', event => {
-  const button = event.target.closest('[data-failure]')
-  if (!button) return
-  const index = Number(button.dataset.failure)
-  selectedFailure = selectedFailure === index ? -1 : index
-  renderMonitor()
-  byId('failure-list').querySelector('[data-failure="'+index+'"]').focus({preventScroll:true})
-})
-byId('route-audit').addEventListener('click', () => openAudit('聚合调用 · 16:35 · 已记录故障切换 · 演示', true))
-byId('monitor-audit').addEventListener('click', () => {
-  const hours = Number(byId('monitor-range').value)
-  const type = selectedFailure < 0 ? '全部失败' : failureTypes[selectedFailure]
-  openAudit(interval(hours,selectedBucket) + ' · 全部来源 · 全部模型 · ' + type + ' · 演示', false)
-})
-byId('claim').addEventListener('click', () => {
-  byId('claim').disabled = true
-  byId('claim-status').textContent = '已领取 10 积分 · 演示回执'
-  byId('bonus').textContent = '50'
-})
-function indicateAnchor() {
-  const hash = location.hash === '#audit-example' ? '#audit' : location.hash || '#overview'
-  document.querySelectorAll('.contents a').forEach(link => {
-    if (link.hash === hash) {
-      link.setAttribute('aria-current','location')
-      link.scrollIntoView({block:'nearest',inline:'nearest'})
-    } else link.removeAttribute('aria-current')
-  })
-}
-window.addEventListener('hashchange', indicateAnchor)
-renderRoute()
-renderMonitor()
-indicateAnchor()
-</script>
 </body>
 </html>

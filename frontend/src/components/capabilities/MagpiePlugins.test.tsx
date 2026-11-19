@@ -3,6 +3,7 @@ import { App } from 'antd'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
+import { clearAgentDataCache } from '../agent/agent-data-cache'
 import MagpiePluginImport from './MagpiePluginImport'
 import MagpieSourceSettings from './MagpieSourceSettings'
 vi.mock('../../api', () => ({ api: vi.fn() }))
@@ -10,8 +11,9 @@ vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../cluster/node-url', () => ({ nodeApi: (path: string) => '/api' + path }))
 const provider = { id: 'workbuddy', name: 'WorkBuddy', methods: [{ type: 'api', label: 'API Key' }], options: [], signedIn: false, models: [] }
+const communityPath = '/agent/model-gateway/plugins/community'
 beforeEach(() => { window.matchMedia = vi.fn().mockReturnValue({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }) })
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); clearAgentDataCache(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 it.each([false, true])('uploads folder paths or a ZIP and creates the chosen provider (ZIP=%s)', async zip => {
   let sent: FormData | undefined
   vi.stubGlobal('fetch', vi.fn(async (_url, options) => { sent = options.body; return { ok: true, json: async () => ({ data: { id: 'package-id', name: 'WorkBuddy', version: '1' } }) } }))
@@ -63,7 +65,7 @@ it('discovers every plugin in an imported collection and adds from the matching 
 it('keeps compatible providers visible when another imported plugin cannot load', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ data: { packages: [{ id: 'broken', name: 'Broken plugin' }, { id: 'valid', name: 'Valid plugin' }] } }) })))
   vi.mocked(api).mockImplementation(async (_method, path, body) => {
-    if (path.endsWith('/packages')) return { data: [] }
+    if (path.endsWith('/packages') || path.startsWith(communityPath + '?')) return { data: [] }
     if (body.packageId === 'broken') throw { apiError: { code: 'MODEL_PLUGIN_FAILED' } }
     return { data: [{ ...provider, name: 'Available cloud' }] }
   })
@@ -73,10 +75,30 @@ it('keeps compatible providers visible when another imported plugin cannot load'
   expect(screen.getByRole('alert').textContent).toContain('hub.plugin.failed')
 })
 
+it('loads provider plugins from the registry and downloads only the selected version', async () => {
+  const pkg = { id: 'release-id', name: '@magpie-community/opencode-workbuddy-auth', version: '0.2.37' }
+  vi.mocked(api).mockImplementation(async (method, path) => {
+    if (path.startsWith(communityPath + '?')) return { data: [{ package: pkg.name, name: 'WorkBuddy', providers: ['workbuddy'], version: pkg.version }] }
+    if (path === communityPath && method === 'POST') return { data: pkg }
+    if (path.endsWith('/inspect')) return { data: [provider] }
+    return { data: [] }
+  })
+  render(<App><MagpiePluginImport revision="r1" onImported={vi.fn()} /></App>)
+  const selector = await screen.findByRole('combobox', { name: 'hub.plugin.communityPackage' })
+  await waitFor(() => expect(selector.getAttribute('aria-disabled')).not.toBe('true'))
+  fireEvent.mouseDown(selector.closest('.ant-select-selector')!)
+  fireEvent.click(await screen.findByTitle('WorkBuddy'))
+  expect(vi.mocked(api).mock.calls.some(([method]) => method === 'POST')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'hub.plugin.download' }))
+  await screen.findByRole('button', { name: 'hub.plugin.addSource' })
+  expect(api).toHaveBeenCalledWith('POST', communityPath, { channel: 'github', package: pkg.name, version: pkg.version })
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/plugins/inspect', { packageId: pkg.id }, expect.anything())
+})
+
 it('filters repository metadata, dependencies and environment files before a folder upload', async () => {
   let sent: FormData | undefined
   vi.stubGlobal('fetch', vi.fn(async (_url, options) => { sent = options.body; return { ok: true, json: async () => ({ data: { id: 'package', name: 'Plugin' } }) } }))
-  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/packages') ? [] : [provider] }))
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/inspect') ? [provider] : [] }))
   const page = render(<App><MagpiePluginImport revision="r1" onImported={() => {}} /></App>)
   const files = ['repo/packages/plugin/package.json', 'repo/.git/config', 'repo/node_modules/pkg/index.js', 'repo/packages/plugin/.env.local'].map(path => { const file = new File(['content'], path.split('/').pop()!); Object.defineProperty(file, 'webkitRelativePath', { value: path }); return file })
   fireEvent.change(page.container.querySelector('input[webkitdirectory]')!, { target: { files } })
