@@ -12,6 +12,7 @@ from roami_agent.protocol.tools import Tool, object_schema
 from roami_agent.replies.answer_contract import reply_text, validate_answer
 from roami_agent.replies.task_progress import request_language
 from roami_agent.storage.database import row
+from roami_agent.storage.native_tool_observations import tool_diagnostic
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
 from roami_agent.storage.request_quotes import quote_text
 from roami_agent.storage.swarm_coordination_tasks import request_context as coordination_request
@@ -542,6 +543,10 @@ def register_main_tools(
                         if report and report["result_json"]
                         else None
                     )
+                    if diagnostic := tool_diagnostic(
+                        db, item["id"], attempt["runId"], item["revision"]
+                    ):
+                        item["executorToolDiagnostic"] = diagnostic
                 if intent.get("target", {}).get("resourceOnly") is not True or not attempt.get(
                     "runId"
                 ):
@@ -924,7 +929,7 @@ def register_main_tools(
         Tool(
             "task_status",
             "Read delegated progress in this conversation. A progress question needs only state and essential blockers, not a repeated report. "
-            "Use includeResult=true only when the user asks for prior detailed/full results; the stored executor report is not fresh retrieval. Optionally filter by exact taskId.",
+            "Use includeResult=true only when the user asks for prior detailed/full results; the stored executor report is not fresh retrieval. Tool diagnostics are timestamped historical observations, not proof of a current blocker, stopped input or business result. Optionally filter by exact taskId.",
             object_schema(
                 {
                     "taskId": {"type": "string", "minLength": 1, "maxLength": 200},
