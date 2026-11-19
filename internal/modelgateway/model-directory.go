@@ -40,6 +40,7 @@ type sourceDirectoryEntry struct {
 	Fingerprint string
 	Details     []agentproviders.SourceModelDetail
 	ObservedAt  time.Time
+	Problem     string
 }
 
 func sourceDirectoryFingerprint(source ModelSource) string {
@@ -48,6 +49,9 @@ func sourceDirectoryFingerprint(source ModelSource) string {
 	return hex.EncodeToString(digest[:])
 }
 func (s *CatalogStore) rememberSourceDetails(source ModelSource, revision string, details []agentproviders.SourceModelDetail) {
+	s.rememberSourceDirectory(source, revision, sourceDirectoryEntry{Fingerprint: sourceDirectoryFingerprint(source), Details: details, ObservedAt: time.Now()})
+}
+func (s *CatalogStore) rememberSourceDirectory(source ModelSource, revision string, entry sourceDirectoryEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if revision != s.value.Revision {
@@ -55,12 +59,53 @@ func (s *CatalogStore) rememberSourceDetails(source ModelSource, revision string
 	}
 	// Unsaved discovery must never replace a configured source's evidence.
 	for _, saved := range s.value.Sources {
-		if saved.ID == source.ID && sourceDirectoryFingerprint(saved) == sourceDirectoryFingerprint(source) {
+		if saved.ID == source.ID && sourceDirectoryFingerprint(saved) == entry.Fingerprint {
 			if s.directory == nil {
 				s.directory = map[string]sourceDirectoryEntry{}
 			}
-			s.directory[source.ID] = sourceDirectoryEntry{sourceDirectoryFingerprint(source), details, time.Now()}
+			s.directory[source.ID] = entry
 		}
+	}
+}
+
+func (h *Handler) routingSourceDirectory(ctx context.Context, source ModelSource, revision string) sourceDirectoryEntry {
+	s := h.Catalog
+	fingerprint := sourceDirectoryFingerprint(source)
+	cached := func() (sourceDirectoryEntry, bool) {
+		s.mu.Lock()
+		entry := s.directory[source.ID]
+		s.mu.Unlock()
+		ttl := 15 * time.Minute
+		if entry.Problem != "" {
+			ttl = time.Minute
+		}
+		return entry, entry.Fingerprint == fingerprint && time.Since(entry.ObservedAt) < ttl
+	}
+	if entry, ok := cached(); ok {
+		return entry
+	}
+	result := s.directoryReads.DoChan(revision+"/"+fingerprint, func() (any, error) {
+		if entry, ok := cached(); ok {
+			return entry, nil
+		}
+		callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Second)
+		defer cancel()
+		_, details, err := h.fetchSourceModels(callCtx, source)
+		entry := sourceDirectoryEntry{Fingerprint: fingerprint, Details: details, ObservedAt: time.Now()}
+		if err != nil {
+			entry.Details, entry.Problem = nil, "directory"
+			if err.Error() == "MODEL_LIST_UNAUTHORIZED" {
+				entry.Problem = "authorization"
+			}
+		}
+		s.rememberSourceDirectory(source, revision, entry)
+		return entry, nil
+	})
+	select {
+	case <-ctx.Done():
+		return sourceDirectoryEntry{Problem: "directory"}
+	case result := <-result:
+		return result.Val.(sourceDirectoryEntry)
 	}
 }
 func unknownCapabilities() map[string]CapabilityFact {

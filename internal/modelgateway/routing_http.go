@@ -30,7 +30,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 		reject(w, 404, "MODEL_NOT_CONFIGURED")
 		return
 	}
-	choice, err := h.newRoutingChoice(r.Context(), catalog, *model)
+	choice, err := h.newRoutingChoice(r.Context(), catalog, *model, "", true)
 	if err != nil {
 		reject(w, 503, "MODEL_ROUTE_UNAVAILABLE")
 		return
@@ -74,5 +74,14 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 			return target.Channel.Measured.UnixMilli()
 		}(), "recentTokens": target.Channel.Input + target.Channel.Output})
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"now": time.Now().UnixMilli(), "available": available, "channels": rows}})
+	type memberStatus struct {
+		ModelCandidate
+		Block   string `json:"block,omitempty"`
+		Context int    `json:"context,omitempty"`
+	}
+	members := make([]memberStatus, 0, len(model.Candidates))
+	for _, candidate := range model.Candidates {
+		members = append(members, memberStatus{candidate, choice.blocks[candidate], choice.contexts[candidate]})
+	}
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"now": time.Now().UnixMilli(), "available": available, "channels": rows, "members": members}})
 }

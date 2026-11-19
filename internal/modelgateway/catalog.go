@@ -16,6 +16,7 @@ import (
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/modelplugins"
+	"golang.org/x/sync/singleflight"
 )
 
 type ModelSource struct {
@@ -81,15 +82,16 @@ type catalogDisk struct {
 	AgentKeys   map[string]agentKeyState `json:"agentKeys,omitempty"`
 }
 type CatalogStore struct {
-	directory   map[string]sourceDirectoryEntry
-	mu          sync.Mutex
-	ledger      *Ledger
-	value       ModelCatalog
-	baseURL     string
-	agents      *agentproviders.Store
-	applying    bool
-	agentSocket string
-	plugins     *modelplugins.Manager
+	directory      map[string]sourceDirectoryEntry
+	directoryReads singleflight.Group
+	mu             sync.Mutex
+	ledger         *Ledger
+	value          ModelCatalog
+	baseURL        string
+	agents         *agentproviders.Store
+	applying       bool
+	agentSocket    string
+	plugins        *modelplugins.Manager
 }
 
 var catalogID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$`)

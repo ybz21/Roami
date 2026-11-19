@@ -44,6 +44,60 @@ func responseFixture(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"id":"r","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"2"}]}],"usage":{"input_tokens":4,"output_tokens":1}}`))
 }
+
+func TestRoutingChecksAPIMemberCapabilitiesAutomatically(t *testing.T) {
+	var reads, calls atomic.Int64
+	h := aggregateFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/models" {
+			reads.Add(1)
+			_, _ = w.Write([]byte(`{"data":[{"id":"fixture","context_length":64000,"supported_parameters":["tools"]}]}`))
+			return
+		}
+		calls.Add(1)
+		responseFixture(w, r)
+	}, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/models" {
+			t.Errorf("status check sent %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"fixture","context_length":32000,"supported_parameters":[]}]}`))
+	})
+	catalog := h.Catalog.snapshot()
+	catalog.Models[0].RequireTools = true
+	catalog.Models[0].MinContext = 16000
+	if err := h.Catalog.update(context.Background(), catalog); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		h.routingView(w, httptest.NewRequest(http.MethodGet, "/v1/model-gateway/catalog/routing?model=coding-main", nil))
+		var response struct {
+			Data struct {
+				Available int
+				Members   []struct {
+					SourceID string
+					Block    string
+					Context  int
+				}
+			}
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil ||
+			w.Code != http.StatusOK || response.Data.Available != 1 || len(response.Data.Members) != 2 {
+			t.Fatalf("routing status = %d %s; %v", w.Code, w.Body.String(), err)
+		}
+		first, second := response.Data.Members[0], response.Data.Members[1]
+		if first.SourceID != "work" || first.Block != "" || first.Context != 64000 ||
+			second.SourceID != "backup" || second.Block != "tools" || second.Context != 32000 {
+			t.Fatalf("members: %+v", response.Data.Members)
+		}
+	}
+	if reads.Load() != 1 || calls.Load() != 0 {
+		t.Fatalf("status did not reuse directory or sent inference: reads=%d calls=%d", reads.Load(), calls.Load())
+	}
+	w := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`)
+	if w.Code != http.StatusOK || calls.Load() != 1 || reads.Load() != 1 {
+		t.Fatalf("dispatch did not use the same checked capability: %d %s", w.Code, w.Body.String())
+	}
+}
 func TestAggregateRetriesRejectedSourceHonorsCooldownAndKeepsAttempts(t *testing.T) {
 	var first, second atomic.Int64
 	h := aggregateFixture(t, func(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +261,7 @@ func TestAggregateCompactionFiltersUnsupportedSourceBeforeScheduling(t *testing.
 	if err := h.Catalog.update(context.Background(), value); err != nil {
 		t.Fatal(err)
 	}
-	choice, err := h.newRoutingChoice(context.Background(), h.Catalog.snapshot(), h.Catalog.value.Models[0], "openai-responses")
+	choice, err := h.newRoutingChoice(context.Background(), h.Catalog.snapshot(), h.Catalog.value.Models[0], "openai-responses", false)
 	if err != nil {
 		t.Fatal(err)
 	}

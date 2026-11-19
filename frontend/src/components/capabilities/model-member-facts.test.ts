@@ -37,3 +37,27 @@ it('cancels in-flight metadata and disables live reads when the page is inactive
  expect(useRoutingStatus).toHaveBeenLastCalledWith('', false, 'one')
  expect(useModelMonitor).toHaveBeenLastCalledWith(false, 24, '', '', 0)
 })
+it('shows checked member facts even when routing excludes every channel', async () => {
+ await vi.mocked(useRoutingStatus).withImplementation(() => ({
+  failed: false,
+  retry: vi.fn(),
+  data: { now: 1, available: 0, channels: [], members: [{ sourceId: 'a', model: 'first', block: 'tools', context: 32000 }] },
+ }), async () => {
+  const { result } = renderHook(() => useModelMemberFacts(model, model, catalog, true))
+  expect(result.current.facts['a/first']).toMatchObject({ configured: true, block: 'tools', context: 32000 })
+  expect(api).not.toHaveBeenCalled()
+ })
+})
+it('still refreshes signed-in plugin directories when the gateway checks saved API members', async () => {
+ const pluginCatalog = { ...catalog, sources: catalog.sources.map(source => source.id === 'b' ? { ...source, pluginSourceId: 'plugin-b' } : source) }
+ vi.mocked(api).mockResolvedValue({ data: { details: [] } })
+ await vi.mocked(useRoutingStatus).withImplementation(() => ({
+  failed: false,
+  retry: vi.fn(),
+  data: { now: 1, available: 0, channels: [], members: [] },
+ }), async () => {
+  await act(async () => { renderHook(() => useModelMemberFacts(model, model, pluginCatalog, true)) })
+  expect(api).toHaveBeenCalledTimes(1)
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/discover', { source: pluginCatalog.sources[1], revision: 'one' }, expect.anything())
+ })
+})

@@ -3,17 +3,19 @@ package modelgateway
 import (
 	"context"
 	"errors"
-	"github.com/ybz21/Roami/internal/modelplugins"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 type sourceRouteFacts struct {
-	source ModelSource
-	plugin modelplugins.Provider
-	quotas map[string]modelplugins.Quota
-	valid  map[string]bool
+	source    ModelSource
+	plugin    modelplugins.Provider
+	quotas    map[string]modelplugins.Quota
+	valid     map[string]bool
+	directory sourceDirectoryEntry
 }
 type routingLeaf struct {
 	Candidate          ModelCandidate
@@ -33,13 +35,15 @@ type routingChoice struct {
 	model                 CatalogModel
 	nodes                 map[string]*routingNode
 	targets               []routeTarget
+	blocks                map[ModelCandidate]string
+	contexts              map[ModelCandidate]int
 	ordered               []routeTarget
 	cursor                int
 	initialized, reserved bool
 	providersReserved     map[string]bool
 }
 
-func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model CatalogModel) (map[string]sourceRouteFacts, error) {
+func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model CatalogModel, inspect bool) (map[string]*sourceRouteFacts, error) {
 	needed := map[string]bool{}
 	byModel := map[string]CatalogModel{}
 	for _, m := range catalog.Models {
@@ -60,7 +64,7 @@ func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model 
 					return err
 				}
 			} else {
-				needed[candidate.SourceID] = true
+				needed[candidate.SourceID] = needed[candidate.SourceID] || inspect || m.RequireTools || m.MinContext > 0
 			}
 		}
 		return nil
@@ -68,13 +72,13 @@ func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model 
 	if err := collect(model, 0); err != nil {
 		return nil, err
 	}
-	facts := map[string]sourceRouteFacts{}
+	facts := map[string]*sourceRouteFacts{}
 	pluginSources := map[string]modelplugins.Source{}
 	for _, source := range catalog.Sources {
-		if !needed[source.ID] {
+		if _, ok := needed[source.ID]; !ok {
 			continue
 		}
-		value := sourceRouteFacts{source: source, quotas: map[string]modelplugins.Quota{}, valid: map[string]bool{}}
+		value := &sourceRouteFacts{source: source, quotas: map[string]modelplugins.Quota{}, valid: map[string]bool{}}
 		if source.PluginSourceID != "" && h.Plugins != nil {
 			pluginSource, err := h.Plugins.ReadSource(source.PluginSourceID)
 			if err == nil {
@@ -87,6 +91,22 @@ func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model 
 	var mu sync.Mutex
 	var wait sync.WaitGroup
 	gate := make(chan struct{}, 8)
+	for id, value := range facts {
+		if !needed[id] || value.source.PluginSourceID != "" || h.Catalog == nil {
+			continue
+		}
+		wait.Add(1)
+		go func(fact *sourceRouteFacts) {
+			defer wait.Done()
+			select {
+			case gate <- struct{}{}:
+				defer func() { <-gate }()
+			case <-ctx.Done():
+				return
+			}
+			fact.directory = h.routingSourceDirectory(ctx, fact.source, catalog.Revision)
+		}(value)
+	}
 	for id, value := range facts {
 		if !value.plugin.Usage || len(value.plugin.Accounts) > 64 {
 			continue
@@ -125,11 +145,18 @@ func accountPricingModel(model *modelplugins.Model, accounts int) *modelplugins.
 	return &copy
 }
 
-func routeAllowed(model CatalogModel, candidate ModelCandidate, pluginModel *modelplugins.Model, quota routingQuota, pricing PricingConfig) bool {
-	if !model.enabled() {
-		return false
+func routeCapabilityBlock(model CatalogModel, advertised *modelplugins.Model) string {
+	if model.RequireTools && (advertised == nil || !advertised.Tools) {
+		return "tools"
 	}
-	if model.RequireTools && (pluginModel == nil || !pluginModel.Tools) || model.MinContext > 0 && (pluginModel == nil || pluginModel.Context < model.MinContext) {
+	if model.MinContext > 0 && (advertised == nil || advertised.Context < model.MinContext) {
+		return "context"
+	}
+	return ""
+}
+
+func routeAllowed(model CatalogModel, candidate ModelCandidate, pluginModel *modelplugins.Model, quota routingQuota, pricing PricingConfig) bool {
+	if !model.enabled() || routeCapabilityBlock(model, pluginModel) != "" {
 		return false
 	}
 	if !model.FreeOnly {
@@ -148,8 +175,8 @@ func routeAllowed(model CatalogModel, candidate ModelCandidate, pluginModel *mod
 	}
 	return pluginModel != nil && (pluginModel.Free || model.AllowPlan && pluginModel.Rate > 0 && quota.Known && quota.Remaining != nil && *quota.Remaining > 0)
 }
-func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, model CatalogModel, requiredProtocol ...string) (*routingChoice, error) {
-	facts, err := h.routingFacts(ctx, catalog, model)
+func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, model CatalogModel, requiredProtocol string, inspect bool) (*routingChoice, error) {
+	facts, err := h.routingFacts(ctx, catalog, model, inspect)
 	if err != nil {
 		return nil, err
 	}
@@ -175,11 +202,12 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 		if freeOnly {
 			m.FreeOnly = true
 		}
-		choice := &routingChoice{handler: h, model: configured, nodes: map[string]*routingNode{}, providersReserved: map[string]bool{}}
+		choice := &routingChoice{handler: h, model: configured, nodes: map[string]*routingNode{}, providersReserved: map[string]bool{}, blocks: map[ModelCandidate]string{}, contexts: map[ModelCandidate]int{}}
 		if !m.enabled() {
 			return choice, nil
 		}
 		for _, candidate := range m.Candidates {
+			choice.blocks[candidate] = "source"
 			weight := m.Weights[candidateIdentity(candidate)]
 			if weight == 0 {
 				weight = 1
@@ -215,6 +243,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				}
 				choice.targets = append(choice.targets, target)
 				choice.nodes[id] = &routingNode{target: target, child: child}
+				delete(choice.blocks, candidate)
 				continue
 			}
 			fact, ok := facts[candidate.SourceID]
@@ -245,14 +274,33 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 					return nil, errors.New("MODEL_ROUTE_TOO_LARGE")
 				}
 			}
-			if len(requiredProtocol) > 0 && requiredProtocol[0] != "" {
+			if requiredProtocol != "" {
 				effective := fact.source.Protocol
 				if pluginModel != nil {
 					effective = modelplugins.ModelProtocol(*pluginModel, fact.plugin)
 				}
-				if effective != requiredProtocol[0] {
+				if effective != requiredProtocol {
 					continue
 				}
+			}
+			advertised := accountPricingModel(pluginModel, len(accounts))
+			if fact.source.PluginSourceID == "" {
+				for _, detail := range fact.directory.Details {
+					if detail.ID == candidate.Model {
+						advertised = &modelplugins.Model{Tools: detail.Tools != nil && *detail.Tools, Context: detail.Context}
+						break
+					}
+				}
+			}
+			if advertised != nil && advertised.Context > 0 {
+				choice.contexts[candidate] = advertised.Context
+			}
+			if block := routeCapabilityBlock(m, advertised); block != "" {
+				if fact.directory.Problem != "" {
+					block = fact.directory.Problem
+				}
+				choice.blocks[candidate] = block
+				continue
 			}
 			start := len(choice.targets)
 			for _, account := range accounts {
@@ -263,7 +311,8 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				if fact.valid[account.Key] {
 					quota = quotaForModel(fact.quotas[account.Key], candidate.Model, now)
 				}
-				if !routeAllowed(m, candidate, accountPricingModel(pluginModel, len(accounts)), quota, config.Pricing) {
+				if !routeAllowed(m, candidate, advertised, quota, config.Pricing) {
+					choice.blocks[candidate] = "pricing"
 					continue
 				}
 				count++
@@ -299,6 +348,17 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				}
 				choice.targets = append(choice.targets, target)
 				choice.nodes[target.ID] = &routingNode{target: target, leaf: &routingLeaf{Candidate: candidate, Account: account.Key, ChannelID: channelID, Free: m.FreeOnly, PricingRevision: priceRevision, ProviderStrategy: config.Pricing.Sources[candidate.SourceID].AccountStrategy}}
+			}
+			if len(choice.targets) > start {
+				delete(choice.blocks, candidate)
+				if inspect && fact.source.PluginSourceID == "" {
+					switch {
+					case fact.directory.Problem != "":
+						choice.blocks[candidate] = fact.directory.Problem
+					case !fact.directory.ObservedAt.IsZero() && advertised == nil:
+						choice.blocks[candidate] = "notListed"
+					}
+				}
 			}
 			if m.Strategy == "weight" && len(choice.targets) > start {
 				provider := providerRouteModel(candidate, config.Pricing.Sources[candidate.SourceID].AccountStrategy)
