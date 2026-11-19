@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| Agent 渲染视图宽度统一 | [20261119-agent-render-width](20261119-agent-render-width/README.md) | 所有 Agent 消息、输入及附属状态铺满可用宽度与桌面/真机验收 |
 | Main 工作中切换模型 | [20261117-main-model-switch](20261117-main-model-switch/README.md) | 请求边界切换、模型连接排空、命令入口及桌面/真机验收 |
 | 模型网关与能力选择统一 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 统一模型目录、原生/聚合展示、CLI 与 Agent 选模委派及运行验收 |
 | 会话标签行尾间距 | [20261116-session-tab-spacing](20261116-session-tab-spacing/README.md) | 鼠标端动作紧邻排列、统一尺寸与桌面/真机验收 |
