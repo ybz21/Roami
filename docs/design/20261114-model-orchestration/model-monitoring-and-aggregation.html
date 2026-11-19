@@ -21,8 +21,10 @@
 </nav>
 <main class="document" id="document">
 <section id="overview" aria-labelledby="overview-title">
-  <header class="section-head"><h2 id="overview-title">现行设计</h2><a class="page-reference" href="./history/index.html">历史设计与验收</a></header>
-  <p class="copy">截至 2026 年 11 月 19 日。七个页签各有一份设计，网关、聚合、监控、审计与 WorkBuddy 收录可交互样例。</p>
+  <header class="section-head"><h2 id="overview-title">当前设计</h2>
+    <div class="actions"><a class="page-reference" href="./latest-design.html">最新设计</a><a class="page-reference" href="./history/index.html">历史设计与验收</a></div>
+  </header>
+  <p class="copy">这里保留七个页签的设计和原型。网关、聚合、监控、审计与 WorkBuddy 的样例可以逐页打开。下一轮方案和待实现项从「最新设计」进入。</p>
   <table class="guide-table overview-table step" aria-label="七个子页的设计和入口">
     <thead><tr><th scope="col">子页设计</th><th scope="col">主要用途</th></tr></thead>
     <tbody>
@@ -31,7 +33,7 @@
       <tr id="usage"><th scope="row"><a href="./model-usage.html">概况</a></th><td>看用量、记账费用和每日限额</td></tr>
       <tr id="monitor"><th scope="row"><a href="./model-monitoring.html">监控</a></th><td>看成功率、延迟和失败分布</td></tr>
       <tr id="audit"><th scope="row"><a href="./model-audit.html">审计</a></th><td>定位某次调用、命中模型与费用</td></tr>
-      <tr id="gateway"><th scope="row"><a href="./model-gateway.html">本机网关</a></th><td>人机交互、对外调用、控制接口与故障排查</td></tr>
+      <tr id="gateway"><th scope="row"><a href="./model-gateway.html">本机网关</a></th><td>模型目录、接入与密钥，含网关分层设计入口</td></tr>
       <tr id="speech"><th scope="row"><a href="./model-speech.html">语音输入</a></th><td>配置和验证转写服务</td></tr>
     </tbody>
   </table>
@@ -39,21 +41,20 @@
   <ul class="copy">
     <li>模型源维护连接、授权、定价和启用范围。本机网关共享已接入目录，网页、CLI 与 Agent 选模使用同一份模型能力和稳定调用名。</li>
     <li>聚合只调度已保存的成员。「仅看免费模型」用于候选筛选。具体费用约束由请求表达，准入与记账由 Go 网关处理。</li>
-    <li>调度页分别展示策略草稿、当前生效顺位和历史命中。请求级观测方案记录最终结果，来源视图继续统计各次上游尝试。</li>
-    <li>网关的接入、调用与控制契约集中在<a href="./model-gateway.html">本机网关</a>。失败和降级从监控进审计，能查原因、尝试次数和对应处理入口。</li>
+    <li>调度页保留策略草稿与当前生效顺位。监控已有来源和上游尝试记录，审计用于核对调用结果与费用。</li>
   </ul>
   <p class="copy step">在 Roami 内打开本文时，各设计页的「打开现有页面」使用当前节点地址。</p>
   <h3 class="step">跨页流程</h3>
   <ul class="copy">
     <li>接入模型，从<a href="./model-sources.html">模型源</a>启用模型，按需配置<a href="./model-aggregation.html">聚合</a>，到<a href="./model-gateway.html">本机网关</a>复制调用方式。</li>
-    <li>排查故障，从<a href="./model-aggregation.html">聚合</a>的切换记录或<a href="./model-monitoring.html">监控</a>的异常时段进入<a href="./model-audit.html">审计</a>，保留筛选。</li>
+    <li>排查故障，从<a href="./model-aggregation.html">聚合</a>核对生效顺位，再检查<a href="./model-monitoring.html">监控</a>中的来源异常和<a href="./model-audit.html">审计</a>中的调用记录。</li>
     <li>核对费用，从<a href="./model-usage.html">概况</a>查看额度和用量，再到<a href="./model-audit.html">审计</a>核对明细。账号积分在 <a id="workbuddy" href="./model-sources.html#workbuddy">WorkBuddy 插件</a>里看。</li>
   </ul>
   <div class="copy step" id="history"><h3>历史沿革</h3><p>从 10 月 26 日的本地记账，到 11 月 19 日的网关和调度观测，技术设计、原型和验收集中在本目录。<a href="./history/index.html">查看全部历史 HTML</a></p></div>
 </section>
 
 <section id="delivery" aria-labelledby="delivery-title">
-  <header class="section-head"><h2 id="delivery-title">技术设计与验收</h2></header>
+  <header class="section-head"><h2 id="delivery-title">原方案的实施与验收</h2><a class="page-reference" href="./latest-design.html#sequence">查看最新实施顺序</a></header>
   <div class="copy step">
     <h3>实施顺序</h3>
     <ol>

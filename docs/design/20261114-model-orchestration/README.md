@@ -1,6 +1,8 @@
 # 模型源与聚合：工作台重构
 
-2026-11-19 [大模型设计汇编（HTML）](model-monitoring-and-aggregation.html) · [历史设计、原型和验收（HTML）](history/index.html)。相关专题及相对资源统一归入本目录。七个现行页面独立存放，引用共享的设计口径和对应历史记录。
+2026-11-19 [当前设计（HTML）](model-monitoring-and-aggregation.html) · [最新设计（HTML）](latest-design.html) · [历史设计、原型和验收（HTML）](history/index.html)。当前保留七个独立页面。最新设计汇总网关分层、请求级观测与聚合降级，并引用对应的交互原型和技术章节。
+
+桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 验证了三个入口之间的导航，以及从降级原型进入审计再返回。37 个 HTML 页面和 549 条本地引用通过检查。截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
 
 归档验收覆盖桌面四档宽度与 Redmi Note 8。逐卷打开九个历史专题，核对正文锚点、动态原型和旧账本快照返回。检查 36 个 HTML 和 528 条本地引用，在隔离目录重建三个迁移后的原型。15 条旧临时链接匹配到已有归档副本，其余临时证据在对应记录中标明。
 
