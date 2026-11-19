@@ -1,0 +1,4204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用量、审计与调度监控 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+</head>
+<body>
+<header class="page-head"><h1>用量、审计与调度监控</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计归档">
+  <a href="../../model-monitoring-and-aggregation.html">现行设计</a>
+  <a href="../index.html">历史目录</a>
+  <a href="#contents" aria-current="page">本页目录</a>
+</nav>
+<main class="document archive" id="contents">
+<section aria-labelledby="record-heading">
+<h2 id="record-heading">设计与验收记录</h2>
+<p class="copy">用量时区、来源定价、聚合效果与监控留存。记录按原版本归档，实施状态以当时的记录为准。</p>
+<p class="muted"><a href="../index.html">返回历史目录</a> · <a href="../../model-monitoring-and-aggregation.html">查看现行设计</a></p>
+<details><summary>原型和历史 HTML（3）</summary><ul class="record-list"><li><a href="aggregation-review.html">聚合 · Roami</a></li>
+<li><a href="interaction-review.html">概况与审计 · Roami</a></li>
+<li><a href="prototype.html">概况与审计 · Roami</a></li>
+</ul></details>
+<details open><summary>文档（18）</summary><ul class="record-list"><li><a href="#design-readme">大模型管理 · 用量、聚合与监控</a></li>
+<li><a href="#design-acceptance">概况与审计原型验收 · 第二版</a></li>
+<li><a href="#design-aggregation-editor">聚合编辑与网关模型目录</a></li>
+<li><a href="#design-aggregation-effects">聚合策略与运行效果原型</a></li>
+<li><a href="#design-free-aggregation">模型源定价与免费聚合 · 原型增补</a></li>
+<li><a href="#design-implementation">概况 / 审计实现与六页设计验收</a></li>
+<li><a href="#design-interaction-implementation">概况分析与模型源定价交互接入</a></li>
+<li><a href="#design-interaction-review">用量与定价交互重做</a></li>
+<li><a href="#design-local-time">用量本地时间修正</a></li>
+<li><a href="#design-product-integration">正式接入：源定价、聚合路由与模型监控</a></li>
+<li><a href="#design-routing-monitoring">路由策略与模型监控 · 原型增补</a></li>
+<li><a href="#design-source-cards">模型源卡片简化</a></li>
+<li><a href="#design-revisions-acceptance-v1">原型验收 · 2026-11-12</a></li>
+<li><a href="#design-revisions-v1">第一版结构记录</a></li>
+<li><a href="#design-revisions-v2">第二版结构确认</a></li>
+<li><a href="#design-revisions-v3">模型源定价与免费聚合增补</a></li>
+<li><a href="#design-revisions-v4">聚合候选先选源，再选模型</a></li>
+<li><a href="#design-revisions-v5">九种路由策略与监控</a></li>
+</ul></details>
+<details><summary>验收数据（33）</summary><ul class="record-list"><li><a href="#evidence-aggregation-card-evidence">aggregation-card-evidence.json</a></li>
+<li><a href="#evidence-aggregation-config-evidence">aggregation-config-evidence.json</a></li>
+<li><a href="#evidence-aggregation-editor-evidence">aggregation-editor-evidence.json</a></li>
+<li><a href="#evidence-aggregation-effects-evidence">aggregation-effects-evidence.json</a></li>
+<li><a href="#evidence-aggregation-order-evidence">aggregation-order-evidence.json</a></li>
+<li><a href="#evidence-evidence-acceptance-v1">evidence/acceptance-v1.json</a></li>
+<li><a href="#evidence-evidence-acceptance">evidence/acceptance.json</a></li>
+<li><a href="#evidence-evidence-free-pool-desktop">evidence/free-pool-desktop.json</a></li>
+<li><a href="#evidence-evidence-free-pool-phone">evidence/free-pool-phone.json</a></li>
+<li><a href="#evidence-evidence-free-pool-policy">evidence/free-pool-policy.json</a></li>
+<li><a href="#evidence-evidence-implementation-desktop">evidence/implementation-desktop.json</a></li>
+<li><a href="#evidence-evidence-implementation-phone">evidence/implementation-phone.json</a></li>
+<li><a href="#evidence-evidence-interaction-product-desktop">evidence/interaction-product-desktop.json</a></li>
+<li><a href="#evidence-evidence-interaction-product-locales">evidence/interaction-product-locales.json</a></li>
+<li><a href="#evidence-evidence-interaction-product-phone">evidence/interaction-product-phone.json</a></li>
+<li><a href="#evidence-evidence-interaction-review-desktop">evidence/interaction-review-desktop.json</a></li>
+<li><a href="#evidence-evidence-interaction-review-phone">evidence/interaction-review-phone.json</a></li>
+<li><a href="#evidence-evidence-merge-verification">evidence/merge-verification.json</a></li>
+<li><a href="#evidence-evidence-navigation-desktop">evidence/navigation-desktop.json</a></li>
+<li><a href="#evidence-evidence-navigation-phone">evidence/navigation-phone.json</a></li>
+<li><a href="#evidence-evidence-plugin-accounts-desktop">evidence/plugin-accounts-desktop.json</a></li>
+<li><a href="#evidence-evidence-plugin-accounts-phone">evidence/plugin-accounts-phone.json</a></li>
+<li><a href="#evidence-evidence-pool-source-first-phone">evidence/pool-source-first-phone.json</a></li>
+<li><a href="#evidence-evidence-pool-source-first">evidence/pool-source-first.json</a></li>
+<li><a href="#evidence-evidence-product-integration-desktop">evidence/product-integration-desktop.json</a></li>
+<li><a href="#evidence-evidence-product-integration-phone">evidence/product-integration-phone.json</a></li>
+<li><a href="#evidence-evidence-prototype-all-pages">evidence/prototype-all-pages.json</a></li>
+<li><a href="#evidence-evidence-prototype-phone-pages">evidence/prototype-phone-pages.json</a></li>
+<li><a href="#evidence-evidence-routing-monitoring-browser">evidence/routing-monitoring-browser.json</a></li>
+<li><a href="#evidence-evidence-routing-monitoring-phone">evidence/routing-monitoring-phone.json</a></li>
+<li><a href="#evidence-evidence-routing-retention">evidence/routing-retention.json</a></li>
+<li><a href="#evidence-local-time-evidence">local-time-evidence.json</a></li>
+<li><a href="#evidence-source-cards-evidence">source-cards-evidence.json</a></li>
+</ul></details>
+</section>
+<section aria-label="文档正文">
+<article class="record" id="design-readme">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/README.md</code></p>
+<h2 id="design-readme--大模型管理--用量聚合与监控">大模型管理 · 用量、聚合与监控</h2>
+<p>状态：按已确认原型接入概况、审计、源定价、九种聚合路由和监控，已通过全量质量门与桌面 / 安卓真机验收。详见 <a href="#design-product-integration">正式接入与验收</a>。</p>
+<ul>
+<li><a href="prototype.html">打开交互原型</a></li>
+<li><a href="#design-acceptance">原型验收记录</a></li>
+<li><a href="#design-implementation">概况 / 审计实现与验收</a></li>
+<li><a href="#design-product-integration">源定价、聚合与监控正式接入</a></li>
+<li><a href="#design-free-aggregation">模型源定价与免费聚合</a></li>
+<li><a href="#design-routing-monitoring">九种路由策略与滚动监控</a></li>
+<li>参考：用户提供的 Magpie 截图 <code>/tmp/clipboard-20261112-180757-1x36.png</code>，借鉴「概览 / 请求」的信息拆分。</li>
+</ul>
+<h3 id="design-readme--产品设计">产品设计</h3>
+<p>「能力 / 大模型」的用量部分分为两个同级 Tab：</p>
+<ul>
+<li><strong>概况</strong>：用量、限额、汇总、趋势，以及按模型源 / 智能体 / 模型的分组统计。</li>
+<li><strong>审计</strong>：逐条调用记录、条件筛选、搜索、分页和单次调用详情。</li>
+</ul>
+<p>默认进入概况。概况内可以调整示例每日限额；今日额度覆盖全部调用，不随统计条件变化。未知费用存在时，剩余额度显示待核对。审计直接进入请求列表，不再套一层「概览 / 请求」导航，也不重复概况的限额与汇总模块。点击概况中的分组或趋势进入审计并携带筛选条件；两个 Tab 切换保留已有选择。</p>
+<p>本版按用户对信息结构的纠正修订：<a href="#design-revisions-v1">第一版结构记录</a>。</p>
+<table>
+<thead>
+<tr>
+<th>区域</th>
+<th>内容与行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>统计周期</td>
+<td>今天、近 7 天、近 30 天、自定义起止日期；示例时钟固定为 2026-11-12 18:08（Asia/Shanghai）</td>
+</tr>
+<tr>
+<td>全局筛选</td>
+<td>模型源、智能体、模型、调用来源；筛选同时作用于总览、分组、趋势和请求</td>
+</tr>
+<tr>
+<td>概况：今日额度</td>
+<td>网关状态、今日已记账费用、每日费用上限和剩余额度；限额可在原型内调整，状态只保留在当前页面</td>
+</tr>
+<tr>
+<td>概况：摘要</td>
+<td>已知总 Token、请求数、已知记账费用、缓存读取占已知输入的比例</td>
+</tr>
+<tr>
+<td>用量趋势</td>
+<td>按天查看总 Token、输入、输出、缓存读取、请求数或记账费用；点击柱形进入当天请求</td>
+</tr>
+<tr>
+<td>用量分布</td>
+<td>按模型源、智能体或模型分组；可按 Token、请求数和费用等列排序；占比跟随展示指标</td>
+</tr>
+<tr>
+<td>审计</td>
+<td>继承全局筛选，可按状态或模型 / 请求 ID 查找；多页才显示分页</td>
+</tr>
+<tr>
+<td>单次请求</td>
+<td>桌面右侧面板，手机全屏二级页；呈现身份、状态、回执和价格快照；返回保留列表位置</td>
+</tr>
+<tr>
+<td>历史归档</td>
+<td>依照现有 48 小时保留规则，较早请求只显示聚合；选择已归档日期时说明原因</td>
+</tr>
+</tbody>
+</table>
+<p>「模型源」指实际处理调用的连接，如 WorkBuddy、OpenAI；「调用来源」指对话、任务、RSI 等业务入口。两个维度单独命名，避免把原接口的 <code>source=rsi</code> 当成供应商源。智能体先按现有类型 Roami、Codex、Claude Code、OpenCode、Pi 展示；未知归属单列，不凭模型名推测。</p>
+<p>总 Token = 输入 + 输出；缓存读取是输入的子集，不能再相加。未知用量 / 费用单独标记，汇总标示「已知」，不把未知记成 0。费用按本地价格快照记账，不能叠加云端账单或供应商积分；原型仅展示 USD 示例。正式版多币种须分币种展示，不直接相加。</p>
+<p>桌面沿用能力中心的主分类与左侧模型 Tab。内容铺满剩余空间，只有可选详情面板开启时占用宽度；主内容独立滚动。手机使用顶部栏、同级 Tab 与四入口底栏，筛选按需展开，汇总表改为列表。上下文中的其他能力分类和底部目的地仅用于展示壳层，不模拟完整产品导航。</p>
+<h3 id="design-readme--用户故事">用户故事</h3>
+<ol>
+<li>我想同时掌握用量和限额：进入「概况」，先查看今日额度，再按周期浏览汇总；在原型内调整限额后切换 Tab，选择仍保留。</li>
+<li>我想知道最近一周哪个模型源消耗最多：选择「近 7 天 / 按模型源 / 总 Token」，按降序看占比，进入「审计」查看该源请求。</li>
+<li>我想比较智能体的消耗：切到「按智能体」，在总 Token、输入 / 输出、请求数和费用之间切换，筛选某一模型进一步查看。</li>
+<li>我想解释某笔请求为什么贵：打开请求详情，核对输入、输出、缓存读取及请求时单价；缓存只按缓存价计费。</li>
+<li>我想排查未确认费用：进入「审计」，筛选「待核对」；缺失字段显示未知，不把请求当成免费。</li>
+<li>我在手机上查看：展开筛选、触摸打开请求详情，再返回时保留筛选与滚动位置；只保留一个可见返回栏。</li>
+<li>我想查旧记录：30 天统计继续显示累计用量，早于保留期的请求显示归档提示，不伪造逐条回执。</li>
+</ol>
+<h3 id="design-readme--技术设计">技术设计</h3>
+<h4 id="design-readme--产品接入架构">产品接入架构</h4>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>后续实现方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>frontend/src/components/capabilities/ModelHub.tsx</code></td>
+<td>现有 <code>usage</code> 对应「概况」，含用量、限额和汇总；新增同级 <code>audit</code> 对应「审计」，建议路由 <code>capabilities/models/audit</code>；旧链接继续兼容概况</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/settings/gateway-settings.tsx</code></td>
+<td>限额表单与汇总保留在概况；逐条记录与详情归入审计，对账动作复用现有网关流程</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/settings/model-usage-statistics.tsx</code></td>
+<td>复用汇总口径与已知 / 未知状态，拆分筛选、趋势、分组列表和请求详情；避免从最近 20 条请求推算统计</td>
+</tr>
+<tr>
+<td><code>internal/modelgateway/ledger.go</code></td>
+<td>已有 <code>agentKind</code>、<code>sourceId</code>、<code>routeId</code>、<code>role</code> 和请求时价格快照，作为归属基础</td>
+</tr>
+<tr>
+<td><code>internal/modelgateway/statistics.go</code></td>
+<td>旧查询兼容保留；新增 <code>view=overview / audit</code> 查询分支，支持独立 <code>sourceId</code> / <code>unattributed</code>、智能体、模型、日期、状态、分页和搜索</td>
+</tr>
+<tr>
+<td><code>internal/modelgateway/daily_retention.go</code></td>
+<td>单次回执默认保留 48 小时；schema v6 日汇总主键加入 <code>source_id</code>，新记录归档保持源归属；既有归档回填空 ID，明确显示未归属</td>
+</tr>
+</tbody>
+</table>
+<p>产品已接入自定义日期、模型 / 模型源聚合、服务端分页和搜索，审计回执携带请求时单价与完成时间。调用来源仍按现有可靠的 RSI / other 分类展示；对话 / 任务没有稳定映射，因此没有把原型里的四分类硬接为错误数据。正式版费用按币种分别展示，不相加折算。</p>
+<p>归属优先使用记录中的稳定 ID，名称从目录映射；源被删除或旧记录未归属时保留未知组。列表中的失败与费用结算状态正式接入时必须分别映射真实证据。未知费用不能仅凭失败状态归零。</p>
+<p>统计读取复用网关数据入口，避免每个分组自行轮询；切换条件取消过时请求，隐藏时暂停，错误退避，筛选切换保留用户输入。额度的准入与拦截仍由 Go 网关负责。</p>
+<h4 id="design-readme--原型文件">原型文件</h4>
+<ul>
+<li><code>prototype.html</code>：内联脚本、样式和数据的独立原型；无需网络依赖，可直接用浏览器打开。</li>
+<li><code>assets/prototype.tsx</code>：示例数据与交互，直接复用项目 <code>useLayout()</code>、图标集及 <code>BackButton</code>。</li>
+<li><code>assets/prototype.css</code>：布局样式，颜色、字号、间距与圆角均引用现有令牌。</li>
+<li><code>assets/build.mjs</code>：打包入口，从 <code>index.css</code> / <code>theme.tsx</code> 读取基础与深浅色令牌；编译时仅替换偏好持久化适配，确保原型不会写入真实配置。</li>
+</ul>
+<p>原型文案遵循静态 HTML 的最小语言表规则，含中英文并按浏览器语言选择；<code>I18nProvider</code> 和返回按钮复用项目实现，偏好写入在打包时替换为空操作，语言只存本地。正式产品新增文案须迁入 <code>frontend/src/i18n/locales/</code>。</p>
+<p>在仓库已有前端依赖时重建：</p>
+<pre><code class="language-bash">node docs/design/20261114-model-orchestration/history/20261112-model-usage-details/assets/build.mjs
+</code></pre>
+<p>如复用另一个 checkout 的已安装依赖，可使用 <code>ROAMI_PROTOTYPE_DEPS=/path/to/checkout/frontend</code> 指定位置。本次复用 <code>/home/ai/codes/ttmux/frontend</code> 的现有依赖，没有添加依赖或锁文件。</p>
+<p>概况 / 审计、源定价、聚合与监控已接入正式产品；补充页面的历史设计保留在同一静态原型中。</p>
+<h3 id="design-readme--六个页面的完整设计">六个页面的完整设计</h3>
+<p>用户在确认概况 / 审计后，要求把大模型下每一页一起设计。静态原型补齐了以下页面。下表记录当时的设计；当前实际接入范围与模块见 <a href="#design-product-integration">正式接入</a>，现有产品操作继续保留。</p>
+<table>
+<thead>
+<tr>
+<th>页面</th>
+<th>产品设计与用户故事</th>
+<th>交互与模块</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型与连接</td>
+<td>我可以搜索连接、查看它提供的模型，添加或配置连接，并选择可用模型与调用策略</td>
+<td>自适应连接卡片、凭证保存状态、连接编辑器、模型选择、手动模型添加、固定 / 故障切换。桌面编辑器只在打开时占用右侧宽度，手机用全屏编辑页</td>
+</tr>
+<tr>
+<td>概况</td>
+<td>我可以同时掌握今日额度、限额和周期汇总，按源 / 智能体 / 模型比较消耗</td>
+<td>今日额度不随统计筛选变化，限额内联编辑；趋势和分组下钻进入同级审计</td>
+</tr>
+<tr>
+<td>审计</td>
+<td>我可以从聚合进入逐条调用，按状态 / 关键词筛选，再核对回执与价格</td>
+<td>请求列表、分页、未知值、历史归档提示；桌面详情面板 / 手机全屏详情</td>
+</tr>
+<tr>
+<td>价格与记账</td>
+<td>我可以配置默认单价，并为个别模型指定独立单价或恢复默认</td>
+<td>币种、每百万 Token 的普通输入 / 缓存 / 输出单价、模型覆盖价行内编辑；保存和未保存状态明确，历史账单保留快照</td>
+</tr>
+<tr>
+<td>网关接入</td>
+<td>我可以找到客户端接入地址，管理访问密钥并查看智能体接入关系</td>
+<td>地址复制、命名密钥创建、启用 / 停用、仅展示尾号、智能体接入列表；原型不会创建真实凭证</td>
+</tr>
+<tr>
+<td>语音模型</td>
+<td>我可以配置独立的语音识别服务，选择语言并理解识别结果</td>
+<td>关闭 / OpenAI 兼容 / 火山引擎选项，服务地址与模型、凭证保留、语言、保存状态；识别演示明确标注为示例，不发起真实识别</td>
+</tr>
+</tbody>
+</table>
+<p><code>assets/model-management.tsx</code> 承载四个补充页面的静态交互，复用原型令牌、图标、布局入口与语言状态。组件保持挂载，使切换概况、审计或其他管理页后仍保留草稿；只有当前页面拥有滚动容器。源凭证不会显示已保存明文，新填凭证仅在当前原型内临时存在；示例网关域名使用保留域 <code>.example</code>。</p>
+<p>最新增补：聚合默认 smart，提供九种路由策略与模型权重；新增监控页按模型源对比，数据最多保留 24 小时，并设置条数和容量上限。这些增补已接入产品，接口规范继续暂缓。历史原型说明见 <a href="#design-routing-monitoring">路由策略与监控</a>，当前实现见 <a href="#design-product-integration">正式接入</a>。</p>
+<h3 id="design-readme--用量与定价交互重做">用量与定价交互重做</h3>
+<p>针对上线反馈，新增 <a href="interaction-review.html">可点击交互稿</a> 与 <a href="#design-interaction-review">设计说明</a>。默认展示模型请求量、按小时分析，并明确源默认价、模型覆盖、生效来源和各自的保存边界。此稿先供交互评审，正式产品实现保持当前版本。</p>
+<p>最新交互修订：概况仅显示汇总、趋势和分布，明细集中在审计；模型源以卡片展示，点击卡片内「定价」进入该源设置，返回卡片列表。</p>
+<p>最新定价导航：定价全部归入模型源，侧栏无独立定价项；全局默认价从模型源页进入，各源和模型定价从卡片内进入。当前审阅以 <a href="interaction-review.html">新版交互原型</a> 为准。</p>
+<p><a href="#design-interaction-implementation">新版概况与模型源定价实现及验收</a>：按确认稿接入小时分组分析、概况 / 审计分工、卡片定价、嵌套默认价和独立保存。</p>
+<p>插件源可从卡片「添加账号」创建独立实例；同包 10 个账号的并发、重启与登录隔离已验收。源详情顺序为连接、定价、调度，见 <a href="#design-interaction-implementation--%E6%8F%92%E4%BB%B6%E5%A4%9A%E8%B4%A6%E5%8F%B7%E4%B8%8E%E8%AF%A6%E6%83%85%E9%A1%BA%E5%BA%8F">接入与多账号验收</a>。</p>
+<ul>
+<li>
+<p><a href="#design-local-time">用量本地时间修正</a>：设备时区、跨日筛选与结算边界。</p>
+</li>
+<li>
+<p><a href="aggregation-review.html">聚合策略与运行效果原型</a> · <a href="#design-aggregation-effects">设计说明</a>。</p>
+</li>
+<li>
+<p><a href="#design-source-cards">模型源卡片简化</a>：同尺寸卡片、顶部新建与详情内编辑。</p>
+</li>
+</ul>
+<p>聚合 ID 编辑、按源批量选择与网关能力目录见 <a href="#design-aggregation-editor">实现设计</a>。</p>
+</article>
+<article class="record" id="design-acceptance">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/acceptance.md</code></p>
+<h2 id="design-acceptance--概况与审计原型验收--第二版">概况与审计原型验收 · 第二版</h2>
+<p>验收日期：2026-11-12。状态：待用户确认，未开始产品前后端实现。</p>
+<h3 id="design-acceptance--信息结构">信息结构</h3>
+<ul>
+<li>「概况」和「审计」是大模型下两个同级 Tab，默认打开概况。</li>
+<li>概况统一展示用量、每日限额、汇总、趋势和分组统计；今日额度不受统计筛选影响。</li>
+<li>审计直接呈现逐条请求，不显示概况的额度、汇总和趋势模块，也没有内部「概览 / 请求」Tab。</li>
+<li>点击概况分组或趋势进入审计，保留对应筛选条件；调用详情返回审计。</li>
+</ul>
+<h3 id="design-acceptance--浏览器与真机验证">浏览器与真机验证</h3>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>独立静态 HTML</td>
+<td>打包通过，约 959 KiB；样式、脚本、图标与示例数据内联</td>
+</tr>
+<tr>
+<td>桌面布局</td>
+<td>1280 / 1920 / 2560 / 3440 CSS px，导航展开 / 收起均通过，无文档级溢出</td>
+</tr>
+<tr>
+<td>审计详情面板</td>
+<td>四档宽度均检查开启后的边界，面板与主内容不重叠；关闭释放宽度</td>
+</tr>
+<tr>
+<td>限额调整</td>
+<td>概况内可编辑示例每日金额、保存并切换 Tab；返回后保留修改，仅作用于原型页面</td>
+</tr>
+<tr>
+<td>分组与下钻</td>
+<td>切换智能体 / 模型源分组、进入审计、继承源筛选、打开单次请求并返回均通过</td>
+</tr>
+<tr>
+<td>审计筛选</td>
+<td>状态筛选、请求搜索、空结果无分页、旧记录归档提示均通过</td>
+</tr>
+<tr>
+<td>主题与语言</td>
+<td>概况 / 审计可切换中文 / 英文、浅色 / 深色</td>
+</tr>
+<tr>
+<td>真实后端隔离</td>
+<td>交互期间没有真实 <code>/api/</code> 请求；无浏览器运行错误</td>
+</tr>
+<tr>
+<td>仓库检查</td>
+<td><code>git diff --check</code> 和打包脚本 <code>node --check</code> 通过</td>
+</tr>
+</tbody>
+</table>
+<p>Android 设备为 Redmi Note 8（<code>216d6a43</code>），通过 LAN HTTPS 打开静态文件。实际为 compact / coarse，文档宽度与滚动宽度均为 392 CSS px，筛选控件命中高度均为 44 CSS px。用真实触摸事件切换两个同级 Tab、展开 / 收起筛选、滚动、进入全屏详情并返回；详情只有一个可见标题栏。列表滚动至约 419.64 CSS px，返回后恢复原位置；英文无横向溢出。</p>
+<p>结构化结果：<a href="#evidence-evidence-acceptance">evidence/acceptance.json</a>。<a href="#design-revisions-acceptance-v1">第一版验收</a>仅保留历史，不代表当前导航。</p>
+<h3 id="design-acceptance--预览与截图">预览与截图</h3>
+<ul>
+<li>静态文件：<a href="prototype.html">prototype.html</a>。</li>
+<li>临时预览：<code>https://192.168.130.19:19312/prototype.html</code>，通过隔离启动器提供本设计目录，未启动产品后端。</li>
+<li>桌面截图：<code>/tmp/roami-usage-v2-overview.png</code>、<code>/tmp/roami-usage-v2-audit.png</code>、<code>/tmp/roami-usage-v2-audit-detail.png</code>、<code>/tmp/roami-usage-v2-audit-dark-en.png</code>。</li>
+<li>真机截图：<code>/tmp/roami-usage-v2-phone-overview.png</code>、<code>/tmp/roami-usage-v2-phone-audit.png</code>、<code>/tmp/roami-usage-v2-phone-detail.png</code>、<code>/tmp/roami-usage-v2-phone-dark-en.png</code>。</li>
+</ul>
+<p>截图保留在临时目录，不提交主分支。本次仍仅修改设计目录；没有修改业务前端、Go 或 Python 代码，未运行业务前端完整测试 / 产品构建或提交 / PR 门禁，原型已单独打包并完成上述交互验收。</p>
+<h3 id="design-acceptance--后续六页设计与正式接入">后续：六页设计与正式接入</h3>
+<p>用户已确认第二版并要求实现概况 / 审计，同时追加大模型内每个页面的设计。当前 HTML 已扩展为六页完整交互原型，详见 <a href="#design-readme--%E5%85%AD%E4%B8%AA%E9%A1%B5%E9%9D%A2%E7%9A%84%E5%AE%8C%E6%95%B4%E8%AE%BE%E8%AE%A1">六页设计</a>；正式产品接入与最新验收见 <a href="#design-implementation">实现记录</a>。上面的第二版截图与数据只作为历史验收保留。</p>
+</article>
+<article class="record" id="design-aggregation-editor">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/aggregation-editor.md</code></p>
+<h2 id="design-aggregation-editor--聚合编辑与网关模型目录">聚合编辑与网关模型目录</h2>
+<h3 id="design-aggregation-editor--product-design">Product Design</h3>
+<ul>
+<li>聚合的名称与对外模型 ID 均可编辑。改名保留旧 ID 的兼容入口，新的模型目录仅公布新 ID；已保存的嵌套引用统一为新 ID。</li>
+<li>添加成员先选源，再多选模型，可全选该源、按源公布的免费输入/输出价格筛选。已添加成员不重复选择。一次添加完整选择，不静默截断。</li>
+<li>聚合支持最多 64 个成员；展开嵌套后仍最多 64 个模型，路由展开仍最多 256 个账号/Key，嵌套深度与并发额度查询限制保持不变。普通故障转移仍最多 8 个候选。</li>
+<li>桌面编辑器旁显示草稿的调度预览；手机在编辑页中显示。顺序、用完再换、轮流与权重展示新调度周期的前 12 轮示意，支持模拟跳过一个不可用成员。智能、额度、到期、速度、价格展示判断顺序，不伪造实时指标或排名。保存后的渠道列表仍来自真实路由状态。</li>
+<li>网关页增加模型目录：按源、能力、名称/ID 搜索；区分已添加的网关模型和源中尚未添加的模型。展示上下文、最大输出、输入/输出类型、工具调用、推理和输入/输出美元标价。没有公布的数据显示“未提供”，不从模型名字推断能力。</li>
+<li>目录标价是源公布的美元每百万 token 输入/输出价格，实际路由与计费仍遵守用户在源内的定价规则。</li>
+</ul>
+<h3 id="design-aggregation-editor--user-stories">User Stories</h3>
+<ol>
+<li>我可以把 hy4 改成 free，旧的调用配置继续有效，父聚合不会失去这个成员。</li>
+<li>我可以先选 OpenRouter，再筛选免费模型并全选，一次加入聚合；超过限制时先调整选择。</li>
+<li>我可以对比权重 3:1 与轮流分配的示意，并查看一个成员不可用时的分配变化。</li>
+<li>我可以在网关页查看每个源的完整模型列表，筛选支持图片或工具的模型，并分辨能力未知和明确支持。</li>
+</ol>
+<h3 id="design-aggregation-editor--technical-design">Technical Design</h3>
+<ul>
+<li><code>agentproviders.ReadSourceModelDetails</code> 复用既有源鉴权、禁止重定向、超时、Anthropic 分页、去重与 ID 过滤；只投影经过约束的能力字段。新详情读取上限 8 MiB，原有仅 ID 调用保留 1 MiB 限制；模型数仍有 1000 的边界。</li>
+<li><code>catalog/discover</code> 与 <code>catalog/source-models</code> 保持旧 <code>models: string[]</code> 响应兼容，附带 <code>details</code>。插件能力使用其已校验的模型数据。读取目录不保存配置、不发模型推理请求。</li>
+<li>聚合保留至多 32 个历史 ID。别名只能来自同一个已有聚合，禁止与其他模型/别名/默认入口碰撞，禁止凭空注入别名或吞并其他模型。网关请求、原生绑定和默认模型识别均支持兼容 ID；绑定使用记录归并到现 ID，删除保护覆盖历史 ID。</li>
+<li><code>source-model-directory.ts</code> 的组件内结果按源与配置 revision 区分，离开时取消请求，不轮询、不写数据库。<code>GatewayModelDirectory</code> 每源每页 30 个模型，避免手机一次渲染所有条目。</li>
+<li><code>routing-preview.ts</code> 只执行草稿示意的平滑权重/轮流计算，不调用运行中的调度器、不改变游标。动态策略使用优先级步骤和成员图，不把示意称为真实分配结果。</li>
+<li>不新增监控采集、持久化或保留期；原有 24 小时滚动监控限制保持原样。</li>
+</ul>
+<h3 id="design-aggregation-editor--acceptance">Acceptance</h3>
+<p>验收数据见 <a href="#evidence-aggregation-editor-evidence">evidence</a>。</p>
+<ul>
+<li>桌面 1280、1920、2560、3440 CSS px，各验证编辑器打开与关闭；检查内部面板边界和文档无滚动溢出。</li>
+<li>Redmi Note 8 真机 392 CSS px、粗指针：单层返回栏可命中，ID 可编辑；真实触摸完成先选源、全选、添加、暂不可用模拟、滚动、返回和网关图片能力筛选。</li>
+<li>以公开 OpenRouter 目录快照（471 模型、17 个输入/输出免费模型）在隔离实例验收读取与展示，核对 1,048,576 上下文与 262,144 最大输出。源内全选超过 64 明确阻止添加，免费筛选的 17 个模型全部加入且无重复。</li>
+<li>改名后旧 ID、新 ID、父聚合调用与持久化重开由后端回归覆盖；历史绑定仍阻止删除。能力未知、异常价格、字段边界与单位转换有回归覆盖。</li>
+<li>前端 252 文件、1,810 测试通过；最后的首次创建聚合预览与绑定回归 28 项通过。typecheck、i18n、hover、production build 和 quick 质量门禁通过（含全部 Go 测试）。</li>
+<li>首次总检查命中已有会话取消测试的时序失败，单项及完整 quick 重跑均通过；没有修改该测试或会话取消逻辑。</li>
+<li>截图保留在私有 <code>/tmp/roami-aggregation-editor-20261114/</code>，没有把一次性图片放入主分支。尚未创建 PR 或部署。</li>
+</ul>
+<h3 id="design-aggregation-editor--成员排序交互">成员排序交互</h3>
+<h4 id="design-aggregation-editor--product-design-1">Product Design</h4>
+<p>路由策略决定实际优先级；配置顺序决定固定顺序策略的先后、轮流的轮转顺序，以及自动策略条件相同时的顺序。预览列表展示当前策略与对应的顺序说明。编辑状态直接在预览成员行里提供拖动手柄、上下移和权重；不再在两处重复列出编辑器。</p>
+<p>“整理顺序”支持按模型源分组（源内相对顺序不变）、按模型名称排序，操作直接调整待保存的候选顺序；它们是一次整理动作，不是持续覆盖手动顺序的路由策略。手动拖动后保留该顺序，点击保存后提交。</p>
+<h4 id="design-aggregation-editor--user-stories-1">User Stories</h4>
+<ul>
+<li>我可以直接拖动预览中的模型，把希望优先调用的放前面，马上看到前 12 轮分配更新。</li>
+<li>我可以先按模型源分组，再手动调整同源成员；权重始终跟着原来的成员。</li>
+<li>在手机上可以抓住手柄拖动；列表其他位置正常滚动，也可点上下移。键盘用户聚焦手柄后用上下键，Home/End 移到首尾，Escape 取消拖动。</li>
+<li>智能、速度、价格等自动策略解释手动顺序只在条件相同或相近时生效，不把手动顺序误当作实时排名。</li>
+</ul>
+<h4 id="design-aggregation-editor--technical-design-1">Technical Design</h4>
+<p><code>AggregationMemberOrder</code> 统一成员顺序、快捷整理和权重编辑。<code>useAggregationMemberDrag</code> 使用 Pointer Events 与指针捕获同时处理鼠标/触屏，仅手柄禁用原生触摸滚动；超过移动阈值后显示原行和插入位置，松开才修改草稿。拖到滚动区域边缘时使用 requestAnimationFrame 滚动所在面板，不滚动文档；取消、离开落点、丢失捕获、保存、切换编辑器或卸载时不提交意外排序并清理动画。</p>
+<p>候选以 source/model 身份移动，不按数组位置搬动权重。保存使用原有 candidates 数组；不增加数据库字段、后台排序任务或轮询。不同协议的源可以重新排列而不重定义聚合入口协议，调用时原有协议过滤继续执行。</p>
+<h4 id="design-aggregation-editor--acceptance-1">Acceptance</h4>
+<p>单元回归覆盖键盘首尾/上下移动、鼠标拖动在松开前不修改、取消及越界落点不修改、保存顺序与预览更新、权重随成员保留、源内稳定分组、保存时禁用，以及不同协议候选重新排序后的入口协议保持。</p>
+<p>排序交互验收见 <a href="#evidence-aggregation-order-evidence">evidence</a>：桌面四种宽度与面板开关均无溢出，鼠标从首项拖到第三项、Escape 取消、源内稳定分组、键盘首尾移动、权重保持与保存回读通过。Redmi Note 8 真机验证 17 个成员的触摸拖动、取消、边缘持续滚动、源分组、上下移、正常滑动不排序、保存回读及页面无溢出。</p>
+<p>完整前端 253 文件、1,815 测试通过，新增排序与保存回归共 9 项；typecheck、i18n、hover、生产构建、Go 网关回归及完整 quick 门禁通过。验收中另修正服务端省略 false 时“仅用免费来源”被误显示为选中的问题，新增回归断言后 5 项聚合工作区测试通过；新建聚合仍默认仅用免费来源。</p>
+<p>截图保留在私有 <code>/tmp/roami-aggregation-editor-20261114/order-*.png</code>，未创建 PR、未部署。</p>
+<h3 id="design-aggregation-editor--卡片内容归属修正">卡片内容归属修正</h3>
+<h4 id="design-aggregation-editor--product-design-2">Product Design</h4>
+<p>聚合卡片是其运行状态、策略预览和成员的共同容器，不在卡片列表下方展示公共详情。列表初始仅显示身份、状态、策略和成员数；点击卡片中的“查看调度”展开该卡片，内部用“运行状态 / 调度预览”切换，默认显示真实渠道。切换聚合时收起原卡片，不重复聚合名称，也不同时堆叠示意成员与真实渠道。</p>
+<p>编辑时，桌面上的草稿预览及成员排序直接留在原卡片中，卡片标记“未保存”；新建聚合有独立草稿卡。右侧配置表单保持当前聚合身份，其他聚合的配置入口在保存/取消前禁用，避免丢失草稿。手机使用原有全屏配置页，预览随该聚合表单显示。</p>
+<p>宽屏预览在卡片内部把调度步骤/模拟与成员分配并排，窄屏顺排，不增加包围卡片或外部公共面板。</p>
+<h4 id="design-aggregation-editor--user-stories-2">User Stories</h4>
+<ul>
+<li>我展开哪个聚合，就在它的卡片里看到它的渠道；不会把下方公共区域误认为另一张卡片。</li>
+<li>我可以切到该卡的策略预览，按需查看模拟，不让示意内容和真实状态混在一起。</li>
+<li>编辑名称、ID 或成员时，原卡片立即展示草稿；新建聚合的预览也有自己的卡片。</li>
+</ul>
+<h4 id="design-aggregation-editor--technical-design-2">Technical Design</h4>
+<p><code>AggregationPoolCard</code> 负责单个聚合的标题、展开状态、操作以及卡内标签。真实状态在卡片展开且“运行状态”激活时挂载 <code>LiveChannels</code>，复用 <code>useRoutingStatus</code>；收起、切到预览或离开页面时停止查询。未保存的草稿不查询运行状态。</p>
+<p><code>ModelAggregationWorkspace</code> 只负责列表与表单协调，将原来列表外的公共状态、策略和草稿预览移除。<code>RoutingStrategyPreview</code> 使用内部网格组织模拟和成员区，在卡内标签中省去重复标题。保存接口、路由策略与监控存储均不改变。</p>
+<p>卡片归属验收见 <a href="#evidence-aggregation-card-evidence">evidence</a>。三个聚合的展开/收起、卡内运行状态与预览切换、编辑草稿和新建草稿归属、鼠标及 Redmi Note 8 真实触摸排序、手机返回与滚动均通过；桌面 1280/1920/2560/3440 CSS px 的折叠、展开、编辑状态均无文档或卡片溢出。浅色英文也通过。展开项置前、卡片最多三列，避免全宽展开时产生顶部空行或把其他卡片标题挤碎。</p>
+<p>前端 253 文件、1,817 测试、typecheck/i18n/hover、生产构建和 full 门禁通过；此次只改前端与设计文档，不运行无关的 Go/Python 检查。PR 图片保留在私有 <code>/tmp/roami-aggregation-card-20261114/</code> 并按仓库规范上传 pr-shots，不写入主分支。</p>
+<h3 id="design-aggregation-editor--配置流程与模型源统一当前方案替代前版并排编辑">配置流程与模型源统一（当前方案，替代前版并排编辑）</h3>
+<h4 id="design-aggregation-editor--product-design-3">Product Design</h4>
+<p>聚合列表复用模型源的 <code>tt-model-connections</code> 网格和 <code>tt-model-connection</code> 卡片：图标、名称、ID、策略、状态、成员摘要，整张卡片进入配置。卡片不展开长表单、不放配置/启停/删除按钮组。启停和删除位于聚合详情内。</p>
+<p>点击卡片后与模型源一致，在保留大模型导航的完整详情页配置；手机使用一层全屏二级页。成员、调度、运行状态各有独立标签。先选源，直接在可搜索、可全选的模型目录里勾选，取消勾选立即从草稿移除；不再使用模型多选下拉后点击添加。选中项跨源、筛选和标签保留；目录每页最多 30 项，超过 64 成员的全选明确禁用并提示缩小范围，不截断选择。</p>
+<p>调度标签集中策略、说明、效果预览、成员拖动和权重，次要调用条件与故障切换折叠。运行状态仅展示该聚合已保存的真实渠道，不根据草稿 ID 查询。底部固定选择计数与取消/保存，只有内容区滚动。返回列表保留每个聚合各自的草稿，可以编辑其他聚合再回来继续；取消只清除当前草稿。</p>
+<h4 id="design-aggregation-editor--user-stories-3">User Stories</h4>
+<ul>
+<li>我可以像配置模型源一样，点击聚合卡片进入自己的详情，不用在左右两边寻找成员和保存按钮。</li>
+<li>我可以在某个源中搜索、批量勾选模型，再选另一个源，不重复点击添加。</li>
+<li>我可以在调度标签修改顺序或权重、立即查看示意，再回成员标签继续选择。</li>
+<li>我可以返回列表再进入，或者暂时编辑另一个聚合，原草稿仍在；保存失败也不丢输入。</li>
+<li>我可以在运行状态标签确认已保存配置的真实渠道，未保存的 ID 不触发错误状态请求。</li>
+</ul>
+<h4 id="design-aggregation-editor--technical-design-3">Technical Design</h4>
+<p><code>ModelAggregationWorkspace</code> 管理按原始 ID 区分的草稿及保存协调。<code>AggregationPoolCard</code> 复用模型源的现有卡片结构和样式，仅承载摘要与一个打开入口。<code>AggregationEditor</code> 统一桌面/手机的详情标签、一个滚动区与固定保存栏。<code>AggregationMemberPicker</code> 复用源目录读取、模型目录勾选模式与 64 成员校验，并保留原有协议、身份和权重语义。<code>AggregationRuntime</code> 由运行状态标签按需挂载，离开即停止既有状态轮询。没有新增后台轮询、接口、存储或监控记录。</p>
+<h4 id="design-aggregation-editor--acceptance-2">Acceptance</h4>
+<p>验收结果记录在 <a href="#evidence-aggregation-config-evidence">evidence</a>。PR 图片走 pr-shots 分支，私有原始截图保留在 <code>/tmp/roami-aggregation-config-20261114/</code>。</p>
+</article>
+<article class="record" id="design-aggregation-effects">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/aggregation-effects.md</code></p>
+<h2 id="design-aggregation-effects--聚合策略与运行效果原型">聚合策略与运行效果原型</h2>
+<h3 id="design-aggregation-effects--产品设计">产品设计</h3>
+<p>聚合列表使用可选卡片，显示名称、调用 ID、启停状态、策略、成员数与核心效果。选中聚合后使用完整工作区，保留同级导航。默认标签为“运行效果”，另有“调度策略”和“成员”。</p>
+<ul>
+<li>运行效果：近 1 小时、6 小时、24 小时的请求数、成功率、首字耗时、输出速度、费用和质量通过率。趋势可按源、模型分组，切换请求、输出 Token、首字耗时或成功率。次数 / Token 为堆叠量，耗时 / 成功率为各成员独立指标，不能相加。</li>
+<li>调用分布：来源的占比与实际调用数量，提示失败接管会使实际分布偏离配置权重。</li>
+<li>最近调度：实际渠道、选择原因和备用接管；打开详情查看条件过滤、候选排序、限流休息与回答成功的路径。请求详情保持源、模型、时间、用量与费用一致。</li>
+<li>调度策略：保留 smart、order、drain、rotate、usage、pace、weight、fast、cheap 九种已确认策略。卡片说明目标，选中后展示详细规则。先选源再选模型；只有权重策略突出权重，顺序相关策略提供排序操作。</li>
+<li>调度试算：独立于运行效果，展示当前示例状态下的预计选择、原因和接下来 10 轮的成员分配；可模拟首选限流与恢复。不会发起模型调用，未保存的策略不能被当成线上生效策略。</li>
+<li>成员：分开显示可用、休息、额度耗尽和价格未确认。WorkBuddy 示例保留 10 个独立账号，可打开账号列表比较额度及重置 / 到期时间。嵌套聚合按一个组成员展示，组内使用自己的账号策略。</li>
+</ul>
+<p>免费聚合只允许已确认的免费模型，订阅额度需明确勾选；未知价格不当作免费，未知余额不当作无限额度。少量或无质量样本显示未知。所有页面和试算时间由浏览器自动获取本地时区，不写死北京时间。</p>
+<h3 id="design-aggregation-effects--用户故事">用户故事</h3>
+<ol>
+<li>看这个聚合是否有效：多少请求、是否更稳定、哪个源承担了流量，是否全部免费。</li>
+<li>知道一次调用为什么去了这个源：查看真实选择理由与失败后的备用接管。</li>
+<li>修改策略前能比较：切换九种策略、编辑权重或顺序、模拟限流，看到选择变化再保存。</li>
+<li>多账号可以解释：查看同一 WorkBuddy 源的 10 个独立账号，而非把一个源误认为一个账号。</li>
+<li>手机上完成同样的动作：切换标签、选择策略、试算、打开全屏账号 / 请求详情，使用一层返回栏。</li>
+</ol>
+<h3 id="design-aggregation-effects--技术设计">技术设计</h3>
+<p>原型为独立 HTML，使用项目令牌与 <code>frontend/src/icons.tsx</code> 导出的 SVG，内置中英文文案和深浅主题。不访问业务 API、不调用真实模型、不保存线上配置。代码之外的演示数字仅用于设计评审，页面持续标记“演示数据”。</p>
+<p>正式实现复用 <code>ModelAggregationWorkspace</code>、<code>RoutingStatus</code>、<code>useRoutingStatus</code> 及现有网关监控 / 审计。聚合 ID、策略版本和实际路由结果必须可关联；现有状态接口尚不提供完整的效果指标和决策轨迹，不能在前端把预测当作真实执行。缺失观测须按真实记录补充，未知和失败需如实展示。本轮不定义接口规范，不修改正式前后端。</p>
+<p>运行效果沿用监控的 24 小时滚动保留与容量上限，详情按既有审计保留策略读取，不引入无限历史或额外永久轮询。新版正式页面遵守当前 <code>ViewBoundary</code> / workspace store 的导航状态和资源生命周期规则，编辑草稿与运行资源分开管理。</p>
+<h3 id="design-aggregation-effects--验收">验收</h3>
+<ul>
+<li>桌面 1280、1920、2560、3440 CSS px 的三个标签均无文档溢出。</li>
+<li>九种策略选择、权重编辑、首选限流 / 恢复、先源后模型、添加成员、保存演示配置、十账号详情、空状态和英文深色均通过。</li>
+<li>Redmi Note 8 真机检查：真实触控标签切换、权重选择、限流试算、账号列表、调度详情、全屏二级页单返回栏、中英文和深浅主题。</li>
+<li>浏览器记录的业务 API 请求数为零。</li>
+<li>截图保留于 <code>/tmp/roami-aggregation-design-20261114/</code>，不提交到 main。</li>
+</ul>
+<p>尺寸与交互断言见 <a href="#evidence-aggregation-effects-evidence">aggregation-effects-evidence.json</a>。</p>
+</article>
+<article class="record" id="design-free-aggregation">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/free-aggregation.md</code></p>
+<h2 id="design-free-aggregation--模型源定价与免费聚合--原型增补">模型源定价与免费聚合 · 原型增补</h2>
+<p>本文件记录原型评审阶段。后续正式实现见 <a href="#design-product-integration">产品接入</a>。</p>
+<p>本轮只增补静态原型。用户要求暂停接口规范整理，未新增或迁移真实接口，也未改变已实现的概况 / 审计代码或当前真实计价、路由行为。</p>
+<h3 id="design-free-aggregation--产品设计">产品设计</h3>
+<p>在大模型下新增同级「聚合」页，提供多个对外模型入口，例如 <code>free-default</code> 和 <code>free-code</code>。每个聚合独立配置候选列表与策略，智能体选入口，调度选择实际模型源。</p>
+<p>添加候选先选模型源，再从该源下选择模型，点击「添加候选」。未选源时模型选择不可用；切换源会清空待添加的模型，已经添加的候选保留，可跨源排序和移除。已添加及不符合免费条件的模型不能重复加入，选项直接标明原因。</p>
+<p>定价放入模型源编辑器：源默认策略支持继承全局、按 Token、明确免费、套餐额度和未知；源内模型可覆盖默认策略。全局定价页保留兜底策略、币种与各源策略概览，并可直接进入对应源配置。普通输入、缓存读取、输出分别定价；额度与货币不是同一单位。源定价的单位跟随已保存的记账币种，未保存的全局编辑不覆盖源草稿。</p>
+<p>免费 API 是默认候选范围；套餐额度通过每个聚合里的开关单独纳入，不与无限免费混为一类。原型中的 <code>Free API A / B</code> 和 <code>demo-free-*</code> 是显式示例，不表示任何真实供应商当前免费。</p>
+<p>填写三项 0 元不会自动成为免费候选。源必须有明确的免费策略和条件确认；模型覆盖为付费或未知时，覆盖结果优先。套餐额度只有已知且足够时可用，未知不计为 0，不切换到付费扣费模式。</p>
+<p>最新修订：路由策略已扩展为默认 smart 等九种，详见 <a href="#design-routing-monitoring">路由策略与监控</a>。下表的优先级 / 轮询对应当前 order / rotate。</p>
+<h3 id="design-free-aggregation--每个聚合可配置的策略">每个聚合可配置的策略</h3>
+<table>
+<thead>
+<tr>
+<th>设置</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>优先级 / 轮询</td>
+<td>按候选顺序选首个可用模型，或在可用候选之间轮询</td>
+</tr>
+<tr>
+<td>候选顺序</td>
+<td>独立选择模型并上移 / 下移，最多 8 个，与现有候选规模契约一致</td>
+</tr>
+<tr>
+<td>限流冷却</td>
+<td>可选 30 / 60 / 120 / 300 秒；冷却期间跳过该源，到期后重新参与</td>
+</tr>
+<tr>
+<td>限流时切换</td>
+<td>开启则尝试下一候选，关闭则按当前策略停止</td>
+</tr>
+<tr>
+<td>额度耗尽时切换</td>
+<td>开启则尝试下一候选，关闭则停止；从不回退付费模型</td>
+</tr>
+<tr>
+<td>套餐额度</td>
+<td>每个聚合独立选择是否纳入，余额按来源自身单位记录</td>
+</tr>
+<tr>
+<td>能力要求</td>
+<td>是否需要工具调用、最低上下文长度；不满足要求的候选跳过</td>
+</tr>
+<tr>
+<td>启用 / 停用</td>
+<td>停用后不会调度；没有可用免费候选时停止并展示原因</td>
+</tr>
+</tbody>
+</table>
+<p>开始输出后中断始终停止切换，不把已经开始执行的请求自动重放到另一模型。这个行为不作为可随意关闭的重试选项。</p>
+<h3 id="design-free-aggregation--用户故事与交互">用户故事与交互</h3>
+<ol>
+<li>我创建一个免费通用入口，先选择源，再选择该源模型并添加；从另一个源再添加候选，设优先级；第一个限流时，另一个接手。</li>
+<li>我创建编码入口，要求工具调用和足够上下文，设轮询；不符合能力的模型不会被选中。</li>
+<li>我只想用免费 API，保持套餐开关关闭；需要利用 WorkBuddy 等套餐时，显式纳入并按积分记录。</li>
+<li>我希望限流后直接停下，在该聚合内关闭切换；其他聚合的策略不受影响。</li>
+<li>我把源策略改为按量计价，或把某个模型改为未知价，它立即退出免费池的可用候选；不会因为价格字段是 0 而误入。</li>
+<li>我切到概况或模型源配置后回来，聚合草稿、候选和策略仍保留。</li>
+</ol>
+<p>「调度演示」可模拟正常调用、首选限流、额度耗尽和开始输出后中断。可推进示例时间或恢复示例状态，所有结果都来自本页示例数据，不访问真实模型。</p>
+<h3 id="design-free-aggregation--技术设计与接入边界">技术设计与接入边界</h3>
+<ul>
+<li><code>assets/source-pricing.tsx</code>：源策略、模型覆盖、免费确认及原型内价格解析；源编辑保存仅提交当前源的变更，保留其他源和全局设置。</li>
+<li><code>assets/model-aggregation.tsx</code>：聚合配置、资格判断、优先级 / 轮询、源级冷却、套餐余额和演示执行记录。草稿与运行状态分开，未保存策略不会改变演示中的已保存聚合。</li>
+<li><code>assets/model-management.tsx</code>：模型源、全局定价和聚合之间的交互联动。</li>
+<li><code>assets/prototype.tsx</code>：加入同级聚合入口，其余导航结构不变。</li>
+</ul>
+<p>真实接入仍应在 Go 网关完成资格判断、调度、状态并发保护和审计；Python 不增加 Token、请求数或支出准入上限。HTTP 限流的真实冷却不能早于上游明确的重试时间。候选能力、免费条件和套餐快照要有来源与有效期，未知或失效时不可自动认定可用。</p>
+<p>已核对当前代码：<code>PricingConfig.LookupExit</code> 优先对外模型价，随后源 / 原生模型价、模型通用价、全局默认；尚无源默认策略。Magpie host 会输出 <code>free</code> / <code>rate</code> 等信息，但 <code>modelplugins.Model</code> 尚未完整保留这些字段，Go 侧也未统一接入套餐额度。现有 <code>failover</code> 只对明确未发送的拨号失败切换，不能把原型中的限流 / 额度调度当成已上线能力。</p>
+<p>本轮不改动现有出口定价优先级，也不整理 <code>/llm-gateway/...</code> 接口规范。</p>
+<h3 id="design-free-aggregation--验收">验收</h3>
+<p>单文件静态 HTML 构建通过。桌面检查源配置 / 聚合 / 定价页在 1280、1920、2560、3440 CSS px 无文档溢出；验证优先级、轮询、冷却与恢复、候选耗尽不回退付费、开始输出后不重试、套餐独立消耗、0 元不自动免费、模型覆盖、重复 ID 校验、跨页草稿及中英文。</p>
+<p>额外验证每个聚合的冷却时长、限流 / 耗尽时停止或切换、策略互不串用、工具 / 上下文不匹配时不调度。安卓真机检查聚合配置的实际触摸操作、滚动、调度演示和全屏源定价编辑。</p>
+<p>证据存放在 <code>evidence/free-pool-*.json</code>。截图留在本机 <code>/tmp/roami-free-pool*.png</code>、<code>/tmp/roami-free-source-default.png</code>、<code>/tmp/roami-source-pricing.png</code>，不提交主分支。</p>
+<p>源优先选择增补验证记录在 <code>evidence/pool-source-first*.json</code>，覆盖源与模型联动、跨源候选保留、排序移除、资格限制、草稿保留及真实手机触摸操作。</p>
+</article>
+<article class="record" id="design-implementation">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/implementation.md</code></p>
+<h2 id="design-implementation--概况--审计实现与六页设计验收">概况 / 审计实现与六页设计验收</h2>
+<p>日期：2026-11-12。</p>
+<h3 id="design-implementation--已实现">已实现</h3>
+<p>「能力 / 大模型」的原 <code>usage</code> 路由显示概况，保留今日全局用量和每日限额，剩余额度在费用未知时显示待核对，已知时按纳单位精确扣减；同时提供周期汇总、趋势、按模型源 / 智能体 / 模型分组、排序与下钻。新增同级 <code>audit</code> 路由，提供逐条调用、状态与关键词筛选、服务端分页、回执、耗时和请求时价格快照。旧链接继续兼容。</p>
+<p>概况和审计不再嵌套内部 Tab。切换到其他模型管理页时保留筛选，后台停止页面读取；打开调用详情时暂停列表刷新。周期数据每 30 秒按可见性刷新，取消过时请求，隐藏时暂停，错误退避。搜索输入在分页请求期间保持挂载，避免请求完成后丢焦点。</p>
+<p>今日用量读取全部调用，分析筛选不能改变每日额度口径。总 Token 为输入加输出，缓存读取属于输入；费用分币种合并，不换算相加；未知用量和费用保持未知。审计详情复用现有对账流程。</p>
+<h3 id="design-implementation--模块">模块</h3>
+<ul>
+<li><code>ModelHub.tsx</code>：概况 / 审计导航、现有设置控制器和页面状态保留。</li>
+<li><code>ModelUsageWorkspace.tsx</code>、<code>model-usage-workspace-state.ts</code>：数据读取、筛选、概况、分组、审计列表与详情；复用项目图表、金额合并、SVG 图标、返回按钮和手机二级页。</li>
+<li><code>usage-workspace.go</code>：沿用已授权的 <code>/agent/model-gateway/usage</code> 入口，以 <code>view=overview / audit</code> 区分查询，保留原接口行为。</li>
+<li><code>ledger.go</code>、<code>daily_retention.go</code>：schema v6 在日汇总中保留模型源 ID；归档迁移与计费整数约束一致。既有归档源不可恢复，明确进入未归属组。</li>
+</ul>
+<p>新增审计查询支持起止日期、模型源、未归属源、智能体、模型、RSI / other 来源、状态、关键词和页码。关键词按普通文本匹配模型、记录 ID、请求 ID 和上游请求 ID；单页 20 条。返回的单价来自原始请求快照，不使用当前价格重算历史费用。</p>
+<h3 id="design-implementation--自动检查">自动检查</h3>
+<ul>
+<li><code>npm run typecheck</code>、<code>npm run i18n:check</code>、<code>npm run hover:check</code> 通过；中英文语言包同步新增。</li>
+<li>完整 <code>npx vitest run</code>：234 个文件、1708 项测试通过；后续搜索挂载与样式调整后，相关 33 项测试再次通过，包含新增的跨币种额度、纳单位精度及历史日期下钻检查。</li>
+<li><code>npm run build</code> 通过，生产构建并压缩；存在仓库已有的 chunk 大小和 GitPanel 混合导入提示。</li>
+<li><code>go test ./...</code> 通过。新增回归覆盖模型源归档前后不丢归属、旧库迁移、完整计数与分页、普通文本搜索、冻结单价、未知回执和非法筛选。</li>
+<li><code>scripts/dev/quality/check.sh quick</code> 与 <code>git diff --check</code> 通过。新增前端模块没有 emoji 或文字符号图标。</li>
+</ul>
+<p>未修改 Python 代码、依赖或运行资源，未执行 Python 依赖同步 / lint / 测试。</p>
+<h3 id="design-implementation--桌面--真机">桌面 / 真机</h3>
+<p>隔离实例通过 <code>scripts/dev/isolated-roami.sh /tmp/roami-usage-product/home</code> 启动，使用独立配置、数据库与 tmux socket。65 笔确定性调用记录仅写入此测试库，未发起真实模型请求；修改测试每日限额也只作用于此实例。复用已安装的 Python 运行时提供接口转发，未修改其配置或模型路线。</p>
+<p>桌面使用生产构建与真实接口，检查 1280 / 1920 / 2560 / 3440 CSS px，以及详情开启 / 关闭。验证限额保存、按源下钻、分页、关键词搜索、请求单价、未知值，以及筛选后的汇总 33 笔、今日额度仍覆盖全部 65 笔。页面无文档级溢出，详情关闭后释放宽度。</p>
+<p>Redmi Note 8（<code>216d6a43</code>）通过 LAN HTTPS 使用生产页面。实际为 compact / coarse，页面宽度与滚动宽度均为 392 CSS px，筛选控件均达到 44 CSS px。真实触摸进入审计、展开筛选、滚动、打开全屏详情并返回；详情只有一个返回栏。返回后列表位置保持约 428.73 CSS px。</p>
+<p>证据：<a href="#evidence-evidence-implementation-desktop">桌面</a>、<a href="#evidence-evidence-implementation-phone">手机</a>。</p>
+<p>截图未提交主分支：<code>/tmp/roami-product-overview.png</code>、<code>/tmp/roami-product-audit-detail.png</code>、<code>/tmp/roami-product-phone-overview.png</code>、<code>/tmp/roami-product-phone-audit.png</code>、<code>/tmp/roami-product-phone-detail.png</code>。</p>
+<h3 id="design-implementation--六页原型">六页原型</h3>
+<p>用户追加的六页设计已补齐静态 HTML。模型与连接支持搜索、连接编辑、模型选择和策略；价格页支持默认 / 覆盖单价；网关页支持命名密钥及启停；语音页支持服务商、语言、保存状态和明确标注的识别演示。所有交互均为原型内状态，不调用真实服务。</p>
+<p>六页分别检查桌面四档宽度和安卓真机；连接 / 价格草稿跨页保留，手机连接编辑为可触摸的全屏页面。中英文导航及主要交互通过验证。</p>
+<p>证据：<a href="#evidence-evidence-prototype-all-pages">六页桌面</a>、<a href="#evidence-evidence-prototype-phone-pages">六页手机</a>。这些页面的补充布局属于设计产物，现有产品连接、价格、密钥和语音配置流程没有被原型逻辑替换。</p>
+<p>隔离验收服务及其专用 tmux server 已在验收后清理。静态原型预览服务保留，独立 HTML 可直接打开。</p>
+</article>
+<article class="record" id="design-interaction-implementation">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/interaction-implementation.md</code></p>
+<h2 id="design-interaction-implementation--概况分析与模型源定价交互接入">概况分析与模型源定价交互接入</h2>
+<h3 id="design-interaction-implementation--产品设计">产品设计</h3>
+<p>按 <a href="#design-interaction-review">已确认的交互稿</a> 接入正式页面。大模型导航依次为模型源、聚合、概况、监控、审计、本机网关、语音输入，定价全部归入模型源。</p>
+<p>模型源卡片内进入该源定价；详情全宽显示连接、模型与定价、账号调度。默认单价从模型源页进入，源内查看默认价后返回原源并保留草稿。旧定价地址继续进入模型源下的默认价页面。已有模型和对外名称覆盖价保留，通过显式展开查看，真实价格来源由网关返回。</p>
+<p>概况仅展示全局今日额度、周期摘要、分组趋势和分布，不展示明细表。默认按模型、请求量、小时展示；可按源、智能体、总量以及 Token、各币种费用分析。图例聚焦组，柱形和时段选择器选择区间；进入审计携带区间与归属，返回保留概况选择。分组统计表和逐条记录在审计。</p>
+<h3 id="design-interaction-implementation--用户故事">用户故事</h3>
+<ol>
+<li>比较今天各模型请求量，选择某个小时并查看对应审计，返回后仍停在原来的分析位置。</li>
+<li>将统计切为按源看 Token，浏览最近一周中的某天；归档日期明确提示切回每日汇总。</li>
+<li>在源默认价里输入未保存修改，再保存一个模型的价格；模型保存不提交源默认草稿，反之也如此。</li>
+<li>从模型源卡片进入定价，查看继承和倍率后的真实生效价，单独保存账号调度；手机输入时仍能点击保存和返回。</li>
+</ol>
+<h3 id="design-interaction-implementation--技术设计">技术设计</h3>
+<ul>
+<li><code>ModelHub</code>：七个导航项、全宽源详情、卡片定价入口和嵌套默认价入口，保留旧地址与连接创建、目录选择、导入和语音功能。</li>
+<li><code>ModelUsageWorkspace</code>：概况和审计各自保留筛选状态，恢复分组图表序列，使用既有 ECharts 渲染器；手机小时图独立横向滚动，时段选择器提供键盘可用的等价入口。</li>
+<li><code>model-usage-workspace-state</code>：传递所选小时日期和审计小时，复用可见性轮询与取消机制。</li>
+<li><code>usage-workspace.go</code>：按账本配置时区和全部归属筛选生成小时组；审计的小时、状态和搜索条件同时作用于记录与分组统计。夏令时重复小时包含两次实际时段。每日归档不伪造成完整小时数据，今日额度维持全局口径。</li>
+<li><code>SourcePricingSettings</code>：源默认规则、单模型规则、账号策略分开保存，后端事务只合并指定范围。未提交的其他草稿保留；免费需确认，无效单价禁用提交。手机编辑为全屏二级页，保存栏随软键盘避让。</li>
+<li><code>source_pricing.go</code>：返回基础规则、命中来源、源与分时倍率、最终单价，以及既有对外名称覆盖价，沿用网关实际定价函数和价格快照语义。</li>
+<li><code>useGatewaySettings</code>：默认价与限额分开保存和撤销，并保留另一上下文草稿。服务端原子合并，避免旧全局配置覆盖新保存的源策略。</li>
+</ul>
+<p>不增加存储表、小时历史或监控保留量；用量明细沿用 48 小时归档，监控继续沿用滚动 24 小时与既有容量上限。</p>
+<h3 id="design-interaction-implementation--验收">验收</h3>
+<p>桌面与 Redmi Note 8 使用隔离开发实例、真实 Go API 和已有合成账本，没有调用用户真实模型源。截图保留在 <code>/tmp/roami-redesign-*.png</code>，不提交主线。</p>
+<ul>
+<li>前端全量：240 个文件，1,765 项测试通过。</li>
+<li>Go 网关回归覆盖时区与归属过滤、归档、夏令时重复小时、独立保存、价格来源与倍率；定向 race 检查通过。</li>
+<li>全量质量门通过；首次出现未修改模块 <code>TestClaudeRejectionSettlesAndReusesOriginalProvider/cancelled</code> 的生命周期暂态失败，定向连续三次通过，随后完整质量门通过。</li>
+<li>桌面四档宽度与真机证据见 <a href="#evidence-evidence-interaction-product-desktop">桌面</a>、<a href="#evidence-evidence-interaction-product-phone">手机</a>。</li>
+</ul>
+<p>英文浅色版在四档桌面与 392 CSS px 下复验通过，手机导航采用短名称和自然宽度，超出部分由既有 Tabs 菜单承接，避免文字相互覆盖；中文真机完整操作复验通过。<a href="#evidence-evidence-interaction-product-locales">语言与主题证据</a>。</p>
+<h3 id="design-interaction-implementation--插件多账号与详情顺序">插件多账号与详情顺序</h3>
+<p>模型源详情顺序统一为「连接 → 模型与定价 → 账号调度」。插件源卡片提供「添加账号」，复用已安装的插件包创建新的独立实例，自动区分名称并进入新实例的连接页。普通 API 源不显示该操作。</p>
+<p>新实例使用新的源 ID、进程和私有工作目录，不复制原实例的登录凭证、选项、模型选择或定价。已有包与提供方的导入入口同样可以重复创建。源内模型选择与聚合仍以源 ID 区分账号。</p>
+<p>插件进程容量从 8 调整至 64，与现有模型源容量一致；沙箱、单进程资源限制与删除实例时的清理继续生效。登录区移入连接配置的内容滚动区，修正手机宽度越界，并避免登录输入框的 Enter 误提交外层连接表单。</p>
+<p>验收：同一合成 WorkBuddy 插件包创建 10 个实例，分别登录，验证各实例选项、凭证与调用隔离；10 路并发、管理器重启恢复，以及退出一个账号不影响另一个均通过 race 集成测试。桌面四档宽度和 Redmi Note 8 实际触摸添加账号、独立登录、切换定价及返回通过，前端全量为 240 个文件 / 1,765 项测试。没有使用真实 WorkBuddy 账号或外部模型调用。</p>
+<p>证据：<a href="#evidence-evidence-plugin-accounts-desktop">桌面多账号</a>、<a href="#evidence-evidence-plugin-accounts-phone">手机多账号</a>。</p>
+</article>
+<article class="record" id="design-interaction-review">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/interaction-review.md</code></p>
+<h2 id="design-interaction-review--用量与定价交互重做">用量与定价交互重做</h2>
+<p>状态：交互稿已确认并接入正式页面，见 <a href="#design-interaction-implementation">实现与验收</a>。入口：<a href="interaction-review.html">interaction-review.html</a>。沿用本主题目录，保留已上线版本和原有八页原型。</p>
+<h3 id="design-interaction-review--产品设计">产品设计</h3>
+<h4 id="design-interaction-review--用量分析">用量分析</h4>
+<p>截图中的问题不是缺少底部模型分组按钮，而是概况趋势退化成单一总量、模型请求量不再直接可见，小时数据也没有接回新工作区。新的主路径为「选择周期与范围 → 分组 / 指标 / 时间粒度 → 查看模型对比 → 选择时段概况 → 进入审计查看请求明细」。</p>
+<ul>
+<li>默认直接展示按模型拆分的请求量；今天默认按小时，近七天默认按天。分组支持模型、源、智能体和总量；指标支持请求量、总 Token、输入、输出、缓存读取和费用。</li>
+<li>颜色图例直接显示各组数值。点击图例聚焦单组，再点恢复；点击柱形只更新时段概况，不在概况页展示明细表。请求量是整数，请求总数包含费用待核对的请求。</li>
+<li>多天周期仍可选择其中某一天按小时分析。小时明细遵守现有 48 小时保留期；已归档日期展示明确状态并可切回按天，不生成不存在的历史请求。</li>
+<li>概况仅保留额度、汇总、趋势和分布；逐条请求与分组统计表都归入审计。点击「进入审计」时携带当前范围；返回保留原有分组、指标、时段和筛选。零结果不显示零计数或分页。</li>
+<li>今日额度是独立的全局区，不受分析筛选影响。未知费用不算作 0，余额保持待核对。模拟时钟固定为 2026-11-13 18:00、Asia/Shanghai，后续小时为空。</li>
+</ul>
+<h4 id="design-interaction-review--模型源定价">模型源定价</h4>
+<p>定价统一归属于「模型源」，侧栏不再保留独立定价入口。模型源页提供全局默认价入口，卡片内进入该源与模型的定价。源内查看全局默认价后返回原源并保留草稿；从卡片列表进入默认价后返回卡片列表。旧原型的相关导航转向此版入口。</p>
+<p>卡片显示未保存修改标记，进入详情继续编辑时保留各源和各模型的草稿。卡片上的价格概况展示已保存、当前生效的规则。</p>
+<p>原界面把账号路由、源默认策略、折叠的模型覆盖和手动添加模型混排，无法直接判断某模型实际使用哪个价格。模型源首先以独立卡片展示，卡片包含身份、服务地址、模型、默认定价概况及操作；点击卡片内「定价」才进入该源的定价页，返回回到卡片列表。定价详情内保留「连接 / 模型与定价 / 账号调度」三个上下文。手机定价详情是全屏二级页，只显示一个返回栏。</p>
+<ul>
+<li>模型与定价页同时展示源默认规则和源内模型的当前生效单价。表格明确标注继承全局、继承源默认或单独定价，统一说明币种和每百万 Token 的单位。</li>
+<li>源默认价是独立保存范围：保存源默认规则、倍率和时段，不连带保存未提交的模型覆盖。</li>
+<li>单个模型通过右侧编辑器修改，手机为全屏二级页。保存只影响当前模型；恢复「使用源默认价」立即展示继承结果。返回或切页保留草稿，未保存的模型显示标记。</li>
+<li>基础单价和当前最终单价分开显示；最终价计算源倍率与当前时段倍率。表中显示已保存、当前生效的结果，不把未保存草稿冒充已生效价格。</li>
+<li>明确免费必须确认条件；普通 0 元单价不代表免费资格。套餐额度与货币费用分开呈现，未知价格不显示为零。无效单价显示行内提示并禁用保存。</li>
+<li>添加模型通过独立选择器打开，目录选择为默认，手动 ID 输入为次级方式；保留已有模型与单价。账号路由单独保存，不再混在定价表单里。</li>
+<li>全局默认价归入模型源，只展示兜底规则；返回恢复模型源上下文。全局未定价、模型无匹配、归档、确认免费、无效价格、未保存和保存成功均有实际交互状态。</li>
+</ul>
+<h3 id="design-interaction-review--用户故事">用户故事</h3>
+<ol>
+<li>我直接比较不同模型今天的请求量，点击 10:00 后查看各模型在该小时的数值，再进入对应审计查看分组统计与逐条记录并返回。</li>
+<li>我切为按源看 Token，再从近七天切换到其中一天的小时分布；更早日期明确提示归档。</li>
+<li>我修改源默认输入价但暂不保存，再编辑并保存另一个模型的专属价；模型保存不会偷偷提交源默认草稿。</li>
+<li>我看见模型继承全局价，可以查看全局规则，或改为单独定价；倍率改变后能看到当前实际乘算结果。</li>
+<li>我在手机选择免费策略，必须确认条件才能保存；输入数字时保存栏保持可达，返回只保留草稿，不误提交。</li>
+</ol>
+<h3 id="design-interaction-review--技术设计">技术设计</h3>
+<ul>
+<li><code>assets/interaction-review.tsx</code>：独立的示例数据、分析状态、审计下钻、源默认与模型草稿、价格继承和保存边界。无产品配置写入，也不调用模型。</li>
+<li><code>assets/interaction-copy.ts</code>：中文与英文文案，沿用项目 I18nProvider；固定样例品牌、模型 ID、日期和币种是示例内容。</li>
+<li><code>assets/interaction-review.css</code>：项目设计令牌、鼠标限定 Hover、内部滚动、手机 44px 触控目标、小时横向滚动、全屏编辑与键盘避让。仅打开的编辑器占据侧栏宽度。</li>
+<li><code>assets/build.mjs interaction-review</code>：生成可独立打开的单文件 HTML；不带参数仍构建原八页原型。旧原型支持 <code>?tab=</code>，便于跳转聚合、监控等已设计页面。</li>
+</ul>
+<p>正式接入时复用 <code>ModelUsageWorkspace</code> 和既有图表渲染器，恢复分组序列；<code>WorkspaceUsage</code> 补齐按所选日期、配置时区和全部筛选条件计算的小时数据，保留归档判定。当前工作区响应中的小时数组未填充，不能只修改图形。</p>
+<p>源定价接入 <code>SourcePricingSettings</code> 时，保存模型覆盖应从已保存的源规则合并当前模型，避免提交另一份未保存的源默认草稿。实际生效价格必须由后端返回命中规则和倍率。已有对外模型显式价格覆盖优先规则需要兼容并显示来源；此稿示例没有额外的对外模型覆盖，不在前端猜测真实账单。历史价格快照和多币种统计保持原口径。</p>
+<h3 id="design-interaction-review--验收证据">验收证据</h3>
+<p>桌面验证 1280、1920、2560、3440 CSS px，检查真实筛选、小时选择与审计返回、独立保存、继承恢复、免费确认、无效输入、倍率、添加模型、草稿保留及中英文 / 明暗主题。</p>
+<p>Redmi Note 8 验证实际触摸图例、筛选、小时横向滚动、原生计价方式菜单、免费确认、保存和返回；全屏编辑只有一个返回栏，返回目标为 44px，键盘打开后保存栏可达。</p>
+<p>证据：<a href="#evidence-evidence-interaction-review-desktop">桌面</a>、<a href="#evidence-evidence-interaction-review-phone">手机</a>。截图放在 <code>/tmp/roami-interaction-*.png</code>，不提交主线。</p>
+<p>最新结构复验：概况无明细表，审计包含可折叠分组统计与请求列表；模型源为卡片入口，进入定价与返回卡片在桌面和真机均通过。</p>
+<p>默认定价归属复验：桌面与真机确认侧栏无独立定价入口，模型源内默认价可进入和返回；桌面另验证从源继承区查看默认价后返回原源并保留草稿。</p>
+</article>
+<article class="record" id="design-local-time">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/local-time.md</code></p>
+<h2 id="design-local-time--用量本地时间修正">用量本地时间修正</h2>
+<h3 id="design-local-time--产品设计">产品设计</h3>
+<p>概况和审计使用设备 IANA 时区。日期范围、今天、按小时曲线、时间段跳转及请求详情保持同一时区，跨午夜时也一致。监控现有的设备本地时间格式保持一致。</p>
+<p>额度的“今日费用”和每日限额使用原结算时区，在额度区说明该时区。已归档记录只剩日汇总，不能恢复跨时区的小时归属；仍保留结算日期，查询含归档数据且时区不同时显示一句提示。</p>
+<h3 id="design-local-time--用户故事">用户故事</h3>
+<ul>
+<li>北京时间刚过午夜时，今天应显示新日期，UTC 前一天 16 点的请求出现在今天 0 点。</li>
+<li>点击某小时查看审计时，看到的请求时间应落在这个本地小时内。</li>
+<li>不同设备时区可以查看自己的本地时间，额度和历史费用不会因查看时区发生变化。</li>
+</ul>
+<h3 id="design-local-time--技术设计">技术设计</h3>
+<p><code>model-usage-workspace-state.ts</code> 从 <code>Intl.DateTimeFormat().resolvedOptions().timeZone</code> 取得设备时区，附于概况及审计 GET 查询。<code>usage-workspace.go</code> 验证 IANA 时区，用本地午夜的毫秒边界筛选原始记录，返回显示时区和结算时区。</p>
+<p><code>usage-local-days.go</code> 根据原始记录实际涉及的日期建立查询内的本地日窗口，将明细按本地日重新汇总，不修改持久数据。夏令时按日历边界处理，重复小时包含两段记录；保留整数纳币金额。<code>Today</code> 仍读取原结算日且不受分析筛选影响。归档日表保留原日期，没有新增数据库表、迁移或常驻存储。</p>
+<p><code>ModelUsageWorkspace.tsx</code> 使用接口的显示时区格式化审计时间及详情，并说明结算和归档边界。</p>
+<h3 id="design-local-time--验收">验收</h3>
+<ul>
+<li>前端完整测试：240 个文件、1,766 项测试通过；时间修正专项 4 项通过。</li>
+<li>Go 用量专项：UTC / 本地跨日、源与模型筛选、审计钻取、纽约重复小时、印度半小时时差、Lord Howe 半小时夏令时切换、非法时区和归档保留日期。</li>
+<li>桌面实页：1280、1920、2560、3440 CSS px 无文档溢出；概况、审计和详情对应同一时区。</li>
+<li>Redmi Note 8 真机：392 CSS px、coarse pointer，无文档溢出；真实触控打开审计和请求详情，均显示 <code>11月14日 00:20</code>。</li>
+<li>隔离库三条收据：北京时间前一天 23:30、当天 00:15、00:20；“今天”仅包含后两条，0 点小时图为 2 次，接口和页面一致。</li>
+<li>检查未发送真实模型请求，未修改线上数据。截图留于 <code>/tmp/roami-local-time-20261114/</code>，不提交到 main。</li>
+</ul>
+<p>最终 <code>scripts/dev/quality/check.sh quick</code> 通过；中文深色、英文浅色实页通过。详细尺寸与时间断言见 <a href="#evidence-local-time-evidence">local-time-evidence.json</a>。</p>
+</article>
+<article class="record" id="design-product-integration">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/product-integration.md</code></p>
+<h2 id="design-product-integration--正式接入源定价聚合路由与模型监控">正式接入：源定价、聚合路由与模型监控</h2>
+<p>本轮按「实现」要求接入产品代码，接口命名规范仍未调整。原型在 <code>prototype.html</code>，既有概况 / 审计实现见 <code>implementation.md</code>。</p>
+<h3 id="design-product-integration--产品设计与用户故事">产品设计与用户故事</h3>
+<p>左侧导航按重要性排列：模型源、聚合、概况、监控、审计、本机网关、模型定价、语音输入。手机同级页签沿用同一顺序。</p>
+<ul>
+<li>在模型源内设置默认定价、模型覆盖、明确免费 / 套餐 / 未知策略，以及可选价格倍率与时段规则。账号路由独立选择，默认 smart。</li>
+<li>在「聚合」先选源、再选该源模型，添加跨源候选或已发布的路由组；排序、权重、启停和切换条件均保存至网关。默认 smart，免费聚合没有合格渠道就停止，不回退付费。</li>
+<li>智能体的模型设置将「路由组」作为独立来源，直接选择已发布聚合 ID，避免把聚合误认成首个模型源。</li>
+<li>在「监控」按源、模型和最近 1 / 6 / 24 小时比较可用率、首字 P95、输出速度 P50 与质量抽检。质量只来自实际抽检，不以延迟推算。</li>
+<li>手动抽检固定问答、JSON 和工具调用，经过现有 Go 准入并正常记账；不执行模型返回的工具，不保存完整提示词或响应。</li>
+<li>桌面详情打开侧栏，关闭释放宽度；手机用一个返回栏的全屏二级页。隐藏页面停止轮询，失败退避。</li>
+</ul>
+<h3 id="design-product-integration--技术设计">技术设计</h3>
+<h4 id="design-product-integration--go-网关">Go 网关</h4>
+<p><code>source_pricing.go</code> 扩展源默认及模型规则。明确免费需要确认；普通 0 元单价不能取得免费资格。源策略独立局部保存，全局设置的旧调用不会清空源策略。调用仍冻结请求时单价；已有对外模型显式单价保持优先，源策略随后生效。</p>
+<p><code>routing_model.go</code> 校验九种策略、1–1000 权重、成员数量、嵌套组循环及深度。旧 fixed / failover 配置保持兼容。策略、源及账号缓存都有数量上限。</p>
+<p><code>routing_choice.go</code>、<code>routing_state.go</code>、<code>provider_routing.go</code> 实现账号 / Key 展开、组作为一个成员、持久 drain 游标、轮次、平滑权重、速度探测及动态价格排序。权重先分给模型，模型内按源自己的账号策略选择。drain 游标存入 schema v7，删除模型时一并清理。</p>
+<p><code>routing_quota.go</code> 通过现有插件宿主读取额度，保留周 / 5 小时窗口、月度重置与积分批次到期信息。读取合并并发、限制并发数、缓存一分钟；超过两分钟、余额未知、查询失败或过期快照不能取得套餐免费资格。重置和积分到期会提前使缓存失效，已耗尽的短窗口仍能阻止周额度继续使用。</p>
+<p><code>modelplugins/manager.go</code> 保留模型免费、单价、工具与账号元数据，并让 Fetch 指向选中的账号；<code>modelplugins/quota.go</code> 封装宿主已有用量查询。Python 没有新增额度准入逻辑。</p>
+<p><code>catalog_http.go</code> 在发送前选择渠道，明确 HTTP 拒绝或未发送的连接失败可切换；每次尝试独立结算，并尊重更长的 Retry-After。已经向调用方输出后不自动重放。流式速度来自实际首个内容增量和输出 Token，权重偏向新测量；速度状态不从磁盘恢复。</p>
+<h4 id="design-product-integration--监控存储与采集">监控存储与采集</h4>
+<p><code>monitor_store.go</code> 使用独立固定大小环形文件，而非账本或 WAL：10,000 个 4,096 字节槽，共 <strong>40,960,000 字节（39.0625 MiB）</strong>，低于 64 MiB 总预算。不会因为不断删除 / 插入而扩大文件。</p>
+<p>每次写入 / 读取清理 24 小时边界，独立维护每分钟清理并同步文件，不依赖浏览器在线。达到条数上限覆盖最旧槽，校验过的 JSON + CRC 检测部分写入；重启扫描恢复有效记录，过期或损坏记录不参与统计。单条过大直接丢弃并计数。文件权限 0600，不生成临时备份或 WAL，不影响审计账本。</p>
+<p><code>response_observation.go</code> 只用有上限的内存缓冲观测实际输出，区分心跳和首字，采集延迟与输出速度。正常请求的质量为未检测；<code>monitor_probe.go</code> 通过已配置源执行固定题、JSON / 工具规则，只保存指标和判定。探测受到网关现有额度与取消机制约束。</p>
+<h4 id="design-product-integration--前端模块">前端模块</h4>
+<ul>
+<li><code>ModelAggregationWorkspace.tsx</code> / <code>model-routing-api.ts</code>：聚合配置、可用渠道和保存后的真实状态。</li>
+<li><code>SourcePricingSettings.tsx</code>：源内定价、覆盖、账号策略与倍率。</li>
+<li><code>ModelMonitoringWorkspace.tsx</code> / <code>model-monitor-api.ts</code>：筛选、趋势、源对比、详情及手动质量抽检。</li>
+<li><code>ModelHub.tsx</code> / <code>GatewayModelBinding.tsx</code>：同级聚合、监控入口和智能体聚合绑定。</li>
+<li><code>model-routing.css</code> / <code>model-monitoring.css</code>：现有令牌、平面工作区、独立滚动及手机触控目标。</li>
+</ul>
+<h3 id="design-product-integration--验证">验证</h3>
+<p>有针对性的 Go 测试覆盖九种排序、额度 / 到期、持久与临时切换、组循环、提供方账号轮流、权重跨账号去重、免费记账、流式中断不重放、Retry-After、实际抽检、并发环形写入、24 小时清理、容量与损坏恢复。</p>
+<p>前端交互测试覆盖先源后模型、跨源候选、草稿保留、默认 smart、实际抽检触发以及智能体组入口。完整前端与 Go 质量门、桌面 / 安卓真机验收均已通过。</p>
+<p>桌面端到端已使用隔离实例及两个本地假上游，验证真实网关 8 个请求按 3:1 分配，付费 0 元源被排除，以及六次实际探测和页面内 JSON 抽检。没有对用户真实模型源发验收请求。</p>
+<h4 id="design-product-integration--最终验收2026-11-13">最终验收（2026-11-13）</h4>
+<ul>
+<li><code>scripts/dev/quality/check.sh full</code> 通过，覆盖 Go 全量测试、前端类型检查、国际化、Hover 审计、生产构建、密钥扫描和文件策略。Python 未改动，按仓库要求跳过 Python 门。</li>
+<li>提交钩子中 <code>TestClaudeCompactionPreservesAuthenticatedTurn/same-prompt</code> 曾出现一次 <code>SESSION_STOP_UNCONFIRMED</code>；该模块未被修改，定向 <code>-count=3</code> 复跑通过，随后重跑完整提交检查。</li>
+<li><code>npx vitest run</code>：237 个测试文件、1,740 项测试全部通过。</li>
+<li>路由、监控及源定价定向 race 检查通过，覆盖本次新增的多账号免费元数据保守判定、compact 协议筛选和倍率后价格上限。</li>
+<li>桌面在 1280 / 1920 / 2560 / 3440 CSS px 下检查详情打开与关闭：文档无溢出，关闭详情恢复全部内容宽度。实际页面创建先源后模型的聚合，3:1 权重分配得到 6 / 2 次请求，普通 0 元单价被免费聚合排除。证据：<a href="#evidence-evidence-product-integration-desktop">桌面</a>。</li>
+<li>Redmi Note 8（392 × 766 CSS px、coarse 指针）实测触摸选择策略、保存聚合、主区域滚动、源筛选、全屏详情返回及工具质量抽检。输入与返回目标均为 44px，只有一个返回栏；当前详情内容可完整容纳，无需额外滚动。证据：<a href="#evidence-evidence-product-integration-phone">真机</a>。</li>
+<li>两个隔离本地假上游的固定问答、JSON、工具抽检全部通过；页面内 JSON / 工具抽检通过真实网关执行。验收未调用用户真实模型源。</li>
+<li>环形文件实际大小 40,960,000 字节，界面显示 39.1 / 64 MiB；过期、容量覆盖、重启恢复及并发写入由 Go 测试验证。监控不保存完整提示词、响应或凭证。</li>
+</ul>
+<p>提供方模型列表是多账号的并集，不能证明每个账号具有相同免费条件。多账号时不以并集里的免费 / 积分倍率作为自动免费凭据，需明确源策略；未知额度或工具能力也不冒充已知。倍率后的单价超过现有有效范围时按未知计价，避免金额溢出。</p>
+<p>PR 截图通过 <code>scripts/dev/pr-shot.sh</code> 上传独立 <code>pr-shots</code> 分支，不提交到主线。截图包括真实旧页面、聚合配置、源定价、监控及安卓全屏抽检。</p>
+<h4 id="design-product-integration--导航排序验收">导航排序验收</h4>
+<p>按用户确认将模型源保留首位，随后依次为聚合、概况、监控、审计、本机网关、模型定价和语音输入。产品与静态原型已同步。桌面四档宽度无文档溢出，实际点击概况、审计、聚合和监控通过；Redmi Note 8 实际触摸模型、聚合、概况和监控通过，手机沿用相同顺序。证据：<a href="#evidence-evidence-navigation-desktop">桌面</a>、<a href="#evidence-evidence-navigation-phone">手机</a>。完整前端测试中旧审计位置断言随新顺序调整，对应 24 项测试复跑通过，其余 236 个文件 / 1,716 项测试通过；全量质量门通过。</p>
+<h4 id="design-product-integration--主分支同步与冲突回归">主分支同步与冲突回归</h4>
+<p>同步主分支 <code>104e4e53</code>，保留新增的网关默认模型、Claude 模型别名、Codex 目录格式和 Pi / OpenCode 目录同步，同时保留聚合组入口、免费路由条件及模型源优先的导航顺序。</p>
+<p>四处文本冲突分别位于 <code>GatewayModelBinding.tsx</code>、<code>model-hub-api.ts</code>、<code>catalog.go</code>、<code>catalog_http.go</code>。额外接入主分支的智能体注册表名称 Hook，用量筛选使用已存在的 Agent 标识校验，避免依赖尚未加载的名称表。</p>
+<p>回归覆盖默认模型实际调度聚合、停用后停止调度、Claude 聚合别名识别、默认入口切换、Pi / OpenCode 活跃目录一致性，以及停用组不进入公开 / 原生目录；直连源不会被误认成首个候选相同的聚合。定向 Go race 检查通过。完整前端 238 个文件 / 1,753 项测试通过，桌面四档宽度与 Redmi Note 8 导航复验通过，证据见 <a href="#evidence-evidence-merge-verification">合并验收</a>。</p>
+<p>质量门按最终合并树相对 <code>origin/main</code> 的实际差异运行，使用既有 <code>QUALITY_BASE_SHA</code> / <code>QUALITY_HEAD_SHA</code> 指定比较范围。最终差异不包含 Python 改动，因此按仓库规则跳过主分支带入的无关 Python 测试。</p>
+</article>
+<article class="record" id="design-routing-monitoring">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/routing-monitoring.md</code></p>
+<h2 id="design-routing-monitoring--路由策略与模型监控--原型增补">路由策略与模型监控 · 原型增补</h2>
+<p>本文件记录原型评审阶段。后续正式实现见 <a href="#design-product-integration">产品接入</a>。</p>
+<p>本轮继续完善静态 HTML。真实后端的路由、监控采集、磁盘保留机制均未接入，接口规范继续暂缓。示例供应商名称、账号、单价、额度和质量数据均用于交互演示。</p>
+<h3 id="design-routing-monitoring--产品设计">产品设计</h3>
+<p>大模型新增同级「监控」页。「聚合」保留先选源、再选模型的添加方式，默认策略改为 <code>smart</code>。模型源的免费资格仍先于策略排序；免费聚合没有可用免费候选时停止，不转为付费调用。</p>
+<h4 id="design-routing-monitoring--九种路由策略">九种路由策略</h4>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>设计行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>智能 <code>smart</code>，默认</td>
+<td>账号与 Key 共同排序，嵌套组算一个。订阅先看周额度重置，只有 5 小时窗口的看该窗口重置；无重置时间的积分看最早到期。重置相同再比较积分到期。还有余量的在前，休息渠道最后</td>
+</tr>
+<tr>
+<td>按顺序 <code>order</code></td>
+<td>从第一个成员开始，不能回答时继续下一个</td>
+</tr>
+<tr>
+<td>用完再换 <code>drain</code></td>
+<td>当前账号或 Key 用完后转移持久游标；前面额度恢复也不切回。休息只临时跳过，不移动持久游标</td>
+</tr>
+<tr>
+<td>轮流 <code>rotate</code></td>
+<td>会话每一轮推进一个账号或 Key；同一轮的失败重试不重复推进</td>
+</tr>
+<tr>
+<td>最少使用 <code>usage</code></td>
+<td>按来源报告的剩余额度从多到少排序；未知不解释成无限额度</td>
+</tr>
+<tr>
+<td>到期前用完 <code>pace</code></td>
+<td>周剩余额度 / 距重置小时数；没有周窗口时使用 5 小时窗口。更早到期的最先一批积分可覆盖该速率。使用达到 90% 的账号最后兜底；Key 按近期发送 Token 数从少到多排</td>
+</tr>
+<tr>
+<td>按权重 <code>weight</code></td>
+<td>每个模型权重 1–1000，默认 1；均匀穿插，模型内部仍使用提供方自己的账号 / Key 路由。嵌套组算一个成员，休息成员退出本轮，失败转下一个</td>
+</tr>
+<tr>
+<td>速度优先 <code>fast</code></td>
+<td>综合首字时间和输出速度，新测量权重更高；不到 10% 的差距保持原序。每五个请求给一小时未测渠道一个探测机会。只采集流式测量，重启清空，休息渠道最后</td>
+</tr>
+<tr>
+<td>最便宜优先 <code>cheap</code></td>
+<td>只用于路由组。自设价优先于标价，再乘提供方倍率与时段倍率；同币种等价保持原序，未知最后。免费组内价格均为 0 时维持原序</td>
+</tr>
+</tbody>
+</table>
+<p>策略选择下只显示简短说明，完整规则可展开。权重只在选中 <code>weight</code> 时出现在成员旁；空值、小数、0 和超过 1000 都不能保存。所有策略以模型源的免费条件、能力要求、余额和休息状态为前提。</p>
+<p>按用户提供的分时计价规则设计：DeepSeek 官方 API、Command Code、OpenCode Go 的 DeepSeek 在工作日 UTC 01:00–04:00 和 06:00–10:00 使用 2 倍；Ollama Cloud 的 DeepSeek V4.1 Flash / V4 Pro 在工作日 UTC 12:00–18:00 使用高峰价，其他时间半价。原型不把这些当作已核实的真实供应商价格写入当前配置。</p>
+<h4 id="design-routing-monitoring--策略演示边界">策略演示边界</h4>
+<p>「调度演示」仍使用当前已保存的聚合成员，验证选择、限流休息、耗尽和开始输出后停止切换。「策略数据演示」是独立示例，提供周 / 5 小时额度、积分到期、Key Token、模型权重 / 嵌套组、速度和分时价格数据。可以模拟轮次、耗尽、恢复和推进时间。</p>
+<p>独立示例中的嵌套组仅展示“一组一成员”的权重语义，尚未实现嵌套组编辑器或真实的提供方账号列表。当前聚合演示每个源 / 模型映射一个示例渠道；它不能被解释为完整的多账号调度实现。当前源列表未提供统一的真实订阅余额、积分批次与速度遥测，正式接入前须补齐来源证据。</p>
+<p>演示对速度使用“首字延迟 + 100 个输出 Token 的耗时”进行比较，最近一次样本权重 70%；真实策略的目标输出长度与衰减参数须随实际遥测校准。便宜策略演示按输入 / 输出 1:1 的示例负载比较，分别展示输入、输出有效单价，不做跨币种换算。以上是明确标注的演示假设，不是已确认的后端计费契约。</p>
+<h3 id="design-routing-monitoring--监控页面">监控页面</h3>
+<ul>
+<li>顶部选择模型源、模型、最近 1 / 6 / 24 小时；全局卡片、趋势、源对比和详情使用同一范围。</li>
+<li>展示可用率、首字延迟 P95、成功回复输出速度 P50、质量抽检通过率及抽检数量。质量与速度分别计算，未检测不记为通过或失败。</li>
+<li>质量抽检设计覆盖固定问答、结构化输出和工具调用，使用相同版本的检查集比较源。原型用预设结果展示，不执行真实探测或发送模型请求。</li>
+<li>桌面点击源打开右侧详情，关闭即释放宽度；手机是带一个返回栏的全屏详情。详情列出最近异常、错误分类和抽检未通过记录。</li>
+<li>示例每 5 秒更新，后台或离开监控时暂停生成；重新进入会按实际经过时间推进示例时钟并执行过期清理。页面筛选不改变保留策略。</li>
+</ul>
+<h4 id="design-routing-monitoring--只保留一天且容量有上限">只保留一天，且容量有上限</h4>
+<p>监控数据最多滚动保留 24 小时，不是按自然日累计。每次写入先清过期记录；达到 <strong>10,000 条或 64 MiB 指标数据</strong>中的任一上限，就从最旧记录开始提前淘汰。不承诺容量受限时仍保留完整 24 小时。</p>
+<p>原型使用 <code>MonitorRing</code> 有序内存队列，不写 localStorage、IndexedDB 或真实数据库。插入过程中持续限制条数和字节数，允许乱序到达；单条记录超过预算直接丢弃。展示现有条数、序列化指标字节数、过期数量和容量淘汰数量，并可演示推进 24 小时和达到条数上限。抽检未检测、指标未知和空数据保留明确状态。</p>
+<h4 id="design-routing-monitoring--后端存储设计待确认后实施">后端存储设计，待确认后实施</h4>
+<p>保留策略归监控存储本身管理，不依赖浏览器在线。读取时严格过滤 24 小时边界；写入前清理，独立维护任务每分钟回收过期数据。时间跳变也不能使旧数据变成永久保留。</p>
+<p>使用独立监控存储和一分钟聚合桶；仅存指标、错误分类、规则 ID / 版本及通过 / 失败结果，不存完整提示词、模型响应或凭证。限制源 / 模型序列数，防止无限标签基数。生产容量预算应包含索引、数据库空页、WAL、SHM 和临时文件，不能只限制 JSON 内容大小。</p>
+<p>可采用独立 SQLite 文件，启用可增量回收的空间策略，设置最大页数，并对 WAL 在写入准入处实行阈值检查与 checkpoint / truncate。建议将 64 MiB 的磁盘预算划分为主文件不超过 48 MiB、WAL 不超过 8 MiB，其余预留 sidecar / 临时空间；到达预算且无法回收时跳过新监控样本，保留丢弃计数，不能继续增长。删除行不等于文件缩小，回收和异常重启均须实测。</p>
+<p>此规则只作用于新增监控数据；现有用量汇总、审计回执与记账证据沿用各自保留规则，不能为了监控清理误删账本。</p>
+<h3 id="design-routing-monitoring--用户故事">用户故事</h3>
+<ol>
+<li>我不配置策略时直接用 smart；根据额度重置和积分到期优先使用会损失的额度。</li>
+<li>我设置模型权重 3:1，观察请求均匀穿插；同一模型有多个账号也不会变成双倍成员权重。</li>
+<li>我使用 drain 时，前面的额度恢复不会抢回当前账号；休息恢复则可回到同一持久游标。</li>
+<li>我按同一模型比较不同源的可用率、延迟和质量，打开详情确认异常原因。</li>
+<li>我让监控一直运行；超过一天的数据滚动清掉，数据量激增也不会无限占存储。</li>
+</ol>
+<h3 id="design-routing-monitoring--代码与模块架构">代码与模块架构</h3>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assets/routing-strategies.ts</code></td>
+<td>九种策略声明与双语说明、排序、会话轮次、持久游标、平滑权重和流式速度测量示例</td>
+</tr>
+<tr>
+<td><code>assets/routing-scenarios.ts</code></td>
+<td>独立额度 / 积分 / Key / 权重 / 速度 / 时段单价数据</td>
+</tr>
+<tr>
+<td><code>assets/routing-policy-guide.tsx</code></td>
+<td>当前策略摘要与展开规则</td>
+</tr>
+<tr>
+<td><code>assets/routing-policy-lab.tsx</code></td>
+<td>有明确示例边界的轮次与故障交互</td>
+</tr>
+<tr>
+<td><code>assets/model-aggregation.tsx</code></td>
+<td>聚合配置与已保存成员演示，默认 smart，权重校验</td>
+</tr>
+<tr>
+<td><code>assets/monitor-retention.ts</code></td>
+<td>时间 / 条数 / 字节三重限制的监控队列、汇总统计</td>
+</tr>
+<tr>
+<td><code>assets/model-monitoring.tsx</code></td>
+<td>模型源比较、趋势、全屏 / 侧边详情、滚动更新与清理演示</td>
+</tr>
+</tbody>
+</table>
+<p>真实账号 / Key 准入、重试与路由状态仍应由 Go 网关统一管理。监控不会给 Python 增加配额准入逻辑，也不增加接口命名规范。</p>
+<h3 id="design-routing-monitoring--验收">验收</h3>
+<p>运行 <code>node docs/design/20261114-model-orchestration/history/20261112-model-usage-details/assets/verify-routing-retention.mjs</code>：20 项有意义的策略与保留测试，覆盖重置 / 积分排序、持久 / 临时切换、轮次、90% 兜底、权重跨账号去重、速度探测、分时边界、24 小时边界、乱序插入、条数 / 字节淘汰和未知统计。</p>
+<p>浏览器验证九种策略、默认 smart、权重范围、示例嵌套组轮次、模型 / 源筛选、监控质量口径、条数上限与 24 小时清理、跨页保留、中英文及无真实 API 请求。桌面覆盖 1280 / 1920 / 2560 / 3440 CSS px 和源详情开关；安卓真机验证策略原生选择、权重输入、监控详情、触摸滚动、源筛选和过期清理。</p>
+<p>证据：<code>evidence/routing-retention.json</code>、<code>evidence/routing-monitoring-browser.json</code>、<code>evidence/routing-monitoring-phone.json</code>。截图留在 <code>/tmp/roami-routing-*.png</code>、<code>/tmp/roami-monitoring-*.png</code>，不提交主分支。</p>
+</article>
+<article class="record" id="design-source-cards">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/source-cards.md</code></p>
+<h2 id="design-source-cards--模型源卡片简化">模型源卡片简化</h2>
+<h3 id="design-source-cards--产品设计">产品设计</h3>
+<p>模型源列表只展示身份、协议与认证、模型摘要和默认定价状态。整卡点击进入连接详情，移除卡片里的改名、配置、定价、账号调度、更新和删除快捷按钮。列表左上角默认单价入口移除；默认单价仍可从模型源定价页进入。</p>
+<p>新建入口位于列表顶部右侧，使用“+ 新建”按钮；菜单保留添加模型源、导入插件源和本机模型源入口。按最新确认移除虚线占位卡片，无模型源时仍保留顶部新建按钮。</p>
+<h3 id="design-source-cards--用户故事">用户故事</h3>
+<ul>
+<li>不同模型数量、长名称和备用源提示不会改变卡片尺寸。</li>
+<li>点击任意一张源卡片后，按“连接、模型与定价、账号调度”完成编辑。</li>
+<li>在连接页修改名称、读取模型列表、添加插件账号或删除；仍保留删除确认和备用源保护。</li>
+<li>手机可用整卡点击进入，使用顶部新建按钮创建，详情为完整二级页。</li>
+</ul>
+<h3 id="design-source-cards--技术设计">技术设计</h3>
+<p><code>ModelHub</code> 保留详情路由和已有草稿状态。列表区域使用原生按钮覆盖卡片，提供本地化可访问名称与键盘焦点；未嵌套交互控件。顶部新建按钮复用现有 Dropdown 菜单。</p>
+<p><code>model-hub.css</code> 使用等分网格行与拉伸对齐，摘要适度截断；默认定价区域底对齐。<code>ModelSourceEditor</code> 将名称放在连接字段中，添加账号位于插件登录区，删除管理操作在内容滚动区。原有定价、调度、发现、保存与删除 API 不变。</p>
+<h3 id="design-source-cards--验收">验收</h3>
+<ul>
+<li><code>npm run typecheck</code>、<code>npm run i18n:check</code>、<code>npm run hover:check</code>、<code>npx vitest run</code>、<code>npm run build</code> 和 <code>scripts/dev/quality/check.sh quick</code> 通过。</li>
+<li>前端 248 文件 / 1,801 测试通过；包含新建菜单、详情编辑与定价 / 调度导航、删除后返回、备用源删除保护、插件多账号入口迁移等验证。</li>
+<li>桌面 1280、1920、2560、3440 CSS px：全部来源卡片尺寸一致，文档无溢出；中文深色与英文浅色均验证。</li>
+<li>Redmi Note 8 实机：整卡触控打开，名称可编辑，定价与调度标签可达，列表真实手势滚动，顶部新建菜单与新建表单可用。</li>
+<li>所有交互运行于独立实例和合成目录，未修改线上配置或发起真实模型调用。截图位于 <code>/tmp/roami-source-cards-20261114/</code>。</li>
+</ul>
+<p>详细尺寸断言见 <a href="#evidence-source-cards-evidence">source-cards-evidence.json</a>。</p>
+</article>
+<article class="record" id="design-revisions-acceptance-v1">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/revisions/acceptance-v1.md</code></p>
+<h2 id="design-revisions-acceptance-v1--原型验收--2026-11-12">原型验收 · 2026-11-12</h2>
+<p>仅验收设计原型；正式产品实现待用户确认。此次只修改 <code>docs/design/</code>，没有业务前端、Go 或 Python 运行时代码改动。</p>
+<h3 id="design-revisions-acceptance-v1--结果">结果</h3>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>独立 HTML 打包</td>
+<td>通过，约 956 KiB，脚本、样式、图标与示例数据内联</td>
+</tr>
+<tr>
+<td>桌面布局</td>
+<td>1280 / 1920 / 2560 / 3440 CSS px，均检查导航展开 / 收起；文档宽高不溢出，主内容拥有独立滚动区</td>
+</tr>
+<tr>
+<td>可选详情面板</td>
+<td>四档宽度均检查开启后的主内容与面板边界；关闭时释放宽度</td>
+</tr>
+<tr>
+<td>分组</td>
+<td>模型源 4 组、智能体 6 组（含未标记）、模型 5 组；分组下钻继承模型源筛选</td>
+</tr>
+<tr>
+<td>筛选与展示</td>
+<td>周期、模型源、请求状态、模型 / 请求 ID 搜索、展示指标切换、空态无分页均已操作</td>
+</tr>
+<tr>
+<td>日期校验</td>
+<td>结束早于开始时显示错误，不返回错误区间的数据</td>
+</tr>
+<tr>
+<td>历史归档</td>
+<td>点击 11 月 6 日：汇总保留 25 笔请求，逐条记录为 0，显示归档说明</td>
+</tr>
+<tr>
+<td>中英文与主题</td>
+<td>桌面和真机均切换中文 / 英文、浅色 / 深色</td>
+</tr>
+<tr>
+<td>产品边界</td>
+<td>用量与限额可预览，并可返回用量明细；原型交互未发起真实 <code>/api/</code> 请求</td>
+</tr>
+<tr>
+<td>JavaScript</td>
+<td>浏览器交互无运行错误，打包脚本通过 <code>node --check</code></td>
+</tr>
+<tr>
+<td>仓库检查</td>
+<td><code>git diff --check</code> 通过；检查新增原型复用 SVG 图标，没有引入文字图标；<code>frontend/src</code> 符号扫描的抽查结果为既有注释</td>
+</tr>
+</tbody>
+</table>
+<p>结构化结果：<a href="#evidence-evidence-acceptance-v1">evidence/acceptance.json</a>。</p>
+<h3 id="design-revisions-acceptance-v1--android-真机">Android 真机</h3>
+<p>设备：Redmi Note 8，序列号 <code>216d6a43</code>，通过 LAN HTTPS 打开原型，并连接手机 Chrome CDP。未使用视口模拟替代真机。</p>
+<ul>
+<li>实际布局为 <code>compact / coarse</code>，文档宽度与滚动宽度均为 392 CSS px。</li>
+<li>顶部栏内容高 60 CSS px；底栏含安全区。页面只有一个主内容滚动容器。</li>
+<li>四个筛选控件均为 44 CSS px；展开与收起经过真实触摸事件和中心命中测试。</li>
+<li>通过触摸事件进入请求页、打开全屏详情并返回；详情只有一个可见标题栏。</li>
+<li>合成触摸滚动令内容 <code>scrollTop</code> 从 0 变为约 529.09；返回后恢复约 529.09。</li>
+<li>英文切换后无横向溢出，深浅主题可用。</li>
+</ul>
+<h3 id="design-revisions-acceptance-v1--临时预览与截图">临时预览与截图</h3>
+<p>预览服务：<code>https://192.168.130.19:19312/prototype.html</code>，只提供本设计目录。服务通过 <code>scripts/dev/isolated-roami.sh /tmp/roami-usage-prototype</code> 启动，使用临时自签证书；没有启动产品后端，也没有使用用户 tmux 作为测试夹具。</p>
+<p>截图保存在本机临时目录，不提交主分支：</p>
+<ul>
+<li><code>/tmp/roami-usage-overview.png</code>：桌面完整概览。</li>
+<li><code>/tmp/roami-usage-request-detail.png</code>：桌面请求与右侧详情。</li>
+<li><code>/tmp/roami-usage-dark-en.png</code>：桌面英文深色。</li>
+<li><code>/tmp/roami-usage-phone-overview.png</code>：真机概览。</li>
+<li><code>/tmp/roami-usage-phone-detail.png</code>：真机全屏详情。</li>
+<li><code>/tmp/roami-usage-phone-dark-en.png</code>：真机英文深色。</li>
+</ul>
+<p>没有提交或创建 PR；因此未执行提交 / PR 的质量门禁。没有改动 <code>frontend/</code>，未运行业务前端完整测试与产品构建；原型已单独打包并完成上述浏览器 / 真机交互检查。Python、Go 测试不属于本次变更范围。</p>
+</article>
+<article class="record" id="design-revisions-v1">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/revisions/v1.md</code></p>
+<h2 id="design-revisions-v1--第一版结构记录">第一版结构记录</h2>
+<p>第一版把「用量与限额」和「用量明细」并列，再在「用量明细」内分概览 / 请求。</p>
+<p>用户已纠正此拆分：用量、限额和汇总应合在同一个「概况」Tab，逐条记录应进入同级「审计」Tab。当前原型按这个要求修订，不再保留第一版导航。</p>
+</article>
+<article class="record" id="design-revisions-v2">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/revisions/v2.md</code></p>
+<h2 id="design-revisions-v2--第二版结构确认">第二版结构确认</h2>
+<p>用户确认：概况统一用量、限额和汇总；审计为同级 Tab，承载逐条请求。按此结构开始产品实现。</p>
+<p>随后用户要求把大模型下每个页面也设计出来，静态原型扩展到模型与连接、概况、审计、价格与记账、网关接入、语音模型六页，保留第二版的同级导航结构。</p>
+</article>
+<article class="record" id="design-revisions-v3">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/revisions/v3.md</code></p>
+<h2 id="design-revisions-v3--模型源定价与免费聚合增补">模型源定价与免费聚合增补</h2>
+<p>在已确认的概况 / 审计结构上，用户提出模型源内定价与默认策略，并新增免费模型聚合、可配置调度策略。原型加入同级「聚合」页，源编辑器加入默认策略与模型覆盖，定价页保留全局兜底和各源入口。</p>
+<p>用户随后要求先不做接口规范，因此本轮不新增或迁移真实接口。新增聚合与源默认策略仅在静态原型内演示，既有真实计价与路由继续保持。</p>
+</article>
+<article class="record" id="design-revisions-v4">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/revisions/v4.md</code></p>
+<h2 id="design-revisions-v4--聚合候选先选源再选模型">聚合候选先选源，再选模型</h2>
+<p>按用户要求将混合候选列表改为「模型源 / 模型 / 添加候选」。模型选择只显示当前源的模型；切换源清空待添加模型，已添加候选保持原样。候选列表继续支持跨源排序，并增加直接移除动作。免费资格与调度策略保持原有原型行为。</p>
+<p>仅调整静态原型，不涉及接口规范或真实调度实现。</p>
+</article>
+<article class="record" id="design-revisions-v5">
+<p class="muted">原稿 <code>history/20261112-model-usage-details/revisions/v5.md</code></p>
+<h2 id="design-revisions-v5--九种路由策略与监控">九种路由策略与监控</h2>
+<p>按用户给出的规则，将聚合默认策略设为 smart，加入 order、drain、rotate、usage、pace、weight、fast、cheap，补齐双语规则、模型权重和有边界的策略数据演示。</p>
+<p>新增同级「监控」页，按源 / 模型比较可用率、首字延迟、输出速度与质量抽检；滚动保留最多 24 小时，同时以 10,000 条 / 64 MiB 指标数据限制内存队列。提供源详情与清理演示。真实存储还需对数据库和 WAL 等文件实行总预算。</p>
+<p>本轮只改静态原型，真实多账号路由、嵌套组编辑器和后端监控存储不属于已完成的产品实现。接口规范继续暂缓。完整产品、用户故事、技术设计与验收见 ../routing-monitoring.md。</p>
+</article>
+</section>
+<section aria-labelledby="evidence-heading"><h2 id="evidence-heading">验收数据</h2>
+<details class="evidence" id="evidence-aggregation-card-evidence"><summary>aggregation-card-evidence.json</summary><pre><code>{
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;checks&quot;: [
+      &quot;collapsed card summary&quot;,
+      &quot;runtime only inside expanded owner&quot;,
+      &quot;preview tab replaces live data&quot;,
+      &quot;one expanded saved card&quot;,
+      &quot;draft preview stays in original card&quot;,
+      &quot;new draft has its own card&quot;,
+      &quot;mouse drag updates card member order&quot;,
+      &quot;light English&quot;,
+      &quot;four widths, collapsed/expanded/editing&quot;
+    ],
+    &quot;viewportColumns&quot;: [
+      &quot;state&quot;,
+      &quot;width&quot;,
+      &quot;height&quot;,
+      &quot;expandedCards&quot;,
+      &quot;maximumCardOverflow&quot;
+    ],
+    &quot;viewports&quot;: [
+      [
+        &quot;collapsed&quot;,
+        1280,
+        1080,
+        0,
+        0
+      ],
+      [
+        &quot;collapsed&quot;,
+        1920,
+        1080,
+        0,
+        0
+      ],
+      [
+        &quot;collapsed&quot;,
+        2560,
+        1080,
+        0,
+        0
+      ],
+      [
+        &quot;collapsed&quot;,
+        3440,
+        1080,
+        0,
+        0
+      ],
+      [
+        &quot;expanded&quot;,
+        1280,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;expanded&quot;,
+        1920,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;expanded&quot;,
+        2560,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;expanded&quot;,
+        3440,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;editing&quot;,
+        1280,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;editing&quot;,
+        1920,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;editing&quot;,
+        2560,
+        1080,
+        1,
+        0
+      ],
+      [
+        &quot;editing&quot;,
+        3440,
+        1080,
+        1,
+        0
+      ]
+    ]
+  },
+  &quot;phone&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;layout&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;cards&quot;: [
+        {
+          &quot;right&quot;: 376.727294921875,
+          &quot;width&quot;: 360.727294921875,
+          &quot;scrollWidth&quot;: 359,
+          &quot;clientWidth&quot;: 359
+        },
+        {
+          &quot;right&quot;: 376.727294921875,
+          &quot;width&quot;: 360.727294921875,
+          &quot;scrollWidth&quot;: 359,
+          &quot;clientWidth&quot;: 359
+        },
+        {
+          &quot;right&quot;: 376.727294921875,
+          &quot;width&quot;: 360.727294921875,
+          &quot;scrollWidth&quot;: 359,
+          &quot;clientWidth&quot;: 359
+        }
+      ]
+    },
+    &quot;before&quot;: [
+      &quot;a/hy4free&quot;,
+      &quot;b/vendor/coding-a&quot;,
+      &quot;b/vendor/coding-b&quot;
+    ],
+    &quot;after&quot;: [
+      &quot;b/vendor/coding-a&quot;,
+      &quot;a/hy4free&quot;,
+      &quot;b/vendor/coding-b&quot;
+    ],
+    &quot;checks&quot;: [
+      &quot;card summaries only until expanded&quot;,
+      &quot;live status inside owning card&quot;,
+      &quot;card-local preview tab&quot;,
+      &quot;previous card collapses&quot;,
+      &quot;full-screen editor owns draft&quot;,
+      &quot;touch reorder works&quot;,
+      &quot;back returns to owner card&quot;,
+      &quot;no document/card overflow&quot;,
+      &quot;touch scrolling&quot;
+    ]
+  },
+  &quot;checks&quot;: [
+    &quot;typecheck&quot;,
+    &quot;i18n audit&quot;,
+    &quot;hover audit&quot;,
+    &quot;253 frontend files / 1817 tests&quot;,
+    &quot;production build&quot;,
+    &quot;full quality gate; Go and Python correctly skipped for frontend-only changes&quot;
+  ],
+  &quot;screenshots&quot;: {
+    &quot;desktopBefore&quot;: &quot;/tmp/roami-aggregation-card-20261114/card-desktop-before.png&quot;,
+    &quot;desktopRuntime&quot;: &quot;/tmp/roami-aggregation-card-20261114/card-desktop-after-runtime.png&quot;,
+    &quot;desktopPreview&quot;: &quot;/tmp/roami-aggregation-card-20261114/card-desktop-after-preview.png&quot;,
+    &quot;phoneBefore&quot;: &quot;/tmp/roami-aggregation-card-20261114/card-phone-before.png&quot;,
+    &quot;phoneRuntime&quot;: &quot;/tmp/roami-aggregation-card-20261114/card-phone-after-runtime.png&quot;,
+    &quot;phonePreview&quot;: &quot;/tmp/roami-aggregation-card-20261114/card-phone-after-preview.png&quot;
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-aggregation-config-evidence"><summary>aggregation-config-evidence.json</summary><pre><code>{
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;layouts&quot;: [
+      {
+        &quot;state&quot;: &quot;list&quot;,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;content&quot;: null,
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 3
+      },
+      {
+        &quot;state&quot;: &quot;list&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;content&quot;: null,
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 3
+      },
+      {
+        &quot;state&quot;: &quot;list&quot;,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;content&quot;: null,
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 3
+      },
+      {
+        &quot;state&quot;: &quot;list&quot;,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;content&quot;: null,
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 3
+      },
+      {
+        &quot;state&quot;: &quot;members&quot;,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 1940
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;members&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 1229
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;members&quot;,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 992
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;members&quot;,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 803
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;members-sidebar-open&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 1229
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;routing&quot;,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 928
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;routing&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 738
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;routing&quot;,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 738
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      },
+      {
+        &quot;state&quot;: &quot;routing&quot;,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;footer&quot;: {
+          &quot;top&quot;: 990,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;content&quot;: {
+          &quot;client&quot;: 738,
+          &quot;scroll&quot;: 738
+        },
+        &quot;outside&quot;: false,
+        &quot;cards&quot;: 0
+      }
+    ],
+    &quot;checks&quot;: [
+      &quot;full detail replaces list and split pane&quot;,
+      &quot;fixed footer at four widths&quot;,
+      &quot;sidebar open and closed&quot;,
+      &quot;search selects immediately&quot;,
+      &quot;tabs retain choices and manual order&quot;,
+      &quot;back and resume retain ID&quot;,
+      &quot;save/readback retains aliases and weights&quot;,
+      &quot;source-style cards with a single open action&quot;,
+      &quot;runtime belongs to aggregate detail&quot;,
+      &quot;light English&quot;
+    ]
+  },
+  &quot;phone&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;bounds&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;footer&quot;: {
+        &quot;top&quot;: 677.0909423828125,
+        &quot;bottom&quot;: 741.8182144165039
+      },
+      &quot;scroll&quot;: 1257,
+      &quot;client&quot;: 570,
+      &quot;headers&quot;: 1
+    },
+    &quot;before&quot;: [
+      &quot;b/vendor/coding-b&quot;,
+      &quot;b/vendor/coding-a&quot;,
+      &quot;a/hy4free&quot;,
+      &quot;b/hy4free&quot;
+    ],
+    &quot;after&quot;: [
+      &quot;b/vendor/coding-a&quot;,
+      &quot;b/vendor/coding-b&quot;,
+      &quot;a/hy4free&quot;,
+      &quot;b/hy4free&quot;
+    ],
+    &quot;picked&quot;: &quot;hy4free&quot;,
+    &quot;checks&quot;: [
+      &quot;full-screen source-style detail&quot;,
+      &quot;single return bar&quot;,
+      &quot;touch selection without add step&quot;,
+      &quot;touch drag order&quot;,
+      &quot;one content scroll area&quot;,
+      &quot;fixed save visible&quot;,
+      &quot;back resumes unsaved draft&quot;,
+      &quot;touch save and readback&quot;,
+      &quot;real touch source switch&quot;,
+      &quot;native keyboard text input and cancel&quot;
+    ],
+    &quot;keyboard&quot;: {
+      &quot;state&quot;: &quot;open&quot;,
+      &quot;kb&quot;: &quot;314px&quot;,
+      &quot;footerBottom&quot;: 451.8181838989258,
+      &quot;viewport&quot;: 765.8181762695312,
+      &quot;clientHeight&quot;: 766,
+      &quot;source&quot;: &quot;Primary source&quot;
+    }
+  },
+  &quot;tests&quot;: {
+    &quot;files&quot;: 253,
+    &quot;passed&quot;: 1821
+  },
+  &quot;checks&quot;: [
+    &quot;full quality gate&quot;,
+    &quot;typecheck&quot;,
+    &quot;i18n&quot;,
+    &quot;hover&quot;,
+    &quot;production build&quot;
+  ],
+  &quot;artifacts&quot;: &quot;/tmp/roami-aggregation-config-20261114&quot;,
+  &quot;scope&quot;: &quot;Frontend only; no routing, billing, API or retention changes.&quot;
+}
+</code></pre></details>
+<details class="evidence" id="evidence-aggregation-editor-evidence"><summary>aggregation-editor-evidence.json</summary><pre><code>{
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;layouts&quot;: [
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 1280,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: {
+          &quot;x&quot;: 779.609375,
+          &quot;right&quot;: 1280,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;main&quot;: {
+          &quot;right&quot;: 779.609375,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 1920,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: {
+          &quot;x&quot;: 1131.609375,
+          &quot;right&quot;: 1920,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;main&quot;: {
+          &quot;right&quot;: 1131.609375,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 2560,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: {
+          &quot;x&quot;: 1483.609375,
+          &quot;right&quot;: 2560,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;main&quot;: {
+          &quot;right&quot;: 1483.609375,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 3440,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: {
+          &quot;x&quot;: 1967.609375,
+          &quot;right&quot;: 3440,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;main&quot;: {
+          &quot;right&quot;: 1967.609375,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 1280,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: null,
+        &quot;main&quot;: {
+          &quot;right&quot;: 1280,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 1920,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: null,
+        &quot;main&quot;: {
+          &quot;right&quot;: 1920,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 2560,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: null,
+        &quot;main&quot;: {
+          &quot;right&quot;: 2560,
+          &quot;bottom&quot;: 1055
+        }
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;workspace&quot;: {
+          &quot;x&quot;: 168,
+          &quot;right&quot;: 3440,
+          &quot;bottom&quot;: 1055
+        },
+        &quot;pane&quot;: null,
+        &quot;main&quot;: {
+          &quot;right&quot;: 3440,
+          &quot;bottom&quot;: 1055
+        }
+      }
+    ],
+    &quot;models&quot;: 471,
+    &quot;free&quot;: 17,
+    &quot;savedMembers&quot;: 17,
+    &quot;aliases&quot;: [
+      &quot;hy4&quot;
+    ],
+    &quot;checks&quot;: [
+      &quot;four desktop widths, pane open/closed&quot;,
+      &quot;editable ID and old ID compatibility saved&quot;,
+      &quot;all source selection blocked without silent truncation&quot;,
+      &quot;all free source models added once&quot;,
+      &quot;rotate and unavailable simulation&quot;,
+      &quot;capabilities/context from recorded OpenRouter data&quot;,
+      &quot;free/search filters&quot;,
+      &quot;light English&quot;
+    ]
+  },
+  &quot;phone&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;layout&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;barWidth&quot;: 392.727294921875,
+      &quot;barHittable&quot;: true,
+      &quot;editable&quot;: true
+    },
+    &quot;overflow&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    },
+    &quot;scrolled&quot;: 856.727294921875,
+    &quot;checks&quot;: [
+      &quot;full screen editor and hittable return bar&quot;,
+      &quot;editable ID&quot;,
+      &quot;source then bulk select and add by touch&quot;,
+      &quot;unavailable simulation&quot;,
+      &quot;one internal editor scroll area&quot;,
+      &quot;real touch scroll&quot;,
+      &quot;cancel and return&quot;,
+      &quot;gateway capability filtering&quot;,
+      &quot;no document overflow&quot;
+    ]
+  },
+  &quot;checks&quot;: {
+    &quot;go&quot;: &quot;scripts/dev/quality/check.sh quick: passed (go test ./... included)&quot;,
+    &quot;frontend&quot;: &quot;typecheck, i18n, hover, vitest (252 files / 1810 tests), build: passed&quot;,
+    &quot;latestRegression&quot;: &quot;new aggregate preview and gateway binding: 28 tests passed&quot;,
+    &quot;note&quot;: &quot;The first full Go pass hit the existing TestClaudeRejectedCancellationStopsOnlyNewOwnedProcesses timing failure. The focused rerun and complete quick rerun both passed.&quot;
+  },
+  &quot;screenshots&quot;: {
+    &quot;desktopRouting&quot;: &quot;/tmp/roami-aggregation-editor-20261114/desktop-edit-1920.png&quot;,
+    &quot;desktopDirectory&quot;: &quot;/tmp/roami-aggregation-editor-20261114/desktop-gateway-free.png&quot;,
+    &quot;phoneRouting&quot;: &quot;/tmp/roami-aggregation-editor-20261114/phone-strategy.png&quot;,
+    &quot;phoneDirectory&quot;: &quot;/tmp/roami-aggregation-editor-20261114/phone-gateway.png&quot;
+  },
+  &quot;fixture&quot;: &quot;Recorded public OpenRouter directory: 471 models, 17 with zero advertised input and output token prices. No generation requests were sent to OpenRouter.&quot;,
+  &quot;deployment&quot;: &quot;Not deployed; production catalog and preferences were not changed.&quot;
+}
+</code></pre></details>
+<details class="evidence" id="evidence-aggregation-effects-evidence"><summary>aggregation-effects-evidence.json</summary><pre><code>{
+  &quot;desktop-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;layouts&quot;: [
+      {
+        &quot;tab&quot;: &quot;effects&quot;,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;strategy&quot;,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;memberHealth&quot;,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;effects&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;strategy&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;memberHealth&quot;,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;effects&quot;,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;strategy&quot;,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;memberHealth&quot;,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;effects&quot;,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;strategy&quot;,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;tab&quot;: &quot;memberHealth&quot;,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      }
+    ],
+    &quot;errors&quot;: [],
+    &quot;api&quot;: [],
+    &quot;checks&quot;: [
+      &quot;three views at four widths&quot;,
+      &quot;nine routing policies&quot;,
+      &quot;weight editing&quot;,
+      &quot;rate-limit simulation&quot;,
+      &quot;source before model&quot;,
+      &quot;add member&quot;,
+      &quot;save demo&quot;,
+      &quot;ten-account detail&quot;,
+      &quot;empty state&quot;,
+      &quot;English dark mode&quot;
+    ]
+  },
+  &quot;phone-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;dimensions&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;timezone&quot;: &quot;Asia/Shanghai&quot;
+    },
+    &quot;detail&quot;: {
+      &quot;width&quot;: 392.727294921875,
+      &quot;x&quot;: 0,
+      &quot;shellHidden&quot;: true,
+      &quot;visibleHeaders&quot;: 1
+    },
+    &quot;checks&quot;: [
+      &quot;real touch tab navigation&quot;,
+      &quot;weight policy selection&quot;,
+      &quot;rate-limit simulation&quot;,
+      &quot;10 independent accounts&quot;,
+      &quot;single full-screen return bar&quot;,
+      &quot;request routing trace&quot;,
+      &quot;English dark theme bounds&quot;
+    ]
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-aggregation-order-evidence"><summary>aggregation-order-evidence.json</summary><pre><code>{
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;layouts&quot;: [
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;paneRight&quot;: 1280,
+        &quot;workspaceRight&quot;: 1280,
+        &quot;listRight&quot;: 763.609375,
+        &quot;previewRight&quot;: 779.609375
+      },
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;paneRight&quot;: 1920,
+        &quot;workspaceRight&quot;: 1920,
+        &quot;listRight&quot;: 1115.609375,
+        &quot;previewRight&quot;: 1131.609375
+      },
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;paneRight&quot;: 2560,
+        &quot;workspaceRight&quot;: 2560,
+        &quot;listRight&quot;: 1467.609375,
+        &quot;previewRight&quot;: 1483.609375
+      },
+      {
+        &quot;open&quot;: true,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;paneRight&quot;: 3440,
+        &quot;workspaceRight&quot;: 3440,
+        &quot;listRight&quot;: 1951.609375,
+        &quot;previewRight&quot;: 1967.609375
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;detail&quot;: false,
+        &quot;mainRight&quot;: 1280,
+        &quot;workspaceRight&quot;: 1280
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;detail&quot;: false,
+        &quot;mainRight&quot;: 1920,
+        &quot;workspaceRight&quot;: 1920
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;detail&quot;: false,
+        &quot;mainRight&quot;: 2560,
+        &quot;workspaceRight&quot;: 2560
+      },
+      {
+        &quot;open&quot;: false,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;detail&quot;: false,
+        &quot;mainRight&quot;: 3440,
+        &quot;workspaceRight&quot;: 3440
+      }
+    ],
+    &quot;original&quot;: [
+      &quot;openrouter/inclusionai/ling-3.2-flash:free&quot;,
+      &quot;legacy/legacy-model&quot;,
+      &quot;openrouter/baidu/ernie-5.5-flash-preview:free&quot;,
+      &quot;openrouter/thinkingmachines/inkling-2-small:free&quot;
+    ],
+    &quot;saved&quot;: [
+      &quot;openrouter/baidu/ernie-5.5-flash-preview:free&quot;,
+      &quot;openrouter/inclusionai/ling-3.2-flash:free&quot;,
+      &quot;openrouter/thinkingmachines/inkling-2-small:free&quot;,
+      &quot;legacy/legacy-model&quot;
+    ],
+    &quot;weights&quot;: [
+      {
+        &quot;key&quot;: &quot;openrouter/baidu/ernie-5.5-flash-preview:free&quot;,
+        &quot;weight&quot;: &quot;1&quot;
+      },
+      {
+        &quot;key&quot;: &quot;openrouter/inclusionai/ling-3.2-flash:free&quot;,
+        &quot;weight&quot;: &quot;3&quot;
+      },
+      {
+        &quot;key&quot;: &quot;openrouter/thinkingmachines/inkling-2-small:free&quot;,
+        &quot;weight&quot;: &quot;1&quot;
+      },
+      {
+        &quot;key&quot;: &quot;legacy/legacy-model&quot;,
+        &quot;weight&quot;: &quot;2&quot;
+      }
+    ],
+    &quot;checks&quot;: [
+      &quot;mouse handle drag from first to third&quot;,
+      &quot;Escape cancel&quot;,
+      &quot;stable source grouping&quot;,
+      &quot;keyboard End&quot;,
+      &quot;weights remain attached&quot;,
+      &quot;save preserves order&quot;,
+      &quot;four widths open/closed&quot;
+    ]
+  },
+  &quot;phone&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;pane&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;barWidth&quot;: 392.727294921875,
+      &quot;handleWidth&quot;: 71.19318389892578,
+      &quot;handleHeight&quot;: 36
+    },
+    &quot;scrolled&quot;: 1084,
+    &quot;dragDestination&quot;: 9,
+    &quot;original&quot;: [
+      &quot;openrouter/baidu/ernie-5.5-flash-preview:free&quot;,
+      &quot;openrouter/inclusionai/ling-3.2-flash:free&quot;,
+      &quot;openrouter/thinkingmachines/inkling-2-small:free&quot;,
+      &quot;legacy/legacy-model&quot;,
+      &quot;openrouter/liquid/lfm-3-1.7b:free&quot;,
+      &quot;openrouter/particle-ai/particle-1:free&quot;,
+      &quot;openrouter/recursive/flint-v1.0:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3.5-super-vl:free&quot;,
+      &quot;openrouter/dots-studio/dots-3-note-preview:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3.5-lightning:free&quot;,
+      &quot;openrouter/cohere/north-mini-code:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3-ultra-550b-a55b:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free&quot;,
+      &quot;openrouter/google/gemma-4-26b-a4b-it:free&quot;,
+      &quot;openrouter/google/gemma-4-31b-it:free&quot;,
+      &quot;openrouter/google/lyria-3-pro-preview&quot;,
+      &quot;openrouter/google/lyria-3-clip-preview&quot;
+    ],
+    &quot;saved&quot;: [
+      &quot;openrouter/baidu/ernie-5.5-flash-preview:free&quot;,
+      &quot;legacy/legacy-model&quot;,
+      &quot;openrouter/thinkingmachines/inkling-2-small:free&quot;,
+      &quot;openrouter/liquid/lfm-3-1.7b:free&quot;,
+      &quot;openrouter/particle-ai/particle-1:free&quot;,
+      &quot;openrouter/recursive/flint-v1.0:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3.5-super-vl:free&quot;,
+      &quot;openrouter/dots-studio/dots-3-note-preview:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3.5-lightning:free&quot;,
+      &quot;openrouter/inclusionai/ling-3.2-flash:free&quot;,
+      &quot;openrouter/cohere/north-mini-code:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3-ultra-550b-a55b:free&quot;,
+      &quot;openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free&quot;,
+      &quot;openrouter/google/gemma-4-26b-a4b-it:free&quot;,
+      &quot;openrouter/google/gemma-4-31b-it:free&quot;,
+      &quot;openrouter/google/lyria-3-pro-preview&quot;,
+      &quot;openrouter/google/lyria-3-clip-preview&quot;
+    ],
+    &quot;checks&quot;: [
+      &quot;real touch handle drag&quot;,
+      &quot;touch cancel leaves order intact&quot;,
+      &quot;edge autoscroll while held&quot;,
+      &quot;source grouping by touch&quot;,
+      &quot;move buttons by touch&quot;,
+      &quot;normal list scroll does not reorder&quot;,
+      &quot;save preserves dragged order&quot;,
+      &quot;no document overflow&quot;
+    ]
+  },
+  &quot;checks&quot;: {
+    &quot;frontend&quot;: &quot;253 files / 1815 tests passed; typecheck, i18n, hover, production build passed&quot;,
+    &quot;latestRegression&quot;: &quot;5 aggregation workspace tests passed after restoring correct false/omitted free-only checkbox rendering&quot;,
+    &quot;go&quot;: &quot;go test ./internal/modelgateway passed; complete quick quality gate passed&quot;
+  },
+  &quot;screenshots&quot;: {
+    &quot;desktop&quot;: &quot;/tmp/roami-aggregation-editor-20261114/order-desktop-final.png&quot;,
+    &quot;phone&quot;: &quot;/tmp/roami-aggregation-editor-20261114/order-phone-drag.png&quot;,
+    &quot;phoneSourceGrouping&quot;: &quot;/tmp/roami-aggregation-editor-20261114/order-phone-source-sort.png&quot;
+  },
+  &quot;deployment&quot;: &quot;Not deployed. Production configuration was not changed.&quot;
+}
+</code></pre></details>
+<details class="evidence" id="evidence-evidence-acceptance-v1"><summary>evidence/acceptance-v1.json</summary><pre><code>{
+  &quot;desktopLayout&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;collapsed&quot;: false,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 256,
+        &quot;width&quot;: 1024,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1031,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 1280,
+      &quot;collapsed&quot;: true,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 128,
+        &quot;width&quot;: 1152,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;collapsed&quot;: false,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 256,
+        &quot;width&quot;: 1664,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;collapsed&quot;: true,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 128,
+        &quot;width&quot;: 1792,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;collapsed&quot;: false,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 256,
+        &quot;width&quot;: 2304,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;collapsed&quot;: true,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 128,
+        &quot;width&quot;: 2432,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;collapsed&quot;: false,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 256,
+        &quot;width&quot;: 3184,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;collapsed&quot;: true,
+      &quot;size&quot;: &quot;large&quot;,
+      &quot;documentWidth&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;documentHeight&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;main&quot;: {
+        &quot;x&quot;: 128,
+        &quot;width&quot;: 3312,
+        &quot;height&quot;: 968
+      },
+      &quot;contentHeight&quot;: 836,
+      &quot;contentScrollHeight&quot;: 1012,
+      &quot;visibleGroups&quot;: 4
+    }
+  ],
+  &quot;desktopInteractions&quot;: {
+    &quot;passed&quot;: true,
+    &quot;paneBounds&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;pane&quot;: {
+          &quot;x&quot;: 951.6875,
+          &quot;width&quot;: 328.3125,
+          &quot;right&quot;: 1280
+        },
+        &quot;main&quot;: {
+          &quot;x&quot;: 256,
+          &quot;width&quot;: 695.6875,
+          &quot;right&quot;: 951.6875
+        }
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;pane&quot;: {
+          &quot;x&quot;: 1480,
+          &quot;width&quot;: 440,
+          &quot;right&quot;: 1920
+        },
+        &quot;main&quot;: {
+          &quot;x&quot;: 256,
+          &quot;width&quot;: 1224,
+          &quot;right&quot;: 1480
+        }
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;pane&quot;: {
+          &quot;x&quot;: 2120,
+          &quot;width&quot;: 440,
+          &quot;right&quot;: 2560
+        },
+        &quot;main&quot;: {
+          &quot;x&quot;: 256,
+          &quot;width&quot;: 1864,
+          &quot;right&quot;: 2120
+        }
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;pane&quot;: {
+          &quot;x&quot;: 3000,
+          &quot;width&quot;: 440,
+          &quot;right&quot;: 3440
+        },
+        &quot;main&quot;: {
+          &quot;x&quot;: 256,
+          &quot;width&quot;: 2744,
+          &quot;right&quot;: 3000
+        }
+      }
+    ],
+    &quot;errors&quot;: [],
+    &quot;apiRequests&quot;: [],
+    &quot;checks&quot;: [
+      &quot;agent/source/model groups&quot;,
+      &quot;metric selection&quot;,
+      &quot;source filter&quot;,
+      &quot;request drilldown&quot;,
+      &quot;request detail&quot;,
+      &quot;desktop pane bounds at 4 widths&quot;,
+      &quot;status filter&quot;,
+      &quot;empty result without pagination&quot;,
+      &quot;invalid date range&quot;,
+      &quot;English&quot;,
+      &quot;dark theme&quot;,
+      &quot;limits tab&quot;,
+      &quot;no live API calls&quot;
+    ]
+  },
+  &quot;android&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8 / 216d6a43&quot;,
+    &quot;dimensions&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;size&quot;: &quot;compact&quot;,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;topbar&quot;: 60,
+      &quot;bottom&quot;: 84,
+      &quot;scrollContainers&quot;: [
+        &quot;content-scroll&quot;
+      ]
+    },
+    &quot;filterControlHeights&quot;: [
+      44,
+      44,
+      44,
+      44
+    ],
+    &quot;realTouchScroll&quot;: {
+      &quot;before&quot;: 0,
+      &quot;after&quot;: 529.0908813476562,
+      &quot;restored&quot;: 529.0908813476562
+    },
+    &quot;detail&quot;: {
+      &quot;width&quot;: 392.727294921875,
+      &quot;x&quot;: 0,
+      &quot;viewport&quot;: 392,
+      &quot;visibleBars&quot;: 1,
+      &quot;scrollers&quot;: [
+        {
+          &quot;height&quot;: 622,
+          &quot;scrollHeight&quot;: 823
+        }
+      ],
+      &quot;backLabel&quot;: &quot;返回用量明细&quot;
+    },
+    &quot;english&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392
+    },
+    &quot;checks&quot;: [
+      &quot;top and bottom bars&quot;,
+      &quot;no document scrolling&quot;,
+      &quot;coarse pointer&quot;,
+      &quot;filter expand and collapse&quot;,
+      &quot;request tab by touch&quot;,
+      &quot;content scroll by touch&quot;,
+      &quot;request open by touch&quot;,
+      &quot;full-screen detail with one header&quot;,
+      &quot;back by touch with scroll preserved&quot;,
+      &quot;English bounds&quot;,
+      &quot;dark theme&quot;
+    ]
+  },
+  &quot;archive&quot;: {
+    &quot;passed&quot;: true,
+    &quot;archivedDate&quot;: &quot;2026-11-06&quot;,
+    &quot;summaryCalls&quot;: 25,
+    &quot;retainedRequestRows&quot;: 0
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-evidence-acceptance"><summary>evidence/acceptance.json</summary><pre><code>{
+  &quot;version&quot;: 2,
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;version&quot;: 2,
+    &quot;layouts&quot;: [
+      {
+        &quot;collapsed&quot;: false,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: true,
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: false,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: true,
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: false,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: true,
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: false,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      },
+      {
+        &quot;collapsed&quot;: true,
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;contentHeight&quot;: 893
+      }
+    ],
+    &quot;panes&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;mainRight&quot;: 951.6875,
+        &quot;detailLeft&quot;: 951.6875,
+        &quot;detailRight&quot;: 1280
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;mainRight&quot;: 1480,
+        &quot;detailLeft&quot;: 1480,
+        &quot;detailRight&quot;: 1920
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;mainRight&quot;: 2120,
+        &quot;detailLeft&quot;: 2120,
+        &quot;detailRight&quot;: 2560
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;mainRight&quot;: 3000,
+        &quot;detailLeft&quot;: 3000,
+        &quot;detailRight&quot;: 3440
+      }
+    ],
+    &quot;errors&quot;: [],
+    &quot;apiRequests&quot;: [],
+    &quot;checks&quot;: [
+      &quot;sibling Overview and Audit tabs&quot;,
+      &quot;no nested Overview/Requests navigation&quot;,
+      &quot;usage, limits and aggregation in Overview&quot;,
+      &quot;limit editing and preservation&quot;,
+      &quot;aggregation drilldown into Audit&quot;,
+      &quot;no overview modules in Audit&quot;,
+      &quot;audit filters, search and empty state&quot;,
+      &quot;request detail open and return&quot;,
+      &quot;archive message&quot;,
+      &quot;English and dark theme&quot;
+    ]
+  },
+  &quot;android&quot;: {
+    &quot;passed&quot;: true,
+    &quot;version&quot;: 2,
+    &quot;device&quot;: &quot;Redmi Note 8 / 216d6a43&quot;,
+    &quot;overview&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;size&quot;: &quot;compact&quot;
+    },
+    &quot;auditAndEnglish&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;size&quot;: &quot;compact&quot;
+    },
+    &quot;controlHeights&quot;: [
+      44,
+      44,
+      44,
+      44
+    ],
+    &quot;detail&quot;: {
+      &quot;width&quot;: 392.727294921875,
+      &quot;headers&quot;: 1
+    },
+    &quot;realTouchScroll&quot;: {
+      &quot;after&quot;: 419.6363525390625,
+      &quot;restored&quot;: 419.6363525390625
+    },
+    &quot;checks&quot;: [
+      &quot;sibling Overview/Audit by touch&quot;,
+      &quot;overview contains usage/limits/summary&quot;,
+      &quot;audit omits overview modules&quot;,
+      &quot;filter expand and collapse&quot;,
+      &quot;real touch scrolling&quot;,
+      &quot;full-screen detail with one title bar&quot;,
+      &quot;back restores scroll&quot;,
+      &quot;English and dark theme&quot;
+    ]
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-evidence-free-pool-desktop"><summary>evidence/free-pool-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;layouts&quot;: [
+    {
+      &quot;page&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;聚合&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;聚合&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;聚合&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;聚合&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;page&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;errors&quot;: [],
+  &quot;apiRequests&quot;: [],
+  &quot;checks&quot;: [
+    &quot;priority scheduling&quot;,
+    &quot;round robin&quot;,
+    &quot;rate-limit cooldown and recovery&quot;,
+    &quot;all candidates exhausted: no paid fallback&quot;,
+    &quot;no retries after output starts&quot;,
+    &quot;paid and unconfirmed eligibility gates&quot;,
+    &quot;plan allowance opt-in and independent credits&quot;,
+    &quot;source default pricing&quot;,
+    &quot;per-model overrides win&quot;,
+    &quot;zero prices are not automatic free eligibility&quot;,
+    &quot;new pool and duplicate ID validation&quot;,
+    &quot;drafts across tabs&quot;,
+    &quot;Chinese and English&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-free-pool-phone"><summary>evidence/free-pool-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;initial&quot;: {
+    &quot;width&quot;: 392,
+    &quot;scrollWidth&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  },
+  &quot;targetHeights&quot;: [
+    44,
+    44,
+    44
+  ],
+  &quot;scroll&quot;: {
+    &quot;before&quot;: 0,
+    &quot;after&quot;: 448.3636474609375
+  },
+  &quot;source&quot;: {
+    &quot;width&quot;: 392.727294921875,
+    &quot;top&quot;: 0,
+    &quot;policy&quot;: &quot;free&quot;
+  },
+  &quot;checks&quot;: [
+    &quot;aggregation tab by touch&quot;,
+    &quot;pool editor by touch&quot;,
+    &quot;real touch scrolling&quot;,
+    &quot;per-pool policy toggle&quot;,
+    &quot;rate-limit demo switches to free backup&quot;,
+    &quot;source-level default strategy on full-screen editor&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-free-pool-policy"><summary>evidence/free-pool-policy.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;checks&quot;: [
+    &quot;per-pool cooldown duration&quot;,
+    &quot;stop or switch on rate limit&quot;,
+    &quot;stop or switch on exhausted allowance&quot;,
+    &quot;cooldown does not expire early&quot;,
+    &quot;pool policy isolation&quot;,
+    &quot;tool and context eligibility&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-implementation-desktop"><summary>evidence/implementation-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainWidth&quot;: 1112,
+      &quot;contentHeight&quot;: 906
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainWidth&quot;: 1752,
+      &quot;contentHeight&quot;: 906
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainWidth&quot;: 2392,
+      &quot;contentHeight&quot;: 906
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainWidth&quot;: 3272,
+      &quot;contentHeight&quot;: 906
+    }
+  ],
+  &quot;panels&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;mainRight&quot;: 946.40625,
+      &quot;panelLeft&quot;: 946.40625,
+      &quot;panelRight&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;mainRight&quot;: 1480,
+      &quot;panelLeft&quot;: 1480,
+      &quot;panelRight&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;mainRight&quot;: 2120,
+      &quot;panelLeft&quot;: 2120,
+      &quot;panelRight&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;mainRight&quot;: 3000,
+      &quot;panelLeft&quot;: 3000,
+      &quot;panelRight&quot;: 3440
+    }
+  ],
+  &quot;errors&quot;: [],
+  &quot;checks&quot;: [
+    &quot;real gateway API&quot;,
+    &quot;limit save&quot;,
+    &quot;source summary and audit drilldown&quot;,
+    &quot;server pagination&quot;,
+    &quot;search input stability&quot;,
+    &quot;frozen price snapshot&quot;,
+    &quot;unknown receipt remains unknown&quot;,
+    &quot;global today independent of source filter&quot;,
+    &quot;navigation and state preservation&quot;,
+    &quot;remaining budget stays unconfirmed with unknown expenses&quot;,
+    &quot;stored duration displayed&quot;,
+    &quot;past-day drilldown displays the explicit custom date&quot;
+  ],
+  &quot;requestCount&quot;: 13,
+  &quot;pastDay&quot;: &quot;2026-11-06&quot;
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-implementation-phone"><summary>evidence/implementation-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8 / 216d6a43&quot;,
+  &quot;overview&quot;: {
+    &quot;width&quot;: 392,
+    &quot;scrollWidth&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollHeight&quot;: 766,
+    &quot;size&quot;: &quot;compact&quot;,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  },
+  &quot;targets&quot;: [
+    44,
+    44,
+    44,
+    44
+  ],
+  &quot;detail&quot;: {
+    &quot;x&quot;: 0,
+    &quot;width&quot;: 392.727294921875,
+    &quot;height&quot;: 621.0909423828125,
+    &quot;scrollHeight&quot;: 785,
+    &quot;headerCount&quot;: 1,
+    &quot;backHit&quot;: true
+  },
+  &quot;scroll&quot;: {
+    &quot;after&quot;: 428.7272644042969,
+    &quot;restored&quot;: 428.7272644042969
+  },
+  &quot;checks&quot;: [
+    &quot;LAN HTTPS and real API&quot;,
+    &quot;coarse pointer layout and safe areas&quot;,
+    &quot;sibling overview and audit tabs&quot;,
+    &quot;filter targets&quot;,
+    &quot;real touch scroll&quot;,
+    &quot;full-screen detail&quot;,
+    &quot;return restores scroll&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-interaction-product-desktop"><summary>evidence/interaction-product-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;panels&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;sourceCards&quot;: 2,
+  &quot;errors&quot;: [],
+  &quot;checks&quot;: [
+    &quot;real APIs and hourly model requests&quot;,
+    &quot;no overview detail tables&quot;,
+    &quot;audit hour scope and return&quot;,
+    &quot;source/token filters&quot;,
+    &quot;archived hour indication&quot;,
+    &quot;pricing inside model sources&quot;,
+    &quot;source cards and return&quot;,
+    &quot;independent model/default saves&quot;,
+    &quot;model draft retention&quot;,
+    &quot;validation and free confirmation&quot;,
+    &quot;four widths with inspector open and closed&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-interaction-product-locales"><summary>evidence/interaction-product-locales.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;checks&quot;: [
+    &quot;English labels&quot;,
+    &quot;light theme&quot;,
+    &quot;four desktop widths and compact bounds&quot;
+  ],
+  &quot;results&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440
+    },
+    {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392
+    }
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-interaction-product-phone"><summary>evidence/interaction-product-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;bounds&quot;: {
+    &quot;width&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollWidth&quot;: 392,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  },
+  &quot;editor&quot;: {
+    &quot;back&quot;: 44,
+    &quot;top&quot;: 8,
+    &quot;headers&quot;: 1
+  },
+  &quot;keyboard&quot;: {
+    &quot;keyboard&quot;: 314,
+    &quot;saveBottom&quot;: 451.8181838989258,
+    &quot;height&quot;: 766,
+    &quot;viewport&quot;: 765.8181762695312
+  },
+  &quot;chartScroll&quot;: {
+    &quot;before&quot;: 0,
+    &quot;after&quot;: 246.90908813476562
+  },
+  &quot;checks&quot;: [
+    &quot;real touch filters and legend&quot;,
+    &quot;hourly horizontal scroll&quot;,
+    &quot;audit request and return&quot;,
+    &quot;cards and pricing entry&quot;,
+    &quot;default pricing within sources&quot;,
+    &quot;source and model return bars&quot;,
+    &quot;free confirmation and save&quot;,
+    &quot;keyboard footer visibility&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-interaction-review-desktop"><summary>evidence/interaction-review-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;requests&quot;: 497,
+  &quot;legendRequests&quot;: 497,
+  &quot;checks&quot;: [
+    &quot;overview has only summary and charts&quot;,
+    &quot;source cards with pricing entry&quot;,
+    &quot;detail tables in audit only&quot;,
+    &quot;request-first model comparison&quot;,
+    &quot;hour selection and audit back&quot;,
+    &quot;source and metric switching&quot;,
+    &quot;hour/day and archived state&quot;,
+    &quot;effective global/source/model prices&quot;,
+    &quot;isolated model/source save&quot;,
+    &quot;multiplier exactly once&quot;,
+    &quot;restore inheritance&quot;,
+    &quot;confirmed free gate&quot;,
+    &quot;invalid price&quot;,
+    &quot;draft preservation&quot;,
+    &quot;model picker preservation&quot;,
+    &quot;default pricing nested in model sources&quot;,
+    &quot;default pricing return to cards and source draft&quot;,
+    &quot;global scope&quot;,
+    &quot;English and light theme&quot;
+  ],
+  &quot;errors&quot;: []
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-interaction-review-phone"><summary>evidence/interaction-review-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;bounds&quot;: {
+    &quot;width&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollWidth&quot;: 392,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  },
+  &quot;editor&quot;: {
+    &quot;top&quot;: 0,
+    &quot;headers&quot;: 1,
+    &quot;back&quot;: 44
+  },
+  &quot;chartScroll&quot;: {
+    &quot;before&quot;: 0,
+    &quot;after&quot;: 240
+  },
+  &quot;keyboard&quot;: {
+    &quot;keyboard&quot;: &quot;314px&quot;,
+    &quot;viewport&quot;: 765.8181762695312,
+    &quot;saveBottom&quot;: 451.8181838989258
+  },
+  &quot;checks&quot;: [
+    &quot;real filter toggle&quot;,
+    &quot;legend selection&quot;,
+    &quot;hourly horizontal touch scroll&quot;,
+    &quot;default pricing within model sources and touch return&quot;,
+    &quot;source cards pricing entry&quot;,
+    &quot;pricing return to cards and switch source&quot;,
+    &quot;model price editor&quot;,
+    &quot;single full-screen return bar&quot;,
+    &quot;native pricing menu selection&quot;,
+    &quot;free confirmation gate&quot;,
+    &quot;actual save by touch&quot;,
+    &quot;keyboard save visibility&quot;,
+    &quot;back navigation&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-merge-verification"><summary>evidence/merge-verification.json</summary><pre><code>{
+  &quot;base&quot;: &quot;104e4e53&quot;,
+  &quot;unresolvedConflicts&quot;: 0,
+  &quot;frontend&quot;: {
+    &quot;files&quot;: 238,
+    &quot;tests&quot;: 1753,
+    &quot;passed&quot;: true
+  },
+  &quot;focusedRace&quot;: &quot;passed&quot;,
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;order&quot;: [
+      &quot;模型&quot;,
+      &quot;聚合&quot;,
+      &quot;概况&quot;,
+      &quot;监控&quot;,
+      &quot;审计&quot;,
+      &quot;本机网关&quot;,
+      &quot;模型定价&quot;,
+      &quot;语音输入&quot;
+    ],
+    &quot;layouts&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      }
+    ],
+    &quot;clicked&quot;: [
+      &quot;usage&quot;,
+      &quot;audit&quot;,
+      &quot;aggregate&quot;,
+      &quot;monitor&quot;
+    ]
+  },
+  &quot;phone&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;order&quot;: [
+      &quot;模型&quot;,
+      &quot;聚合&quot;,
+      &quot;概况&quot;,
+      &quot;监控&quot;,
+      &quot;审计&quot;,
+      &quot;网关&quot;,
+      &quot;定价&quot;,
+      &quot;语音输入&quot;
+    ],
+    &quot;clicked&quot;: [
+      &quot;catalog&quot;,
+      &quot;aggregate&quot;,
+      &quot;usage&quot;,
+      &quot;monitor&quot;
+    ],
+    &quot;bounds&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;
+    }
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-evidence-navigation-desktop"><summary>evidence/navigation-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;order&quot;: [
+    &quot;模型&quot;,
+    &quot;聚合&quot;,
+    &quot;概况&quot;,
+    &quot;监控&quot;,
+    &quot;审计&quot;,
+    &quot;本机网关&quot;,
+    &quot;模型定价&quot;,
+    &quot;语音输入&quot;
+  ],
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;clicked&quot;: [
+    &quot;usage&quot;,
+    &quot;audit&quot;,
+    &quot;aggregate&quot;,
+    &quot;monitor&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-navigation-phone"><summary>evidence/navigation-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;order&quot;: [
+    &quot;模型&quot;,
+    &quot;聚合&quot;,
+    &quot;概况&quot;,
+    &quot;监控&quot;,
+    &quot;审计&quot;,
+    &quot;网关&quot;,
+    &quot;定价&quot;,
+    &quot;语音输入&quot;
+  ],
+  &quot;clicked&quot;: [
+    &quot;catalog&quot;,
+    &quot;aggregate&quot;,
+    &quot;usage&quot;,
+    &quot;monitor&quot;
+  ],
+  &quot;bounds&quot;: {
+    &quot;width&quot;: 392,
+    &quot;scrollWidth&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  }
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-plugin-accounts-desktop"><summary>evidence/plugin-accounts-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;order&quot;: [
+    &quot;连接&quot;,
+    &quot;模型与定价&quot;,
+    &quot;账号调度&quot;
+  ],
+  &quot;accountCount&quot;: 10,
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;errors&quot;: [],
+  &quot;checks&quot;: [
+    &quot;card creates independent account&quot;,
+    &quot;new instance signed out&quot;,
+    &quot;own sign-in succeeds&quot;,
+    &quot;connection/pricing/routing order&quot;,
+    &quot;ten unique instances and names&quot;,
+    &quot;four desktop widths&quot;,
+    &quot;login and connection share one scroll container&quot;,
+    &quot;plugin form fits its pane in four widths&quot;
+  ],
+  &quot;connectionLayouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;formLeft&quot;: 264,
+      &quot;formRight&quot;: 1184,
+      &quot;paneLeft&quot;: 168,
+      &quot;paneRight&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;formLeft&quot;: 584,
+      &quot;formRight&quot;: 1504,
+      &quot;paneLeft&quot;: 168,
+      &quot;paneRight&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;formLeft&quot;: 904,
+      &quot;formRight&quot;: 1824,
+      &quot;paneLeft&quot;: 168,
+      &quot;paneRight&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;formLeft&quot;: 1344,
+      &quot;formRight&quot;: 2264,
+      &quot;paneLeft&quot;: 168,
+      &quot;paneRight&quot;: 3440
+    }
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-plugin-accounts-phone"><summary>evidence/plugin-accounts-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;bounds&quot;: {
+    &quot;width&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollWidth&quot;: 392,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  },
+  &quot;order&quot;: [
+    &quot;连接&quot;,
+    &quot;模型与定价&quot;,
+    &quot;账号调度&quot;
+  ],
+  &quot;form&quot;: {
+    &quot;left&quot;: 16,
+    &quot;right&quot;: 376.727294921875,
+    &quot;paneLeft&quot;: 0,
+    &quot;paneRight&quot;: 392.727294921875
+  },
+  &quot;checks&quot;: [
+    &quot;add account by real touch&quot;,
+    &quot;new instance starts signed out&quot;,
+    &quot;independent login by touch&quot;,
+    &quot;connection/pricing/routing order&quot;,
+    &quot;price tab and back to cards&quot;,
+    &quot;no document overflow&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-pool-source-first-phone"><summary>evidence/pool-source-first-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;selection&quot;: {
+    &quot;source&quot;: &quot;freea&quot;,
+    &quot;model&quot;: &quot;demo-free-chat&quot;,
+    &quot;disabled&quot;: false
+  },
+  &quot;after&quot;: {
+    &quot;model&quot;: &quot;&quot;,
+    &quot;candidates&quot;: &quot;Free API A / demo-free-chat&quot;,
+    &quot;targets&quot;: [
+      44,
+      44,
+      44
+    ],
+    &quot;width&quot;: 392,
+    &quot;scrollWidth&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollHeight&quot;: 766
+  },
+  &quot;checks&quot;: [
+    &quot;model disabled until source chosen&quot;,
+    &quot;native source menu selected by touch&quot;,
+    &quot;native model menu scoped to source&quot;,
+    &quot;native model selection by touch&quot;,
+    &quot;add by touch&quot;,
+    &quot;remove by touch&quot;,
+    &quot;44px targets&quot;,
+    &quot;no document overflow&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-pool-source-first"><summary>evidence/pool-source-first.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;checks&quot;: [
+    &quot;source required before model selection&quot;,
+    &quot;models scoped to source&quot;,
+    &quot;pending model reset on source change&quot;,
+    &quot;cross-source added candidates preserved&quot;,
+    &quot;duplicate and paid candidates disabled&quot;,
+    &quot;plan eligibility follows opt-in&quot;,
+    &quot;remove and reorder&quot;,
+    &quot;draft across tabs&quot;,
+    &quot;save and dispatch&quot;,
+    &quot;English labels&quot;
+  ],
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 961,
+      &quot;collapsed&quot;: false,
+      &quot;x&quot;: 280,
+      &quot;right&quot;: 1241,
+      &quot;scrollWidth&quot;: 961,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 1280,
+      &quot;documentScroll&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1089,
+      &quot;collapsed&quot;: true,
+      &quot;x&quot;: 152,
+      &quot;right&quot;: 1241,
+      &quot;scrollWidth&quot;: 1089,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 1280,
+      &quot;documentScroll&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1601,
+      &quot;collapsed&quot;: false,
+      &quot;x&quot;: 280,
+      &quot;right&quot;: 1881,
+      &quot;scrollWidth&quot;: 1601,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 1920,
+      &quot;documentScroll&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 1729,
+      &quot;collapsed&quot;: true,
+      &quot;x&quot;: 152,
+      &quot;right&quot;: 1881,
+      &quot;scrollWidth&quot;: 1729,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 1920,
+      &quot;documentScroll&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 2241,
+      &quot;collapsed&quot;: false,
+      &quot;x&quot;: 280,
+      &quot;right&quot;: 2521,
+      &quot;scrollWidth&quot;: 2241,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 2560,
+      &quot;documentScroll&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 2369,
+      &quot;collapsed&quot;: true,
+      &quot;x&quot;: 152,
+      &quot;right&quot;: 2521,
+      &quot;scrollWidth&quot;: 2369,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 2560,
+      &quot;documentScroll&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 3121,
+      &quot;collapsed&quot;: false,
+      &quot;x&quot;: 280,
+      &quot;right&quot;: 3401,
+      &quot;scrollWidth&quot;: 3121,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 3440,
+      &quot;documentScroll&quot;: 3440
+    },
+    {
+      &quot;width&quot;: 3249,
+      &quot;collapsed&quot;: true,
+      &quot;x&quot;: 152,
+      &quot;right&quot;: 3401,
+      &quot;scrollWidth&quot;: 3249,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;documentWidth&quot;: 3440,
+      &quot;documentScroll&quot;: 3440
+    }
+  ],
+  &quot;errors&quot;: []
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-product-integration-desktop"><summary>evidence/product-integration-desktop.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;distribution&quot;: {
+    &quot;qa-a&quot;: 6,
+    &quot;qa-b&quot;: 2
+  },
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1280,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 835.203125,
+      &quot;paneLeft&quot;: 835.203125,
+      &quot;paneRight&quot;: 1280
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 1219.203125,
+      &quot;paneLeft&quot;: 1219.203125,
+      &quot;paneRight&quot;: 1920
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 1603.203125,
+      &quot;paneLeft&quot;: 1603.203125,
+      &quot;paneRight&quot;: 2560
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 3440
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 906.21875,
+      &quot;mainRight&quot;: 2131.203125,
+      &quot;paneLeft&quot;: 2131.203125,
+      &quot;paneRight&quot;: 3440
+    }
+  ],
+  &quot;errors&quot;: [],
+  &quot;checks&quot;: [
+    &quot;HEAD before screenshot&quot;,
+    &quot;source-before-model actual form&quot;,
+    &quot;persisted model weights&quot;,
+    &quot;public gateway 3:1 interleaving&quot;,
+    &quot;zero price excluded from free pool&quot;,
+    &quot;source default pricing saved&quot;,
+    &quot;actual source-specific JSON quality probe&quot;,
+    &quot;monitor source details&quot;,
+    &quot;fixed 39.1 MiB file within 64 MiB budget&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-product-integration-phone"><summary>evidence/product-integration-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;target&quot;: &quot;866&quot;,
+  &quot;initial&quot;: {
+    &quot;width&quot;: 392,
+    &quot;scrollWidth&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;
+  },
+  &quot;editor&quot;: {
+    &quot;top&quot;: 0,
+    &quot;headers&quot;: 1
+  },
+  &quot;heights&quot;: [
+    44,
+    44,
+    44,
+    44,
+    44,
+    44
+  ],
+  &quot;detail&quot;: {
+    &quot;top&quot;: 0,
+    &quot;headers&quot;: 1,
+    &quot;back&quot;: 44
+  },
+  &quot;scroll&quot;: {
+    &quot;mainBefore&quot;: 0,
+    &quot;mainAfter&quot;: 330.5454406738281,
+    &quot;detailBefore&quot;: 0,
+    &quot;detailAfter&quot;: 0,
+    &quot;detailScrollable&quot;: false
+  },
+  &quot;storage&quot;: &quot;保留与清理最多保留 24 小时、10,000 条；固定大小的环形文件覆盖最旧记录，总预算 64 MiB，不产生 WAL。当前记录 / 上限64 / 10,000文件大小 / 总预算39.1 / 64 MiB过期 / 容量淘汰0 / 0丢弃记录0&quot;,
+  &quot;checks&quot;: [
+    &quot;HEAD mobile before screenshot&quot;,
+    &quot;actual aggregate full-screen editor&quot;,
+    &quot;touch strategy selection&quot;,
+    &quot;44px routing targets&quot;,
+    &quot;monitor source cards&quot;,
+    &quot;one full-screen return bar&quot;,
+    &quot;real main scroll and detail bounds&quot;,
+    &quot;actual tool quality probe by touch&quot;,
+    &quot;source filter by touch&quot;,
+    &quot;bounded disk storage display&quot;,
+    &quot;source price editor&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-prototype-all-pages"><summary>evidence/prototype-all-pages.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;layouts&quot;: [
+    {
+      &quot;tab&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;概况&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;审计&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;网关接入&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;语音模型&quot;,
+      &quot;width&quot;: 1280,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;概况&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;审计&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;网关接入&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;语音模型&quot;,
+      &quot;width&quot;: 1920,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;概况&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;审计&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;网关接入&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;语音模型&quot;,
+      &quot;width&quot;: 2560,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;概况&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;审计&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;网关接入&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    },
+    {
+      &quot;tab&quot;: &quot;语音模型&quot;,
+      &quot;width&quot;: 3440,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080
+    }
+  ],
+  &quot;errors&quot;: [],
+  &quot;checks&quot;: [
+    &quot;connection edit/search&quot;,
+    &quot;drafts across all tabs&quot;,
+    &quot;default and model prices&quot;,
+    &quot;key create and toggle&quot;,
+    &quot;speech provider and sample recognition&quot;,
+    &quot;all six pages in Chinese and English&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-prototype-phone-pages"><summary>evidence/prototype-phone-pages.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;results&quot;: [
+    {
+      &quot;tab&quot;: &quot;模型与连接&quot;,
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    },
+    {
+      &quot;tab&quot;: &quot;概况&quot;,
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    },
+    {
+      &quot;tab&quot;: &quot;审计&quot;,
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    },
+    {
+      &quot;tab&quot;: &quot;价格与记账&quot;,
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    },
+    {
+      &quot;tab&quot;: &quot;网关接入&quot;,
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    },
+    {
+      &quot;tab&quot;: &quot;语音模型&quot;,
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766
+    }
+  ],
+  &quot;editor&quot;: {
+    &quot;width&quot;: 392.727294921875,
+    &quot;top&quot;: 0,
+    &quot;bottom&quot;: 765.8181762695312,
+    &quot;hit&quot;: true
+  }
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-routing-monitoring-browser"><summary>evidence/routing-monitoring-browser.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;checks&quot;: [
+    &quot;nine policies and smart default&quot;,
+    &quot;descriptions&quot;,
+    &quot;weight defaults and validation&quot;,
+    &quot;weighted nested group example&quot;,
+    &quot;source and model filters&quot;,
+    &quot;quality separate from latency&quot;,
+    &quot;24h pruning and 10000-record capacity&quot;,
+    &quot;strategy persistence&quot;,
+    &quot;English labels&quot;,
+    &quot;no API requests&quot;
+  ],
+  &quot;layouts&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 1265
+    },
+    {
+      &quot;width&quot;: 1280,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 1280,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 833,
+      &quot;detailLeft&quot;: 833,
+      &quot;detailRight&quot;: 1265
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 1905
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 1920,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 1473,
+      &quot;detailLeft&quot;: 1473,
+      &quot;detailRight&quot;: 1905
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 2545
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 2560,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 2113,
+      &quot;detailLeft&quot;: 2113,
+      &quot;detailRight&quot;: 2545
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;pane&quot;: false,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 3425
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;pane&quot;: true,
+      &quot;scrollWidth&quot;: 3440,
+      &quot;height&quot;: 1080,
+      &quot;scrollHeight&quot;: 1080,
+      &quot;mainHeight&quot;: 892.8125,
+      &quot;mainRight&quot;: 2993,
+      &quot;detailLeft&quot;: 2993,
+      &quot;detailRight&quot;: 3425
+    }
+  ],
+  &quot;errors&quot;: [],
+  &quot;apiRequests&quot;: []
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-routing-monitoring-phone"><summary>evidence/routing-monitoring-phone.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;device&quot;: &quot;Redmi Note 8&quot;,
+  &quot;bounds&quot;: {
+    &quot;width&quot;: 392,
+    &quot;scrollWidth&quot;: 392,
+    &quot;height&quot;: 766,
+    &quot;scrollHeight&quot;: 766,
+    &quot;pointer&quot;: &quot;coarse&quot;,
+    &quot;mainHeight&quot;: 537.8181762695312
+  },
+  &quot;pane&quot;: {
+    &quot;top&quot;: 0,
+    &quot;bottom&quot;: 765.8181762695312,
+    &quot;width&quot;: 392.727294921875,
+    &quot;headers&quot;: 1,
+    &quot;back&quot;: 44
+  },
+  &quot;detailScroll&quot;: {
+    &quot;before&quot;: 0,
+    &quot;after&quot;: 378.9090881347656
+  },
+  &quot;retention&quot;: &quot;示例记录6 / 10,000指标数据容量0.00 / 64 MiB已过期 / 提前淘汰1,740 / 0&quot;,
+  &quot;targets&quot;: [
+    44,
+    44,
+    44,
+    44,
+    44,
+    44
+  ],
+  &quot;checks&quot;: [
+    &quot;native nine-policy selector&quot;,
+    &quot;touch weight input&quot;,
+    &quot;monitor tab by touch&quot;,
+    &quot;full-screen source detail&quot;,
+    &quot;touch detail scrolling&quot;,
+    &quot;native source filter&quot;,
+    &quot;24h pruning by touch&quot;,
+    &quot;44px targets&quot;,
+    &quot;no document overflow&quot;
+  ]
+}</code></pre></details>
+<details class="evidence" id="evidence-evidence-routing-retention"><summary>evidence/routing-retention.json</summary><pre><code>{
+  &quot;passed&quot;: true,
+  &quot;checks&quot;: [
+    &quot;smart: five-hour window before later weekly resets&quot;,
+    &quot;smart: reset-free credits and equal monthly resets&quot;,
+    &quot;resting channels rank last&quot;,
+    &quot;drain: exhausted anchor advances and recovered earlier quota does not reclaim it&quot;,
+    &quot;drain: temporary rest does not move its anchor&quot;,
+    &quot;rotate: one update advances one round&quot;,
+    &quot;usage: highest remaining first, unknown last&quot;,
+    &quot;pace: five-hour quota rate and 90% reserve&quot;,
+    &quot;pace: earliest credit batch can override reset rate&quot;,
+    &quot;pace: keys rank by recent tokens and update after dispatch&quot;,
+    &quot;weight: 3:1 interleaving counts member once across two accounts&quot;,
+    &quot;weight: nested group is one member; resting member exits cycle&quot;,
+    &quot;fast: within 10% preserves order; fifth request probes stale channel&quot;,
+    &quot;fast: stream-only measurements, recent sample weighted more, reset is empty&quot;,
+    &quot;cheap: custom effective price, unknown last, tie stable&quot;,
+    &quot;cheap: UTC weekday half-open peak windows and weekend&quot;,
+    &quot;monitor: exact rolling 24h boundary and future rejection&quot;,
+    &quot;monitor: record cap evicts oldest with out-of-order arrivals&quot;,
+    &quot;monitor: byte cap and oversized entry bound storage&quot;,
+    &quot;monitor: unchecked quality and failed streams excluded from quality/latency&quot;
+  ]
+}
+</code></pre></details>
+<details class="evidence" id="evidence-local-time-evidence"><summary>local-time-evidence.json</summary><pre><code>{
+  &quot;desktop-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;day&quot;: &quot;2026-11-14&quot;,
+    &quot;requests&quot;: 2,
+    &quot;hours&quot;: [
+      0,
+      0
+    ],
+    &quot;expected&quot;: &quot;11月14日 00:20&quot;,
+    &quot;layouts&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      }
+    ],
+    &quot;errors&quot;: []
+  },
+  &quot;desktop-en-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;day&quot;: &quot;2026-11-14&quot;,
+    &quot;requests&quot;: 2,
+    &quot;hours&quot;: [
+      0,
+      0
+    ],
+    &quot;expected&quot;: &quot;Nov 14, 12:20 AM&quot;,
+    &quot;layouts&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080
+      }
+    ],
+    &quot;errors&quot;: []
+  },
+  &quot;phone-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;dimensions&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;timezone&quot;: &quot;Asia/Shanghai&quot;
+    },
+    &quot;expected&quot;: &quot;11月14日 00:20&quot;,
+    &quot;touchChecks&quot;: [
+      &quot;open audit&quot;,
+      &quot;open receipt&quot;
+    ],
+    &quot;productionUntouched&quot;: true
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-source-cards-evidence"><summary>source-cards-evidence.json</summary><pre><code>{
+  &quot;desktop-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;layouts&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;scrollWidth&quot;: 1280,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;cards&quot;: [
+          {
+            &quot;width&quot;: 532,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 532,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 532,
+            &quot;height&quot;: 282.921875
+          }
+        ]
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;scrollWidth&quot;: 1920,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;cards&quot;: [
+          {
+            &quot;width&quot;: 562.65625,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 562.671875,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 562.671875,
+            &quot;height&quot;: 282.921875
+          }
+        ]
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;scrollWidth&quot;: 2560,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;cards&quot;: [
+          {
+            &quot;width&quot;: 459.1875,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 459.203125,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 459.203125,
+            &quot;height&quot;: 282.921875
+          }
+        ]
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;scrollWidth&quot;: 3440,
+        &quot;height&quot;: 1080,
+        &quot;scrollHeight&quot;: 1080,
+        &quot;cards&quot;: [
+          {
+            &quot;width&quot;: 449.140625,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 449.140625,
+            &quot;height&quot;: 282.921875
+          },
+          {
+            &quot;width&quot;: 449.140625,
+            &quot;height&quot;: 282.921875
+          }
+        ]
+      }
+    ],
+    &quot;errors&quot;: [],
+    &quot;checks&quot;: [
+      &quot;equal card dimensions at four widths&quot;,
+      &quot;no list editing buttons&quot;,
+      &quot;top creation menu&quot;,
+      &quot;open connection from card&quot;,
+      &quot;name editing in detail&quot;,
+      &quot;connection/pricing/routing tabs&quot;,
+      &quot;backup deletion guard&quot;,
+      &quot;English light theme&quot;
+    ]
+  },
+  &quot;phone-check.json&quot;: {
+    &quot;passed&quot;: true,
+    &quot;device&quot;: &quot;Redmi Note 8&quot;,
+    &quot;layout&quot;: {
+      &quot;width&quot;: 392,
+      &quot;scrollWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;scrollHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;cards&quot;: [
+        {
+          &quot;width&quot;: 360.727294921875,
+          &quot;height&quot;: 314.9659118652344
+        },
+        {
+          &quot;width&quot;: 360.727294921875,
+          &quot;height&quot;: 314.9659118652344
+        },
+        {
+          &quot;width&quot;: 360.727294921875,
+          &quot;height&quot;: 314.9659118652344
+        }
+      ]
+    },
+    &quot;detail&quot;: {
+      &quot;width&quot;: 392.727294921875,
+      &quot;x&quot;: 0,
+      &quot;topBarHittable&quot;: true,
+      &quot;nameEditable&quot;: true,
+      &quot;tabs&quot;: [
+        &quot;连接&quot;,
+        &quot;模型与定价&quot;,
+        &quot;账号调度&quot;
+      ],
+      &quot;deleteInside&quot;: true
+    },
+    &quot;scrolled&quot;: 541.0908813476562,
+    &quot;checks&quot;: [
+      &quot;equal source cards&quot;,
+      &quot;whole-card touch navigation&quot;,
+      &quot;name editing inside detail&quot;,
+      &quot;pricing and routing tabs&quot;,
+      &quot;single full-screen return bar&quot;,
+      &quot;scroll list by touch&quot;,
+      &quot;top New creation/import/local source menu&quot;,
+      &quot;new source form&quot;
+    ]
+  }
+}
+</code></pre></details>
+</section>
+</main>
+</div>
+</body>
+</html>

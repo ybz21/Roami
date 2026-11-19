@@ -1,0 +1,2002 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型能力、CLI 和 Agent 选模 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+</head>
+<body>
+<header class="page-head"><h1>模型能力、CLI 和 Agent 选模</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计归档">
+  <a href="../../model-monitoring-and-aggregation.html">现行设计</a>
+  <a href="../index.html">历史目录</a>
+  <a href="#contents" aria-current="page">本页目录</a>
+</nav>
+<main class="document archive" id="contents">
+<section aria-labelledby="record-heading">
+<h2 id="record-heading">设计与验收记录</h2>
+<p class="copy">统一模型目录、原生与聚合、Auto、会话及委派选模。记录按原版本归档，实施状态以当时的记录为准。</p>
+<p class="muted"><a href="../index.html">返回历史目录</a> · <a href="../../model-monitoring-and-aggregation.html">查看现行设计</a></p>
+<details><summary>原型和历史 HTML（3）</summary><ul class="record-list"><li><a href="index.html">原型设计 · 模型能力与 Auto 调度 · Roami</a></li>
+<li><a href="prototype.html">原型设计 · 模型能力与 Auto 调度 · Roami</a></li>
+<li><a href="technical-design.html">技术设计 · 模型能力与 Auto 调度 · Roami</a></li>
+</ul></details>
+<details open><summary>文档（11）</summary><ul class="record-list"><li><a href="#design-readme">模型能力与 Auto 调度</a></li>
+<li><a href="#design-acceptance">设计稿验收 · 2026-11-16</a></li>
+<li><a href="#design-catalog-picker-acceptance">聚合优先与网关目录统一</a></li>
+<li><a href="#design-deployment-acceptance">模型目录发布：MCP 完成证据</a></li>
+<li><a href="#design-gateway-options-acceptance">网关统一选模与能力展示</a></li>
+<li><a href="#design-implementation">CLI 与 Roami 创建会话选模</a></li>
+<li><a href="#design-naming-acceptance">模型名称与访问密钥</a></li>
+<li><a href="#design-openrouter-connector">OpenRouter 免费目录连接器</a></li>
+<li><a href="#design-picker-display">精简 Main 选模列表</a></li>
+<li><a href="#design-runtime-acceptance">runtime-acceptance</a></li>
+<li><a href="#design-simplification-acceptance">创建会话选模简化验收</a></li>
+</ul></details>
+<details><summary>验收数据（3）</summary><ul class="record-list"><li><a href="#evidence-acceptance">acceptance.json</a></li>
+<li><a href="#evidence-model-evidence">model-evidence.json</a></li>
+<li><a href="#evidence-runtime-acceptance">runtime-acceptance.json</a></li>
+</ul></details>
+</section>
+<section aria-label="文档正文">
+<article class="record" id="design-readme">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/README.md</code></p>
+<h2 id="design-readme--模型能力与-auto-调度">模型能力与 Auto 调度</h2>
+<p><a href="technical-design.html">技术设计（HTML）</a> · <a href="prototype.html#/capabilities/models/gateway">统一原型（HTML）</a></p>
+<h3 id="design-readme--product-design">Product Design</h3>
+<p>统一模型类型、输入输出能力、工具、推理、结构化输出、容量、费用与证据视图，供模型设置、Roami Main/Worker、首页和 CLI 共用。能力目录可筛选，详情展示声明与验证的差别。Roami 聚合、固定模型与上游自动路由分别呈现，来源与原生/适配能力单独建模。</p>
+<p>对外交付只保留技术设计、原型设计两份 HTML。原始证据、源码与验收记录作为内部支撑资料。</p>
+<p>统一入口从 <strong>能力 / 大模型 / 本机网关</strong> 进入，保留“接入与密钥 / 模型目录”和三类目录卡片；顶部按钮可直接回到 <a href="prototype.html#/capabilities/agents/roami">Roami 模型设置</a>。Roami 页仍对应用户截图，手机经工具 / 能力进入。首页、项目下任务共用同一目录与聚合成员数据。</p>
+<p>本轮与会话 <code>2026-1112-1808-jl57</code>（本机网关设计，检查点 <code>21ca98ec</code>）对照统一；对方工作区只读，保留其生产实现和静态稿。本会话检查点为 <code>58c750ac</code>。技术设计增加“与本机网关设计统一”，当时仅做设计统一，合并预演无冲突。当前实施阶段已复用网关生产实现 <code>5f99951a</code>，并扩展本机模型目录与 CLI / 原生会话选模；另一个会话的工作区保持原样。</p>
+<p>三个关键口径：目录范围与模型身份分开；<code>hy4free</code> 的视觉能力保持未知；Auto 引用网关 <code>free-pool</code> 及其保存成员，不扫描全部免费模型。历史 Key 不支持从哈希恢复明文，统一原型只在生成 / 轮换后复制一次。</p>
+<p>本目录保留完整设计与原型。已实现的阶段一行为以 <a href="#design-implementation">实现记录</a> 为准；其余能力证明、请求条件调度和持久等待仍是后续设计。任务分支尚未部署；WorkBuddy 现场过期引用的修复单独记录在当前验收中，保留宿主账号、凭据和 Main/Worker 选择。</p>
+<h3 id="design-readme--user-stories">User Stories</h3>
+<ul>
+<li>按图片、音频、工具、推理等能力选择模型，看到明确的未知与不可用原因。</li>
+<li>通过 <code>roami model list</code> 查看相同能力，使用 <code>--model</code>（兼容 <code>-model</code>）为新建 Roami 执行会话或任务指定模型。</li>
+<li>指定已配置的 Auto 聚合池，在任务硬约束下复用现有策略调度，不改全局 Main/Worker 默认模型。</li>
+<li>未来以检查点和持久等待恢复免费长时任务，额度不足不静默转付费。</li>
+</ul>
+<h3 id="design-readme--technical-design">Technical Design</h3>
+<p>技术设计包含能力数据、模块与接口、CLI 契约、长时任务和验收边界；原型设计包含能力目录、Roami 选模和 Auto 调度的交互。扩展已有 Go 网关、目录修订与路径验证，不创建第二套路由/额度准入。Python 传播 Go 决定；前端复用能力选择器和 workspace store。</p>
+<ul>
+<li><code>proposal.tsx</code>：技术设计源码；<code>model-design-unification.tsx</code> 记录跨会话的页面归属、共享契约、冲突决定与集成顺序。</li>
+<li><code>product-prototype.tsx</code> / <code>product-prototype.css</code>：带实际导航、页面位置和独立流程的当前原型，复用 <code>useLayout()</code> 与仓库图标。</li>
+<li><code>prototype-models.ts</code>：统一目录、能力快照、两个明确成员的聚合与仅上游目录示例。Free pool 有三个成员，Coding pool 有两个成员且权重为 3:1。</li>
+<li><code>prototype-gateway.tsx</code> / <code>prototype-gateway.css</code>：合并后的网关接入、Key、三类卡片和检查器。目录数据与 Key 元数据由同一原型根组件持有；新 Key 明文只在检查器临时保留。</li>
+<li><code>proposal.css</code>：与仓库设计规范一致的令牌快照、平面布局和手机全屏详情。</li>
+<li><code>build.mjs</code>：通过项目既有 esbuild 依赖构建可直接打开的两份 HTML；不请求 CDN。</li>
+<li><code>technical-design.html</code>：技术设计，内嵌 JS/CSS，离线可用。</li>
+<li><code>prototype.html</code>：交互原型，原图使用同目录相对路径。</li>
+<li><code>index.html</code>：原型的旧入口别名，用于保持此前交付链接可用。</li>
+<li><code>model-evidence.json</code>：2026-11-16 读取的六个公开 OpenRouter ID 的原始字段子集、UTC 时间、来源和完整响应摘要。只读目录，无推理调用。</li>
+<li><code>assets/reference-input.png</code>：用户附件原件的逐字节副本，属于设计输入资料，非 PR 一次性截图。原件仍保留在 <code>/tmp/clipboard-20261116-113946-6x2v.png</code>。</li>
+</ul>
+<p>构建：先按仓库方式在 <code>frontend</code> 安装锁定依赖，再从仓库根运行：</p>
+<pre><code class="language-bash">node docs/design/20261114-model-orchestration/history/20261116-model-capabilities/build.mjs
+</code></pre>
+<p>简单静态预览可使用以下隔离入口；剪贴板与手机键盘的最终验收使用任务目录内的自签 HTTPS 服务，未启动或修改生产 Agent：</p>
+<pre><code class="language-bash">scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
+  python3 -m http.server 19376 --bind 0.0.0.0 \
+  --directory docs/design/20261114-model-orchestration/history/20261116-model-capabilities
+</code></pre>
+<p>后续实现必须核对 <code>hy4free</code>、<code>workbuddy-hy4</code> 的实际候选图；本次不按名称猜测其能力。公开目录中的“声明支持”也不代替当前节点的账号、协议和适配器验证。</p>
+<p>延续：<a href="../model-workspace.html#design-readme">模型源与聚合工作台</a>、<a href="../20261030-%E6%99%BA%E8%83%BD%E4%BD%93%E6%A8%A1%E5%9E%8B%E5%88%87%E6%8D%A2/design-records.html#design-readme">现有网关与 Roami 模型绑定</a>。</p>
+<h3 id="design-readme--实现进展">实现进展</h3>
+<p><a href="#design-implementation">CLI 与 Roami 会话选模实现</a>记录本轮生产行为、命令、代码入口与范围；<a href="#design-simplification-acceptance">简化验收</a>记录当前修订检查；<a href="#design-runtime-acceptance">运行验收</a>保留简化前的历史证据。技术设计与原型继续作为两份设计交付，不替代生产验证。</p>
+<p>首页模型选择器动态显示模型与原生/聚合类型；Agent 委派复用原有 <code>delegate.model</code> / <code>freeOnly</code> 参数和任务记录。参见 <a href="#design-implementation">当前实现</a>。</p>
+<ul>
+<li>
+<p><a href="#design-naming-acceptance">名称与访问密钥：用词和验收</a></p>
+</li>
+<li>
+<p><a href="#design-catalog-picker-acceptance">聚合优先与网关目录统一：实现与验收</a></p>
+</li>
+<li>
+<p><a href="#design-gateway-options-acceptance">网关统一选模与能力展示</a></p>
+</li>
+<li>
+<p><a href="#design-deployment-acceptance">发布停止核对与 MCP 完成证据</a></p>
+</li>
+<li>
+<p><a href="#design-picker-display">Main 选模列表与 /model 验收</a></p>
+</li>
+<li>
+<p><a href="#design-openrouter-connector">OpenRouter 免费目录与来源搜索</a></p>
+</li>
+</ul>
+</article>
+<article class="record" id="design-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/acceptance.md</code></p>
+<h2 id="design-acceptance--设计稿验收--2026-11-16">设计稿验收 · 2026-11-16</h2>
+<p>范围：仅 HTML 设计文档与页面内演示。未实现产品模型能力、CLI 选模或 Auto 调度；未调用真实模型生成，未修改生产模型、账号、密钥、额度或路由。桌面使用本任务专用 Roami Chrome 标签页，手机使用 Redmi Note 8 的 Chrome 真机。</p>
+<h3 id="design-acceptance--跨会话统一最新">跨会话统一（最新）</h3>
+<ul>
+<li>只读核对“本机网关设计”会话 <code>2026-1112-1808-jl57</code>、分支 <code>feat/local-gateway-workspace</code> 的 <code>21ca98ec</code>，与本会话 <code>58c750ac</code> 对照。读取了网关设计、复核、实现说明和源代码；对方工作区没有被修改。</li>
+<li>两个检查点执行 <code>git merge-tree --write-tree 58c750ac 21ca98ec</code> 成功，无冲突；这是预演，未实际合并分支。网关分支包含生产代码，本 PR 仍只有设计资料。</li>
+<li>网关、Roami 选择器、调用示例和任务改用同一原型目录。保留接入 / 目录双入口、统一卡片、成员 / 权重与桌面检查器；三类范围明确为已接入 / 聚合 / 上游目录。上游自动路由和原生 / 适配能力另列。</li>
+<li>四档桌面 1280/1920/2560/3440 均检查模型左侧导航、网关双页签、三类卡片、检查器开关释放空间与横向溢出。真实安全上下文复制调用名称成功，卡片选择的调用 ID 与示例一致。</li>
+<li>共享数据验收：备用源目录模型启用后，Roami 选择器立即能找到同一模型；Free pool 初始三个成员中有两个图片成员，删除其中一个后，任务图片候选变成一个，而非扫描全部目录里的三个图片模型。严格验证条件仍进入等待。</li>
+<li>Key 名称校验、创建、一次性复制、重命名、启停、轮换、固定单例和替换确认通过；明文关闭后从 DOM 和原型状态清除，跨业务页保留的只是 Key 元数据。</li>
+<li>Redmi Note 8 经任务自签 HTTPS 预览，局部接受本测试站点证书后验证：网关页签、全屏成员详情、启用来源、共享选模、成员限定 Auto，以及新 Key 的实际剪贴板写入。没有修改全局浏览器安全设置。</li>
+<li>修复手机键盘焦点变化导致首次提交可能落空：沿用项目的 VirtualKeyboard overlaysContent、布局 keyboard token 和提交按钮保留输入焦点；最终真实触控一次点按提交通过。桌面与手机没有 JavaScript 异常，未发起 <code>/api/</code> 或模型生成请求。</li>
+<li>最终原始数据见 <code>acceptance.json.unifiedDesign</code>；验收脚本为 <code>/tmp/roami-model-capability-design/verify-unified.mjs</code>。一轮过程中本地静态服务退出，保留已有截图后重启隔离服务，最终完整检查通过；不将这次测试服务退出归因于产品代码。</li>
+<li>本轮技术设计增加统一章节，原型统一管理与消费流程；仍只交付技术设计、原型设计两个 HTML。此前“技术设计不变”仅对应上一轮页面位置修订。</li>
+</ul>
+<h3 id="design-acceptance--页面位置修订历史">页面位置修订（历史）</h3>
+<ul>
+<li>默认进入 <code>#/capabilities/agents/roami</code>，对应截图里的“Roami 主智能体与执行智能体”。实际入口通过 <code>CapabilitiesPage.tsx</code>、<code>AgentCatalog.tsx</code>、<code>RoamiAgentModels.tsx</code> 核对：能力 / 智能体 / Roami；手机经工具 / 能力进入。此前把此页口述为设置入口不准确，当前原型和 README 已纠正。</li>
+<li>原型采用 Roami 导航、能力分类、页面位置提示和两个模型选择框；只有点开选择框才出现共享能力选择器。首页对话、项目下任务、模型目录各有独立路由，不再把三个演示堆在一页。目录位于能力 / 大模型 / 本机网关。</li>
+<li>桌面 1280/1920/2560/3440 均验证弹层边界、源页面位置、筛选、选择应用和容器溢出。初始九项（八个附件模型与聚合示例），图片条件五项，叠加具体模型类型三项。</li>
+<li>Roami 修改应用、返回智能体列表再进入保留页面内选择；首页对话与任务覆盖不改模型默认设置。任务 Auto 图片筛选得到三个声明候选，要求已验证后进入等待；没有实际创建任务或调用模型。</li>
+<li>Redmi Note 8 真机验证四项底部导航、经工具 / 能力 / Roami 的真实触控路径、全屏模型页、图片筛选、选择应用、返回、对话选模与任务 Auto。无 JavaScript 异常，无内容区横向溢出。弹层通过原生 dialog 管理焦点与 Escape，手机仅保留一个返回栏。</li>
+<li>原始测量保存在 <code>acceptance.json.contextualPrototype</code>，脚本 <code>/tmp/roami-model-capability-design/verify-context.mjs</code>。技术设计 HTML 与修订前逐字节相同；仅原型和支撑资料发生变化。</li>
+</ul>
+<h3 id="design-acceptance--双文档修订历史">双文档修订（历史）</h3>
+<ul>
+<li>对外交付仅两份：<a href="technical-design.html">技术设计</a>、<a href="prototype.html">原型设计</a>，顶部只保留两个入口。<code>index.html</code> 为原型旧入口别名，不作为第三份文档。</li>
+<li>技术设计承载能力数据、标准字段、模块/API、CLI、调度规则、长时任务与验收边界；原型仅承载能力目录、Roami 选择和 Auto 交互。</li>
+<li>重新通过桌面 1280/1920/2560/3440：两个入口真实点击切换、内容隔离、目录详情开关与空间回收、容器无横向溢出。图片筛选、Main/Worker 选择器、Auto 验证不足空池及主题切换通过。</li>
+<li>Redmi Note 8 真机通过两个页面的真实触控切换、筛选、全屏详情、返回保留筛选与手势滚动；技术页和原型页均无内容容器横向溢出。无 JavaScript 异常。</li>
+<li>原始测量保存在 <code>acceptance.json</code> 的 <code>twoDocuments</code>，临时脚本为 <code>/tmp/roami-model-capability-design/verify-split.mjs</code>。本次修改仍限于设计资料。</li>
+</ul>
+<p>下方保留首次合稿的内容核对与历史验收；最新布局以双文档修订为准。</p>
+<h3 id="design-acceptance--内容核对">内容核对</h3>
+<ul>
+<li>对照现有 <code>CatalogModel</code>、源模型详情、角色绑定、CLI 帮助、执行 spec 与 Python native 任务校验，区分现有基础和拟新增契约。</li>
+<li>通过公开 Models API 逐项匹配附件中的六个 OpenRouter ID；原始字段子集、抓取时间与响应摘要保存在 <a href="#evidence-model-evidence">model-evidence.json</a>。这些是上游声明，尚未验证本节点链路。</li>
+<li>其中五项为具体模型，<code>openrouter/free</code> 为上游自动路由。五个具体模型中三项声明图片输入；计入路由共四项。两个本地名称保留未知，不根据名称断言聚合、图片或免费能力。</li>
+<li>附件原件与设计输入副本 SHA-256 相同：<code>352a8d6f380f0e7d690165b38617c4be7ca788c114ce8bc7a1c1f5afe016464e</code>。</li>
+<li>新增命令、JSON 字段和错误码在文档中明确标记为提案。开发者文档使用中文，符合仓库 i18n 的文档例外；未增加产品硬编码文案。</li>
+</ul>
+<h3 id="design-acceptance--浏览器与真机">浏览器与真机</h3>
+<p>测量明细见 <a href="#evidence-acceptance">acceptance.json</a>。交互通过 CDP 的真实鼠标/触摸输入并核对 <code>elementFromPoint</code>；没有以 DOM <code>click()</code> 代替命中测试。</p>
+<table>
+<thead>
+<tr>
+<th>桌面 CSS 宽度</th>
+<th style="text-align:right">详情关闭时目录宽度</th>
+<th style="text-align:right">详情打开时目录宽度</th>
+<th>验收</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1280</td>
+<td style="text-align:right">1001</td>
+<td style="text-align:right">641</td>
+<td>文档无横向溢出；关闭释放 360px</td>
+</tr>
+<tr>
+<td>1920</td>
+<td style="text-align:right">1641</td>
+<td style="text-align:right">1281</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>2560</td>
+<td style="text-align:right">2281</td>
+<td style="text-align:right">1921</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>3440</td>
+<td style="text-align:right">3161</td>
+<td style="text-align:right">2801</td>
+<td>同上</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>桌面内容容器高 940px（1000px 视口减真实 60px 页头）；文档本身不滚动，<code>main</code> 承担纵向滚动。深浅主题均打开检查。</li>
+<li>图片筛选得到四项，叠加具体模型类型得到三项；添加音频条件为空态。详情可打开、关闭，宽度完全归还。</li>
+<li>Roami 选模复用全部演示能力条件；图片条件下包含四个公开条目与一个按请求筛选成员的聚合示例。聚合类型筛选仅留下该池。Main/Worker 切换保留各自页面内选择。</li>
+<li>Auto 图片与工具条件得到三个声明候选；要求已验证后为空池，模拟额度耗尽后显示等待且不转付费。未将未知验证、真实延迟或余额伪造为通过。</li>
+<li>Redmi Note 8：约 393 CSS px，<code>compact/coarse</code>。实际触控完成图片筛选、全屏详情、返回保留筛选、Roami 选择与 Auto 计划。详情覆盖全部可用视口；真实滚动使 <code>main.scrollTop</code> 从约 6295 增至约 6644。</li>
+<li>最后一轮同时检查 <code>document</code> 和 <code>main</code> 的横向边界。修正了技术表格的 grid 最小宽度造成的内部横向溢出，并让 checkbox 保持 16px 视觉尺寸、由 44px label 提供触控区域。</li>
+<li>桌面与手机运行无 JavaScript 异常。本稿为独立开发者文档，产品顶栏、四项底栏、软键盘与安全区的完整业务验收列为未来产品实现的门禁，不冒称本次已实现或验收。</li>
+</ul>
+<h3 id="design-acceptance--检查与交付">检查与交付</h3>
+<ul>
+<li><code>node docs/design/20261114-model-orchestration/history/20261116-model-capabilities/build.mjs</code> 成功，HTML 内嵌 JS/CSS，无 CDN 依赖；源码复用现有 <code>useLayout()</code>、图标和令牌。</li>
+<li><code>scripts/dev/quality/check.sh quick</code> 通过，包括 CLI 审计、shell 语法、Go 格式、i18n、hover、前端 typecheck、secret scan 与 staged policy。</li>
+<li>本次仅修改 <code>docs/design/**</code>。Python/Go 运行测试按质量脚本范围跳过；没有产品 frontend 改动，不运行无关的全量 Vitest 或生产构建。</li>
+<li><code>git diff --check</code> 通过。原图与 JSON 相对资源保持在同目录，截图只放本机验收目录及 PR 的 <code>pr-shots</code> 分支，不提交到主分支。</li>
+</ul>
+<p>本机验收目录：<code>/tmp/roami-model-capability-design/</code>，含 browser-verification.log、verification.json、quality-quick.log 与桌面/手机截图；一次性验收脚本为该目录的 <code>verify.mjs</code>。静态服务通过仓库隔离入口启动，收尾通过同入口 <code>--stop</code> 核对并清理测试服务器。</p>
+</article>
+<article class="record" id="design-catalog-picker-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/catalog-picker-acceptance.md</code></p>
+<h2 id="design-catalog-picker-acceptance--聚合优先与网关目录统一">聚合优先与网关目录统一</h2>
+<p>日期：2026-11-17。</p>
+<h3 id="design-catalog-picker-acceptance--product-design">Product Design</h3>
+<p>首页 Main/Worker 选择器与本机网关模型目录统一读取 Go 网关目录。选择器先列聚合，再列单模型；当前选择仍有勾选状态。搜索放在标题下，节点范围提示移到列表底部；普通行展示名称和输入输出能力，同名行额外显示调用 ID。手机继续使用全屏二级页。</p>
+<p>网关默认展示全部已添加模型，聚合排在前面，保留聚合、已接入模型与上游目录筛选。上游模型仍需接入后才能调用。源声明的能力明确标注；未提供能力显示未知，聚合不把成员能力并集当作调用保证。</p>
+<h3 id="design-catalog-picker-acceptance--user-stories">User Stories</h3>
+<ul>
+<li>打开首页选择器，先找到聚合，再按名称或调用 ID 搜索模型，并看到输入、输出及工具等能力。</li>
+<li>从本机网关查看同一条路线的相同能力、上下文与最大输出；详情中仍能区分调用 ID 和上游模型 ID。</li>
+<li>能力源读取失败时保留已添加路线，允许重试，不改变已保存选择。</li>
+</ul>
+<h3 id="design-catalog-picker-acceptance--technical-design">Technical Design</h3>
+<ul>
+<li><code>internal/modelgateway/model-directory.go</code>：已有 <code>/v1/model-gateway/models</code> 补齐输入输出模态、上下文、最大输出和公布标价；排序为已配置优先、聚合优先。能力刷新截止时间为 12 秒，留在前端共享请求的 15 秒预算内。CLI JSON 自动获得相同字段。</li>
+<li><code>gateway-model-catalog.ts</code>：首页与网关复用节点范围缓存和在途请求；按目录修订隔离能力证据，五分钟内复用读取结果，无新增轮询。</li>
+<li><code>ModelCapabilities.tsx</code>：两处共用能力展示和中英文文案。</li>
+<li><code>useAgentModels.ts</code>：绑定网关的角色使用目录中的已配置 ID；直连服务商保留现有入口，并按源地址关联能力，防止同 ID 跨源误认。写入继续走现有角色配置接口。</li>
+<li><code>GatewayModelDirectory.tsx</code>：移除逐源发现和另一套列表拼装，统一使用网关行；保留搜索、来源/能力/类型筛选、分页、复制和详情返回。</li>
+</ul>
+<h3 id="design-catalog-picker-acceptance--acceptance">Acceptance</h3>
+<ul>
+<li><code>quality/check.sh quick</code>、<code>quality/check.sh full</code> 通过，包含 Go 全量、TypeScript、i18n、hover 和生产构建。无 Python 变更，按门禁计划跳过 Python 运行时检查。</li>
+<li>前端全量 Vitest：259 个文件、1890 项通过。首轮高并发超时，限制为两名 worker 后全量通过；未跳过测试。</li>
+<li>新回归覆盖聚合排序、配置/上游输入输出和容量保真、未知能力不推断、跨修订旧能力隐藏、两处请求共用，以及选模不改 Worker。</li>
+<li>桌面 Chrome：1280/1920/2560/3440 CSS px，工作台开/关；选择器和目录详情无越界、无文档滚动，关闭详情释放宽度。</li>
+<li>Redmi Note 8 真机：实际触控完成列表滑动、搜索 <code>vision</code>、选中、详情打开与返回；最小模型选项高度不低于 44px。中英文文案与软键盘下选模均检查。</li>
+<li>UI 使用独立 HTTPS 实例 <code>/tmp/roami-gateway-catalog-1117/instance</code> 和本机协议夹具；没有修改宿主模型设置。启动与 tmux 清理统一使用 <code>scripts/dev/isolated-roami.sh</code>。</li>
+<li>规范扫描无发现；全目录图标扫描保留既有注释等命中，本次未新增 emoji、文本图标或内联 SVG。</li>
+</ul>
+<p>结构化浏览器证据、测试日志及改前/改后桌面和手机 PNG 保留在 <code>/tmp/roami-gateway-catalog-1117/</code>。PR 截图通过 <code>pr-shot.sh</code> 上传独立 <code>pr-shots</code> 分支，未加入主分支。</p>
+<p>会话准备时，宿主删除了稳定会话 <code>2026-1117-1551-t65g</code> 及占位 worktree/分支。当时尚无业务文件修改；已在原路径重建独立 <code>feat/gateway-model-catalog</code> 工作区并同步 <code>origin/main</code>，没有新建替代会话或更改宿主绑定。会话展示名曾成功设置为“模型网关聚合”，后续宿主已无法解析该稳定 ID。</p>
+</article>
+<article class="record" id="design-deployment-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/deployment-acceptance.md</code></p>
+<h2 id="design-deployment-acceptance--模型目录发布mcp-完成证据">模型目录发布：MCP 完成证据</h2>
+<h3 id="design-deployment-acceptance--产品与用户故事">产品与用户故事</h3>
+<p>完成任务后，发布应在宿主确认没有进行中的输入和工具时继续。执行器的完成回复不代替宿主状态；不取消任务、不替用户验收、不重复执行结果不确定的外部操作。</p>
+<h3 id="design-deployment-acceptance--技术设计">技术设计</h3>
+<p>本机升级停在 <code>AGENT_UPGRADE_BUSY</code>。绑定的 Codex 原生记录已包含根轮次 <code>task_complete</code>，但两个失败的 <code>McpToolCall</code> 结束记录未被完成证据解析器识别，工具仍被算作进行中。</p>
+<p>只扩展 <code>internal/agentexecution/session-codex-completion.go</code> 的既有 <code>item_completed</code> 解析：MCP 项要求有效调用 ID、非空服务/工具、终态、匹配的线程与轮次、有效开始/完成时间。沿用完整记录摘要、最终回复、未结束调用、子智能体、进程身份、重复证据等检查，再由既有 <code>execution status</code> 核对并保存停止证据。命令执行仍要求进程和退出码。没有新增路由、任务状态接口或 Python 逻辑。</p>
+<h3 id="design-deployment-acceptance--验证">验证</h3>
+<p>扩展既有状态核对回归，覆盖 MCP 成功/失败结束、仍在执行、缺失服务/工具、错误线程/轮次、结束时间晚于最终回复、重复结束、存活进程和未结束子智能体；确认核对幂等且不再次提交输入。定向回归已通过。</p>
+<p>完整门禁、合入及本机部署结果保留在本次本机交付报告。</p>
+</article>
+<article class="record" id="design-gateway-options-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/gateway-options-acceptance.md</code></p>
+<h2 id="design-gateway-options-acceptance--网关统一选模与能力展示">网关统一选模与能力展示</h2>
+<h3 id="design-gateway-options-acceptance--产品设计与用户故事">产品设计与用户故事</h3>
+<ul>
+<li>模型源只管理连接和已选模型，移除页底“正在使用”列表；使用方在网关模型行与详情中查看。</li>
+<li>网关默认进入模型目录，聚合模型优先，单模型随后；未接入的上游目录独立展示。</li>
+<li>Main 选模与网关复用目录、价格与能力数据；模型名称、调用 ID、输入/输出、工具、推理和价格状态同时可见，长 ID 单行省略且可搜索完整值。</li>
+<li>源名称 <code>openrouter-free</code> 仅标识用户保存的来源，不作为价格依据。上游正价格明确标为付费；零 Token 标价单独标识为未确认免费；仅免费筛选只接纳确认免费路线或已保存的仅免费策略。</li>
+<li>聚合能力与费用说明由实际成员决定，不把成员能力并集当作每次请求保证；未声明的输入输出保持未知。</li>
+</ul>
+<h3 id="design-gateway-options-acceptance--技术设计">技术设计</h3>
+<p>沿用 Go 网关 <code>/agent/model-gateway/models</code>，补充已有来源元数据中的输入、输出模态及付费标价分类。配置路线保持主身份，来源发现不创建或启用路线；元数据仍使用现有修订和凭据指纹约束。聚合优先顺序同时用于网关 CLI。</p>
+<p>前端通过既有 Agent 数据缓存共享显式目录请求、合并同时发起的读取，30 秒有效期，无新增轮询。沿用 PR #947 的 <code>gateway-model-catalog</code> 与 <code>ModelCapabilities</code>，提供配置路线映射和能力/价格展示，Main 与网关共同使用。直接连接当前模型与同源网关路线合并显示，点当前选项不会重写配置；其余选模继续走原有角色绑定接口。模型源页移除重复使用列表及孤立样式。</p>
+<p>未增加 Python 逻辑、数据库结构、账户价格规则或模型调度服务；未修改用户保存的源名称、调用 ID、模型选择与密钥。</p>
+<h3 id="design-gateway-options-acceptance--验证记录">验证记录</h3>
+<ul>
+<li>初轮相关前端回归 61 项通过；合并后全量前端 259 个文件、1893 项测试通过。</li>
+<li>Go 定向回归覆盖聚合优先、配置/上游分离、付费标价、输入/输出模态，以及零标价不会直接成为确认免费。</li>
+<li><code>quality/check.sh full</code> 通过；最终 typecheck、i18n、hover、1893 项 Vitest 与生产构建通过。Python 未变更，按范围跳过。</li>
+<li>真实桌面 Chrome 在 1280、1920、2560、3440 CSS px 验证选模弹窗与网关详情开关，无文档溢出；标题与内容间隔为 8 CSS px。</li>
+<li>Redmi Note 8（392 × 766 CSS px、粗指针）通过真实触摸验证：聚合优先、输入输出/付费信息、齿轮进入网关、详情使用方、免费筛选、完整调用 ID 搜索、内部手势滚动与返回。</li>
+<li>隔离测试目录只有 5 条已配置路线，付费上游仅在“上游目录”出现。确认免费筛选保留免费池和两个确认免费单模型，排除混合池、付费模型与未知价格。</li>
+<li>本机证据位于 <code>/tmp/roami-model-simplification/</code>：<code>usage-ui-verification.json</code>、<code>usage-interactions.json</code>、<code>usage-{source,picker}-{before,after}-{desktop,phone}.png</code>、<code>usage-paid-upstream-{desktop,phone}.png</code>。PR 截图通过 <code>pr-shot.sh</code> 保存到独立 <code>pr-shots</code> 分支，未放入主分支。</li>
+</ul>
+</article>
+<article class="record" id="design-implementation">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/implementation.md</code></p>
+<h2 id="design-implementation--cli-与-roami-创建会话选模">CLI 与 Roami 创建会话选模</h2>
+<p>本轮保留模型能力目录、<code>roami model list</code>、Web / CLI 创建 Roami 会话时指定模型和仅免费约束。网关工作区复用本机网关会话的生产实现（<code>5f99951a</code>）；另一个会话的工作区不变。</p>
+<h3 id="design-implementation--产品行为与用户故事">产品行为与用户故事</h3>
+<ul>
+<li>用户在本机网关配置模型或聚合池，然后以相同调用名称创建 Roami 会话。</li>
+<li>创建界面按模型类型、标准能力和免费条件筛选；筛选不替换已经选定的模型。</li>
+<li>选定模型保存到原有任务的 <code>intent_json.model</code>；仅免费保存为 <code>intent_json.freeOnly</code>，恢复任务时一并读取。</li>
+<li>省略模型或选择 <code>auto</code> 时，沿用执行角色保存的默认模型或池。显式模型只影响这个任务。</li>
+<li>不新增已有会话切模功能；默认模型继续在“能力 → 智能体 → Roami”中配置。</li>
+</ul>
+<h3 id="design-implementation--cli">CLI</h3>
+<pre><code class="language-bash">roami model list
+roami model list --json
+roami model list --capability image
+roami model list --refresh --all --json
+roami model list --free
+
+roami session new 资料整理 --kind roami --model free-pool --free-only \
+  --task &quot;整理本机资料&quot; --dir /absolute/path --key research-task --json
+
+roami session new 调研 --kind roami -model auto --task &quot;整理资料&quot;
+</code></pre>
+<p><code>free-pool</code> 是用户保存的示例调用名称，不会自动创建。<code>-model</code> 与 <code>--model</code> 都受支持。结果包括 <code>roami:</code> 会话 ID、任务 ID、原生对话 ID；通过 Web 会话入口或 <code>roami agent history --conversation ID</code> 查看，不使用 tmux attach。</p>
+<p><code>roami agent new</code> 保持原有命令接口。受管智能体通过已有注册任务能力传入 <code>model</code>；新增用户 CLI 入口保留受管上下文限制。</p>
+<h3 id="design-implementation--agent-动态选模与委派">Agent 动态选模与委派</h3>
+<p>首页模型选择器继续使用原有网关目录：列表和当前选中项显示模型名称与“原生 / 聚合”，缺失目录时保留“类型未知”。“原生”表示单模型入口，不代表输入能力已经做过原生/适配实测。打开列表会刷新现有目录，类型和模型增删跟随节点配置，不在 Agent 代码维护固定模型名单。</p>
+<p>Agent 可以通过 <code>roami model list --json</code> 查询当前模型或池 ID，然后在原有委派工具中传入：</p>
+<pre><code class="language-json">{&quot;goal&quot;:&quot;整理资料&quot;,&quot;executor&quot;:&quot;native&quot;,&quot;model&quot;:&quot;free-pool&quot;,&quot;freeOnly&quot;:true}
+</code></pre>
+<p><code>model</code>、<code>freeOnly</code> 是 <code>delegate</code> 的可选参数；不传时沿用默认设置。它们进入同一个任务 intent，并由原生执行器、Provider 和 Go 网关执行。已有会话的执行器与工作区绑定继续保持，不能用这些参数绕过续接契约。</p>
+<p>目录配置更新在后续调用生效，不需要修改 Agent 代码或重启。模型已删除、上游引用失效时显示“当前模型不可用，请在模型列表中重新选择”，不只显示通用重试提示。</p>
+<h3 id="design-implementation--技术设计">技术设计</h3>
+<p>复用现有链路：</p>
+<pre><code class="language-text">创建会话 / 任务 → task.intent_json → NativeExecutor → AgentLoop
+             → 现有 ChatCompletions（覆盖 model）→ Go 网关现有目录路由
+</code></pre>
+<ul>
+<li>不新增选模服务、选模预校验接口、专用请求头、目录版本握手或数据库迁移。</li>
+<li>NativeExecutor 从任务记录读取模型，随现有 turn 传入；AgentLoop 在有覆盖时使用 Provider 的浅拷贝，共享原有 HTTP 连接，互不改写模型、参数与缓存身份。</li>
+<li>Provider 使用原有请求体的 <code>model</code>；仅免费以 <code>roami_free_only</code> 布尔字段传给本机网关。Go 在转发上游前移除此字段，使用现有计价与聚合路由执行约束。</li>
+<li>默认角色配置、生成参数与原有路由身份校验继续有效。选模不修改进程全局模型，也不在 Python 增设费用规则。</li>
+<li>模型是否存在、启用、可用，以及免费路线是否满足条件，在实际调用时由 Go 统一判断。不存在的模型可形成任务记录，但执行失败，不调用上游。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>增量职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cmd/roami/model.go</code></td>
+<td>模型目录表格、JSON、能力与免费筛选</td>
+</tr>
+<tr>
+<td><code>cmd/roami/native-session-new.go</code></td>
+<td>幂等创建原生任务、返回真实会话身份</td>
+</tr>
+<tr>
+<td><code>internal/modelgateway/model-directory.go</code></td>
+<td>配置与上游声明缓存的统一能力目录</td>
+</tr>
+<tr>
+<td><code>internal/modelgateway/handler.go</code>、<code>catalog_http.go</code></td>
+<td>用请求中的模型走既有目录路由、执行仅免费约束</td>
+</tr>
+<tr>
+<td><code>executors/native.py</code>、<code>core/loop.py</code>、<code>providers/chat_completions.py</code></td>
+<td>从现有任务传递模型，复用 Provider 连接</td>
+</tr>
+<tr>
+<td><code>dispatch/tasks.py</code>、<code>protocol/http.py</code>、<code>server/http.py</code></td>
+<td>创建入口与原有任务字段透传</td>
+</tr>
+<tr>
+<td><code>tools/main_catalog.py</code>、<code>tools/model_inputs.py</code></td>
+<td>原有 delegate 工具暴露、传递模型与免费条件</td>
+</tr>
+<tr>
+<td><code>useAgentModels.ts</code>、<code>AgentModelPicker.tsx</code></td>
+<td>动态目录、原生/聚合标识与原有默认模型切换</td>
+</tr>
+<tr>
+<td><code>ModelSelectionFields.tsx</code>、<code>NewSessionModal.tsx</code></td>
+<td>新建会话选模与能力筛选</td>
+</tr>
+</tbody>
+</table>
+<p>新增管理接口仅有模型目录查询 <code>GET /v1/model-gateway/models</code> 和原生会话创建 <code>POST /v1/native-sessions</code>。不增加会话模型 GET/PUT 接口。</p>
+<h3 id="design-implementation--能力与免费口径">能力与免费口径</h3>
+<p>标准能力包括文本、图片、音频、视频、工具、推理、结构化输出和流式输出。缺失证据保留未知；上游声明标为 advertised，不冒充验证或原生支持。聚合能力不取成员并集。</p>
+<p><code>advertised-zero</code> 只代表 token 标价声明；<code>confirmed-free</code> 来自网关已确认计价规则；<code>free-only</code> 代表池策略。仅免费包含嵌套池，不放行付费套餐额度；无免费成员或费用未知时失败，不回退到付费。定价在准入中改变时拒绝旧的免费决策。</p>
+<p>节点独立的记忆、通知、压缩任务仍使用各自的角色设置；单任务免费不保证整个节点零费用。请求级多模态条件路由、能力实测和长时等待恢复仍是后续范围。</p>
+<h3 id="design-implementation--验收">验收</h3>
+<p>当前修订见 <a href="#design-simplification-acceptance">简化验收</a>。此前 <a href="#design-runtime-acceptance">运行验收</a> 保留原始历史证据，其中已撤回的会话切模功能不代表当前交付。</p>
+</article>
+<article class="record" id="design-naming-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/naming-acceptance.md</code></p>
+<h2 id="design-naming-acceptance--模型名称与访问密钥">模型名称与访问密钥</h2>
+<p>本轮沿用现有模型目录和配置字段，统一界面用词；不迁移调用 ID、不轮换密钥、不新增选模服务。</p>
+<h3 id="design-naming-acceptance--产品设计与用户故事">产品设计与用户故事</h3>
+<table>
+<thead>
+<tr>
+<th>用词</th>
+<th>保存字段</th>
+<th>用户用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型名称</td>
+<td>模型 <code>name</code></td>
+<td>在目录与 Agent 中识别模型，可重复</td>
+</tr>
+<tr>
+<td>调用 ID（model）</td>
+<td>模型 <code>id</code></td>
+<td>CLI、API 和委派传参，唯一标识网关路线</td>
+</tr>
+<tr>
+<td>上游模型 ID</td>
+<td>候选项 <code>model</code></td>
+<td>识别服务商提供的模型，在详情或连接编辑中设置</td>
+</tr>
+<tr>
+<td>网关访问密钥（API Key）</td>
+<td>已有网关密钥</td>
+<td>客户端向本网关认证</td>
+</tr>
+<tr>
+<td>密钥备注</td>
+<td>密钥 <code>name</code></td>
+<td>识别客户端或设备；修改备注不更换凭据</td>
+</tr>
+<tr>
+<td>服务商 API Key</td>
+<td>模型源 <code>apiKey</code></td>
+<td>网关向服务商认证</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>选择同名模型时，通过第二行调用 ID 与原生/聚合标签确认路线。</li>
+<li>在目录复制调用 ID，直接用于 <code>roami model list</code> 所列模型及会话/委派的 <code>model</code> 参数。</li>
+<li>为客户端创建访问密钥时填写备注，生成后明确执行“复制访问密钥”；列表仅显示带掩码的末尾。</li>
+<li>修改模型名称保留调用 ID 与上游候选项。修改调用 ID 继续沿用已有旧 ID 别名兼容行为。</li>
+</ul>
+<h3 id="design-naming-acceptance--技术设计">技术设计</h3>
+<p>前端沿用 <code>AgentModelPicker</code>、<code>GatewayModelDirectory</code>、<code>ModelHub</code> 与 <code>GatewayAccessKeys</code>；文案经中英文 i18n 输出。Agent 列表保留现有 ID 作为选项值，名称仅用于展示；内部 <code>gateway:</code> 选项前缀不展示为调用 ID。上游目录的 ID 明确标为上游模型 ID，只有已接入且可调用的网关模型提供复制调用 ID。凭据生成、重命名和一次性明文生命周期均使用原有 API。</p>
+<p>未修改 Go、Python、数据库结构或已有用户配置。CLI 的 JSON 字段 <code>id</code> / <code>name</code> 与认证环境变量 <code>ROAMI_GATEWAY_KEY</code> 保持兼容。</p>
+<h3 id="design-naming-acceptance--验证">验证</h3>
+<ul>
+<li>TypeScript、i18n（5974 个条目）、hover 检查通过。</li>
+<li>Vitest：258 个文件、1887 项测试通过，包括同名路线选择、模型改名不改 ID、备注更新不替换凭据、分别复制调用 ID/访问密钥。</li>
+<li>生产构建及 <code>quality/check.sh full</code> 通过；本轮仅改前端和文档，Go/Python 按影响范围跳过。</li>
+<li>桌面 1280/1920/2560/3440 CSS px 下，选模弹层无越界、文档无滚动；实际 Redmi Note 8（392×766 CSS px、粗指针）通过触摸搜索调用 ID 并选择模型，选项命中高度至少 44px。</li>
+<li>浏览器实际生成测试密钥、复制完整值、修改备注后认证仍返回 HTTP 200；关闭面板后明文不再显示。目录复制结果为网关调用 ID <code>free-text</code>，没有复制模型名称或上游 ID。</li>
+<li>验收仅操作隔离实例。临时 JSON 证据保留在 <code>/tmp/roami-model-simplification/naming-browser-verification.json</code>，截图走 PR 孤儿分支。</li>
+</ul>
+<h3 id="design-naming-acceptance--合入与部署状态">合入与部署状态</h3>
+<p>前序功能 PR <a href="https://github.com/ybz21/Roami/pull/939">#939</a> 已合入，主分支提交 <code>cdc44640d8dec1586b4ad56e2d34d80a409f52f8</code>。版本 <code>main-cdc44640</code> 的离线完整安装包已构建并通过候选检查。</p>
+<p>本机升级保护返回 <code>AGENT_UPGRADE_BUSY</code>；一项已有委派执行的停止状态未知。官方 <code>reconcile-session</code> 返回 <code>SESSION_RECONCILIATION_SCOPE_REQUIRED</code>，未能确认停止。未强制中断会话、改写任务状态或绕过升级保护；当前运行版本保持原状。</p>
+</article>
+<article class="record" id="design-openrouter-connector">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/openrouter-connector.md</code></p>
+<h2 id="design-openrouter-connector--openrouter-免费目录连接器">OpenRouter 免费目录连接器</h2>
+<h3 id="design-openrouter-connector--产品与使用场景">产品与使用场景</h3>
+<p>在模型源点「新建 → OpenRouter 免费模型」，填写 OpenRouter API Key 后拉取免费目录，勾选需要接入的模型。已保存的官方 OpenRouter Chat Completions 连接可以在「修改连接」里切换源类型。转换保留来源和模型 ID、密钥以及调度引用。既有接入模型仍在已接入列表，拉取后的可选列表只显示当次发现的免费变体。</p>
+<p>通用 API、本地服务和插件账号在已接入列表与可选列表均可搜索模型。搜索匹配模型 ID、已保存名称或上游目录名称。已接入列表的搜索直接使用本地配置。</p>
+<p>「新建」显示 OpenRouter 免费模型、API / 本地服务、模型插件三个入口及所需资料。连接 API 或本地服务时，服务地址和协议在表单主区域。模型插件入口使用 ZIP 或文件夹。</p>
+<h3 id="design-openrouter-connector--技术设计">技术设计</h3>
+<p>模型源增加可选的 <code>connector</code> 字段。Go 网关固定 OpenRouter 连接的 HTTPS 地址、Chat Completions 协议和 Bearer 认证。入口复用既有模型目录读取，免费连接器仅接受 OpenRouter <code>:free</code> 变体或 <code>openrouter/free</code>，并要求输入和输出 Token 标价均为零。免费目录属于发现策略，网关额度和供应商请求限制仍分别生效。缓存指纹包含连接类型，目录刷新不会写入配置。</p>
+<p>沿用模型源编辑器的目录、选中状态与保存流程。新增连接类型选项和独立创建入口。通用 API 保留完整目录和手动录入。</p>
+<p><a href="https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties">OpenRouter 模型目录 API</a> · <a href="https://openrouter.ai/collections/free-models">免费变体说明</a></p>
+<h3 id="design-openrouter-connector--验收记录">验收记录</h3>
+<ul>
+<li>Go 回归覆盖仅免费目录、完整通用目录、保留能力元数据、拒绝替代地址以及复用已保存凭据。</li>
+<li>前端回归覆盖独立入口、按目录名称搜索并保存所选模型、已接入列表搜索不发起目录请求。</li>
+<li>浏览器与真机截图随 PR 交付。</li>
+</ul>
+<h3 id="design-openrouter-connector--聚合成员检测">聚合成员检测</h3>
+<p>打开调度页后，网关按当前来源、模型目录、额度和调度规则返回每个成员的状态。成员未入选时显示来源、工具能力、上下文或费用和额度原因。仍可按调度顺序调整成员。</p>
+<p>API 目录读取按连接合并并缓存。调度页刷新目录证据，带工具或上下文约束的实际调用复用同一证据。自动检测使用目录和现有额度数据，首字延迟沿用真实调用记录。免费规则继续由 Go 网关核对已确认的定价和额度。</p>
+</article>
+<article class="record" id="design-picker-display">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/picker-display.md</code></p>
+<h2 id="design-picker-display--精简-main-选模列表">精简 Main 选模列表</h2>
+<p>在首页输入 <code>/model</code> 或点当前模型，都会打开同一个选择器。标题下直接显示搜索框，列表保留模型名称、原生或聚合类型、输入输出、能力及价格状态。切换生效说明在列表下方。调用 ID 从列表行移除，仍可用完整 ID 搜索同名模型，网关继续提供调用 ID 和复制入口。</p>
+<p>沿用现有 <code>AgentModelPicker</code>、<code>/model</code> 命令与网关目录，选模请求仍使用稳定 ID。桌面弹窗标题减少垂直留白，手机沿用全屏选择页和触摸返回。</p>
+<p>回归覆盖隐藏 ID 后按完整 ID 搜索同名模型并切换到正确路线，以及桌面和手机在 Main 工作中用 <code>/model</code> 打开选择器。</p>
+</article>
+<article class="record" id="design-runtime-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/runtime-acceptance.md</code></p>
+<blockquote>
+<p>历史记录：以下证据对应简化前的 <code>40de2934</code>。独立会话切模、预校验和选模表已撤回；当前版本见 <a href="#design-simplification-acceptance">简化验收</a>。</p>
+</blockquote>
+<h2 id="design-runtime-acceptance--模型选模运行验收">模型选模运行验收</h2>
+<p>日期：2026-11-16。使用本任务私有实例 <code>/tmp/roami-model-implementation/instance</code>，启动与清理统一经过 <code>scripts/dev/isolated-roami.sh</code>；没有改动宿主模型设置。</p>
+<h3 id="design-runtime-acceptance--cli-与真实推理链路">CLI 与真实推理链路</h3>
+<ul>
+<li><code>roami model list</code>：列出已接入模型与聚合池，展示能力声明与未知值。</li>
+<li><code>roami model list --refresh --all --json</code>：从本机协议夹具读取上游目录，未接入条目保持 <code>configured=false</code>。</li>
+<li><code>roami model list --capability image --json</code>：只保留声明支持图片的具体模型，不把聚合能力并集当作保证。</li>
+<li><code>roami agent new --model free-pool --free-only</code>：实际创建独立对话并保存选择。</li>
+<li><code>roami session new --kind roami --model mixed-pool --free-only --task ... --key model-selection-task --json</code>：原生任务执行成功；主执行请求落到免费成员 <code>fixture/free-text</code>，没有调用 <code>fixture/paid</code>。</li>
+<li>用同一个幂等键与同一请求重试，返回完全相同的会话、任务与对话 ID。</li>
+<li>桌面、手机均实际创建并完成原生任务。手机按图片能力筛选后选择 <code>free-vision</code> 并开启仅免费，主执行请求到达 <code>fixture/free-vision</code>；当前记录未出现 <code>fixture/paid</code> 调用。</li>
+<li>故意将夹具的免费计价规则改成未知后创建测试任务：结果为 <code>failed / MODEL_ROUTE_NO_AVAILABLE_MEMBER</code>，未回退付费成员；测试结束后恢复原计价规则。</li>
+<li>原生会话内从池切换到单模型，Worker 默认设置仍为 <code>default-worker</code>；重启隔离服务后选择记录保持。</li>
+<li>无效模型返回 400，未创建对话。调用记录中，独立的后台记忆工作仍使用保存的 Worker 默认模型；没有把单个任务的免费约束描述为整个节点费用承诺。</li>
+</ul>
+<h3 id="design-runtime-acceptance--自动检查">自动检查</h3>
+<ul>
+<li>前端全量：259 个文件、1885 项通过。</li>
+<li>迁移回归：9 项通过；新增表的空状态不影响历史数据快照比较。</li>
+<li><code>scripts/dev/quality/check.sh full</code> 通过：Go 全量、Python 全量（4903 通过、48 跳过、6 项 subtests 通过）、i18n、hover、TypeScript 与生产构建均通过。</li>
+<li>首次实现提交的 <code>quick</code> 提交钩子通过；收尾改动再按影响范围运行 Go 与前端检查。</li>
+<li>受管智能体不能经新增 CLI 入口绕过注册的任务准入；CLI 在创建资源前拒绝此类调用。停用的已保存模型保持可见，需选择启用模型才能应用。</li>
+</ul>
+<h3 id="design-runtime-acceptance--浏览器与手机">浏览器与手机</h3>
+<ul>
+<li>生产构建已运行。桌面 Chrome 检查 1280、1920、2560、3440 CSS px；详情面板打开时占用宽度，关闭后全部归还，文档与目录均无水平溢出。</li>
+<li>Redmi Note 8（Android 真机）：392 CSS px、粗指针、返回按钮 44 × 44；文档宽高均与视口一致。真实触控完成网关目录、详情、返回、新建会话、能力筛选、选模与提交。</li>
+<li>软键盘展开为 314 CSS px 时，表单仍在自己的滚动容器内，并成功提交，未依靠 DOM click 绕过触控命中。</li>
+<li>技术设计与原型 HTML 均已重新打开；无脚本异常，技术设计显示当前 <code>roami model list</code> 命令。</li>
+</ul>
+<h3 id="design-runtime-acceptance--证据">证据</h3>
+<p>结构化回执见 <a href="#evidence-runtime-acceptance">runtime-acceptance.json</a>。截图经 <code>scripts/dev/pr-shot.sh 939</code> 上传到独立的 <code>pr-shots</code> 分支，不提交截图到主分支。</p>
+<p><img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-directory-desktop.png" alt="模型目录" loading="lazy" />
+<img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-native-session-phone.png" alt="手机原生会话实测" loading="lazy" />
+<img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-cli.png" alt="CLI 运行与免费路线耗尽验证" loading="lazy" /></p>
+</article>
+<article class="record" id="design-simplification-acceptance">
+<p class="muted">原稿 <code>history/20261116-model-capabilities/simplification-acceptance.md</code></p>
+<h2 id="design-simplification-acceptance--创建会话选模简化验收">创建会话选模简化验收</h2>
+<p>本修订撤回独立选模服务、会话选模表与 schema 29、选模预校验接口、三个专用请求头、目录版本握手、已有会话切模 Hook 和 <code>roami agent new</code> 的新增选模参数。</p>
+<p>保留 <code>roami model list</code>、新建 Roami 会话指定模型和免费限制。模型复用任务原有 <code>intent_json.model</code>；仅免费随任务记录保存，执行走原有 Provider 和 Go 网关目录路由。</p>
+<h3 id="design-simplification-acceptance--验证范围">验证范围</h3>
+<ul>
+<li>任务选模幂等与保存；并行请求选模互不污染默认值、共用既有连接；原生任务实际执行收到选定模型。</li>
+<li>Go 网关按请求模型路由，移除本机免费字段，免费条件不满足时拒绝；角色默认设置和准入规则仍有效。</li>
+<li>删除选模表后不再升级数据库，历史迁移回归保持原样。</li>
+<li>Go 全量检查通过；删除遗留 Web 路由后的 <code>backend/server</code>、<code>internal/modelgateway</code>、<code>cmd/roami</code> 补充检查通过。</li>
+<li>前端 typecheck、i18n、hover、258 个文件 / 1884 项 Vitest 与生产构建通过。</li>
+<li>真实隔离链路的 CLI、桌面、Android 三个原生任务成功；创建重试返回同一回执。创建会话覆盖模型的验证阶段，默认 Worker 仍为 <code>default-worker</code>；之后的首页选模测试单独绑定了隔离节点角色，不涉及宿主默认模型。</li>
+<li>免费路线耗尽以 <code>MODEL_ROUTE_NO_AVAILABLE_MEMBER</code> 失败；不存在的模型以 <code>MODEL_NOT_CONFIGURED</code> 失败。付费夹具调用和本机约束字段泄漏均为 0。</li>
+<li>新隔离实例数据库维持 schema 28，无 <code>conversation_models</code> 表。</li>
+<li>桌面 1280 / 1920 / 2560 / 3440 CSS px 无文档或会话内容横向溢出；Android 实机 392 × 766 CSS px、314 CSS px 键盘下真实触摸创建成功，无页面异常。</li>
+<li>两份设计 HTML 已同步、实际打开，无脚本异常。</li>
+<li>最终 <code>quick</code>（提交钩子）与 <code>full</code> 均完成：Go 全量通过，Python 4903 通过、48 跳过、6 项 subtests 通过；i18n、hover、typecheck 和生产构建通过。原始日志为 <code>commit.log</code>、<code>delegate-full.log</code>，均含 Quality gate passed。</li>
+<li>委派工具、任务选模、路由策略的针对性回归 59 项通过；工具公开 schema 包含 model/freeOnly，并保存进原有任务记录。</li>
+<li>首页选择器的原生/聚合、未知类型、别名和动态目录变化已增加验证，前端 1884 项通过。</li>
+<li>实机验证：桌面与 Android 均展示类型；通过两端真实点击互换模型，另一端重新打开列表后读到最新选择。桌面四种宽度及手机均无溢出，触摸项至少 44 CSS px。证据见 <code>model-picker-verification.json</code>。</li>
+</ul>
+<p>此前 <code>runtime-acceptance.md/json</code> 属于简化前的历史验收；其中会话切模、预校验与独立选模表的结果不再代表当前版本。</p>
+<p>证据保存在本次节点 <code>/tmp/roami-model-simplification/</code>：<code>runtime-verification.json</code>、<code>desktop-layout-verification.json</code>、<code>phone-create-verification.json</code>、<code>document-verification.json</code>。截图通过 <code>pr-shots/pr-939/simplified-*.png</code> 随 PR 展示，不提交至 main。</p>
+<p>仅本机协议夹具参与推理验证，未部署任务分支；以下 WorkBuddy 故障修复单独使用宿主已保存的网关配置验证。</p>
+<h3 id="design-simplification-acceptance--workbuddy-现场修复">WorkBuddy 现场修复</h3>
+<p>用户提供的失败截图对应 <code>MODEL_NOT_CONFIGURED</code>；两个已登录的插件账号当前均提供 <code>hy4flash-free</code>，而保存的单模型和聚合池仍有 5 处 <code>hy4free</code> 引用。</p>
+<p>通过现有目录 API、当前 revision 修正这 5 处引用，并合并替换后相同的聚合成员。模型入口 ID、账号、凭据、Main/Worker 选择保持原绑定；原始目录备份仅在本机以 0600 权限保留。没有在 Agent 代码中写入 WorkBuddy 特例。</p>
+<p>直接请求原网关入口 <code>workbuddy-hy4</code>，实际使用 <code>hy4flash-free</code>，HTTP 200、无流式错误、返回 <code>OK</code>；网关结算状态为 known，实际金额为 0。该验证保留用户当前选中的 Main 模型。脱敏结果位于 <code>/tmp/roami-model-simplification/workbuddy-direct-verification.json</code>；备份与凭据不进入仓库。</p>
+</article>
+</section>
+<section aria-labelledby="evidence-heading"><h2 id="evidence-heading">验收数据</h2>
+<details class="evidence" id="evidence-acceptance"><summary>acceptance.json</summary><pre><code>{
+  &quot;desktop&quot;: [
+    {
+      &quot;width&quot;: 1280,
+      &quot;closed&quot;: {
+        &quot;width&quot;: 1280,
+        &quot;mainWidth&quot;: 1049,
+        &quot;mainScrollWidth&quot;: 1049,
+        &quot;docWidth&quot;: 1280,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 1064,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;opened&quot;: {
+        &quot;width&quot;: 1280,
+        &quot;mainWidth&quot;: 1049,
+        &quot;mainScrollWidth&quot;: 1049,
+        &quot;docWidth&quot;: 1280,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 1064,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;catalogWidthClosed&quot;: 1001,
+      &quot;catalogWidthOpen&quot;: 641
+    },
+    {
+      &quot;width&quot;: 1920,
+      &quot;closed&quot;: {
+        &quot;width&quot;: 1920,
+        &quot;mainWidth&quot;: 1689,
+        &quot;mainScrollWidth&quot;: 1689,
+        &quot;docWidth&quot;: 1920,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 1704,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;opened&quot;: {
+        &quot;width&quot;: 1920,
+        &quot;mainWidth&quot;: 1689,
+        &quot;mainScrollWidth&quot;: 1689,
+        &quot;docWidth&quot;: 1920,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 1704,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;catalogWidthClosed&quot;: 1641,
+      &quot;catalogWidthOpen&quot;: 1281
+    },
+    {
+      &quot;width&quot;: 2560,
+      &quot;closed&quot;: {
+        &quot;width&quot;: 2560,
+        &quot;mainWidth&quot;: 2329,
+        &quot;mainScrollWidth&quot;: 2329,
+        &quot;docWidth&quot;: 2560,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 2344,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;opened&quot;: {
+        &quot;width&quot;: 2560,
+        &quot;mainWidth&quot;: 2329,
+        &quot;mainScrollWidth&quot;: 2329,
+        &quot;docWidth&quot;: 2560,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 2344,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;catalogWidthClosed&quot;: 2281,
+      &quot;catalogWidthOpen&quot;: 1921
+    },
+    {
+      &quot;width&quot;: 3440,
+      &quot;closed&quot;: {
+        &quot;width&quot;: 3440,
+        &quot;mainWidth&quot;: 3209,
+        &quot;mainScrollWidth&quot;: 3209,
+        &quot;docWidth&quot;: 3440,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 3224,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;opened&quot;: {
+        &quot;width&quot;: 3440,
+        &quot;mainWidth&quot;: 3209,
+        &quot;mainScrollWidth&quot;: 3209,
+        &quot;docWidth&quot;: 3440,
+        &quot;docHeight&quot;: 1000,
+        &quot;viewportHeight&quot;: 1000,
+        &quot;main&quot;: {
+          &quot;x&quot;: 216,
+          &quot;y&quot;: 60,
+          &quot;width&quot;: 3224,
+          &quot;height&quot;: 940
+        },
+        &quot;pointer&quot;: &quot;fine&quot;,
+        &quot;size&quot;: &quot;large&quot;
+      },
+      &quot;catalogWidthClosed&quot;: 3161,
+      &quot;catalogWidthOpen&quot;: 2801
+    }
+  ],
+  &quot;phone&quot;: [
+    {
+      &quot;width&quot;: 392,
+      &quot;mainWidth&quot;: 393,
+      &quot;mainScrollWidth&quot;: 393,
+      &quot;docWidth&quot;: 392,
+      &quot;docHeight&quot;: 766,
+      &quot;viewportHeight&quot;: 766,
+      &quot;main&quot;: {
+        &quot;x&quot;: 0,
+        &quot;y&quot;: 121.45455169677734,
+        &quot;width&quot;: 392.727294921875,
+        &quot;height&quot;: 644.3636474609375
+      },
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;size&quot;: &quot;compact&quot;
+    },
+    {
+      &quot;detail&quot;: {
+        &quot;x&quot;: 0,
+        &quot;y&quot;: 0,
+        &quot;width&quot;: 392.727294921875,
+        &quot;height&quot;: 765.8181762695312
+      }
+    },
+    {
+      &quot;scrollBefore&quot;: 6294.54541015625,
+      &quot;scrollAfter&quot;: 6644.36376953125
+    }
+  ],
+  &quot;checks&quot;: [
+    &quot;Image input: four entries / three fixed models&quot;,
+    &quot;Roami standard filters, aggregate selection, independent Main/Worker drafts&quot;,
+    &quot;Auto capability constraints, verified-only empty pool, exhaustion wait&quot;,
+    &quot;Android physical Chrome: touch filter, full screen detail, return preserves filter, picker, plan and real scrolling&quot;
+  ],
+  &quot;twoDocuments&quot;: {
+    &quot;desktop&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 1280,
+          &quot;mainWidth&quot;: 1265,
+          &quot;mainScrollWidth&quot;: 1265,
+          &quot;docWidth&quot;: 1280,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 1280,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 1280,
+          &quot;mainWidth&quot;: 1265,
+          &quot;mainScrollWidth&quot;: 1265,
+          &quot;docWidth&quot;: 1280,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 1280,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;technical&quot;: {
+          &quot;width&quot;: 1280,
+          &quot;mainWidth&quot;: 1265,
+          &quot;mainScrollWidth&quot;: 1265,
+          &quot;docWidth&quot;: 1280,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 1280,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        }
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 1920,
+          &quot;mainWidth&quot;: 1905,
+          &quot;mainScrollWidth&quot;: 1905,
+          &quot;docWidth&quot;: 1920,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 1920,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 1920,
+          &quot;mainWidth&quot;: 1905,
+          &quot;mainScrollWidth&quot;: 1905,
+          &quot;docWidth&quot;: 1920,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 1920,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;technical&quot;: {
+          &quot;width&quot;: 1920,
+          &quot;mainWidth&quot;: 1905,
+          &quot;mainScrollWidth&quot;: 1905,
+          &quot;docWidth&quot;: 1920,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 1920,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        }
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 2560,
+          &quot;mainWidth&quot;: 2545,
+          &quot;mainScrollWidth&quot;: 2545,
+          &quot;docWidth&quot;: 2560,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 2560,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 2560,
+          &quot;mainWidth&quot;: 2545,
+          &quot;mainScrollWidth&quot;: 2545,
+          &quot;docWidth&quot;: 2560,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 2560,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;technical&quot;: {
+          &quot;width&quot;: 2560,
+          &quot;mainWidth&quot;: 2545,
+          &quot;mainScrollWidth&quot;: 2545,
+          &quot;docWidth&quot;: 2560,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 2560,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        }
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 3440,
+          &quot;mainWidth&quot;: 3425,
+          &quot;mainScrollWidth&quot;: 3425,
+          &quot;docWidth&quot;: 3440,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 3440,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 3440,
+          &quot;mainWidth&quot;: 3425,
+          &quot;mainScrollWidth&quot;: 3425,
+          &quot;docWidth&quot;: 3440,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 3440,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;technical&quot;: {
+          &quot;width&quot;: 3440,
+          &quot;mainWidth&quot;: 3425,
+          &quot;mainScrollWidth&quot;: 3425,
+          &quot;docWidth&quot;: 3440,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 115.3984375,
+            &quot;width&quot;: 3440,
+            &quot;height&quot;: 884.6015625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        }
+      }
+    ],
+    &quot;phone&quot;: [
+      {
+        &quot;prototype&quot;: {
+          &quot;width&quot;: 392,
+          &quot;mainWidth&quot;: 393,
+          &quot;mainScrollWidth&quot;: 393,
+          &quot;docWidth&quot;: 392,
+          &quot;docHeight&quot;: 766,
+          &quot;viewportHeight&quot;: 766,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 121.45455169677734,
+            &quot;width&quot;: 392.727294921875,
+            &quot;height&quot;: 644.3636474609375
+          },
+          &quot;pointer&quot;: &quot;coarse&quot;,
+          &quot;size&quot;: &quot;compact&quot;
+        },
+        &quot;technical&quot;: {
+          &quot;width&quot;: 392,
+          &quot;mainWidth&quot;: 393,
+          &quot;mainScrollWidth&quot;: 393,
+          &quot;docWidth&quot;: 392,
+          &quot;docHeight&quot;: 766,
+          &quot;viewportHeight&quot;: 766,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 121.45455169677734,
+            &quot;width&quot;: 392.727294921875,
+            &quot;height&quot;: 644.3636474609375
+          },
+          &quot;pointer&quot;: &quot;coarse&quot;,
+          &quot;size&quot;: &quot;compact&quot;
+        },
+        &quot;scrollBefore&quot;: 0,
+        &quot;scrollAfter&quot;: 299.6363525390625
+      }
+    ],
+    &quot;checks&quot;: [
+      &quot;Only two top-level entries; distinct technical and prototype contents&quot;,
+      &quot;Four desktop widths and inspector release space&quot;,
+      &quot;Desktop filters, role picker, Auto verified-only empty state, theme&quot;,
+      &quot;Android real touches: document links, filter, full-screen detail, return and scroll&quot;
+    ]
+  },
+  &quot;contextualPrototype&quot;: {
+    &quot;desktop&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 1280,
+          &quot;mainWidth&quot;: 1000,
+          &quot;mainScrollWidth&quot;: 1000,
+          &quot;docWidth&quot;: 1280,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 280,
+            &quot;y&quot;: 194.59375,
+            &quot;width&quot;: 1000,
+            &quot;height&quot;: 805.40625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;dialog&quot;: {
+          &quot;x&quot;: 180,
+          &quot;y&quot;: 116,
+          &quot;width&quot;: 920,
+          &quot;height&quot;: 768,
+          &quot;top&quot;: 116,
+          &quot;right&quot;: 1100,
+          &quot;bottom&quot;: 884,
+          &quot;left&quot;: 180
+        }
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 1920,
+          &quot;mainWidth&quot;: 1640,
+          &quot;mainScrollWidth&quot;: 1640,
+          &quot;docWidth&quot;: 1920,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 280,
+            &quot;y&quot;: 194.59375,
+            &quot;width&quot;: 1640,
+            &quot;height&quot;: 805.40625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;dialog&quot;: {
+          &quot;x&quot;: 500,
+          &quot;y&quot;: 116,
+          &quot;width&quot;: 920,
+          &quot;height&quot;: 768,
+          &quot;top&quot;: 116,
+          &quot;right&quot;: 1420,
+          &quot;bottom&quot;: 884,
+          &quot;left&quot;: 500
+        }
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 2560,
+          &quot;mainWidth&quot;: 2280,
+          &quot;mainScrollWidth&quot;: 2280,
+          &quot;docWidth&quot;: 2560,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 280,
+            &quot;y&quot;: 194.59375,
+            &quot;width&quot;: 2280,
+            &quot;height&quot;: 805.40625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;dialog&quot;: {
+          &quot;x&quot;: 820,
+          &quot;y&quot;: 116,
+          &quot;width&quot;: 920,
+          &quot;height&quot;: 768,
+          &quot;top&quot;: 116,
+          &quot;right&quot;: 1740,
+          &quot;bottom&quot;: 884,
+          &quot;left&quot;: 820
+        }
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 3440,
+          &quot;mainWidth&quot;: 3160,
+          &quot;mainScrollWidth&quot;: 3160,
+          &quot;docWidth&quot;: 3440,
+          &quot;docHeight&quot;: 1000,
+          &quot;viewportHeight&quot;: 1000,
+          &quot;main&quot;: {
+            &quot;x&quot;: 280,
+            &quot;y&quot;: 194.59375,
+            &quot;width&quot;: 3160,
+            &quot;height&quot;: 805.40625
+          },
+          &quot;pointer&quot;: &quot;fine&quot;,
+          &quot;size&quot;: &quot;large&quot;
+        },
+        &quot;dialog&quot;: {
+          &quot;x&quot;: 1260,
+          &quot;y&quot;: 116,
+          &quot;width&quot;: 920,
+          &quot;height&quot;: 768,
+          &quot;top&quot;: 116,
+          &quot;right&quot;: 2180,
+          &quot;bottom&quot;: 884,
+          &quot;left&quot;: 1260
+        }
+      }
+    ],
+    &quot;phone&quot;: [
+      {
+        &quot;settings&quot;: {
+          &quot;width&quot;: 392,
+          &quot;mainWidth&quot;: 393,
+          &quot;mainScrollWidth&quot;: 393,
+          &quot;docWidth&quot;: 392,
+          &quot;docHeight&quot;: 766,
+          &quot;viewportHeight&quot;: 766,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 149.3806915283203,
+            &quot;width&quot;: 392.727294921875,
+            &quot;height&quot;: 531.7102661132812
+          },
+          &quot;pointer&quot;: &quot;coarse&quot;,
+          &quot;size&quot;: &quot;compact&quot;
+        },
+        &quot;picker&quot;: {
+          &quot;x&quot;: 0,
+          &quot;y&quot;: 0,
+          &quot;width&quot;: 392.727294921875,
+          &quot;height&quot;: 765.8181762695312,
+          &quot;top&quot;: 0,
+          &quot;right&quot;: 392.727294921875,
+          &quot;bottom&quot;: 765.8181762695312,
+          &quot;left&quot;: 0
+        },
+        &quot;final&quot;: {
+          &quot;width&quot;: 392,
+          &quot;mainWidth&quot;: 393,
+          &quot;mainScrollWidth&quot;: 393,
+          &quot;docWidth&quot;: 392,
+          &quot;docHeight&quot;: 766,
+          &quot;viewportHeight&quot;: 766,
+          &quot;main&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 149.3806915283203,
+            &quot;width&quot;: 392.727294921875,
+            &quot;height&quot;: 531.7102661132812
+          },
+          &quot;pointer&quot;: &quot;coarse&quot;,
+          &quot;size&quot;: &quot;compact&quot;
+        }
+      }
+    ],
+    &quot;checks&quot;: [
+      &quot;Default is screenshot page: capabilities / agents / Roami&quot;,
+      &quot;Native dialog shared by role settings, homepage conversation and project task&quot;,
+      &quot;Filters, role apply, contextual navigation and independent task override&quot;,
+      &quot;Directory lives in models / gateway, not the Roami role page&quot;,
+      &quot;Android full screen picker, real touch selection/apply/back, all four navigation destinations&quot;
+    ]
+  },
+  &quot;unifiedDesign&quot;: {
+    &quot;sessions&quot;: {
+      &quot;gateway&quot;: {
+        &quot;id&quot;: &quot;2026-1112-1808-jl57&quot;,
+        &quot;checkpoint&quot;: &quot;21ca98ec&quot;
+      },
+      &quot;capabilities&quot;: {
+        &quot;id&quot;: &quot;2026-1116-1141-fswy&quot;,
+        &quot;checkpoint&quot;: &quot;58c750ac&quot;
+      }
+    },
+    &quot;mergePreview&quot;: &quot;clean; no actual branch merge&quot;,
+    &quot;browser&quot;: {
+      &quot;desktop&quot;: [
+        {
+          &quot;width&quot;: 1280,
+          &quot;access&quot;: {
+            &quot;width&quot;: 1280,
+            &quot;mainWidth&quot;: 808,
+            &quot;mainScrollWidth&quot;: 808,
+            &quot;docWidth&quot;: 1280,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 808,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 793,
+              &quot;scrollWidth&quot;: 793
+            }
+          },
+          &quot;directory&quot;: {
+            &quot;width&quot;: 1280,
+            &quot;mainWidth&quot;: 808,
+            &quot;mainScrollWidth&quot;: 808,
+            &quot;docWidth&quot;: 1280,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 808,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 793,
+              &quot;scrollWidth&quot;: 793
+            }
+          },
+          &quot;opened&quot;: {
+            &quot;width&quot;: 1280,
+            &quot;mainWidth&quot;: 808,
+            &quot;mainScrollWidth&quot;: 808,
+            &quot;docWidth&quot;: 1280,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 808,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 433,
+              &quot;scrollWidth&quot;: 433
+            }
+          }
+        },
+        {
+          &quot;width&quot;: 1920,
+          &quot;access&quot;: {
+            &quot;width&quot;: 1920,
+            &quot;mainWidth&quot;: 1448,
+            &quot;mainScrollWidth&quot;: 1448,
+            &quot;docWidth&quot;: 1920,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 1448,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 1448,
+              &quot;scrollWidth&quot;: 1448
+            }
+          },
+          &quot;directory&quot;: {
+            &quot;width&quot;: 1920,
+            &quot;mainWidth&quot;: 1448,
+            &quot;mainScrollWidth&quot;: 1448,
+            &quot;docWidth&quot;: 1920,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 1448,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 1448,
+              &quot;scrollWidth&quot;: 1448
+            }
+          },
+          &quot;opened&quot;: {
+            &quot;width&quot;: 1920,
+            &quot;mainWidth&quot;: 1448,
+            &quot;mainScrollWidth&quot;: 1448,
+            &quot;docWidth&quot;: 1920,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 1448,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 970,
+              &quot;scrollWidth&quot;: 970
+            }
+          }
+        },
+        {
+          &quot;width&quot;: 2560,
+          &quot;access&quot;: {
+            &quot;width&quot;: 2560,
+            &quot;mainWidth&quot;: 2088,
+            &quot;mainScrollWidth&quot;: 2088,
+            &quot;docWidth&quot;: 2560,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 2088,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 2088,
+              &quot;scrollWidth&quot;: 2088
+            }
+          },
+          &quot;directory&quot;: {
+            &quot;width&quot;: 2560,
+            &quot;mainWidth&quot;: 2088,
+            &quot;mainScrollWidth&quot;: 2088,
+            &quot;docWidth&quot;: 2560,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 2088,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 2088,
+              &quot;scrollWidth&quot;: 2088
+            }
+          },
+          &quot;opened&quot;: {
+            &quot;width&quot;: 2560,
+            &quot;mainWidth&quot;: 2088,
+            &quot;mainScrollWidth&quot;: 2088,
+            &quot;docWidth&quot;: 2560,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 2088,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 1584,
+              &quot;scrollWidth&quot;: 1584
+            }
+          }
+        },
+        {
+          &quot;width&quot;: 3440,
+          &quot;access&quot;: {
+            &quot;width&quot;: 3440,
+            &quot;mainWidth&quot;: 2968,
+            &quot;mainScrollWidth&quot;: 2968,
+            &quot;docWidth&quot;: 3440,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 2968,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 2968,
+              &quot;scrollWidth&quot;: 2968
+            }
+          },
+          &quot;directory&quot;: {
+            &quot;width&quot;: 3440,
+            &quot;mainWidth&quot;: 2968,
+            &quot;mainScrollWidth&quot;: 2968,
+            &quot;docWidth&quot;: 3440,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 2968,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 2968,
+              &quot;scrollWidth&quot;: 2968
+            }
+          },
+          &quot;opened&quot;: {
+            &quot;width&quot;: 3440,
+            &quot;mainWidth&quot;: 2968,
+            &quot;mainScrollWidth&quot;: 2968,
+            &quot;docWidth&quot;: 3440,
+            &quot;docHeight&quot;: 1000,
+            &quot;viewportHeight&quot;: 1000,
+            &quot;main&quot;: {
+              &quot;x&quot;: 472,
+              &quot;y&quot;: 194.59375,
+              &quot;width&quot;: 2968,
+              &quot;height&quot;: 805.40625
+            },
+            &quot;pointer&quot;: &quot;fine&quot;,
+            &quot;size&quot;: &quot;large&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 2464,
+              &quot;scrollWidth&quot;: 2464
+            }
+          }
+        }
+      ],
+      &quot;phone&quot;: [
+        {
+          &quot;access&quot;: {
+            &quot;width&quot;: 392,
+            &quot;mainWidth&quot;: 393,
+            &quot;mainScrollWidth&quot;: 393,
+            &quot;docWidth&quot;: 392,
+            &quot;docHeight&quot;: 766,
+            &quot;viewportHeight&quot;: 766,
+            &quot;main&quot;: {
+              &quot;x&quot;: 0,
+              &quot;y&quot;: 194.90341186523438,
+              &quot;width&quot;: 392.727294921875,
+              &quot;height&quot;: 486.1875
+            },
+            &quot;pointer&quot;: &quot;coarse&quot;,
+            &quot;size&quot;: &quot;compact&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 393,
+              &quot;scrollWidth&quot;: 393
+            }
+          },
+          &quot;inspector&quot;: {
+            &quot;x&quot;: 0,
+            &quot;y&quot;: 0,
+            &quot;width&quot;: 392.727294921875,
+            &quot;height&quot;: 765.8181762695312,
+            &quot;top&quot;: 0,
+            &quot;right&quot;: 392.727294921875,
+            &quot;bottom&quot;: 765.8181762695312,
+            &quot;left&quot;: 0
+          },
+          &quot;final&quot;: {
+            &quot;width&quot;: 392,
+            &quot;mainWidth&quot;: 393,
+            &quot;mainScrollWidth&quot;: 393,
+            &quot;docWidth&quot;: 392,
+            &quot;docHeight&quot;: 766,
+            &quot;viewportHeight&quot;: 766,
+            &quot;main&quot;: {
+              &quot;x&quot;: 0,
+              &quot;y&quot;: 194.90341186523438,
+              &quot;width&quot;: 392.727294921875,
+              &quot;height&quot;: 486.1875
+            },
+            &quot;pointer&quot;: &quot;coarse&quot;,
+            &quot;size&quot;: &quot;compact&quot;,
+            &quot;gateway&quot;: {
+              &quot;width&quot;: 393,
+              &quot;scrollWidth&quot;: 393
+            }
+          }
+        }
+      ],
+      &quot;checks&quot;: [
+        &quot;Four desktop widths with original model navigation, two gateway tasks, three directory tabs and inspector release&quot;,
+        &quot;One registry: discovered model enabling reaches Roami picker; canonical ID reaches invocation example&quot;,
+        &quot;Saved pool membership constrains Auto; two image members initially, one after removing a member; verification unknown waits&quot;,
+        &quot;Real secure clipboard writes, Key name validation, rename, disable/enable, rotate, one-time plaintext, fixed singleton replacement confirmation&quot;,
+        &quot;Android HTTPS touch pass: gateway tabs, full-screen member detail, source enable, shared chooser, Auto pool scope and new Key copy&quot;,
+        &quot;No API or model inference requests&quot;
+      ]
+    }
+  }
+}
+</code></pre></details>
+<details class="evidence" id="evidence-model-evidence"><summary>model-evidence.json</summary><pre><code>{
+  &quot;source&quot;: &quot;https://openrouter.ai/api/v1/models&quot;,
+  &quot;retrievedAt&quot;: &quot;2026-11-16T03:44:20.762840+00:00&quot;,
+  &quot;scope&quot;: &quot;Exact six public IDs visible in the supplied screenshot; advertised metadata only, no inference request. Local source, enabled state, credentials and end-to-end support were not inspected.&quot;,
+  &quot;responseSha256&quot;: &quot;6ce77451e4723fcd1be9ba4eb2b2b8efd60639e961adf1ba9dc82a65e65a2a7d&quot;,
+  &quot;models&quot;: [
+    {
+      &quot;id&quot;: &quot;thinkingmachines/inkling-2-small:free&quot;,
+      &quot;name&quot;: &quot;Thinking Machines: Inkling 2 Small (free)&quot;,
+      &quot;architecture&quot;: {
+        &quot;modality&quot;: &quot;text+image-&gt;text&quot;,
+        &quot;input_modalities&quot;: [
+          &quot;text&quot;,
+          &quot;image&quot;
+        ],
+        &quot;output_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;tokenizer&quot;: &quot;Other&quot;,
+        &quot;instruct_type&quot;: null
+      },
+      &quot;supported_parameters&quot;: [
+        &quot;include_reasoning&quot;,
+        &quot;max_tokens&quot;,
+        &quot;reasoning&quot;,
+        &quot;reasoning_effort&quot;,
+        &quot;seed&quot;,
+        &quot;stop&quot;,
+        &quot;temperature&quot;,
+        &quot;tools&quot;,
+        &quot;top_p&quot;
+      ],
+      &quot;context_length&quot;: 1048576,
+      &quot;pricing&quot;: {
+        &quot;prompt&quot;: &quot;0&quot;,
+        &quot;completion&quot;: &quot;0&quot;
+      },
+      &quot;top_provider&quot;: {
+        &quot;context_length&quot;: 1048576,
+        &quot;max_completion_tokens&quot;: 131072,
+        &quot;is_moderated&quot;: false
+      }
+    },
+    {
+      &quot;id&quot;: &quot;particle-ai/particle-1:free&quot;,
+      &quot;name&quot;: &quot;Particle AI: Particle-1 (free)&quot;,
+      &quot;architecture&quot;: {
+        &quot;modality&quot;: &quot;text+image-&gt;text&quot;,
+        &quot;input_modalities&quot;: [
+          &quot;text&quot;,
+          &quot;image&quot;
+        ],
+        &quot;output_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;tokenizer&quot;: &quot;Other&quot;,
+        &quot;instruct_type&quot;: null
+      },
+      &quot;supported_parameters&quot;: [
+        &quot;frequency_penalty&quot;,
+        &quot;include_reasoning&quot;,
+        &quot;logprobs&quot;,
+        &quot;max_tokens&quot;,
+        &quot;min_p&quot;,
+        &quot;presence_penalty&quot;,
+        &quot;reasoning&quot;,
+        &quot;reasoning_effort&quot;,
+        &quot;repetition_penalty&quot;,
+        &quot;response_format&quot;,
+        &quot;seed&quot;,
+        &quot;stop&quot;,
+        &quot;structured_outputs&quot;,
+        &quot;temperature&quot;,
+        &quot;tool_choice&quot;,
+        &quot;tools&quot;,
+        &quot;top_k&quot;,
+        &quot;top_logprobs&quot;,
+        &quot;top_p&quot;
+      ],
+      &quot;context_length&quot;: 1048576,
+      &quot;pricing&quot;: {
+        &quot;prompt&quot;: &quot;0&quot;,
+        &quot;completion&quot;: &quot;0&quot;
+      },
+      &quot;top_provider&quot;: {
+        &quot;context_length&quot;: 1048576,
+        &quot;max_completion_tokens&quot;: 131072,
+        &quot;is_moderated&quot;: false
+      }
+    },
+    {
+      &quot;id&quot;: &quot;recursive/flint-v1.0:free&quot;,
+      &quot;name&quot;: &quot;Recursive: Flint (free)&quot;,
+      &quot;architecture&quot;: {
+        &quot;modality&quot;: &quot;text-&gt;text&quot;,
+        &quot;input_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;output_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;tokenizer&quot;: &quot;Other&quot;,
+        &quot;instruct_type&quot;: null
+      },
+      &quot;supported_parameters&quot;: [
+        &quot;include_reasoning&quot;,
+        &quot;logprobs&quot;,
+        &quot;max_tokens&quot;,
+        &quot;reasoning&quot;,
+        &quot;response_format&quot;,
+        &quot;seed&quot;,
+        &quot;stop&quot;,
+        &quot;temperature&quot;,
+        &quot;tools&quot;,
+        &quot;top_logprobs&quot;,
+        &quot;top_p&quot;
+      ],
+      &quot;context_length&quot;: 262144,
+      &quot;pricing&quot;: {
+        &quot;prompt&quot;: &quot;0&quot;,
+        &quot;completion&quot;: &quot;0&quot;
+      },
+      &quot;top_provider&quot;: {
+        &quot;context_length&quot;: 262144,
+        &quot;max_completion_tokens&quot;: 235929,
+        &quot;is_moderated&quot;: false
+      }
+    },
+    {
+      &quot;id&quot;: &quot;nvidia/nemotron-3.5-super-vl:free&quot;,
+      &quot;name&quot;: &quot;NVIDIA: Nemotron 3.5 Super VL (free)&quot;,
+      &quot;architecture&quot;: {
+        &quot;modality&quot;: &quot;text+image+video-&gt;text&quot;,
+        &quot;input_modalities&quot;: [
+          &quot;text&quot;,
+          &quot;image&quot;,
+          &quot;video&quot;
+        ],
+        &quot;output_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;tokenizer&quot;: &quot;Other&quot;,
+        &quot;instruct_type&quot;: null
+      },
+      &quot;supported_parameters&quot;: [
+        &quot;include_reasoning&quot;,
+        &quot;max_tokens&quot;,
+        &quot;reasoning&quot;,
+        &quot;response_format&quot;,
+        &quot;seed&quot;,
+        &quot;structured_outputs&quot;,
+        &quot;temperature&quot;,
+        &quot;tool_choice&quot;,
+        &quot;tools&quot;,
+        &quot;top_p&quot;
+      ],
+      &quot;context_length&quot;: 1000000,
+      &quot;pricing&quot;: {
+        &quot;prompt&quot;: &quot;0&quot;,
+        &quot;completion&quot;: &quot;0&quot;
+      },
+      &quot;top_provider&quot;: {
+        &quot;context_length&quot;: 1000000,
+        &quot;max_completion_tokens&quot;: 131072,
+        &quot;is_moderated&quot;: false
+      }
+    },
+    {
+      &quot;id&quot;: &quot;nvidia/nemotron-3.5-lightning:free&quot;,
+      &quot;name&quot;: &quot;NVIDIA: Nemotron 3.5 Lightning (free)&quot;,
+      &quot;architecture&quot;: {
+        &quot;modality&quot;: &quot;text-&gt;text&quot;,
+        &quot;input_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;output_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;tokenizer&quot;: &quot;Other&quot;,
+        &quot;instruct_type&quot;: null
+      },
+      &quot;supported_parameters&quot;: [
+        &quot;include_reasoning&quot;,
+        &quot;max_tokens&quot;,
+        &quot;reasoning&quot;,
+        &quot;seed&quot;,
+        &quot;temperature&quot;,
+        &quot;tool_choice&quot;,
+        &quot;tools&quot;,
+        &quot;top_p&quot;
+      ],
+      &quot;context_length&quot;: 1000000,
+      &quot;pricing&quot;: {
+        &quot;prompt&quot;: &quot;0&quot;,
+        &quot;completion&quot;: &quot;0&quot;
+      },
+      &quot;top_provider&quot;: {
+        &quot;context_length&quot;: 1000000,
+        &quot;max_completion_tokens&quot;: 65536,
+        &quot;is_moderated&quot;: false
+      }
+    },
+    {
+      &quot;id&quot;: &quot;openrouter/free&quot;,
+      &quot;name&quot;: &quot;Free Models Router&quot;,
+      &quot;architecture&quot;: {
+        &quot;modality&quot;: &quot;text+image-&gt;text&quot;,
+        &quot;input_modalities&quot;: [
+          &quot;text&quot;,
+          &quot;image&quot;
+        ],
+        &quot;output_modalities&quot;: [
+          &quot;text&quot;
+        ],
+        &quot;tokenizer&quot;: &quot;Router&quot;,
+        &quot;instruct_type&quot;: null
+      },
+      &quot;supported_parameters&quot;: [
+        &quot;frequency_penalty&quot;,
+        &quot;include_reasoning&quot;,
+        &quot;logprobs&quot;,
+        &quot;max_completion_tokens&quot;,
+        &quot;max_tokens&quot;,
+        &quot;min_p&quot;,
+        &quot;presence_penalty&quot;,
+        &quot;reasoning&quot;,
+        &quot;reasoning_effort&quot;,
+        &quot;repetition_penalty&quot;,
+        &quot;response_format&quot;,
+        &quot;seed&quot;,
+        &quot;stop&quot;,
+        &quot;structured_outputs&quot;,
+        &quot;temperature&quot;,
+        &quot;tool_choice&quot;,
+        &quot;tools&quot;,
+        &quot;top_k&quot;,
+        &quot;top_logprobs&quot;,
+        &quot;top_p&quot;
+      ],
+      &quot;context_length&quot;: 200000,
+      &quot;pricing&quot;: {
+        &quot;prompt&quot;: &quot;0&quot;,
+        &quot;completion&quot;: &quot;0&quot;
+      },
+      &quot;top_provider&quot;: {
+        &quot;context_length&quot;: null,
+        &quot;max_completion_tokens&quot;: null,
+        &quot;is_moderated&quot;: false
+      }
+    }
+  ]
+}
+</code></pre></details>
+<details class="evidence" id="evidence-runtime-acceptance"><summary>runtime-acceptance.json</summary><pre><code>{
+  &quot;date&quot;: &quot;2026-11-16&quot;,
+  &quot;scope&quot;: &quot;isolated local protocol fixtures; no production model settings changed&quot;,
+  &quot;cliAndExecution&quot;: {
+    &quot;passed&quot;: true,
+    &quot;taskStates&quot;: [
+      &quot;succeeded&quot;,
+      &quot;succeeded&quot;,
+      &quot;succeeded&quot;
+    ],
+    &quot;paidFixtureCalls&quot;: 0,
+    &quot;primaryModels&quot;: [
+      &quot;fixture/free-text&quot;,
+      &quot;fixture/free-vision&quot;
+    ],
+    &quot;choices&quot;: [
+      {
+        &quot;conversation_id&quot;: &quot;bf874999a5524580ac0395400dac87c7&quot;,
+        &quot;model&quot;: &quot;free-pool&quot;,
+        &quot;free_only&quot;: 1
+      },
+      {
+        &quot;conversation_id&quot;: &quot;b5152dd4473b4b219e3132cbd0bf5253&quot;,
+        &quot;model&quot;: &quot;mixed-pool&quot;,
+        &quot;free_only&quot;: 1
+      },
+      {
+        &quot;conversation_id&quot;: &quot;5087e22c65c242e7aa6cb0258b00c219&quot;,
+        &quot;model&quot;: &quot;free-vision&quot;,
+        &quot;free_only&quot;: 1
+      },
+      {
+        &quot;conversation_id&quot;: &quot;df716fff8f374f81bc5931e91946269a&quot;,
+        &quot;model&quot;: &quot;free-vision&quot;,
+        &quot;free_only&quot;: 1
+      }
+    ],
+    &quot;backgroundWorkerDefaultsRemainConfigured&quot;: true
+  },
+  &quot;freeExhaustion&quot;: {
+    &quot;passed&quot;: true,
+    &quot;missingSelectionRejectedBeforeConversationCreation&quot;: true,
+    &quot;exhaustedFreeRoutesState&quot;: &quot;failed&quot;,
+    &quot;outcome&quot;: {
+      &quot;state&quot;: &quot;failed&quot;,
+      &quot;errorCode&quot;: &quot;MODEL_ROUTE_NO_AVAILABLE_MEMBER&quot;
+    },
+    &quot;paidFixtureCalls&quot;: 0
+  },
+  &quot;desktop&quot;: {
+    &quot;passed&quot;: true,
+    &quot;result&quot;: [
+      {
+        &quot;width&quot;: 1280,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 1280,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 1280,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 1112,
+            &quot;scrollWidth&quot;: 1112,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: null
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 1280,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 1280,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 752,
+            &quot;scrollWidth&quot;: 752,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: {
+            &quot;left&quot;: 920,
+            &quot;right&quot;: 1280
+          }
+        }
+      },
+      {
+        &quot;width&quot;: 1920,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 1920,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 1920,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 1752,
+            &quot;scrollWidth&quot;: 1752,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: null
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 1920,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 1920,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 1248,
+            &quot;scrollWidth&quot;: 1248,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: {
+            &quot;left&quot;: 1416,
+            &quot;right&quot;: 1920
+          }
+        }
+      },
+      {
+        &quot;width&quot;: 2560,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 2560,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 2560,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 2392,
+            &quot;scrollWidth&quot;: 2392,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: null
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 2560,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 2560,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 1888,
+            &quot;scrollWidth&quot;: 1888,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: {
+            &quot;left&quot;: 2056,
+            &quot;right&quot;: 2560
+          }
+        }
+      },
+      {
+        &quot;width&quot;: 3440,
+        &quot;closed&quot;: {
+          &quot;width&quot;: 3440,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 3440,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 3272,
+            &quot;scrollWidth&quot;: 3272,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: null
+        },
+        &quot;opened&quot;: {
+          &quot;width&quot;: 3440,
+          &quot;height&quot;: 1000,
+          &quot;dpr&quot;: 1,
+          &quot;documentWidth&quot;: 3440,
+          &quot;documentHeight&quot;: 1000,
+          &quot;scroll&quot;: {
+            &quot;width&quot;: 2768,
+            &quot;scrollWidth&quot;: 2768,
+            &quot;height&quot;: 712
+          },
+          &quot;panel&quot;: {
+            &quot;left&quot;: 2936,
+            &quot;right&quot;: 3440
+          }
+        }
+      }
+    ],
+    &quot;errors&quot;: []
+  },
+  &quot;phoneLayout&quot;: {
+    &quot;passed&quot;: true,
+    &quot;bounds&quot;: {
+      &quot;width&quot;: 392,
+      &quot;documentWidth&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;documentHeight&quot;: 766,
+      &quot;pointer&quot;: &quot;coarse&quot;,
+      &quot;back&quot;: {
+        &quot;width&quot;: 44,
+        &quot;height&quot;: 44
+      }
+    },
+    &quot;errors&quot;: []
+  },
+  &quot;phoneCreate&quot;: {
+    &quot;passed&quot;: true,
+    &quot;bounds&quot;: {
+      &quot;width&quot;: 392,
+      &quot;height&quot;: 766,
+      &quot;documentWidth&quot;: 392,
+      &quot;documentHeight&quot;: 766,
+      &quot;scrollHeight&quot;: 555,
+      &quot;clientHeight&quot;: 391,
+      &quot;keyboard&quot;: 314
+    },
+    &quot;errors&quot;: []
+  },
+  &quot;nativeModelSwitch&quot;: {
+    &quot;passed&quot;: true,
+    &quot;workerDefault&quot;: &quot;default-worker&quot;,
+    &quot;errors&quot;: []
+  },
+  &quot;documents&quot;: [
+    {
+      &quot;name&quot;: &quot;technical-design.html&quot;,
+      &quot;rendered&quot;: true,
+      &quot;errors&quot;: []
+    },
+    {
+      &quot;name&quot;: &quot;prototype.html&quot;,
+      &quot;rendered&quot;: true,
+      &quot;errors&quot;: []
+    }
+  ],
+  &quot;checks&quot;: {
+    &quot;frontend&quot;: {
+      &quot;files&quot;: 259,
+      &quot;passed&quot;: 1885
+    },
+    &quot;migrationRegression&quot;: {
+      &quot;passed&quot;: 9
+    },
+    &quot;full&quot;: &quot;passed&quot;,
+    &quot;preCommitQuick&quot;: &quot;passed&quot;,
+    &quot;python&quot;: {
+      &quot;passed&quot;: 4903,
+      &quot;skipped&quot;: 48,
+      &quot;subtestsPassed&quot;: 6
+    },
+    &quot;go&quot;: &quot;passed&quot;
+  },
+  &quot;status&quot;: &quot;historical-superseded&quot;,
+  &quot;coversCommit&quot;: &quot;40de2934&quot;,
+  &quot;currentAcceptance&quot;: &quot;simplification-acceptance.md&quot;
+}
+</code></pre></details>
+</section>
+</main>
+</div>
+</body>
+</html>

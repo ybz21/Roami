@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roami 大模型设计 · 总览</title>
+<title>Roami 大模型设计汇编</title>
 <link rel="stylesheet" href="./assets/model-workspace-design.css">
 </head>
 <body>
-<header class="page-head"><h1>Roami 大模型设计 · 总览</h1></header>
+<header class="page-head"><h1>Roami 大模型设计汇编</h1></header>
 <div class="workspace">
 <nav class="contents" aria-label="设计目录">
   <a href="./model-monitoring-and-aggregation.html" aria-current="page">总览</a>
@@ -21,8 +21,8 @@
 </nav>
 <main class="document" id="document">
 <section id="overview" aria-labelledby="overview-title">
-  <header class="section-head"><h2 id="overview-title">页面总览</h2><small>2026 年 11 月 19 日</small></header>
-  <p class="copy">七个页面各有一份设计，包含在现有 Roami 页面中的改动、数据口径与历史依据。聚合、监控、审计与 WorkBuddy 提供可点样例。</p>
+  <header class="section-head"><h2 id="overview-title">现行设计</h2><a class="page-reference" href="./history/index.html">历史设计与验收</a></header>
+  <p class="copy">截至 2026 年 11 月 19 日。七个页签各有一份设计，网关、聚合、监控、审计与 WorkBuddy 收录可交互样例。</p>
   <table class="guide-table overview-table step" aria-label="七个子页的设计和入口">
     <thead><tr><th scope="col">子页设计</th><th scope="col">主要用途</th></tr></thead>
     <tbody>
@@ -35,6 +35,13 @@
       <tr id="speech"><th scope="row"><a href="./model-speech.html">语音输入</a></th><td>配置和验证转写服务</td></tr>
     </tbody>
   </table>
+  <h3 class="step">统一口径</h3>
+  <ul class="copy">
+    <li>模型源维护连接、授权、定价和启用范围。本机网关共享已接入目录，网页、CLI 与 Agent 选模使用同一份模型能力和稳定调用名。</li>
+    <li>聚合只调度已保存的成员。「仅看免费模型」用于候选筛选。具体费用约束由请求表达，准入与记账由 Go 网关处理。</li>
+    <li>调度页分别展示策略草稿、当前生效顺位和历史命中。请求级观测方案记录最终结果，来源视图继续统计各次上游尝试。</li>
+    <li>网关的接入、调用与控制契约集中在<a href="./model-gateway.html">本机网关</a>。失败和降级从监控进审计，能查原因、尝试次数和对应处理入口。</li>
+  </ul>
   <p class="copy step">在 Roami 内打开本文时，各设计页的「打开现有页面」使用当前节点地址。</p>
   <h3 class="step">跨页流程</h3>
   <ul class="copy">
@@ -42,7 +49,7 @@
     <li>排查故障，从<a href="./model-aggregation.html">聚合</a>的切换记录或<a href="./model-monitoring.html">监控</a>的异常时段进入<a href="./model-audit.html">审计</a>，保留筛选。</li>
     <li>核对费用，从<a href="./model-usage.html">概况</a>查看额度和用量，再到<a href="./model-audit.html">审计</a>核对明细。账号积分在 <a id="workbuddy" href="./model-sources.html#workbuddy">WorkBuddy 插件</a>里看。</li>
   </ul>
-  <div class="copy step"><h3>历史设计</h3><p>交互稿和验收记录保留原位置。各子页引用与当前方案相关的原稿。</p><ul class="references"><li><a href="./interaction-design.md">原工作区交互设计</a></li><li><a href="./interaction-implementation.md">已实现页面与验收</a></li><li><a href="./README.md">模型编排设计索引</a></li></ul></div>
+  <div class="copy step" id="history"><h3>历史沿革</h3><p>从 10 月 26 日的本地记账，到 11 月 19 日的网关和调度观测，技术设计、原型和验收集中在本目录。<a href="./history/index.html">查看全部历史 HTML</a></p></div>
 </section>
 
 <section id="delivery" aria-labelledby="delivery-title">

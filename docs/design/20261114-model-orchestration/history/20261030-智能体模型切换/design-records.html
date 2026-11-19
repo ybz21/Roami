@@ -1,0 +1,1794 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智能体绑定与网关协议 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+</head>
+<body>
+<header class="page-head"><h1>智能体绑定与网关协议</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计归档">
+  <a href="../../model-monitoring-and-aggregation.html">现行设计</a>
+  <a href="../index.html">历史目录</a>
+  <a href="#contents" aria-current="page">本页目录</a>
+</nav>
+<main class="document archive" id="contents">
+<section aria-labelledby="record-heading">
+<h2 id="record-heading">设计与验收记录</h2>
+<p class="copy">多上游连接、协议适配、访问密钥与账本接入。记录按原版本归档，实施状态以当时的记录为准。</p>
+<p class="muted"><a href="../index.html">返回历史目录</a> · <a href="../../model-monitoring-and-aggregation.html">查看现行设计</a></p>
+<details><summary>原型和历史 HTML（6）</summary><ul class="record-list"><li><a href="add-model.html">Roami · 添加模型交互稿</a></li>
+<li><a href="gateway-billing.html">Roami · 本地网关与 Agent 独立计费 · 设计提案</a></li>
+<li><a href="index.html">能力中心 · 大模型与智能体 · 第二版</a></li>
+<li><a href="records/2026-10-30/prototype.html">智能体模型切换 · Roami 交互提案</a></li>
+<li><a href="records/2026-11-01/gateway-billing-v1.html">Roami · 本地网关与 Agent 独立计费 · 设计提案</a></li>
+<li><a href="records/2026-11-01/gateway-billing-visible-keys.html">Roami · 本地网关与 Agent 独立计费 · 设计提案</a></li>
+</ul></details>
+<details open><summary>文档（23）</summary><ul class="record-list"><li><a href="#design-readme">能力中心：统一模型网关与智能体</a></li>
+<li><a href="#design-acceptance">第二版设计原型验证</a></li>
+<li><a href="#design-add-model-design">添加模型：最短流程</a></li>
+<li><a href="#design-add-model-review">简化添加模型：原型验收</a></li>
+<li><a href="#design-claude-gateway-binding-acceptance">Claude 本机网关接入修正</a></li>
+<li><a href="#design-connections-acceptance">连接与模型合并验收</a></li>
+<li><a href="#design-gateway-access-key">本机网关调用 Key</a></li>
+<li><a href="#design-gateway-adaptation">Roami 内置网关协议适配验收</a></li>
+<li><a href="#design-gateway-billing-implementation">默认智能体网关记账：V1 实现与验收</a></li>
+<li><a href="#design-gateway-billing-review">本地网关与智能体独立计费：修订 2</a></li>
+<li><a href="#design-implementation">首版实现与验收</a></li>
+<li><a href="#design-modes-acceptance">原厂与自定义模式验收</a></li>
+<li><a href="#design-native-model-discovery">原生智能体默认模型与目录切换</a></li>
+<li><a href="#design-revision-acceptance">统一模型列表修订验收</a></li>
+<li><a href="#design-source-catalog-acceptance">配置源与批量模型目录</a></li>
+<li><a href="#design-records-20261110-lan-source">局域网模型源接入回归</a></li>
+<li><a href="#design-records-2026-10-30-readme">2026-10-30 第一版</a></li>
+<li><a href="#design-records-2026-10-30-acceptance">设计原型验证</a></li>
+<li><a href="#design-records-2026-10-30-proposal">智能体模型切换</a></li>
+<li><a href="#design-records-2026-10-31-readme">能力中心：大模型与智能体</a></li>
+<li><a href="#design-records-2026-11-01-gateway-billing-v1-review">本地网关与 Agent 独立计费：设计稿验收</a></li>
+<li><a href="#design-records-2026-11-03-source-model-editing">模型源目录内编辑已添加模型</a></li>
+<li><a href="#design-records-2026-11-11-home-gateway-models">首页选择网关模型</a></li>
+</ul></details>
+<details><summary>验收数据（1）</summary><ul class="record-list"><li><a href="#evidence-assets-tsconfig">assets/tsconfig.json</a></li>
+</ul></details>
+</section>
+<section aria-label="文档正文">
+<article class="record" id="design-readme">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/README.md</code></p>
+<h2 id="design-readme--能力中心统一模型网关与智能体">能力中心：统一模型网关与智能体</h2>
+<p>2026-10-31 修订。连接与模型合并管理，Roami 内置网关负责适配客户端协议。同一个上游、同一个模型可以供 CC、Codex、OpenCode、Pi 和 Roami 使用，不再为不同智能体重复建立来源。</p>
+<p>新增提案：<a href="gateway-billing.html">本地网关与 Agent 独立计费（HTML）</a>。覆盖本地模型库复用、本机连接导入、默认智能体各自的 Key、直接按智能体归账和托管会话明细，以及产品交互和技术迁移方案；目前仅设计，未改运行代码。<a href="#design-gateway-billing-review">原型验收</a>。</p>
+<p>最新产品提案：<a href="#design-add-model-design">简化添加模型</a> · <a href="add-model.html">交互稿</a>。默认只填地址与密钥、读取后勾选；已有来源直接选择。定价、聚合策略各放后置选项卡。配置源与批量拉取已在 2026-11-01 落地，见 <a href="#design-source-catalog-acceptance">模型目录实现与验收</a>。提案中的独立聚合策略页签仍是后续范围；下文保留此前实现说明。</p>
+<p><a href="#design-connections-acceptance">连接合并验收</a> · <a href="#design-gateway-adaptation">网关适配验收</a> · <a href="#design-modes-acceptance">模式切换验收</a> · <a href="#design-implementation">早期实现记录</a> · <a href="#design-records-2026-10-31-readme">历史设计</a></p>
+<h3 id="design-readme--product-design">Product Design</h3>
+<p>能力并列“大模型”和“智能体”。大模型保留三个页签：</p>
+<table>
+<thead>
+<tr>
+<th>页签</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型</td>
+<td>按连接分组，在同一表单配置地址、密钥及多个模型</td>
+</tr>
+<tr>
+<td>用量与限额</td>
+<td>原有用量账本、币种、每日金额限额、时区与费用核对</td>
+</tr>
+<tr>
+<td>模型定价</td>
+<td>原有默认、逐模型及前缀价格，输入、输出及缓存价格</td>
+</tr>
+</tbody>
+</table>
+<p>添加连接时填写名称、地址、密钥和模型 ID；显示名称选填，可以继续增加多个模型，一次确认保存。上游的协议和认证方式放在“连接选项”中，普通 OpenAI 兼容服务默认使用 Chat Completions。协议属于连接参数，不再划分可使用它的智能体。列表不展示协议类别或内部路由 ID，名称与地址相同时不重复显示。</p>
+<p>连接下面直接展示它的模型。连接编辑表单同时管理所属模型；模型的聚合策略作为单独的高级入口保留。主备候选可以使用不同上游协议，由网关逐个适配。正在使用列表为空时不展示空标题。</p>
+<p>智能体页统一安装、升级、启动、登录和模型配置。自动识别本机已有 CC；未安装的 OpenCode 等工具可以安装，已安装则显示版本与升级。模型配置提供：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>操作与结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>原厂模式（Default）</td>
+<td>确认后交回工具自己的登录和默认模型，移除接管的自定义连接</td>
+</tr>
+<tr>
+<td>自定义模式</td>
+<td>选已保存的来源，再选模型；确认后连接 Roami 网关，凭据与协议由网关处理</td>
+</tr>
+</tbody>
+</table>
+<p>选择选项只编辑草案，“当前使用”始终显示实际配置；确认应用后才写入真实文件，新会话生效。来源目录只读，未登记的模型也能选；目录不可用时可输入已知模型 ID，确认应用才加入共享列表。旧连接预设与“恢复以前配置”放在高级区域，恢复可以回到以前的第三方设置，原厂模式则使用工具默认行为。</p>
+<h3 id="design-readme--user-stories">User Stories</h3>
+<ol>
+<li>配置一次 OpenAI 兼容来源及多个模型后，CC 和 Codex 都能选择同一个模型，无需另建 Claude 来源。</li>
+<li>CC 发送 Messages，Codex 发送 Responses，Roami 使用 Chat Completions，均通过 Roami 网关转成上游格式。</li>
+<li>工具调用的名称、ID、参数与结果经过完整往返；客户端能够执行真实工具，继续发送结果并收到最终回复。</li>
+<li>手机在一个全屏表单完成连接与模型配置；地址、已有密钥、模型和聚合策略不会因分开编辑而丢失。</li>
+<li>原有定价、用量、限额继续有效，按真正调用的上游模型和原始用量计价。</li>
+<li>保存失败保留输入；编辑不会改变列表顺序；切换原厂仍保留登录、hooks、MCP、权限等非模型设置。</li>
+</ol>
+<h3 id="design-readme--technical-design">Technical Design</h3>
+<ol class="flow"><li>CC / Codex / OpenCode / Pi / Roami</li><li>Roami 内置网关</li><li>一次配置的上游与模型</li></ol><details><summary>图的原始描述</summary><pre><code>flowchart LR
+  C[&quot;CC / Codex / OpenCode / Pi / Roami&quot;] --&gt; G[&quot;Roami 内置网关&quot;]
+  G --&gt; U[&quot;一次配置的上游与模型&quot;]
+</code></pre></details>
+<h4 id="design-readme--模块">模块</h4>
+<ul>
+<li><code>ModelHub.tsx</code>：连接分组、一次提交连接与多个模型，复用原定价与费用表单；协议和认证方式收在连接选项。</li>
+<li><code>GatewayModelBinding.tsx</code>：所有智能体共用来源和模型列表，不再按上游协议过滤；原厂与自定义模式独立。</li>
+<li><code>RoamiAgentModels.tsx</code>：主智能体与执行智能体从同一完整列表选择模型。</li>
+<li><code>catalog_http.go</code>：原生配置写入工具所需的网关协议，独立于上游协议；公开回环推理和私有管理接口分离。</li>
+<li><code>protocol_requests.go</code>：将三种协议的消息、工具、工具结果、图片和常用参数转为上游请求；支持命名空间、自定义文本工具和对话中的 system 消息。</li>
+<li><code>protocol_results.go</code>：解析 JSON 或 SSE，上游文本增量实时输出，完整收集并校验工具参数。</li>
+<li><code>protocol_events.go</code>：输出客户端所需的 JSON 或 SSE 事件，保持调用关联、结束事件和用量字段。</li>
+<li><code>native_usage.go</code> / 原账本：计量读取原始上游响应，一次结算实际候选模型，不依赖转换后的客户端数据。</li>
+</ul>
+<p>原生配置中只写 Roami 的回环地址与按智能体派生的凭据。CC 固定使用 Messages，Codex 固定使用 Responses，OpenCode / Pi 默认使用 Chat Completions；三种客户端协议都能由网关适配到三种上游协议。上游密钥只保留在节点，不返回浏览器或复制进 CLI。</p>
+<p>目录中的 <code>protocol</code> 保留为主来源协议字段，以兼容既有存储，不再代表客户端准入条件。主来源和备用来源可使用不同协议。主备仍仅在连接建立前失败时切换，收到上游响应后不重试其他来源；每个尝试按原账本独立结算，避免重复请求与重复消费。</p>
+<h4 id="design-readme--保存恢复与兼容">保存、恢复与兼容</h4>
+<p>连接及多个模型使用同一个目录修订和一次 PUT 保存，保留路由 ID、已有密钥与主备候选。源被其他模型作为备用时不能直接删除；正在使用或保存在原生预设中的模型仍受后端引用保护。修改连接协议不会要求重新配置客户端，网关在后续请求时适配；进行中的请求保留原快照。</p>
+<p>旧 <code>/capabilities/models/sources</code> 及其详情链接统一进入模型页，原有设置和节点参数继续保留。原厂切换和恢复使用现有备份、修订校验、原子写入与读回确认。Claude 保留 Roami 管理标记，避免本机已有同步服务立即覆盖其设置。</p>
+<h4 id="design-readme--适配边界">适配边界</h4>
+<p>支持普通回复、文本流、函数工具往返、标准 URL/Base64 图片输入、常用采样参数及可转换的结构化输出。工具参数完整校验后才输出为工具调用；截断、格式错误或缺少可信用量时返回错误，不伪造完成事件或用量。</p>
+<p>提供商托管的搜索等能力不能凭协议转换产生。跨协议的 Responses 自动模式会停用不支持的托管搜索/工具检索，保留所有客户端工具并明确告知模型及响应头；强制调用不支持的托管工具则拒绝。同协议透传继续保留原生提供商能力。命名空间恢复到客户端原名称，自定义文本工具用字符串参数承接，并提供原格式说明；语法约束仍由客户端工具验证。</p>
+<p>CC/Codex 默认附带的厂商专用思考配置不跨协议强制注入，按上游默认行为执行并通过响应头标明；显式保存的 Chat 推理参数仍按对应字段转发。可见思考文本可进入后续上下文，不伪造提供商签名。CC 的流事件先输出思考再输出正文；若上游在正文后继续追加思考而无法保持这一顺序，明确报错，避免客户端最终回复被覆盖为空。跨协议不接受提供商加密状态、文件 ID 等无法移植的内容；<code>previous_response_id</code>、WebSocket 及跨协议的 <code>responses/compact</code> 仍不支持。模型本身的图片、推理和上下文能力由上游决定，协议转换不改变模型能力。</p>
+<p>协议参考：<a href="https://developers.openai.com/api/docs/guides/migrate-to-responses">OpenAI Responses 迁移与类型化事件</a>、<a href="https://developers.openai.com/api/reference/resources/responses/streaming-events">Responses 流事件</a>、<a href="https://developers.openai.com/api/docs/guides/tools-tool-search">命名空间工具</a>、<a href="https://platform.claude.com/docs/en/build-with-claude/streaming">Claude 消息流</a>。历史 HTML、发布流程和同协议限制仅用于早期设计对照，不代表当前实现。</p>
+<p>默认智能体网关记账 V1 已实现：<a href="#design-gateway-billing-implementation">模块设计与验收</a>。支持本地源导入、独立 Key 的自动应用与轮换、按默认智能体归集费用；无需另建接入身份。</p>
+<p>交互修订：下游智能体密钥由内部自动管理，移除密钥页面、尾号和手工操作；模型来源与智能体费用统计保留。</p>
+<p>本机 Claude 接入修正：<a href="#design-claude-gateway-binding-acceptance">问题、实现与真实 Token 验收</a>。旧直连预设不再误判为已接入网关。</p>
+<p>其他本机客户端可配置独立的网关调用 Key，智能体自动凭据继续由内部管理：<a href="#design-gateway-access-key">产品、接口与鉴权设计</a>。</p>
+<p>首页直连时补充网关模型，并保留另一角色配置：<a href="#design-records-2026-11-11-home-gateway-models">问题、实现与验收</a>。</p>
+<ul>
+<li><a href="#design-native-model-discovery">原生智能体默认模型与目录切换</a></li>
+</ul>
+</article>
+<article class="record" id="design-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/acceptance.md</code></p>
+<h2 id="design-acceptance--第二版设计原型验证">第二版设计原型验证</h2>
+<p>真实产品的首版实现、测试与真机验收另见 <a href="#design-implementation">implementation.md</a>。本文件保留原型阶段的历史证据。</p>
+<p>2026-10-31。第一版的提案、独立 HTML 和验证已保留在 <a href="#design-records-2026-10-30-readme">2026-10-30 快照</a>。当前记录只针对新版模拟原型，不代表统一模型网关已实现。</p>
+<h3 id="design-acceptance--产物与复现">产物与复现</h3>
+<p><code>README.md</code> 为当前 Product Design、User Stories 和 Technical Design；<code>index.html</code> 是可离线打开的独立原型。原稿与构建入口在 <code>assets/</code>。复用项目 <code>useLayout()</code>、SVG 图标、主题令牌和 antd，没有修改产品运行代码或全局翻译。</p>
+<pre><code class="language-bash">node docs/design/20261114-model-orchestration/history/20261030-智能体模型切换/assets/build.mjs
+frontend/node_modules/.bin/tsc -p docs/design/20261114-model-orchestration/history/20261030-智能体模型切换/assets/tsconfig.json
+node --check docs/design/20261114-model-orchestration/history/20261030-智能体模型切换/assets/build.mjs
+</code></pre>
+<p>以上检查通过。需要先按仓库约定在 frontend 安装依赖。中文是内部设计稿的语言例外；产品接入时必须走全局中英 i18n。</p>
+<h3 id="design-acceptance--桌面操作">桌面操作</h3>
+<p>通过 <code>roami chrome</code> 稳定标签 ID 验证：</p>
+<ul>
+<li>添加模拟模型源、保存确认后可在来源目录中找到。</li>
+<li>新建编程备用模型，保存草稿时未进入发布列表；发布后出现，并跳入该模型稳定 URL。</li>
+<li>Codex 在唯一智能体详情中选择使用 Roami 大模型并应用，出现默认配置更新反馈。</li>
+<li>从 Codex 点管理来源与策略，进入编程主力；返回恢复原 Codex 详情，无第二份智能体表单。</li>
+<li>主源未连上时，规则模拟选择 OpenRouter；已经输出时，模拟明确不自动换源或重放。</li>
+<li>检查深色桌面与浅色窄屏；正常、来源失败、已有输出及配置冲突为页面内模拟状态。</li>
+<li>浏览器资源记录无 <code>/api/</code> 请求，没有真实模型调用或配置写入。</li>
+</ul>
+<p>320、390、820、1100、1280、1600、1920px 七档截图与 ResizeObserver 几何读取均无横向溢出，文档 scrollHeight 不超过视口高度。compact / medium / expanded / large 选择符合项目断点；内容在页面自己的容器中滚动。</p>
+<h3 id="design-acceptance--android-真机">Android 真机</h3>
+<p>Redmi Note 8，物理屏幕 1080×2340、DPR 2.75、392 CSS px，Chrome 154，LAN 打开静态原型。</p>
+<p>使用 <code>roami adb</code> 实际点按与滑动：</p>
+<ol>
+<li>从模型源切换到对外模型，打开编程主力详情，页面只保留一条返回栏。</li>
+<li>滑动详情容器，scrollTop 达约 321；文档 scrollTop 保持 0。系统返回回到对外模型列表。</li>
+<li>通过能力分类选择器切到唯一智能体目录，打开 Codex。</li>
+<li>选择使用 Roami 大模型，滑动至应用，点按应用和备份确认；读取到“Codex 默认模型已设为编程主力”的模拟成功反馈。</li>
+<li>上下栏保留，未增加第五个底部入口，所有读取的页面无横向溢出。</li>
+</ol>
+<p>手机浏览器仍不提供 <code>roami chrome</code> 要求的 browser 实例 ID，因此 ADB 负责实际操作和截图，直接 CDP 只负责读取布局、定位和激活本任务页面。分类下拉打开后的选择在同一组操作中完成；不在中间重复激活页面，以免焦点变化关闭菜单。只操作本任务的页面 ID，未修改 CLI 的身份检查。</p>
+<h3 id="design-acceptance--范围与清理">范围与清理</h3>
+<p>预览通过 <code>scripts/dev/isolated-roami.sh /tmp/roami-model-hub-v2 ...</code> 启动，结束时同一入口 <code>--stop</code> 清理。ADB 只移除本次创建的 19556 转发。</p>
+<p>截图在 <code>/tmp/model-hub-v2-*.png</code>，不提交一次性图片到主分支；后续 PR 使用仓库 pr-shots 流程。设计链接和空白检查通过。</p>
+<p>未修改 frontend/src、Go 或 Python，未运行与文档无关的产品全量测试。原型未实现真实鉴权、协议转换、主备、发布事务或安装；正式落地仍需 README 所列协议、CLI、事务、计量及前端门禁。</p>
+</article>
+<article class="record" id="design-add-model-design">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/add-model-design.md</code></p>
+<h2 id="design-add-model-design--添加模型最短流程">添加模型：最短流程</h2>
+<p>2026-10-31 产品修订提案。用户要求简化添加，并将定价、聚合策略放到后面的选项卡。本文及 <a href="add-model.html">可交互稿</a> 用于评审，尚未改动产品运行代码。原型为中文开发评审文档、使用示例数据；正式实现的所有文案接入全局中英 i18n。</p>
+<h3 id="design-add-model-design--product-design">Product Design</h3>
+<p>上一版合并了“来源”和“模型”的页面，但仍要求理解连接命名、模型 ID、显示名称和手动加行。合并表单没有减少用户要做的决定。</p>
+<p>这版只问两件事：<strong>连接哪项服务，添加哪些模型</strong>。普通流程不要求用户理解协议、网关、智能体类型或路由。</p>
+<h4 id="design-add-model-design--页面结构">页面结构</h4>
+<p>能力下继续并列“大模型”和“智能体”，不增加一级入口。大模型按以下顺序显示选项卡：</p>
+<table>
+<thead>
+<tr>
+<th>选项卡</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型</td>
+<td>统一添加、按来源分组的模型列表、连接设置</td>
+</tr>
+<tr>
+<td>定价</td>
+<td>保留默认、逐模型、前缀定价，以及输入、输出、缓存读取/写入价格和币种</td>
+</tr>
+<tr>
+<td>聚合策略</td>
+<td>给已添加的模型选择备用来源与模型、排列备用顺序；默认直接使用主来源</td>
+</tr>
+<tr>
+<td>用量与限额</td>
+<td>保留真实用量、费用、每日限额、时区、核账和记录</td>
+</tr>
+</tbody>
+</table>
+<p>添加页不显示定价、策略、限额，也不显示“对外模型”。已有聚合策略原样保留，不因简化添加而重置。原型只展示策略的主用及一个备用位置，正式实现保留已有多个候选和顺序。</p>
+<h4 id="design-add-model-design--首次添加">首次添加</h4>
+<ol>
+<li>点击“添加模型”，打开添加页。桌面为内容面板，手机为全屏二级页。</li>
+<li>默认只显示“服务地址”“API 密钥”两个输入，主按钮“读取模型”。“连接选项”折叠；“手动填写模型”作为可见的文字操作。</li>
+<li>读取成功后，在同一页将连接输入收为来源摘要及“修改连接”，下面显示可搜索、可多选的模型列表。</li>
+<li>用户勾选模型，底部按钮变为“添加 2 个模型”。不默认勾选，不把整个上游目录自动导入。</li>
+<li>一次保存来源和所选模型，直接显示添加结果。提供“配置智能体”和“完成”，不再弹第二次保存确认。</li>
+</ol>
+<p>“读取模型”只读取目录，不发送付费推理请求。成功文案是“已读取模型列表”，不能宣称模型已通过推理或工具能力验证。来源和未选择的目录项此时均未落库。</p>
+<h4 id="design-add-model-design--已有来源再加模型">已有来源再加模型</h4>
+<p>从某个来源下的“添加更多模型”进入，直接显示该来源的模型选择列表，复用已保存的地址和密钥。主入口“添加模型”默认最近使用的来源；存在多个来源时可切换，并在同一选择器里提供“添加其他来源”。不强迫用户再填一次连接。</p>
+<p>已添加的模型标为“已添加”，不可重复选。目录搜索不清空当前选择；“选择本页”仅选择当前过滤范围。切换来源保留各来源的草稿，回到来源时恢复。目录不可用时仍可手动填写已知模型名称，每行一个，支持一次添加多个。</p>
+<h4 id="design-add-model-design--自动处理与按需编辑">自动处理与按需编辑</h4>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>默认处理</th>
+<th>修改入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>来源名称</td>
+<td>使用服务域名；域名重复时生成可区分的名称</td>
+<td>连接选项 / 连接设置</td>
+</tr>
+<tr>
+<td>模型显示名称</td>
+<td>沿用上游模型名称，不再要求再填一份</td>
+<td>添加后的模型详情</td>
+</tr>
+<tr>
+<td>上游模型标识</td>
+<td>来自读取结果，完整保存，不自行改写</td>
+<td>找不到时手动填写</td>
+</tr>
+<tr>
+<td>协议及认证</td>
+<td>使用现有兼容连接默认值；网关适配各智能体</td>
+<td>连接选项，保留原生上游格式选择</td>
+</tr>
+<tr>
+<td>聚合策略</td>
+<td>主来源直连</td>
+<td>聚合策略选项卡</td>
+</tr>
+<tr>
+<td>定价</td>
+<td>沿用原有定价匹配和未知价格处理</td>
+<td>定价选项卡</td>
+</tr>
+<tr>
+<td>智能体选择</td>
+<td>添加后所有场景可选择，不自动覆盖正在使用的配置</td>
+<td>智能体的原厂 / 自定义模式</td>
+</tr>
+</tbody>
+</table>
+<p>不通过一个 <code>/models</code> 响应猜测上游支持哪些推理协议。高级格式选项用于上游连接；用户无需为 CC 再建一份来源。智能体页继续“先选来源，再选模型”，原厂 Default 保留。</p>
+<h4 id="design-add-model-design--失败与恢复">失败与恢复</h4>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>页面行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>地址格式错误</td>
+<td>在地址字段指出问题并聚焦，保留密钥</td>
+</tr>
+<tr>
+<td>密钥无效</td>
+<td>提示检查密钥；不把手动添加当作认证成功</td>
+</tr>
+<tr>
+<td>不提供模型目录</td>
+<td>保留地址、密钥，提供“重试读取”和“手动填写模型”</td>
+</tr>
+<tr>
+<td>超时 / 临时失败</td>
+<td>可重试或手动填写，不进入反复自动读取循环</td>
+</tr>
+<tr>
+<td>搜不到模型</td>
+<td>保留搜索词，显示手动填写入口</td>
+</tr>
+<tr>
+<td>保存失败</td>
+<td>保留连接、全部勾选和搜索词，按钮可重试；不留下半个来源</td>
+</tr>
+<tr>
+<td>目录修订冲突</td>
+<td>重新读取后合并仍有效的选择；要求用户处理真正冲突的部分</td>
+</tr>
+<tr>
+<td>返回修改连接</td>
+<td>保留已选项；地址或认证改变后重新读取，确认仍存在的模型</td>
+</tr>
+</tbody>
+</table>
+<p>修改已投入使用的连接是独立的“连接设置”操作；只在确实影响现有使用者时确认影响范围。新增来源和模型无需常规二次确认。取消、失败不更改现有智能体配置。</p>
+<h3 id="design-add-model-design--user-stories">User Stories</h3>
+<ol>
+<li>第一次配置时，我只需提供地址和密钥，从目录里勾选所需模型，一次添加。</li>
+<li>已有一个可用来源时，我可以直接添加它的其他模型，不再输入连接信息。</li>
+<li>上游不提供目录时，我能手动输入模型名称，继续完成配置。</li>
+<li>我先把模型添加好；价格和备用策略需要时再到后面的选项卡设置。</li>
+<li>CC 和 Codex 都能选这些模型；添加模型本身不会替我更换正在使用的模型。</li>
+<li>在手机上添加多个模型、搜索、返回修改或重试保存，已填内容和选择不会丢失。</li>
+</ol>
+<h3 id="design-add-model-design--technical-design">Technical Design</h3>
+<h4 id="design-add-model-design--现状与必要变化">现状与必要变化</h4>
+<ul>
+<li>当前 <code>ModelHub.tsx</code> 已支持来源与模型原子保存，但添加入口仍是手填表单。改为单个添加草稿驱动“连接输入 / 模型选择 / 添加结果”状态；这是同一任务中的渐进展示，不增加多个设置页。</li>
+<li>现有 <code>/catalog/source-models</code> 需要已保存的来源、目录修订及 <code>kind</code>，无法在首次保存前读取。新增独立目录发现接口，不能先保存空来源来绕过。</li>
+<li>保存继续复用现有目录的一次 PUT、引用检查和密钥保留机制，价格和账本不迁移、不重建。</li>
+<li>聚合策略从模型编辑内的入口移到后置选项卡，仍修改同一模型的候选与顺序，不引入额外“对外模型”实体。</li>
+</ul>
+<h4 id="design-add-model-design--建议模块">建议模块</h4>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelHub.tsx</code></td>
+<td>四个选项卡和统一入口</td>
+</tr>
+<tr>
+<td><code>ModelAddition.tsx</code></td>
+<td>单个添加流程，复用 <code>MobileSubPage</code> / 桌面面板</td>
+</tr>
+<tr>
+<td><code>use-model-addition.ts</code></td>
+<td>草稿、目录请求取消、选择、修订及一次保存</td>
+</tr>
+<tr>
+<td><code>ModelDirectoryPicker.tsx</code></td>
+<td>搜索、多选、已添加状态及手动输入</td>
+</tr>
+<tr>
+<td><code>ModelAggregation.tsx</code></td>
+<td>已有主用与备用候选的编辑，保留现有路由 ID</td>
+</tr>
+<tr>
+<td><code>source_models.go</code> / <code>agentproviders</code></td>
+<td>读取保存前的来源目录，复用既有地址、认证和目录解析</td>
+</tr>
+</tbody>
+</table>
+<h4 id="design-add-model-design--目录发现契约提案">目录发现契约提案</h4>
+<p><code>POST /api/agent/model-gateway/catalog/discover</code></p>
+<ul>
+<li>已有来源：传 <code>sourceId</code> 和目录修订，服务端取保存的密钥；浏览器不接收密钥。</li>
+<li>新来源：传草稿 <code>baseUrl</code>、<code>apiKey</code>、可选 <code>protocol</code> / <code>authMode</code>。鉴权沿用节点管理接口，不要求传智能体 <code>kind</code>。</li>
+<li>返回合法、去重后的原始模型名称及读取状态；不写来源、模型、原生 CLI 或账本，不生成推理调用费用。</li>
+<li>复用既有 URL 校验、超时、响应大小限制与错误码；凭据不出现在 URL、日志和错误中，不跟随跨来源重定向转发密钥。</li>
+<li>地址 / 凭据变化时取消旧请求，旧结果不能覆盖新草稿。共享进行中的请求，只在用户读取、重试或连接改变时发起；不新增轮询。</li>
+</ul>
+<p>保存前按“来源 ID + 上游模型名称”检查已有绑定，避免重复添加。已有多个高级路由引用同一上游时保留它们的身份及策略，不自动合并删除。名称、目录返回值均作为不可信文本渲染。</p>
+<p>草稿密钥只留组件内存，不写 localStorage、URL 或原型演示记录。目录读取成功和最终保存成功分别展示；不会把前者当成配置已生效。</p>
+<h4 id="design-add-model-design--验收目标">验收目标</h4>
+<ul>
+<li>首次添加：默认两个输入，无必填来源名或第二份模型显示名；一次读取、一次添加，无常规确认框。</li>
+<li>已有来源：默认零个连接输入；勾选后一次添加。跨来源添加不丢失原有来源、模型或策略。</li>
+<li>默认未选择模型时不能提交；已添加项不可重复添加，搜索不清空勾选。</li>
+<li>手动输入支持多行、去空、去重、长度限制；认证错误清晰且不伪装成功。</li>
+<li>保存为原子操作；失败、冲突和返回修改均保留草稿。</li>
+<li>原有定价、限额、账本及所有备用候选保留；智能体选择的真实配置不被添加流程覆盖。</li>
+<li>手机仅一层返回栏、一个内容滚动区，底部主动作避让键盘；模型行及动作命中区至少 44px。</li>
+</ul>
+<p>交互稿的验证记录见 <a href="#design-add-model-review">原型验收</a>。正式实现仍需完整前后端检查及真实云上游的配置验收。</p>
+</article>
+<article class="record" id="design-add-model-review">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/add-model-review.md</code></p>
+<h2 id="design-add-model-review--简化添加模型原型验收">简化添加模型：原型验收</h2>
+<p>2026-10-31。对应 <a href="#design-add-model-design">产品提案</a> 和 <a href="add-model.html">交互稿</a>。本轮仅设计文档与静态原型；不发送真实模型请求，不保存真实密钥，不修改运行中的网关或智能体配置。</p>
+<h3 id="design-add-model-review--桌面">桌面</h3>
+<p>通过真实浏览器操作及运行时断言验证：</p>
+<ol>
+<li>默认只有地址、密钥两个主输入，连接选项折叠。</li>
+<li>搜索不会丢失已选模型。</li>
+<li>多选后一次加入来源及模型。</li>
+<li>选项卡依次为模型、定价、聚合策略、用量与限额。</li>
+<li>已有来源直接进入选择页，已添加模型不可重复选择。</li>
+<li>添加第二个来源后，原来源及其模型仍保留。</li>
+<li>保存失败保留密钥、勾选，不留下半个来源。</li>
+<li>保存失败后重试可完成。</li>
+<li>无目录时手动多行添加，对重复名称去重。</li>
+</ol>
+<p>所有九项断言通过。JavaScript 语法检查通过。原型的失败、目录与保存结果均为明确标记的演示状态；不是后端发现接口的集成测试。</p>
+<h3 id="design-add-model-review--android-真机">Android 真机</h3>
+<p>Redmi Note 8，设备 <code>216d6a43</code>，1080×2340、DPR 2.75，CSS 宽 392。通过独立 HTTPS 静态测试实例访问。</p>
+<ul>
+<li>用 ADB 真实点按、输入示例地址与密钥；读取后真实勾选两个模型，添加结果为两个模型。</li>
+<li>模型行高 56px；选项卡命中区至少 44×44px。</li>
+<li>ADB 上滑后内容 scrollTop 从 0 到约 42.55，文档 scrollTop 始终为 0；scrollWidth=392，与视口一致。</li>
+<li>实际切换定价、聚合策略；定价保留缓存读写字段，策略显示备用入口。</li>
+<li>搜索键盘弹出后隐藏底部导航，主按钮上移。结合 VirtualKeyboard 边界，并为输入法候选栏留一档空间；最终按钮底边约 415.82 CSS px，实际在键盘上方可见。</li>
+<li>键盘打开时直接用 ADB 点“添加 1 个模型”，成功进入结果页，原已有模型和新增模型共两个。</li>
+</ul>
+<p>Roami Chrome CLI 对手机端返回 <code>CHROME_BROWSER_IDENTITY_UNAVAILABLE</code>，手机改用 ADB 实际操作并通过只读 CDP 核对状态。没有把 DOM <code>.click()</code> 当成手机触控验收。</p>
+<h3 id="design-add-model-review--证据">证据</h3>
+<ul>
+<li><a href="add-model.html">打开交互稿（HTML）</a></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/add-desktop.png">两个主输入（桌面）</a></li>
+<li><span>勾选多个模型（桌面）</span><small>（历史链接未归档）</small></li>
+<li><span>填写连接（手机）</span><small>（历史链接未归档）</small></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/select-phone.png">勾选多个模型（手机）</a></li>
+<li><span>键盘打开时的添加按钮（手机）</span><small>（历史链接未归档）</small></li>
+<li><span>独立聚合策略页（手机）</span><small>（历史链接未归档）</small></li>
+</ul>
+<p>静态测试实例和本轮手机转发在验收后清理；可交互 HTML 和截图单独保留。未将一次性截图加入仓库，也未将原型接入产品路由或部署。</p>
+</article>
+<article class="record" id="design-claude-gateway-binding-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/claude-gateway-binding-acceptance.md</code></p>
+<h2 id="design-claude-gateway-binding-acceptance--claude-本机网关接入修正">Claude 本机网关接入修正</h2>
+<p>2026-11-02。对应本机 Claude 仍直连上游、Roami 无法记录用量的问题。</p>
+<h3 id="design-claude-gateway-binding-acceptance--产品与用户故事">产品与用户故事</h3>
+<p>已保存、已应用的本机直连预设不代表已连接 Roami 网关。用户打开智能体模型页时，仍能应用当前选中的来源与模型，将本机 CLI 接入网关；确认成功后才显示“已应用”。直连状态增加一句提示，不显示下游密钥。</p>
+<h3 id="design-claude-gateway-binding-acceptance--技术修正">技术修正</h3>
+<p><code>GatewayModelBinding.tsx</code> 先核对原生预设地址是否为目录返回的网关地址，再按目录别名识别当前网关模型和“已应用”状态。旧原生预设的来源匹配同时核对上游协议、地址与模型，防止同一服务的 Messages 和 Chat Completions 连接被误认为同一原生配置。选择来源时仍可使用任何由网关支持的上游协议，不限制智能体跨协议适配。</p>
+<p>地址比较保留原有尾部斜杠与 <code>/v1</code> 归一化；现有修订检查、确认框、备份及原子应用流程不变。原厂模式继续可用。</p>
+<h3 id="design-claude-gateway-binding-acceptance--本机真实调用">本机真实调用</h3>
+<ul>
+<li>初始本机 Claude 指向第三方上游地址，Claude 账本无调用。</li>
+<li>通过已有配置 API 备份并接入回环网关；保留原模型 <code>deepseek-4.1-flash</code>。没有修改 RSI 的路由、参数、能力或配额。</li>
+<li>同一服务的原生 Messages 接口在 <code>message_start</code> 和 <code>message_delta</code> 中均返回全零用量，不能据此得到实际 Token。</li>
+<li>最终使用节点已保存的 Chat Completions 来源及相同模型，由 Roami 适配 Claude Messages。没有设置测试用的模型、Base URL 或凭据环境覆盖。</li>
+<li>用已安装的 Claude Code 2.1.316 从空目录运行一次无工具、无会话持久化的最小请求，返回 <code>OK</code>。</li>
+<li>Claude 输出：普通输入 297、缓存读取 1,280、输出 2。</li>
+<li>Go 账本：输入总量 1,577（包含缓存读取 1,280）、输出 2，智能体 <code>claude</code>，HTTP 200、结算状态 <code>known</code>，无 pending。账本记录 ID：<code>6b5ac1f0-3076-47ae-95e5-bb8eb76068ee</code>。</li>
+<li>金额按节点保存的定价计算，为 CNY 0.000280500；这不是服务商对账凭证。此前直连的消耗无法由本次接入追溯补记。</li>
+<li>已运行的 CLI 不自动重启；新启动的 Claude 已验证使用网关。</li>
+</ul>
+<p>真实测试和 UI 测试分别通过 <code>scripts/dev/isolated-roami.sh</code> 运行。真实测试只读取本机 Claude 已保存配置并产生少量推理用量；界面测试使用隔离原生配置和假来源，不操作用户会话。</p>
+<h3 id="design-claude-gateway-binding-acceptance--验收">验收</h3>
+<ul>
+<li>新增回归：匹配来源的直连预设仍可应用、网关预设显示已应用、同地址不同协议不误匹配、直连模型 ID 不误当网关别名。</li>
+<li><code>check.sh quick</code>、<code>check.sh full</code>、typecheck、i18n（4,750 keys）、hover、Vitest（158 files / 1,167 tests）及构建通过。Python 无相关修改，按范围跳过。</li>
+<li>桌面真实浏览器：旧包复现错误“已应用”；新包识别原生协议对应的来源，显示直连提示和可用的“应用”。</li>
+<li>Redmi Note 8 真机：ADB 点按“应用”并确认，原生配置切入测试网关，提示消失，按钮变为禁用的“已应用”；返回回到智能体列表，底栏首页可达。</li>
+<li>手机为 compact / coarse，视口及文档宽均为 392，文档 scrollTop 为 0；应用按钮与确认按钮命中高度为 44。</li>
+<li>截图走 PR 的 <code>pr-shots</code> 分支；不提交一次性截图或密钥。</li>
+</ul>
+<h3 id="design-claude-gateway-binding-acceptance--2026-11-02明确网关名称与-chrome-实测">2026-11-02：明确网关名称与 Chrome 实测</h3>
+<ul>
+<li>模式名称改为“Roami 模型网关”，来源字段改为“上游模型源”。当前配置确实已应用到网关时，当前使用显示“Roami 模型网关 · 模型名称”；未应用草案和旧直连不冒充网关接入。</li>
+<li>中英文文案同步，沿用当前布局与令牌，不新增凭据展示。</li>
+<li>通过本机已保存配置再次运行真实 Claude Code 最小请求，成功回复；Claude 与 Go 账本均记录输入 1,583、输出 9、缓存读取 0。未覆盖模型、地址、凭据或配额。</li>
+<li>在生产 Chrome 实际点击“大模型 → 用量与限额”的智能体筛选，选择 Claude Code，核对调用数增加 1、Token 增加 1,592，展开最近请求可见对应 Claude Code 计费记录。生产截图作为受登录保护的本机交付文件，不上传公开 PR 图片分支。</li>
+<li>隔离环境桌面与 Redmi Note 8 验证新名称、当前状态和上游字段；真机点按原厂/网关只改变草案，当前使用继续显示实际配置。返回与底栏首页可达；文档宽 392、视口宽 392，文档无滚动，模式命中高度 44。</li>
+<li>typecheck、i18n（4,752 keys）、hover、Vitest（158 files / 1,167 tests）、build 与 quick/full 质量门禁通过。公开 PR 截图仅使用隔离环境数据。</li>
+</ul>
+</article>
+<article class="record" id="design-connections-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/connections-acceptance.md</code></p>
+<h2 id="design-connections-acceptance--连接与模型合并验收">连接与模型合并验收</h2>
+<p>2026-10-31。用户指出模型与模型源分成两页；本轮将它们合并为按连接分组的模型管理。</p>
+<h3 id="design-connections-acceptance--产品与保存行为">产品与保存行为</h3>
+<ul>
+<li>模型、用量与限额、模型定价三个页签；连接及其模型在同一列表相邻展示。</li>
+<li>添加连接时同一表单填写地址、协议、凭据及多个模型；已有连接可直接添加模型。</li>
+<li>一次确认、一次目录提交。保留原路由 ID、已有密钥、主备策略和备用候选，不迁移数据库。</li>
+<li>保存后连接和模型保持列表位置；失败保留草稿。原生预设引用仍由现有后端保护。</li>
+<li>旧模型源列表和详情链接可继续打开，智能体管理入口进入同一模型列表。</li>
+</ul>
+<h3 id="design-connections-acceptance--自动化">自动化</h3>
+<ul>
+<li>前端覆盖合并列表与旧链接、连接和两个模型一次确认提交、编辑时保留路由与主备候选、原有定价和智能体选择回归。</li>
+<li>typecheck、i18n、hover、生产构建和 quick 质量门通过；完整 Vitest 为 153 个文件、1132 项测试通过。</li>
+</ul>
+<h3 id="design-connections-acceptance--桌面与-android">桌面与 Android</h3>
+<p>隔离实例 <code>/tmp/roami-model-connections-run</code>，使用虚构模型服务和测试密钥；所有原生 CLI 配置位于隔离目录，不改用户模型选择。</p>
+<p>Redmi Note 8，1080×2340、DPR 2.75。ADB 实际点按连接编辑、上下滑动表单、模型 ID 输入、保存与确认。软键盘弹出后 <code>--kb=314px</code>，正在输入的模型字段可见；收起后可触达保存。保存后的目录回读保留密钥和原路由 ID，模型值更新；最终复验确认按钮为 44px，连接及模型顺序不变；<code>scrollWidth=innerWidth=392</code>，文档 scrollTop=0。顶栏和底部四个主入口保持一致。</p>
+<p>桌面中英文界面均检查。真实浏览器一次新增连接与 demo-model-a / demo-model-b，目录回读为一条新连接、两个新模型，已有连接未覆盖。</p>
+<h3 id="design-connections-acceptance--产物">产物</h3>
+<ul>
+<li><span>合并后的桌面列表</span><small>（历史链接未归档）</small></li>
+<li><span>合并后的手机列表</span><small>（历史链接未归档）</small></li>
+<li><span>同一表单配置连接与模型（桌面）</span><small>（历史链接未归档）</small></li>
+<li><span>手机模型编辑</span><small>（历史链接未归档）</small></li>
+<li><span>手机键盘输入</span><small>（历史链接未归档）</small></li>
+</ul>
+<p>隔离实例通过同一 launcher 停止，移除本任务的手机调试转发；用户真实 CLI 配置和线上实例未被此轮验收修改。</p>
+</article>
+<article class="record" id="design-gateway-access-key">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-access-key.md</code></p>
+<h2 id="design-gateway-access-key--本机网关调用-key">本机网关调用 Key</h2>
+<h3 id="design-gateway-access-key--产品与用户场景">产品与用户场景</h3>
+<p>在“本机网关”标签配置其他本机客户端使用的调用 Key。用户可以输入、替换或确认停用；密钥输入在模型标签间切换时仅保存在内存中，不进入设置草稿的持久存储。保存后清空明文，只显示末尾八位。未配置时不新增调用凭据，已有智能体的自动密钥保持独立。</p>
+<p>调用 Key 使用 16–512 个可打印的非空白英文字符。客户端可以使用 Bearer 或 X-Api-Key 调用目录及已有推理协议；调用沿用网关的预算、排队、转发和用量记录，不得到管理权限。</p>
+<h3 id="design-gateway-access-key--技术设计">技术设计</h3>
+<ul>
+<li>GatewayAccessKey 使用登录保护的 GET / PUT / DELETE <code>/agent/model-gateway/access-key</code>，读取配置状态、设置和停用 Key。写入校验共享目录 revision，冲突后保留输入并允许重新读取。</li>
+<li>Go 私有管理路由 <code>/v1/model-gateway/access-key</code> 由网关 Unix socket 承接，公网/loopback 推理 handler 不暴露它。</li>
+<li>catalogDisk 保存独立的 SHA-256 摘要、随机 generation ID 和末尾，不保存 Key 明文；目录快照与目录更新保留私有状态，常规目录 API 不暴露摘要。</li>
+<li>authenticate 将此凭据归为 external，拒绝与智能体凭据重合；keyAllowed 校验 generation，在替换或停用后唤醒并拒绝旧 Key 的排队请求。已获准的请求正常结束。</li>
+<li>调用账目记录 external 与不可变 keyId，用量页面显示“其他客户端”；不更改 AgentKeys、Token 或智能体配置文件。</li>
+</ul>
+<h3 id="design-gateway-access-key--验证">验证</h3>
+<p>Go 回归覆盖设置与重新加载、明文不落库、不泄露、推理转发时使用上游凭据、独立用量归属、普通目录更新保留 Key、替换/停用失效、管理路由隔离、排队撤销和已有智能体密钥保持。前端覆盖保存后清明文、冲突恢复保留输入、确认后停用。</p>
+</article>
+<article class="record" id="design-gateway-adaptation">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-adaptation.md</code></p>
+<h2 id="design-gateway-adaptation--roami-内置网关协议适配验收">Roami 内置网关协议适配验收</h2>
+<p>2026-10-31。修正“按智能体协议重复配置来源”的问题：同一上游模型经 Roami 网关供 CC、Codex、OpenCode、Pi 和 Roami 选择。</p>
+<h3 id="design-gateway-adaptation--自动化覆盖">自动化覆盖</h3>
+<ul>
+<li>三种协议两两转换，共六个方向，分别验证 JSON 和 SSE。检查 system 消息、工具 schema、调用 ID、参数、工具结果以及结束事件。</li>
+<li>四类原生配置使用工具自己的协议连接网关，不再把上游协议写成客户端准入条件；所有类型均能看到同一份模型列表。</li>
+<li>CC 对话中的 system 消息、Codex 命名空间、自定义文本工具、图片输入及工具返回图片、可移植的思考文本、结构化输出保持对应关系。</li>
+<li>不把厂商托管搜索伪造成可执行函数；自动模式移除无法提供的托管工具，告知模型并返回能力提示头，强制指定不支持的工具则拒绝。</li>
+<li>CC/Codex 默认附带的厂商专用思考配置不强加给另一类上游，避免普通模型因不支持该参数而拒绝请求；响应头明确标注。上游返回的可见思考文本仍可进入工具后续上下文。显式保存的 Chat 推理参数按对应字段转发。</li>
+<li>CC 的思考块先于正文块，JSON 与 SSE 上游均保留最终文本；正文后追加的思考明确拒绝，避免 CC 回执显示空白。</li>
+<li>文本在上游结束前即可收到；完整协议结束事件后可完成响应，无需等待上游关闭连接。截断流不生成成功结束事件。</li>
+<li>主备来源可使用不同协议，仅连接建立前失败才切换，每次尝试独立结算。</li>
+<li>用量读取原始上游协议：示例输入 100、输出 7、缓存 20 在各转换方向均保持；价格使用真正调用的候选模型。无法转换的请求在准入前拒绝，不产生调用账目。</li>
+</ul>
+<p>完整前端：153 个文件、1136 项测试通过。typecheck、i18n、hover、生产构建通过。仓库 full 质量门及 Go 网关、原生适配器 race 检查通过；本轮不涉及 Python 修改，按范围跳过 Python 检查。</p>
+<h3 id="design-gateway-adaptation--真实客户端工具往返">真实客户端工具往返</h3>
+<p>使用一个本地确定性 Chat Completions 测试上游、一条来源和一个模型，原生客户端直连 Roami 回环网关。测试上游不调用外部模型；并非真实云模型的质量或全能力测试。</p>
+<table>
+<thead>
+<tr>
+<th>客户端</th>
+<th>原生协议</th>
+<th>验证结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude Code 2.1.314</td>
+<td>Messages</td>
+<td>两轮完成 Bash 调用、写入 GW_TOOL_OK、回传工具结果并得到 GW_NATIVE_OK</td>
+</tr>
+<tr>
+<td>Codex CLI 0.166.0</td>
+<td>Responses</td>
+<td>两轮完成 exec_command 调用、写入 GW_TOOL_OK、回传工具结果并得到 GW_NATIVE_OK</td>
+</tr>
+</tbody>
+</table>
+<p>两份独立工作目录各自生成文件。第二轮的上游请求保留工具调用 ID、工具结果及前一轮可见思考文本。Claude 回执中 is_error=false，Codex 回执 turn.completed，网关用量均可核对。</p>
+<p>CLI 配置、账本及捕获日志均在 <code>/tmp/roami-gateway-adapter-run</code> 隔离目录。用户真实 CC 和 Codex 配置未改动。测试过程中先用本机代理查看请求结构，最终验证使用已保存的网关原生配置直接调用。</p>
+<h3 id="design-gateway-adaptation--真实界面与-android">真实界面与 Android</h3>
+<p>主列表仅有“统一模型服务 / 主力编程模型”，正在使用同时显示 Codex 与 Claude。手机真实点按配置智能体、进入 CC 模型页和 Codex 模型页：两页的来源下拉均只有同一个“统一模型服务”，模型均为“主力编程模型”，显示已应用；不再要求来源协议匹配智能体。</p>
+<p>Redmi Note 8，1080×2340、DPR 2.75。来源与模型选项、返回按钮均为 44px；模型搜索键盘弹出时，选项向上展开可点；文档宽 392、视口宽 392、scrollTop=0。顶栏、返回和底部导航保持可用。</p>
+<h3 id="design-gateway-adaptation--交付证据">交付证据</h3>
+<ul>
+<li><span>共享来源演示（MP4，约 22 秒）</span><small>（历史链接未归档）</small></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-gateway-shared-phone.png">单一来源（手机）</a></li>
+<li><span>CC 使用此模型（手机）</span><small>（历史链接未归档）</small></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-gateway-codex-phone.png">Codex 使用此模型（手机）</a></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-gateway-cc-desktop.png">CC 模型页（桌面）</a></li>
+<li><span>Codex 模型页（桌面）</span><small>（历史链接未归档）</small></li>
+<li><span>客户端验证摘要（JSON）</span><small>（历史链接未归档）</small></li>
+</ul>
+<p>录屏已解码检查，为 1280×800、111 帧、约 22 秒。临时实例和手机转发通过任务所属入口清理；测试密钥及捕获的请求不进入仓库。</p>
+<p>协议范围与剩余限制见 <a href="#design-readme--%E9%80%82%E9%85%8D%E8%BE%B9%E7%95%8C">设计入口</a>。提供商的加密思考状态、服务器会话和模型固有能力不凭协议转换获得；无法等价实现的内容明确拒绝。</p>
+<h3 id="design-gateway-adaptation--roami-智能体品牌标修正2026-11-01">Roami 智能体品牌标修正（2026-11-01）</h3>
+<p>智能体目录中的 Roami 项改用既有 <code>RoamiLogo</code>，直接引用 <code>/logo-mark.svg</code>，保留 32px 尺寸及现有品牌标布局，无新增产品文案。桌面与 Redmi Note 8 均确认图片完整加载；手机实际点按管理进入 Roami 模型配置，页面宽 392、文档宽 392。完整前端仍为 1136 项通过，完整质量门通过。</p>
+<p><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-before-desktop.png">桌面改前</a> · <a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-after-desktop.png">桌面改后</a> · <a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-before-phone.png">手机改前</a> · <a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-after-phone.png">手机改后</a>。所有截图使用隔离实例；测试结束后清理本轮实例与手机转发。</p>
+</article>
+<article class="record" id="design-gateway-billing-implementation">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-billing-implementation.md</code></p>
+<h2 id="design-gateway-billing-implementation--默认智能体网关记账v1-实现与验收">默认智能体网关记账：V1 实现与验收</h2>
+<p>基线：<code>5d66fbe8</code>；分支：<code>feat/agent-gateway-billing</code>。本次实现直接使用 OpenCode、Claude Code、Codex、Pi、Roami，不新增接入身份。设计入口：<a href="gateway-billing.html">HTML</a>。</p>
+<h3 id="design-gateway-billing-implementation--最新交互修订">最新交互修订</h3>
+<p>按用户后续要求，密钥完全由内部管理。移除独立密钥标签、密钥尾号、换发/停用/复制界面；模型页只展示来源与模型。网页目录不返回下游密钥状态，网页路由不再代理密钥管理接口；Go 私有接口继续支持内部维护。费用仍按默认智能体自动归集，原有本地源 API Key 配置保留。下方初次验收中涉及手工密钥界面的内容是本次修订前的历史记录。</p>
+<p>修订验收：前端 158 文件 / 1163 测试通过，typecheck / i18n / hover / production build 通过；网关与 server Go 测试通过。桌面目录只有模型、用量与限额、模型定价三个标签，目录响应不含 agentKeys，网页密钥接口为 404。Android 真机确认无密钥入口、尾号与横向溢出，点按用量标签仍可查看既有按智能体账目。截图：<code>/tmp/gateway-hidden-keys-desktop.png</code>、<code>/tmp/gateway-hidden-keys-phone.png</code>。</p>
+<h3 id="design-gateway-billing-implementation--产品与用户故事">产品与用户故事</h3>
+<ul>
+<li>已在 CLI 中配置模型服务的用户，可以在模型目录中显式导入本地源，再拉取全部模型。扫描不改原配置，凭据只在 Go 进程内读取、导入，不通过浏览器中转。</li>
+<li>在智能体中应用模型时，自动写入本机网关地址和该默认智能体的 Key。模型源与模型仍是仅有的选择；显示 Key 尾号，不增加身份选择。</li>
+<li>每个默认智能体可独立换 Key 或停用。已连接的原生配置随换 Key 更新；其他智能体不受影响。完整新 Key 仅返回一次，关闭弹层即从组件与 DOM 移除。</li>
+<li>用量页按默认智能体筛选、汇总；换 Key 保持同一智能体的历史费用。来源、时间与现有全局限额继续使用原有入口。</li>
+<li>未定价调用保留 Token、金额待核账；明确填写零价才表示免费。历史金额保留，后续改价不重算旧账。</li>
+</ul>
+<h3 id="design-gateway-billing-implementation--技术设计与模块">技术设计与模块</h3>
+<h4 id="design-gateway-billing-implementation--key-与配置应用">Key 与配置应用</h4>
+<p><code>internal/modelgateway/agent_keys.go</code> 从现有 agent 注册表取得类型并加入内置 Roami。每类使用已有主密钥派生独立 HMAC 凭据，轮换增加 192 位随机代际；目录数据库保存代际、停用状态与过渡时间，不新增明文 Key 副本。管理列表只返回尾号。主密钥仍是受保护的本机秘密，能派生下游 Key；这与 HTML 中后续阶段的随机 Key 摘要存储方案不同，是复用现有配置自动写入机制的 V1 选择。</p>
+<p>轮换先持久化新旧凭据的过渡状态，再通过 <code>agentproviders/gateway-key.go</code> 和既有 <code>apply.go</code> journal 写原生配置，成功后将旧 Key 设为 5 分钟有效。写入失败回退；中断后保留可重试的 pending 代际，界面显示“配置待确认”，避免旧配置因超时而断开。原生配置修订冲突先拒绝，不覆盖用户更改。</p>
+<p>停用使后续鉴权失败，并唤醒准入队列重新检查 Key；已准入的调用继续结算。Roami 在使用目录网关时，其私有转发路径也遵守停用状态。</p>
+<h4 id="design-gateway-billing-implementation--本地源导入">本地源导入</h4>
+<p><code>agentproviders/local-sources.go</code> 读取既有保存方案，以及 Claude Code、Codex、OpenCode v1/v2、Pi 的原生源配置。支持明确的 API Key 与可解析的环境变量引用；不执行 helper、命令或 OAuth 流程。无法复用的凭据标为需手动配置。</p>
+<p><code>modelgateway/local_sources.go</code> 返回经过脱敏的预览，显式 POST 才导入。导入同时检查目录修订和源配置指纹；指纹覆盖原生修订、源字段与凭据，防止预览后变化。跳过指向本机网关端口的回环地址（包括 localhost / IPv6 变体），避免递归。相同地址但凭据不同的源不合并；已有同一源返回冲突提示。</p>
+<h4 id="design-gateway-billing-implementation--账本与价格">账本与价格</h4>
+<p><code>ledger.go</code> 的版本 3 迁移添加 <code>agent_kind</code>、<code>key_id</code>、<code>source_id</code>、<code>route_id</code>、<code>price_status</code>。历史 CLI 角色映射回默认智能体，原模型、请求 ID、金额与已存价格保持不变。其他原有内部调用继续归 Roami。</p>
+<p>每次真实上游尝试保存来源、路由、Key 代际与价格快照。查价顺序为对外路由价、来源/原始模型价、原始模型或前缀价、默认价。新节点没有默认价时使用未定价状态；旧的已保存默认零价保持原语义。</p>
+<p><code>statistics.go</code> 在服务端筛选全部统计、小时明细与最近记录。智能体归属取自 Key，不采用客户端归账 header。原有全局 Go 准入与账期规则保留，不增加 Python 侧限额。</p>
+<h4 id="design-gateway-billing-implementation--界面与接口">界面与接口</h4>
+<ul>
+<li><code>AgentGatewayKeys.tsx</code>：默认智能体列表、换 Key、停用、一次性复制与费用跳转。</li>
+<li><code>LocalModelSources.tsx</code>：源预览、显式导入；手机复用全屏二级页。</li>
+<li><code>GatewayModelBinding.tsx</code>：自动 Key 提示与尾号。</li>
+<li><code>ModelProxySettings</code> / <code>ModelUsageStatistics</code>：智能体过滤与费用分组，复用既有图表、核账和限额设置。</li>
+<li>新增私有管理接口：<code>GET /keys</code>、<code>POST /keys/:kind/rotate|disable</code>、<code>GET|POST /catalog/local-sources</code>；现有 usage 增加 <code>agentKind</code>。均在 <code>/agent/model-gateway</code> 下，经既有登录 API 代理，推理监听器不提供管理入口。</li>
+</ul>
+<p>V1 的 Key 使用现有目录路由权限。按托管会话自动签发临时 Key、租约、单独的路由授权属于后续阶段；共享 CLI Key 的会话、内部子智能体不会被声称为独立账单。</p>
+<h3 id="design-gateway-billing-implementation--验收">验收</h3>
+<ul>
+<li><code>scripts/dev/quality/check.sh quick</code>、<code>full</code>：通过；通过隔离入口运行，Python 无相关改动，按规则跳过。</li>
+<li>前端 typecheck、i18n、hover、build：通过；4777 个 locale key。Vitest：158 文件、1165 测试通过。</li>
+<li>提交钩子曾遇到既有父进程生命周期测试的 <code>unix.Poll</code> EINTR；单独连续重跑 3 次及完整钩子重跑通过，未修改该测试。</li>
+<li>Go 网关 / 原生配置适配器：测试通过；<code>go test -race ./internal/modelgateway ./internal/agentproviders</code> 通过。</li>
+<li>回归覆盖：5 类 Key 与管理端口隔离、修订冲突、原生配置更新、旧 Key 过渡与停用、pending 重启恢复、排队请求撤销、来源凭据与 header 隔离、历史账目迁移不改金额、本地源显式导入/环境变量变化/回环递归阻断、未定价与明确零价区分。</li>
+<li>独立实例 <code>/tmp/roami-gateway-billing-test20261101</code>、模拟上游端口 18466；只调用本任务的固定响应服务，没有付费模型推理。</li>
+<li>模拟账目：OpenCode 两笔已知费用 CNY 4.00、另有一笔未定价；Codex 一笔 CNY 2.00。共 4 次、4,500,000 Token，已知金额 CNY 6.00。OpenCode 换 Key 前后同一智能体归账；停用后请求为 401，账目不变。</li>
+<li>桌面实测导入本地源、拉取 3 个模型、应用到 OpenCode、换 Key、按智能体查费用；MCP 配置保留，原上游 Key 没有写进下游网关方案。</li>
+<li>Android Redmi Note 8（216d6a43）：ADB 实际点按换 Key、停用、启用与费用跳转；确认按钮稳定态高 44 CSS px。无文档横向溢出，正文在内部滚动，顶部栏和底栏保留。ADB 滑动使内容 scrollTop 从 0 增至 454.5，document scrollTop 保持 0，视口与文档宽度均为 392 CSS px。</li>
+</ul>
+<p>临时截图不提交主分支：<code>/tmp/gateway-billing-keys-desktop.png</code>、<code>/tmp/gateway-billing-usage-desktop.png</code>、<code>/tmp/gateway-billing-keys-phone.png</code>、<code>/tmp/gateway-billing-usage-phone.png</code>。此处验收为隔离实例，生产服务未部署本次改动。</p>
+</article>
+<article class="record" id="design-gateway-billing-review">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-billing-review.md</code></p>
+<h2 id="design-gateway-billing-review--本地网关与智能体独立计费修订-2">本地网关与智能体独立计费：修订 2</h2>
+<p>2026-11-01，基线 <code>5d66fbe8</code>。<a href="gateway-billing.html">最新 HTML</a>。按用户修订，直接使用节点现有默认智能体，不再增加自定义记账对象。</p>
+<h3 id="design-gateway-billing-review--本次修改">本次修改</h3>
+<ul>
+<li>去掉模型配置中的身份选择器、创建入口、账本中的额外筛选及同类命名示例。</li>
+<li>OpenCode、Claude Code、Codex、Pi、Roami 自动使用自己的 Key；Key 管理列表来自现有智能体注册表，不要求新建、命名或选择另一对象。</li>
+<li>账本只按默认智能体筛选与汇总；Key 轮换不拆账，停用不删除历史。托管会话临时 Key 仍归到所属默认智能体，会话只作为明细。</li>
+<li>技术方案移除 GatewayConsumer 和 consumer_id；Key、租约和调用记录直接使用 agent_kind。配置应用沿用现有 kind 参数，Key 操作按 agentKind 定位。</li>
+<li>V1 使用默认智能体 Key；V2 托管会话 Key 由系统自动签发，不增加手工选择步骤。</li>
+</ul>
+<h3 id="design-gateway-billing-review--验证">验证</h3>
+<ul>
+<li>内联脚本 <code>node --check</code>、<code>git diff --check</code> 通过；HTML 中没有已移除的选择器、创建入口、GatewayConsumer 或 consumer 字段。</li>
+<li>桌面：模型配置只剩来源和模型；切换到 Codex 自动切换其 Key。应用、按默认智能体管理 Key、轮换、费用跳转均可用；轮换后的示例配置与展示 Key 一致。</li>
+<li>Key 列表固定展示 5 个默认智能体；没有创建入口。账本全部为 3 个有记录的智能体分组，已知费用 CNY 0.3600；OpenCode 4 次调用、CNY 0.2240、另有 1 条待核账；Codex 为 CNY 0.0856。</li>
+<li>Android Redmi Note 8：ADB 真实点按切换费用账本 / 智能体密钥；Key 列表正确，文档无横向溢出，导航 clientWidth 与 scrollWidth 均为 393 CSS px。账本仅有智能体和时间两个筛选。</li>
+<li>仍为单文件 HTML，无外部库、产品 API 或真实凭据；未改线上功能。正式产品文案需接入现有中英 i18n。</li>
+</ul>
+<p>截图：<code>/tmp/roami-gateway-billing-v2-connect-desktop.png</code>、<code>/tmp/roami-gateway-billing-v2-ledger-desktop.png</code>、<code>/tmp/roami-gateway-billing-v2-connect-phone.png</code>、<code>/tmp/roami-gateway-billing-v2-keys-phone.png</code>。临时截图不提交进主分支。</p>
+<p><a href="records/2026-11-01/gateway-billing-v1.html">初稿快照</a> · <a href="#design-records-2026-11-01-gateway-billing-v1-review">初稿验收</a>。以上验证为设计原型，不代表真实鉴权、Key 写入、会话覆盖配置或计费往返已实现。</p>
+</article>
+<article class="record" id="design-implementation">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/implementation.md</code></p>
+<h2 id="design-implementation--首版实现与验收">首版实现与验收</h2>
+<p>2026-10-31。交互已按后续反馈修订为“添加模型即全场景可选”，见 <a href="#design-readme">当前设计</a> 与 <a href="#design-revision-acceptance">修订验收</a>。以下保留首版实现和验收记录，发布相关步骤由修订替代。真实产品实现位于 <code>feat/agent-model-switch</code>；设计 HTML 与模拟状态不作为实现验收。</p>
+<h3 id="design-implementation--product-design">Product Design</h3>
+<p>能力中心并列“大模型”和“智能体”。大模型管理一个节点上的统一接入，添加多个模型源，再发布稳定的对外模型。智能体原来的安装、登录、启动和模型恢复保留在同一个目录，加入 Roami 主智能体与后台智能体。</p>
+<p>大模型包含四个页签：</p>
+<table>
+<thead>
+<tr>
+<th>页签</th>
+<th>首版行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型源</td>
+<td>名称、上游地址、协议、认证方式和密钥；同一上游可建多条协议或账户配置</td>
+</tr>
+<tr>
+<td>对外模型</td>
+<td>稳定标识、真实模型映射、固定来源或有序主备；保存草稿与发布分开</td>
+</tr>
+<tr>
+<td>用量与限额</td>
+<td>原账本、币种、每日金额上限、时区、统计过滤和未知费用核对</td>
+</tr>
+<tr>
+<td>模型定价</td>
+<td>原默认价格及模型/前缀价格，分别设置输入、输出、缓存命中单价</td>
+</tr>
+</tbody>
+</table>
+<p>价格沿用原来的账本和接口，迁移导航不会删除配置或历史。计价使用实际上游模型 ID，模型别名不会另计一次。高级模型能力、上下文和推理设置仍在 Roami 详情中。</p>
+<h3 id="design-implementation--user-stories">User Stories</h3>
+<ul>
+<li>配置者集中保存多条上游凭据，修改对外模型背后的来源后，使用它的工具无需逐个重填 Key。</li>
+<li>Codex、Claude Code、OpenCode 和 Pi 用户在原模型详情选择已发布且协议匹配的对外模型，确认影响范围后应用；新会话生效，并保留原配置恢复入口。</li>
+<li>Roami 用户分别选择主智能体与后台智能体模型，首次接入备份已配置的原连接与角色字段，之后可恢复。</li>
+<li>财务配置者继续使用默认价、逐模型价、前缀匹配、缓存价和每日金额限额；旧定价与用量链接自动进入新页面。</li>
+<li>手机用户通过分类选择器进入大模型或智能体；来源和模型详情以单返回栏的全屏二级页打开，保留底部四个目的地。</li>
+</ul>
+<h3 id="design-implementation--technical-design">Technical Design</h3>
+<h4 id="design-implementation--模块">模块</h4>
+<ul>
+<li><code>frontend/src/components/capabilities/ModelHub.tsx</code>：来源与发布编辑，以及复用原 <code>GatewaySettingsForm</code> / <code>GatewayReconciliation</code>。</li>
+<li><code>model-hub-api.ts</code>：目录读写、版本冲突处理、空集合归一化，无新增轮询。</li>
+<li><code>GatewayModelBinding.tsx</code> / <code>RoamiAgentModels.tsx</code>：外部工具和 Roami 角色接入。</li>
+<li><code>route-hash.ts</code>：旧设置和定价链接迁移，保留节点参数。</li>
+<li><code>internal/modelgateway/catalog.go</code>：目录、密钥、引用保护和版本校验，使用原 Go 账本数据库新增表；不改变原价格与调用记录。</li>
+<li><code>catalog_http.go</code>：仅回环开放的推理入口，以及私有 Unix socket 上的管理和本机工具配置操作。</li>
+<li><code>roami_binding.go</code>：通过已有 Python runtime 设置 API 保存/恢复角色，不直接改写 runtime 配置文件。</li>
+<li><code>native_usage.go</code>：原生 Responses / Messages 用量解析；Chat Completions 复用原捕获器。</li>
+<li><code>service.go</code> / <code>handler.go</code>：持久化回环端口，所有推理执行原额度准入与结算；Roami 内部转发直接进入同一个调用路径，避免双重扣账。</li>
+</ul>
+<p>管理 API 经现有 Web 登录鉴权：<code>/api/agent/model-gateway/catalog</code>、<code>catalog/apply</code>、<code>catalog/roles</code>。推理入口只监听 <code>127.0.0.1</code>，没有管理 API。每种工具持有不同的网关调用凭据，上游 Key 不写入工具配置，也不回传浏览器。复用现有原生配置适配器的备份、版本校验与读回验证。</p>
+<h4 id="design-implementation--协议与安全换源">协议与安全换源</h4>
+<p>HTTP JSON 与 SSE 原样传递工具调用等负载，只替换模型名及上游认证。支持 Chat Completions、Responses、Messages，各来源明确声明一种协议；没有跨协议转换。</p>
+<p>主备只在网络拨号失败、确定尚未连接上游时换源。HTTP 错误、超时、已输出或费用不明均不自动重放；未知用量仍以原有未知费用状态处理。缺少终态用量不会伪造为零费用。</p>
+<p>首版不支持 WebSocket 及供应商 <code>previous_response_id</code> 续接，明确拒绝后者，界面提供兼容说明。公开别名缺少供应商模型元数据时，CLI 可能使用默认上下文等元数据；可通过原高级设置调整。需要使用方自行携带完整上下文。</p>
+<p>原设计中的模型目录自动发现、连接诊断、能力自动验证、路由预览、加权路由、LAN 推理以及按别名/模型源汇总报表尚未实现。当前报表按实际模型和调用角色呈现。用户应为主备配置等价模型；首版校验协议，不自动认证工具能力或上下文等价性。</p>
+<h3 id="design-implementation--验收证据">验收证据</h3>
+<p>测试实例使用 <code>scripts/dev/isolated-roami.sh /tmp/roami-model-hub-run</code>，独立数据目录、Unix socket、tmux server 和 CLI 配置目录。上游为本地 HTTP fixture，没有使用真实服务商密钥或产生外部消费。</p>
+<h4 id="design-implementation--自动化">自动化</h4>
+<ul>
+<li>Go 全仓快速质量门禁通过；新增目录、密钥隔离、发布、版本冲突、引用保护、配置备份/恢复、协议转发、未知结算、主备不重放和 Roami 单次计价测试。</li>
+<li><code>go test -race ./internal/modelgateway</code> 通过。</li>
+<li>前端 typecheck、i18n、hover 审计、完整 Vitest 和生产构建通过。149 个文件、1119 项测试；定价回归还覆盖目录不可用时继续保存价格、旧 URL 迁移与草稿不发布。</li>
+<li>未修改 Python 代码或依赖，按仓库规则跳过 Python 检查。</li>
+</ul>
+<h4 id="design-implementation--真实接口与桌面">真实接口与桌面</h4>
+<p>通过管理 API 保存四种来源配置和四个对外模型，再从真实页面读取。旧默认价格、逐模型覆盖、每日限额和时区均保留。Codex 页面应用后读回当前默认模型为 <code>Roami Gateway / coding-main</code>，原配置备份仍可恢复。</p>
+<p>真实 <code>codex-cli 0.166.0</code> 使用独立 <code>CODEX_HOME</code> 调用回环网关，收到本地测试源的 Responses SSE 文本后正常退出。原账本产生实际上游 <code>fixture-coder</code> 的已知费用记录；1000 输入、80 输出、100 缓存，按测试覆盖价格计为 CNY 0.0138。测试源初始缺少 Responses <code>total_tokens</code> 导致 CLI 重试，补全 fixture 后单次调用正常完成；未以这段无效 fixture 的重试作为产品通过证据。</p>
+<p>Roami 角色绑定通过真实 runtime 设置 API 保存，并读回主/后台角色；Go 集成测试另外验证原连接恢复与每次调用只记账一次。</p>
+<h4 id="design-implementation--android">Android</h4>
+<p>Redmi Note 8，1080×2340、DPR 2.75、392 CSS px，LAN HTTPS。通过 ADB 真实点按输入默认输入单价 11、保存，再从后端 GET 确认保存；实际滑动使内容 <code>scrollTop=112</code>，文档保持 0。模型源列表打开来源详情，返回到列表，再通过能力分类切到智能体目录。检查单返回栏、底栏、无横向溢出，补齐新选择器及下拉项的 44px 触控高度。</p>
+<p>手机 Chrome 不提供 CLI 要求的 browser 实例 ID，使用 ADB 实际操作，直接 CDP 仅用于本任务页面定位、激活与布局读取；不修改 CLI 身份检查。</p>
+<p>构建后再次检查分类选择器和全部八个下拉选项，稳定后的真实高度均为 44px。定价页硬刷新后保留默认输入价 11。录屏另外将逐模型输出价从 36 改为 32、每日限额从 100 改为 80，GET 读回均一致，默认价格与其他价格字段未被覆盖。恢复 Roami 后 GET 读回 <code>original-main</code> / <code>original-worker</code>。</p>
+<p>产物通过 Roami 文件入口交付，不提交一次性媒体到主分支：</p>
+<ul>
+<li><span>真实产品录屏，55 秒 MP4</span><small>（历史链接未归档）</small>：来源编辑、主备草稿与发布、定价保存、用量与限额、Codex 应用、Roami 分别选模与恢复。</li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-550/model-hub-implementation-pricing.png">桌面定价截图</a></li>
+<li><span>Android 定价截图</span><small>（历史链接未归档）</small></li>
+</ul>
+<p>视频为实际页面操作记录；录制器压缩无画面变化的等待时间。已解码检查，1280×800、545 帧，文件约 816 KiB。</p>
+</article>
+<article class="record" id="design-modes-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/modes-acceptance.md</code></p>
+<h2 id="design-modes-acceptance--原厂与自定义模式验收">原厂与自定义模式验收</h2>
+<p>2026-10-31。交付范围：能力 / 智能体中的安装、启动和模型模式；自定义配置为“模型源、模型”两步。</p>
+<h3 id="design-modes-acceptance--自动化覆盖">自动化覆盖</h3>
+<ul>
+<li>原厂不是“恢复旧配置”：从第三方预设切换后不保留其端点和凭据，恢复旧配置仍能回到原来的第三方连接。</li>
+<li>Claude Code、Codex、OpenCode、Pi 均验证切换、持久化读回和恢复。登录文件、hooks、权限、MCP 等非模型设置保留；Codex 内置 OpenAI 的旧转发覆盖被移除。</li>
+<li>原厂 API 校验配置修订，过期提交返回冲突，不覆盖新的设置。</li>
+<li>自定义应用同时验证来源和模型；来源与模型不匹配时不改本机配置。</li>
+<li>原厂状态不会显示仍在使用自定义模型；未启用的旧连接预设继续保留引用保护，覆盖 Claude 根入口和 Codex <code>/v1</code> 入口。</li>
+<li>前端验证先选源再选模，换源后不能沿用旧模型；只改变表单不写配置；确认后才应用；目录不可用不妨碍原厂模式；未安装先安装。</li>
+<li>原有定价、用量与限额回归保留，主流程外的旧预设仍可在高级区域操作。</li>
+<li>来源模型目录为只读服务端请求，不下发凭据；来源仅配置连接时也可选模，确认应用才加入共享列表；目录失败可直接输入模型 ID。新增源目录读取、手填回退和重复应用复用路由测试。</li>
+<li>原生 CLI 内直接更换模型后，当前使用和删除保护按实际端点与模型计算，不依赖旧预设仍被标为应用。</li>
+<li>前端 150 文件、1128 测试通过；typecheck、i18n、hover、生产构建通过。Go 适配器、网关及 API 测试通过；两核心包 race 检查及 quick 质量门通过。</li>
+</ul>
+<h3 id="design-modes-acceptance--桌面真实界面">桌面真实界面</h3>
+<p>独立实例 <code>/tmp/roami-model-modes-run</code>，全部 CLI 配置位于其专属目录，未修改用户真实 CC 的已配置模型。</p>
+<ol>
+<li>初始显示 CC 已安装、版本 2.1.314、原厂模式（Default）、已应用；提供升级和打开终端。</li>
+<li>自定义选择“团队模型源”，模型下拉仅出现“日常编程 / 深入推理”。选择日常编程后换到“个人模型源”，模型清空、应用禁用。</li>
+<li>另增“新配置的模型源”，不预登记任何模型。下拉直接读取 source-live-model / source-reasoning-model；选择 source-live-model 并确认，模型进入统一列表，当前使用更新。真实模型配置经过 Go 适配器写入，API 回读模式为 custom。</li>
+<li>选择原厂只是编辑，当前使用仍显示 source-live-model；确认应用后才变为原厂，API 回读 official。</li>
+<li>原厂页面不展示自定义来源和模型字段，不把恢复旧配置当成原厂。</li>
+</ol>
+<h3 id="design-modes-acceptance--android-真机">Android 真机</h3>
+<p>Redmi Note 8，1080×2340、DPR 2.75、392 CSS px。ADB 实际点按自定义、新配置的模型源、source-reasoning-model、应用和确认；当前使用更新为 source-reasoning-model，共享目录新增该模型，正在使用标为 Claude Code。再实际点按原厂、应用和确认，回到原厂。</p>
+<p>模型搜索弹出真实软键盘，列表在字段上方展开，两个选项均可触达；用 ADB 直接点选第二项并完成应用。来源、模型选项、模式按钮及确认动作实测 44px；无横向溢出，文档 scrollTop=0。CC 二级页保持一条返回栏和底部四个导航入口，高级预设默认收起。手机 Chrome 缺少 CLI 要求的 browser ID，ADB 负责真实操作，CDP 只用于读取和定位本任务页面。</p>
+<h3 id="design-modes-acceptance--产物">产物</h3>
+<ul>
+<li><span>模式切换录屏（MP4，约 13 秒）</span><small>（历史链接未归档）</small>：来源联动、读取新源模型目录、应用自定义、切回原厂，146 帧、1280×800，已解码检查。</li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-550/model-modes-custom-phone.png">手机自定义模式</a></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-550/model-modes-factory-phone.png">手机原厂模式</a></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-550/model-modes-keyboard-phone.png">手机键盘与模型列表</a></li>
+<li><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-550/model-modes-factory-desktop.png">桌面原厂模式</a></li>
+</ul>
+<p>使用本地测试源和专属 CLI 配置，不调用外部模型服务；用户真实 CC 继续保留上一轮确认的 DeepSeek 配置。测试实例通过同一隔离入口清理。</p>
+</article>
+<article class="record" id="design-native-model-discovery">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/native-model-discovery.md</code></p>
+<h2 id="design-native-model-discovery--原生智能体默认模型与目录切换">原生智能体默认模型与目录切换</h2>
+<h3 id="design-native-model-discovery--product-design">Product Design</h3>
+<p>Claude Code、Pi、OpenCode、Codex 接入 Roami 模型网关时，都可以选择“默认”，无需指定上游源。每次默认请求跟随节点保存的 Roami 主模型；工具自身的模型菜单可切换到网关已配置的任意路由。来源与固定模型选择继续保留。</p>
+<p>目录范围是已保存的网关路由，不自动注册所有上游模型。默认目标不存在时明确失败，不静默选择其他模型。</p>
+<h3 id="design-native-model-discovery--user-stories">User Stories</h3>
+<ul>
+<li>接入默认模型后，Roami 主模型改变，下一次默认请求跟随变化。</li>
+<li>在工具原生模型菜单中跨来源切换，无需重新配置接入。</li>
+<li>用户在原生工具保存的模型选择继续生效；网关配置不通过环境变量强制改回旧模型。</li>
+<li>Pi/OpenCode 的目录快照过期时，保留当前选择，提示并允许重新应用以同步清单。</li>
+</ul>
+<h3 id="design-native-model-discovery--technical-design">Technical Design</h3>
+<p><code>GatewayModelBinding</code> 对四种工具提供默认项，提交 <code>model=roami-default</code>，不带 sourceId。<code>native-models.go</code> 根据节点主模型解析真实目录路由；旧直连主模型只在地址、凭据、协议和模型匹配已配置路由时可用。引用检查解析默认别名与发现 ID，保护使用中的真实路由。</p>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>原生目录接入</th>
+<th>刷新方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Claude Code</td>
+<td><code>/v1/models</code> 中使用 <code>roami-claude/&lt;id&gt;</code>，通过其发现过滤；原 ID 继续兼容</td>
+<td>重新启动 Claude</td>
+</tr>
+<tr>
+<td>Pi</td>
+<td><code>models.json</code> 的网关提供商保存全部路由与默认项</td>
+<td>目录变化后重新应用；<code>/model</code> 重读文件</td>
+</tr>
+<tr>
+<td>OpenCode</td>
+<td>V1 <code>provider</code> / V2 <code>providers</code> 的 <code>models</code> 保存全部路由与默认项</td>
+<td>目录变化后重新应用并使用原生重新加载或重启</td>
+</tr>
+<tr>
+<td>Codex</td>
+<td><code>model_catalog_url</code> 指向网关；带 <code>client_version</code> 且使用 Codex 凭据的请求返回 Codex Models 格式</td>
+<td>重启 Codex 读取远程目录</td>
+</tr>
+</tbody>
+</table>
+<p>Pi/OpenCode 预设保存模型目录快照；应用时由既有修订检查、备份及原子写入保护。轮换凭据保留完整清单。模型列表校验数量、重复 ID、选择是否存在及配置引用标记。Roami 页面比较保存快照与当前目录，过期时启用重新应用，不自动改写原生配置。</p>
+<p>Claude 网关配置使用 <code>ANTHROPIC_DEFAULT_MODEL</code> 与 <code>settings.model</code>，清除会遮蔽菜单保存选择的 <code>ANTHROPIC_MODEL</code>。Sonnet/Opus/Haiku/Fable 映射到接入模型，路由解析兼容 <code>[1m]</code> 后缀；这只修复别名解析，不宣称上游具备 1M 上下文能力。</p>
+<p>Codex 的 <code>model_catalog_json</code> 会遮蔽远程目录，应用网关时清除并备份，恢复时还原。目录元数据采用官方最小兼容设置，不宣称未验证的模型能力。模型元数据、窗口和工具能力仍由真实上游决定；没有修改 RSI 参数或配额。</p>
+<p>外部 CLI 模型标签 <code>Roami Default</code> 是集成目录元数据；Roami 页面“默认”和提示通过中英文 i18n。</p>
+<p>官方依据：<a href="https://code.claude.com/docs/en/llm-gateway-protocol#model-discovery">Claude 目录发现</a>、<a href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md">Pi 模型配置</a>、<a href="https://opencode.ai/docs/providers">OpenCode 提供商</a>、<a href="https://learn.chatgpt.com/docs/enterprise/roll-out-a-gateway#model-catalog-reference">Codex 网关目录</a>。</p>
+<h3 id="design-native-model-discovery--acceptance-evidence">Acceptance Evidence</h3>
+<p>所有调用使用隔离原生配置、真实 Go 网关和本地测试上游，不改生产配置、不调用生产模型。</p>
+<ul>
+<li>Claude Code 2.1.322 的 <code>/model</code> 显示两个来源的模型；保存 Second model 并重启后仍使用该模型；<code>--model default</code> 回到主模型，均成功返回 OK。</li>
+<li>Pi 1.5.2 的 <code>--list-models</code>、OpenCode 2.2.7 的 <code>models --standalone</code>、Codex 0.167.2 的 <code>debug models</code> 均实际读取到两个来源的模型及 roami-default。</li>
+<li>Pi/OpenCode/Codex 不指定模型的请求均使用主模型并返回 OK；通过各自原生命令选择第二来源的模型，也均返回 OK。测试上游记录分别为 fixture 与 fixture-second。</li>
+<li>Go 回归覆盖全部工具的默认跟随、跨源切换、原生目录、凭据轮换保留目录、缺失默认拒绝、旧 ID/[1m] 解析、其他客户端隔离、引用保护、直连来源匹配、配置恢复和 Codex 本地目录恢复。</li>
+<li>前端回归覆盖四种工具无来源应用默认、保留现有来源选择、目录快照过期后保留选择并启用重新应用、CLI 保存模型后的识别。</li>
+<li>Vitest：234 files / 1,730 tests 通过；typecheck、i18n（5,474 keys）、hover 通过。quick/full、生产构建通过；Python runtime/skills 未改，按范围跳过。</li>
+</ul>
+<p>此前 Claude 的桌面 1280/1920/2560/3440 CSS px 与 Redmi Note 8 真机点按已通过：文档无滚动或横向溢出，来源、应用、确认目标均为 44 CSS px；返回栏与底栏可达。扩展后的各工具截图和交互证据留在 <code>/tmp/roami-claude-models-evidence/</code>，仅将隔离截图上传 PR 图片分支。</p>
+<p>扩展验收：Pi/OpenCode/Codex 的桌面与 Redmi Note 8 手机改前改后均已截图。三个桌面页面实际点击“网关 → 默认 → 应用 → 确认”后显示 Applied；手机三页均为 compact/coarse，视口宽度与文档 scrollWidth 同为 392，scrollTop 为 0。Pi 在真机以 ADB 实际点按网关、应用、确认，已应用状态与三个 touchend 事件同时确认；返回后回到智能体页，底栏保留。英文浅色与中文深色均实际打开验证。</p>
+</article>
+<article class="record" id="design-revision-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/revision-acceptance.md</code></p>
+<h2 id="design-revision-acceptance--统一模型列表修订验收">统一模型列表修订验收</h2>
+<p>2026-10-31。取消“对外模型”与发布流程，模型保存后直接进入所有使用场景共用的目录。</p>
+<h3 id="design-revision-acceptance--自动化">自动化</h3>
+<p>新增回归覆盖：模型保存直接写入可用模型集合，无需公开标识或发布；随后重新进入 Codex 模型页面，可在选择器中找到刚添加的模型；显示名称选填，留空使用服务商模型 ID。默认入口打开模型列表，列表不显示内部 ID 或发布状态。原定价保存和目录故障时仍可设置价格的回归继续保留。</p>
+<p>前端 typecheck、i18n、hover、完整 Vitest 和生产构建作为本次完成门禁。本次仅修改前端与文档，未修改 Go、Python、依赖或数据库。</p>
+<h3 id="design-revision-acceptance--运行验证">运行验证</h3>
+<p>通过 <code>scripts/dev/isolated-roami.sh /tmp/roami-model-hub-run</code> 启动隔离实例，复用独立数据和 CLI 配置目录；不修改用户真实模型配置。模型源使用本地测试地址，不产生外部消费。</p>
+<ul>
+<li><code>npm run typecheck</code>、<code>npm run i18n:check</code>（4503 keys）、<code>npm run hover:check</code>、完整 Vitest（149 文件、1121 测试）与生产构建均通过。</li>
+<li>桌面实际添加“全场景验收模型”，只填写显示名称和服务商模型 ID，保存时没有发布步骤；随后进入 Codex 直接选到并应用。当前默认模型摘要显示名称，不展示内部路由 ID。</li>
+<li>Redmi Note 8 实际 ADB 点按选择 Chat 来源，输入 <code>fixture-mobile</code>，显示名称留空，保存后模型列表显示 <code>fixture-mobile</code>。通过能力分类切到 Roami，主智能体选择器立即包含该模型，无需发布或复制连接。</li>
+<li>同时使用桌面和手机遇到目录版本冲突时，点击“重新读取”后仍保留已输入的 <code>fixture-mobile</code>，再次保存成功；没有覆盖桌面刚添加的模型。</li>
+<li>实际页面 <code>scrollWidth &lt;= innerWidth</code>、文档 <code>scrollTop=0</code>；二级页保持单返回栏和四项底部导航，选择器和选项为 44px。</li>
+<li>再次读取原定价与限额：默认 11/30/1、逐模型 12/32/1.2、每日限额 80 CNY、Asia/Shanghai，均与上一轮保存值相同。</li>
+</ul>
+<h3 id="design-revision-acceptance--产物">产物</h3>
+<ul>
+<li><span>新版操作视频（MP4，约 16 秒）</span><small>（历史链接未归档）</small>：实际添加、在 Codex 选择并应用，再展示保留的定价。录制器压缩静止等待，已解码检查，1280×800、147 帧。</li>
+<li><span>新版桌面截图</span><small>（历史链接未归档）</small></li>
+<li><span>Android 刚添加的模型可供 Roami 选择</span><small>（历史链接未归档）</small></li>
+</ul>
+<p>只清理本任务隔离实例和 19557 ADB 转发；源码和设计文档保留在当前 worktree，未提交一次性媒体文件。</p>
+<h3 id="design-revision-acceptance--claude-code-真实接入与安装补验">Claude Code 真实接入与安装补验</h3>
+<p>用户要求优先交付本机 CC，补验和修改如下。</p>
+<h4 id="design-revision-acceptance--本机真实配置">本机真实配置</h4>
+<ul>
+<li>本机已有 Claude Code 2.1.314，无需重复安装。按当前 Roami 保存的真实连接，将 CC 用户配置设为已保存的上游与 <code>deepseek-4.1-flash</code> 模型，使用 Bearer 认证。此次真实配置直接使用现有上游，不依赖会在验收后关闭的临时网关；没有替换正在运行的 Roami 主服务。</li>
+<li>经现有 <code>agentproviders.Store</code> 的保存、备份、原子应用和读回验证，配置记录为 <code>Roami · deepseek-4.1-flash</code>。保留已有 hooks、插件、权限等非模型字段；Codex 用户配置未改动。</li>
+<li>同步设置 <code>ANTHROPIC_MODEL</code>、Sonnet/Opus/Haiku 默认映射，清理旧的认证 helper 与替代模型列表，启用网关模型发现。原配置、helper 和模型列表进入恢复备份；已存在旧版备份时，新增接管字段也补充备份。</li>
+<li>本机 <code>blade-models-sync.timer</code> 每 30 秒同步一次，会覆盖 CC 凭据与模型目录。在本机同步脚本加上 CC 专属所有权判断：<code>ROAMI_MODEL_MANAGED=1</code> 时跳过 CC 写入，Pi / OpenCode 原同步继续执行。脚本原稿已备份在其私有 <code>backups</code> 目录；恢复原 CC 配置会移除标记，从而恢复原同步行为。脚本语法检查通过，后续多个同步周期 <code>changed=[]</code>，CC 的 Bearer 凭据和模型保持。</li>
+<li>真实 <code>claude -p</code> 读取用户配置，无临时模型覆盖，返回 <code>CC_CONNECTION_OK</code>，JSON 为 <code>subtype=success</code>、<code>is_error=false</code>。验证时禁用工具和 MCP、禁止会话持久化。</li>
+</ul>
+<h4 id="design-revision-acceptance--新版网关真实链路">新版网关真实链路</h4>
+<p>独立实例中配置相同真实上游的 Messages 模型，再从 CC 页面使用的应用 API 写入独立 <code>CLAUDE_CONFIG_DIR</code>。实际 Claude Code CLI 经回环网关返回 <code>CC_GATEWAY_OK</code>。账本记录 <code>role=cli_claude</code>、实际模型 <code>deepseek-4.1-flash</code>；该上游此次流式用量报告为 0，因此本地记录金额为 0，不能据此声称没有外部消费。没有硬编码临时模型替换 Roami 的主/后台路由。</p>
+<h4 id="design-revision-acceptance--安装与界面">安装与界面</h4>
+<ul>
+<li>智能体模型详情现在直接展示安装状态、版本及安装/升级动作，调用既有真实安装 API；其它四种 CLI 的配置能力保留。</li>
+<li>新回归覆盖从缺失状态的 Claude Code 模型页面确认安装，再调用安装 API；不为验收卸载或重装用户已安装的 CC。</li>
+<li>桌面和 Redmi Note 8 打开 CC 模型详情，真实显示已安装版本、所选模型和当前默认模型。手机 ADB 点按升级打开确认并取消，没有执行升级。补齐确认按钮的粗指针高度为 44px。</li>
+<li>Go 全仓快速质量门禁、<code>agentproviders</code> 与 <code>modelgateway</code> 回归和 race 检查、前端 typecheck / i18n / hover / 完整 Vitest / 生产构建通过。前端 149 文件、1122 测试；Go 新回归覆盖默认模型档位、旧 helper/模型目录清理、既有备份升级及恢复。</li>
+</ul>
+<p><span>本机 CC 与网关实际请求回执（JSON）</span><small>（历史链接未归档）</small> · <span>CC 桌面页面</span><small>（历史链接未归档）</small> · <span>CC 手机页面</span><small>（历史链接未归档）</small></p>
+<p>协议与配置参考：<a href="https://code.claude.com/docs/en/llm-gateway-connect">Claude Code 连接网关</a>、<a href="https://code.claude.com/docs/en/llm-gateway-protocol">网关兼容性</a>。本次真实上游先分别验证了认证方式，<code>x-api-key</code> 返回 401，Bearer 返回 200；CLI 成功回执取自配置生效后的真实请求。</p>
+<p>CC 补验最终产物：<span>CC 配置与升级入口录屏</span><small>（历史链接未归档）</small>。最后生产构建完成，手机升级确认和取消按钮实测均为 44px，可真实点按；未触发已安装 CC 的升级。</p>
+<p>验收结束后清理独立实例及其中含临时真实上游凭据的配置目录，真实用户 CC 配置和所有权保护继续保留。</p>
+</article>
+<article class="record" id="design-source-catalog-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/source-catalog-acceptance.md</code></p>
+<h2 id="design-source-catalog-acceptance--配置源与批量模型目录">配置源与批量模型目录</h2>
+<p>2026-11-03 补充：<a href="#design-records-2026-11-03-source-model-editing">已添加模型行内编辑与真机验收</a>。</p>
+<p>2026-11-01。沿用 <a href="#design-add-model-design">简化添加模型</a> 的连接与目录流程；本次聚焦配置源、读取完整目录和批量添加，不调整用量、定价或智能体模式。</p>
+<h3 id="design-source-catalog-acceptance--product-design">Product Design</h3>
+<ul>
+<li>模型页按来源分组，入口使用“添加模型源”“配置源”“添加更多模型”。配置源直接展开连接参数，添加更多模型复用已有连接摘要。</li>
+<li>新来源默认只填地址与密钥；来源名、协议、认证方式放在连接选项。名称留空时采用域名。</li>
+<li>“拉取所有模型”读取完整上游目录，不执行推理，也不提前保存空来源。读取后显示来源摘要、搜索、多选和选择全部；搜索时全选只作用于匹配结果，其他选择保留。</li>
+<li>已添加的模型显示状态且不可重复选，并提供编辑入口。手动输入支持每行一个模型、去空、去重，与目录选择合并提交。</li>
+<li>底部固定显示新增数量及提交按钮。新增来源与模型一次保存，不再常规二次确认。修改已有连接仍确认后续调用影响。</li>
+<li>手机使用 URL 管理的一层返回栏、一个内容滚动区、常驻底部动作和底部导航；没有嵌套目录滚动区。</li>
+<li>拉取失败保留地址、密钥和选择，提供重新读取与手动输入。保存失败保留选择。另一页面修改来源时，阻止覆盖并允许载入最新连接后重新读取。</li>
+</ul>
+<h3 id="design-source-catalog-acceptance--user-stories">User Stories</h3>
+<ol>
+<li>我填地址与密钥后，能看到此源返回的所有模型，一次选择并添加。</li>
+<li>我可先搜索再选一组，搜索其他模型时，之前的选择仍然保留。</li>
+<li>已有来源添加其他模型无需重填密钥，已有模型的显示名和全部备用候选保留。</li>
+<li>目录不可用时，我可手动输入多个模型，失败重试不用重新录入。</li>
+<li>我在手机上能滚动长目录并随时提交，返回和再次进入时草稿仍在。</li>
+</ol>
+<h3 id="design-source-catalog-acceptance--technical-design">Technical Design</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelHub.tsx</code></td>
+<td>来源分组、路由与按来源保存的内存草稿、沿用原定价及用量</td>
+</tr>
+<tr>
+<td><code>ModelSourceEditor.tsx</code></td>
+<td>连接参数、请求取消、搜索多选、手动批量输入、原子提交及冲突恢复</td>
+</tr>
+<tr>
+<td><code>source_models.go</code></td>
+<td><code>POST /catalog/discover</code> 接受草稿来源与目录修订，复用保存来源的密钥规则，只读返回目录</td>
+</tr>
+<tr>
+<td><code>catalog.go</code></td>
+<td>提取统一来源校验，保存与目录发现共用；最多保存 1,000 个模型，与目录读取容量一致</td>
+</tr>
+<tr>
+<td><code>agentproviders/model-options.go</code></td>
+<td>共用原认证、12 秒超时、响应大小限制、去重排序及游标分页；解除最多 10 页导致目录不完整的问题，保留总量、循环游标和页数边界</td>
+</tr>
+<tr>
+<td><code>backend/server/agent-runtime.go</code></td>
+<td>将新接口注册在已有登录保护的管理接口下</td>
+</tr>
+</tbody>
+</table>
+<p>目录请求修改地址、密钥、协议、认证方式或离开页面时取消，旧响应无法覆盖新草稿。已保存密钥只在原地址复用；地址改变必须重新提供密钥。来源参数与密钥不写入 URL 或 localStorage，返回内容无凭据，不跟随重定向。</p>
+<p>保存使用现有一次目录 PUT 和修订检查；新模型按“来源 ID + 上游模型 ID”去重，已有模型对象及所有备用候选保留。修改来源协议时同步所属模型的协议字段。智能体配置、价格、账本不由此流程改写。</p>
+<h3 id="design-source-catalog-acceptance--acceptance">Acceptance</h3>
+<p>验证使用私有 tmux 测试实例 <code>/tmp/roami-model-ui</code>，HTTPS 端口 18463。独立回环测试上游返回 32 个模型，未改用户节点的真实模型源或智能体配置。</p>
+<ul>
+<li>Go：新来源保存前发现、只读且不泄露密钥、已有密钥复用及地址变更拒绝、URL 校验、修订冲突、跨 10 页目录、1,000 模型保存。</li>
+<li>前端：初次批量保存无确认、去重、搜索保留选择、全选、已添加项禁选、保留聚合策略、认证失败手动恢复、取消旧请求、保存失败重试与返回草稿恢复。</li>
+<li>桌面 Chrome：实际读取 32 项、全选、固定提交区、文档无横向溢出。</li>
+<li>Android Redmi Note 8（216d6a43）：LAN HTTPS；ADB 实际点按读取和全选，滑动后内容 scrollTop 从 0 变为 293.45；返回栏、底部导航与动作区均可见，文档无横向溢出。</li>
+<li>手机 Chrome 的 browser WebSocket 地址不带实例 UUID，<code>roami chrome --cdp</code> 返回 <code>CHROME_BROWSER_IDENTITY_UNAVAILABLE</code>。布局读取使用临时直连 CDP，真实交互仍使用 <code>roami adb</code>。</li>
+</ul>
+<p>最终检查：</p>
+<ul>
+<li><code>scripts/dev/quality/check.sh quick</code> 与 <code>full</code>（隔离实例）通过，Python 检查按变更范围跳过。</li>
+<li><code>npm run typecheck</code>、<code>npm run i18n:check</code>、<code>npm run hover:check</code>、<code>npm run build</code> 通过；构建保留仓库已有的大 chunk 提示。</li>
+<li>对齐主分支后，前端全量 Vitest 157 个文件、1,160 项通过；包含 ModelHub 14 项及引导页 2 项回归。</li>
+<li>新用户引导继续复用同一编辑器；地址、密钥、目录选择和手动输入草稿只在内存恢复，不写入浏览器存储，目录由引导页统一滚动。</li>
+<li>手机实际提交后目录包含 1 个来源、32 个模型，接口未返回 API 密钥；使用独立测试上游，无真实付费推理。</li>
+<li>软键盘实际输入 deepseek 后只显示 2 条结果，全部 32 个选择保留；底部动作增加键盘上方留白后可完整触控提交。</li>
+<li>已检查中英文、44px 触控命中、滚动、导航、保存和文档溢出；本次修改的组件未新增 emoji 或文字图标。已有其他页面的历史符号不属于本次修改。</li>
+</ul>
+<p>截图保存在 <code>/tmp/roami-model-source-connection-desktop.png</code>、<code>/tmp/roami-model-source-catalog-desktop.png</code>、<code>/tmp/roami-model-source-catalog-phone.png</code>、<code>/tmp/roami-model-source-keyboard-fixed-phone.png</code> 和 <code>/tmp/roami-model-source-english-desktop.png</code> 及最终构建的 <code>/tmp/roami-model-source-keyboard-shipping-phone.png</code>。最终构建真机再次确认搜索结果 2 条、键盘展开时按钮底边 411.82px、底部留白 40px、无横向溢出。截图为隔离测试实例，不提交进主分支。</p>
+</article>
+<article class="record" id="design-records-20261110-lan-source">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/20261110-lan-source.md</code></p>
+<h2 id="design-records-20261110-lan-source--局域网模型源接入回归">局域网模型源接入回归</h2>
+<h3 id="design-records-20261110-lan-source--问题与行为">问题与行为</h3>
+<p>HTTP 模型地址原来只允许 localhost，私网地址导致目录拉取和保存按钮同时禁用，运行时节点路由也拒绝同类地址。现在目录、保存和节点路由一致允许私网 IP 的 HTTP 地址；公网 HTTP 仍保持原约束。</p>
+<p>用户可拉取目录，也可手动填写模型直接保存；已有模型源可修改名称、协议与密钥，不要求再次拉取目录。已配置模型的编辑入口由“聚合策略”改为“编辑”，与实际可修改内容一致。</p>
+<h3 id="design-records-20261110-lan-source--验证">验证</h3>
+<ul>
+<li>使用用户提供的连接参数实测模型目录和聊天请求，均返回 HTTP 200；目录包含指定模型。密钥不写入仓库。</li>
+<li>Go 模型网关测试通过，新增私网地址接入回归；节点路由复用相同地址约束。</li>
+<li>前端 216 文件、1580 项测试通过；包括私网地址的拉取、手动保存和已有源无拉取修改。</li>
+<li>桌面真实 Chrome 使用隔离的 CapabilitiesPage 及模拟目录 API，验证填写、进入配置源、改名、确认保存、返回列表和提交内容；未修改用户配置。1280、1920、2560、3440 CSS px 的保存按钮均在视口内。</li>
+<li>Android Chrome 通过 CDP 验证隔离页面的紧凑布局和保存按钮命中。设备前台被其他任务占用，未完成 ADB 真实触控和完整应用导航验收。</li>
+<li>typecheck、i18n、hover 和生产构建通过。</li>
+<li>quick 首轮出现 agentexecution 的 child-completion 停止确认失败，该单项重跑通过；最终 quick 全量重跑通过。</li>
+</ul>
+<p>截图保留在 /tmp，不提交仓库。当前为工作区修复，尚未更新运行中服务。</p>
+<h3 id="design-records-20261110-lan-source--源卡片与语言复核">源卡片与语言复核</h3>
+<p>用户要求一个模型源一张独立内容卡，具体配置归属于该源。列表以响应式卡片展示源地址、协议、认证方式及模型；桌面配置源和新增源在卡片内展开，模型编辑仍沿用已有详情流程，手机配置保持全屏二级页。复用 ModelSourceEditor、sourceDrafts 和原保存 API，切换与收起保留草稿，不增加目录请求。</p>
+<p>验证入口补齐正式 I18nProvider 与 ThemeProvider，重新验证中英文桌面配置保存、手机模拟视口的手动模型保存状态，检查无翻译 key 外露。旧的裸 key 截图已从 PR 正文替换。</p>
+<p>已 rebase main e070516e，基线前端 220 文件、1599 项测试及 full 检查通过；卡片调整后另跑检查。正式部署使用包含前端的 Go 构建，复用与当前源码一致的现有 Python runtime，服务切换前保留旧程序、unit 配置并备份数据。</p>
+<h3 id="design-records-20261110-lan-source--已有源模型列表与网关入口修正">已有源模型列表与网关入口修正</h3>
+<p>源卡片增加“更新模型列表”，使用已保存的连接和密钥重新拉取目录。保存的模型不再锁定勾选，可与新增模型一起调整；未出现在新目录的旧模型仍可见并标注，避免静默丢失，用户取消勾选后确认移除。保存保留其他源、未修改模型的 ID、密钥与聚合策略。目录无变化时直接显示没有变更。新增交互回归覆盖卡片入口、重新拉取、增删保存及其他源保留。</p>
+<p>网关地址和协议说明移入“本机网关”同级标签；移除“配置智能体”重复入口。桌面源配置在卡片内，手机仍走全屏二级页。真实部署页检查发现 antd 为双字中文按钮插入空格，浏览器验收选择器改为兼容“返 回”等可访问名称，而不是按隔离页的纯文本误判。</p>
+<p>用户随后给出供应商网格参考图，源卡片首页改为紧凑网格：图标、源名称与地址、协议和认证摘要、模型计数及最多三个模型的预览。使用 auto-fill 保持单个源也呈现卡片宽度，未配置的网格位置不补假卡。配置时展开所属卡片，完整模型列表只在展开后显示。</p>
+<h3 id="design-records-20261110-lan-source--最终上线验收">最终上线验收</h3>
+<p>补充改动在 PR860，基于已合入 PR859 的 main f6e33a34；重放前后源码树一致。最终代码版本 477690e6，220 文件、1601 项前端测试和 full 检查通过。</p>
+<p>本机已实际部署 model-sources-477690e6，Web、Agent 与插件守护进程恢复正常；生产前端与构建 index 原字节一致。原模型目录配置散列保持不变，局域网目录请求 HTTP 200，包含用户指定模型。切换前完成官方数据备份，原 Chrome 和会话保留。</p>
+<p>完整应用直接连接线上 API，桌面 1280/1920/2560/3440 CSS px 的源配置展开、返回及网关标签通过；已有源更新目录 HTTP 200，11 个已保存模型均可调整勾选。</p>
+<p>Redmi Note 8 真机完成 ADB 点按源配置、返回、打开模型列表，以及 ADB 滑动：内容 scrollTop 从 0 增至 376。实际点按取消一项后，勾选状态改变且保存按钮启用；随后重新勾选并返回，未保存或修改用户配置。主页面顶栏、四入口底栏、源卡片均可见，无横向文档溢出；源编辑保持单个返回栏与内容滚动区。</p>
+<p>本次真实验收截图置于 PR860 的 pr-shots；早期手机仅 CDP 的记录为之前阶段，不代表最终验收状态。</p>
+<p>语音配置按用户后续要求改名“语音输入”，从模型列表移入最后一个独立标签。保留旧 speech URL 的直接访问和切换草稿恢复，模型目录不可用不再在语音页展示无关错误；语音配置仍由原 speech/config 接口读取与保存。</p>
+</article>
+<article class="record" id="design-records-2026-10-30-readme">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-30/README.md</code></p>
+<h2 id="design-records-2026-10-30-readme--2026-10-30-第一版">2026-10-30 第一版</h2>
+<p>历史方案，当前方案以<a href="#design-readme">主题入口</a>为准。</p>
+<p><a href="records/2026-10-30/prototype.html">原型</a> · <a href="#design-records-2026-10-30-proposal">产品提案</a> · <a href="#design-records-2026-10-30-acceptance">验收</a></p>
+</article>
+<article class="record" id="design-records-2026-10-30-acceptance">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-30/acceptance.md</code></p>
+<h2 id="design-records-2026-10-30-acceptance--设计原型验证">设计原型验证</h2>
+<p>2026-10-30。范围是本目录的交互提案和模拟数据，不是正式模型接入验收。</p>
+<h3 id="design-records-2026-10-30-acceptance--产物与复现">产物与复现</h3>
+<ul>
+<li><code>README.md</code>：Product Design、User Stories、Technical Design、迁移阶段及资料依据。</li>
+<li><code>index.html</code>：独立 HTML，内联脚本、样式和图标，可离线打开；不依赖测试服务。</li>
+<li><code>assets/prototype.tsx</code>、<code>prototype.css</code>、<code>build.mjs</code>：可维护原稿和构建入口，复用项目图标、<code>useLayout()</code>、主题令牌及 antd。</li>
+<li>原型为中文设计文档，属于内部设计稿的语言例外。正式 UI 接入时必须使用项目全局中英 i18n，不能直接搬入硬编码文案。</li>
+</ul>
+<pre><code class="language-bash">cd frontend &amp;&amp; npm ci --no-audit --no-fund
+cd ..
+node docs/design/20261114-model-orchestration/history/20261030-智能体模型切换/assets/build.mjs
+frontend/node_modules/.bin/tsc -p docs/design/20261114-model-orchestration/history/20261030-智能体模型切换/assets/tsconfig.json
+node --check docs/design/20261114-model-orchestration/history/20261030-智能体模型切换/assets/build.mjs
+</code></pre>
+<p>静态预览通过 <code>scripts/dev/isolated-roami.sh /tmp/roami-model-switch-validation ...</code> 启动；按同一入口 <code>--stop</code> 清理测试 tmux 服务器。没有修改真实 Agent 的配置、凭据、模型路线或用户任务。</p>
+<h3 id="design-records-2026-10-30-acceptance--桌面浏览器">桌面浏览器</h3>
+<p>使用 <code>roami chrome</code> 独立标签验证：</p>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单工具切换、首次确认、成功反馈</td>
+<td>通过，文案为默认已设置，不冒充运行会话已切换</td>
+</tr>
+<tr>
+<td>恢复原配置</td>
+<td>通过，恢复后显示使用原配置及可能需要登录的提示</td>
+</tr>
+<tr>
+<td>连接不兼容</td>
+<td>Codex 选择仅 Chat Completions 的本地连接后禁用应用，保留换连接入口</td>
+</tr>
+<tr>
+<td>返回保留草稿</td>
+<td>选择 OpenRouter 后返回列表，再打开仍为 OpenRouter</td>
+</tr>
+<tr>
+<td>外部配置冲突</td>
+<td>读取前禁止应用，读取后展示当前文件与所选配置，明确选择后才解除阻断</td>
+</tr>
+<tr>
+<td>批量部分失败</td>
+<td>Codex 显示默认已设置，Claude 显示冲突，整体显示部分完成；可进入单项处理</td>
+</tr>
+<tr>
+<td>深浅主题</td>
+<td>主题令牌切换正常；检查桌面深色和窄屏浅色画面</td>
+</tr>
+<tr>
+<td>原型与产品隔离</td>
+<td>浏览器资源记录未出现 <code>/api/</code> 请求；模型测试和写入均为页面内模拟</td>
+</tr>
+</tbody>
+</table>
+<p>七档截图过程中使用 ResizeObserver 读取实际档位和几何数据：320 / 390 为 compact、820 为 medium、1100 为 expanded、1280 / 1600 / 1920 为 large。全部 <code>scrollWidth &lt;= innerWidth</code>，文档高度等于视口高度。手机档有上下栏，页面内容在自己的容器滚动。</p>
+<h3 id="design-records-2026-10-30-acceptance--android-真机">Android 真机</h3>
+<p>Redmi Note 8，Android Chrome 154，392 CSS px 宽、DPR 2.75，实际物理屏幕 1080×2340。通过 LAN 打开原型，<code>data-size=compact</code>、<code>data-pointer=coarse</code>。</p>
+<ul>
+<li>用 <code>roami adb</code> 实际点按 Codex 切换、模型来源、OpenRouter、应用与确认；读取到成功文案及当前来源 OpenRouter。</li>
+<li>实际滑动详情页，详情容器 scrollTop 从 0 变为约 149，再滑至恢复入口；文档 scrollTop 始终为 0。</li>
+<li>实际点按恢复、恢复确认，读取到“已恢复接管前模型配置”，当前值回到“使用原配置”。</li>
+<li>Android 系统返回回到模型列表；上下栏仍在，未出现双重返回栏，页面无横向溢出。</li>
+</ul>
+<p>手机 Chrome 的浏览器 WebSocket 路径不带实例 ID，当前 <code>roami chrome</code> 返回 <code>CHROME_BROWSER_IDENTITY_UNAVAILABLE</code>。因此真机触控与截图使用 <code>roami adb</code>，仅页面状态和几何读取使用直接 CDP。使用稳定页面 ID 定位，并在每组 ADB 操作前激活本任务页面；没有改动该 CLI 的身份校验。</p>
+<h3 id="design-records-2026-10-30-acceptance--检查边界">检查边界</h3>
+<p>构建、设计原稿 TypeScript 检查和构建脚本语法检查通过。更改范围为设计文档和演示资产，未修改 <code>frontend/src</code>、后端或 Python，因此不以产品全量测试代替设计验证，也不声称运行时已经接入。落地仍须执行 README 中的真实 CLI、协议兼容、配置事务与仓库正式前端门禁。</p>
+<p>截图留在 <code>/tmp/model-switch-*.png</code>，作为本次评审展示材料，不提交到主分支；若后续创建 PR，按仓库 <code>pr-shots</code> 流程上传。</p>
+</article>
+<article class="record" id="design-records-2026-10-30-proposal">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-30/proposal.md</code></p>
+<h2 id="design-records-2026-10-30-proposal--智能体模型切换">智能体模型切换</h2>
+<p>2026-10-30 · 产品交互提案，待评审。交付设计与演示原型，尚未接入真实配置写入。</p>
+<p><a href="records/2026-10-30/prototype.html">打开当时原型</a> · <a href="#design-records-2026-10-30-acceptance">当时验收</a></p>
+<p>原型顶部可选正常流程、配置冲突、部分失败和未配置，并可切换深浅主题；所有测试与应用均为模拟。</p>
+<h3 id="design-records-2026-10-30-proposal--product-design">Product Design</h3>
+<h4 id="design-records-2026-10-30-proposal--产品主张">产品主张</h4>
+<p><strong>模型连接只配一次，再决定哪些智能体使用它。</strong> 在现有「设置 / 模型与连接」下增加「智能体使用」标签；用户按智能体查看和切换默认模型，不再重复输入地址和密钥。</p>
+<p>本稿将需求中的 “Cloud Code” 理解为 Claude Code。Codex 指当前节点上的本地 Codex CLI；若还要覆盖托管的 Codex Cloud，需要另做部署和认证接入，不能把本机配置写入当作云端配置。OpenRouter 是模型来源；如果原意是 OpenCode，它也在首批智能体适配范围内。</p>
+<h4 id="design-records-2026-10-30-proposal--已有能力与缺口">已有能力与缺口</h4>
+<table>
+<thead>
+<tr>
+<th>当前代码</th>
+<th>已有能力</th>
+<th>本次设计补齐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>frontend/src/components/settings/agent-settings.tsx</code></td>
+<td>一个模型连接、Roami 主智能体和执行智能体选模；已有模型连接 / 代理与计费 / 模型单价三个标签</td>
+<td>升级为可复用的连接目录；保留现有角色设置与计费入口</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/capabilities/AgentModels.tsx</code></td>
+<td>在每种专业智能体内重复维护连接预设，应用和恢复原配置</td>
+<td>从统一目录选连接；能力中心保留当前摘要与「切换」快捷入口</td>
+</tr>
+<tr>
+<td><code>internal/agentproviders/</code></td>
+<td>Claude / Codex / OpenCode / Pi 原生配置适配、revision 冲突检测、恢复及私有存储</td>
+<td>绑定统一连接引用，补齐协议能力判断和逐目标结果</td>
+</tr>
+<tr>
+<td><code>internal/modelgateway/</code> 与 RSI 单轮 Codex 桥接</td>
+<td>本地准入、统计和受限调用</td>
+<td>不能据此声称完整 CLI 的工具循环、图片、续接已兼容；统一网关是后续阶段</td>
+</tr>
+</tbody>
+</table>
+<h4 id="design-records-2026-10-30-proposal--信息架构">信息架构</h4>
+<p>不新增顶级导航，不把“模型来源”和“使用模型的工具”混成一张列表。</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>用户要做的事</th>
+<th>主要内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型连接</td>
+<td>接入、维护模型来源</td>
+<td>名称、已存凭据状态、可用模型、正在被哪些智能体使用；行尾「分配」</td>
+</tr>
+<tr>
+<td>智能体使用（新增）</td>
+<td>看谁在用什么、切换</td>
+<td>Roami、Codex、Claude Code、OpenCode、Pi；当前连接和模型、必要状态、行尾「切换」</td>
+</tr>
+<tr>
+<td>代理与计费</td>
+<td>看真实用量和限额</td>
+<td>保留现有入口；仅统计实际经过 Roami 网关的调用</td>
+</tr>
+<tr>
+<td>模型单价</td>
+<td>维护本地估算价格</td>
+<td>保留现有入口</td>
+</tr>
+<tr>
+<td>能力中心 / 智能体详情</td>
+<td>在当前工具内快速改模型</td>
+<td>展示同一绑定摘要，打开同一个切换界面；安装与升级仍留在原处</td>
+</tr>
+<tr>
+<td>新建会话 / 会话详情</td>
+<td>确认即将使用或实际使用的模型</td>
+<td>新建时显示默认来源；运行中优先显示实测模型，未知时显示「待确认」</td>
+</tr>
+</tbody>
+</table>
+<h4 id="design-records-2026-10-30-proposal--主界面">主界面</h4>
+<p>页头显示当前节点，例如「开发主机」。手机远程操作修改的是这个节点，不能让用户误以为修改了手机上的 CLI。</p>
+<p>智能体列表采用平面行：工具名、当前模型、来源、一项必要状态与「切换」。Codex / Claude 初次接入时显示「使用原配置」，保留官方登录。未安装工具显示「未安装」和安装入口；不虚构“已接入”。原配置指接管前快照，不能把任意自定义原配置标成官方订阅。</p>
+<p>不在每一行显示路径、协议、密钥、延迟、完整错误和账单。未被 Roami 接管或正在直连时，不显示 Roami 限额保护徽标。</p>
+<h4 id="design-records-2026-10-30-proposal--主路径给-codex-换模型">主路径：给 Codex 换模型</h4>
+<ol>
+<li>打开「智能体使用」，在 Codex 行点「切换」。</li>
+<li>桌面进入同页右侧详情栏；手机进入带单一返回栏的全屏二级页，保留底部四个主导航入口。</li>
+<li>先选已保存的连接，再选该连接中适合 Codex 的模型；默认带出当前组合。地址和密钥无需再次填写。</li>
+<li>用一行说明作用范围：「修改开发主机上此用户的默认配置；新启动的 Roami 和本机命令行会话使用。」协议不兼容项仍可看见，但不能选；说明「此连接暂不能用于 Codex，换一个连接」。协议名在详情中展开。</li>
+<li>可选「测试模型」，明确一次小型验证，最多两次模型请求。检测内容是认证、真实模型响应、流式和工具调用回传；获取模型列表不算验证成功。不默认运行代码、不发送项目正文。测试结果只代表所测版本和组合。</li>
+<li>点「应用」。首次接管某工具时用短确认说明本机 CLI 影响，并提供「应用并备份」；已接管且无冲突时后续切换直接应用。</li>
+<li>成功后显示「已更新 Codex 默认配置」，给出所选来源和模型，并提示「重新打开 Codex 后使用」。列表显示「默认已设置」，不能直接宣称运行中的会话已切换。</li>
+</ol>
+<p>回退：详情内「恢复原配置」。展示将恢复的工具与快照时间，确认后仅恢复接管过的模型相关字段；原来未登录的官方连接仍可能需要登录。恢复成功不等于模型连通。</p>
+<h4 id="design-records-2026-10-30-proposal--另一条路径连接配好后分给多个智能体">另一条路径：连接配好后分给多个智能体</h4>
+<p>连接保存成功后出现轻量动作「分配给智能体」，不强制弹向导。在连接列表行尾也能进入。页面列出适配工具，用户勾选工具并逐个选择模型；<strong>共用连接不要求共用同一个模型</strong>。</p>
+<p>提交按钮写「应用到 2 个智能体」。首次接管的目标合并成一次范围确认；每个目标独立备份、校验和应用。结果逐项展示，例如 Codex 成功、Claude 配置冲突，主状态为「部分完成」；成功项保留，失败项可单独重试。未安装或不兼容目标不可勾选，原因可见。</p>
+<h4 id="design-records-2026-10-30-proposal--生效与边界">生效与边界</h4>
+<table>
+<thead>
+<tr>
+<th>决策</th>
+<th>产品规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>默认作用域</td>
+<td>当前节点、当前服务用户的 CLI 默认配置，包含从 Roami 新启动及本机直接启动的对应工具；不是全组织、全设备或跨用户设置</td>
+</tr>
+<tr>
+<td>正在运行的会话</td>
+<td>不自动终止、重启或重放任务。配置文件热读行为由工具版本决定，因此不承诺原生 CLI 在运行中保持或立即改变；前台显示实际观测值，不能用保存结果代替生效证据</td>
+</tr>
+<tr>
+<td>项目内覆盖</td>
+<td>如果已有环境变量、项目配置或启动参数覆盖默认值，给出「有更高优先级配置」及可见的详情入口；不静默移除</td>
+</tr>
+<tr>
+<td>Roami 内置智能体</td>
+<td>主智能体 / 执行智能体保留独立选模；保存后按现有请求边界生效。外部 CLI 的默认切换不连带改它们</td>
+</tr>
+<tr>
+<td>官方登录</td>
+<td>「恢复原配置」恢复原接管字段；官方订阅凭据不导出为可复用 API Key，不暗示能给其他工具通用</td>
+</tr>
+<tr>
+<td>直连与代理</td>
+<td>首期通过原生配置接入上游。详情明确「直连上游，未纳入 Roami 限额」；不混算本地统计与供应商账单</td>
+</tr>
+<tr>
+<td>密钥更换</td>
+<td>目录只有一个凭据权威。已物化至原生配置的绑定列为待同步；用户明确应用，逐目标回执，失败保留旧有效配置或说明真实恢复状态</td>
+</tr>
+<tr>
+<td>删除连接</td>
+<td>有绑定时列出受影响工具，要求先切换或解除绑定；不留下断开的默认配置。源模型下架同理显示不可用，不擅自换另一个模型</td>
+</tr>
+<tr>
+<td>自定义工具</td>
+<td>已有适配器才能一键应用。未知工具提供「接入说明」及协议选择，默认只展示脱敏配置；不称为兼容一切工具</td>
+</tr>
+<tr>
+<td>后续单会话选模</td>
+<td>单次选择与默认配置分开；通过启动时隔离实现后再开放，不用全局文件切换伪装“仅本会话”</td>
+</tr>
+</tbody>
+</table>
+<h4 id="design-records-2026-10-30-proposal--兼容与验证">兼容与验证</h4>
+<p>产品层呈现「可选 / 待测试 / 不支持 / 测试未通过」，不要求普通用户理解协议转换。可选仅表示有匹配的连接协议与工具适配器；成功测试后显示「已通过模型测试」，不是完整任务质量承诺。</p>
+<ul>
+<li>Codex：本地适配器要求 Responses。仅 Chat Completions 的连接不能因“OpenAI 兼容”就标成支持。</li>
+<li>Claude Code：首期适配 Anthropic Messages，OpenRouter 对应独立入口和 bearer 认证。优先呈现 Claude 模型；其他模型的实验适配不承诺官方支持。</li>
+<li>OpenCode / Pi：依据已安装版本及适配器能力选择具体协议和模型，不把所有版本视为相同。</li>
+<li>多协议网关：连接可包含不同协议的独立入口与认证方式，共用凭据只是默认；不能机械地把一个 Base URL 复制给全部工具。OpenRouter 预设需要版本化能力声明与实测，不只按域名猜。</li>
+</ul>
+<p>连接的鉴权、模型目录、协议、流式、工具调用分别记结果；测试失败保留选择。主动测试可能计费，未知结果不自动重试。实际执行器的工具循环、压缩、图片、续接、取消仍要在实现期跑端到端验收。</p>
+<h4 id="design-records-2026-10-30-proposal--异常与恢复">异常与恢复</h4>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>默认展示</th>
+<th>下一步</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>未配置连接</td>
+<td>尚未添加模型连接</td>
+<td>添加连接；仍可保留原工具配置</td>
+</tr>
+<tr>
+<td>没有兼容模型</td>
+<td>这个连接暂不能用于 Codex</td>
+<td>换连接；展开协议详情</td>
+</tr>
+<tr>
+<td>认证失败</td>
+<td>连接密钥不可用，请更新密钥</td>
+<td>打开对应连接，返回后保留工具和选模</td>
+</tr>
+<tr>
+<td>工具未安装</td>
+<td>Pi 未安装</td>
+<td>去能力中心安装，不允许应用</td>
+</tr>
+<tr>
+<td>外部修改</td>
+<td>配置已在其他地方修改，请先读取当前配置</td>
+<td>读取后展示差异；用户明确选择保留外部配置或重新应用</td>
+</tr>
+<tr>
+<td>写入失败</td>
+<td>默认配置未更新，请重试</td>
+<td>保留选择；展示备份和恢复结果，状态未知时不报“已恢复”</td>
+</tr>
+<tr>
+<td>多工具部分失败</td>
+<td>部分完成</td>
+<td>列出成功和失败工具，只重试失败项</td>
+</tr>
+<tr>
+<td>网关离线 / 每日限额</td>
+<td>仅代理模式下呈现对应真实状态</td>
+<td>恢复网关或查看额度；不自动绕过代理改成直连</td>
+</tr>
+</tbody>
+</table>
+<h4 id="design-records-2026-10-30-proposal--手机交互">手机交互</h4>
+<p>设置分类保留原四入口底栏；模型页四个标签在窄屏排两行，不截断。切换、分配、恢复都是专用二级页，只有一条等高返回栏和一个内容滚动区。应用操作放在内容末尾，保证 320px 和横屏可滚达；不堆叠桌面抽屉和移动对话框。</p>
+<p>返回保留未提交选模；只有明确取消才丢弃。系统返回与页面返回采用同一 URL 历史，不叠加 overlay history。主题、空间、字号和图标复用项目规范。原型为中文设计稿；正式产品所有文案必须进入全局中英 i18n。</p>
+<h3 id="design-records-2026-10-30-proposal--user-stories">User Stories</h3>
+<table>
+<thead>
+<tr>
+<th>用户故事</th>
+<th>验收条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>我已经配好工作网关，希望 Codex 直接使用</td>
+<td>选择已存连接与兼容模型即可应用，无需再次填密钥；能看出修改的是哪个节点</td>
+</tr>
+<tr>
+<td>我通过 OpenRouter 给不同工具供模型</td>
+<td>在“来源”中找到 OpenRouter；Codex、Claude 可各选不同模型，适配协议单独判断</td>
+</tr>
+<tr>
+<td>我希望手机上替服务器换连接</td>
+<td>真机可完成选择、确认、返回、恢复；无横向溢出，底栏与操作可达</td>
+</tr>
+<tr>
+<td>我希望继续使用官方订阅</td>
+<td>默认可以保留原配置，接管后可恢复；不会把订阅当成通用模型 Key</td>
+</tr>
+<tr>
+<td>我只想换下一次启动的默认值</td>
+<td>应用提示清晰；任务不被自动中止，运行状态不冒充切换成功</td>
+</tr>
+<tr>
+<td>我同时维护两台节点</td>
+<td>当前节点贯穿列表、详情与确认；连接目录、凭据和结果不跨节点同步</td>
+</tr>
+<tr>
+<td>我也用 CC Switch 或手工改配置</td>
+<td>revision 冲突阻止覆盖；重新读取后可看见当前值，草稿保留</td>
+</tr>
+<tr>
+<td>我一次接入多个工具，但其中一个失败</td>
+<td>每个目标有独立结果；成功项不回退，失败项可单独恢复和重试</td>
+</tr>
+</tbody>
+</table>
+<h3 id="design-records-2026-10-30-proposal--technical-design">Technical Design</h3>
+<p>以下是实现建议，不代表本次已交付接口或运行能力。</p>
+<h4 id="design-records-2026-10-30-proposal--数据与模块">数据与模块</h4>
+<pre><code class="language-text">ModelConnection
+  id, name, credentialRef, revision
+  endpoints[]: protocol, baseURL, authMode, credentialRef?
+  catalog[]: exactModelID, endpointRef, advertisedCapabilities
+
+AgentModelBinding
+  nodeID, kind, connectionID, exactModelID, endpointRef
+  adapterVersion, appliedRevision, nativeRevision, status
+  snapshotRef, verificationRef
+
+Verification
+  connectionRevision, adapterVersion, exactModelID, checkedAt
+  auth, inference, streaming, toolRoundTrip, errorCode
+
+ApplyOperation
+  id, requestID, targets[]
+  per-target: beforeRevision, backupRef, writeState, readbackState, recoveryState
+</code></pre>
+<ul>
+<li><code>frontend/src/components/settings/agent-settings.tsx</code> 和 <code>model-settings-route.ts</code> 增加 <code>usage</code> 标签；模型来源编辑延用现有表单，按迁移阶段引入多连接。</li>
+<li>新增 <code>agent-model-usage.tsx</code>、<code>agent-model-assignment.tsx</code> 与 <code>agent-model-binding.ts</code>，分别负责列表、分配流程与请求/状态契约；不混入账单模块。</li>
+<li><code>AgentModels.tsx</code> 收敛为统一目录的快捷入口，保留旧独立预设迁移与恢复入口。</li>
+<li><code>internal/agentproviders/</code> 延用现有原生字段捕获、私有文件、revision、冲突和恢复机制；新增按引用生成配置的适配层。避免做一套旁路写文件实现。</li>
+<li>统一连接目录建议归 Go 宿主所有，Python <code>model_settings.py</code> 继续接收既有运行时读取结构；迁移不能创建两份互相覆盖的凭据权威。凭据只在宿主解析，摘要 API 不返回原值。</li>
+<li>新接口建议放在现有 <code>/agent/professional/:kind/models</code> 旁：共享连接读取、兼容候选、应用预检、分配操作和结果。mutation 带连接 revision、原生 revision 和幂等 request ID；具体路径实现前确定。</li>
+</ul>
+<h4 id="design-records-2026-10-30-proposal--应用事务">应用事务</h4>
+<p>读取安装版本和当前原生 revision，解析绑定引用、校验端点与模型；预检记录不发送付费请求。首次接管备份涉及字段，应用时再次比较 revision。逐文件原子写、readback 后才报“默认已设置”；跨文件不能原子完成时保留事务日志并恢复。恢复失败显示需要处理，不能用布尔成功掩盖未知状态。</p>
+<p>多工具操作按目标事务处理，提供逐项状态和恢复入口；不宣称跨工具原子。客户端请求超时先查操作结果，不重新提交可能已成功的应用。模型验证独立于写配置，不以写入成功或 <code>/models</code> 返回代替验证。</p>
+<p>不复制 MCP、权限、插件、hooks 或其它无关配置。保留原始字段备份和外部修改检测。进程环境、配置目录、启动参数覆盖必须预检并说明；不能为达到“已应用”静默清理用户配置。</p>
+<h4 id="design-records-2026-10-30-proposal--迁移与阶段">迁移与阶段</h4>
+<ol>
+<li><strong>首期：统一来源与原生切换。</strong> 现有单连接按 ID 导入目录，主/执行角色继续引用；专业工具旧预设保留，用户可选择迁移为统一连接。仅对端点、协议、认证和凭据均可证明相同的条目去重，不按名称或脱敏 Key 合并。优先 Codex、Claude Code，再按已验证版本开放 OpenCode、Pi。</li>
+<li><strong>后续：统一代理与计费。</strong> 在 Go 网关实现完整原生 Responses / Messages 透传或经过验证的转换，保留工具、SSE、usage、图片、续接、压缩、取消和错误语义。复用 Go 准入和账本；不在 Python 叠加配额。协议未达到端到端门槛时不得打开“受 Roami 限额保护”。RSI 单轮 JSON 桥接不能直接替代完整 Codex CLI 网关。</li>
+<li><strong>再扩展：单会话覆盖、自定义适配器。</strong> 前者使用独立启动配置与会话快照，不写项目级 Codex provider 配置；后者声明版本、格式和应用/恢复契约，再进入兼容目录。首期不做自动故障换模、供应商测速排行或复杂路由规则。</li>
+</ol>
+<h4 id="design-records-2026-10-30-proposal--实现期验收门槛">实现期验收门槛</h4>
+<p>使用隔离配置目录与 <code>scripts/dev/isolated-roami.sh</code>，不把当前用户 Agent 配置当测试夹具。验证引用迁移、恢复、冲突、写入中断、批量部分成功、凭据轮换与高优先级覆盖。各适配器至少跑真实 CLI 的多轮工具调用与取消恢复；付费测试单独明确调用次数与成本提示。</p>
+<p>桌面与 Android 真机覆盖应用、返回草稿、恢复、空态、错误和长名称；随后运行仓库规定的前端与质量门禁。设计原型的验证不代替产品接入验收。</p>
+<h4 id="design-records-2026-10-30-proposal--资料依据">资料依据</h4>
+<p>2026-10-30 检索，接口能力仍以实现时安装版本和实测为准。</p>
+<ul>
+<li><a href="https://developers.openai.com/codex/config-advanced/">Codex Advanced Configuration</a>：自定义提供方和用户级配置，项目级 provider 配置不能承担切换。</li>
+<li><a href="https://developers.openai.com/codex/config-reference/">Codex Configuration Reference</a>：provider wire API 与配置字段；首期沿用仓库 Responses 限定。</li>
+<li><a href="https://code.claude.com/docs/en/llm-gateway-protocol">Claude Code 网关兼容说明</a>：Messages 协议、流式事件、可选端点及工具字段不能简化为 URL 替换。</li>
+<li><a href="https://openrouter.ai/docs/cookbook/coding-agents/claude-code-integration">OpenRouter / Claude Code</a>：独立 Messages 入口和 bearer 认证；其兼容保证有提供方范围。</li>
+<li><a href="https://openrouter.ai/docs/cookbook/coding-agents/codex-cli">OpenRouter / Codex CLI</a>：Codex 通过自定义提供方接入 OpenRouter。目录里的示例型号不作为推荐或固定默认。</li>
+<li><a href="https://github.com/farion1231/cc-switch">CC Switch</a>：借鉴供应商切换、恢复和配置保护，原型的默认生效规则以 Roami 自身适配验证为准。</li>
+</ul>
+</article>
+<article class="record" id="design-records-2026-10-31-readme">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-31/README.md</code></p>
+<h2 id="design-records-2026-10-31-readme--能力中心大模型与智能体">能力中心：大模型与智能体</h2>
+<p>2026-10-31 · 第二版设计已进入首版实现。<a href="#design-implementation">实现范围与验收</a> 记录真实接口、配置写入和验证结果；下文保留完整产品方向。HTML 为设计原型，不调用模型或改写本机配置。</p>
+<p><a href="index.html">交互原型</a> · <a href="assets/prototype.tsx">源码</a> · <a href="#design-acceptance">验证记录</a> · <a href="#design-records-2026-10-30-readme">第一版快照</a></p>
+<h3 id="design-records-2026-10-31-readme--product-design">Product Design</h3>
+<h4 id="design-records-2026-10-31-readme--推荐结构">推荐结构</h4>
+<p><strong>模型配置迁入“能力”，命名“大模型”，与“智能体”相邻，各自有唯一管理页面。</strong> 每个节点默认维护一个统一模型接入，在里面添加多个上游源，配置对外模型及聚合策略，再供智能体和其它客户端使用。</p>
+<pre><code class="language-text">能力
+  大模型
+    统一接入：节点地址、协议入口、调用凭据、状态
+    模型源：工作网关、OpenRouter、官方 API、本地模型
+    对外模型：稳定名称、来源映射、主备策略、验证与发布
+    用量：实际来源、使用方、单价和每日金额限额
+  智能体
+    Roami：主智能体与执行智能体分别选模
+    Codex / Claude Code / OpenCode / Pi
+      安装、版本、登录、启动、模型选择、恢复
+  插件 / 技能 / MCP / CLI / 工具 / 市场
+</code></pre>
+<p>默认直接提供本节点的统一接入，不要求用户先建立“连接分组”。多环境、多网关在明确需要时再扩展。</p>
+<h4 id="design-records-2026-10-31-readme--放在哪里是否放同一页">放在哪里，是否放同一页</h4>
+<table>
+<thead>
+<tr>
+<th>选择</th>
+<th>结果</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型留在设置，工具留在能力</td>
+<td>配模型与管理工具持续跨两个中心，容易复制入口</td>
+<td>不推荐</td>
+</tr>
+<tr>
+<td>所有模型和智能体放一个长页面</td>
+<td>首次设置顺序直观，日常改上游也要看到安装、登录等内容，手机更难找</td>
+<td>不作为主页面</td>
+</tr>
+<tr>
+<td>能力内“大模型 / 智能体”相邻</td>
+<td>同一中心内完成，资产配置与工具生命周期各自清晰</td>
+<td>推荐</td>
+</tr>
+</tbody>
+</table>
+<p>设置原“模型与连接”在迁移期保留“已迁至能力 / 大模型”导航，旧 URL 自动转到唯一页面；迁移完成移除旧分类。设置继续管理节点、账户、外观等系统偏好。</p>
+<p><strong>大模型页下面仍然能看到智能体，但只展示使用关系和配置入口。</strong> 点“配置”打开能力内同一个智能体详情，并保留返回上下文；不在这里再做一套安装、登录与模型表单。</p>
+<h4 id="design-records-2026-10-31-readme--四个产品概念">四个产品概念</h4>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>用途</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>统一接入</td>
+<td>所有使用方连接的 Roami 入口</td>
+<td>当前开发主机的模型网关</td>
+</tr>
+<tr>
+<td>模型源</td>
+<td>上游地址、凭据和真实模型目录</td>
+<td>工作网关、OpenRouter、本地模型</td>
+</tr>
+<tr>
+<td>对外模型</td>
+<td>对使用方稳定展示的名称与标识</td>
+<td>编程主力 <code>coding-main</code>、Claude 主力 <code>claude-main</code></td>
+</tr>
+<tr>
+<td>使用方</td>
+<td>选用对外模型的工具或角色</td>
+<td>Codex、Claude Code、Roami 主智能体</td>
+</tr>
+</tbody>
+</table>
+<p>聚合策略放在“对外模型”详情里，不要求用户额外创建一个策略资源。用户建立“编程主力”，选择它背后的主源和备用源；Codex 只引用 <code>coding-main</code>。换供应商后不必逐个改客户端。主力模型与便宜模型之间的切换属于换模，不能伪装成同模型备援。</p>
+<h4 id="design-records-2026-10-31-readme--大模型页面">大模型页面</h4>
+<p>顶部一行“统一接入”状态和“接入说明”。普通用户选择智能体后由系统完成接入，无需复制地址和 Key 再填回 Roami。</p>
+<p>主体四个标签：<strong>模型源 / 对外模型 / 用量与限额 / 模型定价</strong>。</p>
+<ul>
+<li>模型源：平面列表展示名称、状态、可用模型与引用。新增选预设或自定义，填写地址和凭据，读取目录。多协议端点、特殊认证按需展开。同一供应商可建多个账户，不能按域名合并。</li>
+<li>对外模型：列表展示名称、主源、策略和使用方。新建先选真实模型，带出协议与能力，再选符合条件的备用源。保存草稿、预览路由、验证、发布分别呈现；草稿不进入智能体可选列表。发布前说明影响哪些使用方。</li>
+<li>用量：按对外模型、真实上游与使用方查看同一本 Go 网关账本。原单价、每日金额限额迁入这里。官方登录直连工具标明未经过统一接入，不把订阅额度或上游账单混算。</li>
+<li>模型定价：保留默认单价、逐模型及前缀匹配价格、输入、输出和缓存命中价格。币种随账本统一设置，只影响新请求。</li>
+</ul>
+<p>接入说明才展示协议入口、客户端调用凭据摘要及其它工具示例。上游 Key 与客户端凭据是两类资源，默认不把上游密钥分发到工具。首期监听本机回环；LAN 调用单独配置访问及凭据，手机远程管理不意味着手机直接调用服务器 loopback。</p>
+<p>底部“正在使用”按工具展示模型摘要，行尾“配置”进入唯一智能体详情；没有使用方时一句空态与“配置智能体”。不复制完整智能体目录。</p>
+<h4 id="design-records-2026-10-31-readme--简单聚合策略">简单聚合策略</h4>
+<table>
+<thead>
+<tr>
+<th>首期策略</th>
+<th>用户填写</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>固定来源</td>
+<td>一个模型源和真实模型</td>
+<td>新请求都走指定来源</td>
+</tr>
+<tr>
+<td>主备切换</td>
+<td>主源及有序备用源</td>
+<td>仅在可以安全换源时依次使用备用</td>
+</tr>
+</tbody>
+</table>
+<p>主备必须满足协议、真实模型身份、工具调用、上下文和使用方必需能力；模型 ID 相同不是充分条件。不兼容项显示原因，不能勾选。跨模型降级单独设计且默认关闭，必须明确告知质量、能力和费用变化。</p>
+<p>首期不做复杂表达式、按 Token 智能选模、最低价自动选择或多层路由。后续再考虑加权分流；按成本选源必须有可信价格与能力数据。</p>
+<p>自动备援不等于重放：只有能证明请求未被上游接收或执行才可自动换源。已输出、工具调用已开始、接收状态或费用未知时不自动重放，展示当前请求恢复入口。超时或 HTTP 5xx 本身不能证明未执行。带供应商续接标识的上下文保持原供应商，不能直接发给另一源。</p>
+<p>“预览路由”是无请求的规则模拟；真实“验证连接 / 模型”单独说明调用次数和可能费用。目录读取或预览成功不代表完整智能体兼容。</p>
+<h4 id="design-records-2026-10-31-readme--智能体统一管理">智能体统一管理</h4>
+<p>保留能力中已有的智能体目录，补入 Roami 内置角色；不再创建独立“智能体使用”总表。</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>唯一归属</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>安装、版本、升级、登录、启动</td>
+<td>能力 / 智能体 / 对应工具</td>
+</tr>
+<tr>
+<td>默认模型、接入或恢复原配置</td>
+<td>同一详情“模型”区</td>
+</tr>
+<tr>
+<td>Roami 主 / 执行智能体分别选模</td>
+<td>能力 / 智能体 / Roami 的角色行</td>
+</tr>
+<tr>
+<td>上游 URL、上游凭据、真实模型目录</td>
+<td>能力 / 大模型 / 模型源</td>
+</tr>
+<tr>
+<td>来源映射、主备顺序</td>
+<td>能力 / 大模型 / 对外模型</td>
+</tr>
+<tr>
+<td>当前会话真实模型与来源</td>
+<td>会话状态及执行详情，链接回同一资源</td>
+</tr>
+</tbody>
+</table>
+<p>外部工具的模型区提供 <strong>使用原配置 / 使用 Roami 大模型</strong>。后者只需选已发布、兼容的对外模型，不再填 Base URL 和上游 Key。没有兼容模型可跳去新建，带上所需协议，发布后回到原详情，保留选择。</p>
+<p>原配置可能是官方订阅或其它自定义连接，不一律叫“官方”。保留原登录方式，也不把订阅当成通用 API Key。有环境变量、启动参数或项目配置覆盖默认值时说明实际来源，不静默清理。</p>
+<p>首次接管备份相关字段，明确修改当前节点、当前用户的本机 CLI 默认配置；未安装先安装，协议未验证先处理连接，接管完成前保留有效原配置。恢复也放在同一详情。</p>
+<h4 id="design-records-2026-10-31-readme--两类修改的生效范围">两类修改的生效范围</h4>
+<table>
+<thead>
+<tr>
+<th>修改</th>
+<th>生效范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>智能体接入或换默认对外模型</td>
+<td>更新工具默认配置，新启动会话使用；不强行重启任务，原生热读行为以实测为准</td>
+</tr>
+<tr>
+<td>发布对外模型的来源策略</td>
+<td>新请求使用发布版本，进行中请求保持原路由；工具循环和不可迁移续接保持上下文绑定</td>
+</tr>
+<tr>
+<td>保存新模型草稿</td>
+<td>不影响运行，未发布模型不可被智能体选用</td>
+</tr>
+<tr>
+<td>删除 / 停用被引用的源或模型</td>
+<td>先处理引用或安排替代，不直接留下悬空绑定</td>
+</tr>
+</tbody>
+</table>
+<p>来源与策略修改先保存草稿，原发布版本继续服务。发布前验证，失败可回滚上个有效版本；凭据已撤销时不能以“回滚完成”冒充可用。默认写入结果与实际模型运行状态分别呈现。</p>
+<h4 id="design-records-2026-10-31-readme--完整操作路径">完整操作路径</h4>
+<ol>
+<li>首次设置：能力 / 大模型，添加两个源；建立编程主力，选择主备并发布；点配置智能体，在 Codex 模型区选编程主力并应用。</li>
+<li>日常换源：调整编程主力的来源顺序，预览后发布；Codex 继续引用 <code>coding-main</code>，新请求按发布策略处理。</li>
+<li>从智能体出发：打开 Claude Code，选使用 Roami 大模型；没有兼容模型时带所需协议去添加，发布后返回原详情。</li>
+</ol>
+<p>跨页导航通过 URL 保存受校验的返回上下文，返回保留草稿；路由历史与 MobileSubPage overlay history 不重复叠加。</p>
+<p>手机保留首页、项目、工具、设置四个底栏入口，能力从工具进入。能力分类多时用分类选择器，不挤成一排。三个大模型标签在手机完整显示；源、模型与智能体详情用全屏二级页，一条返回栏、一个滚动区，短发布确认才用对话框。</p>
+<h4 id="design-records-2026-10-31-readme--本版调整">本版调整</h4>
+<p>从第一版“在设置给工具分配直连源”，改为“能力内统一模型接入、多个上游、对外模型及策略，再绑定使用方”。统一网关成为产品核心。完整协议兼容仍是开放对应工具接入的门槛，不用 RSI 单轮适配推定完整 CLI 已支持。</p>
+<h3 id="design-records-2026-10-31-readme--user-stories">User Stories</h3>
+<table>
+<thead>
+<tr>
+<th>故事</th>
+<th>验收条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>多个上游只维护一次</td>
+<td>工具持统一接入凭据和模型引用，不复制上游 Key</td>
+</tr>
+<tr>
+<td>配置主备</td>
+<td>在对外模型内选来源，能预览正常、主源连接未建立、已输出三种结果</td>
+</tr>
+<tr>
+<td>换供应商不逐个改工具</td>
+<td>对外模型标识稳定，发布前可见影响范围</td>
+</tr>
+<tr>
+<td>在能力中管理 Codex</td>
+<td>安装、登录、启动、选模都在同一详情</td>
+</tr>
+<tr>
+<td>从大模型配置使用方</td>
+<td>摘要进入同一智能体详情，有明确返回路径</td>
+</tr>
+<tr>
+<td>保留官方订阅</td>
+<td>可使用原配置，明确不经过统一接入</td>
+</tr>
+<tr>
+<td>不重复已有输出或工具动作</td>
+<td>已输出及执行状态未知时不自动换源</td>
+</tr>
+<tr>
+<td>从旧设置链接进入</td>
+<td>重定向唯一模型入口并保留子区段语义</td>
+</tr>
+</tbody>
+</table>
+<h3 id="design-records-2026-10-31-readme--technical-design">Technical Design</h3>
+<p>实现建议，不代表本次已交付 API。节点间不隐式复制凭据。</p>
+<pre><code class="language-text">NodeModelGateway: nodeID, listener, protocolEntrypoints, accessCredentialRefs, health
+UpstreamSource: id, name, protocolEndpoints, credentialRefs, catalog, revision
+PublishedModel: id, stableModelID, displayName, protocol, requiredCapabilities,
+  candidates[{sourceID, exactModelID, priority}], strategy,
+  draftRevision, publishedRevision, validationRef
+AgentModelBinding: nodeID, kind, role?, mode(original|gateway),
+  publishedModelID, nativeRevision, snapshotRef, appliedState
+RoutingReceipt: requestID, sourceID, publishedModelID, policyRevision,
+  continuationAffinity, attemptState, usageState, errorCode
+</code></pre>
+<h4 id="design-records-2026-10-31-readme--页面与模块">页面与模块</h4>
+<ul>
+<li><code>CapabilitiesPage.tsx</code> 新增 <code>models</code> 分类，建议路由 <code>capabilities/models/sources</code>、<code>capabilities/models/catalog</code>、<code>capabilities/models/usage</code>。详情有独立 URL。</li>
+<li><code>AgentCatalog.tsx</code> 保留唯一目录；<code>AgentModels.tsx</code> 收敛为详情内的对外模型选择、应用、恢复，不另持上游目录。旧 <code>capabilities/agents/:kind/models</code> 兼容到同一模型区。</li>
+<li><code>settings/agent/runtime</code> 和 <code>modelTab</code> 归一化到模型入口；proxy / prices 定向用量对应区段，角色设置指向 <code>capabilities/agents/roami/models</code>，不丢掉原目标语义。</li>
+<li>分开模型源目录、对外模型发布、智能体绑定三个领域模块。关系跳转用稳定 ID 查询当前实体，不复制一份编辑表单或配置快照。</li>
+<li>Go <code>internal/modelgateway/</code> 承担协议入口、认证、路由、准入和记账；<code>internal/agentproviders/</code> 复用原生配置备份、revision、物化、readback、冲突和恢复。</li>
+<li>Python 读宿主运行时结构并传播网关决策，不另建 Token / 费用配额；验收使用节点已存路线、参数与能力。</li>
+</ul>
+<h4 id="design-records-2026-10-31-readme--执行与迁移">执行与迁移</h4>
+<p>一个服务可提供 Messages 和 Responses 等独立契约，但工具回传、流式终态、压缩、图片、取消、续接等必须分别端到端验证。未验证组合不可选，并给出处理入口。</p>
+<p>发布操作带 revision 和幂等 ID，先预检候选、引用、凭据与能力，持久化快照，再原子切换活动版本。请求捕获策略版本并记录每次真实尝试；不能只记最后一次，也不能把未知计成免费。供应商续接标识与请求上下文绑定，网关费用未知继续沿用已有 Go 准入规则。</p>
+<p>调用方凭据与上游密钥分离，摘要 API 不回传原值；日志不落密钥和正文。生成的工具配置只包含统一入口与客户端凭据。官方登录仍由工具认证体系管理。</p>
+<ol>
+<li>入口与实体：已有连接导为模型源，主 / 执行角色转为明确对外模型；旧链接重定向，专业工具原配置保留。旧预设按地址、认证、模型、协议核对后迁移，不按名称合并。</li>
+<li>完整网关与首批 CLI：逐协议和真实工具验证，先开放固定来源；未就绪组合继续原配置并标明待验证，不强行接管。</li>
+<li>主备与发布回滚：具备执行状态、费用状态和续接亲和后开放安全备援。多网关、权重分流、跨模型降级后置。</li>
+</ol>
+<h4 id="design-records-2026-10-31-readme--验收重点">验收重点</h4>
+<p>源增删改、引用完整、草稿与发布隔离、唯一目录及回跳、旧 URL、原配置保护、源密钥隔离。运行层覆盖发送前失败可备援、已输出不备援、工具执行未知不重放、供应商续接绑定、发布中请求稳定、引用资源不可直接删和未知账目。</p>
+<p>CLI 验证用仓库隔离实例和私有配置夹具，不改当前用户路线。正式落地跑前端门禁与 Android 真触控；本目录是中文内部设计稿，产品文案接全局中英 i18n。</p>
+<h4 id="design-records-2026-10-31-readme--依据">依据</h4>
+<p>当前核对了 <code>CapabilitiesPage.tsx</code>、<code>AgentCatalog.tsx</code>、<code>AgentModels.tsx</code>、<code>agent-settings.tsx</code>、<code>model-settings-route.ts</code>、<code>route-hash.ts</code>，以及两个 Go 模型模块。外部协议参考保留在<a href="#design-records-2026-10-30-proposal--%E8%B5%84%E6%96%99%E4%BE%9D%E6%8D%AE">第一版资料</a>，实现时按安装版本复核。页面与实体关系是产品建议，不依赖第三方网关的菜单结构。</p>
+</article>
+<article class="record" id="design-records-2026-11-01-gateway-billing-v1-review">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-11-01/gateway-billing-v1-review.md</code></p>
+<h2 id="design-records-2026-11-01-gateway-billing-v1-review--本地网关与-agent-独立计费设计稿验收">本地网关与 Agent 独立计费：设计稿验收</h2>
+<p>2026-11-01，基线 <code>5d66fbe8</code>。交付为 <a href="records/2026-11-01/gateway-billing-v1.html">单文件 HTML</a>，包含 Product Design、User Stories、Technical Design 和四组可操作示例；不修改产品代码、线上 Key、Agent 配置或账本。</p>
+<h3 id="design-records-2026-11-01-gateway-billing-v1-review--核心设计">核心设计</h3>
+<ul>
+<li>复用 Roami 已配置模型源；本机已有 CLI 连接可显式导入，OAuth / 凭据助手不冒用导入。</li>
+<li>默认各 Agent 类型使用独立接入身份和 Key；支持同类多个命名接入。V2 再给托管会话签发独立临时 Key；共享 Key 的外部进程不伪装成会话分账。</li>
+<li>归账身份来自 Key 的服务端绑定，不信任客户端 Agent / 会话 header。轮换 Key 不拆身份，停用不删历史。</li>
+<li>费用沿用 Go 网关原始用量和快照；缺失用量、未定价、明确零价分开表达。计费为本地核算，不承诺上游扣款或收款。</li>
+</ul>
+<h3 id="design-records-2026-11-01-gateway-billing-v1-review--已验证">已验证</h3>
+<ul>
+<li><code>node --check</code>：内联脚本语法通过。</li>
+<li>桌面 Chrome：5 个章节切换；原厂模式能真正隐藏网关表单；导入分支先禁用应用；演示导入、选择身份与模型后应用，当前模型更新。</li>
+<li>Key：轮换“OpenCode · 项目 A”后身份不变；停用后仍能筛选它的历史。演示字符串以 <code>demo_only_</code> 标识，不能用于真实鉴权。</li>
+<li>账本：6 条示例调用，5 条已知、1 条待核账；已知 Token 192,000，已知费用 CNY 0.3600。OpenCode 筛选为 4 条调用、CNY 0.2240；项目 A 为 CNY 0.1020，另有 1 条待核账。</li>
+<li>单文件无外部依赖，浏览器资源检查除 favicon 外 0 条外部请求；原型不调用产品 API、不持久化密钥。</li>
+<li>Android Redmi Note 8（216d6a43），392 CSS px：ADB 真实点按切换 Agent 接入 / 费用账本；真实滑动后主滚动区 scrollTop 从 0 变为 340.36 和 413.45；文档无横向溢出，导航宽度与 scrollWidth 均为 393，账本横向溢出只留在表格内部。</li>
+<li>表单、标签和动作不少于 44px，hover 限 fine pointer，图标没有使用 emoji / 文字符号；流程图用 CSS 连线与文本节点。</li>
+<li>本稿为中文开发评审文档；正式产品文案使用现有中英 i18n。未改 <code>frontend/src</code> 或运行代码，不运行无关的 Go / Python / 前端构建测试。</li>
+</ul>
+<p>桌面截图：<code>/tmp/roami-gateway-billing-overview-desktop.png</code>、<code>/tmp/roami-gateway-billing-connect-desktop.png</code>、<code>/tmp/roami-gateway-billing-ledger-desktop.png</code>。
+手机截图：<code>/tmp/roami-gateway-billing-connect-phone.png</code>、<code>/tmp/roami-gateway-billing-ledger-phone.png</code>。
+截图为临时验收产物，不提交到主分支。正式实现仍需验证实际 OpenCode 版本的配置覆盖、Key 注入、真实鉴权与协议 / 计费往返；本稿不会把原型操作当作这些能力已实现。</p>
+</article>
+<article class="record" id="design-records-2026-11-03-source-model-editing">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-11-03/source-model-editing.md</code></p>
+<h2 id="design-records-2026-11-03-source-model-editing--模型源目录内编辑已添加模型">模型源目录内编辑已添加模型</h2>
+<h3 id="design-records-2026-11-03-source-model-editing--product-design">Product Design</h3>
+<p>已添加模型行保留状态与防重复选择行为，新增常显“编辑”按钮，复用现有模型编辑表单。保存或返回均回到原模型源页面，保留未提交的目录选择、手动输入及连接草稿。同一个上游模型对应多个本地模型时，分别提供带名称的编辑入口。</p>
+<h3 id="design-records-2026-11-03-source-model-editing--user-stories">User Stories</h3>
+<p>我在已拉取的模型源目录中发现名称、模型 ID 或聚合策略需要修正时，可以直接编辑并返回继续添加模型，无需重新拉取或重复填写。</p>
+<h3 id="design-records-2026-11-03-source-model-editing--technical-design">Technical Design</h3>
+<p><code>ModelSourceEditor</code> 按已保存候选项关联模型，通过 <code>onEditModel</code> 进入 <code>ModelHub</code> 的既有 URL 编辑页。<code>ModelHub</code> 记录本次编辑的来源，保存与取消使用同一返回逻辑；各模型源草稿继续由原状态所有者保存。按钮复用 <code>.tt-act</code>，布局使用既有间距令牌，中英可访问名称包含模型名称，粗指针命中高度沿用 44px 规则。</p>
+<h3 id="design-records-2026-11-03-source-model-editing--acceptance">Acceptance</h3>
+<ul>
+<li><code>ModelHub.test.tsx</code> 验证目录内进入编辑、更新名称和上游模型 ID、稳定本地 ID、保留来源凭据、保存后回到模型源且目录选择与手动输入保留；无需再次拉取。该文件 15 项通过。</li>
+<li>桌面真实隔离服务：拉取本地测试目录，编辑保存名称后自动回到原页面；中文深色与英文浅色均显示可访问的编辑入口，无横向溢出。</li>
+<li>Redmi Note 8（1080×2340，DPR 2.75）：通过 LAN HTTPS 访问隔离服务，使用 <code>roami adb</code> 实际点按编辑、输入名称及保存，回到原 URL 后名称已更新。<code>elementFromPoint</code> 命中编辑按钮，按钮高度 44 CSS px；<code>data-size=compact</code>、<code>data-pointer=coarse</code>；仅一个二级返回栏，底部四入口保留。真实滑动后内容滚动位置从 0 增至 378.91，文档滚动保持 0，视口宽度与文档宽度均为 392，无横向溢出。</li>
+<li>手机 Chrome 的 <code>roami chrome --cdp</code> 返回 <code>CHROME_BROWSER_IDENTITY_UNAVAILABLE</code>，因此手机交互全部使用 <code>roami adb</code>，通过同一转发 CDP 只读核对 DOM 和布局。桌面交互使用 <code>roami chrome</code>。</li>
+<li>截图位于 <code>/tmp/roami-409-editor-desktop.png</code>、<code>/tmp/roami-409-editor-desktop-en-light.png</code>、<code>/tmp/roami-409-editor-phone.png</code>，不提交一次性图片。</li>
+<li>使用私有 tmux 和独立数据目录运行验收实例；只读本地模型目录，不执行付费推理，不修改现用模型连接。</li>
+<li>最终 <code>scripts/dev/quality/check.sh full</code> 通过：Go 全量测试、前端 typecheck / i18n / hover、生产构建及秘密扫描。前端全量 Vitest 167 个文件、1,220 项通过。保留已有的大 chunk 构建提示；Python 因无相关改动按范围跳过。已清理本任务的服务、测试目录上游、浏览器标签、ADB 转发和私有 tmux。</li>
+</ul>
+</article>
+<article class="record" id="design-records-2026-11-11-home-gateway-models">
+<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-11-11/home-gateway-models.md</code></p>
+<h2 id="design-records-2026-11-11-home-gateway-models--首页选择网关模型">首页选择网关模型</h2>
+<h3 id="design-records-2026-11-11-home-gateway-models--product-design">Product Design</h3>
+<p>能力页已经保存 WorkBuddy 的 <code>WorkBuddy Hy4</code>、<code>hy4free</code>，但首页只读取当前直连服务的 <code>/models</code>。本机 Main 和 Worker 仍直连 Blade，返回的 11 个模型不包含这两个模型，因此首页搜索不到。</p>
+<p>首页保留当前服务的模型，同时补充网关目录中尚未出现在该服务列表里的模型。选择网关模型时接入网关；连接失败时保留当前选择，错误提供重试或模型设置入口。复用现有桌面弹层和手机全屏模型页，不增加布局或控件。</p>
+<h3 id="design-records-2026-11-11-home-gateway-models--user-stories">User Stories</h3>
+<ul>
+<li>用户在能力页添加 WorkBuddy 后，回首页搜索 <code>hy</code> 即可选择，不必先手动迁移连接。</li>
+<li>只切换 Main 或 Worker 时，另一个角色继续使用原模型，并保留图片、上下文和推理参数。</li>
+<li>目录修订过期、运行时忙或另一角色无法映射时，不覆盖原模型；刷新目录后可以重试，无法映射时提示先在模型设置绑定两个角色。</li>
+</ul>
+<h3 id="design-records-2026-11-11-home-gateway-models--technical-design">Technical Design</h3>
+<ul>
+<li><code>useAgentModels.ts</code> 复用缓存的网关目录，把补充选择编码为临时 <code>gateway:</code> 标识，避免与直连模型同名 ID 混淆。保存时转回目录 ID，调用现有 <code>/model-gateway/catalog/roles</code>；成功后读回模型配置并广播现有更新事件。</li>
+<li><code>roami_binding.go</code> 为 roles 接口增加互斥的 <code>{ role, model, revision }</code> 输入，沿用目录修订、禁用凭据、并发锁、原连接备份和运行时保存检查。</li>
+<li>接入共享连接时，另一角色仅匹配同地址、同凭据、同上游模型的固定路由，或已经使用的网关 ID；恢复该角色的显式参数。找不到匹配时返回 <code>MODEL_ROLE_REQUIRES_BINDING</code>，不猜测替代模型。</li>
+<li>网关凭据只在 Go 侧读取和应用，不返回浏览器。新提示通过现有中英文 i18n 提供。</li>
+</ul>
+<h3 id="design-records-2026-11-11-home-gateway-models--acceptance--2026-11-11">Acceptance — 2026-11-11</h3>
+<ul>
+<li>本机只读检查：运行时 <code>/v1/models</code> 返回 11 个 Blade 模型；网关目录包含另外两个 WorkBuddy 模型，原连接指向 Blade。</li>
+<li><code>scripts/dev/quality/check.sh full</code>、<code>quick</code> 均通过；Python runtime 检查按改动范围跳过。</li>
+<li>前端全量 Vitest：230 个文件、1,677 项通过。新增回归覆盖手机/桌面组件的目录补充、去重、网关绑定、Worker 切换和目录修订变化后的重试。</li>
+<li><code>go test -race ./internal/modelgateway -run TestRoamiSingleRole -count=1</code> 通过，覆盖 Main/Worker、直连/网关、保留参数、过期修订和不可映射连接。</li>
+<li>隔离实例目录 <code>/tmp/roami-home-hy/instance</code>，通过 <code>isolated-roami.sh</code> 启动；测试来源仅为本地目录服务，没有向真实模型发起生成请求，也没有修改用户的运行配置。</li>
+<li>Redmi Note 8 真机：ADB 打开模型页、输入 <code>hy</code>、点选 WorkBuddy；真实 Go 网关与 Python runtime 保存成功，Main 为 <code>workbuddy-hy4</code>，Worker 为原模型的 <code>existing-main</code> 网关路由。硬刷新后仍显示 <code>WorkBuddy Hy4</code>。模型选项高度 44 CSS px，命中检查和横向溢出检查通过。</li>
+<li>1280、1920、2560、3440 CSS px 的宽屏布局通过 Android Chromium CDP 验证：工作台开/关共八种状态下，模型列表和选项可命中、无横向溢出，关闭工作台释放 440/640 CSS px 给对话。此项仍是粗指针模拟宽屏；本机桌面 Chrome 多个独立测试进程出现 <code>Failed global descriptor lookup: 7</code> 或 CDP 超时，未宣称完成真实桌面鼠标验收。</li>
+<li>本地验收产物位于 <code>/tmp/roami-home-hy/</code>：<code>phone-models.png</code>、<code>phone-search.png</code>、<code>phone-selected-web.png</code>、<code>wide-results.json</code>、<code>wide-panes-results.json</code>。一次性截图不提交进主分支；后续 PR 截图应使用 <code>pr-shot.sh</code> 发布。</li>
+</ul>
+</article>
+</section>
+<section aria-labelledby="evidence-heading"><h2 id="evidence-heading">验收数据</h2>
+<details class="evidence" id="evidence-assets-tsconfig"><summary>assets/tsconfig.json</summary><pre><code>{
+  &quot;extends&quot;: &quot;../../../../../../frontend/tsconfig.json&quot;,
+  &quot;compilerOptions&quot;: {
+    &quot;baseUrl&quot;: &quot;../../../../../../frontend&quot;,
+    &quot;paths&quot;: {
+      &quot;react&quot;: [&quot;node_modules/@types/react&quot;],
+      &quot;react/*&quot;: [&quot;node_modules/@types/react/*&quot;],
+      &quot;react-dom/*&quot;: [&quot;node_modules/@types/react-dom/*&quot;],
+      &quot;antd&quot;: [&quot;node_modules/antd&quot;],
+      &quot;antd/*&quot;: [&quot;node_modules/antd/*&quot;]
+    }
+  },
+  &quot;include&quot;: [&quot;prototype.tsx&quot;, &quot;../../../../../../frontend/src/vite-env.d.ts&quot;]
+}
+</code></pre></details>
+</section>
+</main>
+</div>
+</body>
+</html>

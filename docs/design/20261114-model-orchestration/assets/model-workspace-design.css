@@ -146,6 +146,20 @@ code { overflow-wrap:anywhere; }
 .route-policy strong { color:var(--text-bright); }
 .route-source-health { margin-block:var(--sp-2); padding-inline-start:var(--sp-5); }
 .route-source-health li { padding-block:var(--sp-1); }
+.archive > section { max-inline-size:110ch; }
+.archive .record-list { padding-inline-start:var(--sp-5); }
+.archive .record-list li { margin-block:var(--sp-1); }
+.archive .record-list a { display:inline-block; padding-block:var(--sp-2); }
+.archive .record { margin-block-start:var(--sp-5); padding-block:var(--sp-4); border-top:1px solid var(--border-subtle); scroll-margin-top:var(--sp-2); }
+.archive .record h2,.archive .record h3,.archive .record h4,.archive .record h5,.archive .record h6 { margin-block:var(--sp-4) var(--sp-2); scroll-margin-top:var(--sp-2); }
+.archive .record h2:first-child { margin-block-start:0; }
+.archive .record p { margin-block:var(--sp-2); }
+.archive .record pre,.archive .evidence pre { padding:var(--sp-3); background:var(--bg-container); white-space:pre-wrap; overflow-wrap:anywhere; tab-size:2; }
+.archive .record table { width:100%; border-collapse:collapse; }
+.archive .record :is(th,td) { border-bottom:1px solid var(--border-subtle); padding:var(--sp-2); text-align:start; vertical-align:top; }
+.archive .record blockquote { margin-inline:0; padding-inline-start:var(--sp-3); border-inline-start:1px solid var(--border); }
+.archive .record img { display:block; max-width:100%; height:auto; }
+.archive .evidence { border-top:1px solid var(--border-subtle); scroll-margin-top:var(--sp-2); }
 @media (max-width:730px) {
   .gateway-design .sample-head label { display:grid; width:100%; }
   .gateway-request { align-items:flex-start; }

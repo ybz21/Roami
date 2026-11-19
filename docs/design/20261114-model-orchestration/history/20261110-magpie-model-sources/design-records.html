@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magpie 模型源与账号 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+</head>
+<body>
+<header class="page-head"><h1>Magpie 模型源与账号</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="设计归档">
+  <a href="../../model-monitoring-and-aggregation.html">现行设计</a>
+  <a href="../index.html">历史目录</a>
+  <a href="#contents" aria-current="page">本页目录</a>
+</nav>
+<main class="document archive" id="contents">
+<section aria-labelledby="record-heading">
+<h2 id="record-heading">设计与验收记录</h2>
+<p class="copy">WorkBuddy、豆包工作、隔离运行与来源接入。记录按原版本归档，实施状态以当时的记录为准。</p>
+<p class="muted"><a href="../index.html">返回历史目录</a> · <a href="../../model-monitoring-and-aggregation.html">查看现行设计</a></p>
+
+<details open><summary>文档（2）</summary><ul class="record-list"><li><a href="#design-readme">Magpie 插件模型源</a></li>
+<li><a href="#design-acceptance">验收记录</a></li>
+</ul></details>
+
+</section>
+<section aria-label="文档正文">
+<article class="record" id="design-readme">
+<p class="muted">原稿 <code>history/20261110-magpie-model-sources/README.md</code></p>
+<h2 id="design-readme--magpie-插件模型源">Magpie 插件模型源</h2>
+<h3 id="design-readme--product-design">Product Design</h3>
+<p>模型目录支持导入文件夹或 ZIP。每个已配置的插件源显示为独立卡片，配置页复用插件声明的登录方式、选项与模型列表。导入和登录是两个步骤；导入不会自动执行登录、签到或模型请求。已有源保留，更新模型列表时保留用户选择。</p>
+<p>网关调用 Key 支持自动生成、命名、复制、轮换、停用和删除；完整 Key 仅在生成或轮换后显示一次，持久化哈希。</p>
+<h3 id="design-readme--user-stories">User Stories</h3>
+<ul>
+<li>上传官方 WorkBuddy 文件夹或 ZIP，选择中国站或国际站，按插件提供的浏览器登录/API Key 登录并更新模型。</li>
+<li>上传官方豆包工作插件，在支持的桌面环境中打开独立窗口登录，反代其模型；串行请求，不自动重放取消后的任务。</li>
+<li>当前 Linux 环境明确提示豆包工作缺少受支持的 macOS/Windows 桌面应用，允许保存导入的插件，不谎报可调用。</li>
+<li>管理多个调用方 Key，单独撤销一个 Key，不修改模型源登录凭据或 Agent 内部凭据。</li>
+</ul>
+<h3 id="design-readme--technical-design">Technical Design</h3>
+<ul>
+<li><code>internal/modelplugins</code>：文件夹与 ZIP 共用路径、类型、数量和展开大小校验，导入到内容寻址的不可变包目录。不执行 npm 安装和生命周期脚本。</li>
+<li><code>internal/modelplugins/runtime</code>：固定版本的原版 Magpie Bun host，以 JSON 行 RPC 连接；保留原插件的 auth/config/provider/fetch 行为，不另写 WorkBuddy 专用反代。</li>
+<li>每个配置源独立运行状态、登录文件、进程和选项。Web 只接收白名单元数据与登录步骤，不返回 auth 文件、loader API Key 或请求头。</li>
+<li>模型按各自 npm/native API 协议路由，再接入现有网关协议转换、计量与准入。不能将混合协议的 WorkBuddy 模型都视为同一个上游接口。</li>
+<li>豆包工作使用独立桌面 profile；保留插件的 <code>maxConcurrency: 1</code>、文本能力限制与取消语义。操作系统或应用缺失时返回环境错误。</li>
+</ul>
+<h3 id="design-readme--references">References</h3>
+<ul>
+<li>Magpie runtime: <code>yetone/magpie@d4b4a188ef2557ca8a8b33a70960bfa5fa0b28ef</code>，MIT。</li>
+<li>验证插件：<code>magpie-community/plugins@ebc7783caeb5025191e7068e544bae95eb8ae616</code> 的 <code>packages/workbuddy</code> 和 <code>packages/doubao-work</code>，MIT。</li>
+</ul>
+<h3 id="design-readme--acceptance">Acceptance</h3>
+<p>实现与验收进行中。导入包检查通过不等于已通过登录或真实推理；真实调用结果、平台限制及部署版本单独记录。</p>
+<h3 id="design-readme--compatibility-boundary">Compatibility boundary</h3>
+<p>首批兼容对象是上述固定版本的 WorkBuddy 与豆包工作 OpenCode v1 provider 插件。插件自己的名称、登录说明、问题和选项文案作为第三方内容按其语言声明展示；Roami 的按钮、状态、校验和错误均提供中英翻译。</p>
+<p>Linux worker 使用 Bubblewrap 独立文件系统、进程和网络命名空间，并使用独立 systemd scope 限制内存、进程数和 CPU。只挂载插件包、自有状态目录、运行时和单个出网 socket。HTTP(S) 出网代理拒绝本机、内网及特殊地址；不共享宿主 Chrome CDP、管理 socket 或用户 HOME。不自动安装依赖或执行 npm 生命周期脚本。</p>
+<p>豆包工作在 Linux 可以导入、解析模型、创建卡片及保存配置；其上游插件明确不支持 Linux 桌面推理。当前尚无可用的 macOS/Windows 节点和已登录桌面应用，因此真实豆包调用尚未验收；不能将导入成功计为反代通过。</p>
+<h4 id="design-readme--desktop-runtime">Desktop runtime</h4>
+<p>macOS/Windows 的桌面入口仅允许固定版本豆包工作 0.1.5 的已审阅代码；逐文件规范化校验 8 个运行文件和 manifest，允许 Git 的 CRLF 转换，拒绝代码改动、额外运行文件和 manifest 改动。任意上传包不会因此获得桌面访问权限。桌面 worker 使用独立登录目录及最小环境，不继承 Roami 登录凭据；此入口使用桌面应用本身，不能声称拥有 Linux Bubblewrap 的文件系统隔离。其他插件仍需受支持的隔离环境。</p>
+<p>豆包应用由插件通过自己的 profile 启动，保留单请求并发。删除源移除 Roami 配置和 worker，但不关闭桌面窗口或云任务，也不删除正在使用的桌面 profile。上述桌面命令构造、包校验和跨平台编译可在当前机器验证；实际启动、登录、模型菜单与云任务需兼容桌面节点实机验收。</p>
+<h3 id="design-readme--桌面二级导航调整2026-11-11">桌面二级导航调整（2026-11-11）</h3>
+<p>桌面能力分类继续横排；模型、用量、定价、网关、语音输入作为左侧竖排导航，右侧内容占用剩余空间并独立滚动。导航不随内容滚走，编辑详情打开和关闭后按可用宽度分配空间。手机保留五栏横排和全屏详情，以保持已验证的紧凑触控布局。使用原有 Tabs 与路由，不改变设置保存和草稿行为。</p>
+<h3 id="design-readme--模型源名称编辑">模型源名称编辑</h3>
+<p>源卡片名称旁提供常驻编辑按钮，桌面和手机均以短表单修改名称。保存会去掉首尾空格，空名称和未变化的名称不提交，长度沿用现有 100 字符限制。改名复用目录版本校验，仅修改指定源名称；保留模型、凭据和连接配置，并同步已经打开的配置草稿。失败保留输入，目录冲突可重新读取后再保存。</p>
+<h3 id="design-readme--整仓库与多插件导入">整仓库与多插件导入</h3>
+<p>用户可上传整个仓库 ZIP，或包含多个插件的文件夹。导入层扫描各级 <code>package.json</code>，跳过工作区根配置，按各插件的有效入口切分包；同一文件归属最近的插件根目录，重复内容沿用单包导入时的身份。路径、文件类型、文件数及解压总量仍统一校验，过滤仓库元数据、依赖目录和环境配置，不执行安装脚本。</p>
+<p>批量导入沿用 32 MiB ZIP、64 MiB 解压总量、2,048 文件与单文件 16 MiB 限制，一次最多识别 128 个插件。HTTP 逐段读取表单，避免大文件夹撞上默认 1,000 段限制。单包响应保持兼容，多包返回包列表及未识别配置路径。</p>
+<p>导入页自动展示本次导入的全部插件，顺序检查并逐个显示模型源；某个插件加载失败不阻断其他插件。添加源始终携带所属包的身份，不自动登录或替用户创建全部源。页面离开或切换插件后取消未完成检查，未识别配置通过折叠详情查看。</p>
+</article>
+<article class="record" id="design-acceptance">
+<p class="muted">原稿 <code>history/20261110-magpie-model-sources/acceptance.md</code></p>
+<h2 id="design-acceptance--验收记录">验收记录</h2>
+<h3 id="design-acceptance--已完成">已完成</h3>
+<ul>
+<li>
+<p><code>scripts/dev/quality/check.sh quick</code> 与 <code>full</code> 通过；未修改 Python，按仓库检查计划跳过 Python 检查。</p>
+</li>
+<li>
+<p>前端 223 个测试文件、1,612 项测试通过；typecheck、i18n、hover 与生产构建通过。</p>
+</li>
+<li>
+<p>Go modelplugins/modelgateway/agentproxy 的竞态测试通过。</p>
+</li>
+<li>
+<p>通过显式 <code>ROAMI_MAGPIE_FIXTURES</code>、<code>ROAMI_MAGPIE_BUN</code> 运行未修改的官方 WorkBuddy 0.2.26 和豆包工作 0.1.5：分别返回 2 个、1 个 provider，均含模型与登录方式。</p>
+</li>
+<li>
+<p>真正的 Bubblewrap/systemd 隔离进程完成 2 MiB 流式回复、背压、取消、并行管理请求验证；公共 TLS 出网验证通过，内网和特殊地址拒绝测试通过。</p>
+</li>
+<li>
+<p>网关集成测试完成 OpenAI 请求至插件 Anthropic 原生请求的转换、上游独立凭据、API 模型 ID、用量归属、参数修改后的旧缓存失效及旧参数结果拒绝回填。</p>
+</li>
+<li>
+<p>官方豆包运行文件和 manifest 校验通过，代码改动被拒绝，CRLF 转换保留可信身份；运行层通过 macOS 和 Windows 交叉编译。原版文件夹内的上游测试文件也单独核验。</p>
+</li>
+<li>
+<p>隔离完整应用通过 WorkBuddy 文件夹、豆包 ZIP 导入、独立源卡片、已有源拉取与勾选模型、Linux 桌面限制，以及 1280/1920/2560/3440 桌面布局检查。</p>
+</li>
+<li>
+<p>真实界面完成多个网关 Key 自动生成、关闭后移除完整 Key、改名、停用/启用、独立轮换和删除；对应 <code>/v1/models</code> 200/401 验证通过，测试 Key 已全部删除。</p>
+</li>
+<li>
+<p>Android Redmi Note 8 实机通过 ZIP 文件选择导入、已有源模型目录的原生滚动与勾选、44px 控件、Key 生成/移除明文/停用/删除及语音输入导航；最终安装包复验五个 Tab 全部可见，工具栏仅“新建”，菜单保留添加源、插件导入与本地源导入。</p>
+</li>
+<li>
+<p>正式部署 <code>magpie-48a08f89</code>，已包含最新主线的会话关闭修复 #861；Web/Agent 健康检查通过。官方数据库备份成功，保存于节点私有备份目录。</p>
+</li>
+<li>
+<p>正式节点导入并隔离加载未修改的 WorkBuddy 与豆包工作插件包，分别识别 2/1 个 provider；未替用户创建账号或插件源。实际临时 Key 的 <code>/v1/models</code> 200、删除后 401 均通过，临时 Key 已删除。</p>
+</li>
+<li>
+<p>正式现有源模型列表拉取 200、11 项可编辑选项，四档桌面配置/返回交互通过；原有 2 个源、12 个模型、草稿与上游凭据保留。目录仅增加默认字段并更新 revision。</p>
+</li>
+</ul>
+<h3 id="design-acceptance--需要外部环境的验收">需要外部环境的验收</h3>
+<ul>
+<li>WorkBuddy 真实账号登录后的供应商推理；当前没有供应商账号凭据，未将网关调用 Key 当作供应商凭据。</li>
+<li>豆包工作的真实 macOS/Windows 应用启动、登录、模型菜单及云任务。当前节点为 Linux，没有可用兼容桌面节点；不能将导入、编译或命令构造通过记为真实豆包推理通过。</li>
+</ul>
+<p>截图使用隔离节点，不包含生产源凭据。真实账号推理与真实豆包桌面应用仍未验证，不将上述导入、协议集成、交叉编译或静态模型列表通过等同于这两项通过。PR #860 正文包含桌面、Android 实机及改前截图。</p>
+<h3 id="design-acceptance--桌面二级导航验收2026-11-11">桌面二级导航验收（2026-11-11）</h3>
+<ul>
+<li>上层能力 Tab 横排，下层模型页五个 Tab 改为左侧竖排；导航固定，右侧内容独立滚动。</li>
+<li>1280/1920/2560/3440 下的布局、页面切换、详情面板开关和文档无溢出通过。</li>
+<li>Redmi Note 8 原生点按验证手机五栏横排、语音/网关/模型切换与新建菜单，上下导航栏和安全区正常。</li>
+<li>quality quick/full、typecheck、i18n、hover、构建和 1,612 项前端测试通过。</li>
+<li>正式部署 <code>model-tabs-76ba507a</code>，保留最新主线的会话队列修复；数据库备份、服务健康检查与现有源、模型、凭据、网关设置一致性检查通过。</li>
+<li>PR #863 使用通用示例源截图展示改前、改后与手机布局。</li>
+</ul>
+<h4 id="design-acceptance--侧栏紧凑调整">侧栏紧凑调整</h4>
+<p>去掉页签间的默认空隙，缩小侧栏宽度、上下留白和行高；触屏竖排项继续保留触控最小高度。最终安装包检查与四档桌面导航切换通过，Android 原生点按复验通过；quality quick/full 和前端 1,615 项测试通过。</p>
+<h3 id="design-acceptance--模型源名称编辑验收">模型源名称编辑验收</h3>
+<ul>
+<li>名称旁可直接打开编辑表单，取消不提交、空值不可保存、保存去掉首尾空格，刷新后保留新名称。</li>
+<li>四档桌面宽度通过；真实保存前后对比确认仅名称变化，模型与连接字段保留，不发送模型列表请求。</li>
+<li>Android 原生点按完成编辑、输入、保存及刷新验证，输入触控高度 44px，上下栏及文档边界正常。</li>
+<li>quality quick/full、typecheck、i18n、hover、生产构建和前端 226 个文件、1,619 项测试通过。</li>
+<li>PR #866 包含通用示例源的改前、编辑表单、改后及手机截图。</li>
+</ul>
+<h3 id="design-acceptance--整仓库批量导入验收">整仓库批量导入验收</h3>
+<ul>
+<li>原版官方整仓库 ZIP 经真实隔离运行识别出 2 个插件、3 个 provider；包身份与逐个导入一致。</li>
+<li>通用示例仓库的文件夹与 ZIP 都能识别多个插件，过滤仓库元数据、依赖目录和环境配置；重复导入不增加重复结果。</li>
+<li>1280/1920/2560/3440 下检查导入页边界、结果展示和添加源；从第二个插件添加后核对 provider 与包身份正确。</li>
+<li>Android 原生文件选择器选中整仓库 ZIP，自动显示多个结果；真实点按完成单个/全部切换及添加对应源，44px 控件与文档边界通过。</li>
+<li>非法路径、符号链接、伪造元数据、体积限制、嵌套包、同内容去重、单包兼容、多个包中部分失败及超过 1,000 段的文件夹表单均有回归覆盖。</li>
+<li>quality quick/full、Go 竞态、原版插件夹具检查和前端 230 个文件、1,677 项测试通过；匹配最新主线的运行时离线安装与依赖校验通过，相关 Python 市场回归 60 项通过。</li>
+<li>PR #881 使用通用示例仓库截图。正式发布须通过节点的官方升级空闲检查，不中断当前运行任务。</li>
+</ul>
+</article>
+</section>
+
+</main>
+</div>
+</body>
+</html>
