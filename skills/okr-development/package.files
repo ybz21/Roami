@@ -1,5 +1,5 @@
 a20f81dd03302514d1248516018357405fcf204f35a32a3b4552326bc90b2a0f  README.md
-bdf43fbfda76f796a5796744e90e1034705ea99b547d728baebb04da9aa14059  SKILL.md
+f12801a93d3bcb0a5fde73e88a42f0ada73c9570b452a44eb4cdef491ea352ec  SKILL.md
 6b64e6cd760bd5c5e33ea080128e2b9a322ef2ea95615a269251c81688bfd9c5  assets/.roami/okr/AGENTS.md
 d4703f2c9176be2dba427248322f7e5291bb715c2c696b540f2e27376b9fb08d  assets/.roami/okr/README.md
 78f423bace6cb44511cf9d49afe54e51c9fd96edb2ba52cbf9036f5569671e67  assets/.roami/okr/agents/main.json
@@ -18,7 +18,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/okr/data/reviews.jsonl
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/okr/evidence/.gitkeep
 6ac229bb84dd6cc7b67634175ac71673a52b7accf955c8237e9624984777bab2  assets/.roami/okr/manuals/README.md
-7ad79ce457f5af3064487ef2444cf4eeff7f4aaf9c26d2bd10ee4c6605210ad4  assets/.roami/okr/manuals/automation.md
+689e7f7b7ac6f76281f8970ad322bfa509a8358374046859f1901c0be9f6037c  assets/.roami/okr/manuals/automation.md
 b5361a481d3a5dce41e740cfd3d92b0c1f66e9bf0744517dd84c70670f7e2020  assets/.roami/okr/manuals/daily.md
 1518dfddc48dca60599019334dd0b1d4411f9794ee1c1cdf8edaf429f5c60a2d  assets/.roami/okr/manuals/dashboard.md
 544a260e86d3943849e988354f00d4d4d970aa2ee59c36d65e3bab81020f86ba  assets/.roami/okr/manuals/data.md
@@ -43,7 +43,7 @@ dc26c98342033ba7ad2a768792a5ea3b7eb39fd49b91dcb26167790d8d3a89bc  assets/.roami/
 d92c62d3b31885163368e3f412bb49f5d1bec00ecbcda35cd01d55d56df46e5e  assets/.roami/okr/skills/okr-planning/SKILL.md
 32ad3c6463704fe5814c48d26cac96b1b6e094535123812380169a7d81a93e08  assets/.roami/okr/skills/swarm-execution/SKILL.md
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/okr/state/.gitkeep
-74f5fd4b4ce99ec0aa90dd33b883793d7dc5f3128c80782d491271291cdddbbc  assets/AGENTS.md
+9bdd35c088a0028ddc5c1055bd67b5bcd5a401214170e4dc34af874465642eb2  assets/AGENTS.md
 03751a7fb5b05a06f08cff938368d3fdeb8d8e29140ce98374b754c04662e2d7  assets/README.md
 fb76b25b9cbeb2337cca8e47c9bc2034c7be5810e0238b1091b931e1283c753e  assets/materials/README.md
 59ffe2c46847e61b0cf01937f69258d1572dd09839fed0c21f58a68baabefdf2  examples/content-growth/config.json

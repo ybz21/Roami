@@ -135,6 +135,11 @@ member's memory and original provider conversation. Unknown execution results
 require reconciliation, not a new instance. Keep task results and group-chat
 receipts distinct from independent acceptance.
 
+For a model outage in an established team, follow the copied project's
+[automation manual](assets/.roami/okr/manuals/automation.md#模型故障的接续).
+Preserve the bound model, original execution and business key. Use the host's
+settled outcome and the latest project scope before continuing work.
+
 Use the host-supported Connector batch workflow for confirmed Skills.
 Collect unbound legacy sources through `collect`; record verified unbound manual facts
 through `record`. Collection updates dated JSONL facts and a confirmed file
