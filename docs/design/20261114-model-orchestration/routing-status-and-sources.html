@@ -61,14 +61,15 @@ summary { min-height:var(--tap); align-content:center; overflow-wrap:anywhere; }
 .warn { color:var(--warn); }
 .alert { margin-top:var(--sp-3); padding:var(--sp-3) 0; color:var(--warn); }
 .ledger { margin-top:var(--sp-3); }
-.list-header,.member > summary { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr); gap:var(--sp-3); align-items:center; padding:var(--sp-3) 0; }
+.list-header,.member > summary { display:grid; grid-template-columns:calc(var(--sp-5) * 2) minmax(0,2fr) minmax(0,1fr) minmax(0,1fr); gap:var(--sp-3); align-items:center; padding:var(--sp-3) 0; }
 .list-header { color:var(--text-dim); font-size:var(--fs-meta); padding-top:var(--sp-1); }
-.member { border-top:1px solid var(--border-subtle); }
-.member:last-child { border-bottom:1px solid var(--border-subtle); }
+.routing-order { list-style:none; margin:0; padding:0; border-bottom:1px solid var(--border-subtle); }
+.routing-order > li { border-top:1px solid var(--border-subtle); }
 .member > summary { list-style:none; }
 .member > summary::-webkit-details-marker { display:none; }
 .member > summary strong,.member > summary small { display:block; overflow-wrap:anywhere; }
 .member > summary .state { font-size:var(--fs-sm); }
+.route-position { font-variant-numeric:tabular-nums; }
 .state::before { content:""; display:inline-block; width:var(--sp-2); height:var(--sp-2); margin-right:var(--sp-2); background:currentColor; border-radius:50%; }
 .member[open] { background:var(--sel-bg); }
 .detail { padding:var(--sp-2) var(--sp-3) var(--sp-3); }
@@ -79,7 +80,7 @@ summary { min-height:var(--tap); align-content:center; overflow-wrap:anywhere; }
 .fields label { display:grid; gap:var(--sp-1); }
 .actions { margin-top:var(--sp-3); }
 .connection-list { margin-top:var(--sp-3); }
-.connection,.plugin-choice { border-top:1px solid var(--border-subtle); padding:var(--sp-3) 0; }
+.connection { border-top:1px solid var(--border-subtle); padding:var(--sp-3) 0; }
 .connection .toolbar { margin-bottom:var(--sp-2); }
 .connection dl { display:grid; grid-template-columns:auto minmax(0,1fr); width:max-content; max-width:100%; gap:var(--sp-1) var(--sp-3); }
 .connection dt { color:var(--text-dim); }
@@ -88,7 +89,6 @@ summary { min-height:var(--tap); align-content:center; overflow-wrap:anywhere; }
 .new-menu { background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--r-sm); padding:var(--sp-1); margin:var(--sp-3) 0 0 auto; width:min(100%,calc(var(--sp-5) * 14)); }
 .new-menu button { display:block; width:100%; text-align:start; border-color:transparent; background:transparent; }
 .new-menu small { display:block; }
-.plugin-choice { display:flex; gap:var(--sp-3); justify-content:space-between; align-items:center; }
 section + details,.fields + details { margin-top:var(--sp-3); }
 #source-setup { margin-top:var(--sp-4); border-top:1px solid var(--border-subtle); padding-top:var(--sp-4); }
 #technical { min-height:0; flex:1; overflow:auto; padding:var(--sp-5); }
@@ -108,8 +108,8 @@ code { overflow-wrap:anywhere; }
   .summary > div:last-child strong { display:inline; }
   .summary button { margin:0 var(--sp-2); }
   .list-header { display:none; }
-  .member > summary { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:var(--sp-1) var(--sp-2); }
-  .member > summary > :last-child { grid-column:2; }
+  .member > summary { grid-template-columns:calc(var(--sp-4) * 2) minmax(0,1.3fr) minmax(0,1fr); gap:var(--sp-1) var(--sp-2); }
+  .member > summary > :last-child { grid-column:3; }
   #sources > .tt-pagehead { flex-direction:column; align-items:stretch; }
 }
 </style>
@@ -154,12 +154,12 @@ code { overflow-wrap:anywhere; }
         <dl><dt>实际命中</dt><dd>OpenRouter 免费模型 · Gemma 4 26B</dd><dt>结果</dt><dd>成功 · 首字 1.8 秒</dd><dt>记录时间</dt><dd>今天 14:48</dd></dl>
       </div>
       <div class="ledger">
-        <header class="tt-pagehead"><h2>调度成员</h2><small>检查于 <span id="checked-at">14:49</span></small></header>
-        <div class="list-header" aria-hidden="true"><span>成员</span><span>当前状态</span><span>额度与恢复</span></div>
-        <div id="routing-rows"></div>
+        <header class="tt-pagehead"><h2 id="routing-order-title">当前调度顺序</h2><small><span id="live-strategy">智能</span> · <span id="checked-at">14:49</span></small></header>
+        <div class="list-header" aria-hidden="true"><span>顺位</span><span>成员</span><span>当前状态</span><span>额度与恢复</span></div>
+        <ol class="routing-order" id="routing-rows" aria-labelledby="routing-order-title" role="list"></ol>
       </div>
       <details class="rule" id="rule-section">
-        <summary>调度规则 · <span id="live-strategy">智能</span></summary>
+        <summary>调度规则</summary>
         <div class="fields detail">
           <label>策略<select id="edit-strategy"><option>智能</option><option>按顺序</option></select></label>
           <button type="button" id="apply-strategy" disabled>应用规则</button>
@@ -183,28 +183,16 @@ code { overflow-wrap:anywhere; }
         <p class="muted" id="api-key-label">使用来源的 API Key 完成连接。</p>
       </div>
       <div id="plugin-setup" hidden>
-        <p>让 Roami 使用插件的账号登录和模型列表。<a href="https://github.com/yetone/magpie/blob/main/docs/integrating.md#3-plugins" target="_blank" rel="noopener">Magpie 插件说明</a></p>
-        <section class="actions" aria-label="可选插件">
-          <div class="plugin-choice"><div><strong>WorkBuddy</strong><br><small>确认包版本后授权并选模型</small></div><button type="button" id="choose-workbuddy">选择</button></div>
-          <div class="plugin-choice"><div><strong>豆包工作</strong><br><small>需要 macOS 或 Windows 节点及桌面应用</small></div><button type="button" disabled>当前节点不可用</button></div>
-        </section>
-        <a href="https://github.com/magpie-community/plugins" target="_blank" rel="noopener">浏览 Magpie 社区插件目录</a>
-        <details>
-          <summary>粘贴插件链接</summary>
-          <form id="plugin-form" class="fields detail">
-            <label>插件页面链接<input id="plugin-url" type="url" required placeholder="https://github.com/magpie-community/plugins/…"></label>
+        <form id="plugin-form" class="fields">
+          <label>插件路径<input id="plugin-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" required placeholder="例如 packages/workbuddy" aria-describedby="plugin-path-hint"></label>
+          <p class="muted" id="plugin-path-hint">粘贴 GitHub 插件目录链接，或填入目录里的插件路径。</p>
+          <div class="inline">
             <button type="submit">识别插件</button>
-            <p class="warn" id="plugin-error" role="status" hidden></p>
-          </form>
-        </details>
-        <details>
-          <summary>上传 ZIP 或文件夹</summary>
-          <div class="fields detail">
-            <label>插件 ZIP<input id="plugin-zip" type="file" accept=".zip,application/zip"></label>
-            <label>插件文件夹<input id="plugin-dir" type="file" webkitdirectory multiple></label>
-            <p class="muted" id="upload-note" role="status" hidden></p>
+            <a href="https://github.com/magpie-community/plugins/tree/main/packages" target="_blank" rel="noopener">打开 Magpie 插件目录</a>
+            <a href="https://github.com/yetone/magpie/blob/main/docs/integrating.md#3-plugins" target="_blank" rel="noopener">插件说明</a>
           </div>
-        </details>
+          <p class="warn" id="plugin-error" role="status" hidden></p>
+        </form>
         <section class="detail rule" id="plugin-confirm" aria-live="polite" hidden>
           <h3>确认 WorkBuddy</h3>
           <dl><dt>来源</dt><dd>Magpie 社区目录</dd><dt>包版本</dt><dd>0.2.26 · 演示</dd></dl>
@@ -216,6 +204,14 @@ code { overflow-wrap:anywhere; }
             <p class="muted" id="plugin-enabled" role="status" hidden>演示完成。启用的模型进入该来源的模型列表。</p>
           </div>
         </section>
+        <details class="actions">
+          <summary>上传 ZIP 或文件夹</summary>
+          <div class="fields detail">
+            <label>插件 ZIP<input id="plugin-zip" type="file" accept=".zip,application/zip"></label>
+            <label>插件文件夹<input id="plugin-dir" type="file" webkitdirectory multiple></label>
+            <p class="muted" id="upload-note" role="status" hidden></p>
+          </div>
+        </details>
       </div>
     </section>
     <div class="connection-list" id="source-list"></div>
@@ -243,20 +239,20 @@ code { overflow-wrap:anywhere; }
   <article>
     <h1>技术设计</h1>
     <h2>聚合调度</h2>
-    <p>「成员」用于增删成员。「调度」默认展示已生效策略和当前状态。额度、重置时间、冷却及受限原因在成员行内展示或展开。策略编辑和优先顺序集中在「调度规则」中，规则应用前沿用已保存策略核对实时状态。</p>
+    <p>「成员」用于增删成员。「调度」首屏按当前生效顺序显示可调度成员的顺位，其后列出跳过的成员及原因。额度、重置时间和冷却在成员行内展示或展开。「调度规则」复用现有策略和成员顺序编辑器，应用后更新首屏顺位和当前优先候选。</p>
     <ul>
       <li><code>AggregationEditor</code> 只提供成员和调度页签，把 <code>AggregationRuntime</code> 的额度与时间信息放入成员详情，由 <code>useRoutingStatus</code> 在可见时共享一份响应。沿用按配置版本失效、隐藏暂停和失败退避。</li>
-      <li><code>routingView</code> 沿用实际调度排序。按来源与上游模型去重计算可调度成员数，再取排序中的首个可用候选。按单条请求变化的条件在实际调度时判断。分开显示冷却、额度耗尽、能力不符和目录无法核验，缺少恢复时间时省略该值。</li>
+      <li><code>routingView</code> 已按实际策略返回 <code>channels</code>。界面以可用渠道在响应中首次出现的位置为准，按来源和上游模型去重生成成员顺位。首行与「当前优先」共用该结果，展开后保留各账号的渠道顺序。手动策略下顺位沿用已保存的成员顺序并跳过受限项。单次请求按实际需求继续筛选。</li>
       <li>最近调用按聚合路由 ID 从同一份监控记录提取，可打开真实记录。现有记录已有 <code>RouteID</code>，现有监控读接口需补路由筛选。只有存在关联证据时才展开重试与切换过程。缺少调用记录时显示「暂无调用」，来源首字 P95 保留来源口径。</li>
-      <li>无可调度成员时标明原因。有可计算的恢复时间时，取各候选同时满足冷却与额度约束后的最早时间，仍用「预计可尝试」表述。</li>
+      <li>跳过的成员显示冷却、额度耗尽、能力不匹配或目录无法核验。无可调度成员时全部显示跳过。有可计算的恢复时间时，取各候选同时满足冷却与额度约束后的最早时间，使用「预计可尝试」。</li>
     </ul>
     <h2>模型源与 API 协议</h2>
     <p>创建、类型筛选和来源卡片共用三种来源类型。「OpenRouter 免费模型」「API 连接」「Magpie 插件」。API 协议在卡片和表单单列，可选 OpenAI Chat Completions、OpenAI Responses 或 Anthropic Messages。API 连接可填云服务或本地服务地址。</p>
     <p><code>ModelHub</code> 复用一个类型映射生成菜单、筛选和卡片标签。按 <code>connector</code> 和 <code>pluginSourceId</code> 判断，通用连接显示为 API 连接。已有 OpenRouter 通用连接通过「修改连接」显式切换。新建只显示上述三项。</p>
     <h2>Magpie 插件</h2>
     <ul>
-      <li>优先从 Roami 兼容清单选择，也可打开上游目录，从支持的插件页面复制链接回来。说明页负责解释，Roami 负责预览、授权和选模型。已有 ZIP 或文件夹可以直接上传。<a href="https://github.com/magpie-community/plugins">Magpie 社区插件目录</a> · <a href="https://github.com/yetone/magpie/blob/main/docs/integrating.md#3-plugins">插件说明</a></li>
-      <li>第一版将受支持的上游插件链接解析成兼容清单里的项目和固定版本。确认发布者、版本和节点要求后，按清单下载固定包并复用现有包校验与隔离执行。未收录的页面提供 ZIP 或文件夹上传。</li>
+      <li>新建 Magpie 插件直接填插件路径。支持兼容清单内的 GitHub 插件目录链接和仓库相对路径，例如 <code>packages/workbuddy</code>。输入框旁提供上游目录和说明入口，ZIP 或文件夹上传作为备用入口。<a href="https://github.com/magpie-community/plugins/tree/main/packages">Magpie 社区插件目录</a> · <a href="https://github.com/yetone/magpie/blob/main/docs/integrating.md#3-plugins">插件说明</a></li>
+      <li>识别时把路径解析为兼容清单里的项目和固定版本，检查当前节点并展示结果。确认发布者、版本和节点要求后，按清单下载固定包并复用现有包校验与隔离执行。</li>
       <li>上游 <code>magpie://import</code> 链接用于导入提供方连接。Roami 的插件链接接入独立使用插件包和版本确认流程。豆包工作按目标节点的实际系统和桌面应用状态展示。<a href="https://github.com/yetone/magpie/blob/main/docs/integrating.md#what-isnt-there">Magpie 导入链接说明</a></li>
     </ul>
     <h2>已安装插件与更新</h2>
@@ -268,7 +264,7 @@ code { overflow-wrap:anywhere; }
       <li>确认后下载固定版本、校验完整性并在隔离环境验证插件清单、可用模型和账号配置兼容性。待正在执行的请求结束后再切包。包 ID 变更与配置指向需一次性应用，失败时继续使用原包。保留上一版本及其对应配置用于回退；新旧格式不兼容时提示所需操作。</li>
     </ul>
     <h2>验收</h2>
-    <p>打开聚合即可看出哪些成员能调度、当前优先是谁及最近一次实际命中。手机在单一滚动区查看同样信息。新建、筛选和保存后的卡片类型逐一对应。验证正常、无可用、规则草稿、链接识别失败、节点不兼容、版本更新和回退。</p>
+    <p>打开聚合即可看出调度顺位、跳过原因和最近一次实际命中。手机在单一滚动区查看同样信息。应用规则后，顺位与当前优先同时更新。新建、筛选和保存后的卡片类型逐一对应。验证正常、无可用、规则草稿、链接识别失败、节点不兼容、版本更新和回退。</p>
   </article>
 </main>
 <script>
@@ -276,7 +272,7 @@ const byId = id => document.getElementById(id)
 const sourceTypes = [
   { id:'openrouter', name:'OpenRouter 免费模型', hint:'用 OpenRouter API Key 拉取免费目录', label:'OpenRouter 免费', protocol:'OpenAI Chat Completions', subtitle:'openrouter.ai/api/v1' },
   { id:'api', name:'API 连接', hint:'填写地址、API 协议和 Key', label:'本地模型服务', protocol:'OpenAI Chat Completions', subtitle:'手动配置的服务' },
-  { id:'plugin', name:'Magpie 插件', hint:'选插件、授权、启用模型', label:'WorkBuddy', protocol:'由插件声明', subtitle:'账号已授权' },
+  { id:'plugin', name:'Magpie 插件', hint:'填写插件路径、授权、启用模型', label:'WorkBuddy', protocol:'由插件声明', subtitle:'账号已授权' },
 ]
 const rows = [
   {name:'ERNIE 5.5 Flash', source:'OpenRouter 免费', state:'可调度', tone:'good', quota:'上游未提供', detail:'符合工具能力和免费规则', context:'102.4 万'},
@@ -284,7 +280,7 @@ const rows = [
   {name:'Gemma 4 26B', source:'OpenRouter 免费', state:'工具能力未满足', tone:'muted', quota:'', detail:'当前规则要求工具调用', context:'26.2 万'},
   {name:'Lyria 3 Clip', source:'OpenRouter 免费', state:'源中未启用', tone:'muted', quota:'', detail:'该模型还未纳入当前源的已启用列表', context:''},
 ]
-const compatiblePlugin = 'https://github.com/magpie-community/plugins/tree/ebc7783caeb5025191e7068e544bae95eb8ae616/packages/workbuddy'
+const pluginDirectory = 'https://github.com/magpie-community/plugins/tree/main/'
 let savedStrategy = '智能'
 let draftStrategy = savedStrategy
 let activeWorkspace = 'pool'
@@ -301,8 +297,10 @@ function renderRouting() {
   const candidates=rows.map((row,index)=>scenario==='blocked'&&row.tone==='good'
     ? {...row, state:index===0?'冷却中':'额度已用尽', tone:'warn', quota:index===0?'14:55 可重试':'15:00 重置', detail:index===0?'最近一次上游限流，冷却至 14:55':'当前套餐额度已用尽'} : row)
   const ready=candidates.filter(row=>row.tone==='good')
+  const skipped=candidates.filter(row=>row.tone!=='good')
   const reset = row => row.reset ?? Number.MAX_SAFE_INTEGER
-  const first=savedStrategy==='按顺序'?ready[0]:[...ready].sort((a,b)=>reset(a)-reset(b))[0]
+  if (savedStrategy==='智能') ready.sort((a,b)=>reset(a)-reset(b))
+  const [first]=ready
   byId('ready-count').textContent=ready.length+' / '+candidates.length
   byId('ready-count').className='key-number '+(ready.length?'good':'warn')
   byId('first-choice').textContent=first?.name || '暂无可调度成员'
@@ -310,7 +308,7 @@ function renderRouting() {
   const notice=byId('route-notice')
   notice.textContent=ready.length===0?'下一次预计可尝试 14:55。':draftStrategy!==savedStrategy?'规则草稿未应用。当前状态按「'+savedStrategy+'」判断。':''
   notice.hidden=!notice.textContent
-  byId('routing-rows').innerHTML=candidates.map(row=>`<details class="member"><summary><div><strong>${row.name}</strong><small>${row.source}</small></div><span class="state ${row.tone}">${row.state}</span><small>${row.quota}</small></summary><div class="detail"><dl><dt>调度说明</dt><dd>${row.detail}</dd>${row.context?'<dt>上下文</dt><dd>'+row.context+'</dd>':''}</dl></div></details>`).join('')
+  byId('routing-rows').innerHTML=[...ready,...skipped].map((row,index)=>`<li><details class="member"><summary><small class="route-position">${index<ready.length?'第 '+(index+1)+' 位':'跳过'}</small><div><strong>${row.name}</strong><small>${row.source}</small></div><span class="state ${row.tone}">${row.state}</span><small>${row.quota}</small></summary><div class="detail"><dl><dt>调度说明</dt><dd>${row.detail}</dd>${row.context?'<dt>上下文</dt><dd>'+row.context+'</dd>':''}</dl></div></details></li>`).join('')
   byId('live-strategy').textContent=savedStrategy
   byId('edit-strategy').value=draftStrategy
   byId('apply-strategy').disabled=draftStrategy===savedStrategy
@@ -399,17 +397,20 @@ byId('close-source').addEventListener('click',()=>{
   byId('source-setup').hidden=true
   byId('new-source').focus()
 })
-byId('choose-workbuddy').addEventListener('click',pluginPreview)
+byId('plugin-url').addEventListener('input',()=>{
+  byId('plugin-confirm').hidden=true
+  byId('plugin-error').hidden=true
+})
 byId('plugin-form').addEventListener('submit',event=>{
   event.preventDefault()
-  const valid=[compatiblePlugin,'https://github.com/magpie-community/plugins/tree/main/packages/workbuddy'].includes(byId('plugin-url').value.trim().replace(/\/$/,''))
-  if(valid) pluginPreview()
-  else {
-    byId('plugin-confirm').hidden=true
-    const error=byId('plugin-error')
-    error.hidden=false
-    error.textContent='链接未在兼容清单中。请从社区目录复制插件页面链接，或上传插件 ZIP。'
-  }
+  const path=byId('plugin-url').value.trim().replace(/\/$/,'')
+  const directory=path.startsWith(pluginDirectory)?path.slice(pluginDirectory.length):path
+  if (directory==='packages/workbuddy') return pluginPreview()
+  const error=byId('plugin-error')
+  error.textContent=directory==='packages/doubao-work'
+    ?'豆包工作需要安装桌面应用的 macOS 或 Windows 节点。'
+    :'未识别该路径。请从 Magpie 插件目录复制具体插件的链接，或上传 ZIP 或文件夹。'
+  error.hidden=false
 })
 byId('plugin-next').addEventListener('click',()=>{byId('plugin-step').hidden=false})
 byId('sample-plugin-model').addEventListener('change',event=>{byId('enable-plugin-model').disabled=!event.target.checked})
