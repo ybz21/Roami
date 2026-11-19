@@ -30,7 +30,6 @@ const sourceCreation = [
   { key: 'source/new/openrouter', label: 'hub.openRouter.name', hint: 'hub.create.openRouter' },
   { key: 'source/new', label: 'hub.addSource', hint: 'hub.create.api' },
   { key: 'import', label: 'hub.plugin.import', hint: 'hub.create.plugin' },
-  { key: 'local', label: 'hub.local.title', hint: 'hub.create.local' },
 ] as const
 const newID = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36)
 export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: string; onNav: (path: string) => void; embedded?: boolean }) {

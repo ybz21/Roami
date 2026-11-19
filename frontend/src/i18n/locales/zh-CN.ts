@@ -5314,7 +5314,6 @@ const zhCN = {
   'hub.create.openRouter': "使用 OpenRouter API Key",
   'hub.create.api': "手动填写服务地址和协议",
   'hub.create.plugin': "从 ZIP 或文件夹接入",
-  'hub.create.local': "复用本机已配置的模型连接",
   'hub.addModel': "添加模型",
   'hub.empty.sources': "还没有模型源",
   'hub.empty.catalog': "还没有模型",
