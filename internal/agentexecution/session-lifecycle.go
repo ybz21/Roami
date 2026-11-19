@@ -571,7 +571,7 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 		return recovered, problem
 	}
 	if state.LaunchKey == key && state.Executor == "claude" && state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.resourceID() == binding.resourceID() {
-		status.Progress = claudeReportedProgress(state.Binding, state.TurnID, state.PromptHash, dir)
+		status.Progress, status.ReportedToolError = claudeReportedState(state.Binding, state.TurnID, state.PromptHash, dir)
 	}
 	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State, status.ObservationErrorCode = "unknown", state.UnknownReason

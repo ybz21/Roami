@@ -44,16 +44,17 @@ type claudeReportRecord struct {
 }
 
 type claudeReportSnapshot struct {
-	Format     int               `json:"format"`
-	Path       string            `json:"path"`
-	Size       int64             `json:"size"`
-	ModifiedNS int64             `json:"modifiedNs"`
-	Inode      uint64            `json:"inode"`
-	ProviderID string            `json:"providerId"`
-	PromptID   string            `json:"promptId"`
-	PromptHash string            `json:"promptHash"`
-	Directory  string            `json:"directory"`
-	Progress   *ReportedProgress `json:"progress"`
+	Format     int                `json:"format"`
+	Path       string             `json:"path"`
+	Size       int64              `json:"size"`
+	ModifiedNS int64              `json:"modifiedNs"`
+	Inode      uint64             `json:"inode"`
+	ProviderID string             `json:"providerId"`
+	PromptID   string             `json:"promptId"`
+	PromptHash string             `json:"promptHash"`
+	Directory  string             `json:"directory"`
+	Progress   *ReportedProgress  `json:"progress"`
+	ToolError  *ReportedToolError `json:"toolError,omitempty"`
 }
 
 func claudeReportText(raw json.RawMessage) string {
@@ -126,34 +127,40 @@ func claudeTranscriptPath(binding SessionBinding) (string, os.FileInfo) {
 }
 
 func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir string) *ReportedProgress {
+	progress, _ := claudeReportedState(binding, turn, promptHash, launchDir)
+	return progress
+}
+
+func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir string) (*ReportedProgress, *ReportedToolError) {
 	if turn == "" || promptHash == "" {
-		return nil
+		return nil, nil
 	}
 	path, info := claudeTranscriptPath(binding)
 	if info == nil {
-		return nil
+		return nil, nil
 	}
 	owner := info.Sys().(*syscall.Stat_t)
 
-	snapshot := claudeReportSnapshot{Format: 1, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
+	snapshot := claudeReportSnapshot{Format: 2, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
 	cache := filepath.Join(launchDir, "reported-progress.json")
 	var previous claudeReportSnapshot
 	if readJSON(cache, &previous) == nil && previous.Format == snapshot.Format && previous.Path == snapshot.Path && previous.Size == snapshot.Size && previous.ModifiedNS == snapshot.ModifiedNS && previous.Inode == snapshot.Inode && previous.ProviderID == snapshot.ProviderID && previous.PromptID == snapshot.PromptID && previous.PromptHash == snapshot.PromptHash && previous.Directory == snapshot.Directory {
-		return previous.Progress
+		return previous.Progress, previous.ToolError
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	defer file.Close()
 	opened, err := file.Stat()
 	if err != nil || !os.SameFile(info, opened) {
-		return nil
+		return nil, nil
 	}
 	hash := sha256.New()
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), hash))
 	matched := false
 	var progress *ReportedProgress
+	observation := claudeToolErrorState{tools: map[string]string{}}
 	valid := true
 	activityKnown, activityMS := true, int64(0)
 	for {
@@ -189,14 +196,21 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 				valid = false
 				break
 			}
-			if record.PromptID == turn && workspaceHash(text) == promptHash {
-				directory, ok := reportDirectory(binding.Directory, record.Cwd)
-				if !ok || directory != binding.Directory {
+			if matched && claudeInputHash(text, promptHash) != promptHash {
+				observation.discarded = true
+				observation.report = nil
+			}
+			if record.PromptID == turn && claudeInputHash(text, promptHash) == promptHash {
+				_, ok := reportDirectory(binding.Directory, record.Cwd)
+				if !ok {
 					valid = false
 					break
 				}
 				matched = true
 			}
+		}
+		if matched {
+			observation.observe(binding, turn, record)
 		}
 		if matched && record.Type == "assistant" && record.Message.StopReason == "end_turn" && text != "" {
 			directory, ok := reportDirectory(binding.Directory, record.Cwd)
@@ -209,10 +223,11 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 	}
 	after, err := file.Stat()
 	if err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
-		return nil
+		return nil, nil
 	}
 	if !valid {
 		progress = nil
+		observation.report = nil
 	}
 	if progress != nil {
 		progress.SourceDigest = hex.EncodeToString(hash.Sum(nil))
@@ -221,6 +236,7 @@ func claudeReportedProgress(binding SessionBinding, turn, promptHash, launchDir 
 		}
 	}
 	snapshot.Progress = progress
+	snapshot.ToolError = observation.report
 	_ = writeJSON(cache, snapshot)
-	return progress
+	return progress, observation.report
 }
