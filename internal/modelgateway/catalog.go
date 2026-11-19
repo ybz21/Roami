@@ -20,6 +20,7 @@ import (
 
 type ModelSource struct {
 	ID                       string `json:"id"`
+	Connector                string `json:"connector,omitempty"`
 	PluginSourceID           string `json:"pluginSourceId,omitempty"`
 	PluginRevision           string `json:"pluginRevision,omitempty"`
 	PluginDesktop            bool   `json:"pluginDesktop,omitempty"`
@@ -272,6 +273,9 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	return v
 }
 func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (ModelSource, error) {
+	if p.Connector != "" && (p.Connector != openRouterFreeConnector || p.PluginSourceID != "") {
+		return ModelSource{}, catalogError()
+	}
 	if p.PluginSourceID != "" {
 		if s.plugins == nil || p.ID != p.PluginSourceID || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || strings.ContainsAny(p.Name, "\r\n\x00") {
 			return ModelSource{}, catalogError()
@@ -289,6 +293,9 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 	}
 
 	p.BaseURL = strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
+	if p.Connector == openRouterFreeConnector && (p.BaseURL != openRouterBaseURL || p.Protocol != "openai-completions" || p.AuthMode != "bearer") {
+		return ModelSource{}, catalogError()
+	}
 	u, err := url.Parse(p.BaseURL)
 	if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
 		return ModelSource{}, catalogError()

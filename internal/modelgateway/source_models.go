@@ -4,11 +4,23 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
+
+const (
+	openRouterFreeConnector = "openrouter-free"
+	openRouterBaseURL       = "https://openrouter.ai/api/v1"
+)
+
+func openRouterFreeModel(row agentproviders.SourceModelDetail) bool {
+	return (strings.HasSuffix(row.ID, ":free") || row.ID == "openrouter/free") &&
+		row.InputPrice != nil && *row.InputPrice == 0 && row.OutputPrice != nil && *row.OutputPrice == 0
+}
 
 func catalogProtocol(kind, protocol string) bool {
 	runner := agent.Get(kind)
@@ -160,6 +172,9 @@ func (h *Handler) fetchSourceModels(ctx context.Context, source ModelSource) ([]
 		}
 	} else {
 		details, err = agentproviders.ReadSourceModelDetails(ctx, agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+		if source.Connector == openRouterFreeConnector {
+			details = slices.DeleteFunc(details, func(row agentproviders.SourceModelDetail) bool { return !openRouterFreeModel(row) })
+		}
 		for _, row := range details {
 			models = append(models, row.ID)
 		}

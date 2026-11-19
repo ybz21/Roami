@@ -164,3 +164,45 @@ func TestDiscoverRetainsAdvertisedCapabilitiesAndUnknowns(t *testing.T) {
 		t.Fatal("read changed catalog")
 	}
 }
+
+func TestOpenRouterFreeConnectorFiltersDiscovery(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/models" {
+			t.Errorf("unexpected discovery request %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"data":[
+			{"id":"vendor/chat:free","pricing":{"prompt":"0","completion":"0"},"supported_parameters":["tools"]},
+			{"id":"openrouter/free","pricing":{"prompt":"0","completion":"0"}},
+			{"id":"vendor/paid","pricing":{"prompt":"0.1","completion":"0.1"}},
+			{"id":"vendor/promoted","pricing":{"prompt":"0","completion":"0"}},
+			{"id":"vendor/partial:free","pricing":{"prompt":"0"}},
+			{"id":"vendor/mispriced:free","pricing":{"prompt":"0","completion":"0.1"}}
+		]}`)
+	}))
+	defer upstream.Close()
+	h := catalogHandler(t, "https://saved.example/v1", "openai-completions")
+	official := ModelSource{ID: "openrouter", Name: "Free catalog", Connector: openRouterFreeConnector, BaseURL: openRouterBaseURL, Protocol: "openai-completions", AuthMode: "bearer"}
+	saved := official
+	saved.Connector, saved.APIKey = "", "stored-router-fixture"
+	validated, err := h.Catalog.validatedSource(official, saved)
+	if err != nil || validated.APIKey != saved.APIKey {
+		t.Fatal("same endpoint should keep its credential", err)
+	}
+	if sourceDirectoryFingerprint(validated) == sourceDirectoryFingerprint(saved) {
+		t.Fatal("a generic directory must not populate free connector evidence")
+	}
+	official.BaseURL = upstream.URL + "/api/v1"
+	if _, err := h.Catalog.validatedSource(official, saved); err == nil {
+		t.Fatal("free connection accepted a substitute endpoint")
+	}
+
+	models, details, err := h.fetchSourceModels(context.Background(), official)
+	if err != nil || strings.Join(models, ",") != "openrouter/free,vendor/chat:free" || len(details) != 2 || details[1].Tools == nil || !*details[1].Tools {
+		t.Fatalf("free model discovery: %v %v", models, err)
+	}
+	official.Connector = ""
+	models, _, err = h.fetchSourceModels(context.Background(), official)
+	if err != nil || len(models) != 6 {
+		t.Fatalf("generic discovery: %v %v", models, err)
+	}
+}

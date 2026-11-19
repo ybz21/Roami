@@ -103,6 +103,7 @@ it('shows connections and their models together and accepts old source-page link
 it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
+  expect(screen.getByRole('combobox', { name: 'capabilities.models.protocol' }).closest('details')).toBeNull()
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
   fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'first-model\nsecond-model\nfirst-model\n' } })
@@ -116,6 +117,32 @@ it('saves a LAN HTTP source and manual models without fetching the directory', a
   expect(writes).toHaveLength(1)
   expect((writes[0][2] as ModelCatalog).models).toHaveLength(3)
   expect((writes[0][2] as ModelCatalog).models[0]).toEqual(catalog.models[0])
+})
+
+it('opens a dedicated OpenRouter connector and only adds models selected from its directory', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['vendor/chat:free', 'openrouter/free'], details: [{ id: 'vendor/chat:free', name: 'Sample free model' }] } }
+    : original(method, path, body, options))
+  mount('catalog/source/new/openrouter')
+  const endpoint = await screen.findByLabelText('agent.models.baseUrl') as HTMLInputElement
+  expect(endpoint.value).toBe('https://openrouter.ai/api/v1')
+  expect(endpoint.readOnly).toBe(true)
+  expect(screen.queryByRole('button', { name: 'hub.directory.manual' })).toBeNull()
+  fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.openRouter.fetch' }))
+  await screen.findByRole('checkbox', { name: 'vendor/chat:free' })
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/discover', expect.objectContaining({
+    source: expect.objectContaining({ connector: 'openrouter-free', baseUrl: endpoint.value, authMode: 'bearer' }),
+  }), expect.anything())
+  fireEvent.change(screen.getByLabelText('hub.directory.search'), { target: { value: 'sample free' } })
+  expect(screen.queryByRole('checkbox', { name: 'openrouter/free' })).toBeNull()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'vendor/chat:free' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ connector: 'openrouter-free' })]),
+    models: expect.arrayContaining([expect.objectContaining({ name: 'vendor/chat:free' })]),
+  })))
 })
 
 it('fetches an unsaved source, selects all matches and keeps selection across searches', async () => {
@@ -359,7 +386,7 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(document.querySelector('.tt-model-connection')).toBeNull()
 })
 
-it('opens creation and import choices from the top New button without a pricing shortcut', async () => {
+it('routes each named choice in the New menu to its own creation flow', async () => {
   const navigate = vi.fn()
   const { container } = mount('', navigate)
   const create = await screen.findByRole('button', { name: 'common.create' })
@@ -367,9 +394,18 @@ it('opens creation and import choices from the top New button without a pricing 
   expect(container.querySelector('.tt-model-connection-new')).toBeNull()
   expect(screen.queryByRole('button', { name: 'agent.gateway.defaultPrice' })).toBeNull()
   expect(container.querySelector('.tt-model-connection-footer button')).toBeNull()
-  fireEvent.keyDown(create, { key: 'ArrowDown' })
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'hub.plugin.import' }))
-  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/import')
+  for (const [name, path] of [
+    ['hub.openRouter.name hub.create.openRouter', 'source/new/openrouter'],
+    ['hub.addSource hub.create.api', 'source/new'],
+    ['hub.plugin.import hub.create.plugin', 'import'],
+    ['hub.local.title hub.create.local', 'local'],
+  ]) {
+    fireEvent.keyDown(create, { key: 'ArrowDown' })
+    expect((await screen.findAllByRole('menuitem'))).toHaveLength(4)
+    fireEvent.click(screen.getByRole('menuitem', { name }))
+    expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/' + path)
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  }
 })
 
 it('keeps the card read-only and opens editing, pricing, routing and deletion inside its detail', async () => {
@@ -484,6 +520,13 @@ it('shows saved source models read-only until management is requested and cancel
  vi.mocked(api).mockImplementation(async(method,path,body,options)=>path.endsWith('/discover')?{data:{models:['priced-model','available-model']}}:original(method,path,body,options))
  mount('catalog/source/upstream')
  await screen.findByText('priced-model',{selector:'.tt-model-directory-name'})
+ const search = screen.getByLabelText('hub.directory.search')
+ fireEvent.change(search, { target: { value: 'missing' } })
+ expect(screen.queryByText('priced-model',{selector:'.tt-model-directory-name'})).toBeNull()
+ fireEvent.change(search, { target: { value: ' coding ' } })
+ expect(screen.getByText('priced-model',{selector:'.tt-model-directory-name'})).toBeTruthy()
+ fireEvent.change(search,{target:{value:''}})
+ expect(vi.mocked(api).mock.calls.some(([,path])=>path.endsWith('/discover'))).toBe(false)
  expect(screen.queryByRole('checkbox')).toBeNull()
  expect(screen.queryByRole('button',{name:'agent.models.save'})).toBeNull()
  fireEvent.click(screen.getByRole('button',{name:'modelInteraction.manageModels'}))
