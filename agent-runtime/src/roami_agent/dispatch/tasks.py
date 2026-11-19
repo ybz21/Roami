@@ -18,6 +18,7 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.native_session_registry import register as register_native_session
+from roami_agent.storage.native_tool_observations import tool_diagnostic
 from roami_agent.storage.request_quotes import source_quote
 from roami_agent.storage.task_context import model_task_projection
 from roami_agent.storage.task_continuation import (
@@ -672,6 +673,8 @@ class Tasks:
                 result_json = attempt.pop("result_json")
                 attempt["result"] = json.loads(result_json) if result_json else None
                 attempt["progress"] = reported_progress(db, task_id, attempt["id"])
+                if diagnostic := tool_diagnostic(db, task_id, attempt["id"], attempt["revision"]):
+                    attempt["toolDiagnostic"] = diagnostic
             children = rows(
                 db,
                 "SELECT * FROM tasks WHERE parent_task_id=? AND owner_id=? ORDER BY created_ms DESC LIMIT 101",
