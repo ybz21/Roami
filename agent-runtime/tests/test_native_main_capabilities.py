@@ -51,6 +51,18 @@ def request(context, args=None, key="one"):
     return {"executionContext": context, "requestId": key, "arguments": args or {}}
 
 
+async def signed_native_launch(runtime, main, turn, retry_suffix=""):
+    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
+    key = "project-main:" + turn["id"] + ":" + "a" * 24 + retry_suffix
+    await runtime.main_capabilities.brief(binding, {**turn, "native_launch_key": key})
+    signed = next(
+        context
+        for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
+        if (context := json.loads(path.read_text())).get("nativeLaunchKey") == key
+    )
+    return binding, key, signed
+
+
 async def group_for(runtime, main, turn):
     runtime.swarms.chat = None
     return await runtime.swarms.create(
@@ -92,14 +104,7 @@ async def test_claude_input_uses_signed_registered_capability_launch(
     native_main, monkeypatch, retry_suffix
 ):
     runtime, main, turn, original_context = native_main
-    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
-    key = "project-main:" + turn["id"] + ":" + "a" * 24 + retry_suffix
-    await runtime.main_capabilities.brief(binding, {**turn, "native_launch_key": key})
-    signed = next(
-        context
-        for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
-        if (context := json.loads(path.read_text())).get("nativeLaunchKey") == key
-    )
+    binding, key, signed = await signed_native_launch(runtime, main, turn, retry_suffix)
     assert "nativeLaunchKey" not in original_context
     with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED"):
         await runtime.main_capabilities.call(
@@ -163,6 +168,55 @@ async def test_claude_input_uses_signed_registered_capability_launch(
     )
     assert wrong_provider["state"] == "failed"
     assert wrong_provider["result"]["error"] == "NATIVE_CAPABILITY_INPUT_UNCONFIRMED"
+
+
+async def test_native_artifact_view_lives_only_for_the_admitted_turn(native_main, monkeypatch):
+    runtime, main, turn, original_context = native_main
+    _, _, signed = await signed_native_launch(runtime, main, turn)
+    expected = b"image bytes already verified by the artifact store"
+    artifact = await runtime.artifacts.put(
+        "alice", expected, name="visual.png", mime_type="image/png"
+    )
+
+    async def preview(args, binding):
+        return {"path": await runtime.main_capabilities.artifact_view(binding, artifact["id"])}
+
+    runtime.tools.add(
+        Tool(
+            "preview_artifact",
+            "Read the visual artifact",
+            object_schema({}),
+            preview,
+            main=True,
+            effect="read",
+        )
+    )
+    invalid = await runtime.main_capabilities.call(
+        "preview_artifact", request(original_context), "alice"
+    )
+    assert invalid["state"] == "failed"
+    value = await runtime.main_capabilities.call(
+        "preview_artifact", request(signed, key="image"), "alice"
+    )
+    image = Path(value["result"]["path"])
+    assert value["state"] == "succeeded"
+    assert image.suffix == ".png" and image.is_symlink() and image.read_bytes() == expected
+    assert image.parent.stat().st_mode & 0o777 == 0o700
+    original_blob = image.resolve()
+
+    async def finished(*args, **kwargs):
+        return "done"
+
+    monkeypatch.setattr(runtime, "_run_turn", finished)
+    assert await runtime.run_turn({**turn, "lease_epoch": turn["lease_epoch"] + 1}) == "done"
+    assert image.is_symlink()
+    assert await runtime.run_turn(turn) == "done"
+    assert not image.is_symlink() and original_blob.read_bytes() == expected
+    left = runtime.main_capabilities.artifact_views.root / "turn-orphan01"
+    left.mkdir(mode=0o700)
+    (left / "image.png").symlink_to(original_blob)
+    runtime.main_capabilities.artifact_views.recover()
+    assert not left.exists() and original_blob.read_bytes() == expected
 
 
 async def test_signed_native_main_can_register_and_plan_without_worker_impersonation(native_main):

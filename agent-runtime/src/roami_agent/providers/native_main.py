@@ -67,12 +67,12 @@ class NativeMain:
             key += ":retry-" + str(retry)
         prompt = (
             "You are the existing project's Main, using its bound persistent native CLI. "
-            "Preserve the original Main, team, task, memory and publication identities. "
+            "Preserve the original Main, team, tasks, memory and recorded external action identities. "
             "Use native tools and the public roami CLI for actual work; host tool definitions are "
             "context, not native callable tools. Do not impersonate a worker or invent run IDs. "
             "Return your actual final human-readable answer; the host delivers it to the same "
             "original Main conversation. Native tool results must not be executed twice. "
-            "Unknown publication outcomes stay unknown and must be reconciled before resending.\n"
+            "Reconcile unknown external outcomes by their original identity before resending.\n"
             + encoded(
                 {
                     "projectId": self.binding["project_id"],

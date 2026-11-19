@@ -89,9 +89,12 @@ def save_review(db, binding, version_id, decision, feedback, proof, *, native_in
         ]
         if (
             current_media != media_proof.get("snapshot")
-            or reviewed_media_images(db, binding, version_id, current_media)
+            or reviewed_media_images(
+                db, binding, version_id, current_media, native_input=native_input
+            )
             != media_proof.get("images")
-            or reviewed_text(db, binding, text) != media_proof.get("text")
+            or reviewed_text(db, binding, text, native_input=native_input)
+            != media_proof.get("text")
         ):
             raise DomainError("PUBLICATION_MEDIA_REVIEW_CHANGED", 409)
     payload = {**proof, "manifestSha256": version["manifest_sha256"]}

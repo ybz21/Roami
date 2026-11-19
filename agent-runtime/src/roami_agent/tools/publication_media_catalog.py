@@ -7,7 +7,9 @@ from roami_agent.publication.media_runtime import media_runtime
 from roami_agent.storage.publication_reviews import current_version
 
 
-def register_publication_media_tools(registry, database, artifacts, factory=None):
+def register_publication_media_tools(
+    registry, database, artifacts, factory=None, *, native_artifact_view=None
+):
     async def execute(args, binding):
         _, manifest = await database.call(
             lambda db: current_version(db, binding, args["versionId"])
@@ -16,7 +18,10 @@ def register_publication_media_tools(registry, database, artifacts, factory=None
             raise DomainError("PUBLICATION_PROJECT_SCOPE_CONFLICT", 403)
         if args["operation"] == "image":
             return await PublicationMedia(database, artifacts, None).image(
-                binding, args["versionId"], args["artifactId"]
+                binding,
+                args["versionId"],
+                args["artifactId"],
+                native_artifact_view=native_artifact_view,
             )
         service = factory() if factory else media_runtime(database, artifacts)
         return await service.prepare(binding, args["versionId"], args["artifactId"])
@@ -25,7 +30,7 @@ def register_publication_media_tools(registry, database, artifacts, factory=None
     registry.add(
         Tool(
             "swarm_publication_media",
-            "Inspect a frozen original-team video/audio version using installed FFmpeg/FFprobe and the node's saved speech service. operation=inspect takes the frozen video/audio artifactId and returns sampled contact sheets, a source report and complete final-track transcription receipts; a missing dependency or uncertain request is an explicit error, never an automatic retry. Fully read returned report/transcript artifacts and call operation=image with each returned contact-sheet artifactId so actual pixels enter this Main model. Sampling is not continuous playback. This does not approve, authorize or publish anything.",
+            "Inspect a frozen original-team video/audio version using installed FFmpeg/FFprobe and the node's saved speech service. operation=inspect takes the frozen video/audio artifactId and returns sampled contact sheets, a source report and complete final-track transcription receipts; a missing dependency or uncertain request is an explicit error, never an automatic retry. Fully read returned report/transcript artifacts and call operation=image with each returned contact-sheet artifactId. If the response contains nativeReadPath, use your native image Read tool on that file in this turn to load the pixels. Sampling is not continuous playback. This does not approve, authorize or publish anything.",
             object_schema(
                 {
                     "swarmId": string,

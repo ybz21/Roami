@@ -40,7 +40,7 @@ class PublicationReview:
             if media:
                 proof["media"] = await PublicationMediaReview(
                     self.db, self.artifacts, self.reviewer
-                ).inspect(binding, version_id, media)
+                ).inspect(binding, version_id, media, native_input=native_input)
             for artifact in manifest["artifacts"]:
                 await self.artifacts.verified_path(binding["owner"], artifact["id"])
             if native_input is not None and await self.native_input(binding) != native_input:

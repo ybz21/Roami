@@ -329,6 +329,11 @@ async def test_prompt_builder_uses_frozen_input_with_original_source_provenance(
     assert "请确认取数口径 frozen" in json.dumps(prompt, ensure_ascii=False)
     assert "late-other-message" not in json.dumps(prompt, ensure_ascii=False)
     assert not any(m["role"] == "user" and "请确认取数口径 frozen" in m["content"] for m in prompt)
+    system_guidance = next(
+        m["content"] for m in prompt if "Current original-Main coordination batch" in m["content"]
+    )
+    assert "Read this project's current root AGENTS.md" in system_guidance
+    assert "publication business" not in system_guidance
     actual = await runtime.db.call(lambda db: admitted_batch(db, "alice", turn["id"]))
     assert [v["postId"] for v in actual["inputs"]] == [first["id"]]
     newer, _ = await runtime.loop.context.build(turn, "Base instructions", [], None)

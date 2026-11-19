@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import pytest
@@ -7,8 +8,11 @@ from test_swarm_delegations import delegated_team as delegated_team_fixture
 
 from roami_agent.dispatch.publication_review import PublicationReview
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.serialization import encoded
 from roami_agent.publication.approved_assets import approved_assets
 from roami_agent.replies.source_review import SourceReplyReview
+from roami_agent.storage.database import event
+from roami_agent.storage.publication_media_evidence import reviewed_media_images
 from roami_agent.storage.transcript_repository import message
 
 coordination = coordination_fixture
@@ -102,6 +106,112 @@ async def test_missing_independent_media_evidence_never_records_approval(coordin
         )
         == 0
     )
+
+
+@pytest.mark.parametrize("fault", [None, "not_in_model", "not_read_in_turn"])
+async def test_native_model_images_must_match_current_media_receipts(coordination, fault):
+    runtime, binding, inspected = await reviewed(
+        coordination, fault="images" if fault == "not_read_in_turn" else "manifest"
+    )
+    selected = inspected["images"][:-1] if fault == "not_in_model" else inspected["images"]
+    native = {
+        "images": [{"mime": image["mimeType"], "sha256": image["sha256"]} for image in selected]
+    }
+
+    async def proof():
+        return await runtime.db.call(
+            lambda db: reviewed_media_images(
+                db,
+                binding,
+                inspected["versionId"],
+                [inspected],
+                native_input=native,
+            )
+        )
+
+    if fault:
+        with pytest.raises(DomainError, match="PUBLICATION_MEDIA_IMAGE_NOT_REVIEWED"):
+            await proof()
+    else:
+        result = await proof()
+        assert [image["artifactId"] for image in result] == [
+            image["id"] for image in inspected["images"]
+        ]
+        assert all(
+            image["source"] == "claude_model_input" and image["resultMessageId"] for image in result
+        )
+
+
+async def test_native_media_approval_uses_complete_text_and_current_sample_pixels(coordination):
+    runtime, binding, inspected = await reviewed(coordination, fault="manifest", account="12345")
+
+    def native_receipts(db):
+        receipts = db.execute(
+            "SELECT native_content(m.content_json) FROM tool_calls c JOIN messages m ON m.id=c.result_message_id "
+            "WHERE c.turn_id=? AND c.tool_name='artifact_read' AND c.state='succeeded' ORDER BY m.seq",
+            (binding["turnId"],),
+        ).fetchall()
+        proofs = []
+        for receipt in receipts:
+            body = json.loads(receipt[0])
+            call = body["tool_call_id"]
+            wrapper = {
+                "toolCallId": call,
+                "requestId": call,
+                "state": "succeeded",
+                "result": json.loads(body["text"]),
+                "finishedMs": 123,
+            }
+            event(
+                db,
+                binding["conversation"],
+                "capability.completed",
+                wrapper,
+                key="capability:" + call + ":result",
+                turn_id=binding["turnId"],
+            )
+            proofs.append(
+                {
+                    "toolCallId": call,
+                    "responseSha256": hashlib.sha256(
+                        encoded({"data": wrapper}).encode()
+                    ).hexdigest(),
+                }
+            )
+        return proofs
+
+    proof = {
+        "providerId": "current-provider",
+        "promptId": "current-prompt",
+        "requestSha256": "a" * 64,
+        "capabilities": await runtime.db.call(native_receipts, write=True),
+        "images": [
+            {"mime": ref["mimeType"], "sha256": ref["sha256"]} for ref in inspected["images"]
+        ],
+    }
+    assert len(proof["capabilities"]) == len(proof["images"]) == 3
+    binding["nativeCapabilityCall"] = {"requestId": "media-review"}
+
+    async def model_input(actual):
+        assert actual is binding
+        return proof
+
+    review = await PublicationReview(
+        runtime.db, runtime.artifacts, None, native_review_input=model_input
+    ).decide(
+        binding, inspected["versionId"], "approved", "Reviewed the sampled images and final track."
+    )
+    assert review["decision"] == "approved" and review["publicationAuthorized"] is False
+    stored = await runtime.db.call(
+        lambda db: json.loads(
+            db.execute(
+                "SELECT proof_json FROM swarm_publication_reviews WHERE id=?",
+                (review["reviewId"],),
+            ).fetchone()[0]
+        )
+    )
+    assert len(stored["media"]["text"]) == 2 and len(stored["media"]["images"]) == 3
+    assert all(i["source"] == "claude_model_input" for i in stored["media"]["images"])
 
 
 @pytest.mark.parametrize("fault", [None, "deleted_transcript", "forgotten_sheet"])
