@@ -1538,11 +1538,7 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
 .tt-tabs[data-l]:not([data-r]) { mask-image: linear-gradient(90deg, transparent 0, #000 22px); }
 .tt-tabs[data-r]:not([data-l]) { mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent 100%); }
 
-/* 会话标签学 VSCode 的编辑器页签：矩形贴边、拿 1px 竖线断句、选中的那枚顶边一道强调色，
-   底色换成下面内容区的底色，视觉上跟内容连成一片。
-   原来是「圆角胶囊 + 2px 间距 + 选中只加粗」：一条挤满标签时既看不出边界在哪，
-   也说不清哪一枚跟下面的终端是同一个会话——加粗在深色小字上几乎读不出来。
-   宽度 132–220（14 §7.1）：给下限是为了让标签宽度稳定，切换时不会因为名字长短乱跳。 */
+/* 固定宽度范围避免切换长短标题时标签跳动。 */
 .tt-tab {
   position: relative;
   display: inline-flex; align-items: center; gap: 7px; min-width: 132px; max-width: 220px;
@@ -1552,10 +1548,13 @@ html[data-pointer="coarse"] .tt-tabs-nav::after { content: ''; position: absolut
   transition: background .12s, color .12s;
 }
 :where(html[data-pointer="fine"]) .tt-tab:hover { background: var(--list-hover); color: var(--text-bright); }
-/* 外壳统一成一张底之后，选中的标签不能再靠「和下面内容同底」显形了——那时它和整条一样黑。
-   改成选中底 + 顶上那条 accent 线：跟侧栏选中行是同一套语言（中性底 + 一条强调线）。 */
-.tt-tab.on { background: var(--sel-bg); color: var(--text-bright); font-weight: 600;
-  box-shadow: inset 0 2px 0 var(--accent); }
+/* 底线贴近内容区；标题与中性底色共同标识当前页，不挪动标签和操作按钮。 */
+.tt-tab.on { background: var(--sel-bg); color: var(--text-bright); font-weight: 600; }
+.tt-tab.on::after {
+  content: ''; position: absolute; inset: auto 0 0; height: var(--sp-1);
+  background: var(--accent); pointer-events: none;
+}
+.tt-tab.on .tt-name .pj, .tt-tab.on .tt-x { color: var(--text-dim); }
 .tt-tab.pinned { min-width: var(--tap); max-width: var(--tap); justify-content: center; padding: 0; }
 .tt-tab.pinned .tt-tab-nm, .tt-tab.pinned .tt-name, .tt-tab.pinned .tt-x, .tt-tab.pinned .tt-wait { display: none; }
 .tt-tab-page { padding: 0 var(--sp-1) 0 0; gap: 0; }
