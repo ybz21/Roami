@@ -199,6 +199,7 @@ class Runtime:
         self.stopping = False
         self.supervisor = None
         self.external_monitor = None
+        self.settled_route_recovery = None
         self.browser_monitor = None
         self.desktop_monitor = None
         self.control_monitor = None
@@ -449,6 +450,9 @@ class Runtime:
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):
             self.external_monitor = asyncio.create_task(self._monitor_external())
+            self.settled_route_recovery = asyncio.create_task(
+                self.main_executions.recover_settled_route_waits()
+            )
         self.browser_monitor = asyncio.create_task(self._monitor_browser())
         self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
         self.control_monitor = asyncio.create_task(self._monitor_controls())
@@ -595,6 +599,9 @@ class Runtime:
         if self.external_monitor:
             self.external_monitor.cancel()
             await asyncio.gather(self.external_monitor, return_exceptions=True)
+        if self.settled_route_recovery:
+            self.settled_route_recovery.cancel()
+            await asyncio.gather(self.settled_route_recovery, return_exceptions=True)
         if self.reminder_monitor:
             self.reminder_monitor.cancel()
             await asyncio.gather(self.reminder_monitor, return_exceptions=True)
