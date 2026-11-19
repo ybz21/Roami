@@ -5,7 +5,8 @@ export const routingStrategies = ['smart', 'order', 'drain', 'rotate', 'usage', 
 export type RoutingStrategy = typeof routingStrategies[number]
 export type PriceRule = { mode: '' | 'inherit' | 'tokens' | 'free' | 'quota' | 'unknown'; confirmed?: boolean; price: { input_per_million: number; output_per_million: number; cache_read_per_million: number } }
 export type SourcePricing = { accountStrategy?: RoutingStrategy; default: PriceRule; models?: Record<string, PriceRule>; multiplier?: number; timeRule?: '' | 'deepseek' | 'ollama-deepseek' }
-export type RoutingStatus = { now: number; available: number; channels: { sourceId: string; model: string; account: string; kind: string; ready: boolean; remaining: number | null; resetAt: number | null; expiresAt: number | null; restUntil: number | null; measuredAt: number | null; recentTokens: number }[] }
+export type RoutingBlock = 'source' | 'authorization' | 'directory' | 'notListed' | 'tools' | 'context' | 'pricing'
+export type RoutingStatus = { now: number; available: number; members?: { sourceId: string; model: string; block?: RoutingBlock; context?: number }[]; channels: { sourceId: string; model: string; account: string; kind: string; ready: boolean; remaining: number | null; resetAt: number | null; expiresAt: number | null; restUntil: number | null; measuredAt: number | null; recentTokens: number }[] }
 export function useRoutingStatus(model: string, active: boolean, revision: string) {
   const [result, setResult] = useState<{ key: string; data: RoutingStatus } | null>(null), [failed, setFailed] = useState(false), [retry, setRetry] = useState(0)
   const key = model + ':' + revision

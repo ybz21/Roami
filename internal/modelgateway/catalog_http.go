@@ -334,7 +334,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		if r.URL.Path == "/v1/responses/compact" {
 			required = protocol
 		}
-		choice, err = h.newRoutingChoice(r.Context(), catalog, *model, required)
+		choice, err = h.newRoutingChoice(r.Context(), catalog, *model, required, false)
 		if err != nil {
 			reject(w, 503, "MODEL_ROUTE_UNAVAILABLE")
 			return

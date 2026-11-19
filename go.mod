@@ -12,6 +12,7 @@ require (
 	github.com/libp2p/go-nat v0.2.0
 	github.com/pion/ice/v4 v4.3.0
 	github.com/pion/webrtc/v4 v4.2.17
+	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.30.2
@@ -69,7 +70,6 @@ require (
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
