@@ -12,6 +12,7 @@ func TestClaudeNativeIdleRequiresSameTurnStopAndActualModel(t *testing.T) {
 	var data []byte
 	for _, record := range []map[string]any{
 		{"type": "user", "sessionId": "provider", "cwd": "/project", "promptId": "human-turn", "message": map[string]any{"content": "continue"}},
+		{"type": "api-request-shape", "sessionId": "provider", "cwd": "/project"},
 		{"type": "assistant", "sessionId": "provider", "cwd": "/project", "message": map[string]any{"model": "roami-claude/free", "content": "Done", "stop_reason": "end_turn"}},
 	} {
 		b, _ := json.Marshal(record)
@@ -20,7 +21,7 @@ func TestClaudeNativeIdleRequiresSameTurnStopAndActualModel(t *testing.T) {
 	if !claudeNativeIdleEvidence(data, state) {
 		t.Fatal("authenticated native idle rejected")
 	}
-	for _, name := range []string{"model", "new input", "wrong provider", "missing idle", "wrong stop", "pending tool", "active launch", "partial"} {
+	for _, name := range []string{"model", "new input", "wrong provider", "missing idle", "wrong stop", "pending tool", "active launch", "partial", "later shape"} {
 		t.Run(name, func(t *testing.T) {
 			s, stop, input := state, *state.ClaudeStop, string(data)
 			s.ClaudeStop = &stop
@@ -39,6 +40,8 @@ func TestClaudeNativeIdleRequiresSameTurnStopAndActualModel(t *testing.T) {
 				s.Tools = map[string]bool{"tool": true}
 			case "active launch":
 				s.LaunchKey = "running"
+			case "later shape":
+				input += `{"type":"api-request-shape","sessionId":"provider","cwd":"/project"}` + "\n"
 			case "partial":
 				input = strings.TrimSuffix(input, "\n")
 			}

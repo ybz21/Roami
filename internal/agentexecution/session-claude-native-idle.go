@@ -43,7 +43,7 @@ func claudeNativeIdleEvidence(data []byte, state sessionLifecycle) bool {
 			return false
 		}
 		switch r.Type {
-		case "api-request", "api-request-blob":
+		case "api-request", "api-request-blob", "api-request-shape":
 			if final {
 				return false
 			}

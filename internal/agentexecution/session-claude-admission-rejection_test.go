@@ -2,15 +2,17 @@ package agentexecution
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
-	for _, scenario := range []string{"complete", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
+	for _, scenario := range []string{"complete", "compaction refusal", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
 		t.Run(scenario, func(t *testing.T) {
 			s, binding, spec, transcript, _ := rejectedClaudeTask(t)
 			dir, _ := s.directory(spec.Key)
@@ -67,6 +69,11 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			message := records[1]["message"].(map[string]any)
 			message["content"] = []any{map[string]any{"type": "text", "text": "API Error: 402 {\"error\":{\"code\":\"MODEL_PROXY_DAILY_LIMIT\"}}"}}
 			switch scenario {
+			case "compaction refusal":
+				delete(records[1], "apiErrorStatus")
+				delete(records[1], "failedResponseHadNoToolCall")
+				records[1]["error"] = "invalid_request"
+				message["content"] = []any{map[string]any{"type": "text", "text": `Prompt is too long · automatic compaction failed: API Error: 503 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}. This is a server-side issue.`}}
 			case "prior history":
 				records = append([]map[string]any{{"type": "user", "promptId": "prior", "message": map[string]any{"content": "prior completed work"}}, {"type": "assistant", "message": map[string]any{"content": "prior result"}}}, records...)
 			case "owned child":
@@ -142,7 +149,7 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 			}
 			result, err := s.ReconcileSession(context.Background(), spec.Key)
-			good := scenario == "complete" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
+			good := scenario == "complete" || scenario == "compaction refusal" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
 			if !good {
 				if err == nil || result.Result != nil {
 					t.Fatalf("accepted %s: %+v %v", scenario, result, err)
@@ -156,12 +163,41 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			if scenario == "cancelled" {
 				want = "cancelled"
 			}
-			if err != nil || result.Result == nil || result.State != want || result.Result.ErrorCode != "MODEL_PROXY_DAILY_LIMIT" || result.Result.InputStopped == nil || !*result.Result.InputStopped || result.Result.OutcomeKnown == nil || !*result.Result.OutcomeKnown || len(result.Result.StopEvidence) != 64 {
+			if err != nil || result.Result == nil || result.State != want || result.Result.ErrorCode != map[bool]string{true: "CLAUDE_COMPACTION_FAILED", false: "MODEL_PROXY_DAILY_LIMIT"}[scenario == "compaction refusal"] || result.Result.InputStopped == nil || !*result.Result.InputStopped || result.Result.OutcomeKnown == nil || !*result.Result.OutcomeKnown || len(result.Result.StopEvidence) != 64 {
 				t.Fatalf("quota not preserved as known failure: %+v %v", result, err)
 			}
 			var after sessionLifecycle
 			if err := readJSON(path, &after); err != nil || after.State != "idle" || after.Binding.ProviderID != binding.ProviderID {
 				t.Fatal("original provider not retained")
+			}
+		})
+	}
+}
+
+func TestClaudeCompactionRefusalRequiresTypedTerminalError(t *testing.T) {
+	for _, scenario := range []string{"complete", "wrong code", "wrong status", "ordinary text", "wrong failure", "extra block", "invalid JSON"} {
+		t.Run(scenario, func(t *testing.T) {
+			r := claudeFailureRecord{Failure: "invalid_request"}
+			text := `Prompt is too long · automatic compaction failed: API Error: 503 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}. This is a server-side issue.`
+			switch scenario {
+			case "wrong code":
+				text = strings.ReplaceAll(text, "MODEL_ROUTE_NO_AVAILABLE_MEMBER", "OTHER")
+			case "wrong status":
+				r.APIStatus = 503
+			case "ordinary text":
+				text = "API Error: 503 MODEL_ROUTE_NO_AVAILABLE_MEMBER"
+			case "wrong failure":
+				r.Failure = "other"
+			case "invalid JSON":
+				text = strings.ReplaceAll(text, `{"error":`, `{broken:`)
+			}
+			blocks := []map[string]string{{"type": "text", "text": text}}
+			if scenario == "extra block" {
+				blocks = append(blocks, map[string]string{"type": "tool_use"})
+			}
+			r.Message.Content, _ = json.Marshal(blocks)
+			if claudeCompactionRefusal(r) != (scenario == "complete") {
+				t.Fatal("unexpected refusal evidence", scenario)
 			}
 		})
 	}

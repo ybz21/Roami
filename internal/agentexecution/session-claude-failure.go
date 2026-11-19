@@ -15,7 +15,8 @@ import (
 )
 
 type claudeFailureRecord struct {
-	APIStatus int `json:"apiErrorStatus"`
+	APIStatus int    `json:"apiErrorStatus"`
+	Failure   string `json:"error"`
 	claudeReportRecord
 	UUID       string `json:"uuid"`
 	ParentUUID string `json:"parentUuid"`
