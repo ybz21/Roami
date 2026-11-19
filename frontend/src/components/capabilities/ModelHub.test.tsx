@@ -118,6 +118,32 @@ it('saves a LAN HTTP source and manual models without fetching the directory', a
   expect((writes[0][2] as ModelCatalog).models[0]).toEqual(catalog.models[0])
 })
 
+it('opens a dedicated OpenRouter connector and only adds models selected from its directory', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['vendor/chat:free', 'openrouter/free'], details: [{ id: 'vendor/chat:free', name: 'Sample free model' }] } }
+    : original(method, path, body, options))
+  mount('catalog/source/new/openrouter')
+  const endpoint = await screen.findByLabelText('agent.models.baseUrl') as HTMLInputElement
+  expect(endpoint.value).toBe('https://openrouter.ai/api/v1')
+  expect(endpoint.readOnly).toBe(true)
+  expect(screen.queryByRole('button', { name: 'hub.directory.manual' })).toBeNull()
+  fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.openRouter.fetch' }))
+  await screen.findByRole('checkbox', { name: 'vendor/chat:free' })
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/catalog/discover', expect.objectContaining({
+    source: expect.objectContaining({ connector: 'openrouter-free', baseUrl: endpoint.value, authMode: 'bearer' }),
+  }), expect.anything())
+  fireEvent.change(screen.getByLabelText('hub.directory.search'), { target: { value: 'sample free' } })
+  expect(screen.queryByRole('checkbox', { name: 'openrouter/free' })).toBeNull()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'vendor/chat:free' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ connector: 'openrouter-free' })]),
+    models: expect.arrayContaining([expect.objectContaining({ name: 'vendor/chat:free' })]),
+  })))
+})
+
 it('fetches an unsaved source, selects all matches and keeps selection across searches', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? { data: { models: ['alpha', 'beta', 'gamma'] } } : original(method, path, body, options))
@@ -484,6 +510,13 @@ it('shows saved source models read-only until management is requested and cancel
  vi.mocked(api).mockImplementation(async(method,path,body,options)=>path.endsWith('/discover')?{data:{models:['priced-model','available-model']}}:original(method,path,body,options))
  mount('catalog/source/upstream')
  await screen.findByText('priced-model',{selector:'.tt-model-directory-name'})
+ const search = screen.getByLabelText('hub.directory.search')
+ fireEvent.change(search, { target: { value: 'missing' } })
+ expect(screen.queryByText('priced-model',{selector:'.tt-model-directory-name'})).toBeNull()
+ fireEvent.change(search, { target: { value: ' coding ' } })
+ expect(screen.getByText('priced-model',{selector:'.tt-model-directory-name'})).toBeTruthy()
+ fireEvent.change(search,{target:{value:''}})
+ expect(vi.mocked(api).mock.calls.some(([,path])=>path.endsWith('/discover'))).toBe(false)
  expect(screen.queryByRole('checkbox')).toBeNull()
  expect(screen.queryByRole('button',{name:'agent.models.save'})).toBeNull()
  fireEvent.click(screen.getByRole('button',{name:'modelInteraction.manageModels'}))

@@ -43,7 +43,7 @@ type sourceDirectoryEntry struct {
 }
 
 func sourceDirectoryFingerprint(source ModelSource) string {
-	raw, _ := json.Marshal(struct{ ID, PluginSourceID, PluginRevision, BaseURL, Protocol, AuthMode, Credential string }{source.ID, source.PluginSourceID, source.PluginRevision, source.BaseURL, source.Protocol, source.AuthMode, source.APIKey})
+	raw, _ := json.Marshal(struct{ ID, Connector, PluginSourceID, PluginRevision, BaseURL, Protocol, AuthMode, Credential string }{source.ID, source.Connector, source.PluginSourceID, source.PluginRevision, source.BaseURL, source.Protocol, source.AuthMode, source.APIKey})
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])
 }

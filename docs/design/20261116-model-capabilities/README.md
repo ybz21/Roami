@@ -72,3 +72,5 @@ scripts/dev/isolated-roami.sh /tmp/roami-model-capability-design/instance \
 - [发布停止核对与 MCP 完成证据](deployment-acceptance.md)
 
 - [Main 选模列表与 /model 验收](picker-display.md)
+
+- [OpenRouter 免费目录与来源搜索](openrouter-connector.md)
