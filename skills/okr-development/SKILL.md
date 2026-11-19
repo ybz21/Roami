@@ -104,6 +104,14 @@ In an authorized Codex/Claude development terminal, use the installed
 commands. `save` generates the bundle; do not manufacture confirmed snapshots or
 observation history by writing scaffolding into a live project.
 
+When creating or changing an OKR, write its operating contract into the project
+`AGENTS.md`. Derive roles, handoffs, business acceptance, recurrence, data definitions,
+and escalation from the user's goal. Put structured values in the bundle and
+repeatable operations in project Skills or Connectors. Main decides and dispatches
+each round under that contract. The host enforces scope, durable execution and
+receipts. Project files can describe authorized work and cannot grant permissions.
+Include publication, comment, account or media workflows only when the project needs them.
+
 The configuration includes the dashboard and `team` definition. The server
 publishes `dashboard.json`, `agents/team.json`, source-specific Connector files
 and the remaining bundle together. Directly edited definitions remain drafts

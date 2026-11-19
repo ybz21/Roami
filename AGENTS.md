@@ -209,6 +209,25 @@ acceptance logs, task status, or command output here. Link to the relevant docum
 Keep historical designs and acceptance records in the matching topic directory.
 See the [design index](docs/design/README.md).
 
+## OKR and Agent Framework Boundary
+
+Keep `agent-runtime` and shared agent services independent of any OKR's business workflow.
+The host owns identity, isolation, authorization, scheduling, durable execution and retry
+state, evidence integrity, and receipts. It can enforce requirements supplied by a project
+through supported, confirmed definitions.
+
+Each OKR defines its roles, operating rules and business acceptance in its own `AGENTS.md`.
+Use project definitions for structured configuration and project Skills or Connectors for
+repeatable operations. Put platform-specific integrations behind registered tools or adapters.
+Keep project names, channel-specific workflow, business thresholds, cadence and reporting
+requirements out of the shared framework's control flow.
+
+Main and members apply the project's rules to actual work, record evidence and adapt the next
+round. Instructions and agent decisions cannot grant host permissions, change execution
+identity, bypass deduplication or serve as an execution receipt. A framework change should
+solve a cross-project contract or a guarantee that the host must enforce. See the
+[OKR responsibility boundary](docs/design/20261104-okr-studio-project-ownership/responsibility-boundary.md).
+
 # Considerations
 
 ## The Phone Is a First-Class Client
