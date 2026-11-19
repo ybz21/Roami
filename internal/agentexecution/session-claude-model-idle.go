@@ -156,7 +156,27 @@ func (s Service) reconcileClaudeModelIdle(ctx context.Context, key string, recei
 	}
 	defer unlock()
 	var state sessionLifecycle
-	if readJSON(path, &state) != nil || state.CompletedKey != key {
+	if readJSON(path, &state) != nil {
+		return Status{}, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
+	}
+	if state.CompletedKey == "" {
+		dir, _ := s.directory(key)
+		var initial Spec
+		current := Spec{Executor: "claude", SessionID: actual.ID, PreparedFrom: key}
+		if readJSON(filepath.Join(dir, "spec.json"), &initial) != nil || !preparedOriginMatches(current, state, initial, receipt, result) {
+			return Status{}, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
+		}
+		reconciled, problem := reconcileDirectClaudeCompletion(ctx, actual, &state, path)
+		if problem != nil {
+			return Status{}, problem
+		}
+		if !reconciled && !confirmedDirectClaudeIdle(actual, state, path) {
+			return Status{}, fmt.Errorf("SESSION_RECONCILIATION_STOP_UNCONFIRMED")
+		}
+		receipt.State = result.State
+		return Status{Receipt: receipt, Result: &result}, nil
+	}
+	if state.CompletedKey != key {
 		return Status{}, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
 	}
 	if state.State == "idle" && state.LaunchKey == "" && reflect.DeepEqual(state.Binding, *receipt.Binding) {

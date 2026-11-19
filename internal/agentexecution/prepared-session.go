@@ -85,7 +85,7 @@ func (s Service) PreparedSession(key string) (PreparedSession, error) {
 		state = normalized
 	}
 	var later []preparedTurnProof
-	if state.CompletedKey == "" && provenClaudeNativeIdle(state) {
+	if state.CompletedKey == "" && (provenClaudeNativeIdle(state) || confirmedDirectClaudeIdle(binding, state, path)) {
 		later = append(later, preparedTurnProof{NativeIdle: true})
 	}
 	if state.CompletedKey != key && state.CompletedKey != "" {

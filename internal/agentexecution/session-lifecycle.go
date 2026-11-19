@@ -449,6 +449,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 		if err = s.preparedContinuation(spec, state); err != nil {
 			return Status{}, err
 		}
+		if _, err = reconcileDirectClaudeCompletion(ctx, binding, &state, path); err != nil {
+			return Status{}, err
+		}
 		if !sessionProcessesStopped(state.Binding) {
 			return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 		}

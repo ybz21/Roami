@@ -40,6 +40,7 @@ type claudeReportRecord struct {
 	Message struct {
 		Content    json.RawMessage `json:"content"`
 		StopReason string          `json:"stop_reason"`
+		Model      string          `json:"model"`
 	} `json:"message"`
 }
 
