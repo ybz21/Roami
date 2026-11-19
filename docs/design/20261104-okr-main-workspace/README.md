@@ -24,6 +24,8 @@
 
 [Claude 原实例中断后的可信接续](claude-interruption-recovery.md)。
 
+[原生 Main 的直接消息结束对账](claude-direct-completion.md)，支持缺失工具完成钩子的原 Claude 输入回到团队协作。
+
 [复盘写入契约与失败恢复](review-input-contract.md)（#843）：准确字段、原请求身份和已保存结果对账。
 
 [等待已核验的原日程](scheduled-goal-wait.md)（#841）：先设计真实排期等待，避免用零碎任务代替接续。

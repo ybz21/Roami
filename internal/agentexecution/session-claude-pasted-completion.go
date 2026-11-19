@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,10 @@ type claudeCompletionRecord struct {
 }
 
 func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, since int64) (*Result, string, map[string]int64) {
+	return claudeCompletedEvidenceForModel(binding, turn, promptHash, since, "")
+}
+
+func claudeCompletedEvidenceForModel(binding SessionBinding, turn, promptHash string, since int64, model string) (*Result, string, map[string]int64) {
 	path, info := claudeTranscriptPath(binding)
 	if info == nil || turn == "" || promptHash == "" || since <= 0 {
 		return nil, "", nil
@@ -145,7 +150,7 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 			return nil, "", nil
 		}
 		if record.Type == "assistant" {
-			if finalText != "" {
+			if finalText != "" || model != "" && strings.TrimPrefix(record.Message.Model, "roami-claude/") != strings.TrimPrefix(model, "roami-claude/") {
 				return nil, "", nil
 			}
 			for _, block := range blocks {
