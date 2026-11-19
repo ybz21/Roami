@@ -37,8 +37,9 @@
     </div>
     <p>候选与<a href="./model-gateway.html">本机网关目录</a>共用价格依据。保存只提交成员和调度配置。网关读取旧版聚合时忽略残留的免费筛选字段，<code>wb-ds</code> 仍可调度已加入的 DeepSeek。请求显式指定免费和网关记账仍沿用原有规则。</p>
   </div>
-  <div class="sample" aria-label="聚合局部样例">
+  <div class="sample" id="strategy-observation" aria-label="聚合局部样例">
     <div class="sample-head"><h3>当前调度顺序</h3><label class="muted">演示状态<select id="route-scenario"><option value="ready">有可用成员</option><option value="blocked">无可用成员</option><option value="unknown">状态未检测</option><option value="empty">暂无调用</option></select></label></div>
+    <div class="route-policy"><span>已生效策略 <strong>按顺序</strong></span><span>可调度来源 <strong id="route-sources-ready"></strong></span><span>冷却成员 <strong id="route-cooling"></strong></span></div>
     <dl class="metrics">
       <div><dt>当前可调度</dt><dd id="route-ready"></dd><small id="route-first"></small></div>
       <div><dt>近 1 小时已完成请求</dt><dd id="route-total">200</dd></div>
@@ -52,14 +53,22 @@
       <p id="route-latest" class="muted">最近命中 16:39 · ERNIE 5.5 Flash · 成功</p>
       <details id="route-events"><summary>最近故障切换</summary><p>16:35 · OpenRouter 免费模型限流，切换到 WorkBuddy，最终成功。</p><a href="./model-audit.html?demo=route#audit-example" id="route-audit">查看这次调用</a></details>
       <p id="route-no-events" class="muted" hidden>暂无切换记录。</p>
+      <details id="route-resilience"><summary>故障转移与来源健康</summary>
+        <p id="route-switch-scope" class="muted"></p>
+        <ul class="route-source-health" id="route-source-health"></ul>
+        <a class="page-reference" href="./model-gateway.html?case=fallback#troubleshoot">查看跨源切换样例</a>
+      </details>
+      <details id="route-draft"><summary>策略草稿预览</summary><p>草稿切到「加权」，成员权重改为 3 和 1。预览显示预期分配，当前顺位仍对应已生效的「按顺序」。此处只演示草稿和当前配置的区别。</p></details>
     </div>
   </div>
   <ul class="copy">
     <li>可调度顺位沿用网关排序，同一成员的多个账户合并成一行。展开看各账户额度、重置时间和冷却原因。手机首行只放成员、顺位和状态，承载放第二行。</li>
     <li>权重只在加权策略下显示，历史承载单列。首选来自当前快照，最近命中来自已记录的调用。规则草稿使用原来的保存入口。</li>
-    <li>无可用成员时展示受限原因。只有能确认约束同时满足的时间才显示「预计可尝试」。状态未检测时显示未知。空事件区用一行「暂无切换记录」。</li>
+    <li>策略依赖速度时提供首字 P95、输出速度 P50 和统计窗口。来源健康按此聚合内符合条件的成员统计。只有一个可调度来源时标明「暂无跨源备用」。历史故障按同源换模型、跨源切换和耗尽区分，显示触发原因、恢复结果与生效策略。</li>
+    <li>无可用成员时展示受限原因。只有能确认约束同时满足的时间才显示「预计可尝试」。状态未检测时显示未知。故障切换入口沿用当前聚合筛选，区分恢复、仍失败和零尝试拒绝。<a href="./model-gateway.html#troubleshoot">网关排查样例</a></li>
   </ul>
-  <div class="step"><h3>技术设计</h3><table class="guide-table"><thead><tr><th scope="col">数据</th><th scope="col">来源与处理</th></tr></thead><tbody><tr><th scope="row">当前可调度</th><td>复用 <code>AggregationRuntime</code>、<code>AggregationMemberOrder</code>、<code>useModelMemberFacts</code> 与 <code>routingView</code>。按来源和上游模型对已保存成员去重，状态只取当前生效配置。聚合列表复用已有信息，避免逐条轮询。</td></tr><tr><th scope="row">聚合统计和切换</th><td><code>MonitorRecord</code> 已记录 <code>routeId</code>、来源、模型和结果。先补按聚合的筛选。请求总数、最终失败率、切换数与成员承载需要逻辑请求关联和终态。记录同一调用的尝试顺序、最终成员与切换原因。同渠道重试单列。旧数据无法建立关联时，显示「历史记录未统计」，保留真实快照。</td></tr></tbody></table></div>
+  <div class="step"><h3>技术设计</h3><table class="guide-table"><thead><tr><th scope="col">数据</th><th scope="col">来源与处理</th></tr></thead><tbody><tr><th scope="row">当前可调度</th><td>复用 <code>AggregationRuntime</code>、<code>AggregationMemberOrder</code>、<code>useModelMemberFacts</code> 与 <code>routingView</code>。按来源和上游模型对已保存成员去重，状态只取当前生效配置。聚合列表复用已有信息，避免逐条轮询。</td></tr><tr><th scope="row">聚合统计和切换</th><td><code>MonitorRecord</code> 已记录 <code>routeId</code>、来源、模型和结果。请求总数、最终失败率、切换数与成员承载需要请求关联和终态。同渠道重试单列。旧数据无法建立关联时显示「历史记录未统计」。<a href="./model-gateway.html#control-api">请求级观测契约</a></td></tr></tbody></table></div>
+  <p class="copy step">参考本机 <code>llm-gateway</code> 的 <code>FreePoolPage.tsx</code> 和 <code>FreePoolStatus</code>（<code>1f1ffc1</code>）。前者并排看策略预览、成员表现和来源健康，后者读取进程内冷却与实际尝试。Roami 使用现有调度策略，历史数据按显示窗口统计，保留来源和真实请求链路。</p>
   <div class="copy step"><h3>成员调整与删除</h3><p>保留左侧来源、右侧已启用模型和上方已选成员。切源保留选择，同名模型按来源区分。桌面支持键盘和拖动，手机手柄以外可以继续滚动。移除成员后通过原有入口保存。聚合在「成员」的更多设置提供删除，确认后返回列表。仍有引用时先在对应配置解除引用。</p><ul class="references"><li><a href="./member-selection.md">聚合成员选择与验收</a></li><li><a href="./routing-status-and-sources.html">原有调度与拖动设计</a></li></ul></div>
 </section>
 </main>

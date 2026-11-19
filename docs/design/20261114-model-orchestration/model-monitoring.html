@@ -21,6 +21,10 @@
   <a href="./model-speech.html">语音输入</a>
 </nav>
 <main class="document" id="document">
+<section id="gateway-observation" aria-labelledby="gateway-observation-title">
+  <header class="section-head"><h2 id="gateway-observation-title">请求失败与降级恢复</h2><a class="page-reference" href="./model-gateway.html#troubleshoot">查看网关排查样例</a></header>
+  <p class="copy">按调用方、网关模型和结果筛选。纳入发送前被拒的请求，保留聚合切换后恢复、切换后仍失败和输出中断。按最终结果计请求，来源视图继续看逐次尝试。最近异常点进审计查看当时的选路记录。</p>
+</section>
 <section id="monitor" aria-labelledby="monitor-title">
   <header class="section-head"><h2 id="monitor-title">监控 · 从失败走势找到原因</h2><a class="page-reference" href="/#/capabilities/models/monitor" target="_blank" rel="noopener">打开现有监控</a></header>
   <p class="copy">保留现有来源、模型和 1 / 6 / 24 小时筛选。首屏看请求数、调用成功率和首字延迟。请求趋势与失败构成使用同一范围，桌面并排，手机依次纵向浏览。源对比与既有抽检入口放在趋势之后。</p>

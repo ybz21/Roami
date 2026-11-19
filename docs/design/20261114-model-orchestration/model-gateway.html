@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roami 大模型设计 · 本机网关</title>
+<title>Roami 大模型设计 · LLM Gateway</title>
 <link rel="stylesheet" href="./assets/model-workspace-design.css">
+<script src="./assets/model-workspace-design.js" defer></script>
 </head>
 <body>
-<header class="page-head"><h1>Roami 大模型设计 · 本机网关</h1></header>
+<header class="page-head"><h1>LLM Gateway 设计</h1></header>
 <div class="workspace">
 <nav class="contents" aria-label="设计目录">
   <a href="./model-monitoring-and-aggregation.html">总览</a>
@@ -19,12 +20,122 @@
   <a href="./model-gateway.html" aria-current="page">本机网关</a>
   <a href="./model-speech.html">语音输入</a>
 </nav>
-<main class="document" id="document">
+<main class="document gateway-design" id="document">
 <section id="gateway" aria-labelledby="gateway-title">
-  <header class="section-head"><h2 id="gateway-title">本机网关 · 找到可调用模型</h2><a class="page-reference" href="/#/capabilities/models/gateway" target="_blank" rel="noopener">打开现有本机网关</a></header>
-  <p class="copy">默认打开已接入目录，聚合优先。列表显示聚合或原生、输入输出能力，以及已确认免费、套餐、按量、待确认等价格状态。调用 ID 放在复制操作与接入示例。</p>
-  <p class="copy">「查看来源」打开对应<a href="./model-sources.html">模型源</a>。「查看聚合」直接打开对应<a href="./model-aggregation.html">聚合</a>，返回时保留目录筛选和选中项。</p>
-  <div class="copy step"><h3>接入信息和凭据</h3><p>保留「模型目录」及「接入与密钥」。调用示例沿用选中的网关模型，固定显示 Base URL 和认证方式。源 Key 用于访问上游，网关访问密钥用于客户端。新增、轮换和停用采用现有流程。</p><ul class="references"><li><a href="./gateway-design.md">本机网关设计</a></li><li><a href="./gateway-implementation.md">网关目录代码与验收</a></li><li><a href="../20261030-智能体模型切换/gateway-access-key.md">网关访问密钥设计</a></li></ul></div>
+  <header class="section-head"><h2 id="gateway-title">从接入模型到排查一次调用</h2><a class="page-reference" href="/#/capabilities/models/gateway" target="_blank" rel="noopener">打开现有本机网关</a></header>
+  <p class="copy">客户端调用稳定的网关模型名。网关依据请求当时生效的规则选择成员，记录最终结果和选择过程。用户从监控找到异常，从审计核对过程，再到来源、聚合或限额页面处理。</p>
+  <nav class="gateway-jump" aria-label="三个设计层次">
+    <a href="#interaction">人机交互</a><a href="#public-api">对外接口</a><a href="#control-api">控制接口</a>
+  </nav>
+  <p class="copy muted">现状核对：截图里的 Claude Code 收到 <code>503 MODEL_ROUTE_NO_AVAILABLE_MEMBER</code>。首次选不出成员和候选尝试耗尽都可能返回这个错误。现有监控记录上游尝试，缺少选路拒绝和整次请求的结果。截图无法确认尝试次数与具体成员原因。</p>
+</section>
+<section id="interaction" aria-labelledby="interaction-title">
+  <header class="section-head"><h2 id="interaction-title">人机交互</h2><small>管理员与调用者共用同一套模型名称</small></header>
+  <table class="guide-table" aria-label="入口和动作">
+    <thead><tr><th scope="col">入口</th><th scope="col">首屏和下一步</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">本机网关</th><td>默认打开已接入目录，聚合排在原生前。展示模型名称、原生或聚合、输入输出、已确认免费或套餐等价格状态。点「复制调用名」或打开接入示例。查看聚合时带入选中的模型，返回时保留目录筛选。接入页按调用协议给地址、认证方式和示例。</td></tr>
+      <tr><th scope="row">监控</th><td>首屏看最终失败、切换后恢复和最近异常。支持按调用方、网关模型、结果和时间筛选。显示 OKR 由宿主明确绑定的调用，不明调用方保留实际客户端标识。聚合 <code>free</code> 无成员时能看到 503、所属阶段与已知原因。<a href="./model-monitoring.html">监控页设计</a></td></tr>
+      <tr><th scope="row">审计</th><td>打开某次异常，先看时间、调用方、模型、最终结果与处理入口。展开看实际尝试顺序、来源、上游结果和未发送原因。技术详情提供复制关联号。桌面用现有详情栏，手机打开全屏详情，返回时保留筛选与滚动位置。<a href="./model-audit.html">审计页设计</a></td></tr>
+      <tr><th scope="row">配置</th><td>来源页管理授权、已启用模型和定价。聚合页管理成员、策略和当前顺位。概况页管理每日限额。出错时链接到对应配置，保留查询上下文。<a href="./model-sources.html">模型源</a> · <a href="./model-aggregation.html">聚合</a> · <a href="./model-usage.html">概况</a></td></tr>
+    </tbody>
+  </table>
+  <div id="troubleshoot" class="sample" aria-label="网关排查样例">
+    <div class="sample-head"><h3>请求详情</h3><label>演示场景<select id="gateway-scenario"><option value="blocked">OKR 免费模型 · 无可用成员</option><option value="exhausted">聚合 · 切换后仍失败</option><option value="fallback">聚合 · 切换后恢复</option><option value="stream">聚合 · 输出中断</option></select></label></div>
+    <div class="gateway-request" role="status">
+      <div><small id="gateway-caller">OKR · Claude Code · free</small><strong id="gateway-outcome">请求失败 · 503</strong><p id="gateway-explanation">网关在发送前找不到可用成员。</p></div>
+      <a id="gateway-audit-link" class="page-reference" href="./model-audit.html?demo=gateway&amp;case=blocked#audit-example">打开审计样例</a>
+    </div>
+    <h3 class="step" id="gateway-timeline-title">调度记录</h3>
+    <ol id="gateway-timeline" class="gateway-timeline" aria-labelledby="gateway-timeline-title"><li>网关选路：暂无可用成员。</li></ol>
+    <details class="recent"><summary>技术详情</summary><dl class="call"><dt>对外结果</dt><dd id="gateway-response">503 MODEL_ROUTE_NO_AVAILABLE_MEMBER</dd><dt>上游尝试</dt><dd id="gateway-attempts">0 次</dd></dl></details>
+    <small class="gateway-sample-note">记录为演示数据。实际原因以请求发生时的已记录证据为准。</small>
+  </div>
+  <p class="copy">费用问题链接到来源定价。认证问题链接到来源授权。所有候选都在冷却或等待额度重置时，展示可确认的恢复时间。历史原因缺失时显示「未记录原因」。<code>free</code> 是一个聚合调用名。「仅看免费模型」是候选筛选。需保证单次调用只走免费成员时，使用已有的显式请求约束 <code>roami_free_only</code>。</p>
+</section>
+<section id="public-api" aria-labelledby="public-api-title">
+  <header class="section-head"><h2 id="public-api-title">对外接口</h2><small>客户端发现模型、发起调用、识别失败</small></header>
+  <table class="guide-table" aria-label="对外接口契约">
+    <thead><tr><th scope="col">能力</th><th scope="col">现有入口与兼容约定</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">发现</th><td><code>GET /v1/models</code> 保持现有客户端协议形状。调用方使用网关凭据获取其可用模型的调用名。Roami CLI 的 <code>roami model list --json</code> 使用完整目录能力，可选 <code>--free</code>、<code>--capability</code>。目录只表达有证据的能力。聚合的必备能力按可选成员和调度约束判断。</td></tr>
+      <tr><th scope="row">调用</th><td>保留 <code>POST /v1/chat/completions</code>、<code>POST /v1/responses</code>、<code>POST /v1/messages</code> 以及客户端适配已有的 <code>POST /v1/responses/compact</code>。按协议入口解码和响应。请求只填稳定调用名。重命名保留兼容别名，解析后用同一个规范模型归因。</td></tr>
+      <tr><th scope="row">认证</th><td>网关访问 Key 用于调用入口，来源 Key 只由网关访问上游。凭据轮换沿用现有入口。客户端拥有网关访问 Key 后，可按其授权范围调用模型。</td></tr>
+      <tr><th scope="row">关联</th><td>新增可选响应头 <code>X-Roami-Model-Request</code>，在网关接受并识别模型后生成。成功、网关拒绝或发生切换都复用同一个号。保留已有 <code>X-Roami-Model-Call</code> 作为上游尝试的关联。现有 SDK 可以继续按原协议调用，接入程序得到了请求号即可交给管理员排查。</td></tr>
+    </tbody>
+  </table>
+  <h3 class="step">失败与降级</h3>
+  <table class="guide-table" aria-label="失败与降级响应规则">
+    <thead><tr><th scope="col">情况</th><th scope="col">客户端看到的结果</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">发送前，无可调度成员</th><td>保留 <code>503</code> 和 <code>MODEL_ROUTE_NO_AVAILABLE_MEMBER</code>。当最早恢复时间可确认时才给 <code>Retry-After</code>。聚合成员数和费用判断留给控制接口上的审计记录。</td></tr>
+      <tr><th scope="row">尝试后，候选耗尽</th><td>保持现有 <code>503 MODEL_ROUTE_NO_AVAILABLE_MEMBER</code>。控制接口显示尝试次数、各自错误和终止原因，按有尝试的最终失败统计。</td></tr>
+      <tr><th scope="row">网关每日限额</th><td>保留 <code>402 MODEL_PROXY_DAILY_LIMIT</code>。上游额度耗尽在尝试详情里单列。两者分别指向限额与来源。</td></tr>
+      <tr><th scope="row">可切换失败</th><td>网关根据策略和发送证据决定换成员。客户端只收到最终响应，审计含所有尝试。记下「切换后恢复」或「切换后仍失败」。同渠道重试单独计数。</td></tr>
+      <tr><th scope="row">已提交响应或带状态续接</th><td>输出已经开始后保留协议原有中断语义，审计标记「输出中断」，即使 HTTP 已返回 200。带供应商续接状态时只走可证明兼容的通道。请求取消和执行结果未知单独呈现。</td></tr>
+    </tbody>
+  </table>
+  <p class="copy step">请求是否允许降级由网关策略与请求约束共同决定。候选必须满足协议、能力和显式费用约束。切换不能绕过预算、扩大授权、重放可能已执行的请求或跨供应商续接。JSON 错误保留现有稳定错误码，协议客户端的 SSE 事件形状保持兼容。</p>
+  <details class="step gateway-wire"><summary>Claude Code 调用与错误示例</summary>
+    <pre><code>POST /v1/messages
+Authorization: Bearer &lt;gateway-key&gt;
+Content-Type: application/json
+Anthropic-Version: 2023-06-01
+
+{"model":"roami-claude/free","max_tokens":32,
+ "messages":[{"role":"user","content":"返回 pong"}]}
+
+HTTP/1.1 503 Service Unavailable
+X-Roami-Model-Error: MODEL_ROUTE_NO_AVAILABLE_MEMBER
+X-Roami-Model-Request: &lt;request-id&gt;
+
+{"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}</code></pre>
+    <p class="muted">示例中的 <code>X-Roami-Model-Request</code> 为拟新增响应头。</p>
+  </details>
+</section>
+<section id="control-api" aria-labelledby="control-api-title">
+  <header class="section-head"><h2 id="control-api-title">控制接口</h2><small>读取配置、应用变更、诊断请求</small></header>
+  <p class="copy">控制接口沿用 Roami 已登录的节点代理 <code>/api/agent/model-gateway</code>，节点侧对应私有 Unix socket 上的 <code>/v1/model-gateway</code>。调用端口只保留推理与发现。来源密钥、路由策略和详细观测由节点控制接口处理。</p>
+  <table class="guide-table step" aria-label="控制接口职责">
+    <thead><tr><th scope="col">职责</th><th scope="col">接口及动作</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">模型与配置</th><td>沿用 <code>GET /models</code> 和 <code>GET /catalog</code>，通过 <code>PUT /catalog</code> 带当前 revision 保存配置。沿用 <code>POST /catalog/discover</code> 显式发现。编辑先核对引用、成员能力和顺位，发布后新请求用新版本，已开始的请求保留原配置版本。</td></tr>
+      <tr><th scope="row">策略与预算</th><td>沿用 <code>GET /catalog/routing?model=free</code> 看当前顺位和状态，沿用 <code>/settings/sources/{source}</code> 设置来源定价与账户调度，<code>/settings?scope=limits</code> 调整限额。提交冲突后重新读取现有配置，保留草稿供操作者处理。</td></tr>
+      <tr><th scope="row">策略预览（拟增）</th><td><code>POST /catalog/routing/preview</code> 接收聚合、当前 revision 与草稿策略，返回预览顺位、排除原因和数据时间。复用网关排序。预览不更新顺位状态、消耗渠道额度或写入调用统计。<a href="./model-aggregation.html#strategy-observation">聚合观测样例</a></td></tr>
+      <tr><th scope="row">凭据</th><td>沿用 <code>/access-keys</code> 创建、轮换、停用和删除。创建或轮换时显示新值一次，普通列表展示名称、权限状态与尾号。外部调用 Key 不授予目录配置和审计权限。</td></tr>
+      <tr><th scope="row">观测查询（拟增）</th><td><code>GET /monitor?view=requests&amp;routeId=free&amp;caller=okr&amp;outcome=failed&amp;hours=6</code> 读按请求聚合的统计和最近记录。支持时间窗、结果、错误阶段与分页游标。原 <code>GET /monitor</code> 保持按来源观测。<code>GET /monitor/requests/{requestId}</code> 读单次执行详情，零尝试也有结果。</td></tr>
+      <tr><th scope="row">验证和回退</th><td>查看当前顺位只读，不占用模型推理额度。抽检明确标明会发出请求并沿用现有 <code>POST /monitor/check</code>。版本回退拟复用配置保存校验，以新 revision 写入所选旧配置。</td></tr>
+    </tbody>
+  </table>
+  <h3 class="step">请求记录与统计</h3>
+  <ul class="copy">
+    <li>入口接受请求并识别模型后建立请求记录。保存请求号、规范模型、客户端类型、服务端可信归因、生效 revision、时间与最终结果。OKR 项目和会话来源仅以 Roami 宿主已验证的绑定为准。未绑定时仍可按实际客户端和模型定位。</li>
+    <li>选路拒绝时保存失败阶段和已知拦截原因。上游尝试记录序号、来源、上游模型、HTTP 状态和网关错误分类。能确认的额度、冷却、协议或授权原因可在详情展示。记录原因分布和有界样本，超出时提示省略。</li>
+    <li>同一请求号记录一次终态。更换成员后成功计为一次请求成功和一次切换恢复，来源统计保留失败尝试。预先跳过和同渠道重试分别记录。资格拦截且零尝试计为一次最终失败。输出中断计为失败，保留已送达状态和已知用量。计费继续依据各尝试的回执。</li>
+    <li>最终失败率用失败数除以已确认终态的成功与失败之和。取消和结果未知单列。切换数按请求去重，其中发生过跨源切换的归入跨源，其余换过模型的归入同源。链路里仍可查看每一步。统计显示时间窗、样本量和覆盖状态。</li>
+    <li>沿用最近 24 小时和有界存储。请求与尝试任一记录被回收时标记详情不完整。老数据继续展示已有来源统计，历史请求级数据无法关联时显示待积累。仅保存状态与关联字段，不记录提示词、响应正文、凭据或未清洗的上游错误文本。</li>
+  </ul>
+  <h3 class="step">代码与落地顺序</h3>
+  <ol class="copy">
+    <li><code>catalog_http.go</code> 负责请求生命周期与对外错误，先捕捉截图所示的零尝试 503。<code>routing_choice.go</code> 提供实际选择、跳过原因与切换决定，<code>response_observation.go</code> 延续尝试记录。</li>
+    <li><code>MonitorStore</code> 保存有界事件，<code>monitor_http.go</code> 负责按请求去重、过滤和详情查询。<code>ModelMonitoringWorkspace</code> 展示监控，审计读取同一关联号。网关目录与调用方绑定复用现有组件。</li>
+    <li>确认请求口径后接通 OKR 的可信归因与排查链接，再接入告警。连续拒绝以窗口内请求数与持续时间判定，切换成功按比例观察，恢复后自动消警。诊断支持限额、授权、冷却和版本变更几个常见场景。</li>
+  </ol>
+  <h3 class="step">验收场景</h3>
+  <table class="guide-table" aria-label="验收场景">
+    <thead><tr><th scope="col">场景</th><th scope="col">通过条件</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">OKR 的 free 返回 503</th><td>调用方能复制请求号。监控筛选后能看到失败。审计区分零尝试拒绝和尝试后耗尽，显示可证明的原因。限流、费用资格和未知原因能区分。</td></tr>
+      <tr><th scope="row">聚合首选 429，备选成功</th><td>客户端收到成功。监控增加一次已恢复，明细有两个按顺序的尝试，来源统计保留原 429。相同请求只计一次。</td></tr>
+      <tr><th scope="row">输出一半断开</th><td>记录流已开始和终态失败，没有二次发送。审计能区分 HTTP 200 与业务结果。</td></tr>
+      <tr><th scope="row">凭据与版本</th><td>调用 Key 不能读取管理明细。旧版本保存返回冲突。旧数据仍可读，关联缺失有提示。</td></tr>
+    </tbody>
+  </table>
+  <ul class="references copy">
+    <li><a href="./gateway-design.md">本机网关原技术设计</a></li>
+    <li><a href="./gateway-implementation.md">现有网关目录与验收</a></li>
+    <li><a href="../20261030-智能体模型切换/gateway-access-key.md">网关访问密钥设计</a></li>
+  </ul>
 </section>
 </main>
 </div>

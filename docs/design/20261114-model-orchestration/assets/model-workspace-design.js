@@ -23,6 +23,19 @@ function renderRoute() {
   byId('route-failure').textContent = empty ? '暂无样本' : '2.0%'
   byId('route-failure-note').hidden = empty
   byId('route-fallback').textContent = empty ? '0 次' : '3 次'
+  byId('route-sources-ready').textContent = mode === 'unknown' ? '待检测' : mode === 'blocked' ? '0 / 2' : '2 / 2'
+  byId('route-cooling').textContent = mode === 'unknown' ? '待检测' : mode === 'blocked' ? '1' : '0'
+  byId('route-switch-scope').textContent = empty ? '近 1 小时暂无切换。' : '近 1 小时同源换模型 1 次，跨源切换 2 次。'
+  const sourceHealth = mode === 'unknown'
+    ? ['OpenRouter · 状态未检测', 'WorkBuddy · 状态未检测']
+    : mode === 'blocked'
+      ? ['OpenRouter · 0 / 2 个成员可调度 · 限流冷却、能力不符', 'WorkBuddy · 0 / 1 个成员可调度 · 额度耗尽']
+      : ['OpenRouter · 1 / 2 个成员可调度', 'WorkBuddy · 1 / 1 个成员可调度']
+  byId('route-source-health').replaceChildren(...sourceHealth.map(text => {
+    const item = document.createElement('li')
+    item.textContent = text
+    return item
+  }))
   byId('route-latest').textContent = empty ? '暂无调用。' : '最近命中 16:39 · ERNIE 5.5 Flash · 成功'
   byId('route-events').hidden = empty
   byId('route-no-events').hidden = !empty
@@ -128,6 +141,84 @@ if (byId('monitor-range')) {
   })
   renderMonitor()
 }
+const gatewayCases = new Map([
+  ['blocked', {
+    caller: 'OKR · Claude Code · free',
+    outcome: '请求失败 · 503',
+    explanation: '网关在发送前找不到可用成员。',
+    response: '503 MODEL_ROUTE_NO_AVAILABLE_MEMBER',
+    attempts: 0,
+    timeline: [
+      ['接收请求', '解析到网关模型 free。'],
+      ['选路未通过', '示例：一个成员处于冷却，另一个成员的上游额度已耗尽。'],
+      ['返回失败', '上游尝试 0 次。'],
+    ],
+  }],
+  ['exhausted', {
+    caller: '聚合调用 · free',
+    outcome: '切换后仍失败 · 503',
+    explanation: '首选限流，备选额度耗尽，候选用完。',
+    response: '503 MODEL_ROUTE_NO_AVAILABLE_MEMBER',
+    attempts: 2,
+    timeline: [
+      ['第 1 次尝试 · 429', 'OpenRouter 免费模型 · 上游限流。'],
+      ['第 2 次尝试 · 402', 'WorkBuddy · 上游额度耗尽。'],
+      ['返回失败', '候选耗尽，计入 1 次最终失败。'],
+    ],
+  }],
+  ['fallback', {
+    caller: '聚合调用 · free',
+    outcome: '切换后恢复',
+    explanation: '首选受到上游限流，备选成员完成请求。',
+    response: '200 · 响应完成',
+    attempts: 2,
+    timeline: [
+      ['第 1 次尝试 · 429', 'OpenRouter 免费模型 · 上游限流。'],
+      ['第 2 次尝试 · 成功', 'WorkBuddy · 返回完整响应。'],
+      ['计入 1 次请求成功', '1 次切换恢复，来源侧仍保留第 1 次失败。'],
+    ],
+  }],
+  ['stream', {
+    caller: '聚合调用 · free',
+    outcome: '输出中断',
+    explanation: '输出已开始，客户端收到部分内容。',
+    response: 'HTTP 200 · 流在完成前中断',
+    attempts: 1,
+    timeline: [
+      ['第 1 次尝试 · 开始输出', '网关已向客户端发送首段输出。'],
+      ['上游流中断', '上游尝试 1 次，后续发送 0 次。'],
+      ['计入 1 次请求失败', '保留已发送状态与已知用量。'],
+    ],
+  }],
+])
+function renderGatewayTimeline(element, rows) {
+  element.replaceChildren(...rows.map(([title, evidence]) => {
+    const item = document.createElement('li')
+    const heading = document.createElement('strong')
+    const detail = document.createElement('span')
+    heading.textContent = title
+    detail.textContent = evidence
+    item.append(heading, detail)
+    return item
+  }))
+}
+const gatewayScenario = byId('gateway-scenario')
+if (gatewayScenario) {
+  const requested = new URLSearchParams(location.search).get('case')
+  if (gatewayCases.has(requested)) gatewayScenario.value = requested
+  const render = () => {
+    const name = gatewayScenario.value
+    const entry = gatewayCases.get(name)
+    for (const field of ['caller', 'outcome', 'explanation', 'response']) {
+      byId('gateway-' + field).textContent = entry[field]
+    }
+    byId('gateway-attempts').textContent = entry.attempts + ' 次'
+    byId('gateway-audit-link').href = './model-audit.html?demo=gateway&case=' + name + '#audit-example'
+    renderGatewayTimeline(byId('gateway-timeline'), entry.timeline)
+  }
+  gatewayScenario.addEventListener('change', render)
+  render()
+}
 if (byId('audit-example')) {
   const query = new URLSearchParams(location.search)
   const demo = query.get('demo')
@@ -139,6 +230,17 @@ if (byId('audit-example')) {
     byId('audit-context').textContent = demo === 'route'
       ? '聚合调用 · 16:35 · 已记录故障切换 · 演示'
       : range + ' · 全部来源 · 全部模型 · ' + reason + ' · 演示'
+  }
+  const name = query.get('case')
+  const entry = demo === 'gateway' && gatewayCases.get(name)
+  if (entry) {
+    byId('audit-example').open = true
+    byId('gateway-audit-record').hidden = false
+    byId('audit-context').textContent = entry.caller + ' · 演示'
+    byId('gateway-audit-outcome').textContent = entry.outcome
+    byId('gateway-audit-response').textContent = entry.response
+    byId('gateway-audit-return').href = './model-gateway.html?case=' + name + '#troubleshoot'
+    renderGatewayTimeline(byId('gateway-audit-timeline'), entry.timeline)
   }
 }
 byId('claim')?.addEventListener('click', () => {
