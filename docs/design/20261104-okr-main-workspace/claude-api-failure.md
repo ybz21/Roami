@@ -67,3 +67,9 @@ Claude原task的r4已通过可信恢复启动新物理session，宿主确认继�
 同provider继续仍须分别验收，#880保持开放。独立证据位于
 `/tmp/okr-member-migration-20261111/final-deployment.json`、`production-layout-evidence.json`
 及 `production-final-layout-run3.log`，不以投递成功代替最终完成。
+
+## 已有 Main 的免费路由暂不可用
+
+宣传项目原 Main 已接收受管输入。客户端在重试后以本轮根消息的直接子记录报告 503 和结构化 MODEL_ROUTE_NO_AVAILABLE_MEMBER。该 synthetic 记录带 failedResponseHadNoToolCall、零输入和输出用量。只读重放确认同一输入没有工具，且实际进程已经停止。旧收口规则漏掉了这一种终结响应，导致后续成员回执排队。
+
+沿用当前受管 launch key、原 prepared provider、输入原文摘要和既有工作区 writer 对账。从根输入到错误只允许原有请求元数据，按原生协议识别这一种 503 代码及客户端标准说明。仍需两次相同证据和真实停止证明。对账返回带来源摘要的失败回执，释放本轮输入。普通 503、不同结构化错误、转录有正常响应或任务工具、后续请求等继续由原规则处理。此变更独立于模型设置以及下一步的持续目标退避和产品状态。
