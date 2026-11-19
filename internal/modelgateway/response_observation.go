@@ -239,7 +239,7 @@ func checkArithmeticObject(raw string) bool {
 
 type qualityProbeContext struct{}
 
-func (h *Handler) observeAttempt(r *http.Request, leaf routingLeaf, call Call, status int, code string, usage *Usage, o *responseObservation) {
+func (h *Handler) observeAttempt(r *http.Request, leaf routingLeaf, call Call, status int, code string, usage *Usage, o *responseObservation, requestID string, attempt int) MonitorRecord {
 	finished := time.Now()
 	successful := status >= 200 && status < 300 && (o.stream && o.terminal || !o.stream && o.eof) && !o.invalid
 	var first, speed *float64
@@ -292,7 +292,10 @@ func (h *Handler) observeAttempt(r *http.Request, leaf routingLeaf, call Call, s
 		}
 	}
 	h.routing.mu.Unlock()
-	record := MonitorRecord{At: h.Ledger.now().UnixMilli(), SourceID: call.SourceID, Model: call.Model, RouteID: call.RouteID, Account: routingAccountKey(leaf.Account), Success: successful, Status: status, Error: monitorError(code), Duration: finished.Sub(o.started).Milliseconds(), FirstToken: first, TokensPerSecond: speed, Quality: quality, QualityRule: rule}
+	if requestID == "" {
+		attempt = 0
+	}
+	record := MonitorRecord{At: h.Ledger.now().UnixMilli(), SourceID: call.SourceID, Model: call.Model, RouteID: call.RouteID, Account: routingAccountKey(leaf.Account), Success: successful, Status: status, Error: monitorError(code), Duration: finished.Sub(o.started).Milliseconds(), FirstToken: first, TokensPerSecond: speed, Quality: quality, QualityRule: rule, RequestID: requestID, Attempt: attempt, CallID: call.ID}
 	if probe, ok := r.Context().Value(qualityProbeContext{}).(*qualityProbe); ok {
 		copy := record
 		probe.Record = &copy
@@ -300,4 +303,5 @@ func (h *Handler) observeAttempt(r *http.Request, leaf routingLeaf, call Call, s
 	if h.Monitor != nil {
 		_ = h.Monitor.Append(record)
 	}
+	return record
 }

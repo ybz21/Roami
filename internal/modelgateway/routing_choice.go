@@ -36,6 +36,7 @@ type routingChoice struct {
 	nodes                 map[string]*routingNode
 	targets               []routeTarget
 	blocks                map[ModelCandidate]string
+	skips                 map[string]int
 	contexts              map[ModelCandidate]int
 	ordered               []routeTarget
 	cursor                int
@@ -383,6 +384,14 @@ func (c *routingChoice) nextLocked() (routingLeaf, bool, error) {
 		node := c.nodes[target.ID]
 		target.Channel = *c.handler.routing.channel(target.ID, now)
 		if !availableTarget(target, now) {
+			reason := "cooldown"
+			if target.Channel.ExhaustedUntil.After(now) || target.Quota.Remaining != nil && *target.Quota.Remaining <= 0 {
+				reason = "quota"
+			}
+			if c.skips == nil {
+				c.skips = map[string]int{}
+			}
+			c.skips[reason]++
 			c.cursor++
 			continue
 		}
@@ -429,6 +438,24 @@ func (c *routingChoice) nextLocked() (routingLeaf, bool, error) {
 	}
 	return routingLeaf{}, false, nil
 }
+func (c *routingChoice) unavailableReasons() map[string]int {
+	result := map[string]int{}
+	for _, reason := range c.blocks {
+		result[reason]++
+	}
+	for reason, count := range c.skips {
+		result[reason] += count
+	}
+	for _, node := range c.nodes {
+		if node.child != nil && node.child.initialized {
+			for reason, count := range node.child.unavailableReasons() {
+				result[reason] += count
+			}
+		}
+	}
+	return result
+}
+
 func (c *routingChoice) Next() (routingLeaf, bool, error) {
 	c.handler.routing.mu.Lock()
 	defer c.handler.routing.mu.Unlock()

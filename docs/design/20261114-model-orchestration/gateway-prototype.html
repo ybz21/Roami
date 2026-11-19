@@ -288,6 +288,11 @@ Error generating stack: `+o.message+`
   <div class="sample" id="strategy-observation" aria-label="\u805A\u5408\u5C40\u90E8\u6837\u4F8B">
     <div class="sample-head"><div class="sample-title"><h3>\u751F\u6548\u8C03\u5EA6</h3><small>\u8FD1 1 \u5C0F\u65F6 \xB7 \u6F14\u793A\u6570\u636E</small></div><label class="muted">\u6F14\u793A\u72B6\u6001<select id="route-scenario"><option value="ready">\u6709\u53EF\u7528\u6210\u5458</option><option value="blocked">\u65E0\u53EF\u7528\u6210\u5458</option><option value="unknown">\u72B6\u6001\u672A\u68C0\u6D4B</option><option value="empty">\u6682\u65E0\u8C03\u7528</option></select></label></div>
     <div class="route-policy"><span>\u5DF2\u751F\u6548\u7B56\u7565 <strong>\u6309\u987A\u5E8F</strong></span><span>\u53EF\u8C03\u5EA6\u6765\u6E90 <strong id="route-sources-ready"></strong></span><span>\u51B7\u5374\u6210\u5458 <strong id="route-cooling"></strong></span></div>
+    <ol class="request-flow route-flow" aria-label="\u5F53\u524D\u5019\u9009\u987A\u4F4D">
+      <li><small>\u8C03\u7528\u540D</small><strong>free</strong></li>
+      <li><small>\u9996\u9009</small><strong id="route-flow-first"></strong></li>
+      <li id="route-flow-next-node"><small>\u5907\u9009</small><strong id="route-flow-next"></strong></li>
+    </ol>
     <dl class="metrics">
       <div><dt>\u5F53\u524D\u53EF\u8C03\u5EA6</dt><dd id="route-ready"></dd><small id="route-first"></small></div>
       <div><dt>\u5DF2\u5B8C\u6210\u8BF7\u6C42</dt><dd id="route-total">200</dd></div>
@@ -295,11 +300,6 @@ Error generating stack: `+o.message+`
       <div><dt>\u6545\u969C\u5207\u6362</dt><dd id="route-fallback">3 \u6B21</dd><small>\u6309\u903B\u8F91\u8BF7\u6C42\u53BB\u91CD</small></div>
     </dl>
 
-    <ol class="request-flow route-flow" aria-label="\u5F53\u524D\u5019\u9009\u987A\u4F4D">
-      <li><small>\u8C03\u7528\u540D</small><strong>free</strong></li>
-      <li><small>\u9996\u9009</small><strong id="route-flow-first"></strong></li>
-      <li id="route-flow-next-node"><small>\u5907\u9009</small><strong id="route-flow-next"></strong></li>
-    </ol>
     <a class="page-reference" id="route-path-action" href="#/troubleshoot?case=fallback">\u67E5\u770B\u6545\u969C\u8DEF\u5F84</a>
     <div class="grid-title"><h3>\u6210\u5458\u72B6\u6001\u4E0E\u8D1F\u8F7D</h3><small>\u8FD1 1 \u5C0F\u65F6\u6210\u529F\u627F\u8F7D</small></div>
     <p id="route-message" class="muted" role="status" hidden></p>
@@ -335,7 +335,7 @@ Error generating stack: `+o.message+`
       </ul>
     </details>
 </section>
-<section data-prototype-view="monitoring" hidden data-design="model-monitoring.html>
+<section data-prototype-view="monitoring" hidden>
   <div class="sample" aria-label="\u76D1\u63A7\u5C40\u90E8\u6837\u4F8B">
     <div class="sample-head"><h3>\u8C03\u7528\u8D8B\u52BF</h3><label class="muted">\u6F14\u793A\u8303\u56F4<select id="monitor-range"><option value="1">\u6700\u8FD1 1 \u5C0F\u65F6</option><option value="6">\u6700\u8FD1 6 \u5C0F\u65F6</option><option value="24">\u6700\u8FD1 24 \u5C0F\u65F6</option><option value="0">\u6682\u65E0\u8C03\u7528</option></select></label></div>
     <dl class="metrics">

@@ -33,7 +33,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"GET", "/agent/model-gateway/plugins/community"}, {"POST", "/agent/model-gateway/plugins/community"},
 		{"GET", "/agent/model-gateway/access-keys"}, {"POST", "/agent/model-gateway/access-keys"}, {"PATCH", "/agent/model-gateway/access-keys/:id"}, {"DELETE", "/agent/model-gateway/access-keys/:id"}, {"POST", "/agent/model-gateway/access-keys/:id/rotate"},
 		{"GET", "/agent/model-gateway/access-key"}, {"PUT", "/agent/model-gateway/access-key"}, {"DELETE", "/agent/model-gateway/access-key"},
-		{"POST", "/agent/model-gateway/monitor/check"}, {"GET", "/agent/model-gateway/monitor"}, {"GET", "/agent/model-gateway/settings/sources/:source"}, {"PUT", "/agent/model-gateway/settings/sources/:source"},
+		{"POST", "/agent/model-gateway/monitor/check"}, {"GET", "/agent/model-gateway/monitor"}, {"GET", "/agent/model-gateway/monitor/requests/:request"}, {"GET", "/agent/model-gateway/settings/sources/:source"}, {"PUT", "/agent/model-gateway/settings/sources/:source"},
 		{"GET", "/agent/model-gateway/settings"}, {"PUT", "/agent/model-gateway/settings"},
 		{"GET", "/agent/model-gateway/models"}, {"GET", "/agent/model-gateway/catalog/routing"}, {"GET", "/agent/model-gateway/catalog"}, {"PUT", "/agent/model-gateway/catalog"}, {"POST", "/agent/model-gateway/catalog/apply"},
 		{"POST", "/agent/model-gateway/catalog/discover"}, {"POST", "/agent/model-gateway/catalog/roles"}, {"POST", "/agent/model-gateway/catalog/source-models"},

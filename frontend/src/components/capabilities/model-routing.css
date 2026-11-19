@@ -178,3 +178,17 @@ html[data-pointer="coarse"] .tt-member-pool-list .tt-act { min-width:var(--tap);
 html:is([data-size="compact"],[data-size="medium"]) .tt-member-pool-list { flex-wrap:nowrap; max-height:none; }
 html:is([data-size="compact"],[data-size="medium"]) .tt-member-pool-list>li { flex-shrink:0; }
 .tt-routing-main > .tt-model-hub-actions > .ui-input-wrap { width:var(--content-form); max-width:100%; }
+.tt-pool-route {
+  display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:var(--sp-3);
+  margin:var(--sp-2) 0 0; padding:0; list-style:none;
+}
+.tt-pool-route li {
+  min-width:0; position:relative; display:flex; flex-direction:column; gap:var(--sp-1);
+  padding:var(--sp-2); border:1px solid var(--border); border-radius:var(--r-xs); overflow-wrap:anywhere;
+}
+.tt-pool-route li + li::before {
+  content:''; position:absolute; inset-inline-end:100%; top:50%; width:calc(var(--sp-3) + 2px); border-top:1px solid var(--accent-border);
+}
+.tt-pool-route li span { font-size:var(--fs-meta); color:var(--text-dim); }
+.tt-pool-route li strong { font-size:var(--fs-sm); }
+.tt-pool-status > .tt-routing-guide { margin-top:var(--sp-2); }

@@ -79,12 +79,13 @@ X-Roami-Model-Error: MODEL_ROUTE_NO_AVAILABLE_MEMBER
 X-Roami-Model-Request: &lt;request-id&gt;
 
 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}</code></pre>
-    <p class="muted">示例中的 <code>X-Roami-Model-Request</code> 为拟新增响应头。</p>
+    <p class="muted"><code>X-Roami-Model-Request</code> 对已识别模型的目录路由返回。</p>
   </details>
 </section>
 <section id="control-api" aria-labelledby="control-api-title">
   <header class="section-head"><h2 id="control-api-title">控制接口</h2><small>读取配置、应用变更、诊断请求</small></header>
   <p class="copy">控制接口沿用 Roami 已登录的节点代理 <code>/api/agent/model-gateway</code>，节点侧对应私有 Unix socket 上的 <code>/v1/model-gateway</code>。调用端口只保留推理与发现。来源密钥、路由策略和详细观测由节点控制接口处理。</p>
+  <p class="copy">请求观测已接入目录路由。对外用 <code>X-Roami-Model-Request</code> 关联整次请求，控制接口用 <code>GET /monitor?view=requests</code> 查询终态，用 <code>GET /monitor/requests/{requestId}</code> 查实际尝试。来源统计和账本沿用原口径。旧记录在来源视图仍可查，OKR 项目的可信归因和服务端策略草稿预览仍在后续范围。</p>
   <table class="guide-table step" aria-label="控制接口职责">
     <thead><tr><th scope="col">职责</th><th scope="col">接口及动作</th></tr></thead>
     <tbody>
@@ -92,7 +93,7 @@ X-Roami-Model-Request: &lt;request-id&gt;
       <tr><th scope="row">策略与预算</th><td>沿用 <code>GET /catalog/routing?model=free</code> 看当前顺位和状态，沿用 <code>/settings/sources/{source}</code> 设置来源定价与账户调度，<code>/settings?scope=limits</code> 调整限额。提交冲突后重新读取现有配置，保留草稿供操作者处理。</td></tr>
       <tr><th scope="row">策略预览（拟增）</th><td><code>POST /catalog/routing/preview</code> 接收聚合、当前 revision 与草稿策略，返回预览顺位、排除原因和数据时间。复用网关排序。预览不更新顺位状态、消耗渠道额度或写入调用统计。<a href="./model-aggregation.html#strategy-observation">聚合观测样例</a></td></tr>
       <tr><th scope="row">凭据</th><td>沿用 <code>/access-keys</code> 创建、轮换、停用和删除。创建或轮换时显示新值一次，普通列表展示名称、权限状态与尾号。外部调用 Key 不授予目录配置和审计权限。</td></tr>
-      <tr><th scope="row">观测查询（拟增）</th><td><code>GET /monitor?view=requests&amp;routeId=free&amp;caller=okr&amp;outcome=failed&amp;hours=6</code> 读按请求聚合的统计和最近记录。支持时间窗、结果、错误阶段与分页游标。原 <code>GET /monitor</code> 保持按来源观测。<code>GET /monitor/requests/{requestId}</code> 读单次执行详情，零尝试也有结果。</td></tr>
+      <tr><th scope="row">观测查询</th><td><code>GET /monitor?view=requests&amp;routeId=free&amp;caller=claude&amp;outcome=blocked&amp;hours=6</code> 读按请求聚合的统计和最近记录。支持固定时间窗、网关模型、调用方和结果，最近请求最多显示 50 条。原 <code>GET /monitor</code> 保持按来源观测。<code>GET /monitor/requests/{requestId}</code> 读单次执行详情，零尝试也有结果。</td></tr>
       <tr><th scope="row">验证和回退</th><td>查看当前顺位只读，不占用模型推理额度。抽检明确标明会发出请求并沿用现有 <code>POST /monitor/check</code>。版本回退拟复用配置保存校验，以新 revision 写入所选旧配置。</td></tr>
     </tbody>
   </table>

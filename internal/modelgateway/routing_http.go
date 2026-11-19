@@ -35,6 +35,13 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 		reject(w, 503, "MODEL_ROUTE_UNAVAILABLE")
 		return
 	}
+	var observation *requestObservationSummary
+	if h.Monitor != nil {
+		if rows, _, readErr := h.Monitor.Snapshot(); readErr == nil {
+			value := routeObservation(rows, append([]string{model.ID}, model.Aliases...), h.Monitor.now().Add(-time.Hour).UnixMilli())
+			observation = &value
+		}
+	}
 	h.routing.mu.Lock()
 	defer h.routing.mu.Unlock()
 	memory := h.routing.memory(choice.model, h.Ledger)
@@ -83,5 +90,5 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 	for _, candidate := range model.Candidates {
 		members = append(members, memberStatus{candidate, choice.blocks[candidate], choice.contexts[candidate]})
 	}
-	writeJSON(w, 200, map[string]any{"data": map[string]any{"now": time.Now().UnixMilli(), "available": available, "channels": rows, "members": members}})
+	writeJSON(w, 200, map[string]any{"data": map[string]any{"now": time.Now().UnixMilli(), "available": available, "channels": rows, "members": members, "observation": observation}})
 }

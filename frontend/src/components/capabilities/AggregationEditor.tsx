@@ -10,9 +10,9 @@ import RoutingStrategyPreview from './RoutingStrategyPreview'
 import AggregationRuntime from './AggregationRuntime'
 import { useModelMemberFacts } from './model-member-facts'
 
-export default function AggregationEditor({ model, original, catalog, active, busy, valid, error, onChange, onSave, onCancel, onDelete, onSource, retry }: {
+export default function AggregationEditor({ model, original, catalog, active, busy, valid, error, onChange, onSave, onCancel, onDelete, onSource, onRequest, retry }: {
   model: CatalogModel; original: string | null; catalog: ModelCatalog; active: boolean; busy: boolean; valid: boolean; error: string
-  onChange: (patch: Partial<CatalogModel>) => void; onSave: () => void; onCancel: () => void; onDelete: () => Promise<boolean>; onSource: (source: string) => void; retry: () => void
+  onChange: (patch: Partial<CatalogModel>) => void; onSave: () => void; onCancel: () => void; onDelete: () => Promise<boolean>; onSource: (source: string) => void; onRequest: (id: string) => void; retry: () => void
 }) {
   const { t, locale } = useI18n(), [tab, setTab] = useState(original ? 'routing' : 'members'), scroll = useRef<HTMLDivElement>(null)
   const more = useRef<HTMLDetailsElement>(null)
@@ -41,7 +41,7 @@ export default function AggregationEditor({ model, original, catalog, active, bu
         </details>
       </section>
       <section hidden={tab !== 'routing'} aria-label={t('pool.section.routing')}>
-        {saved && <AggregationRuntime model={saved} catalog={catalog} status={status} hasDraft={JSON.stringify(saved) !== JSON.stringify(model)} />}
+        {saved && <AggregationRuntime model={saved} catalog={catalog} status={status} onRequest={onRequest} hasDraft={JSON.stringify(saved) !== JSON.stringify(model)} />}
         <RoutingStrategyPreview model={model} sources={catalog.sources} pools={catalog.models.filter(row => row.aggregate)} onChange={onChange} disabled={busy || !active || tab !== 'routing'} facts={facts} configuration={<>
           <label className="agent-settings-field"><span>{t('pool.strategy')}</span><Select aria-label={t('pool.strategy')} virtual={false} disabled={busy} value={model.strategy} options={routingStrategies.map(value => ({ value, label: t('pool.strategy.' + value) }))} onChange={(strategy: RoutingStrategy) => onChange({ strategy })} /></label>
           <p className="agent-settings-hint">{t('pool.strategy.' + model.strategy + '.summary')}</p>

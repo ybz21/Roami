@@ -104,10 +104,18 @@ func TestAggregateRetriesRejectedSourceHonorsCooldownAndKeepsAttempts(t *testing
 		w.Header().Set("Retry-After", "120")
 		http.Error(w, `{"error":{"code":"rate_limit"}}`, 429)
 	}, func(w http.ResponseWriter, r *http.Request) { second.Add(1); responseFixture(w, r) })
+	var recoveredID string
 	for i := 0; i < 2; i++ {
 		w := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`)
 		if w.Code != 200 {
 			t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+		}
+		id := w.Header().Get(requestHeader)
+		if id == "" || id == recoveredID {
+			t.Fatalf("missing distinct gateway reference: %q", id)
+		}
+		if i == 0 {
+			recoveredID = id
 		}
 	}
 	if first.Load() != 1 || second.Load() != 2 {
@@ -120,8 +128,30 @@ func TestAggregateRetriesRejectedSourceHonorsCooldownAndKeepsAttempts(t *testing
 		t.Fatal("ignored Retry-After")
 	}
 	rows, _, err := h.Monitor.Snapshot()
-	if err != nil || len(rows) != 3 || rows[0].Success || !rows[1].Success {
-		t.Fatalf("attempt monitoring: %+v %v", rows, err)
+	if err != nil || len(rows) != 5 || rows[0].Success || !rows[1].Success || rows[2].Outcome != "recovered" || rows[4].Outcome != "success" {
+		t.Fatalf("attempt and request monitoring: %+v %v", rows, err)
+	}
+	detail := httptest.NewRecorder()
+	h.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/v1/model-gateway/monitor/requests/"+recoveredID, nil))
+	var result struct {
+		Data struct {
+			Request  MonitorRecord
+			Attempts []MonitorRecord
+			Complete bool
+		}
+	}
+	if err := json.Unmarshal(detail.Body.Bytes(), &result); err != nil || detail.Code != 200 || !result.Data.Complete ||
+		result.Data.Request.Switch != "source" || len(result.Data.Attempts) != 2 || result.Data.Attempts[0].Status != 429 || result.Data.Attempts[1].Status != 200 {
+		t.Fatalf("request audit: %d %s (%v)", detail.Code, detail.Body.String(), err)
+	}
+	monitor := httptest.NewRecorder()
+	h.ServeHTTP(monitor, httptest.NewRequest(http.MethodGet, "/v1/model-gateway/monitor?view=requests&routeId=coding-main", nil))
+	var summary struct {
+		Data struct{ Totals requestTotals }
+	}
+	if err := json.Unmarshal(monitor.Body.Bytes(), &summary); err != nil || monitor.Code != 200 ||
+		summary.Data.Totals.Requests != 2 || summary.Data.Totals.Failed != 0 || summary.Data.Totals.Recovered != 1 {
+		t.Fatalf("request totals: %d %s (%v)", monitor.Code, monitor.Body.String(), err)
 	}
 	var count int
 	if err = h.Ledger.db.QueryRow(`SELECT count(*) FROM gateway_calls`).Scan(&count); err != nil || count != 3 {
@@ -140,8 +170,8 @@ func TestAggregateNeverReplaysAfterStreamStartsAndRejectsPaidZeroPrice(t *testin
 		t.Fatal("replayed after output")
 	}
 	rows, _, _ := h.Monitor.Snapshot()
-	if len(rows) != 1 || rows[0].Success {
-		t.Fatal("incomplete stream counted as available")
+	if len(rows) != 2 || rows[0].Success || rows[1].Outcome != "interrupted" || rows[1].Status != 200 {
+		t.Fatalf("incomplete stream: %+v", rows)
 	}
 	config, _ := h.Ledger.Configuration()
 	config.Pricing.Sources = map[string]SourcePricing{"work": {Default: PriceRule{Mode: "tokens"}}, "backup": {Default: PriceRule{Mode: "unknown"}}}
@@ -151,6 +181,11 @@ func TestAggregateNeverReplaysAfterStreamStartsAndRejectsPaidZeroPrice(t *testin
 	w = catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello","roami_free_only":true}`)
 	if w.Code != 503 || backup.Load() != 0 {
 		t.Fatal("zero price entered free pool")
+	}
+	rows, _, _ = h.Monitor.Snapshot()
+	last := rows[len(rows)-1]
+	if len(rows) != 3 || last.Outcome != "blocked" || last.Attempts != 0 || last.Blocks["pricing"] != 2 || last.RequestID != w.Header().Get(requestHeader) {
+		t.Fatalf("zero-attempt request: %+v", last)
 	}
 }
 func TestDrainAnchorSurvivesRestartAndEarlierQuotaRecovery(t *testing.T) {

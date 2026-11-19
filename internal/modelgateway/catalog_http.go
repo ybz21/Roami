@@ -300,6 +300,10 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		reject(w, 400, "MODEL_NOT_CONFIGURED")
 		return
 	}
+	observed := &observedRequestWriter{ResponseWriter: w}
+	trace := newRequestObservation(observed, catalog, *model, kind)
+	w = observed
+	defer trace.finish(r, observed, h)
 	if !model.enabled() {
 		reject(w, 503, "MODEL_ROUTE_DISABLED")
 		return
@@ -351,6 +355,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				return
 			}
 			if !ok {
+				if trace.Attempts == 0 {
+					trace.Blocks = choice.unavailableReasons()
+				}
 				reject(w, 503, "MODEL_ROUTE_NO_AVAILABLE_MEMBER")
 				return
 			}
@@ -500,7 +507,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		// Each attempted source settles independently, including zero-send connection failures.
 		attempt := func() bool {
 			observation := newResponseObservation(source.Protocol, time.Now())
-			defer func() { h.observeAttempt(r, leaf, call, status, code, usage, observation) }()
+			delivered := false
+			defer func() {
+				record := h.observeAttempt(r, leaf, call, status, code, usage, observation, trace.RequestID, trace.Attempts+1)
+				trace.attempt(record, candidate, delivered, notSent)
+			}()
 
 			defer func() {
 				if err := h.Ledger.Settle(call, usage, status, code, notSent); err != nil {
@@ -614,6 +625,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 					return false
 				}
 				complete, conversionError := bridge.forward(w, response, &capture)
+				delivered = complete && conversionError == nil
 				usage = capture.finish(complete)
 				if conversionError != nil {
 					code = protocolCode(conversionError)
@@ -645,6 +657,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				}
 			}
 			if status >= 200 && status < 300 {
+				delivered = complete
 				usage = capture.finish(complete)
 				if usage != nil {
 					code = ""

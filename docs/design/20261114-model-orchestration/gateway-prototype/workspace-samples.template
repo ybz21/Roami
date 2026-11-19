@@ -51,6 +51,11 @@
   <div class="sample" id="strategy-observation" aria-label="聚合局部样例">
     <div class="sample-head"><div class="sample-title"><h3>生效调度</h3><small>近 1 小时 · 演示数据</small></div><label class="muted">演示状态<select id="route-scenario"><option value="ready">有可用成员</option><option value="blocked">无可用成员</option><option value="unknown">状态未检测</option><option value="empty">暂无调用</option></select></label></div>
     <div class="route-policy"><span>已生效策略 <strong>按顺序</strong></span><span>可调度来源 <strong id="route-sources-ready"></strong></span><span>冷却成员 <strong id="route-cooling"></strong></span></div>
+    <ol class="request-flow route-flow" aria-label="当前候选顺位">
+      <li><small>调用名</small><strong>free</strong></li>
+      <li><small>首选</small><strong id="route-flow-first"></strong></li>
+      <li id="route-flow-next-node"><small>备选</small><strong id="route-flow-next"></strong></li>
+    </ol>
     <dl class="metrics">
       <div><dt>当前可调度</dt><dd id="route-ready"></dd><small id="route-first"></small></div>
       <div><dt>已完成请求</dt><dd id="route-total">200</dd></div>
@@ -58,11 +63,6 @@
       <div><dt>故障切换</dt><dd id="route-fallback">3 次</dd><small>按逻辑请求去重</small></div>
     </dl>
 
-    <ol class="request-flow route-flow" aria-label="当前候选顺位">
-      <li><small>调用名</small><strong>free</strong></li>
-      <li><small>首选</small><strong id="route-flow-first"></strong></li>
-      <li id="route-flow-next-node"><small>备选</small><strong id="route-flow-next"></strong></li>
-    </ol>
     <a class="page-reference" id="route-path-action" href="#/troubleshoot?case=fallback">查看故障路径</a>
     <div class="grid-title"><h3>成员状态与负载</h3><small>近 1 小时成功承载</small></div>
     <p id="route-message" class="muted" role="status" hidden></p>
@@ -98,7 +98,7 @@
       </ul>
     </details>
 </section>
-<section data-prototype-view="monitoring" hidden data-design="model-monitoring.html>
+<section data-prototype-view="monitoring" hidden>
   <div class="sample" aria-label="监控局部样例">
     <div class="sample-head"><h3>调用趋势</h3><label class="muted">演示范围<select id="monitor-range"><option value="1">最近 1 小时</option><option value="6">最近 6 小时</option><option value="24">最近 24 小时</option><option value="0">暂无调用</option></select></label></div>
     <dl class="metrics">
