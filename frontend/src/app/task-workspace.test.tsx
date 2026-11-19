@@ -135,14 +135,19 @@ it('opens Roami beside Codex in the shared workspace and restores its stable ide
 
 it('loads the workspace while the Roami inventory is pending and prunes only after a fresh response', async () => {
   server.terms = ['$1', 'roami:pending']; server.active = 'roami:pending'
+  server.files = [{ path: '/repo/native.md', task: 'loose:roami:pending', session: 'roami:pending', mode: 'preview', preview: false }]
+  server.activeFile = '/repo/native.md'
   let finish!: (value: unknown) => void
   const base = mock.api.getMockImplementation()!
   mock.api.mockImplementation((method, path, body) => path === '/agent/native-sessions' ? new Promise(resolve => { finish = resolve }) : base(method, path, body))
   const { result } = renderHook(() => useWorkspace())
   await waitFor(() => expect(result.current.workspace.active).toBe('roami:pending'))
   expect(result.current.workspace.terms).toEqual(['alpha', 'roami:pending'])
+  expect(result.current.workspace.fileTabs).toHaveLength(1)
   await act(async () => { finish({ data: [] }) })
   await waitFor(() => expect(server.terms).toEqual(['$1']))
+  expect(server.files).toEqual([])
+  expect(server.activeFile).toBe('')
 })
 
 it('keeps session identities and open tabs stable when only Roami activity changes', async () => {
@@ -197,15 +202,85 @@ it('never activates an unrelated session or neighboring workspace when switching
   expect(result.current.workspace.fileTabs.map(file => file.path)).toEqual(['/two/c.md'])
 })
 
-it('keeps phone files reachable after closing their last session and dismisses only after the last file closes', async () => {
+it('closes the last session with all its files and dismisses the phone overlay', async () => {
   const { result } = renderHook(() => useWorkspace(true))
   await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
   act(() => result.current.workspace.openTerm('alpha'))
   act(() => result.current.workspace.openFileTab('/repo/plan.md'))
+  act(() => result.current.workspace.openFileTab('/repo/code.ts'))
   act(() => result.current.workspace.closeTerm('alpha'))
-  await waitFor(() => expect(result.current.workspace.terms).toEqual([]))
-  expect(result.current.workspace.overlay).toBe(true)
-  expect(result.current.workspace.curFile).toBe('/repo/plan.md')
-  act(() => result.current.workspace.closeFileTab('/repo/plan.md'))
+  await waitFor(() => expect(server.terms).toEqual([]))
+  expect(server.files).toEqual([])
+  expect(result.current.workspace.curFile).toBe('')
   await waitFor(() => expect(result.current.workspace.overlay).toBe(false))
+})
+
+it.each([false, true])('closes only the originating session files even in the same worktree (phone: %s)', async mobile => {
+  projectState.table = { alpha: { worktree: '/repo' }, beta: { worktree: '/repo' } }
+  const { result } = renderHook(() => useWorkspace(mobile))
+  await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+  act(() => {
+    result.current.workspace.openFileTab('/repo/a.md')
+    result.current.workspace.openFileTab('/repo/a.md')
+  })
+  act(() => result.current.workspace.openFileTab('/repo/b.ts'))
+  expect(result.current.workspace.fileTabs).toHaveLength(2)
+  act(() => result.current.workspace.openTerm('beta'))
+  act(() => result.current.workspace.openFileTab('/repo/c.md'))
+  act(() => result.current.workspace.closeTerm('alpha'))
+  await waitFor(() => expect(server.files.map(file => file.path)).toEqual(['/repo/c.md']))
+  expect(result.current.workspace.active).toBe('beta')
+  expect(result.current.workspace.curFile).toBe('/repo/c.md')
+  act(() => result.current.workspace.closeTerm('beta'))
+  await waitFor(() => expect(server.files).toEqual([]))
+  expect(server.activeFile).toBe('')
+})
+
+it('restores file ownership after reload and renaming before closing a session', async () => {
+  projectState.table = { alpha: { worktree: '/repo' }, beta: { worktree: '/repo' } }
+  const first = renderHook(() => useWorkspace())
+  await waitFor(() => expect(first.result.current.workspace.active).toBe('alpha'))
+  act(() => first.result.current.workspace.openFileTab('/repo/a.md'))
+  act(() => first.result.current.workspace.openTerm('beta'))
+  act(() => first.result.current.workspace.openFileTab('/repo/b.md'))
+  await waitFor(() => expect(server.files.map(file => file.session)).toEqual(['$1', '$2']))
+  first.unmount()
+  const next = renderHook(() => useWorkspace())
+  await waitFor(() => expect(next.result.current.workspace.curFile).toBe('/repo/b.md'))
+  act(() => next.result.current.workspace.renameOpenTerm('alpha', 'renamed'))
+  act(() => next.result.current.workspace.closeTerm('renamed'))
+  await waitFor(() => expect(server.files.map(file => file.path)).toEqual(['/repo/b.md']))
+})
+
+it('keeps legacy shared files until the last worktree session closes and preserves standalone files', async () => {
+  projectState.table = { alpha: { worktree: '/repo' }, beta: { worktree: '/repo' } }
+  server = { ...server, terms: ['$1', '$2'], files: [
+    { path: '/repo/legacy.md', task: '/repo', mode: 'preview', preview: false },
+    { path: '/standalone.md', task: '', mode: 'preview', preview: false },
+  ], activeFile: '/repo/legacy.md' }
+  const { result } = renderHook(() => useWorkspace())
+  await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+  act(() => result.current.workspace.closeTerm('alpha'))
+  expect(result.current.workspace.fileTabs).toHaveLength(2)
+  act(() => result.current.workspace.closeTerm('beta'))
+  await waitFor(() => expect(server.files.map(file => file.path)).toEqual(['/standalone.md']))
+  expect(result.current.workspace.curFile).toBe('')
+})
+
+it('cleans owned files when a session disappears through another close entry point', async () => {
+  const id = '2026-1119-1030-abcd'
+  let sessions = [{ id, name: 'alpha' }]
+  const base = mock.api.getMockImplementation()!
+  mock.api.mockImplementation((method, path, body) => path === '/sessions' ? Promise.resolve(sessions) : base(method, path, body))
+  server = { ...server, terms: [id], active: id }
+  const { result } = renderHook(() => useWorkspace(true))
+  await waitFor(() => expect(result.current.workspace.active).toBe('alpha'))
+  act(() => result.current.workspace.openTerm('alpha'))
+  act(() => result.current.workspace.openFileTab('/repo/a.md'))
+  await waitFor(() => expect(server.files[0]?.session).toBe(id))
+  sessions = []
+  await act(async () => { result.current.directory.refresh() })
+  await waitFor(() => expect(server.terms).toEqual([]))
+  expect(server.files).toEqual([])
+  expect(result.current.workspace.overlay).toBe(false)
 })

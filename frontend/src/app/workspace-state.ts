@@ -15,8 +15,9 @@ export function applyWorkspaceChange(state: WorkspaceState, change: WorkspaceCha
   const active = terms.includes(selected) ? selected : terms[terms.length - 1] || ''
   const files = state.files.filter(file => !change.removeFiles?.includes(file.path)).map(file => change.files?.find(f => f.path === file.path) || file)
   files.push(...(change.files || []).filter(file => !files.some(f => f.path === file.path)))
+  const remainingFiles = files.filter(file => !file.session || !change.remove?.includes(file.session))
   const selectedFile = change.activeFile ?? state.activeFile
-  return { ...state, terms, active, files, activeFile: files.some(f => f.path === selectedFile) ? selectedFile : '' }
+  return { ...state, terms, active, files: remainingFiles, activeFile: remainingFiles.some(f => f.path === selectedFile) ? selectedFile : '' }
 }
 
 export function workspaceChange(before: TabSet, after: TabSet): WorkspaceChange {

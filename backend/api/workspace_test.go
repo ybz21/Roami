@@ -67,3 +67,26 @@ func TestWorkspaceFileEditsAndReadFailure(t *testing.T) {
 		t.Fatal("corrupt state was silently overwritten")
 	}
 }
+
+func TestWorkspaceSessionCloseRemovesOwnedFilesAcrossClients(t *testing.T) {
+	dir := t.TempDir()
+	store := NewWorkspaceStore(dir)
+	_, err := store.update(&WorkspaceState{Terms: []string{"one", "two"}, Active: "one"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Another client opens files after the closing client's last read.
+	path := "/repo/one.md"
+	_, err = store.update(nil, []WorkspaceChange{{Files: []WorkspaceFile{
+		{Path: path, Task: "/repo", Session: "one"},
+		{Path: "/repo/two.md", Task: "/repo", Session: "two"},
+		{Path: "/standalone.md"},
+	}, ActiveFile: &path}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := NewWorkspaceStore(dir).update(nil, []WorkspaceChange{{Remove: []string{"one"}}})
+	if err != nil || len(state.Files) != 2 || state.Files[0].Session != "two" || state.Files[1].Path != "/standalone.md" || state.ActiveFile != "" || state.Active != "two" {
+		t.Fatalf("session close lost ownership: %+v, %v", state, err)
+	}
+}

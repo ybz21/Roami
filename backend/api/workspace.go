@@ -17,6 +17,7 @@ type WorkspaceFile struct {
 	Preview bool   `json:"preview"`
 	Mode    string `json:"mode"`
 	Task    string `json:"task"`
+	Session string `json:"session,omitempty"`
 }
 
 type WorkspaceState struct {
@@ -97,6 +98,9 @@ func applyWorkspaceChange(state *WorkspaceState, change WorkspaceChange) {
 			state.Files[i] = file
 		}
 	}
+	state.Files = slices.DeleteFunc(state.Files, func(file WorkspaceFile) bool {
+		return file.Session != "" && slices.Contains(change.Remove, file.Session)
+	})
 	if change.ActiveFile != nil {
 		state.ActiveFile = *change.ActiveFile
 	}
