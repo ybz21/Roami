@@ -175,20 +175,24 @@ class Tools:
             message_id=binding.get("assistantMessageId"),
             metadata={"source": "tool_result", "toolName": tool.name},
         )
+        essential_keys = {
+            "exitCode",
+            "state",
+            "error",
+            "acceptedOnly",
+            "requestComplete",
+            "kind",
+            "taskId",
+            "id",
+        }
+        if tool.name == "swarm_status":
+            essential_keys.update(
+                {"revision", "paused", "archived", "mainState", "mainConversationId", "sequence"}
+            )
         essential = {
             key: item
             for key, item in (value.items() if isinstance(value, dict) else ())
-            if key
-            in {
-                "exitCode",
-                "state",
-                "error",
-                "acceptedOnly",
-                "requestComplete",
-                "kind",
-                "taskId",
-                "id",
-            }
+            if key in essential_keys
             and isinstance(item, (bool, int, float, str, type(None)))
             and len(encoded(item)) <= 1000
         }

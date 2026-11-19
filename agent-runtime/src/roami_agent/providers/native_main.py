@@ -78,6 +78,17 @@ class NativeMain:
             + payload
         )
         if self.capabilities:
+            schemas = [
+                tool for tool in tools or [] if tool.get("function", {}).get("name") != "reply"
+            ]
+            prompt += (
+                "\nHost capability schemas for this turn follow. These are not native tools: "
+                "invoke their exact names and arguments through the signed capability call below. "
+                "Core read supports retained artifact:// paths; do not recover syntax or signed "
+                "contexts from old transcripts.\n"
+                + encoded(schemas)
+                + "\nEnd host capability schemas.\n"
+            )
             prompt += await self.capabilities.brief(self.binding, self.turn)
         spec = {
             "key": key,
