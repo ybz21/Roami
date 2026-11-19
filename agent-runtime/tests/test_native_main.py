@@ -228,3 +228,40 @@ async def test_native_main_rejects_provider_change_while_waiting_for_startup():
 
     with pytest.raises(DomainError, match="SESSION_PROVIDER_BINDING_CHANGED"):
         await anext(NativeMain(binding, fixture_turn(), command, sleep=sleep).stream([], []))
+
+
+async def test_native_main_exposes_current_host_read_schema_without_native_tool_execution():
+    import json
+
+    binding, calls = fixture_binding(), []
+
+    class Capabilities:
+        async def brief(self, binding, turn):
+            return "Use this turn's signed capability context."
+
+    async def command(sub, *args, **kwargs):
+        calls.append(kwargs["spec"])
+        return stopped(binding)
+
+    read = {
+        "type": "function",
+        "function": {
+            "name": "read",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}, "offset": {"type": "integer"}},
+                "required": ["path"],
+            },
+        },
+    }
+    model = NativeMain(binding, fixture_turn(), command, capabilities=Capabilities())
+    messages = [{"role": "user", "content": "Continue this project"}]
+    await anext(model.stream(messages, [read, {"function": {"name": "reply"}}]))
+    prompt = calls[0]["prompt"]
+    encoded_schemas = prompt.split("contexts from old transcripts.\n", 1)[1].split(
+        "\nEnd host capability schemas.", 1
+    )[0]
+    assert json.loads(encoded_schemas) == [read]
+    assert "artifact://" in prompt and "not native tools" in prompt
+    await anext(model.stream(messages, []))
+    assert calls[1]["key"] == calls[0]["key"]
