@@ -12,7 +12,7 @@ import (
 )
 
 func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
-	for _, scenario := range []string{"complete", "compaction refusal", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
+	for _, scenario := range []string{"complete", "compaction refusal", "route exhausted", "untyped 503", "wrong route code", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
 		t.Run(scenario, func(t *testing.T) {
 			s, binding, spec, transcript, _ := rejectedClaudeTask(t)
 			dir, _ := s.directory(spec.Key)
@@ -74,6 +74,17 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				delete(records[1], "failedResponseHadNoToolCall")
 				records[1]["error"] = "invalid_request"
 				message["content"] = []any{map[string]any{"type": "text", "text": `Prompt is too long · automatic compaction failed: API Error: 503 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}. This is a server-side issue.`}}
+			case "route exhausted", "untyped 503", "wrong route code":
+				records[1]["apiErrorStatus"] = 503
+				records[1]["error"] = "server_error"
+				refusal := `API Error: 503 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}. This is a server-side issue, usually temporary — try again in a moment.`
+				if scenario == "untyped 503" {
+					refusal = "API Error: 503 unavailable"
+				}
+				if scenario == "wrong route code" {
+					refusal = strings.Replace(refusal, "MODEL_ROUTE_NO_AVAILABLE_MEMBER", "MODEL_ROUTE_UNAVAILABLE", 1)
+				}
+				message["content"] = []any{map[string]any{"type": "text", "text": refusal}}
 			case "prior history":
 				records = append([]map[string]any{{"type": "user", "promptId": "prior", "message": map[string]any{"content": "prior completed work"}}, {"type": "assistant", "message": map[string]any{"content": "prior result"}}}, records...)
 			case "owned child":
@@ -149,7 +160,7 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 			}
 			result, err := s.ReconcileSession(context.Background(), spec.Key)
-			good := scenario == "complete" || scenario == "compaction refusal" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
+			good := scenario == "complete" || scenario == "compaction refusal" || scenario == "route exhausted" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
 			if !good {
 				if err == nil || result.Result != nil {
 					t.Fatalf("accepted %s: %+v %v", scenario, result, err)
@@ -163,8 +174,15 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			if scenario == "cancelled" {
 				want = "cancelled"
 			}
-			if err != nil || result.Result == nil || result.State != want || result.Result.ErrorCode != map[bool]string{true: "CLAUDE_COMPACTION_FAILED", false: "MODEL_PROXY_DAILY_LIMIT"}[scenario == "compaction refusal"] || result.Result.InputStopped == nil || !*result.Result.InputStopped || result.Result.OutcomeKnown == nil || !*result.Result.OutcomeKnown || len(result.Result.StopEvidence) != 64 {
-				t.Fatalf("quota not preserved as known failure: %+v %v", result, err)
+			code := "MODEL_PROXY_DAILY_LIMIT"
+			switch scenario {
+			case "compaction refusal":
+				code = "CLAUDE_COMPACTION_FAILED"
+			case "route exhausted":
+				code = "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
+			}
+			if err != nil || result.Result == nil || result.State != want || result.Result.ErrorCode != code || result.Result.InputStopped == nil || !*result.Result.InputStopped || result.Result.OutcomeKnown == nil || !*result.Result.OutcomeKnown || len(result.Result.StopEvidence) != 64 {
+				t.Fatalf("rejection not preserved as known failure: %+v %v", result, err)
 			}
 			var after sessionLifecycle
 			if err := readJSON(path, &after); err != nil || after.State != "idle" || after.Binding.ProviderID != binding.ProviderID {
