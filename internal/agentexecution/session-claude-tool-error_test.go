@@ -4,8 +4,60 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestClaudeClassifierActivityKeepsCurrentFailuresSeparateFromHistory(t *testing.T) {
+	binding, path, launch, prompt := reportFixture(t)
+	records := classifierRecords(binding, prompt)
+	appendTool := func(id, tool, stamp, content string, failed bool) {
+		records = append(records,
+			map[string]any{"type": "assistant", "sessionId": binding.ProviderID, "cwd": binding.Directory,
+				"message": map[string]any{"content": []any{map[string]any{"type": "tool_use", "id": id, "name": tool}}}},
+			map[string]any{"type": "user", "sessionId": binding.ProviderID, "promptId": "prompt", "cwd": binding.Directory, "timestamp": stamp,
+				"message": map[string]any{"content": []any{map[string]any{"type": "tool_result", "tool_use_id": id, "is_error": failed, "content": content}}}},
+		)
+	}
+	serverError := strings.Replace(classifierFailure, "(timed out)", "(server error)", 1)
+	appendTool("bash-2", "Bash", "2026-11-19T04:58:00Z", serverError, true)
+	writeReportRecords(t, path, records)
+	_, report, first := claudeReport(binding, "prompt", workspaceHash(prompt), launch)
+	if report == nil || report.ToolUseID != "bash-2" || first == nil ||
+		first.ConsecutiveClassifierErrors != 2 || first.PendingTools != 0 ||
+		first.ProviderID != binding.ProviderID || first.PromptID != "prompt" || len(first.SourceDigest) != 64 {
+		t.Fatalf("classifier failure sequence missing: %+v %+v", report, first)
+	}
+	_, _, cached := claudeReport(binding, "prompt", workspaceHash(prompt), launch)
+	if cached == nil || *cached != *first {
+		t.Fatalf("unchanged transcript lost its observation: %+v", cached)
+	}
+
+	appendTool("read-1", "Read", "2026-11-19T04:58:30Z", "file read succeeded", false)
+	writeReportRecords(t, path, records)
+	_, _, mixed := claudeReport(binding, "prompt", workspaceHash(prompt), launch)
+	if mixed == nil || mixed.ClassifierTool != "Bash" || mixed.ConsecutiveClassifierErrors != 2 {
+		t.Fatalf("unrelated Read success erased the Bash failure sequence: %+v", mixed)
+	}
+	appendTool("bash-3", "Bash", "2026-11-19T04:59:00Z", "command succeeded", false)
+	records = append(records, map[string]any{"type": "assistant", "sessionId": binding.ProviderID, "cwd": binding.Directory,
+		"message": map[string]any{"content": []any{map[string]any{"type": "tool_use", "id": "bash-4", "name": "Bash"}}}})
+	writeReportRecords(t, path, records)
+	_, historical, recovered := claudeReport(binding, "prompt", workspaceHash(prompt), launch)
+	if historical == nil || *historical != *report || recovered == nil ||
+		recovered.ConsecutiveClassifierErrors != 0 || recovered.PendingTools != 1 ||
+		recovered.LastSuccessfulToolResultMS <= report.ObservedMS || recovered.SourceDigest == first.SourceDigest {
+		t.Fatalf("new success and pending call did not invalidate the old state: %+v %+v", historical, recovered)
+	}
+
+	records = append(records, map[string]any{"type": "user", "sessionId": binding.ProviderID, "promptId": "new",
+		"cwd": binding.Directory, "message": map[string]any{"content": "a later prompt"}})
+	writeReportRecords(t, path, records)
+	_, historical, recovered = claudeReport(binding, "prompt", workspaceHash(prompt), launch)
+	if historical != nil || recovered != nil {
+		t.Fatal("diagnosis escaped its original input")
+	}
+}
 
 const classifierFailure = "roami-claude/free is temporarily unavailable (timed out), so auto mode cannot determine the safety of Bash right now. Wait a moment and then try this action again. If it keeps failing, continue with other tasks that don't require this action and come back to it later."
 
