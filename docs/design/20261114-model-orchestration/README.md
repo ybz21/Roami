@@ -1,5 +1,9 @@
 # 模型源与聚合：工作台重构
 
+2026-11-19：[合并调度状态、统一模型源类型与 Magpie 插件更新](routing-status-and-sources.html)。可交互 HTML 含原型和技术设计。
+
+原型已在桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 真机验证。覆盖调度状态和规则应用、来源筛选和创建、插件链接识别、模型选择和更新回退。插件安装和回退使用演示数据。
+
 2026-11-16：本机网关第二轮设计：[设计说明](gateway-design.md) · [可交互 HTML](gateway-prototype.html)。[正式实现与验收](gateway-implementation.md)。
 
 2026-11-16：[交互稿正式实现与验收](interaction-implementation.md)。
