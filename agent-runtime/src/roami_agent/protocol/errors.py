@@ -23,6 +23,14 @@ class ModelAdmissionRejected(DomainError):
     """The trusted model transport rejected admission before sending a request."""
 
 
+class NativeRouteUnavailable(DomainError):
+    """A bound native input settled before producing assistant output or tools."""
+
+    def __init__(self, code, stop_evidence):
+        super().__init__(code, 503)
+        self.stop_evidence = stop_evidence
+
+
 class ToolPreflightError(DomainError):
     """An unavailable dependency prevents starting the tool action."""
 

@@ -314,9 +314,29 @@ def snapshot(db, owner, swarm_id):
     )[::-1]
     main_turn = row(
         db,
-        "SELECT state FROM turns WHERE conversation_id=? "
+        "SELECT id,state FROM turns WHERE conversation_id=? "
         "ORDER BY CASE state WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,created_ms DESC,rowid DESC LIMIT 1",
         (value["conversation_id"],),
+    )
+    model_wait = (
+        row(
+            db,
+            "SELECT j.available_ms AS retryAtMs FROM jobs j "
+            "JOIN swarm_coordination_batches b ON b.turn_id=j.aggregate_id "
+            "JOIN swarm_goal_delegations d ON d.id=b.delegation_id AND d.swarm_id=b.swarm_id "
+            "JOIN turns t ON t.id=b.turn_id "
+            "JOIN conversations c ON c.id=t.conversation_id AND c.active_branch_id=t.branch_id "
+            "WHERE j.kind='turn.run' AND j.aggregate_id=? AND j.state='queued' "
+            "AND b.swarm_id=? AND d.revoked_ms IS NULL AND c.deleted_ms IS NULL "
+            "AND json_extract(j.payload_json,'$.coordinationBatchId')=b.id "
+            "AND json_extract(j.payload_json,'$.nativeRouteRetry')>0",
+            (main_turn["id"], swarm_id),
+        )
+        if main_turn
+        and main_turn["state"] == "queued"
+        and not value["paused"]
+        and not value["archived"]
+        else None
     )
     from roami_agent.storage.swarm_members import member_list
 
@@ -350,4 +370,5 @@ def snapshot(db, owner, swarm_id):
         "posts": posts,
         "mainMessages": main_messages,
         "mainState": main_turn["state"] if main_turn else "idle",
+        "mainModelWait": model_wait,
     }
