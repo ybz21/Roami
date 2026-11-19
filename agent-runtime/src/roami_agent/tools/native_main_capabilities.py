@@ -58,6 +58,9 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             "generation": binding["generation"],
             "providerId": binding["provider_id"],
         }
+        launch_key = turn.get("native_launch_key")
+        if launch_key and binding["executor"] == "claude":
+            context["nativeLaunchKey"] = launch_key
         await self.db.call(lambda db: self.admitted(db, context, context["owner"]))
         context["signature"] = self.signature(context)
         name = hashlib.sha256(encoded(context).encode()).hexdigest() + ".json"
@@ -96,6 +99,66 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             "normally; the host owns final reply delivery, so do not call reply here.\n"
         )
 
+    async def capability_input(self, binding):
+        native = binding.get("nativeCapabilityCall")
+        if native is None:
+            raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
+        context = {
+            **native,
+            "turnId": binding["turnId"],
+            "conversationId": binding["conversation"],
+            "leaseEpoch": binding["leaseEpoch"],
+        }
+
+        def admitted_call(db):
+            self.admitted(db, context, binding["owner"])
+            start = row(
+                db,
+                "SELECT 1 FROM events WHERE event_key=? AND kind='capability.started' "
+                "AND turn_id=? AND conversation_id=? AND message_id=? "
+                "AND json_extract(payload_json,'$.name')=? "
+                "AND json_extract(payload_json,'$.requestId')=?",
+                (
+                    "capability:" + binding["toolCallId"] + ":start",
+                    binding["turnId"],
+                    binding["conversation"],
+                    binding["assistantMessageId"],
+                    native["name"],
+                    native["requestId"],
+                ),
+            )
+            if not start:
+                raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
+
+        await self.db.call(admitted_call)
+        try:
+            proof = await self.runtime.main_executions.executor.command(
+                "capability-input",
+                "--key",
+                native["launchKey"],
+                "--capability",
+                native["name"],
+                "--request",
+                native["requestId"],
+            )
+        except DomainError as error:
+            raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409) from error
+        await self.db.call(admitted_call)
+        if (
+            not isinstance(proof, dict)
+            or set(proof) != {"providerId", "promptId", "requestSha256", "capabilities", "images"}
+            or proof["providerId"] != native["providerId"]
+            or not isinstance(proof["promptId"], str)
+            or not proof["promptId"]
+            or not isinstance(proof["requestSha256"], str)
+            or not re.fullmatch(r"[a-f0-9]{64}", proof["requestSha256"])
+            or not isinstance(proof["capabilities"], list)
+            or not isinstance(proof["images"], list)
+            or not 1 <= len(proof["capabilities"]) + len(proof["images"]) <= 512
+        ):
+            raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
+        return proof
+
     async def invoke(self, name, payload, owner):
         if self.closed:
             raise DomainError("RUNTIME_CLOSED", 503)
@@ -119,7 +182,7 @@ class NativeMainCapabilities(ProfessionalCapabilities):
         }
         if (
             not isinstance(context, dict)
-            or set(context) != strings | {"leaseEpoch", "generation"}
+            or set(context) - {"nativeLaunchKey"} != strings | {"leaseEpoch", "generation"}
             or any(not isinstance(context[k], str) or not context[k] for k in strings)
             or context["kind"] != "project_main"
             or context["owner"] != owner
@@ -130,6 +193,17 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             or not hmac.compare_digest(
                 context["signature"],
                 self.signature({k: v for k, v in context.items() if k != "signature"}),
+            )
+        ):
+            raise DomainError("ACTIVE_MAIN_CONTEXT_REQUIRED", 409)
+        launch_key = context.get("nativeLaunchKey")
+        if "nativeLaunchKey" in context and (
+            not isinstance(launch_key, str)
+            or not re.fullmatch(
+                r"project-main:"
+                + re.escape(context["turnId"])
+                + r":[a-f0-9]{24}(?::retry-[1-9][0-9]*)?",
+                launch_key,
             )
         ):
             raise DomainError("ACTIVE_MAIN_CONTEXT_REQUIRED", 409)
@@ -195,6 +269,7 @@ class NativeMainCapabilities(ProfessionalCapabilities):
                 {"name": name, "arguments": payload["arguments"], "requestId": request_id},
                 key=key + ":start",
                 turn_id=turn["id"],
+                message_id=mid,
             )
             return turn, mid, None
 
@@ -213,6 +288,15 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             "taskId": None,
             "runId": None,
         }
+        if launch_key:
+            binding["nativeCapabilityCall"] = {
+                "launchKey": launch_key,
+                "name": name,
+                "requestId": request_id,
+                "providerId": context["providerId"],
+                "generation": context["generation"],
+                "projectId": context["projectId"],
+            }
         operation = asyncio.create_task(
             self.runtime.gateway.invoke(turn, mid, wire, "main", binding)
         )

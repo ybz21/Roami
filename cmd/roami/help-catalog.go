@@ -92,6 +92,7 @@ var commandGuides = map[string]commandGuide{
 	"agent gateway binding":              {"查看网关绑定", "[--data-root PATH]", "roami agent gateway binding", "data-root", nil},
 	"agent execution catalog":            {"查看已安装执行器", "[--commands NAMES]", "roami agent execution catalog --commands codex,claude", "commands", []string{"只读检查安装与跟踪能力；不证明鉴权可用或额度充足。"}},
 	"agent execution context":            {"查看当前执行上下文", "[--json]", "roami agent execution context --json", "json", []string{"只读当前原生运行；不授予发布权限。"}},
+	"agent execution capability-input":   {"核对原生能力调用的模型输入摘要", "--key LAUNCH_KEY --capability NAME --request REQUEST_ID", "roami agent execution capability-input --key LAUNCH_KEY --capability NAME --request REQUEST_ID", "key capability request", nil},
 	"agent execution launch":             {"启动执行器任务", "--file SPEC.json", "roami agent execution launch --file SPEC.json", "file", []string{"SPEC.json 中 persistent=true 保留交互会话，直到显式 close；默认是一次性执行。", "projectId 创建新的项目 worktree；同时指定 workspaceId 时复用已登记工作区，不 fetch/reset。", "续接已有 sessionId 需可验证的生命周期回调。"}},
 	"agent execution send-message":       {"投递执行器消息", "--file JSON|-", "roami agent execution send-message --file JSON|-", "file", []string{"回执只表示投递结果，仍需核对执行与交付结果。"}},
 	"agent execution prepared":           {"核验待绑定的已就绪原生实例", "--key LAUNCH_KEY", "roami agent execution prepared --key LAUNCH_KEY", "key", []string{"只读核验初始轮次、模型配置、原生身份和空闲证明，不派发任务。"}},

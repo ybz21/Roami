@@ -280,7 +280,13 @@ class Runtime:
         )
         register_project_okr_tools(self.tools, database, self.settings)
         register_swarm_goal_tools(self.tools, database, self.wakeup, schedule=goal_schedule)
-        register_publication_tools(self.tools, database, self.artifacts, lambda: self.reply_review)
+        register_publication_tools(
+            self.tools,
+            database,
+            self.artifacts,
+            lambda: self.reply_review,
+            native_review_input=lambda binding: self.main_capabilities.capability_input(binding),
+        )
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 

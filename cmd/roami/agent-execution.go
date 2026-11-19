@@ -68,7 +68,7 @@ func runAgentExecution(args []string) int {
 		return 0
 	}
 	sub := args[0]
-	if sub != "prepared" && sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "close" && sub != "cleanup" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" && sub != "reconcile-session" {
+	if sub != "prepared" && sub != "capability-input" && sub != "send-message" && sub != "launch" && sub != "status" && sub != "cancel" && sub != "close" && sub != "cleanup" && sub != "run" && sub != "hold" && sub != "event" && sub != "hook-config" && sub != "notify" && sub != "reconcile-native" && sub != "reconcile-session" {
 		fmt.Fprintln(os.Stderr, "unknown execution command")
 		return 2
 	}
@@ -79,6 +79,11 @@ func runAgentExecution(args []string) int {
 	chain := fs.String("chain", "", "private original notifier argv")
 	tmuxBin := fs.String("tmux-bin", "", "callback tmux executable")
 	notification := fs.String("notification", "", "provider completion JSON argument")
+	var capability, request string
+	if sub == "capability-input" {
+		fs.StringVar(&capability, "capability", "", "registered capability name")
+		fs.StringVar(&request, "request", "", "signed capability request ID")
+	}
 	if err := fs.Parse(args[1:]); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -112,6 +117,18 @@ func runAgentExecution(args []string) int {
 	}
 	var status agentexecution.Status
 	switch sub {
+	case "capability-input":
+		if *key == "" || capability == "" || request == "" || *file != "" || *tmuxBin != "" {
+			return fail(fmt.Errorf("capability-input requires --key, --capability and --request"))
+		}
+		proof, err := service.ClaudeCapabilityInput(*key, capability, request)
+		if err == nil {
+			err = json.NewEncoder(os.Stdout).Encode(proof)
+		}
+		if err != nil {
+			return fail(err)
+		}
+		return 0
 	case "send-message":
 		if *file == "" {
 			return fail(fmt.Errorf("--file is required"))

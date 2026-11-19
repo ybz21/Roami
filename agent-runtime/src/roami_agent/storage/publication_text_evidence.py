@@ -1,14 +1,16 @@
 """Match exact frozen UTF-8 text to the current Main's complete successful reads."""
 
+import hashlib
 import json
 
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.artifact_text_coverage import text_coverage
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.publication_review_context import review_turn
 
 
-def reviewed_text(db, binding, required, *, prompt=None):
+def reviewed_text(db, binding, required, *, prompt=None, native_input=None):
     turn = review_turn(db, binding)
     if not required:
         raise DomainError("PUBLICATION_TEXT_REQUIRED", 409)
@@ -27,7 +29,7 @@ def reviewed_text(db, binding, required, *, prompt=None):
             raise DomainError("PUBLICATION_TEXT_UNAVAILABLE", 409)
         receipts = rows(
             db,
-            "SELECT x.id AS call_id,m.id AS result_id,m.content_json FROM tool_calls x "
+            "SELECT x.id AS call_id,m.id AS result_id,native_content(m.content_json) AS content_json FROM tool_calls x "
             "JOIN messages m ON m.id=x.result_message_id JOIN messages current ON current.id=? "
             "WHERE x.turn_id=? AND x.tool_name='artifact_read' AND x.state='succeeded' "
             "AND json_extract(x.arguments_json,'$.id')=? AND m.turn_id=x.turn_id "
@@ -42,7 +44,9 @@ def reviewed_text(db, binding, required, *, prompt=None):
                 turn["branch_id"],
             ),
         )
-        if prompt is not None:
+        if native_input is not None:
+            receipts = native_read_receipts(db, turn, receipts, native_input)
+        elif prompt is not None:
             receipts = [
                 receipt
                 for receipt in receipts
@@ -66,3 +70,33 @@ def reviewed_text(db, binding, required, *, prompt=None):
             }
         )
     return result
+
+
+def native_read_receipts(db, turn, receipts, proof):
+    included = {
+        item["toolCallId"]: item["responseSha256"]
+        for item in proof["capabilities"]
+        if isinstance(item, dict) and set(item) == {"toolCallId", "responseSha256"}
+    }
+    for receipt in receipts:
+        message = json.loads(receipt["content_json"])
+        call_id = message.get("tool_call_id")
+        if call_id not in included:
+            continue
+        event = row(
+            db,
+            "SELECT payload_json FROM events WHERE event_key=? AND turn_id=? "
+            "AND conversation_id=? AND kind='capability.completed'",
+            ("capability:" + call_id + ":result", turn["id"], turn["conversation_id"]),
+        )
+        if not event:
+            continue
+        response = json.loads(event["payload_json"])
+        if (
+            response.get("state") == "succeeded"
+            and response.get("toolCallId") == call_id
+            and response.get("result") == json.loads(message["text"])
+            and hashlib.sha256(encoded({"data": response}).encode()).hexdigest()
+            == included[call_id]
+        ):
+            yield receipt

@@ -87,6 +87,84 @@ async def test_native_main_uses_actual_registry_gateway_and_original_team(native
         await runtime.main_capabilities.call("swarm_memory_read", payload, "alice")
 
 
+@pytest.mark.parametrize("retry_suffix", ["", ":retry-1"])
+async def test_claude_input_uses_signed_registered_capability_launch(
+    native_main, monkeypatch, retry_suffix
+):
+    runtime, main, turn, original_context = native_main
+    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
+    key = "project-main:" + turn["id"] + ":" + "a" * 24 + retry_suffix
+    await runtime.main_capabilities.brief(binding, {**turn, "native_launch_key": key})
+    signed = next(
+        context
+        for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
+        if (context := json.loads(path.read_text())).get("nativeLaunchKey") == key
+    )
+    assert "nativeLaunchKey" not in original_context
+    with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED"):
+        await runtime.main_capabilities.call(
+            "swarm_status", request({**signed, "nativeLaunchKey": key[:-1] + "b"}), "alice"
+        )
+    cli_proof = {
+        "providerId": binding["provider_id"],
+        "promptId": "current-native-prompt",
+        "requestSha256": "a" * 64,
+        "capabilities": [],
+        "images": [{"mime": "image/png", "sha256": "b" * 64}],
+    }
+
+    async def observed(sub, *args):
+        assert (sub, *args[:-1]) == (
+            "capability-input",
+            "--key",
+            key,
+            "--capability",
+            "check_evidence",
+            "--request",
+        )
+        assert args[-1] in {"current", "wrong-provider"}
+        return cli_proof
+
+    monkeypatch.setattr(runtime.main_executions.executor, "command", observed)
+
+    async def input_proof(args, call_binding):
+        if args.get("wrongTool"):
+            call_binding = {
+                **call_binding,
+                "nativeCapabilityCall": {
+                    **call_binding["nativeCapabilityCall"],
+                    "name": "another_tool",
+                },
+            }
+        return await runtime.main_capabilities.capability_input(call_binding)
+
+    runtime.tools.add(
+        Tool(
+            "check_evidence",
+            "Check the input evidence",
+            object_schema({"wrongTool": {"type": "boolean"}}),
+            input_proof,
+            main=True,
+            effect="read",
+        )
+    )
+    actual = await runtime.main_capabilities.call(
+        "check_evidence", request(signed, key="current"), "alice"
+    )
+    assert actual["state"] == "succeeded" and actual["result"] == cli_proof
+    wrong_tool = await runtime.main_capabilities.call(
+        "check_evidence", request(signed, {"wrongTool": True}, "wrong-tool"), "alice"
+    )
+    assert wrong_tool["state"] == "failed"
+    assert wrong_tool["result"]["error"] == "NATIVE_CAPABILITY_INPUT_UNCONFIRMED"
+    cli_proof["providerId"] = "another-provider"
+    wrong_provider = await runtime.main_capabilities.call(
+        "check_evidence", request(signed, key="wrong-provider"), "alice"
+    )
+    assert wrong_provider["state"] == "failed"
+    assert wrong_provider["result"]["error"] == "NATIVE_CAPABILITY_INPUT_UNCONFIRMED"
+
+
 async def test_signed_native_main_can_register_and_plan_without_worker_impersonation(native_main):
     runtime, main, turn, context = native_main
     group = await group_for(runtime, main, turn)
