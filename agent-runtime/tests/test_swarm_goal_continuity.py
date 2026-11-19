@@ -87,6 +87,42 @@ async def test_new_execution_identity_invalidates_goal_fulfillment_cache(deliver
     assert first["sourceFingerprint"] != second["sourceFingerprint"]
 
 
+async def test_continuity_uses_current_provider_assignment_and_preserves_history(delivery):
+    runtime, binding, actor = delivery
+    history = "Verify takeover only; do not publish.\n\nMain's assignment: publish reviewed item."
+    current = "Submit the reviewed item once and reconcile its platform receipt."
+
+    def change(db, text):
+        intent = json.loads(
+            db.execute("SELECT intent_json FROM tasks WHERE id=?", (actor["taskId"],)).fetchone()[0]
+        )
+        intent.update(
+            goal=history,
+            target={"kind": "session", "sessionId": "original-fixture-session"},
+            continuation={"text": text, "instructionAuthor": "main"},
+        )
+        db.execute(
+            "UPDATE tasks SET intent_json=? WHERE id=?", (json.dumps(intent), actor["taskId"])
+        )
+
+    await runtime.db.call(lambda db: change(db, current), write=True)
+    reviewer = Reviewer()
+    policy = GoalContinuityReview(runtime.db, reviewer, "UTC")
+    first = await policy.inspect(binding)
+    payload = reviewer.calls[-1]
+    task = next(t for t in payload["currentOriginalTasks"] if t["id"] == actor["taskId"])
+    assert task["assignment"] == current
+    assert task["assignmentHistory"] == history
+    assert all(m["text"] not in {current, history} for m in payload["humanSources"])
+
+    await runtime.db.call(
+        lambda db: change(db, "Reconcile the unknown submit; never resend."), write=True
+    )
+    second = await policy.inspect(binding)
+    assert first["sourceFingerprint"] != second["sourceFingerprint"]
+    assert reviewer.calls[-1]["literalGoal"] == payload["literalGoal"]
+
+
 async def test_state_changes_during_semantic_review_leave_no_cached_policy(delivery):
     runtime, binding, actor = delivery
 
