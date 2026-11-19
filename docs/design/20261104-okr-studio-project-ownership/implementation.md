@@ -62,6 +62,9 @@ PROJECT/
 
 ## 开发编辑 Skill 与预置模板
 
+创建 OKR 时同时生成该项目的工作约定，明确宿主、项目文件与团队智能体各自承担的职责。
+现有实现清点和新能力的归属判断见[框架与 OKR 业务边界](responsibility-boundary.md)。
+
 canonical 入口统一为仓库 `skills/okr-development/`，安装到
 Codex/Claude 使用同一份正文。新增模板资源建议放在该 Skill 的 `assets/`，
 避免另建模板引擎与第三套 Connector 扩展协议。原型示例在本目录 `templates/`。

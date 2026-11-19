@@ -6,6 +6,9 @@ provider conversations; new work becomes a new round, not an r2/r3 replacement.
 Declare inputs, owner, dependencies, deliverables and independent acceptance.
 A delivery receipt is not completion. Unknown execution needs reconciliation.
 
+Follow the project [operating contract](../../AGENTS.md#框架项目规则与智能体职责).
+Load only the workflow and Connector Skills selected for this project's goal.
+
 Connector Skills live in connectors/<name>/, with scripts/references inside.
 Only actual authorized collection produces observations. Never invent zero or
 backfill history. Use the registered revision-checked project operations; do not
