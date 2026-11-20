@@ -17,7 +17,7 @@ const { outputFiles } = await build({
   format: 'iife',
   minify: true,
   jsx: 'automatic',
-  loader: { '.svg': 'dataurl', '.woff': 'dataurl', '.woff2': 'dataurl', '.png': 'dataurl' },
+  loader: { '.svg': 'dataurl', '.woff': 'dataurl', '.woff2': 'dataurl', '.html': 'text' },
   define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env.DEV': 'false', localStorage: 'prototypeStorage' },
   inject: [path.join(here, 'storage.ts')],
   nodePaths: [path.join(frontend, 'node_modules')],
@@ -55,5 +55,5 @@ ${bundle}
 </body>
 </html>
 `
-await fs.writeFile(path.join(here, '../gateway-prototype.html'), html)
-console.log('Built gateway-prototype.html')
+await fs.writeFile(path.join(here, '../current.html'), html)
+console.log('Built current.html')

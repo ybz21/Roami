@@ -1,0 +1,106 @@
+#root > .ant-app, .model-prototype { height: 100%; min-height: 0; }
+.model-prototype {
+  display: flex;
+  flex-direction: column;
+  color: var(--text-bright);
+  background: var(--bg-base);
+}
+.model-prototype-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  min-height: calc(var(--tap) + var(--sp-2));
+  padding-inline: var(--pad-page);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.model-prototype-bar > div, .model-prototype-bar nav, .model-prototype-scenarios {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.model-prototype-bar strong { font-size: var(--fs-lg); }
+.model-prototype-bar small { color: var(--text-dim); font-size: var(--fs-meta); }
+.model-prototype-bar a, .model-prototype-scenarios a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: var(--fs-sm);
+}
+.model-prototype-bar .prototype-crumb { color: var(--text-dim); }
+.model-prototype-bar button { min-height: var(--tap); min-width: var(--tap); }
+.model-prototype-frame { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.prototype-model-nav {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: calc(var(--sp-5) * 5);
+  overflow: auto;
+  border-inline-end: 1px solid var(--border-subtle);
+  padding-block: var(--sp-2);
+}
+.prototype-model-nav a {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: var(--sp-1) var(--sp-3);
+  border-inline-start: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+:where(html[data-pointer="fine"]) .prototype-model-nav a:hover { background: var(--list-hover); }
+.prototype-model-nav a[aria-current="page"] {
+  border-inline-start-color: var(--accent);
+  background: var(--sel-bg);
+  color: var(--text-bright);
+  font-weight: 650;
+}
+.model-prototype-main, .model-prototype-workspace {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.model-prototype-workspace[hidden], .model-prototype .tt-model-hub-tabs { display: none; }
+.prototype-hub-surface {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.prototype-hub-surface > .tt-model-hub { flex: 1; }
+.prototype-speech { flex: 0 1 36%; padding: var(--sp-4) var(--pad-page); border-inline-start: 1px solid var(--border-subtle); }
+.prototype-speech-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.prototype-speech-result:not(:empty) { padding-block: var(--sp-3); }
+html:is([data-size="compact"],[data-size="medium"]) .prototype-speech-surface { flex-direction: column; overflow: auto; }
+html:is([data-size="compact"],[data-size="medium"]) .prototype-speech-surface > .tt-model-hub { height: auto; flex: none; }
+html:is([data-size="compact"],[data-size="medium"]) .prototype-speech-surface .tt-model-hub-scroll { overflow: visible; }
+html:is([data-size="compact"],[data-size="medium"]) .prototype-speech { flex: none; border-inline-start: 0; border-block-start: 1px solid var(--border-subtle); }
+.model-prototype-scenarios {
+  flex-wrap: wrap;
+  padding-inline: var(--pad-page);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.model-prototype-scenarios a[aria-current] { color: var(--text-bright); font-weight: 650; }
+.embedded-observation { display: flex; min-height: 0; min-width: 0; flex: 1; }
+.embedded-observation > .trace-content { flex: 1; }
+.prototype-agent > .agent-settings-form > .agent-settings-form { padding: 0; }
+html:is([data-size="compact"],[data-size="medium"]) .model-prototype-frame { flex-direction: column; }
+html:is([data-size="compact"],[data-size="medium"]) .prototype-model-nav {
+  flex-direction: row;
+  border-inline-end: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-block: 0;
+}
+html:is([data-size="compact"],[data-size="medium"]) .prototype-model-nav a {
+  border-inline-start: 0;
+  border-bottom: 2px solid transparent;
+}
+html:is([data-size="compact"],[data-size="medium"]) .prototype-model-nav a[aria-current="page"] {
+  border-bottom-color: var(--accent);
+}
+html:is([data-size="compact"],[data-size="medium"]) .model-prototype:has(.embedded-observation[data-detail="true"]) :is(.model-prototype-bar,.prototype-model-nav) {
+  display: none;
+}

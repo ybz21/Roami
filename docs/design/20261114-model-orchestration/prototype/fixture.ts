@@ -223,3 +223,13 @@ export function installFixture() {
     return missing()
   }
 }
+
+export function previewSelection({ model, freeOnly }: { model: string; freeOnly: boolean }) {
+  const choices = directory().models.filter(row => row.configured && row.enabled)
+  const picked = model === 'auto'
+    ? choices.find(row => row.kind === 'aggregate' && !freeOnly) || choices.find(row => !freeOnly || row.pricing === 'confirmed-free')
+    : choices.find(row => row.id === model)
+  if (!picked) return { ready: false, note: model === 'auto' ? '当前没有符合条件的候选。' : '所选模型已停用或不可用。' }
+  if (freeOnly && picked.pricing !== 'confirmed-free') return { ready: false, note: '所选模型未确认免费。可改用 Auto 或选择已确认免费的模型。' }
+  return { ready: true, note: '演示命中 ' + picked.id + (freeOnly ? ' · 已确认免费' : '') }
+}
