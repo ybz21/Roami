@@ -7,6 +7,8 @@ from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.swarm_coordination import admitted_batch, evidence
 from roami_agent.storage.swarm_coordination_admission import for_turn
 
+CURRENT_BATCH_PREFIX = "Current original-Main coordination batch, not a new user message. "
+
 
 def load(db, turn):
     if turn.get("trigger_kind") != "continuation":
@@ -30,8 +32,8 @@ def project(plan, prompt, value):
         1 + plan["currentTurnStart"],
         {
             "role": "system",
-            "content": "Current original-Main coordination batch, not a new user message. "
-            "Continue only the stored user goal within the selected original members and project. "
+            "content": CURRENT_BATCH_PREFIX
+            + "Continue only the stored user goal within the selected original members and project. "
             + (
                 "Read this project's current root AGENTS.md and confirmed project guidance. "
                 "Use its declared roles, acceptance criteria and workflow for this batch. "

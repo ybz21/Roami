@@ -1,6 +1,7 @@
 """Native Main capabilities use the original turn, gateway and immutable provider."""
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,9 +9,13 @@ import httpx
 import pytest
 from test_project_main_execution import setup_main
 
+from roami_agent.context.native_prompt import INLINE_LIMIT, PAGE_BYTES, READ_CAPABILITY
+from roami_agent.context.swarm_coordination import CURRENT_BATCH_PREFIX
 from roami_agent.conversation.main_execution import main_binding
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.providers.native_main import NativeMain
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
 
@@ -61,6 +66,109 @@ async def signed_native_launch(runtime, main, turn, retry_suffix=""):
         if (context := json.loads(path.read_text())).get("nativeLaunchKey") == key
     )
     return binding, key, signed
+
+
+async def test_large_coordination_uses_bound_read_only_context_without_changing_launch(native_main):
+    runtime, main, turn, original_context = native_main
+    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
+    binding["binding"] = json.loads(binding.pop("binding_json"))
+    messages = [
+        {"role": "system", "content": "Current team rules"},
+        {"role": "user", "content": "历史证据🙂" * 30000},
+        {"role": "system", "content": CURRENT_BATCH_PREFIX + "Frozen original goal and evidence"},
+        {"role": "system", "content": "Current resume policy"},
+    ]
+    key = (
+        "project-main:"
+        + turn["id"]
+        + ":"
+        + hashlib.sha256(encoded(messages).encode()).hexdigest()[:24]
+    )
+    context = None
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime)),
+        base_url="http://testserver",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        route = "/v1/tool-directory/" + READ_CAPABILITY + "/call"
+
+        async def command(sub, *args, spec):
+            nonlocal context
+            assert (sub, *args) == ("launch", "--file", "-")
+            assert spec["key"] == key and spec["preparedFrom"] == binding["launch_key"]
+            assert spec["sessionId"] == binding["session_id"] and spec["persistent"]
+            assert len(spec["prompt"].encode()) < INLINE_LIMIT
+            assert READ_CAPABILITY in spec["prompt"] and "历史证据" not in spec["prompt"]
+            context = next(
+                signed
+                for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
+                if (signed := json.loads(path.read_text())).get("nativeLaunchKey") == key
+            )
+            index = await client.post(route, json=request(context, key="context-index"))
+            assert index.status_code == 200
+            assert index.json()["data"]["result"] == {
+                "messageCount": 4,
+                "systemIndices": [0, 2, 3],
+                "coordinationIndex": 2,
+            }
+            for number, message in enumerate(messages):
+                offset, parts = 0, []
+                while offset is not None:
+                    page = await client.post(
+                        route, json=request(context, {"index": number, "offset": offset})
+                    )
+                    assert page.status_code == 200
+                    part = page.json()["data"]["result"]
+                    assert part["offset"] == offset and 0 < len(part["text"].encode()) <= PAGE_BYTES
+                    parts.append(part["text"])
+                    offset = part["nextOffset"]
+                assert "".join(parts) == encoded(message)
+            with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED"):
+                await runtime.main_capabilities.call(READ_CAPABILITY, request(context), "bob")
+            with pytest.raises(DomainError, match="NATIVE_PROMPT_CONTEXT_UNAVAILABLE"):
+                await runtime.main_capabilities.call(
+                    READ_CAPABILITY, request(original_context), "alice"
+                )
+            invalid = await client.post(route, json=request(context, {"index": True}))
+            assert invalid.status_code == 400
+            for epoch in (2, 1):
+                await runtime.db.call(
+                    lambda db, epoch=epoch: db.execute(
+                        "UPDATE turns SET lease_epoch=? WHERE id=?", (epoch, turn["id"])
+                    ),
+                    write=True,
+                )
+                if epoch == 2:
+                    stale = await client.post(route, json=request(context))
+                    assert stale.status_code == 409
+            return {
+                "session": spec["sessionId"],
+                "sessionBinding": binding["binding"],
+                "result": {
+                    "state": "succeeded",
+                    "inputStopped": True,
+                    "outcomeKnown": True,
+                    "summary": "Native answer",
+                },
+            }
+
+        model = NativeMain(
+            binding,
+            {**turn, "trigger_kind": "continuation"},
+            command,
+            capabilities=runtime.main_capabilities,
+        )
+        assert [event.value async for event in model.stream(messages, [])] == ["Native answer"]
+        released = await client.post(route, json=request(context))
+        assert released.status_code == 409
+        assert not runtime.main_capabilities.prepared_prompts
+        calls = await runtime.db.call(
+            lambda db: row(
+                db, "SELECT count(*) count FROM tool_calls WHERE turn_id=?", (turn["id"],)
+            )
+        )
+        assert calls["count"] == 0
 
 
 async def group_for(runtime, main, turn):
