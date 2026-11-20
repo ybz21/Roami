@@ -18,7 +18,7 @@
 </nav>
 <main class="document gateway-overview" id="document">
 <section id="technical" aria-labelledby="latest-title">
-  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-20">2026 年 11 月 20 日</time></div><a class="diagram-action" href="./gateway-prototype.html#/aggregate/free">打开交互原型</a></header>
+  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-20">2026 年 11 月 20 日</time></div><a class="diagram-action" href="./gateway-prototype.html?v=workbench-20261120#/workbench">打开新版原型</a></header>
   <figure class="layer-diagram" aria-label="网关三层设计">
     <div class="diagram-lane">
       <h3><a href="./model-gateway.html#interaction">人机交互</a></h3>
@@ -83,7 +83,8 @@
   </figure>
 </section>
 <section id="workspace-ux" aria-labelledby="workspace-ux-title">
-  <header class="section-head"><h2 id="workspace-ux-title">排查工作台</h2><a class="page-reference" href="./gateway-prototype.html#/aggregate/free">试用原型</a></header>
+  <header class="section-head"><h2 id="workspace-ux-title">调度与排查</h2><a class="page-reference" href="./gateway-prototype.html?v=workbench-20261120#/workbench">打开新版工作台</a></header>
+  <p class="copy">以一个聚合池为范围，同时展示下一次请求的可调度顺位、所选时段的结果分布和一条已完成请求的真实尝试。选择失败或恢复可联动请求列表，打开完整审计后返回到原来的筛选与请求。</p>
   <figure class="layer-diagram" aria-label="排查路径">
     <div class="diagram-lane">
       <h3>首屏</h3>
@@ -94,6 +95,8 @@
       </ol>
     </div>
   </figure>
+  <p class="copy">例如，选中「输出中断」后，同时显示 HTTP 200 和「输出中断」终态。遇到选路被拒时，显示发出前的过滤原因，并跳到这组聚合的配置。遇到限流时，可直达发生限流的来源。</p>
+  <p class="copy">设计接口以聚合 ID 关联生效配置和滚动请求记录。当前原型使用合成记录演示页面联动，聚合设置保存后会回读并更新首选顺位。</p>
 </section>
 <section id="sequence" aria-labelledby="sequence-title">
   <header class="section-head"><h2 id="sequence-title">实施顺序</h2><a class="page-reference" href="./model-gateway.html#control-api">接口和验收条件</a></header>

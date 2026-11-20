@@ -9,10 +9,12 @@ import ModelHub from '../../../../frontend/src/components/capabilities/ModelHub'
 import { BackLink } from '../../../../frontend/src/components/BackButton'
 import { SunIcon, MoonIcon } from '../../../../frontend/src/icons'
 import { installFixture, traceCases } from './fixture'
+import { RoutingWorkbench } from './RoutingWorkbench'
 import '../../../../frontend/src/components/capabilities/model-controls.css'
 import '../../../../frontend/src/index.css'
 import '../../../../frontend/src/mobile-material.css'
 import './styles.css'
+import './routing-workbench.css'
 
 const paths: Record<string, string> = { overview: 'usage', monitoring: 'monitor' }
 const route = () => location.hash.slice(1)
@@ -45,7 +47,9 @@ function Prototype() {
   const sample = cases.includes(example) ? example : 'blocked'
   const tab = trace ? 'audit' : paths[requested] || (requested === 'access' || requested === 'directory' ? 'gateway' : requested) || 'catalog'
   const pool = params.get('demo') === 'route'
+  const workbench = !page || page === 'workbench'
   const account = page === 'catalog/workbuddy-account'
+  const fromWorkbench = params.get('from') === 'workbench' || /^audit\/request\/[^/]+\/workbench$/.test(page)
   const detail = trace ? '/request/' + sample : pool ? '/request/fallback/aggregate/free' : page.slice(requested.length)
 
   useEffect(() => {
@@ -75,9 +79,11 @@ function Prototype() {
   return <div className="model-prototype">
     <div className="model-prototype-bar">
       <div><strong>{zh ? 'Roami 大模型工作台' : 'Roami Model Workspace'}</strong><small>{zh ? '离线演示' : 'Offline demo'}</small></div>
-      <nav aria-label={zh ? '设计文档' : 'Design documents'}>
+      <nav aria-label={zh ? '原型导航' : 'Prototype navigation'}>
+        {workbench ? <a href="#/catalog">{zh ? '模型管理' : 'Manage models'}</a>
+          : <a href="#/workbench">{zh ? '调度与排查' : 'Routing & incidents'}</a>}
         <a href="./latest-design.html">{zh ? '设计总览' : 'Design overview'}</a>
-        <a href={'./model-' + (docPages[tab] || 'gateway') + '.html'}>{zh ? '本页设计' : 'Page design'}</a>
+        {!workbench && <a href={'./model-' + (docPages[tab] || 'gateway') + '.html'}>{zh ? '本页设计' : 'Page design'}</a>}
         <Button type="text" aria-label={zh ? '切换主题' : 'Switch theme'} icon={theme.mode === 'dark' ? <SunIcon /> : <MoonIcon />} onClick={theme.toggle} />
         <Button type="text" aria-label={zh ? 'Switch to English' : '切换为中文'} onClick={() => setLocale(zh ? 'en-US' : 'zh-CN')}>{zh ? 'EN' : '中文'}</Button>
       </nav>
@@ -87,8 +93,14 @@ function Prototype() {
     </div>}
     {!account && page.startsWith('catalog/source/workbuddy') && <div className="model-prototype-scenarios"><a href="#/catalog/workbuddy-account">{zh ? '查看 WorkBuddy 签到方案' : 'Preview WorkBuddy check-in'}</a></div>}
     <main className="model-prototype-main">
+      <div className="model-prototype-workspace" hidden={!workbench}><RoutingWorkbench /></div>
       {account && <WorkBuddyDemo zh={zh} claimed={claimed} claim={() => setClaimed(true)} />}
-      <div className="model-prototype-workspace" hidden={account}><ModelHub sub={account ? 'catalog' : tab + detail} onNav={path => { location.hash = '/' + path.slice('capabilities/models/'.length) }} /></div>
+      <div className="model-prototype-workspace" hidden={account || workbench}><ModelHub sub={account || workbench ? 'catalog' : tab + detail} onNav={path => {
+        const next = path.slice('capabilities/models/'.length)
+        if (fromWorkbench && next === tab) location.hash = '/workbench'
+        else if (fromWorkbench && next.startsWith('catalog/source/') && page.startsWith('catalog/source/')) location.hash = '/' + next + '?from=workbench'
+        else location.hash = '/' + next
+      }} /></div>
     </main>
   </div>
 }

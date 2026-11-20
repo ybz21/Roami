@@ -63,13 +63,23 @@ function directory() {
   ] }
 }
 function routing(model: string | null) {
-  const candidates = catalog.models.find(row => row.id === model)?.candidates || []
+  const pool = catalog.models.find(row => row.id === model)
+  const candidates = pool?.candidates || []
   const members = candidates.map(row => ({ ...row, context: modelDetails(row.model, row.sourceId).contextWindow }))
   const channels = candidates.filter(row => catalog.sources.some(source => source.id === row.sourceId)).map(row => {
     const cooling = row.model === 'deepseek-flash'
-    return { ...row, account: row.sourceId === 'workbuddy' ? 'WorkBuddy · Demo' : '', kind: 'token', ready: !cooling, remaining: cooling ? 0 : 1, resetAt: cooling ? now + 900000 : null, expiresAt: null, restUntil: cooling ? now + 90000 : null, measuredAt: now - 30000, recentTokens: cooling ? 0 : 30000 }
+    return { ...row, account: row.sourceId === 'workbuddy' ? 'WorkBuddy · Demo' : '', kind: 'token', ready: !cooling && pool?.enabled !== false, remaining: cooling ? 0 : 1, resetAt: cooling ? now + 900000 : null, expiresAt: null, restUntil: cooling ? now + 90000 : null, measuredAt: now - 30000, recentTokens: cooling ? 0 : 30000 }
   })
   return { now, available: channels.filter(row => row.ready).length, members, channels, observation: model === 'free' ? requestObservation : null }
+}
+
+export function readWorkbench(poolId: string, hours: number) {
+  const pools = catalog.models.filter(row => row.aggregate)
+  const pool = pools.find(row => row.id === poolId) || pools[0]
+  const poolRoute = pool ? routing(pool.id) : undefined
+  const requests = pool ? requestMonitor(new URLSearchParams({ routeId: pool.id, hours: String(hours) })) : null
+  const ids = new Set(requests?.recent.map(row => row.requestId))
+  return { pools, pool, poolRoute, requests, sources: catalog.sources, traces: traces.filter(row => ids.has(row.request.requestId)) }
 }
 function sourceSettings(id: string, update?: SourcePricing) {
   const policy = update || settings.pricing.sources?.[id] || { default: priceRule('inherit') }

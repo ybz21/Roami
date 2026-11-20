@@ -1,6 +1,10 @@
 # 模型源与聚合：工作台重构
 
-2026-11-20 [统一交互原型（HTML）](gateway-prototype.html#/catalog) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
+2026-11-20 [调度与排查原型（HTML）](gateway-prototype.html?v=workbench-20261120#/workbench) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
+
+新增「调度与排查」首屏。左侧显示当前聚合的可调度顺位和冷却时间，右侧按请求结果筛选，并在同页查看选中请求的尝试。由结果定位到完整审计、限流来源或聚合配置。七个管理入口可从工作台或「模型管理」打开。
+
+桌面四档宽度与 Redmi Note 8 真机通过聚合切换、有请求与空状态、失败筛选、HTTP 200 中断、审计返回和来源跳转。桌面验证了在原聚合页重排并保存后，工作台首选同步更新。首屏使用离线合成数据。改前改后见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
 
 2026-11-20 [排查工作台改版](latest-design.html#workspace-ux)。聚合把首选、备选及来源摆在首屏，调度模拟按需展开。监控并列趋势和结果分布，独立清除时段或结果筛选。审计先显示请求结论，再按顺序显示上游尝试、状态和原因。沿用 UI/UX Pro Max 的图表与触控指引、Impeccable 的层级评审、Vercel Web Design Guidelines 的控件标签和焦点规则。
 
