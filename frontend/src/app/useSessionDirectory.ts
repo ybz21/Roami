@@ -54,7 +54,7 @@ export function useSessionDirectory() {
     const pending = overview.value.filter(item => item.lifecycle && !cliSessions.some(session => session.name === item.name)).map(item => ({ ...item, agent: item.agent || undefined }))
     return [...pending, ...cliSessions.filter(session => !overview.closingNames?.has(session.name)).map(session => {
       const location = locations.get(session.name)
-      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch, lifecycle: location?.lifecycle }
+      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch, review: location?.review, lifecycle: location?.lifecycle }
     }), ...native.value.map(nativeSessionRecord)]
   }, [cliSessions, native.value, overview.value, overview.closingNames])
   useEffect(() => { setSessionLabels(Object.fromEntries(sessList.map(session => [session.name, session.label || session.name]))) }, [sessList])

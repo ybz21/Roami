@@ -10,7 +10,10 @@ import { briefPreamble, type BriefWhere } from './kickoff-brief'
 import { refreshSessionLists } from './native-session-list'
 import { sessionLabel } from './session-label'
 
+export type ReviewIntent = { agent: string; command: string; trigger: 'submit' | 'idle' }
+
 export type LifecycleIntent = {
+  review?: ReviewIntent
   name?: string; task?: string; dir?: string; parent?: string; worktree?: boolean; branch?: string; base?: string; remote?: string; existing?: boolean
   mode?: 'keep' | 'merge' | 'discard'; path?: string; snapshot?: string; sessionIdentity?: string; strategy?: string; keepBranch?: boolean
   launch?: { command: string; agent: string; task: string; preamble: string; taskHeading: string; setupHeading: string; fileBase: string; autoReview: boolean }
@@ -110,7 +113,7 @@ export function lifecycleLaunchIntent(agent: AgentKind | 'none', prefs: Preferen
   return { command: agentLaunch(agent, prefs), agent, task, preamble: briefPreamble({ kind: where, ...vars } as BriefWhere, vars.sess, autoReview, t), taskHeading: t('session.wt.briefTask'), setupHeading: t('session.wt.briefSetup'), fileBase: nodeApi('/file'), autoReview }
 }
 
-export async function lifecycleAction(op: LifecycleOperation, action: 'retry' | 'cancel' | 'retain' | 'retain-branch') {
+export async function lifecycleAction(op: LifecycleOperation, action: 'retry' | 'cancel' | 'retain' | 'retain-branch' | 'continue-without-review') {
   const scope = nodeApi('/session-lifecycle/operations')
   const request = await durableRequestKey(JSON.stringify({ scope, id: op.operationId, action, revision: op.revision }))
   if (nodeApi('/session-lifecycle/operations') !== scope) throw new Error('LIFECYCLE_NODE_CHANGED')

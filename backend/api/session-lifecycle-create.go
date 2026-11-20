@@ -12,6 +12,7 @@ import (
 	"github.com/ybz21/Roami/backend/worktree"
 	"github.com/ybz21/Roami/internal/memguard"
 	life "github.com/ybz21/Roami/internal/sessionlifecycle"
+	"github.com/ybz21/Roami/internal/sessionreview"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -29,13 +30,15 @@ func (a *API) lifecycleSteps(o life.Operation) []life.Step {
 	if o.Kind == "close" {
 		return a.lifecycleCloseSteps()
 	}
-	return []life.Step{
+	steps := []life.Step{
 		{Name: "workspace", Run: a.lifecyclePrepareWorkspace},
 		{Name: "session", Run: a.lifecyclePrepareSession},
 		{Name: "track", Run: a.lifecycleTrack},
-		{Name: "launch", Run: a.lifecycleLaunch},
-		{Name: "compensate", Run: a.lifecycleCompensate},
 	}
+	if o.Intent.Review != nil || o.OriginalIntent.Review != nil {
+		steps = append(steps, life.Step{Name: "review", Run: a.lifecycleReview})
+	}
+	return append(steps, life.Step{Name: "launch", Run: a.lifecycleLaunch}, life.Step{Name: "compensate", Run: a.lifecycleCompensate})
 }
 
 func (a *API) lifecyclePrepareWorkspace(ctx context.Context, o life.Operation) (any, error) {
@@ -222,6 +225,16 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 		guide = strings.NewReplacer("{{FILE_BASE}}", fileBase, "{{FILE_RAW_BASE}}", fileBase+"/raw", "{{FILE_SERVE_BASE}}", fileBase+"/serve").Replace(guide)
 		preamble := strings.NewReplacer("{{PATH}}", prepared.Path, "{{BASE}}", prepared.Base, "{{BRANCH}}", prepared.Branch, "{{SESSION}}", o.ResourceID).Replace(launch.Preamble)
 		prompt := launch.TaskHeading + "\n\n" + strings.TrimSpace(launch.Task) + "\n\n" + launch.SetupHeading + "\n\n" + preamble + "\n\n" + strings.TrimSpace(guide)
+		if o.Intent.Review != nil {
+			reviewer, err := life.Result[sessionreview.Endpoint](o, "review")
+			if err != nil || reviewer.Session == "" {
+				return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_REVIEW_NOT_READY"))
+			}
+			if identity, err := rt.SessionIdentity(reviewer.Session); err != nil || identity == "" || identity != reviewer.Identity {
+				return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_REVIEW_NOT_READY"))
+			}
+			prompt += authorReviewAppendix(reviewer.Session, o.Intent.Review.Trigger)
+		}
 		if runner := agent.Get(launch.Agent); runner != nil {
 			if flag := agent.Describe(runner).PromptFlag; flag != "" {
 				command += " " + flag
@@ -242,6 +255,16 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 func (a *API) lifecycleCompensate(ctx context.Context, o life.Operation) (any, error) {
 	if !o.CancelRequested {
 		return nil, nil
+	}
+	if o.Has("review-intent") {
+		if err := a.stopLifecycleReview(ctx, o); err != nil {
+			return nil, err
+		}
+		latest, err := a.Lifecycle.Get(o.ID)
+		if err != nil {
+			return nil, err
+		}
+		o = latest
 	}
 	rt := lifecycleRuntime(ctx)
 	identity, err := rt.SessionIdentity(o.ResourceID)

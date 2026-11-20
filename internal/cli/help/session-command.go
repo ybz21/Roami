@@ -29,7 +29,7 @@ func sessionCommandPage(command string) (Page, bool) {
 		"kill":                {"关闭指定会话", "SESSION [--cascade] [--yes]", []Entry{{"--cascade", "同时关闭后代会话"}, {"--yes, -y", "跳过交互确认"}}, nil, []string{"默认保留子会话并调整归属；只关闭明确指定的资源。"}},
 		"rename":              {"修改会话展示名", "SESSION NAME", nil, []Entry{{"roami session rename SESSION_ID review", ""}}, []string{"只修改展示名，会话 ID 保持不变。"}},
 		"capture":             {"读取会话终端输出", "SESSION [--lines N]", []Entry{{"--lines N, -n N", "读取末尾行数（默认 200）"}}, []Entry{{"roami session capture SESSION_ID --lines 100", ""}}, nil},
-		"send":                {"向普通会话发送文本", "SESSION TEXT", nil, []Entry{{`roami session send SESSION_ID "git status"`, ""}}, []string{"发送成功只表示文本已提交，仍需核对执行结果。", "受管任务通过 task_steer 或 roami swarm say 续接。"}},
+		"send":                {"向普通会话发送文本", "SESSION TEXT", nil, []Entry{{`roami session send SESSION_ID "git status"`, ""}}, []string{"普通文本发送成功只表示输入已提交。配对的互审消息会排队等待对端就绪。", "受管任务通过 task_steer 或 roami swarm say 续接。"}},
 		"keys":                {"向会话发送按键", "SESSION KEY...", nil, []Entry{{"roami session keys SESSION_ID Down Enter", ""}}, []string{"只接受具名按键或单个字母数字；文本输入使用 send。"}},
 		"resolve":             {"解析会话身份", "SESSION [--strict] [--json]", []Entry{{"--strict", "同名时返回错误，不自动选择"}, {"--json", "输出 JSON"}}, []Entry{{"roami session resolve review --strict --json", ""}}, nil},
 		"children":            {"列出直接子会话", "SESSION [--json]", nil, nil, nil},

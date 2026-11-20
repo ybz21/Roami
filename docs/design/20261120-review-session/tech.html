@@ -30,20 +30,20 @@
         <ol>
           <li>宿主用现有创建意图受理任务。互审配置仅带 Agent 类型和交审方式。用户省略互审时沿用原有创建流程。</li>
           <li>准备 worktree 和作者会话，以同一创建操作预留 <code>review</code> 的稳定 ID，保存父子关系、同一个工作区归属和审查者角色。按当前节点注册表核对审查 Agent 和它的启动参数，检查安装与登录状态。未就绪时保留选择并提示恢复。</li>
-          <li>先启动审查者，将作者 ID、任务范围、约定和版本访问方式一起注入启动 Prompt。Agent 就绪后启动作者，注入 <code>review</code> ID 和对应的交审指令。然后展示「等待交审」。</li>
+          <li>先启动审查者，将作者 ID、任务范围、约定和版本访问方式一起注入启动 Prompt。收到审查 Agent 的就绪标记后启动作者，在原开工 Prompt 末尾追加 <code>review</code> ID 和对应的交审指令。然后展示「等待交审」。</li>
           <li>宿主持久化操作、会话身份和启动阶段回执。回执已确认则复用现有子会话。提交结果未知时先核对接收端身份和实际状态。准备失败时可以重试，或关闭互审后继续开工。</li>
         </ol>
-        <p class="scope">原型用浏览器模拟创建、版本和终端记录。用户的任务、图片、会话和代码仅提供设计参考。</p>
+        <p class="scope">独立原型使用示例数据。实际产品由宿主创建会话、生成版本快照并投递消息。</p>
       </section>
 
       <section id="prompts">
         <h2>双方启动 Prompt</h2>
-        <p>宿主用实际值替换下面的占位符，原任务正文保持在开工提示之前。作者在原会话内写代码、验证并响应审查。审查者核对本轮版本和证据。</p>
+        <p>作者的原任务、开工说明和能力指南保持原有顺序。互审约定追加在末尾。宿主用实际值替换下方占位符。作者在原会话内写代码、验证并响应审查。审查者核对本轮版本和证据。</p>
         <h3>发给作者</h3>
         <pre>你是任务作者，工作区为 {{WORKTREE}}。
 审查会话 ID 为 {{REVIEW_SESSION_ID}}，最多审 3 轮。
 
-主动交审：有可审版本时，向 review 发送轮次、版本和验证摘要。
+主动交审：有可审版本时，向 review 发送验证摘要，由宿主绑定轮次和版本。
 空闲交审：首轮等待宿主提交，有意见时在原会话内继续修复。
 
 收到意见后，逐项修复或说明，再运行相关验证。
@@ -53,26 +53,27 @@
         <pre>你是审查者。作者会话 ID 为 {{AUTHOR_SESSION_ID}}。
 任务范围为 {{TASK_SCOPE}}，最多审 3 轮。
 
-等待交审。收到请求后读取本轮基准和只读快照，核对版本及证据。
+输出独立一行 ROAMI_REVIEW_READY，再等待交审。
+收到请求后读取本轮基准和只读补丁，核对版本及证据。
 发回结论、文件位置、问题、依据和建议，或说明通过的验证依据。
-使用 roami session send 把完整结果发回作者会话。
+使用 roami session send 发回完整意见，包含请求中的轮次和完整版本摘要。
 有修复时等待作者提交下一版本，并在同一 review 会话里继续。
 只审阅本轮快照。通过或达到上限时结束。</pre>
       </section>
 
       <section id="delivery">
         <h2>消息投递</h2>
-        <p>普通会话用 <code>roami session send SESSION_ID TEXT</code>。发送端能从执行记录查看命令，接收端把原文当作一次 Agent 输入。两边独立保留各自的对话历史。</p>
-        <pre>roami session send "$REVIEW_SESSION_ID" '[review.request] r1 rev=b7a18c2 验证摘要，请审阅'
-roami session send "$AUTHOR_SESSION_ID" '[review.changes_requested] r1 rev=b7a18c2 文件:行、问题、依据、建议'
-roami session send "$REVIEW_SESSION_ID" '[review.request] r2 rev=e124dc0 已修复并验证，请复审'
-roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=e124dc0 已核对改动与验证证据'</pre>
+        <p>普通会话使用 <code>roami session send SESSION_ID TEXT</code> 提交互审消息。标记消息写入配对队列，宿主在接收端可接收时投递到绑定的终端。发送端和接收端各自保留对话记录。</p>
+        <pre>roami session send "$REVIEW_SESSION_ID" '[review.request] 验证摘要，请审阅'
+roami session send "$AUTHOR_SESSION_ID" '[review.changes_requested] r1 rev=ROUND_1_FULL_SHA256 文件:行、问题、依据、建议'
+roami session send "$REVIEW_SESSION_ID" '[review.request] 已修复并验证，请复审'
+roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=ROUND_2_FULL_SHA256 已核对改动与验证证据'</pre>
         <ul>
-          <li>首轮「主动交审」由作者发起。「空闲交审」由宿主在确认作者空闲且有新变更时发起。后续轮次由作者提交新版本。</li>
-          <li>每轮保存基准、变更摘要和只读快照。审查端读快照，作者负责写入。恢复时使用已登记的版本。</li>
+          <li>首轮「主动交审」由作者发起。「空闲交审」复用会话观察循环，宿主在作者屏幕稳定且空闲至少 30 秒、存在变更时发起。后续轮次由作者提交新版本。</li>
+          <li>Git 开工基准、已跟踪及未跟踪的变更形成只读补丁。宿主计算补丁的 SHA-256 摘要，并把文件路径、完整摘要和轮次随请求送达。审查端读取已登记的补丁。</li>
           <li>接收端须仍是配对的 Agent 且能接收输入。路由以稳定 ID 及运行身份核验，遇到退出、变成 shell、忙碌或身份变化时停在可恢复的状态。</li>
-          <li>CLI 成功证明输入已提交。宿主以实际发送方身份、配对、消息类型、轮次及版本建立审查回执。终端正文中的标记仅用于关联。重复请求、旧版本结论及结果未知的投递不新开轮次。</li>
-          <li>受管任务使用当前修订对应的 <code>task_steer</code>，Swarm 成员通过 <code>roami swarm say</code>。宿主按会话类型选择路由。</li>
+          <li>CLI 成功表示互审消息已排队。宿主通过发送进程的终端归属核验配对身份，记录类型、轮次、版本及投递回执。结果未知时停止投递并显示中断，避免回放重复意见。</li>
+          <li>此链路覆盖普通交互会话。受管任务继续使用当前修订对应的 <code>task_steer</code>，Swarm 成员继续通过 <code>roami swarm say</code> 续接。</li>
         </ul>
       </section>
 
@@ -84,7 +85,7 @@ roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=e124dc0 已核
           <div><dt>待修复</dt><dd>作者收到完整意见，在原会话修复、验证并提交新版本，review 进入下一轮。</dd></div>
           <div><dt>通过</dt><dd>当前版本已通过，停止自动交审，保留完整历史。</dd></div>
           <div><dt>达到轮次上限</dt><dd>第 3 轮仍有待改项时结束，最后意见留在双方会话。已记录的轮次保留用于追溯。</dd></div>
-          <div><dt>已中断</dt><dd>会话关闭、身份变化或投递需要核对时停在当前轮次，根据回执恢复。取消时只回收当前操作创建且已核对的资源。</dd></div>
+          <div><dt>已中断</dt><dd>会话关闭、身份变化或投递需要核对时停在当前轮次，保留回执供核对。取消创建时只回收当前操作创建且已核对的资源。</dd></div>
         </dl>
         <p class="scope">同一版本重复提交不计新轮次。审查通过只对应本轮版本及验证依据，外部 PR 评审与合并沿用原流程。</p>
       </section>
@@ -93,11 +94,11 @@ roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=e124dc0 已核
         <h2>代码落点</h2>
         <dl>
           <div><dt>创建表单</dt><dd>作者和审查者都从同一个 <a href="../../../frontend/src/agent-registry.ts">Agent 注册表</a> 获取当前节点的 Agent，复用图标和 i18n。<a href="../../../frontend/src/components/sessions/TaskComposer.tsx">TaskComposer</a> 与 <a href="../../../frontend/src/components/sessions/NewSessionModal.tsx">NewSessionModal</a> 共享互审配置和创建意图。</dd></div>
-          <div><dt>宿主生命周期</dt><dd>在 <a href="../../../backend/api/session-lifecycle-create.go">创建生命周期</a> 的作者启动前准备 review 会话与回执。启动指令按双方角色绑定对端稳定 ID。旧 <code>autoReview</code> 布尔值兼容原有路径；新的互审记录走单一流程。</dd></div>
-          <div><dt>状态与投递</dt><dd>宿主记录作者 ID、review ID、交审方式、上限、当前轮次、版本快照、消息状态和核对结果。普通会话使用既有会话发送路径，审查数据复用 <a href="../../../plugins/reviewmesh/reviewmesh.go">Review Mesh</a> 可用的差异读取与意见结构。</dd></div>
-          <div><dt>会话树与终端</dt><dd><a href="../../../frontend/src/components/shell/task-tree.ts">项目树</a> 先读父子绑定与角色，旧陪跑会话保留兼容。桌面标签和手机入口进入现有会话视图。</dd></div>
+          <div><dt>宿主生命周期</dt><dd>在 <a href="../../../backend/api/session-lifecycle-review.go">创建生命周期的互审阶段</a> 准备 review 会话与回执，给双方绑定对端稳定 ID。旧 <code>autoReview</code> 布尔值兼容原有路径。</dd></div>
+          <div><dt>状态与投递</dt><dd>宿主记录作者 ID、review ID、交审方式、上限、当前轮次、版本快照、消息状态和核对结果。<a href="../../../internal/sessionreview/protocol.go">互审协议</a> 校验并排队，<a href="../../../backend/api/session-review-observer.go">会话观察循环</a> 复用既有输入投递，并向工作台提供状态。</dd></div>
+          <div><dt>会话树与终端</dt><dd><a href="../../../frontend/src/components/shell/task-tree.ts">项目树</a> 使用实际父子绑定与角色，兼容旧陪跑会话。会话终端的互审状态栏可直接打开对端。</dd></div>
         </dl>
-        <p class="scope">验证记录见 <a href="./acceptance.md">原型验收</a>。现阶段交付原型和上线设计。</p>
+        <p class="scope">验证记录见 <a href="./acceptance.md">原型验收</a>。运行验收覆盖工作区、会话关系、CLI 和 Web 两端。</p>
       </section>
     </article>
   </main>

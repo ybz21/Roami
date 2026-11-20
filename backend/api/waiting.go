@@ -1,10 +1,11 @@
 package api
 
 import (
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 // 移植前端 prompt.tsx 的 detectPrompt 布尔判定：从一屏 capture 纯文本里看是否有
@@ -36,12 +37,16 @@ func waitClean(s string) string {
 
 // sessionCapture 抓会话当前屏纯文本（=name 精确匹配，避开 tmux -t 前缀匹配 footgun）。
 func sessionCapture(name string, lines int) string {
+	return captureTerminalSession(runtime.New(), name, lines)
+}
+
+func captureTerminalSession(rt runtime.Runtime, name string, lines int) string {
 	// `=name:`：pane 类命令对裸 `=name` 报 can't find pane（tmux 3.4），带冒号才按「该会话当前窗口」解析
-	out, err := exec.Command("tmux", "capture-pane", "-t", "="+name+":", "-p", "-J", "-S", "-"+strconv.Itoa(lines)).Output()
+	out, err := rt.TmuxOutput("capture-pane", "-t", "="+name+":", "-p", "-J", "-S", "-"+strconv.Itoa(lines))
 	if err != nil {
 		return ""
 	}
-	return string(out)
+	return out
 }
 
 // chromeLine Agent 自己的外壳行：状态栏、标签栏、输入框边框、提示符那行（空的，或用户刚敲的话）、

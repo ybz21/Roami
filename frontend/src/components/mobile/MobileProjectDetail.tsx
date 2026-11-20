@@ -63,6 +63,7 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   }
   const status = (s: OverviewItem | undefined, dormant?: boolean) => {
     if (!s) return dormant ? t('mobile.st.dormant') : ''
+    if (s.review?.role === 'reviewer') return t(`session.review.phase.${s.review.phase}`)
     return s.dormant ? t('mobile.st.dormant') : s.waiting ? t('mobile.st.waiting') : s.running ? t('mobile.st.running') : t('mobile.st.idle')
   }
   const busy = (w: Wt) => (w.sessions || []).length > 0 || w.dirty + w.untracked > 0 || (w.committedAhead > 0 && !w.mergedInto)

@@ -12,6 +12,7 @@ import (
 	"github.com/ybz21/Roami/backend/worktree"
 	"github.com/ybz21/Roami/internal/memguard"
 	life "github.com/ybz21/Roami/internal/sessionlifecycle"
+	"github.com/ybz21/Roami/internal/sessionreview"
 	"github.com/ybz21/Roami/internal/sessionstore"
 )
 
@@ -56,6 +57,19 @@ func (a *API) lifecycleInspectClose(ctx context.Context, o life.Operation) (any,
 	}
 	plan := lifecycleClosePlan{Proof: proof}
 	if o.Intent.Mode != "keep" {
+		meta := sessmeta.New(rt.HomeDir)
+		meta.DataDir = rt.DataDir
+		if row, exists := meta.Get(o.ResourceID); exists && row.CreatedBy == "review" {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_REVIEW_WORKSPACE"))
+		}
+		if pair, err := sessionreview.Open(rt).Load(o.ResourceID); err == nil {
+			identity, err := rt.SessionIdentity(pair.Reviewer.Session)
+			if err != nil || identity != "" {
+				return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_REVIEW_WORKSPACE"))
+			}
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
 		path, err := filepath.EvalSymlinks(o.Intent.Path)
 		if err != nil {
 			return nil, err

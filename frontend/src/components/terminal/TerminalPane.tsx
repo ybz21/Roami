@@ -3,6 +3,7 @@ import { SessionProcesses } from '../sessions/SessionProcesses'
 import { TBtn, TI } from './terminal-toolbar'
 import { useSessionLifecycle, blockingLifecycle } from '../sessions/session-lifecycle'
 import { PendingSessionLifecycle, SessionLifecycleDraftNotice } from '../sessions/SessionLifecyclePanel'
+import SessionReviewStatus from '../sessions/SessionReviewStatus'
 import { SessionMemoryBanner } from '../sessions/SessionMemoryControl'
 import { atPath, atPaths } from '../../agent-paths'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -1357,7 +1358,7 @@ export default function TerminalPane(props: {
           dir={cwd} accent="var(--accent)"
           explorerOpen={showFiles} onExplorerClose={() => setShowFiles(false)} onExplorerOpen={() => setShowFiles(true)}
           leadingTitle={active || ''} leadingTab={sessionTab}
-          leadingContent={terminalArea} chrome={<>{sessionToolbar}{active && !curFile && <SessionMemoryBanner name={active} />}</>} footer={sessionBottom}
+          leadingContent={terminalArea} chrome={<>{sessionToolbar}{active && !curFile && <><SessionReviewStatus name={active} open={onOpenSession} /><SessionMemoryBanner name={active} /></>}</>} footer={sessionBottom}
         />
       ) : (
         <div ref={phoneRootRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
@@ -1367,7 +1368,7 @@ export default function TerminalPane(props: {
               ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)}
                   onBack={isPhone ? undefined : onReturnToSession} onClose={() => closeFile(curFile)} />
               : !phoneChrome && sessionToolbar}
-            {active && !curFile && <SessionMemoryBanner name={active} />}
+            {active && !curFile && <><SessionReviewStatus name={active} open={onOpenSession} /><SessionMemoryBanner name={active} /></>}
             {isPhone && active && reconnectFailures[active] && !curFile &&
               <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
                 <span>{t('terminal.recoveryAlert')}</span><strong>{t('terminal.recoveryAction')}</strong>

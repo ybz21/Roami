@@ -84,6 +84,7 @@ export default function SoloTerminal({ name }: { name: string }) {
         codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}
         openCodeMap={openCodeMap} openCodeView={openCodeView} setOpenCodeView={setOpenCodeView}
         agentKinds={agentKinds}
+        onOpenSession={paletteActions.openSession}
         onRename={(_, newName) => { location.hash = '#/term/' + encodeURIComponent(newName) }}
         fileDock="left"
       />

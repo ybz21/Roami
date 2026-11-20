@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/id"
 	life "github.com/ybz21/Roami/internal/sessionlifecycle"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
@@ -81,6 +82,15 @@ func (a *API) LifecycleAccept(c *gin.Context) {
 		if b.Intent.Launch != nil && len(b.Intent.Launch.Command) > 8192 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 			return
+		}
+		if review := b.Intent.Review; review != nil {
+			launch := b.Intent.Launch
+			if launch == nil || agent.Get(launch.Agent) == nil || strings.TrimSpace(launch.Command) == "" || strings.TrimSpace(launch.Task) == "" ||
+				agent.Get(review.Agent) == nil || strings.TrimSpace(review.Command) == "" || len(review.Command) > 8192 ||
+				(review.Trigger != "submit" && review.Trigger != "idle") || launch.AutoReview {
+				lifecycleError(c, fmt.Errorf("LIFECYCLE_REVIEW_INVALID"))
+				return
+			}
 		}
 		b.ResourceID = id.NewAt(time.Now())
 	} else {
@@ -159,6 +169,12 @@ func (a *API) LifecycleAction(c *gin.Context) {
 			return life.ErrConflict
 		}
 		switch action {
+		case "continue-without-review":
+			if o.Kind != "create" || o.State != "attention" || o.Stage != "review" || o.Intent.Review == nil || o.Has("launch-intent") {
+				return life.ErrConflict
+			}
+			o.Intent.Review = nil
+			o.State, o.ErrorCode, o.ErrorDetail = "queued", "", ""
 		case "retry":
 			if o.State != "attention" || o.ErrorCode == "LIFECYCLE_RESULT_UNKNOWN" {
 				return life.ErrConflict

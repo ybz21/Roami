@@ -40,6 +40,13 @@ type Intent struct {
 	Snapshot        string  `json:"snapshot,omitempty"`
 	SessionIdentity string  `json:"sessionIdentity,omitempty"`
 	Launch          *Launch `json:"launch,omitempty"`
+	Review          *Review `json:"review,omitempty"`
+}
+
+type Review struct {
+	Agent   string `json:"agent"`
+	Command string `json:"command"`
+	Trigger string `json:"trigger"`
 }
 
 // Prompt templates are filled as text before shell quoting; paths never become shell syntax.

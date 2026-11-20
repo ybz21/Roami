@@ -29,7 +29,7 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
   const draftId = useId()
   const { draft, setDraft } = useLifecycleDraft(op.resourceId)
   const ready = op.kind === 'create' && op.state === 'succeeded'
-  const act = async (action: 'retry' | 'cancel' | 'retain' | 'retain-branch') => {
+  const act = async (action: 'retry' | 'cancel' | 'retain' | 'retain-branch' | 'continue-without-review') => {
     setBusy(true)
     try { await lifecycleAction(op, action) } catch { message.error(t('session.lifecycle.actionFailed')) } finally { setBusy(false) }
   }
@@ -79,6 +79,8 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
     </div>}
     <div className="tt-lifecycle-actions">
       {op.state === 'attention' && op.errorCode !== 'LIFECYCLE_RESULT_UNKNOWN' && <Button loading={busy} onClick={() => void act('retry')}>{t('session.lifecycle.retry')}</Button>}
+      {op.kind === 'create' && op.stage === 'review' && op.state === 'attention' && op.intent.review && !op.cancelRequested &&
+        <Button loading={busy} onClick={() => void act('continue-without-review')}>{t('session.review.continueWithout')}</Button>}
       {op.kind === 'create' && !lifecycleEnded(op) && !op.cancelRequested && <Button loading={busy} onClick={() => void act('cancel')}>{t('session.lifecycle.cancel')}</Button>}
       {op.kind === 'close' && op.state === 'attention' && !op.receipts.remove && <Button loading={busy} onClick={() => void act('retain')}>{t('session.lifecycle.retain')}</Button>}
       {op.kind === 'close' && op.state === 'attention' && op.receipts.remove && <Button loading={busy} onClick={() => void act('retain-branch')}>{t('session.lifecycle.keepBranch')}</Button>}
