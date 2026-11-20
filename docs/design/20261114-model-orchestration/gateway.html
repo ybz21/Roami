@@ -16,57 +16,43 @@
 </nav>
 <main class="doc">
 <section>
-  <h2>现在能调什么，怎么接</h2>
-  <p class="lead">只列已启用、可调用的模型，聚合排在前面。调用名单独可复制。密钥和目录在同一页，但密钥只在创建时完整显示一次。</p>
-  <div class="board solo">
-  <figure>
-    <figcaption>桌面</figcaption>
-    <div class="app">
-      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
-        <div class="app-main">
-          <div class="toolbar"><h2>本机网关</h2><span class="search">搜索模型</span><span class="seg"><span class="on">全部</span><span>聚合</span><span>原生</span></span><span class="grow"></span><span class="chip">本机可访问</span></div>
-          <div class="split" style="grid-template-columns:minmax(0,1fr) 340px">
-            <table class="grid">
-              <thead><tr><th>模型</th><th>类型</th><th>能力</th><th>费用</th><th></th></tr></thead>
-              <tbody>
-                <tr><td><strong>日常编码</strong><small><code>coding-auto</code></small></td><td>聚合</td><td>文本、图片</td><td>按成员计</td><td><span class="btn quiet">复制调用名</span></td></tr>
-                <tr><td><strong>Qwen 免费</strong><small><code>or-qwen-free</code></small></td><td>原生 · OpenRouter</td><td>文本、图片、工具</td><td><span class="st ok">已确认免费</span></td><td><span class="btn quiet">复制调用名</span></td></tr>
-                <tr><td><strong>DS 代码助手</strong><small><code>wb-ds</code></small></td><td>原生 · WorkBuddy</td><td>文本</td><td>价格未知</td><td><span class="btn quiet">复制调用名</span></td></tr>
-              </tbody>
-            </table>
-            <div class="pane">
-              <div class="tabs"><span class="on">接入</span><span>密钥</span></div>
-              <h3>日常编码</h3>
-              <p class="lead" style="margin-bottom:var(--sp-2)">地址只在这台机器上可访问。</p>
-              <div class="callout ok"><strong>http://127.0.0.1:13579/v1</strong><p>OpenAI 兼容。示例里的密钥用占位符，不写入真实值。</p></div>
-              <span class="btn">复制 curl 示例</span>
-              <h3>访问密钥</h3>
-              <table class="grid">
-                <tbody>
-                  <tr><td>Claude Code<small>···· 7f3a · 可调用</small></td><td><span class="btn quiet">吊销</span></td></tr>
-                  <tr><td>脚本<small>···· 19c0 · 可调用</small></td><td><span class="btn quiet">吊销</span></td></tr>
-                </tbody>
-              </table>
-              <span class="btn">新建密钥</span>
-            </div>
-          </div>
-        </div>
+  <h2>接入与密钥</h2>
+  <p class="lead">打开网关先看到调用地址和复制按钮。向下查看调用示例和访问密钥。</p>
+  <p><a class="btn" href="current.html#/gateway">打开网关原型</a></p>
+  <div class="app">
+    <div class="app-main">
+      <div class="tabs" aria-hidden="true"><span class="on">接入与密钥</span><span>模型列表</span></div>
+      <div class="callout">
+        <strong>API 地址</strong>
+        <p><code>http://127.0.0.1:41155/v1</code> · 仅本机可访问</p>
       </div>
+      <div class="toolbar"><span>调用示例</span><span class="chip">curl / Python</span></div>
+      <div class="toolbar"><span>访问密钥</span><span class="chip">新建密钥</span></div>
     </div>
-  </figure>
   </div>
 </section>
 <section>
-  <h2>行为</h2>
+  <h2>模型列表</h2>
+  <p class="lead">在同一个列表里按类型、来源、能力或费用筛选。默认显示全部已接入模型，聚合排在前面。</p>
+  <p><a class="btn" href="current.html#/directory">打开模型列表原型</a></p>
+  <div class="app">
+    <div class="app-main">
+      <div class="tabs" aria-hidden="true"><span>接入与密钥</span><span class="on">模型列表</span></div>
+      <div class="toolbar"><span class="search">搜索模型</span><span class="select">全部已接入</span><span class="select">所有来源</span><span class="select">全部能力</span><span class="select">全部费用</span></div>
+      <table class="grid">
+        <thead><tr><th>模型</th><th>类型</th><th>输入</th><th>输出</th></tr></thead>
+        <tbody>
+          <tr><td>日常编码</td><td>聚合</td><td>文本、图片</td><td>文本</td></tr>
+          <tr><td>DS 代码助手</td><td>原生 · WorkBuddy</td><td>文本</td><td>文本</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
   <dl class="decisions">
-    <dt>目录和发现是两套清单</dt>
-    <dd>这一页只出现已启用的模型。供应商那边发现了但没启用的，留在<a href="sources.html">模型源</a>，不进这里，也不进选模。</dd>
-    <dt>密钥只完整出现一次</dt>
-    <dd>新建或轮换时显示完整值，之后列表只留名称、用途和尾号。吊销立即生效，用这把密钥发出的历史请求仍可在<a href="audit.html">审计</a>里按时间和来源查到。</dd>
-    <dt>两种密钥不混用</dt>
-    <dd>这里发的是网关访问密钥，只能调模型。供应商凭据在模型源里管理，外部程序拿不到。</dd>
-    <dt>试调算一次真实请求</dt>
-    <dd>接入页可以发一次试调，结果直接链到请求记录。它会消耗额度，按钮旁写明这一点。</dd>
+    <dt>筛选类型</dt>
+    <dd>可选全部已接入、聚合模型、原生模型或上游目录。上游目录用于查看尚未接入的模型。接入后可在模型详情复制调用名。</dd>
+    <dt>管理密钥</dt>
+    <dd>网关访问密钥在创建时完整显示一次。上游凭据在<a href="sources.html">模型源</a>管理。</dd>
   </dl>
 </section>
 </main>

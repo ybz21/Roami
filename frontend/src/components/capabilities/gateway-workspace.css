@@ -6,7 +6,7 @@
 .tt-gateway-tab{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
 .tt-gateway-layout{display:flex;flex:1;min-width:0;min-height:0}
 .tt-gateway-scroll{flex:1;min-width:0;min-height:0;overflow:auto;padding:var(--sp-5) var(--pad-page);overscroll-behavior:contain}
-.tt-gateway-access-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*18)),1fr));gap:var(--sp-4);align-items:stretch}
+.tt-gateway-access-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--sp-5)*18)),1fr));gap:var(--sp-4);align-items:start}
 .tt-gateway-connection,.tt-gateway-sample{padding:var(--sp-4);border:1px solid var(--border-subtle);border-radius:var(--r-card);background:var(--bg-container);min-width:0;display:flex;flex-direction:column;gap:var(--sp-3)}
 .tt-gateway-section-head{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
 .tt-gateway-section-head h3{font-size:var(--fs-sm);display:flex;align-items:center;gap:var(--sp-2);margin:0;min-width:0}
@@ -17,7 +17,7 @@
 .tt-gateway-copy-field{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);border:1px solid var(--border-subtle);border-radius:var(--r-xs);background:var(--bg-base)}
 .tt-gateway-copy-field code{flex:1;min-width:0;overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .tt-gateway-copy-field>button{flex-shrink:0}
-.tt-gateway-connection>button{align-self:flex-start;margin-top:auto;flex-direction:row-reverse}
+.tt-gateway-connection>button{align-self:flex-start;flex-direction:row-reverse}
 .tt-gateway-sample .tt-gateway-section-head>.tt-gateway-example-tabs{margin-left:auto}
 .tt-gateway-sample .ui-tabs-list{padding:0;border:0}
 .tt-gateway-sample-model{display:flex;flex-direction:row;align-items:center;gap:var(--sp-3)}

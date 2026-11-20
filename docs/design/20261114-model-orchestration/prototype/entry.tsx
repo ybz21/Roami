@@ -27,7 +27,7 @@ const documents: Record<string, string> = {
 }
 const aliases: Record<string, string> = {
   '模型源': 'catalog', '聚合': 'aggregate', '概况': 'usage', '监控': 'monitor', '审计': 'audit',
-  '本机网关': 'gateway', '语音输入': 'speech', 'directory': 'gateway', 'monitoring': 'monitor', 'overview': 'usage',
+  '本机网关': 'gateway', '语音输入': 'speech', 'monitoring': 'monitor', 'overview': 'usage',
 }
 const currentRoute = () => {
   const encoded = location.hash.slice(1).replace(/^\//, '').replace(/^capabilities\/models\/?/, '')
@@ -57,8 +57,8 @@ function Prototype() {
   const trace = requested === 'troubleshoot' || params.get('demo') === 'gateway'
   const example = params.get('case') || 'blocked'
   const sample = traceKeys.includes(example) ? example : 'blocked'
-  const access = requested === 'access'
-  const tab = trace ? 'audit' : access ? 'gateway' : routes.includes(requested) ? requested : 'catalog'
+  const gatewayTab = requested === 'access' || requested === 'directory' ? requested : ''
+  const tab = trace ? 'audit' : gatewayTab ? 'gateway' : routes.includes(requested) ? requested : 'catalog'
   const observation = !trace && !params.has('usageView') && (page === 'monitor' || page === 'audit') ? page : undefined
   const account = page === 'catalog/workbuddy-account'
   const fileImport = page === 'catalog/import' && params.get('view') === 'file'
@@ -79,7 +79,7 @@ function Prototype() {
     if (phone) nav.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [phone, tab, agent, workbench])
   useEffect(() => {
-    const selector = access ? '.tt-gateway-tabs [data-node-key="access"]'
+    const selector = gatewayTab ? `.tt-gateway-tabs [data-node-key="${gatewayTab}"]`
       : page === 'monitor/sources' ? '.tt-monitor-workspace [data-node-key="sources"]'
       : page === 'monitor/requests' ? '.tt-monitor-workspace [data-node-key="requests"]'
       : page.startsWith('aggregate/') && page.endsWith('/members') ? '.tt-aggregate-tabs [data-node-key="members"]'
@@ -95,7 +95,7 @@ function Prototype() {
     const observer = new MutationObserver(() => { if (activate()) observer.disconnect() })
     observer.observe(document.querySelector('.model-prototype-main')!, { childList: true, subtree: true })
     return () => observer.disconnect()
-  }, [page, access])
+  }, [page, gatewayTab])
 
   const navigateHub = (path: string) => {
     const next = path.slice('capabilities/models/'.length)

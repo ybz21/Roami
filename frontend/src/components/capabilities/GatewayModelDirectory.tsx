@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Tabs } from 'antd'
+import { App } from 'antd'
 import { Alert, Button, Input, Pagination, Select, Spin } from './model-controls'
 import { CopyIcon, ChevronRight, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -49,8 +49,13 @@ export default function GatewayModelDirectory({ active = true, catalog, onSource
   const filterKey = [kind, source, query, capability, price].join('\0')
   const pools = rows.filter(row => row.kind === 'aggregate')
   return <div className="tt-gateway-layout"><section className="tt-gateway-scroll tt-gateway-directory" aria-label={t('directory.title')}>
-    <Tabs className="tt-directory-tabs" activeKey={kind} onChange={setKind} items={['configured', 'pool', 'native', 'upstream'].map(key => ({ key, label: t('gatewayWorkspace.kind.' + key) }))} />
-    <div className="tt-directory-filters"><Input prefix={<SearchIcon />} aria-label={t('directory.search')} placeholder={t('directory.search')} value={query} onChange={event => setQuery(event.target.value)} allowClear /><Select<string> aria-label={t('hub.source')} value={source} options={[{ value: '', label: t('monitor.allSources') }, ...catalog.sources.map(row => ({ value: row.id, label: row.name }))]} onChange={setSource} /><Select<string> aria-label={t('directory.capability')} value={capability} options={['', 'image', 'audio', 'video', 'tools', 'reasoning', 'structuredOutput', 'streaming'].map(value => ({ value, label: t(value ? 'modelSelection.capability.' + value : 'directory.allCapabilities') }))} onChange={setCapability} /><Select<string> aria-label={t('gatewayOptions.priceFilter')} value={price} options={['', 'free', 'metered', 'advertised-zero', 'unknown'].map(value => ({ value, label: t('gatewayOptions.filter.' + (value || 'all')) }))} onChange={setPrice} /></div>
+    <div className="tt-directory-filters">
+      <Input prefix={<SearchIcon />} aria-label={t('directory.search')} placeholder={t('directory.search')} value={query} onChange={event => setQuery(event.target.value)} allowClear />
+      <Select<string> aria-label={t('gatewayWorkspace.kind')} value={kind} options={['configured', 'pool', 'native', 'upstream'].map(value => ({ value, label: t('gatewayWorkspace.kind.' + value) }))} onChange={setKind} />
+      <Select<string> aria-label={t('hub.source')} value={source} options={[{ value: '', label: t('monitor.allSources') }, ...catalog.sources.map(row => ({ value: row.id, label: row.name }))]} onChange={setSource} />
+      <Select<string> aria-label={t('directory.capability')} value={capability} options={['', 'image', 'audio', 'video', 'tools', 'reasoning', 'structuredOutput', 'streaming'].map(value => ({ value, label: t(value ? 'modelSelection.capability.' + value : 'directory.allCapabilities') }))} onChange={setCapability} />
+      <Select<string> aria-label={t('gatewayOptions.priceFilter')} value={price} options={['', 'free', 'metered', 'advertised-zero', 'unknown'].map(value => ({ value, label: t('gatewayOptions.filter.' + (value || 'all')) }))} onChange={setPrice} />
+    </div>
     {(directory.failed || !!directory.value?.refreshFailures?.length) && <Alert type="warning" message={t('directory.loadFailed')} action={<Button onClick={directory.refresh}>{t('agent.retry')}</Button>} />}
     {directory.loading && <Spin size="small" />}
     <ModelGroup key={'pools/' + filterKey} rows={pools} title={t('gatewayWorkspace.kind.pool')} users={users} onSelect={select} />
