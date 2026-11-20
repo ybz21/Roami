@@ -59,8 +59,8 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 			command = "work"
 		case "add":
 			command = "member-add"
-		case "register":
-			command = "member-register"
+		case "register", "lifecycle":
+			command = "member-" + action
 		case "inspect":
 			command = "member-inspect"
 		default:
@@ -84,7 +84,7 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 	case "daily":
 		valueFlags = "delegation project main-conversation timezone date slot"
 		switchFlags = "dry-run"
-	case "plan", "control", "migrate":
+	case "plan", "control", "migrate", "member-lifecycle":
 		valueFlags = "file"
 	case "member-register":
 		valueFlags = "file key revision executor duty"
@@ -213,7 +213,20 @@ func runCommand(ctx context.Context, rt runtime.Runtime, args []string, w io.Wri
 		if value.MemberProtocol == 1 && value.Members != nil {
 			return writeJSON(w, map[string]any{"data": value.Members})
 		}
-		return writeJSON(w, map[string]any{"data": value.Work})
+		work := value.Work
+		if len(value.RetiredMembers) > 0 {
+			retired := make(map[string]bool, len(value.RetiredMembers))
+			for _, member := range value.RetiredMembers {
+				retired[member.WorkID] = true
+			}
+			work = make([]workItem, 0, len(value.Work))
+			for _, item := range value.Work {
+				if !retired[item.ID] {
+					work = append(work, item)
+				}
+			}
+		}
+		return writeJSON(w, map[string]any{"data": work})
 	}
 	if jsonOutput && command == "board" {
 		return writeJSON(w, map[string]any{"data": boardView(value)})

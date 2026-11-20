@@ -110,6 +110,7 @@
   "swarm_goal_enable": ["swarm", "goal", "enable"],
   "swarm_goal_revoke": ["swarm", "goal", "revoke"],
   "swarm_members_register": ["swarm", "member", "register"],
+  "swarm_members_lifecycle": ["swarm", "member", "lifecycle"],
   "swarm_member": ["swarm", "member", "inspect"],
   "swarm_plan": [
     "swarm",

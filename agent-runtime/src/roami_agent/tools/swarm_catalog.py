@@ -51,6 +51,14 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
             {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
         )
 
+    async def change_members(args, binding):
+        await main(binding, args["swarmId"])
+        return await swarms.change_members(
+            binding["owner"],
+            args["swarmId"],
+            {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
+        )
+
     async def member(args, binding):
         await status(args, binding)
         value = await swarms.member(
@@ -320,6 +328,27 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
                 ["swarmId", "expectedRevision", "members"],
             ),
             register_members,
+            True,
+            "write",
+        ),
+        (
+            "swarm_members_lifecycle",
+            "Apply a requested roster reduction or restoration in this Main's existing team. Read swarm_status first for the current revision and exact stable member IDs. Retire only after assigned work is settled and no active scheduled delegation still selects the role. Keep the original role history, memory and provider identity. Restore the same ID for a returning role. Restoration does not dispatch work.",
+            object_schema(
+                {
+                    "swarmId": string,
+                    "expectedRevision": {"type": "integer", "minimum": 1},
+                    "action": {"type": "string", "enum": ["retire", "restore"]},
+                    "memberIds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "items": {"type": "string", "minLength": 1, "maxLength": 200},
+                    },
+                },
+                ["swarmId", "expectedRevision", "action", "memberIds"],
+            ),
+            change_members,
             True,
             "write",
         ),

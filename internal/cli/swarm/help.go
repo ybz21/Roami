@@ -61,7 +61,7 @@ var helpSpecs = map[string]helpSpec{
 
 func showHelp(w io.Writer, topics []string) error {
 	name := strings.Join(topics, " ")
-	aliases := map[string]string{"create": "new", "list": "ls", "feed": "chat", "member-add": "member add", "member-register": "member register", "member-inspect": "member inspect", "member list": "member ls"}
+	aliases := map[string]string{"create": "new", "list": "ls", "feed": "chat", "member-add": "member add", "member-register": "member register", "member-lifecycle": "member lifecycle", "member-inspect": "member inspect", "member list": "member ls"}
 	if alias, ok := aliases[name]; ok {
 		name = alias
 	}
@@ -72,6 +72,7 @@ func showHelp(w io.Writer, topics []string) error {
 	for command, summary := range map[string]string{"pause": "暂停新派发", "resume": "继续派发", "stop": "取消蜂群任务", "archive": "归档蜂群"} {
 		specs[command] = helpSpec{summary, "SWARM_ID --key KEY --revision N [--json]", "roami swarm " + command + " SWARM_ID --key " + command + "-1 --revision 2", []string{"暂停只停新派发，停止调用任务取消，归档不关闭会话。"}}
 	}
+	specs["member lifecycle"] = helpSpec{"退出或恢复已有成员", "SWARM_ID --file JSON|- [--json]", "roami swarm member lifecycle SWARM_ID --file roster.json", []string{`JSON 示例：{"commandKey":"retire-1","expectedRevision":4,"action":"retire","memberIds":["MEMBER_ID"]}`, "可用 retire 或 restore。退出保留对话、任务历史、记忆与目录。"}}
 	p := clihelp.Page{Command: "roami swarm", Summary: "蜂群协作、群聊与看板", Usage: []string{"roami swarm <命令> [参数]"}, More: "roami swarm <命令> -h"}
 	if spec, ok := specs[name]; ok {
 		p.Command += " " + name
@@ -80,7 +81,7 @@ func showHelp(w io.Writer, topics []string) error {
 		p.Examples = []clihelp.Entry{{Name: spec.example}}
 		p.Notes = spec.notes
 		p.Sections = []clihelp.Section{{Title: "通用选项", Entries: []clihelp.Entry{{Name: "--json", Description: "输出 JSON"}}}}
-		if slices.Contains([]string{"plan", "control", "member add", "member register", "dependencies", "say", "post"}, name) {
+		if slices.Contains([]string{"plan", "control", "member add", "member register", "member lifecycle", "dependencies", "say", "post"}, name) {
 			p.Sections[0].Entries = append(p.Sections[0].Entries, clihelp.Entry{Name: "--file JSON|-", Description: "读取完整请求；- 表示标准输入，不与业务选项混用"})
 		}
 		p.More = "roami swarm --help"
@@ -98,11 +99,11 @@ func showHelp(w io.Writer, topics []string) error {
 		}
 		if name == "member" {
 			p.Command += " member"
-			p.Summary = "登记、派发与查看成员"
+			p.Summary = "登记、调整与查看成员"
 			p.Usage = []string{"roami swarm member <命令> [参数]"}
 			p.More = "roami swarm member <命令> -h"
 		} else {
-			rows = append(rows, clihelp.Entry{Name: "member", Description: "登记、派发与查看成员"})
+			rows = append(rows, clihelp.Entry{Name: "member", Description: "登记、调整与查看成员"})
 		}
 		if name == "" {
 			seen := map[string]bool{}
@@ -132,5 +133,5 @@ func NativeHelpTopic(topics []string) bool {
 	if _, ok := helpSpecs[name]; ok {
 		return true
 	}
-	return slices.Contains([]string{"", "member", "create", "list", "feed", "member-add", "member-register", "member-inspect", "member list", "pause", "resume", "stop", "archive"}, name)
+	return slices.Contains([]string{"", "member", "create", "list", "feed", "member-add", "member-register", "member-lifecycle", "member lifecycle", "member-inspect", "member list", "pause", "resume", "stop", "archive"}, name)
 }

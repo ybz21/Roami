@@ -44,6 +44,7 @@ async def test_schema30_provider_upgrade_preserves_existing_generation(tmp_path,
             lambda db: row(db, "SELECT * FROM swarm_members WHERE id='member'")
         )
         assert current.pop("execution_generation") == 4
+        assert current.pop("retired_ms") is None
         assert current == before
         assert (
             await upgraded.call(

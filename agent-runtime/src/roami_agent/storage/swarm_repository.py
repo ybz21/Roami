@@ -239,7 +239,13 @@ def snapshot(db, owner, swarm_id):
         ):
             item["state"] = "blocked"
             item["dispatch_error"] = item["dispatch_error"] or "SWARM_DEPENDENCY_NOT_VERIFIED"
-    all_ids = {item["id"] for item in work}
+    from roami_agent.storage.swarm_members import member_list
+
+    members = member_list(db, swarm_id, work)
+    retired = [member for member in members if member["retiredAtMs"] is not None]
+    retired_work_ids = {member["workId"] for member in retired}
+    active_work = [item for item in work if item["id"] not in retired_work_ids]
+    all_ids = {item["id"] for item in active_work}
     graph = {item["id"]: [dep["upstreamId"] for dep in item["dependencies"]] for item in work}
 
     def covers(ident):
@@ -253,8 +259,8 @@ def snapshot(db, owner, swarm_id):
             pending.extend(graph.get(upstream, []))
         return all_ids - {ident} <= reached
 
-    integration_complete = any(item["integration"] and covers(item["id"]) for item in work)
-    states = [item["state"] for item in work]
+    integration_complete = any(item["integration"] and covers(item["id"]) for item in active_work)
+    states = [item["state"] for item in active_work]
     state = (
         "planning"
         if not states
@@ -351,9 +357,6 @@ def snapshot(db, owner, swarm_id):
         and not value["archived"]
         else None
     )
-    from roami_agent.storage.swarm_members import member_list
-
-    members = member_list(db, swarm_id, work)
     from roami_agent.storage.swarm_work_pause import pause_view
 
     return {
@@ -377,7 +380,8 @@ def snapshot(db, owner, swarm_id):
         "state": state,
         "sequence": sequence,
         "work": work,
-        "members": members,
+        "members": [member for member in members if member["retiredAtMs"] is None],
+        "retiredMembers": retired,
         "memberProtocol": value["member_protocol"],
         "memberYieldSupported": True,
         "posts": posts,

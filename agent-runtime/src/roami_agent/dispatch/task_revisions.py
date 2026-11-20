@@ -133,6 +133,9 @@ class TaskRevisions:
                 ):
                     raise DomainError("TASK_STEER_KEY_CONFLICT", 409)
                 return self._receipt(previous)
+            from roami_agent.storage.swarm_members import assert_member_active
+
+            assert_member_active(db, task_id)
             assert_session_open(db, task_id)
             if task["revision"] != expected_revision:
                 raise DomainError("TASK_REVISION_CHANGED", 409)
