@@ -75,19 +75,23 @@ it('keeps compatible providers visible when another imported plugin cannot load'
   expect(screen.getByRole('alert').textContent).toContain('hub.plugin.failed')
 })
 
-it('loads provider plugins from the registry and downloads only the selected version', async () => {
+it('lists registry plugins and downloads only the one chosen', async () => {
   const pkg = { id: 'release-id', name: '@magpie-community/opencode-workbuddy-auth', version: '0.2.37' }
   vi.mocked(api).mockImplementation(async (method, path) => {
-    if (path.startsWith(communityPath + '?')) return { data: [{ package: pkg.name, name: 'WorkBuddy', providers: ['workbuddy'], version: pkg.version }] }
+    if (path.startsWith(communityPath + '?')) return { data: [
+      { package: pkg.name, name: 'WorkBuddy', providers: ['workbuddy'], version: pkg.version, summary: { zh: '接入 WorkBuddy', en: 'Connect WorkBuddy' } },
+      { package: '@magpie-community/other', name: 'Other', providers: ['other'], version: '1.0.0' },
+    ] }
     if (path === communityPath && method === 'POST') return { data: pkg }
     if (path.endsWith('/inspect')) return { data: [provider] }
     return { data: [] }
   })
   render(<App><MagpiePluginImport revision="r1" onImported={vi.fn()} /></App>)
-  const selector = await screen.findByRole('combobox', { name: 'hub.plugin.communityPackage' })
-  await waitFor(() => expect(selector.getAttribute('aria-disabled')).not.toBe('true'))
-  fireEvent.mouseDown(selector.closest('.ant-select-selector')!)
-  fireEvent.click(await screen.findByTitle('WorkBuddy'))
+  await screen.findByText('WorkBuddy')
+  expect(screen.getByText('Connect WorkBuddy')).toBeTruthy()
+  expect(screen.getByText('Other')).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: 'hub.plugin.communitySearch' }), { target: { value: 'work' } })
+  expect(screen.queryByText('Other')).toBeNull()
   expect(vi.mocked(api).mock.calls.some(([method]) => method === 'POST')).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'hub.plugin.download' }))
   await screen.findByRole('button', { name: 'hub.plugin.addSource' })

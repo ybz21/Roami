@@ -184,6 +184,9 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-member-pool-list>li { fl
 .tt-pool-runtime-meta .is-ready { color:var(--ok); background:var(--ok-soft); border-color:var(--ok-border); }
 .tt-pool-runtime-meta .is-blocked { color:var(--warn); background:var(--warn-soft); border-color:var(--warn-border); }
 .tt-pool-unavailable { color:var(--warn); margin-block:var(--sp-3); }
+.tt-pool-runtime-meta small { color:var(--text-bright); font-weight:600; }
+html:not([data-size="compact"],[data-size="medium"]) .tt-pool-runtime-body { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:var(--sp-5); }
+html:not([data-size="compact"],[data-size="medium"]) .tt-pool-runtime-body > .tt-request-totals { align-content:center; margin-block-start:var(--sp-3); padding-inline-start:var(--sp-4); border-inline-start:1px solid var(--border-subtle); border-block-end:0; }
 .tt-pool-route {
   display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-4); padding:0;
   margin:var(--sp-3) 0 0; list-style:none;
@@ -207,8 +210,6 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-member-pool-list>li { fl
 }
 .tt-pool-route li:first-child .tt-pool-route-rank { color:var(--accent); }
 .tt-pool-status > .tt-routing-guide { margin-top:var(--sp-2); }
-html[data-size="compact"] .tt-pool-route { grid-template-columns:minmax(0,1fr); gap:var(--sp-2); }
-html[data-size="compact"] .tt-pool-route li + li::before {
-  inset-inline-start:var(--sp-5); top:auto; bottom:100%; width:0; height:var(--sp-2);
-  border-top:0; border-inline-start:1px dashed var(--accent-border);
-}
+html[data-size="compact"] .tt-pool-route { grid-template-columns:minmax(0,1fr); gap:0; }
+html[data-size="compact"] .tt-pool-route li + li { border-block-start:0; }
+html[data-size="compact"] .tt-pool-route li + li::before { content:none; }

@@ -144,13 +144,8 @@ html[data-pointer="coarse"] .tt-model-hub-tabs.ant-tabs-left > .ant-tabs-nav .an
 .tt-model-source-account-add { align-self:flex-start; }
 
 .tt-model-plugin-package { min-width:0; }
-.tt-magpie-community { display:grid; gap:var(--sp-3); max-width:var(--content-form); }
-.tt-magpie-community-fields { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:var(--sp-3); }
-.tt-magpie-community-release { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--sp-2); }
-.tt-magpie-community-release small { color:var(--text-dim); font-size:var(--fs-meta); }
 .tt-magpie-upload { border-top:1px solid var(--border-subtle); padding-top:var(--sp-3); }
 .tt-magpie-upload>summary { cursor:pointer; }
-html[data-size="compact"] .tt-magpie-community-fields { grid-template-columns:minmax(0,1fr); }
 .tt-model-plugin-package h3 { margin:0; font-size:var(--fs-body); overflow-wrap:anywhere; }
 
 .tt-model-plugin-import li { overflow-wrap:anywhere; }

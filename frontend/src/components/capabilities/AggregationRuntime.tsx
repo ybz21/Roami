@@ -49,6 +49,7 @@ export default function AggregationRuntime({ model, catalog, status, hasDraft, o
       </div>
     </div>
     {hasDraft && <p className="agent-settings-hint">{t('pool.savedRuntime')}</p>}
+    <div className="tt-pool-runtime-body">
     {!ready.length ? <p className="tt-pool-unavailable">{t('pool.noneAvailable')}</p> :
       <ol className="tt-pool-route">
         {ready.slice(0, 2).map((key, index) => {
@@ -70,6 +71,7 @@ export default function AggregationRuntime({ model, catalog, status, hasDraft, o
       <div><dt>{t('gatewayTrace.recentFailureRate')}</dt><dd>{observations && resolved > 0 ? new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(observations.failed / resolved) : t('monitor.pending')}</dd></div>
       <div><dt>{t('gatewayTrace.recentSwitches')}</dt><dd>{observations?.requests ? number.format(observations.sameSource + observations.crossSource) : t('monitor.pending')}</dd></div>
     </dl>
+    </div>
     {(latest || latestSwitch) && <div className="tt-request-actions">
       {latest && <Button onClick={() => onRequest(latest.requestId)}>{t('gatewayTrace.latestHit', { model: latest.upstreamModel || latest.model })}</Button>}
       {latestSwitch && latestSwitch.requestId !== latest?.requestId && <Button onClick={() => onRequest(latestSwitch.requestId)}>{t('gatewayTrace.latestSwitch')}</Button>}

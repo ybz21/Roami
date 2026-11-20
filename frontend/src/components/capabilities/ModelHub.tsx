@@ -39,7 +39,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const value = loaded || { revision: '', sources: [], models: [], drafts: [], baseUrl: '', uses: {} }
   const [requested, rawDetail, id, section, originPool] = sub.split('/')
   const legacy = getHashParams().get('modelTab')
-  const detail = requested === 'prices' || (!requested && legacy === 'prices') ? 'pricing' : rawDetail
+  const detail = requested === 'prices' || (!requested && legacy === 'prices') ? 'pricing' : requested === 'import' ? 'import' : rawDetail
   const tab = requested === 'prices' ? 'catalog' : requested === 'sources' ? 'catalog' : tabs.includes(requested) ? requested : legacy === 'prices' ? 'catalog' : legacy === 'proxy' ? 'usage' : 'catalog'
   const catalogDetail = tab === 'catalog' && !!detail
   const requestDetail = tab === 'audit' && detail === 'request' ? id : ''

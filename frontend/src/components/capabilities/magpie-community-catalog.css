@@ -1,0 +1,12 @@
+.tt-magpie-community { display:grid; gap:var(--sp-3); min-width:0; }
+.tt-magpie-list { list-style:none; margin:0; padding:0; }
+.tt-magpie-list li { display:grid; grid-template-columns:minmax(0, 2fr) minmax(0, 1fr) auto; align-items:center; gap:var(--sp-2) var(--sp-3); padding-block:var(--sp-3); border-bottom:1px solid var(--border-subtle); }
+.tt-magpie-list li > div { display:grid; gap:var(--sp-1); min-width:0; overflow-wrap:anywhere; }
+.tt-magpie-list small,.tt-magpie-list-state { color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-magpie-community-fields { display:grid; grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr)); gap:var(--sp-3); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-magpie-community-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-magpie-community-fields > .ant-input-affix-wrapper { grid-column:1/-1; }
+html[data-size="compact"] .tt-magpie-list li { grid-template-columns:minmax(0,1fr) auto; }
+html[data-size="compact"] .tt-magpie-list-state { grid-row:2; }
+html[data-size="compact"] .tt-magpie-list li > button { grid-column:2; grid-row:1/3; }
+html[data-pointer="coarse"] .tt-magpie-list li > button { min-height:var(--tap); }

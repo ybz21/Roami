@@ -4,10 +4,11 @@ import { ChevronRight, CloseIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import { Alert, Button, Select, Spin } from './model-controls'
 import type { ModelCatalog } from './model-hub-api'
-import { useGatewayRequests, type RequestWindow } from './gateway-request-api'
+import { requestFailureReasons, useGatewayRequests, type RequestFailureReason, type RequestWindow } from './gateway-request-api'
 
 const outcomes = ['blocked', 'exhausted', 'interrupted', 'failed', 'recovered', 'success', 'uncertain'] as const
 const series = ['success', 'recovered', 'failed', 'uncertain'] as const
+const failureLabel = (reason: RequestFailureReason) => 'gatewayTrace.' + (reason === 'quota' ? 'reason.quota' : reason)
 
 export default function GatewayRequestMonitor({ active, catalog, onRequest }: {
   active: boolean; catalog: ModelCatalog | null; onRequest: (id: string) => void
@@ -15,11 +16,12 @@ export default function GatewayRequestMonitor({ active, catalog, onRequest }: {
   const { t, locale } = useI18n()
   const [hours, setHours] = useState(6), [route, setRoute] = useState(''), [caller, setCaller] = useState('')
   const [window, setWindow] = useState<RequestWindow | null>(null), [outcome, setOutcome] = useState('')
+  const [reason, setReason] = useState<RequestFailureReason>(), [preferReasons, setPreferReasons] = useState(true)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const filterId = useId()
   const openRow = useRef<HTMLButtonElement | null>(null)
   const pageActive = usePageActive()
-  const state = useGatewayRequests(active && pageActive, hours, route, caller, outcome, window)
+  const state = useGatewayRequests(active && pageActive, hours, route, caller, outcome, window, reason)
   useEffect(() => {
     if (active && openRow.current?.isConnected) openRow.current.focus({ preventScroll: true })
   }, [active])
@@ -34,10 +36,19 @@ export default function GatewayRequestMonitor({ active, catalog, onRequest }: {
   const peak = Math.max(1, ...(data?.points.map(point => point.totals.requests) || []))
   const count = (value: number) => number.format(value)
   const callerName = (value: string) => value === 'external' ? t('hub.gateway.externalClient') : value
-  const selected = !!(route || caller || window || outcome)
+  const selected = !!(route || caller || window || outcome || reason)
   const windowLabel = window && stamp.formatRange(window.from, window.to)
-  const outcomeRows = outcomes.filter(key => data?.outcomes[key] || outcome === key)
-  const outcomePeak = Math.max(1, ...outcomeRows.map(key => data?.outcomes[key] || 0))
+  const failureRows = requestFailureReasons.filter(key => data?.failureReasons?.[key] || reason === key)
+  const showReasons = data?.failureReasons !== undefined && preferReasons && failureRows.length > 0
+  const breakdownLabel = t(showReasons ? 'gatewayTrace.failureBreakdown' : 'gatewayTrace.breakdown')
+  const breakdown = showReasons ? failureRows.map(key => ({
+    key, label: t(failureLabel(key)), total: data?.failureReasons?.[key] || 0, pressed: reason === key, tone: 'failed',
+    toggle: () => { setOutcome(''); setReason(reason === key ? undefined : key) },
+  })) : outcomes.filter(key => data?.outcomes[key] || outcome === key).map(key => ({
+    key, label: t('gatewayTrace.' + key), total: data?.outcomes[key] || 0, pressed: outcome === key, tone: key,
+    toggle: () => { setReason(undefined); setOutcome(outcome === key ? '' : key) },
+  }))
+  const breakdownPeak = Math.max(1, ...breakdown.map(row => row.total))
   const select = (label: string, value: string, options: { value: string; label: string }[], change: (value: string) => void) =>
     <label className="agent-settings-field">{label}<Select virtual={false} aria-label={label} value={value} options={options} onChange={change} /></label>
   const filterChip = (label: string, clear: () => void) =>
@@ -57,6 +68,7 @@ export default function GatewayRequestMonitor({ active, catalog, onRequest }: {
       {caller && filterChip(callerName(caller), () => setCaller(''))}
       {windowLabel && filterChip(windowLabel, () => setWindow(null))}
       {outcome && filterChip(t('gatewayTrace.' + outcome), () => setOutcome(''))}
+      {reason && filterChip(t(failureLabel(reason)), () => setReason(undefined))}
     </div>}
     {state.failed && <Alert type="error" role="alert" message={t('monitor.failed')} action={<Button onClick={state.retry}>{t('agent.retry')}</Button>} />}
     {!data ? state.unsupported ? <p className="agent-settings-hint">{t('gatewayTrace.unsupported')}</p> : !state.failed && <Spin /> : <>
@@ -86,13 +98,17 @@ export default function GatewayRequestMonitor({ active, catalog, onRequest }: {
               </div>
             </div>
           </section>
-          <section className="tt-request-breakdown" aria-label={t('gatewayTrace.breakdown')}>
-            <h3>{t('gatewayTrace.breakdown')}</h3>
-            {outcomeRows.length ? <ul className="tt-request-outcomes">
-              {outcomeRows.map(key => <li key={key}>
-                <button className={'tt-act is-' + key} type="button" aria-pressed={outcome === key} onClick={() => setOutcome(outcome === key ? '' : key)}>
-                  <span>{t('gatewayTrace.' + key)}</span><strong>{count(data.outcomes[key] || 0)}</strong>
-                  <span className="tt-request-outcome-track" aria-hidden="true"><i style={{ width: (data.outcomes[key] || 0) / outcomePeak * 100 + '%' }} /></span>
+          <section className="tt-request-breakdown" aria-label={breakdownLabel} aria-busy={state.pending}>
+            <div className="tt-request-section-head">
+              <h3>{breakdownLabel}</h3>
+              {failureRows.length > 0 && <Button onClick={() => setPreferReasons(!showReasons)}>{t(showReasons ? 'gatewayTrace.breakdown' : 'gatewayTrace.failureBreakdown')}</Button>}
+            </div>
+            {windowLabel && <small>{windowLabel}</small>}
+            {breakdown.length ? <ul className="tt-request-outcomes">
+              {breakdown.map(row => <li key={row.key}>
+                <button className={'tt-act is-' + row.tone} type="button" aria-pressed={row.pressed} disabled={state.pending} onClick={row.toggle}>
+                  <span>{row.label}</span><strong>{count(row.total)}</strong>
+                  <span className="tt-request-outcome-track" aria-hidden="true"><i style={{ width: row.total / breakdownPeak * 100 + '%' }} /></span>
                 </button>
               </li>)}
             </ul> : <p className="agent-settings-hint">{t('gatewayTrace.empty')}</p>}

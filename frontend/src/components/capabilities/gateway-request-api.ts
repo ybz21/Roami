@@ -3,19 +3,22 @@ import { api } from '../../api'
 import { pollWhileVisible } from '../../visible-poll'
 
 export type RequestOutcome = 'success' | 'recovered' | 'blocked' | 'exhausted' | 'interrupted' | 'failed' | 'cancelled' | 'unknown'
+export const requestFailureReasons = ['blocked', 'exhausted', 'interrupted', 'upstreamLimited', 'upstreamUnauthorized', 'upstreamTimeout', 'connectFailed', 'dailyLimit', 'quota', 'failed'] as const
+export type RequestFailureReason = typeof requestFailureReasons[number]
 export type RequestTotals = { requests: number; failed: number; recovered: number; uncertain: number; sameSource: number; crossSource: number }
 export type GatewayRequest = {
   requestId: string; at: number; routeId: string; model: string; caller: string; outcome: RequestOutcome
   sourceId: string; upstreamModel?: string; status: number; error?: string; durationMs: number; attempts?: number
   switch?: 'source' | 'model'; blocks?: Record<string, number>; revision?: string
 }
-type RequestAttempt = { attempt: number; sourceId: string; model: string; status: number; success: boolean; at: number; error?: string }
+export type RequestAttempt = { attempt: number; sourceId: string; model: string; status: number; success: boolean; at: number; error?: string }
 export type RequestSnapshot = RequestTotals & { latest?: GatewayRequest; latestSwitch?: GatewayRequest }
 export type RequestWindow = { from: number; to: number; end: number }
 type RequestView = {
   now: number; totals: RequestTotals; routes: Record<string, string>; callers: Record<string, boolean>
   points: { from: number; to: number; totals: RequestTotals }[]
   outcomes: Partial<Record<RequestOutcome | 'uncertain', number>>
+  failureReasons?: Partial<Record<RequestFailureReason, number>>
   recent: GatewayRequest[]
 }
 export type RequestDetail = { request: GatewayRequest; attempts: RequestAttempt[]; complete: boolean }
@@ -24,13 +27,14 @@ const base = '/agent/model-gateway/monitor'
 export const loadRequestDetail = (id: string, signal: AbortSignal): Promise<{ data: RequestDetail }> =>
   api('GET', base + '/requests/' + encodeURIComponent(id), undefined, { signal })
 
-export function useGatewayRequests(active: boolean, hours: number, route: string, caller: string, outcome: string, window: RequestWindow | null) {
+export function useGatewayRequests(active: boolean, hours: number, route: string, caller: string, outcome: string, window: RequestWindow | null, reason?: RequestFailureReason) {
   const [result, setResult] = useState<{ query: string; data?: RequestView; failed?: boolean; unsupported?: boolean } | null>(null)
   const [retry, setRetry] = useState(0)
   const params = new URLSearchParams({ view: 'requests', hours: String(hours) })
   if (route) params.set('routeId', route)
   if (caller) params.set('caller', caller)
   if (outcome) params.set('outcome', outcome)
+  if (reason) params.set('reason', reason)
   if (window) {
     params.set('from', String(window.from))
     params.set('to', String(window.to))

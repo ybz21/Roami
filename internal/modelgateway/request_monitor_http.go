@@ -43,6 +43,36 @@ type requestBucket struct {
 	Totals requestTotals `json:"totals"`
 }
 
+var requestFailureReasons = []string{"blocked", "exhausted", "interrupted", "upstreamLimited", "upstreamUnauthorized", "upstreamTimeout", "connectFailed", "dailyLimit", "quota", "failed"}
+
+func requestFailureReason(row MonitorRecord) string {
+	switch row.Outcome {
+	case "success", "recovered", "unknown", "cancelled":
+		return ""
+	case "blocked", "exhausted", "interrupted":
+		return row.Outcome
+	}
+	switch row.Error {
+	case "MODEL_PROXY_DAILY_LIMIT":
+		return "dailyLimit"
+	case "MODEL_TRANSPORT_FAILED":
+		return "connectFailed"
+	}
+	if row.Attempts > 0 && (row.Error == "" || strings.HasPrefix(row.Error, "MODEL_HTTP_")) {
+		switch row.Status {
+		case http.StatusTooManyRequests:
+			return "upstreamLimited"
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return "upstreamUnauthorized"
+		case http.StatusRequestTimeout, http.StatusGatewayTimeout:
+			return "upstreamTimeout"
+		case http.StatusPaymentRequired:
+			return "quota"
+		}
+	}
+	return "failed"
+}
+
 type requestObservationSummary struct {
 	requestTotals
 	Latest       *MonitorRecord `json:"latest,omitempty"`
@@ -124,8 +154,10 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 		}
 		hours, _ = strconv.Atoi(value)
 	}
-	route, caller, outcome := query.Get("routeId"), query.Get("caller"), query.Get("outcome")
-	if route != "" && !catalogID.MatchString(route) || len(caller) > 120 || outcome != "" && !containsField([]string{"success", "recovered", "blocked", "exhausted", "interrupted", "failed", "uncertain"}, outcome) {
+	route, caller, outcome, reason := query.Get("routeId"), query.Get("caller"), query.Get("outcome"), query.Get("reason")
+	if route != "" && !catalogID.MatchString(route) || len(caller) > 120 ||
+		outcome != "" && !containsField([]string{"success", "recovered", "blocked", "exhausted", "interrupted", "failed", "uncertain"}, outcome) ||
+		reason != "" && !containsField(requestFailureReasons, reason) {
 		reject(w, 400, "INVALID_MONITOR_QUERY")
 		return true
 	}
@@ -158,6 +190,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 	}
 	var totals requestTotals
 	routes, callers, outcomes := map[string]string{}, map[string]bool{}, map[string]int{}
+	failureReasons := map[string]int{}
 	recent := []MonitorRecord{}
 	for index := len(rows) - 1; index >= 0; index-- {
 		row := rows[index]
@@ -181,13 +214,18 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 				key = "uncertain"
 			}
 			outcomes[key]++
-			if len(recent) < 50 && (outcome == "" || key == outcome) {
+			failure := requestFailureReason(row)
+			if failure != "" {
+				failureReasons[failure]++
+			}
+			if len(recent) < 50 && (outcome == "" || key == outcome) && (reason == "" || failure == reason) {
 				recent = append(recent, row)
 			}
 		}
 	}
 	writeJSON(w, 200, map[string]any{"data": map[string]any{
-		"now": end, "totals": totals, "points": points, "routes": routes, "callers": callers, "outcomes": outcomes, "recent": recent, "storage": storage,
+		"now": end, "totals": totals, "points": points, "routes": routes, "callers": callers, "outcomes": outcomes,
+		"failureReasons": failureReasons, "recent": recent, "storage": storage,
 	}})
 	return true
 }

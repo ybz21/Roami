@@ -10,6 +10,7 @@ import { AgentLogo, ArrowDown, BellIcon, ChecklistIcon, ChevronDown, ClockIcon, 
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
+import ModelSelectionFields, { defaultModelChoice, modelChoiceRequest, type ModelChoice } from '../capabilities/ModelSelectionFields'
 import AgentMemory from './AgentMemory'
 import { openAgentPage } from './agent-page-route'
 import AgentTasks from './AgentTasks'
@@ -76,6 +77,14 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const [sending, setSending] = useState(false)
   const agents = useRegisteredAgents()
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState<AgentKind>('codex')
+  const [taskModel, setTaskModel] = useState<ModelChoice>(defaultModelChoice)
+  const [taskModelOpen, setTaskModelOpen] = useState(false)
+  const taskModelTrigger = useRef<HTMLButtonElement>(null)
+  const nativeTask = !project && target !== 'direct' && executor === 'native'
+  const closeTaskModel = () => {
+    setTaskModelOpen(false)
+    requestAnimationFrame(() => taskModelTrigger.current?.focus({ preventScroll: true }))
+  }
   const [panel, setPanel] = useState<'tasks' | 'memory' | 'context' | null>(null)
   const showPanel = (next: 'tasks' | 'memory' | 'context') => {
     if (!project && phone && next !== 'context') { openAgentPage(next); return }
@@ -93,7 +102,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const [modelRequest, setModelRequest] = useState(0)
   const scroll = useRef<HTMLDivElement>(null), stick = useRef(true), sendingRef = useRef(false)
   const activeCID = useRef(cid); activeCID.current = cid
-  const pending = useRef<{ text: string; payload?: string; okrContext?: AgentMessage['content']['okrContext']; target: string; executor: string; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
+  const pending = useRef<{ text: string; payload?: string; okrContext?: AgentMessage['content']['okrContext']; target: string; executor: string; modelChoice?: ModelChoice; cid: string; key: string; attachmentIds: string[]; scope: string } | null>(null)
   const pendingOwner = useRef('')
   const createKey = useMemo(newKey, [cid, node])
   const draftKey = project?.draftKey || `roami.agent.draft.${node || 'local'}.${cid || 'new'}`
@@ -162,6 +171,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
 
   useEffect(() => {
     stick.current = true; setError(''); setWorkspaceTask(''); setPanel(null); setSource(null)
+    setTaskModelOpen(false); setTaskModel(defaultModelChoice)
     if (!sendingRef.current || pending.current?.cid !== cid) {
       setTarget('direct')
     }
@@ -187,13 +197,15 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     const destination = direct ? 'direct' : target
     const attachmentIds = consumeDraft ? attachments.ids : []
     const value = text.trim()
+    const modelChoice = destination !== 'direct' && !value.startsWith('/') && nativeTask ? taskModel : undefined
     if ((project && !project.isCurrent()) || (!value && !attachmentIds.length) || (consumeDraft && attachments.blocked) || sendingRef.current || readOnly || (destination !== 'direct' && !value.startsWith('/') && value.length > 20000)) return
     sendingRef.current = true; setSending(true); setError('')
     let request = pending.current
     try {
       const origin = await ensureConversation()
-      if (!request || request.text !== value || request.target !== destination || request.executor !== executor || JSON.stringify(request.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && !project && request.cid !== cid)) {
-        request = { text: value, payload: value, okrContext: project?.prepareContext(value), target: destination, executor, cid, key: newKey(), attachmentIds, scope: draftKey }
+      const modelChanged = request?.modelChoice?.model !== modelChoice?.model || request?.modelChoice?.freeOnly !== modelChoice?.freeOnly
+      if (!request || request.text !== value || request.target !== destination || request.executor !== executor || modelChanged || JSON.stringify(request.attachmentIds) !== JSON.stringify(attachmentIds) || (cid && !project && request.cid !== cid)) {
+        request = { text: value, payload: value, okrContext: project?.prepareContext(value), target: destination, executor, modelChoice, cid, key: newKey(), attachmentIds, scope: draftKey }
         pending.current = request
       }
       if (project && request.cid && request.cid !== origin) throw new Error('Project Main changed')
@@ -203,14 +215,18 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
       if (!current()) return
       if (destination !== 'direct' && !value.startsWith('/')) {
         await api('POST', '/agent/tasks', { conversationId: origin, goal: value, requestKey: request.key, executor,
+          ...(request.modelChoice ? modelChoiceRequest(request.modelChoice) : {}),
           target: destination === 'loose' ? { kind: 'new_session' } : { kind: 'project', projectId: destination.slice(8) } })
         invalidateAgentData(agentDataKey('/agent/tasks?conversationId=' + encodeURIComponent(origin)))
-        if (current()) { setTarget('direct'); showPanel('tasks') }
+        if (current()) { setTarget('direct'); setTaskModel(defaultModelChoice); setTaskModelOpen(false); showPanel('tasks') }
       } else {
         const { data } = await api('POST', `/agent/conversations/${encodeURIComponent(origin)}/messages`, { requestKey: request.key, text: request.payload ?? value, attachmentIds: request.attachmentIds, ...(request.okrContext ? { okrContext: request.okrContext } : {}) })
         if (request.attachmentIds.length) attachments.clear(request.scope)
         if (!current()) { inbox?.refresh(); return }
-        if (data.kind === 'ui_action' && data.action === 'model') setModelRequest(value => value + 1)
+        if (data.kind === 'ui_action' && data.action === 'model') {
+          if (nativeTask) setTaskModelOpen(true)
+          else setModelRequest(value => value + 1)
+        }
         else if (data.kind === 'model') { if (data.executor) message.info(data.model); else { window.dispatchEvent(new Event(MODEL_SETTINGS_CHANGED)); message.success(t('agent.models.switched', { name: data.model })) } }
         else if (data.kind === 'ui_action') showPanel(data.action === 'tasks' ? 'tasks' : 'memory')
         else if (data.kind === 'commands') showPanel('context')
@@ -282,6 +298,8 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     {secondaryActions}
   </>
   const panelTitle = panel ? t(`agent.${panel}`) : ''
+  const taskModelTitle = t('agent.composer.model')
+  const taskModelFields = <ModelSelectionFields value={taskModel} onChange={setTaskModel} scope="task" disabled={sending} />
   const latestUserSeq = useMemo(() => bodies.reduce((seq, m) => m.role === 'user' ? Math.max(seq, m.seq) : seq, 0), [bodies])
 
   const panelBody = <>
@@ -332,14 +350,16 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
             if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (commandsOpen) openCommand(slash[commandIndex % slash.length]); else if (draft === '/' + slash[commandIndex % slash.length]) { void submit() } else { changeDraft('/' + slash[commandIndex % slash.length] + (slash[commandIndex % slash.length] === 'compact' ? ' ' : '')); setCommandsOpen(false) } }
           }
         }}
-        leading={<AgentComposerPlus {...composerActions} mode={project ? undefined : { task: target !== 'direct', onChange: task => setTarget(task ? 'loose' : 'direct') }} options={<>
+        leading={<AgentComposerPlus {...composerActions} mode={project ? undefined : { task: target !== 'direct', onChange: task => setTarget(task ? 'loose' : 'direct') }} onTaskModel={nativeTask ? () => setTaskModelOpen(true) : undefined} options={<>
           <Dropdown trigger={['click']} menu={{ selectedKeys: [target], items: [{ key: 'loose', label: t('agent.loose') }, ...projects.map(project => ({ key: 'project:' + project.id, label: project.name }))], onClick: ({ key }) => setTarget(key) }}><button type="button" className="tt-pill sel" aria-label={t('agent.destination')}>{target === 'loose' ? t('agent.loose') : projects.find(project => 'project:' + project.id === target)?.name}<ChevronDown /></button></Dropdown>
-          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: agents.map(({ kind }) => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> })), onClick: ({ key }) => { if (isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
-        settings={project?.modelControlsDisabled ? undefined : project?.nativeModel ? <span className="tt-pill">{project.nativeModel}</span> : <AgentComposerPlus {...composerActions} modelTrigger />}
+          <Dropdown overlayClassName="agent-executor-menu" trigger={['click']} menu={{ selectedKeys: [executor], items: [{ key: 'native', label: agentName('native'), icon: <AgentLogo kind="native" /> }, ...agents.map(({ kind }) => ({ key: kind, label: kind === 'claude' ? 'Claude Code' : agentName(kind), icon: <AgentLogo kind={kind} /> }))], onClick: ({ key }) => { if (key === 'native' || isAgentKind(key)) setExecutor(key) } }}><button type="button" className="tt-pill sel" aria-label={t('agent.executor')}><AgentLogo kind={executor} />{executor === 'claude' ? 'Claude Code' : agentName(executor)}<ChevronDown /></button></Dropdown></>} />}
+        settings={nativeTask ? <button ref={taskModelTrigger} type="button" className="tt-pill agent-model-trigger" aria-label={taskModelTitle} aria-haspopup="dialog" aria-expanded={taskModelOpen} disabled={readOnly || sending} onClick={() => setTaskModelOpen(true)}><span>{taskModel.model === 'auto' ? t('modelSelection.auto') : taskModel.model}{taskModel.freeOnly ? ' · ' + t('modelSelection.freeOnly') : ''}</span><ChevronDown /></button> : project?.modelControlsDisabled ? undefined : project?.nativeModel ? <span className="tt-pill">{project.nativeModel}</span> : <AgentComposerPlus {...composerActions} modelTrigger />}
         voice={<VoiceInput inline scope={draftKey} hotkey={pageActive && !inactive} disabled={readOnly || inactive} accent="var(--accent)" onResult={text => changeDraft(draftRef.current + (draftRef.current ? '\n' : '') + text)} />} />
       <input ref={fileInput} type="file" multiple className="agent-file-input" aria-label={t('agent.composer.addFiles')} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; void addFiles(files) }} />
     </div>
     {dragging && <div className="agent-drop-zone"><FileTextIcon size={24} /><span>{t('agent.composer.dropFiles')}</span></div>}
+    {nativeTask && taskModelOpen && (phone ? <MobileSubPage title={taskModelTitle} dialogLabel={taskModelTitle} search={false} onBack={closeTaskModel}><div className="agent-project-panel">{taskModelFields}</div></MobileSubPage>
+      : <Modal title={taskModelTitle} open onCancel={closeTaskModel} footer={null}>{taskModelFields}</Modal>)}
     {phone && panel ? <MobileSubPage title={panelTitle} onBack={() => setPanel(null)}><div className="agent-project-panel">{panelBody}</div></MobileSubPage> : <Modal title={panelTitle} open={!!panel} onCancel={() => setPanel(null)} footer={null} destroyOnClose className={panel === 'tasks' ? 'agent-task-dialog' : undefined} wrapClassName={panel === 'tasks' ? 'agent-task-wrap' : undefined} centered={panel === 'tasks'} width={panel === 'tasks' ? 'calc(var(--sp-5) * 32)' : undefined}>{panelBody}</Modal>}
     <Modal destroyOnClose title={t('agent.remember')} open={!!source} onCancel={() => setSource(null)} onOk={() => { void saveMemory() }} okText={t('agent.save')} cancelText={t('common.cancel')} okButtonProps={{ 'aria-label': t('agent.save'), disabled: !memoryBody.trim() || memoryBody.length > 20000 }}>
       <label className="agent-field">{t('agent.memoryTitle')}<Input aria-label={t('agent.memoryTitle')} value={memoryTitle} maxLength={200} onChange={(e) => setMemoryTitle(e.target.value)} /></label>

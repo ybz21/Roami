@@ -1,7 +1,7 @@
 // ── 新建会话（prompt-first 派活）/ 派生子会话 ──
 // parent 非空 = 派生模式：同一张表单（目录默认父 cwd 可改、三选一、命名约定 prompt 全同款），
 // 仅提交路由不同（fork / fork-worktree，meta 记父子关系）。两处不再各维护一份表单。
-import ModelSelectionFields, { type ModelChoice } from '../capabilities/ModelSelectionFields'
+import ModelSelectionFields, { defaultModelChoice, modelChoiceRequest, type ModelChoice } from '../capabilities/ModelSelectionFields'
 import { refreshSessionLists } from './native-session-list'
 import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
@@ -57,7 +57,7 @@ export function taskNameFromPrompt(p: string, limit = 16): string {
 export function NewSessionModal({ open, parent, onClose, onDone }: { open: boolean; parent?: string | null; onClose: () => void; onDone: (name: string) => void }) {
   const { phone } = useLayout()
   const agents = useRegisteredAgents(open)
-  const [modelChoice, setModelChoice] = useState<ModelChoice>({ model: 'auto', freeOnly: false })
+  const [modelChoice, setModelChoice] = useState<ModelChoice>(defaultModelChoice)
   const nativeRequest = useRef<{ signature: string; key: string } | null>(null)
   const [prompt, setPrompt] = useState('')
   const [name, setName] = useState('')
@@ -90,7 +90,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   useEffect(() => {
     if (!open) return
     setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); setAutoReview(false)
-    setModelChoice({ model: 'auto', freeOnly: false }); nativeRequest.current = null
+    setModelChoice(defaultModelChoice); nativeRequest.current = null
     setBase(''); setBranches([]); setRemoteBranches([]); setDefBranch(''); setExistingWts([]); setMainPath(''); setExisting('')
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
     if (parent) {
@@ -153,7 +153,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     try {
       setCreating(true)
       if (agent === 'native') {
-        const body = { title: finalName.slice(0, 80), task: prompt, ...(dir.trim() ? { directory: dir.trim() } : {}), ...(modelChoice.model !== 'auto' || modelChoice.freeOnly ? { model: modelChoice.model } : {}), freeOnly: modelChoice.freeOnly }
+        const body = { title: finalName.slice(0, 80), task: prompt, ...(dir.trim() ? { directory: dir.trim() } : {}), ...modelChoiceRequest(modelChoice) }
         const destination = nodeApi('/agent/native-sessions')
         const signature = JSON.stringify([destination, body])
         if (nativeRequest.current?.signature !== signature) nativeRequest.current = { signature, key: crypto.randomUUID() }

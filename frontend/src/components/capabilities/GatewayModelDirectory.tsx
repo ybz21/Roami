@@ -17,7 +17,7 @@ function ModelRow({ row, users, onSelect }: { row: Entry; users: string[]; onSel
   const { t } = useI18n(), { message } = App.useApp()
   const callable = row.configured && row.enabled && !row.unavailable
   return <article className="tt-gateway-model">
-    <button type="button" className="tt-directory-model-name" onClick={event => onSelect(row, event.currentTarget)}><strong>{row.name || row.id}</strong><code>{t(row.configured ? 'modelIdentity.callId' : 'modelIdentity.upstreamId', { model: row.id })}</code><small className={'tt-gateway-status' + (callable ? ' is-enabled' : '')}>{t(stateOf(row))}</small>{!!users.length && <small>{t('gatewayOptions.usedBy')}: {[...new Set(users)].join(', ')}</small>}</button>
+    <button type="button" className="tt-directory-model-name" onClick={event => onSelect(row, event.currentTarget)}><strong>{row.name || row.id}</strong><small className={'tt-gateway-status' + (callable ? ' is-enabled' : '')}>{t(stateOf(row))}</small>{!!users.length && <small>{t('gatewayOptions.usedBy')}: {[...new Set(users)].join(', ')}</small>}</button>
     <span className="tt-directory-model-source">{t('hub.source')}: {row.sourceName}</span>
     <ModelCapabilities model={row} />
     <Button type="text" icon={callable ? <CopyIcon /> : <ChevronRight />} aria-label={t(callable ? 'gatewayWorkspace.copyModel' : 'gatewayWorkspace.modelDetails', { model: row.id })} onClick={async event => { if (!callable) { onSelect(row, event.currentTarget); return } try { await navigator.clipboard.writeText(row.id); message.success(t('common.copied')) } catch { message.error(t('gatewayWorkspace.copyFailed')) } }} />
