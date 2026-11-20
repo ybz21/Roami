@@ -58,18 +58,19 @@
     <thead><tr><th scope="col">页面</th><th scope="col">正式入口和本轮改动</th></tr></thead>
     <tbody>
       <tr><th scope="row"><a href="sources.html">模型源</a></th><td>新建连接可单独保存，之后再发现和启用模型。</td></tr>
-      <tr><th scope="row"><a href="plugins.html">插件与账号</a></th><td>社区目录组件管理搜索、下载源、版本筛选和本地版本显示。导入页接着检查下载包、创建来源和授权。</td></tr>
+      <tr><th scope="row"><a href="plugins.html">插件与账号</a></th><td>社区目录管理搜索、版本和下载源。授权后，账号页按已加载插件声明展示额度和签到。</td></tr>
       <tr><th scope="row"><a href="aggregation.html">聚合</a></th><td>调度中的首选、备选和运行统计并排展示，手机按顺位查看。成员管理和草稿编辑继续沿用原入口。</td></tr>
       <tr><th scope="row"><a href="gateway.html">网关</a></th><td>列表显示模型名。详情和复制动作提供调用名。同一目录供 CLI 查询。</td></tr>
       <tr><th scope="row"><a href="usage.html">用量</a></th><td>每日限额独立成组件。账本未加载或仍有未确认费用时，余额显示待确认。</td></tr>
       <tr><th scope="row"><a href="monitor.html">监控</a></th><td>按时间桶和失败原因筛选请求。网关每日限额与上游限额分开统计。</td></tr>
-      <tr><th scope="row"><a href="audit.html">审计</a></th><td>区分实际命中和最后尝试，展示换路类型及毫秒级时间线。</td></tr>
-      <tr><th scope="row"><a href="agent.html">选模</a></th><td>新建会话与 Roami 原生委派共用模型选择器，选择随各自的请求提交。</td></tr>
+      <tr><th scope="row"><a href="audit.html">审计</a></th><td>区分实际命中和最后尝试。时间线按尝试关联费用账本并保留原币种。</td></tr>
+      <tr><th scope="row"><a href="agent.html">选模</a></th><td>会话与原生委派共用选模。符合安全恢复条件的仅免费任务，可按网关给出的恢复时间自动重试一次。</td></tr>
       <tr><th scope="row"><a href="speech.html">语音</a></th><td>保存配置后可试录，复用会话录音与转写链路，识别结果留在设置页。</td></tr>
     </tbody>
   </table>
   <p>隔离实例实测 429 后切换成功和上游 401。桌面四档及安卓真机核对监控筛选、审计返回、聚合顺位及网关入口。试录转写、会话与委派选模使用自动化测试验证。</p>
-  <p>逐次尝试的费用仍需关联账本。免费额度恢复后的自动续跑和 WorkBuddy 的签到动作仍需确认接口能力。</p>
+  <p>逐次费用使用服务端生成的请求关联，老账本缺少归属凭据时显示不可关联。免费续跑保留原任务，等待期间释放执行槽位。WorkBuddy 国内版的签到由插件处理，成功后刷新当前账号额度。</p>
+  <p>隔离实例在桌面四档和安卓真机验证插件账号页。测试账号签到后积分从 30 增至 35，仅声明额度的账号只展示额度。回归测试覆盖逐次费用归属、任务重启续跑和单步预算。<a href="https://github.com/ybz21/Roami/pull/989">查看验收截图</a>。</p>
 </section>
 <section>
   <h2>这版定下来的事</h2>

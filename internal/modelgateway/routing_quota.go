@@ -16,6 +16,7 @@ type creditExpiry struct {
 type routingQuota struct {
 	Remaining, Capacity *float64
 	Reset               time.Time
+	RetryAt             time.Time
 	Credits             []creditExpiry
 	Known               bool
 	Observed            time.Time
@@ -30,6 +31,12 @@ type quotaCacheEntry struct {
 type quotaCache struct {
 	mu      sync.Mutex
 	entries map[string]*quotaCacheEntry
+}
+
+func (c *quotaCache) invalidate(source, account string) {
+	c.mu.Lock()
+	delete(c.entries, source+"/"+account)
+	c.mu.Unlock()
 }
 
 func (c *quotaCache) read(ctx context.Context, manager *modelplugins.Manager, source modelplugins.Source, account string) (modelplugins.Quota, bool) {
@@ -91,6 +98,14 @@ func quotaTimestamp(value string) time.Time {
 	date, _ := time.Parse(time.RFC3339Nano, value)
 	return date
 }
+
+func quotaWindowReset(window modelplugins.QuotaWindow, observed time.Time) time.Time {
+	reset := quotaTimestamp(window.ResetsAt)
+	if reset.IsZero() && window.ResetSeconds > 0 {
+		reset = observed.Add(time.Duration(window.ResetSeconds) * time.Second)
+	}
+	return reset
+}
 func quotaDeadlinePassed(quota modelplugins.Quota, now time.Time) bool {
 	observed := time.UnixMilli(quota.ObservedAt)
 	deadlines := []time.Time{}
@@ -148,10 +163,7 @@ func quotaForModel(quota modelplugins.Quota, model string, now time.Time) routin
 		if remaining != nil && (math.IsNaN(*remaining) || math.IsInf(*remaining, 0) || *remaining < 0) {
 			continue
 		}
-		reset := quotaTimestamp(window.ResetsAt)
-		if reset.IsZero() && window.ResetSeconds > 0 {
-			reset = observed.Add(time.Duration(window.ResetSeconds) * time.Second)
-		}
+		reset := quotaWindowReset(window, observed)
 		item := routingQuota{Remaining: remaining, Known: remaining != nil, Reset: reset, Observed: observed, ValidUntil: result.ValidUntil}
 		if capacity > 0 {
 			item.Capacity = &capacity
@@ -203,15 +215,29 @@ func quotaForModel(quota modelplugins.Quota, model string, now time.Time) routin
 	}
 
 	// A known depleted secondary window still blocks a usable weekly allowance.
+	var retryAt time.Time
+	resetUnknown := false
 	for _, window := range quota.Windows {
 		if window.Aside || window.Model != "" && window.Model != model || len(window.Models) > 0 && !containsField(window.Models, model) || containsField(window.NotModels, model) {
 			continue
 		}
-		if window.Balance != nil && *window.Balance <= 0 || window.Used != nil && *window.Used >= 100 {
+		depleted := window.Balance != nil && *window.Balance <= 0 || window.Used != nil && *window.Used >= 100
+		if depleted {
 			zero := float64(0)
 			result.Remaining = &zero
 			result.Known = true
 		}
+		if depleted || window.Balance == nil && window.Used == nil && window.Limit > 0 && window.Amount >= window.Limit {
+			at := quotaWindowReset(window, observed)
+			if !at.After(now) {
+				resetUnknown = true
+			} else if at.After(retryAt) {
+				retryAt = at
+			}
+		}
+	}
+	if !resetUnknown && result.Remaining != nil && *result.Remaining <= 0 {
+		result.RetryAt = retryAt
 	}
 	return result
 }

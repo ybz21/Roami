@@ -161,15 +161,14 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 	}
 	switch {
 	case len(parts) == 2 && parts[1] == "info" && r.Method == "GET":
-		provider, err := h.Plugins.CachedProvider(source)
-		if err != nil || r.URL.Query().Get("refresh") == "1" {
-			provider, err = h.Plugins.Provider(r.Context(), source)
-		}
+		provider, err := h.pluginAccountProvider(r, source)
 		if err != nil {
 			pluginFailure(w, err)
 			return true
 		}
 		writeJSON(w, 200, map[string]any{"data": map[string]any{"provider": publicProvider(provider), "options": source.Options, "desktopUnavailable": modelplugins.DesktopUnavailable(source.ProviderID), "desktopAppMissing": modelplugins.DesktopAppMissing(source.ProviderID)}})
+	case len(parts) == 2 && (parts[1] == "usage" || parts[1] == "check-in"):
+		h.pluginAccountCapability(w, r, source, parts[1])
 	case len(parts) == 2 && parts[1] == "options" && r.Method == "POST":
 		var input struct {
 			Options map[string]any `json:"options"`

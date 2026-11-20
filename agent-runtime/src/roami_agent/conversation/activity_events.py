@@ -18,6 +18,7 @@ def activity_event(db, cid, kind, payload, *, key=None, cascade=True, **refs):
         "task.failed",
         "task.cancelled",
         "task.interrupted",
+        "task.waiting_for_free_model",
         "task.waiting_user",
         "task.cancelling",
         "task.observation_unknown",

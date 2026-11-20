@@ -48,6 +48,33 @@ it('shows the Doubao desktop requirement and prevents login on Linux', async () 
   expect(vi.mocked(api).mock.calls.some(([method]) => method === 'POST')).toBe(false)
 })
 
+it('renders account capabilities from the loaded plugin and refreshes allowance after a manual check-in', async () => {
+  let claimed = false
+  vi.mocked(api).mockImplementation(async (_method, path) => {
+    if (path.endsWith('/info')) return { data: { provider: { ...provider, id: 'another-provider', signedIn: true, usage: true, checkin: true }, options: {} } }
+    if (path.endsWith('/usage')) return { data: { balance: claimed ? '35 credits' : '30 credits', windows: [] } }
+    claimed = true
+    return { data: { outcome: 'claimed', credit: 5, streak: 2 } }
+  })
+  render(<App><MagpieSourceSettings sourceId="account-id" onChanged={() => {}} /></App>)
+  await screen.findByText('30 credits')
+  expect(vi.mocked(api).mock.calls.some(([method]) => method === 'POST')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'hub.plugin.checkInNow' }))
+  await screen.findByText('35 credits')
+  expect(screen.getByText('hub.plugin.checkIn.claimed')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'hub.plugin.checkIn.done' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/plugins/sources/account-id/check-in', {}, expect.anything())
+})
+
+it('omits check-in when the signed-in provider only declares allowance', async () => {
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/info')
+    ? { provider: { ...provider, id: 'workbuddy-ai', signedIn: true, usage: true, checkin: false }, options: {} }
+    : { balance: '30 credits' } }))
+  render(<App><MagpieSourceSettings sourceId="account-id" onChanged={() => {}} /></App>)
+  await screen.findByText('30 credits')
+  expect(screen.queryByRole('button', { name: 'hub.plugin.checkInNow' })).toBeNull()
+})
+
 it('discovers every plugin in an imported collection and adds from the matching package', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ data: { packages: [{ id: 'first', name: 'First plugin' }, { id: 'second', name: 'Second plugin' }], skipped: ['repo/broken/package.json'] } }) })))
   vi.mocked(api).mockImplementation(async (_method, path, body) => ({ data: path.endsWith('/packages') ? [] : path.endsWith('/inspect') ? [{ ...provider, name: body.packageId === 'first' ? 'First cloud' : 'Second cloud' }] : {} }))

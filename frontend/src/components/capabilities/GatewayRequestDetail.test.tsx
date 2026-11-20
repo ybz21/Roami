@@ -76,6 +76,34 @@ it('keeps HTTP 200 visible when output ends unsuccessfully', async () => {
   expect(screen.getByText('gatewayTrace.lastAttempt')).toBeTruthy()
 })
 
+it('preserves each currency and exact fee, with upstream references in collapsed technical details', async () => {
+  openRequest(row, [
+    { ...limited, billing: { state: 'settled', currency: 'CNY', cost: '0.000000000', upstreamRequestId: 'up-first' } },
+    { ...served, billing: { state: 'settled', currency: 'USD', cost: '0.000000021', upstreamRequestId: 'up-last' } },
+  ])
+  await screen.findByRole('heading', { name: 'gatewayTrace.recovered' })
+  const [first, second] = screen.getAllByRole('listitem')
+  expect(within(first).getByText(/CNY\s+0\.00$/)).toBeTruthy()
+  expect(within(second).getByText(/USD\s+0\.000000021$/)).toBeTruthy()
+  expect(screen.getByText('up-first').closest('details')?.open).toBe(false)
+  expect(screen.getByText('up-last').closest('details')?.open).toBe(false)
+})
+
+it('distinguishes pending, unknown, and missing fees without inventing values for legacy responses', async () => {
+  openRequest({ ...row, attempts: 4 }, [
+    { ...limited, billing: { state: 'pending' } },
+    { ...limited, attempt: 2, billing: { state: 'unknown' } },
+    { ...limited, attempt: 3, billing: { state: 'missing' } },
+    { ...served, attempt: 4 },
+  ])
+  await screen.findByRole('heading', { name: 'gatewayTrace.recovered' })
+  const attempts = screen.getAllByRole('listitem')
+  expect(within(attempts[0]).getByText(/gatewayTrace.feePending/)).toBeTruthy()
+  expect(within(attempts[1]).getByText(/agent.proxy.state.unknown/)).toBeTruthy()
+  expect(within(attempts[2]).getByText(/gatewayTrace.feeMissing/)).toBeTruthy()
+  expect(within(attempts[3]).queryByText(/agent.usage.cost/)).toBeNull()
+})
+
 it.each([
   { outcome: 'blocked', sourceId: '', upstreamModel: undefined, attempts: [], blocks: { pricing: 2 }, reason: 'gatewayTrace.reason.pricing' },
   { outcome: 'exhausted', sourceId: 'fallback', upstreamModel: 'qwen', attempts: [limited, { ...served, status: 402, success: false }], reason: 'gatewayTrace.reason.quota' },

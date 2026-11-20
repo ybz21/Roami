@@ -6,7 +6,7 @@ import { ChevronRight, SearchIcon } from '../../../../frontend/src/icons'
 import { useI18n } from '../../../../frontend/src/i18n'
 import { useLayout } from '../../../../frontend/src/layout'
 import { addDemoPluginSource, readPluginSources } from './fixture'
-import { applyPluginRelease, loadMagpieRegistry, loadMagpieReleases, pluginAccounts, pluginRelease, readMagpiePlugins, registryURL, rollBackPluginRelease, stagePluginRelease } from './plugin-fixture'
+import { applyPluginRelease, loadMagpieRegistry, loadMagpieReleases, pluginRelease, readMagpiePlugins, registryURL, rollBackPluginRelease, stagePluginRelease } from './plugin-fixture'
 import './magpie-plugin-desk.css'
 
 const hub = '#/catalog/plugins'
@@ -135,17 +135,6 @@ export function MagpiePluginDesk({ pluginId, action, itemId, syncSources }: Prop
             <span>{word('当前插件版本', 'Active plugin version')} <code>{state.active}</code></span>
           </div>
           <MagpieSourceSettings key={activeAccount.authId} sourceId={activeAccount.authId} onChanged={refresh} />
-          {activeAccount.providerId === 'workbuddy' && activeAccount.authorized && <section className="magpie-desk-section">
-            <h3>{word('积分与签到', 'Credits and check-in')}</h3>
-            <dl className="magpie-version-facts"><div><dt>{word('周期积分', 'Cycle credits')}</dt><dd>{word('已用 120 / 500 · 11 天后重置', '120 / 500 used · resets in 11 days')}</dd></div>
-              <div><dt>{word('额外积分', 'Bonus credits')}</dt><dd>{activeAccount.claimed ? 60 : 40}</dd></div></dl>
-            <div className="magpie-desk-actions"><Button disabled={activeAccount.claimed} onClick={() => {
-              const stored = pluginAccounts.find(row => row.sourceId === activeAccount.sourceId)
-              if (stored && !stored.claimed) stored.claimed = true
-              refresh()
-            }}>{word('立即签到', 'Check in')}</Button>
-              <span role="status">{activeAccount.claimed ? word('今日已签 · 领取 20 积分', 'Checked in · 20 credits claimed') : word('今日未签', 'Not checked in today')}</span></div>
-          </section>}
           {activeAccount.authorized && <a className="magpie-source-link" href={'#/catalog/source/' + activeAccount.sourceId + '?from=plugins&plugin=' + selected.id}>{word('管理来源模型', 'Manage source models')}<ChevronRight /></a>}
         </> : creating && provider ? <form className="magpie-account-form" onSubmit={event => {
           event.preventDefault()

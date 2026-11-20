@@ -3,6 +3,7 @@ package modelgateway
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -461,6 +462,55 @@ func (c *routingChoice) Next() (routingLeaf, bool, error) {
 	defer c.handler.routing.mu.Unlock()
 	return c.nextLocked()
 }
+
+func (c *routingChoice) nextAvailableAt() time.Time {
+	c.handler.routing.mu.Lock()
+	defer c.handler.routing.mu.Unlock()
+	now := c.handler.Ledger.now()
+	at := c.readyAtLocked(now)
+	if !at.After(now) {
+		return time.Time{}
+	}
+	return at
+}
+
+func (c *routingChoice) readyAtLocked(now time.Time) time.Time {
+	var earliest time.Time
+	for _, target := range c.targets {
+		channel := c.handler.routing.channel(target.ID, now)
+		if channel.RestUntil.After(now) && channel.RestStatus != http.StatusTooManyRequests && channel.RestStatus != http.StatusPaymentRequired {
+			continue
+		}
+		at := now
+		for _, blockedUntil := range []time.Time{channel.RestUntil, channel.ExhaustedUntil} {
+			if blockedUntil.After(at) {
+				at = blockedUntil
+			}
+		}
+		if target.Quota.Remaining != nil && *target.Quota.Remaining <= 0 {
+			if !target.Quota.RetryAt.After(now) {
+				continue
+			}
+			if target.Quota.RetryAt.After(at) {
+				at = target.Quota.RetryAt
+			}
+		}
+		if child := c.nodes[target.ID].child; child != nil {
+			childAt := child.readyAtLocked(now)
+			if childAt.IsZero() {
+				continue
+			}
+			if childAt.After(at) {
+				at = childAt
+			}
+		}
+		if earliest.IsZero() || at.Before(earliest) {
+			earliest = at
+		}
+	}
+	return earliest
+}
+
 func (h *Handler) restRoute(leaf routingLeaf, model CatalogModel, status int, retry time.Duration) {
 	h.routing.mu.Lock()
 	defer h.routing.mu.Unlock()
@@ -471,6 +521,7 @@ func (h *Handler) restRoute(leaf routingLeaf, model CatalogModel, status int, re
 		duration = retry
 	}
 	channel.RestUntil = now.Add(duration)
+	channel.RestStatus = status
 	if status == 402 {
 		channel.ExhaustedUntil = channel.RestUntil
 	}

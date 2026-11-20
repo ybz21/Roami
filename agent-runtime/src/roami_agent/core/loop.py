@@ -6,7 +6,12 @@ import json
 from contextlib import ExitStack, asynccontextmanager, nullcontext
 from itertools import count
 
-from roami_agent.protocol.errors import DomainError, ModelAdmissionRejected, ToolPreflightError
+from roami_agent.protocol.errors import (
+    DomainError,
+    FreeModelAdmissionDeferred,
+    ModelAdmissionRejected,
+    ToolPreflightError,
+)
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.model_tool_selection import select_final_reply
 from roami_agent.protocol.models import Model
@@ -130,6 +135,7 @@ class AgentLoop:
             return selected
 
         phase = "context"
+        free_model_wait = False
         try:
             model = select_model()
             execution_deadline = asyncio.timeout(turn.get("executionTimeoutSeconds"))
@@ -279,6 +285,17 @@ class AgentLoop:
                                 elif part.kind == "usage":
                                     usage = part.value
                     except ModelAdmissionRejected as exc:
+                        if (
+                            isinstance(exc, FreeModelAdmissionDeferred)
+                            and task_id
+                            and turn.get("freeOnly")
+                            and step == 0
+                            and not text
+                            and not calls
+                        ):
+                            await self.journal.discard_request(turn, mid)
+                            free_model_wait = True
+                            raise
                         if (
                             role != "main"
                             or exc.code != "MODEL_GATEWAY_ROUTE_CHANGED"
@@ -550,6 +567,8 @@ class AgentLoop:
             await self.journal.fail(turn, "failed", code, completion=completion)
             raise DomainError(code, 504) from exc
         except BaseException as exc:
+            if free_model_wait and isinstance(exc, FreeModelAdmissionDeferred):
+                raise
             if (
                 isinstance(exc, asyncio.CancelledError)
                 and exc.args == ("NEW_USER_INTENT",)

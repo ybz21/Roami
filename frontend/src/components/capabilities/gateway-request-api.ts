@@ -11,7 +11,14 @@ export type GatewayRequest = {
   sourceId: string; upstreamModel?: string; status: number; error?: string; durationMs: number; attempts?: number
   switch?: 'source' | 'model'; blocks?: Record<string, number>; revision?: string
 }
-export type RequestAttempt = { attempt: number; sourceId: string; model: string; status: number; success: boolean; at: number; error?: string }
+type RequestAttemptBilling = {
+  state: 'settled' | 'pending' | 'unknown' | 'unrecorded' | 'missing' | 'unavailable'
+  currency?: string; cost?: string; upstreamRequestId?: string
+}
+export type RequestAttempt = {
+  attempt: number; sourceId: string; model: string; status: number; success: boolean; at: number; error?: string
+  billing?: RequestAttemptBilling
+}
 export type RequestSnapshot = RequestTotals & { latest?: GatewayRequest; latestSwitch?: GatewayRequest }
 export type RequestWindow = { from: number; to: number; end: number }
 type RequestView = {

@@ -61,7 +61,10 @@ CREATE TABLE gateway_daily_usage(
 );
 INSERT INTO gateway_daily_usage SELECT *,'' FROM gateway_daily_usage_v5;
 DROP TABLE gateway_daily_usage_v5;
-`}, {Version: 7, Name: "model-route-anchors", SQL: `CREATE TABLE gateway_route_anchors(model_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,anchor TEXT NOT NULL);`}}
+`}, {Version: 7, Name: "model-route-anchors", SQL: `CREATE TABLE gateway_route_anchors(model_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,anchor TEXT NOT NULL);`}, {Version: 8, Name: "gateway-observation-attribution", SQL: `
+ALTER TABLE gateway_calls ADD COLUMN observation_request_id TEXT NOT NULL DEFAULT '';
+CREATE INDEX gateway_calls_observation ON gateway_calls(observation_request_id) WHERE observation_request_id!='';
+`}}
 
 type Ledger struct {
 	paths metadb.Paths
@@ -168,18 +171,20 @@ type Call struct {
 }
 
 type CallAttribution struct {
-	AgentKind, KeyID, SourceID, RouteID string
-	Free                                bool
-	PricingRevision                     string
+	AgentKind, KeyID, SourceID, RouteID, ObservationRequestID string
+	Free                                                      bool
+	PricingRevision                                           string
 }
 type gatewayKeyContext struct{}
 
 func (l *Ledger) Admit(role, model, session, request string, attribution ...CallAttribution) (Call, error) {
 	call := Call{ID: uuid.NewString(), Role: role, Model: model, Session: session, Request: request, Started: l.now().UnixMilli(), State: "pending"}
 	call.AgentKind = "roami"
+	var observationID string
 	if len(attribution) > 0 {
 		a := attribution[0]
 		call.AgentKind, call.KeyID, call.SourceID, call.RouteID = a.AgentKind, a.KeyID, a.SourceID, a.RouteID
+		observationID = a.ObservationRequestID
 	}
 	err := l.db.Tx(func(tx *sql.Tx) error {
 		c, err := configuration(tx)
@@ -223,7 +228,7 @@ func (l *Ledger) Admit(role, model, session, request string, attribution ...Call
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(`INSERT INTO gateway_calls(id,day,timezone,role,model,session_id,request_id,started_ms,state,currency,price_json,agent_kind,key_id,source_id,route_id,price_status) VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)`, call.ID, call.Day, call.Timezone, role, model, session, request, call.Started, call.Currency, string(price), call.AgentKind, call.KeyID, call.SourceID, call.RouteID, call.PriceStatus)
+		_, err = tx.Exec(`INSERT INTO gateway_calls(id,day,timezone,role,model,session_id,request_id,started_ms,state,currency,price_json,agent_kind,key_id,source_id,route_id,price_status,observation_request_id) VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?)`, call.ID, call.Day, call.Timezone, role, model, session, request, call.Started, call.Currency, string(price), call.AgentKind, call.KeyID, call.SourceID, call.RouteID, call.PriceStatus, observationID)
 		return err
 	})
 	return call, err

@@ -308,15 +308,15 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		reject(w, 503, "MODEL_ROUTE_DISABLED")
 		return
 	}
+	var freeOnlyRequested bool
 	if raw, present := payload["roami_free_only"]; present {
-		var freeOnly bool
-		if json.Unmarshal(raw, &freeOnly) != nil {
+		if json.Unmarshal(raw, &freeOnlyRequested) != nil {
 			reject(w, 400, "INVALID_MODEL_CONFIG")
 			return
 		}
 		delete(payload, "roami_free_only")
 		body, _ = json.Marshal(payload)
-		if freeOnly {
+		if freeOnlyRequested {
 			model.FreeOnly, model.AllowPlan = true, false
 		}
 	}
@@ -357,6 +357,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			if !ok {
 				if trace.Attempts == 0 {
 					trace.Blocks = choice.unavailableReasons()
+					if index == 0 && freeOnlyRequested && len(checks) > 0 && (kind == "roami_worker" || kind == "roami_research") {
+						if at := choice.nextAvailableAt(); !at.IsZero() {
+							w.Header().Set("X-Roami-Model-Retry-At", strconv.FormatInt(at.UnixMilli(), 10))
+						}
+					}
 				}
 				reject(w, 503, "MODEL_ROUTE_NO_AVAILABLE_MEMBER")
 				return
@@ -482,7 +487,10 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 		}
 		admissionStarted := time.Now()
-		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, Free: leaf.Free, PricingRevision: leaf.PricingRevision})
+		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{
+			AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, ObservationRequestID: trace.RequestID,
+			Free: leaf.Free, PricingRevision: leaf.PricingRevision,
+		})
 		admissionDuration += time.Since(admissionStarted)
 		w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(admissionDuration.Milliseconds(), 10))
 		if e != nil {

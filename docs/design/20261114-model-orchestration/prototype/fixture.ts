@@ -47,6 +47,7 @@ const demoProvider = (pluginId: string, id: string, signedIn: boolean) => {
   const provider = pluginProvider(pluginId, id)
   return {
     id, name: provider?.name || id, signedIn,
+    usage: id === 'workbuddy' || id === 'workbuddy-ai', checkin: id === 'workbuddy',
     methods: [{ type: 'api', label: 'Demo sign-in', keyless: true, labels: { 'zh-CN': '演示授权', en: 'Demo sign-in' } }],
     options: [],
     models: provider?.models.map(id => ({ id, name: id })) || [],
@@ -211,6 +212,14 @@ export function installFixture() {
       const account = pluginAccounts.find(row => row.authId === id)
       if (!account) return missing()
       if (action === 'info') return data({ provider: demoProvider(account.pluginId, account.providerId, account.authorized), options: authOptions[id] || {} })
+      if (action === 'usage' && method === 'GET' && account.authorized && ['workbuddy', 'workbuddy-ai'].includes(account.providerId)) {
+        return data({ windows: [{ name: '周期积分', display: '120 / 500' }, { name: '额外积分', balance: account.claimed ? 60 : 40, unit: '积分' }] })
+      }
+      if (action === 'check-in' && method === 'POST' && account.authorized && account.providerId === 'workbuddy') {
+        const outcome = account.claimed ? 'done' : 'claimed'
+        account.claimed = true
+        return data({ outcome, credit: outcome === 'claimed' ? 20 : 0, streak: 1 })
+      }
       if (action === 'auth') {
         if (body.action === 'apiKey') account.authorized = true
         return data({ ok: account.authorized })

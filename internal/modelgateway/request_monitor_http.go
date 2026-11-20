@@ -143,7 +143,9 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 			reject(w, 404, "MODEL_REQUEST_NOT_FOUND")
 			return true
 		}
-		writeJSON(w, 200, map[string]any{"data": map[string]any{"request": terminal, "attempts": attempts, "complete": len(attempts) == terminal.Attempts}})
+		writeJSON(w, 200, map[string]any{"data": map[string]any{
+			"request": terminal, "attempts": h.requestAttemptsWithBilling(r.Context(), *terminal, attempts), "complete": len(attempts) == terminal.Attempts,
+		}})
 		return true
 	}
 	hours := 24

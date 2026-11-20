@@ -4,7 +4,8 @@ import os
 
 import httpx
 
-from roami_agent.protocol.errors import ModelAdmissionRejected
+from roami_agent.protocol.errors import FreeModelAdmissionDeferred, ModelAdmissionRejected
+from roami_agent.protocol.identity import now_ms
 from roami_agent.providers.request_receipts import GATEWAY_EXTENSION
 
 
@@ -33,6 +34,13 @@ class LocalGatewayTransport(httpx.AsyncBaseTransport):
         response = await self.transport.handle_async_request(forwarded)
         response.extensions[GATEWAY_EXTENSION] = True
         code = response.headers.get("x-roami-model-error")
+        if response.status_code == 503 and code == "MODEL_ROUTE_NO_AVAILABLE_MEMBER":
+            retry_at = response.headers.get("x-roami-model-retry-at", "")
+            if retry_at.isascii() and retry_at.isdecimal() and len(retry_at) <= 15:
+                retry_at_ms = int(retry_at)
+                if retry_at_ms > now_ms():
+                    await response.aclose()
+                    raise FreeModelAdmissionDeferred(retry_at_ms)
         if response.status_code >= 400 and code in {
             "MODEL_PROXY_DAILY_LIMIT",
             "MODEL_PROXY_USAGE_PENDING",

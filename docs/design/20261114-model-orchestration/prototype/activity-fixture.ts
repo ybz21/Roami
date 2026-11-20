@@ -25,6 +25,7 @@ const makeTrace = (key: keyof typeof traceCases, offset: number, suffix = '', me
   const attempts = entry.attempts.map((status, index) => ({
     attempt: index + 1, ...members[index], status, at: at + index * 850,
     success: status === 200 && key !== 'stream', error: attemptError[status] || (key === 'stream' ? traceCases.stream.error : undefined),
+    billing: status === 200 && key !== 'stream' ? { state: 'settled', cost: '0.000000000', currency: 'CNY' } : { state: 'unknown' },
   }))
   const last = attempts[attempts.length - 1]
   const request: GatewayRequest = {

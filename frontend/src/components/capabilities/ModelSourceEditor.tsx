@@ -28,10 +28,10 @@ const sourceName = (source: ModelSource) => {
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management, initialAuthorizationOpen = false }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
-  pricing?: ReactNode; initialAuthorizationOpen?: boolean; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
+  pricing?: ReactNode; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
   const [confirming, setConfirming] = useState(false), [page, setPage] = useState(1)
@@ -127,7 +127,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
     <Popconfirm danger={removedCount > 0} open={confirming} onOpenChange={setConfirming} title={t(removedCount ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removedCount ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
     <div className="tt-model-source-content">
-      {authentication && <details className="tt-model-source-authorization" open={initialAuthorizationOpen || undefined}><summary>{t('modelInteraction.authorization')}</summary><div>{authentication}</div></details>}
+      {authentication}
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
@@ -141,7 +141,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
             <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} placeholder={t('hub.directory.autoName')} onChange={event => updateSource({ name: event.target.value })} /></label>
             {!openRouter && <label className="agent-settings-field">{t('capabilities.models.authMode')}<Select virtual={false} aria-label={t('capabilities.models.authMode')} value={source.authMode} options={['api_key', 'bearer'].map(value => ({ value, label: t('capabilities.models.auth.' + value) }))} onChange={authMode => updateSource({ authMode })} /></label>}
           </div></details>
-        </> : <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy || draft.managing} onClick={() => patch({ editing: true, managing: false })}>{t('hub.directory.changeConnection')}</button></div>}
+        </> : <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{!source.pluginSourceId && sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy || draft.managing} onClick={() => patch({ editing: true, managing: false })}>{t('hub.directory.changeConnection')}</button></div>}
         {!connectionOnly && <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!canRead || busy} onClick={() => void read()}>{t(openRouter ? 'hub.openRouter.fetch' : existing && !draft.managing ? 'modelInteraction.manageModels' : existing && draft.directory === null ? 'hub.directory.updateModels' : draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{!existing && draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>}
         {readError && <Alert type="warning" role="alert" message={t(readError)} />}
         {management}

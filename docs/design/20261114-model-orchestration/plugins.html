@@ -76,7 +76,11 @@
     <dt>更新先下载校验再替换</dt>
     <dd>应用前列出受影响的账号。校验失败或应用失败都保留正在使用的版本，账号不需要重新授权。</dd>
     <dt>授权和启用是两页的事</dt>
-    <dd>这里只负责账号授权。授权完成回到模型源，由用户决定启用哪些模型。</dd>
+    <dd>授权完成后可查看这个账号的插件能力。模型仍在模型源里启用。</dd>
+    <dt>页面按插件实际能力渲染</dt>
+    <dd>已授权账号声明 <code>usage</code> 时展示额度，声明 <code>checkin</code> 时提供签到按钮。签到成功后刷新余额。由插件返回已签、活动未开放或需到服务商应用验证等状态。</dd>
+    <dt>WorkBuddy 国内版和国际版各自显示</dt>
+    <dd>国内版插件提供签到，国际版展示其支持的额度信息。其他平台也根据各自声明显示。可在<a href="current.html#/catalog/workbuddy-account">账号原型</a>试用演示结果，或查看<a href="https://github.com/magpie-community/plugins/blob/main/packages/workbuddy/README.md#daily-check-in">插件说明</a>。</dd>
     <dt>解绑前检查引用</dt>
     <dd>账号被某个来源使用时不能直接删除，先列出使用它的来源。</dd>
   </dl>

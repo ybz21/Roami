@@ -115,14 +115,14 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     back()
     return true
   }
-  const sourceAuthentication = sourceBase.pluginSourceId ? <><Button className="tt-model-source-account-add" icon={<PlusIcon />} disabled={!!addingAccount || controller.busy} loading={addingAccount === sourceBase.id} onClick={() => void addAccount(sourceBase)}>{t('hub.plugin.addAccount')}</Button>{accountError && <Alert type="error" role="alert" message={t(accountError)} />}<MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} onChanged={controller.retry}/></> : undefined
+  const sourceAuthentication = sourceBase.pluginSourceId ? <><Button className="tt-model-source-account-add" icon={<PlusIcon />} disabled={!!addingAccount || controller.busy} loading={addingAccount === sourceBase.id} onClick={() => void addAccount(sourceBase)}>{t('hub.plugin.addAccount')}</Button>{accountError && <Alert type="error" role="alert" message={t(accountError)} />}<MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} initiallyOpen={accountToAuthorize === sourceBase.id} onChanged={controller.retry}/></> : undefined
   const sourceManagement = detail === 'source' && id !== 'new' && sources.some(source => source.id === id) ? <div className="tt-model-source-management">
     <Popconfirm danger classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.deleteConnection', { name: sourceBase.name })} description={sourceBase.pluginDesktop ? t('hub.plugin.deleteDesktopHint') : undefined} onConfirm={removeSource} okText={t('capabilities.models.deleteAction')}>
       <button type="button" className="tt-act danger" disabled={!!sourceDependencies.length || controller.busy}>{t('hub.deleteSource')}</button>
     </Popconfirm>
     {!!sourceDependencies.length && <p className="agent-settings-hint">{t('hub.sourceInUse', { models: new Intl.ListFormat(locale).format([...new Set(sourceDependencies.map(model => model.name))]) })}</p>}
   </div> : undefined
-  const connectionEditor = <ModelSourceEditor key={sourceBase.id} initialAuthorizationOpen={accountToAuthorize === sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [sourceDraftKey]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
+  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [sourceDraftKey]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
     const saved = await controller.save(next)
     if (saved) {
       setSourceDrafts(previous => { const next = { ...previous }; delete next[sourceDraftKey]; return next })

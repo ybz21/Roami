@@ -5,11 +5,19 @@ import { useLayout } from '../../layout'
 import { ChevronRight, CopyIcon } from '../../icons'
 import BackButton from '../BackButton'
 import MobileSubPage from '../MobileSubPage'
+import { chargeText } from '../settings/model-charges'
 import { Alert, Button, Spin } from './model-controls'
 import type { ModelCatalog } from './model-hub-api'
 import { loadRequestDetail, type RequestAttempt, type RequestDetail, type RequestOutcome } from './gateway-request-api'
 
 const knownReasons = ['source', 'authorization', 'directory', 'notListed', 'tools', 'context', 'pricing', 'quota', 'cooldown']
+const feeStateLabel = {
+  pending: 'gatewayTrace.feePending',
+  unknown: 'agent.proxy.state.unknown',
+  unrecorded: 'gatewayTrace.feeUnrecorded',
+  missing: 'gatewayTrace.feeMissing',
+  unavailable: 'gatewayTrace.feeUnavailable',
+}
 
 function attemptReason(attempt: RequestAttempt, outcome: RequestOutcome) {
   if (attempt.success) return 'success'
@@ -53,6 +61,12 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
   const title = t('gatewayTrace.detail')
   const count = new Intl.NumberFormat(locale)
   const attemptTime = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 })
+  const attemptFee = (billing: RequestAttempt['billing']) => {
+    if (!billing) return null
+    if (billing.state !== 'settled') return t(feeStateLabel[billing.state])
+    return billing.currency && billing.cost != null ? chargeText([{ currency: billing.currency, amount: billing.cost }], locale)
+      : t('agent.proxy.state.unknown')
+  }
   const body = <div className="tt-request-detail-scroll">
     {result?.failure ? <Alert type="error" role="alert" message={t('gatewayTrace.' + result.failure)}
       action={result.failure === 'requestFailed' && <Button onClick={() => { setResult(undefined); setRetry(value => value + 1) }}>{t('agent.retry')}</Button>} /> : !row ? <Spin /> : <>
@@ -83,7 +97,11 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
       {!!attempts.length && <section className="tt-request-path"><h3>{t('gatewayTrace.path')}</h3>
         <ol>{attempts.map(attempt => <li key={attempt.attempt}>
           <span className={'tt-request-path-step ' + (attempt.success ? 'is-success' : 'is-failed')} aria-label={t('gatewayTrace.step', { step: count.format(attempt.attempt) })}>{count.format(attempt.attempt)}</span>
-          <div><strong translate="no">{attempt.model}</strong><span>{sources.get(attempt.sourceId) || t('gatewayTrace.sourceRemoved')}</span></div>
+          <div>
+            <strong translate="no">{attempt.model}</strong>
+            <span>{sources.get(attempt.sourceId) || t('gatewayTrace.sourceRemoved')}</span>
+            {attempt.billing && <span>{t('agent.usage.cost')} · {attemptFee(attempt.billing)}</span>}
+          </div>
           <div className="tt-request-path-result">
             <strong className={'tt-request-outcome ' + (attempt.success ? 'is-success' : 'is-failed')}>{t('gatewayTrace.' + attemptReason(attempt, row.outcome))}</strong>
             {attempt.status > 0 && <small>HTTP {attempt.status}</small>}
@@ -99,7 +117,10 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
       </div>
       <details className="tt-routing-guide tt-request-technical"><summary><ChevronRight />{t('gatewayTrace.technical')}</summary>
         {!!row.error && <p><code>{row.error}</code></p>}
-        {attempts.map(attempt => attempt.error && <p key={attempt.attempt}>{t('gatewayTrace.step', { step: count.format(attempt.attempt) })} <code>{attempt.error}</code></p>)}
+        {attempts.map(attempt => (attempt.error || attempt.billing?.upstreamRequestId) && <div key={attempt.attempt}>
+          <p>{t('gatewayTrace.step', { step: count.format(attempt.attempt) })} {attempt.error && <code>{attempt.error}</code>}</p>
+          {attempt.billing?.upstreamRequestId && <p>{t('agent.gateway.upstreamRequestId')} <code translate="no">{attempt.billing.upstreamRequestId}</code></p>}
+        </div>)}
         <p>{t('gatewayTrace.requestId')} <code>{row.requestId}</code></p>
         <Button icon={<CopyIcon />} onClick={async () => {
           try { await navigator.clipboard.writeText(row.requestId); message.success(t('common.copied')) }

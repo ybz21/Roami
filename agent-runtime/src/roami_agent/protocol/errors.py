@@ -23,6 +23,14 @@ class ModelAdmissionRejected(DomainError):
     """The trusted model transport rejected admission before sending a request."""
 
 
+class FreeModelAdmissionDeferred(ModelAdmissionRejected):
+    """The private gateway rejected a free request before contacting an upstream."""
+
+    def __init__(self, retry_at_ms):
+        self.retry_at_ms = retry_at_ms
+        super().__init__("MODEL_ROUTE_NO_AVAILABLE_MEMBER", 503)
+
+
 class ToolPreflightError(DomainError):
     """An unavailable dependency prevents starting the tool action."""
 

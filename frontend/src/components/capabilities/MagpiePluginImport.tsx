@@ -7,7 +7,7 @@ import { useLayout } from '../../layout'
 import MagpieCommunityCatalog, { communityPath, type MagpiePackage as Package } from './MagpieCommunityCatalog'
 import { catalogFailure } from './model-hub-api'
 
-export type PluginProvider = { id: string; name: string; signedIn: boolean; fellBack?: boolean; methods: { type: string; label: string; keyless?: boolean; labels?: Record<string, string> }[]; options: { key: string; label: string; description: string; default: boolean; labels?: Record<string, string> }[]; models: { id: string; name: string }[] }
+export type PluginProvider = { id: string; name: string; signedIn: boolean; fellBack?: boolean; usage?: boolean; checkin?: boolean; methods: { type: string; label: string; keyless?: boolean; labels?: Record<string, string> }[]; options: { key: string; label: string; description: string; default: boolean; labels?: Record<string, string> }[]; models: { id: string; name: string }[] }
 type InspectedPackage = { pkg: Package; providers?: PluginProvider[]; error?: string }
 export const pluginFailure = (cause: any) => {
   const code = cause?.apiError?.code || cause?.message

@@ -6,6 +6,7 @@ from pathlib import Path
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.conversation.activity_payloads import activity_payload
+from roami_agent.dispatch.native_free_model_retry import queued_free_model_retry
 from roami_agent.dispatch.navigation_recovery import stopped_navigation
 from roami_agent.dispatch.task_cancellation import request_task_cancellation
 from roami_agent.dispatch.task_revisions import TaskRevisions
@@ -547,6 +548,8 @@ class Tasks:
             "FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
             (task["revision"], task["id"]),
         )
+        if retry_at := queued_free_model_retry(db, task):
+            task["modelRetryAtMs"] = retry_at
         if task["latestAttempt"]:
             result_json = task["latestAttempt"].pop("inspectionResultJson")
             result = json.loads(result_json) if result_json else {}
