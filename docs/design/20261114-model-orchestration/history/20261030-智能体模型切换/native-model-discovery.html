@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>原生智能体默认模型与目录切换</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="原生智能体默认模型与目录切换">原生智能体默认模型与目录切换</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<h2 id="product-design">Product Design</h2>
+<p>Claude Code、Pi、OpenCode、Codex 接入 Roami 模型网关时，都可以选择“默认”，无需指定上游源。每次默认请求跟随节点保存的 Roami 主模型；工具自身的模型菜单可切换到网关已配置的任意路由。来源与固定模型选择继续保留。</p>
+<p>目录范围是已保存的网关路由，不自动注册所有上游模型。默认目标不存在时明确失败，不静默选择其他模型。</p>
+<h2 id="user-stories">User Stories</h2>
+<ul>
+<li>接入默认模型后，Roami 主模型改变，下一次默认请求跟随变化。</li>
+<li>在工具原生模型菜单中跨来源切换，无需重新配置接入。</li>
+<li>用户在原生工具保存的模型选择继续生效；网关配置不通过环境变量强制改回旧模型。</li>
+<li>Pi/OpenCode 的目录快照过期时，保留当前选择，提示并允许重新应用以同步清单。</li>
+</ul>
+<h2 id="technical-design">Technical Design</h2>
+<p><code>GatewayModelBinding</code> 对四种工具提供默认项，提交 <code>model=roami-default</code>，不带 sourceId。<code>native-models.go</code> 根据节点主模型解析真实目录路由；旧直连主模型只在地址、凭据、协议和模型匹配已配置路由时可用。引用检查解析默认别名与发现 ID，保护使用中的真实路由。</p>
+<table>
+<thead>
+<tr class="header">
+<th>工具</th>
+<th>原生目录接入</th>
+<th>刷新方式</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Claude Code</td>
+<td><code>/v1/models</code> 中使用 <code>roami-claude/&lt;id&gt;</code>，通过其发现过滤；原 ID 继续兼容</td>
+<td>重新启动 Claude</td>
+</tr>
+<tr class="even">
+<td>Pi</td>
+<td><code>models.json</code> 的网关提供商保存全部路由与默认项</td>
+<td>目录变化后重新应用；<code>/model</code> 重读文件</td>
+</tr>
+<tr class="odd">
+<td>OpenCode</td>
+<td>V1 <code>provider</code> / V2 <code>providers</code> 的 <code>models</code> 保存全部路由与默认项</td>
+<td>目录变化后重新应用并使用原生重新加载或重启</td>
+</tr>
+<tr class="even">
+<td>Codex</td>
+<td><code>model_catalog_url</code> 指向网关；带 <code>client_version</code> 且使用 Codex 凭据的请求返回 Codex Models 格式</td>
+<td>重启 Codex 读取远程目录</td>
+</tr>
+</tbody>
+</table>
+<p>Pi/OpenCode 预设保存模型目录快照；应用时由既有修订检查、备份及原子写入保护。轮换凭据保留完整清单。模型列表校验数量、重复 ID、选择是否存在及配置引用标记。Roami 页面比较保存快照与当前目录，过期时启用重新应用，不自动改写原生配置。</p>
+<p>Claude 网关配置使用 <code>ANTHROPIC_DEFAULT_MODEL</code> 与 <code>settings.model</code>，清除会遮蔽菜单保存选择的 <code>ANTHROPIC_MODEL</code>。Sonnet/Opus/Haiku/Fable 映射到接入模型，路由解析兼容 <code>[1m]</code> 后缀；这只修复别名解析，不宣称上游具备 1M 上下文能力。</p>
+<p>Codex 的 <code>model_catalog_json</code> 会遮蔽远程目录，应用网关时清除并备份，恢复时还原。目录元数据采用官方最小兼容设置，不宣称未验证的模型能力。模型元数据、窗口和工具能力仍由真实上游决定；没有修改 RSI 参数或配额。</p>
+<p>外部 CLI 模型标签 <code>Roami Default</code> 是集成目录元数据；Roami 页面“默认”和提示通过中英文 i18n。</p>
+<p>官方依据：<a href="https://code.claude.com/docs/en/llm-gateway-protocol#model-discovery">Claude 目录发现</a>、<a href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md">Pi 模型配置</a>、<a href="https://opencode.ai/docs/providers">OpenCode 提供商</a>、<a href="https://learn.chatgpt.com/docs/enterprise/roll-out-a-gateway#model-catalog-reference">Codex 网关目录</a>。</p>
+<h2 id="acceptance-evidence">Acceptance Evidence</h2>
+<p>所有调用使用隔离原生配置、真实 Go 网关和本地测试上游，不改生产配置、不调用生产模型。</p>
+<ul>
+<li>Claude Code 2.1.322 的 <code>/model</code> 显示两个来源的模型；保存 Second model 并重启后仍使用该模型；<code>--model default</code> 回到主模型，均成功返回 OK。</li>
+<li>Pi 1.5.2 的 <code>--list-models</code>、OpenCode 2.2.7 的 <code>models --standalone</code>、Codex 0.167.2 的 <code>debug models</code> 均实际读取到两个来源的模型及 roami-default。</li>
+<li>Pi/OpenCode/Codex 不指定模型的请求均使用主模型并返回 OK；通过各自原生命令选择第二来源的模型，也均返回 OK。测试上游记录分别为 fixture 与 fixture-second。</li>
+<li>Go 回归覆盖全部工具的默认跟随、跨源切换、原生目录、凭据轮换保留目录、缺失默认拒绝、旧 ID/[1m] 解析、其他客户端隔离、引用保护、直连来源匹配、配置恢复和 Codex 本地目录恢复。</li>
+<li>前端回归覆盖四种工具无来源应用默认、保留现有来源选择、目录快照过期后保留选择并启用重新应用、CLI 保存模型后的识别。</li>
+<li>Vitest：234 files / 1,730 tests 通过；typecheck、i18n（5,474 keys）、hover 通过。quick/full、生产构建通过；Python runtime/skills 未改，按范围跳过。</li>
+</ul>
+<p>此前 Claude 的桌面 1280/1920/2560/3440 CSS px 与 Redmi Note 8 真机点按已通过：文档无滚动或横向溢出，来源、应用、确认目标均为 44 CSS px；返回栏与底栏可达。扩展后的各工具截图和交互证据留在 <code>/tmp/roami-claude-models-evidence/</code>，仅将隔离截图上传 PR 图片分支。</p>
+<p>扩展验收：Pi/OpenCode/Codex 的桌面与 Redmi Note 8 手机改前改后均已截图。三个桌面页面实际点击“网关 → 默认 → 应用 → 确认”后显示 Applied；手机三页均为 compact/coarse，视口宽度与文档 scrollWidth 同为 392，scrollTop 为 0。Pi 在真机以 ADB 实际点按网关、应用、确认，已应用状态与三个 touchend 事件同时确认；返回后回到智能体页，底栏保留。英文浅色与中文深色均实际打开验证。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

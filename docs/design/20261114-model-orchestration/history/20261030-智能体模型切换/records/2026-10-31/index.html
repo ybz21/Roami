@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>能力中心：大模型与智能体</title>
+<link rel="stylesheet" href="../../../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="能力中心大模型与智能体">能力中心：大模型与智能体</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../../../index.html">专题首页</a>
+<a href="../../../../screens/index.html">逐页设计</a>
+<a href="../../../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="../../design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<p>2026-10-31 · 第二版设计已进入首版实现。<a href="../../implementation.html">实现范围与验收</a> 记录真实接口、配置写入和验证结果；下文保留完整产品方向。HTML 为设计原型，不调用模型或改写本机配置。</p>
+<p><a href="../../index.html">交互原型</a> · <a href="../../assets/prototype.tsx">源码</a> · <a href="../../acceptance.html">验证记录</a> · <a href="../2026-10-30/index.html">第一版快照</a></p>
+<h2 id="product-design">Product Design</h2>
+<h3 id="推荐结构">推荐结构</h3>
+<p><strong>模型配置迁入“能力”，命名“大模型”，与“智能体”相邻，各自有唯一管理页面。</strong> 每个节点默认维护一个统一模型接入，在里面添加多个上游源，配置对外模型及聚合策略，再供智能体和其它客户端使用。</p>
+<pre class="text"><code>能力
+  大模型
+    统一接入：节点地址、协议入口、调用凭据、状态
+    模型源：工作网关、OpenRouter、官方 API、本地模型
+    对外模型：稳定名称、来源映射、主备策略、验证与发布
+    用量：实际来源、使用方、单价和每日金额限额
+  智能体
+    Roami：主智能体与执行智能体分别选模
+    Codex / Claude Code / OpenCode / Pi
+      安装、版本、登录、启动、模型选择、恢复
+  插件 / 技能 / MCP / CLI / 工具 / 市场</code></pre>
+<p>默认直接提供本节点的统一接入，不要求用户先建立“连接分组”。多环境、多网关在明确需要时再扩展。</p>
+<h3 id="放在哪里是否放同一页">放在哪里，是否放同一页</h3>
+<table>
+<thead>
+<tr class="header">
+<th>选择</th>
+<th>结果</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>模型留在设置，工具留在能力</td>
+<td>配模型与管理工具持续跨两个中心，容易复制入口</td>
+<td>不推荐</td>
+</tr>
+<tr class="even">
+<td>所有模型和智能体放一个长页面</td>
+<td>首次设置顺序直观，日常改上游也要看到安装、登录等内容，手机更难找</td>
+<td>不作为主页面</td>
+</tr>
+<tr class="odd">
+<td>能力内“大模型 / 智能体”相邻</td>
+<td>同一中心内完成，资产配置与工具生命周期各自清晰</td>
+<td>推荐</td>
+</tr>
+</tbody>
+</table>
+<p>设置原“模型与连接”在迁移期保留“已迁至能力 / 大模型”导航，旧 URL 自动转到唯一页面；迁移完成移除旧分类。设置继续管理节点、账户、外观等系统偏好。</p>
+<p><strong>大模型页下面仍然能看到智能体，但只展示使用关系和配置入口。</strong> 点“配置”打开能力内同一个智能体详情，并保留返回上下文；不在这里再做一套安装、登录与模型表单。</p>
+<h3 id="四个产品概念">四个产品概念</h3>
+<table>
+<thead>
+<tr class="header">
+<th>名称</th>
+<th>用途</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>统一接入</td>
+<td>所有使用方连接的 Roami 入口</td>
+<td>当前开发主机的模型网关</td>
+</tr>
+<tr class="even">
+<td>模型源</td>
+<td>上游地址、凭据和真实模型目录</td>
+<td>工作网关、OpenRouter、本地模型</td>
+</tr>
+<tr class="odd">
+<td>对外模型</td>
+<td>对使用方稳定展示的名称与标识</td>
+<td>编程主力 <code>coding-main</code>、Claude 主力 <code>claude-main</code></td>
+</tr>
+<tr class="even">
+<td>使用方</td>
+<td>选用对外模型的工具或角色</td>
+<td>Codex、Claude Code、Roami 主智能体</td>
+</tr>
+</tbody>
+</table>
+<p>聚合策略放在“对外模型”详情里，不要求用户额外创建一个策略资源。用户建立“编程主力”，选择它背后的主源和备用源；Codex 只引用 <code>coding-main</code>。换供应商后不必逐个改客户端。主力模型与便宜模型之间的切换属于换模，不能伪装成同模型备援。</p>
+<h3 id="大模型页面">大模型页面</h3>
+<p>顶部一行“统一接入”状态和“接入说明”。普通用户选择智能体后由系统完成接入，无需复制地址和 Key 再填回 Roami。</p>
+<p>主体四个标签：<strong>模型源 / 对外模型 / 用量与限额 / 模型定价</strong>。</p>
+<ul>
+<li>模型源：平面列表展示名称、状态、可用模型与引用。新增选预设或自定义，填写地址和凭据，读取目录。多协议端点、特殊认证按需展开。同一供应商可建多个账户，不能按域名合并。</li>
+<li>对外模型：列表展示名称、主源、策略和使用方。新建先选真实模型，带出协议与能力，再选符合条件的备用源。保存草稿、预览路由、验证、发布分别呈现；草稿不进入智能体可选列表。发布前说明影响哪些使用方。</li>
+<li>用量：按对外模型、真实上游与使用方查看同一本 Go 网关账本。原单价、每日金额限额迁入这里。官方登录直连工具标明未经过统一接入，不把订阅额度或上游账单混算。</li>
+<li>模型定价：保留默认单价、逐模型及前缀匹配价格、输入、输出和缓存命中价格。币种随账本统一设置，只影响新请求。</li>
+</ul>
+<p>接入说明才展示协议入口、客户端调用凭据摘要及其它工具示例。上游 Key 与客户端凭据是两类资源，默认不把上游密钥分发到工具。首期监听本机回环；LAN 调用单独配置访问及凭据，手机远程管理不意味着手机直接调用服务器 loopback。</p>
+<p>底部“正在使用”按工具展示模型摘要，行尾“配置”进入唯一智能体详情；没有使用方时一句空态与“配置智能体”。不复制完整智能体目录。</p>
+<h3 id="简单聚合策略">简单聚合策略</h3>
+<table>
+<thead>
+<tr class="header">
+<th>首期策略</th>
+<th>用户填写</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>固定来源</td>
+<td>一个模型源和真实模型</td>
+<td>新请求都走指定来源</td>
+</tr>
+<tr class="even">
+<td>主备切换</td>
+<td>主源及有序备用源</td>
+<td>仅在可以安全换源时依次使用备用</td>
+</tr>
+</tbody>
+</table>
+<p>主备必须满足协议、真实模型身份、工具调用、上下文和使用方必需能力；模型 ID 相同不是充分条件。不兼容项显示原因，不能勾选。跨模型降级单独设计且默认关闭，必须明确告知质量、能力和费用变化。</p>
+<p>首期不做复杂表达式、按 Token 智能选模、最低价自动选择或多层路由。后续再考虑加权分流；按成本选源必须有可信价格与能力数据。</p>
+<p>自动备援不等于重放：只有能证明请求未被上游接收或执行才可自动换源。已输出、工具调用已开始、接收状态或费用未知时不自动重放，展示当前请求恢复入口。超时或 HTTP 5xx 本身不能证明未执行。带供应商续接标识的上下文保持原供应商，不能直接发给另一源。</p>
+<p>“预览路由”是无请求的规则模拟；真实“验证连接 / 模型”单独说明调用次数和可能费用。目录读取或预览成功不代表完整智能体兼容。</p>
+<h3 id="智能体统一管理">智能体统一管理</h3>
+<p>保留能力中已有的智能体目录，补入 Roami 内置角色；不再创建独立“智能体使用”总表。</p>
+<table>
+<thead>
+<tr class="header">
+<th>配置</th>
+<th>唯一归属</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>安装、版本、升级、登录、启动</td>
+<td>能力 / 智能体 / 对应工具</td>
+</tr>
+<tr class="even">
+<td>默认模型、接入或恢复原配置</td>
+<td>同一详情“模型”区</td>
+</tr>
+<tr class="odd">
+<td>Roami 主 / 执行智能体分别选模</td>
+<td>能力 / 智能体 / Roami 的角色行</td>
+</tr>
+<tr class="even">
+<td>上游 URL、上游凭据、真实模型目录</td>
+<td>能力 / 大模型 / 模型源</td>
+</tr>
+<tr class="odd">
+<td>来源映射、主备顺序</td>
+<td>能力 / 大模型 / 对外模型</td>
+</tr>
+<tr class="even">
+<td>当前会话真实模型与来源</td>
+<td>会话状态及执行详情，链接回同一资源</td>
+</tr>
+</tbody>
+</table>
+<p>外部工具的模型区提供 <strong>使用原配置 / 使用 Roami 大模型</strong>。后者只需选已发布、兼容的对外模型，不再填 Base URL 和上游 Key。没有兼容模型可跳去新建，带上所需协议，发布后回到原详情，保留选择。</p>
+<p>原配置可能是官方订阅或其它自定义连接，不一律叫“官方”。保留原登录方式，也不把订阅当成通用 API Key。有环境变量、启动参数或项目配置覆盖默认值时说明实际来源，不静默清理。</p>
+<p>首次接管备份相关字段，明确修改当前节点、当前用户的本机 CLI 默认配置；未安装先安装，协议未验证先处理连接，接管完成前保留有效原配置。恢复也放在同一详情。</p>
+<h3 id="两类修改的生效范围">两类修改的生效范围</h3>
+<table>
+<thead>
+<tr class="header">
+<th>修改</th>
+<th>生效范围</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>智能体接入或换默认对外模型</td>
+<td>更新工具默认配置，新启动会话使用；不强行重启任务，原生热读行为以实测为准</td>
+</tr>
+<tr class="even">
+<td>发布对外模型的来源策略</td>
+<td>新请求使用发布版本，进行中请求保持原路由；工具循环和不可迁移续接保持上下文绑定</td>
+</tr>
+<tr class="odd">
+<td>保存新模型草稿</td>
+<td>不影响运行，未发布模型不可被智能体选用</td>
+</tr>
+<tr class="even">
+<td>删除 / 停用被引用的源或模型</td>
+<td>先处理引用或安排替代，不直接留下悬空绑定</td>
+</tr>
+</tbody>
+</table>
+<p>来源与策略修改先保存草稿，原发布版本继续服务。发布前验证，失败可回滚上个有效版本；凭据已撤销时不能以“回滚完成”冒充可用。默认写入结果与实际模型运行状态分别呈现。</p>
+<h3 id="完整操作路径">完整操作路径</h3>
+<ol type="1">
+<li>首次设置：能力 / 大模型，添加两个源；建立编程主力，选择主备并发布；点配置智能体，在 Codex 模型区选编程主力并应用。</li>
+<li>日常换源：调整编程主力的来源顺序，预览后发布；Codex 继续引用 <code>coding-main</code>，新请求按发布策略处理。</li>
+<li>从智能体出发：打开 Claude Code，选使用 Roami 大模型；没有兼容模型时带所需协议去添加，发布后返回原详情。</li>
+</ol>
+<p>跨页导航通过 URL 保存受校验的返回上下文，返回保留草稿；路由历史与 MobileSubPage overlay history 不重复叠加。</p>
+<p>手机保留首页、项目、工具、设置四个底栏入口，能力从工具进入。能力分类多时用分类选择器，不挤成一排。三个大模型标签在手机完整显示；源、模型与智能体详情用全屏二级页，一条返回栏、一个滚动区，短发布确认才用对话框。</p>
+<h3 id="本版调整">本版调整</h3>
+<p>从第一版“在设置给工具分配直连源”，改为“能力内统一模型接入、多个上游、对外模型及策略，再绑定使用方”。统一网关成为产品核心。完整协议兼容仍是开放对应工具接入的门槛，不用 RSI 单轮适配推定完整 CLI 已支持。</p>
+<h2 id="user-stories">User Stories</h2>
+<table>
+<thead>
+<tr class="header">
+<th>故事</th>
+<th>验收条件</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>多个上游只维护一次</td>
+<td>工具持统一接入凭据和模型引用，不复制上游 Key</td>
+</tr>
+<tr class="even">
+<td>配置主备</td>
+<td>在对外模型内选来源，能预览正常、主源连接未建立、已输出三种结果</td>
+</tr>
+<tr class="odd">
+<td>换供应商不逐个改工具</td>
+<td>对外模型标识稳定，发布前可见影响范围</td>
+</tr>
+<tr class="even">
+<td>在能力中管理 Codex</td>
+<td>安装、登录、启动、选模都在同一详情</td>
+</tr>
+<tr class="odd">
+<td>从大模型配置使用方</td>
+<td>摘要进入同一智能体详情，有明确返回路径</td>
+</tr>
+<tr class="even">
+<td>保留官方订阅</td>
+<td>可使用原配置，明确不经过统一接入</td>
+</tr>
+<tr class="odd">
+<td>不重复已有输出或工具动作</td>
+<td>已输出及执行状态未知时不自动换源</td>
+</tr>
+<tr class="even">
+<td>从旧设置链接进入</td>
+<td>重定向唯一模型入口并保留子区段语义</td>
+</tr>
+</tbody>
+</table>
+<h2 id="technical-design">Technical Design</h2>
+<p>实现建议，不代表本次已交付 API。节点间不隐式复制凭据。</p>
+<pre class="text"><code>NodeModelGateway: nodeID, listener, protocolEntrypoints, accessCredentialRefs, health
+UpstreamSource: id, name, protocolEndpoints, credentialRefs, catalog, revision
+PublishedModel: id, stableModelID, displayName, protocol, requiredCapabilities,
+  candidates[{sourceID, exactModelID, priority}], strategy,
+  draftRevision, publishedRevision, validationRef
+AgentModelBinding: nodeID, kind, role?, mode(original|gateway),
+  publishedModelID, nativeRevision, snapshotRef, appliedState
+RoutingReceipt: requestID, sourceID, publishedModelID, policyRevision,
+  continuationAffinity, attemptState, usageState, errorCode</code></pre>
+<h3 id="页面与模块">页面与模块</h3>
+<ul>
+<li><code>CapabilitiesPage.tsx</code> 新增 <code>models</code> 分类，建议路由 <code>capabilities/models/sources</code>、<code>capabilities/models/catalog</code>、<code>capabilities/models/usage</code>。详情有独立 URL。</li>
+<li><code>AgentCatalog.tsx</code> 保留唯一目录；<code>AgentModels.tsx</code> 收敛为详情内的对外模型选择、应用、恢复，不另持上游目录。旧 <code>capabilities/agents/:kind/models</code> 兼容到同一模型区。</li>
+<li><code>settings/agent/runtime</code> 和 <code>modelTab</code> 归一化到模型入口；proxy / prices 定向用量对应区段，角色设置指向 <code>capabilities/agents/roami/models</code>，不丢掉原目标语义。</li>
+<li>分开模型源目录、对外模型发布、智能体绑定三个领域模块。关系跳转用稳定 ID 查询当前实体，不复制一份编辑表单或配置快照。</li>
+<li>Go <code>internal/modelgateway/</code> 承担协议入口、认证、路由、准入和记账；<code>internal/agentproviders/</code> 复用原生配置备份、revision、物化、readback、冲突和恢复。</li>
+<li>Python 读宿主运行时结构并传播网关决策，不另建 Token / 费用配额；验收使用节点已存路线、参数与能力。</li>
+</ul>
+<h3 id="执行与迁移">执行与迁移</h3>
+<p>一个服务可提供 Messages 和 Responses 等独立契约，但工具回传、流式终态、压缩、图片、取消、续接等必须分别端到端验证。未验证组合不可选，并给出处理入口。</p>
+<p>发布操作带 revision 和幂等 ID，先预检候选、引用、凭据与能力，持久化快照，再原子切换活动版本。请求捕获策略版本并记录每次真实尝试；不能只记最后一次，也不能把未知计成免费。供应商续接标识与请求上下文绑定，网关费用未知继续沿用已有 Go 准入规则。</p>
+<p>调用方凭据与上游密钥分离，摘要 API 不回传原值；日志不落密钥和正文。生成的工具配置只包含统一入口与客户端凭据。官方登录仍由工具认证体系管理。</p>
+<ol type="1">
+<li>入口与实体：已有连接导为模型源，主 / 执行角色转为明确对外模型；旧链接重定向，专业工具原配置保留。旧预设按地址、认证、模型、协议核对后迁移，不按名称合并。</li>
+<li>完整网关与首批 CLI：逐协议和真实工具验证，先开放固定来源；未就绪组合继续原配置并标明待验证，不强行接管。</li>
+<li>主备与发布回滚：具备执行状态、费用状态和续接亲和后开放安全备援。多网关、权重分流、跨模型降级后置。</li>
+</ol>
+<h3 id="验收重点">验收重点</h3>
+<p>源增删改、引用完整、草稿与发布隔离、唯一目录及回跳、旧 URL、原配置保护、源密钥隔离。运行层覆盖发送前失败可备援、已输出不备援、工具执行未知不重放、供应商续接绑定、发布中请求稳定、引用资源不可直接删和未知账目。</p>
+<p>CLI 验证用仓库隔离实例和私有配置夹具，不改当前用户路线。正式落地跑前端门禁与 Android 真触控；本目录是中文内部设计稿，产品文案接全局中英 i18n。</p>
+<h3 id="依据">依据</h3>
+<p>当前核对了 <code>CapabilitiesPage.tsx</code>、<code>AgentCatalog.tsx</code>、<code>AgentModels.tsx</code>、<code>agent-settings.tsx</code>、<code>model-settings-route.ts</code>、<code>route-hash.ts</code>，以及两个 Go 模型模块。外部协议参考保留在<a href="../2026-10-30/proposal.html#资料依据">第一版资料</a>，实现时按安装版本复核。页面与实体关系是产品建议，不依赖第三方网关的菜单结构。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

@@ -151,6 +151,7 @@ code { overflow-wrap:anywhere; }
 .archive .record-list li { margin-block:var(--sp-1); }
 .archive .record-list a { display:inline-block; padding-block:var(--sp-2); }
 .archive .record { margin-block-start:var(--sp-5); padding-block:var(--sp-4); border-top:1px solid var(--border-subtle); scroll-margin-top:var(--sp-2); }
+.archive .converted-record { max-inline-size:110ch; }
 .archive .record h2,.archive .record h3,.archive .record h4,.archive .record h5,.archive .record h6 { margin-block:var(--sp-4) var(--sp-2); scroll-margin-top:var(--sp-2); }
 .archive .record h2:first-child { margin-block-start:0; }
 .archive .record p { margin-block:var(--sp-2); }

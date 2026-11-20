@@ -27,7 +27,7 @@
 </section>
 <section aria-label="文档正文">
 <article class="record" id="design-readme">
-<p class="muted">原稿 <code>history/20261117-main-model-switch/README.md</code></p>
+<p class="muted">独立记录 <a href="index.html">index.html</a></p>
 <h2 id="design-readme--main-工作中切换模型">Main 工作中切换模型</h2>
 <h3 id="design-readme--产品设计">产品设计</h3>
 <p>首页和项目 Main 继续使用输入框已有的模型选择器。正在生成回复、执行工具或等待后台任务时，可以选择新模型及思考强度；当前请求继续完成，从下一次模型请求开始使用新配置。同一轮里，工具调用完成后也会重新选择模型，不必另开对话。</p>
@@ -61,7 +61,7 @@
 <p>回归与浏览器证据见 <a href="#design-acceptance">acceptance.md</a>。未修改用户正在运行的实例、真实模型路由或会话数据；验证使用隔离实例和可控模型夹具。</p>
 </article>
 <article class="record" id="design-acceptance">
-<p class="muted">原稿 <code>history/20261117-main-model-switch/acceptance.md</code></p>
+<p class="muted">独立记录 <a href="acceptance.html">acceptance.html</a></p>
 <h2 id="design-acceptance--验收记录">验收记录</h2>
 <p>日期：2026-11-17。基线：<code>43a4973f</code>。</p>
 <p>所有运行验证通过 <code>scripts/dev/isolated-roami.sh</code>，使用本任务独立目录和 socket。浏览器夹具运行真实 React 组件和 Python Runtime，模型输出为可控夹具，不宣称真实上游模型调用验收。</p>

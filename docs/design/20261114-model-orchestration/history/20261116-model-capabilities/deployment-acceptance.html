@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型目录发布：MCP 完成证据</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="模型目录发布mcp-完成证据">模型目录发布：MCP 完成证据</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<h2 id="产品与用户故事">产品与用户故事</h2>
+<p>完成任务后，发布应在宿主确认没有进行中的输入和工具时继续。执行器的完成回复不代替宿主状态；不取消任务、不替用户验收、不重复执行结果不确定的外部操作。</p>
+<h2 id="技术设计">技术设计</h2>
+<p>本机升级停在 <code>AGENT_UPGRADE_BUSY</code>。绑定的 Codex 原生记录已包含根轮次 <code>task_complete</code>，但两个失败的 <code>McpToolCall</code> 结束记录未被完成证据解析器识别，工具仍被算作进行中。</p>
+<p>只扩展 <code>internal/agentexecution/session-codex-completion.go</code> 的既有 <code>item_completed</code> 解析：MCP 项要求有效调用 ID、非空服务/工具、终态、匹配的线程与轮次、有效开始/完成时间。沿用完整记录摘要、最终回复、未结束调用、子智能体、进程身份、重复证据等检查，再由既有 <code>execution status</code> 核对并保存停止证据。命令执行仍要求进程和退出码。没有新增路由、任务状态接口或 Python 逻辑。</p>
+<h2 id="验证">验证</h2>
+<p>扩展既有状态核对回归，覆盖 MCP 成功/失败结束、仍在执行、缺失服务/工具、错误线程/轮次、结束时间晚于最终回复、重复结束、存活进程和未结束子智能体；确认核对幂等且不再次提交输入。定向回归已通过。</p>
+<p>完整门禁、合入及本机部署结果保留在本次本机交付报告。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

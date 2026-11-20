@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>精简 Main 选模列表</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="精简-main-选模列表">精简 Main 选模列表</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<p>在首页输入 <code>/model</code> 或点当前模型，都会打开同一个选择器。标题下直接显示搜索框，列表保留模型名称、原生或聚合类型、输入输出、能力及价格状态。切换生效说明在列表下方。调用 ID 从列表行移除，仍可用完整 ID 搜索同名模型，网关继续提供调用 ID 和复制入口。</p>
+<p>沿用现有 <code>AgentModelPicker</code>、<code>/model</code> 命令与网关目录，选模请求仍使用稳定 ID。桌面弹窗标题减少垂直留白，手机沿用全屏选择页和触摸返回。</p>
+<p>回归覆盖隐藏 ID 后按完整 ID 搜索同名模型并切换到正确路线，以及桌面和手机在 Main 工作中用 <code>/model</code> 打开选择器。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

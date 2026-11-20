@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大模型管理 · 用量、聚合与监控</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="大模型管理--用量聚合与监控">大模型管理 · 用量、聚合与监控</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<p>状态：按已确认原型接入概况、审计、源定价、九种聚合路由和监控，已通过全量质量门与桌面 / 安卓真机验收。详见 <a href="product-integration.html">正式接入与验收</a>。</p>
+<ul>
+<li><a href="prototype.html">打开交互原型</a></li>
+<li><a href="acceptance.html">原型验收记录</a></li>
+<li><a href="implementation.html">概况 / 审计实现与验收</a></li>
+<li><a href="product-integration.html">源定价、聚合与监控正式接入</a></li>
+<li><a href="free-aggregation.html">模型源定价与免费聚合</a></li>
+<li><a href="routing-monitoring.html">九种路由策略与滚动监控</a></li>
+<li>参考：用户提供的 Magpie 截图 <code>/tmp/clipboard-20261112-180757-1x36.png</code>，借鉴「概览 / 请求」的信息拆分。</li>
+</ul>
+<h2 id="产品设计">产品设计</h2>
+<p>「能力 / 大模型」的用量部分分为两个同级 Tab：</p>
+<ul>
+<li><strong>概况</strong>：用量、限额、汇总、趋势，以及按模型源 / 智能体 / 模型的分组统计。</li>
+<li><strong>审计</strong>：逐条调用记录、条件筛选、搜索、分页和单次调用详情。</li>
+</ul>
+<p>默认进入概况。概况内可以调整示例每日限额；今日额度覆盖全部调用，不随统计条件变化。未知费用存在时，剩余额度显示待核对。审计直接进入请求列表，不再套一层「概览 / 请求」导航，也不重复概况的限额与汇总模块。点击概况中的分组或趋势进入审计并携带筛选条件；两个 Tab 切换保留已有选择。</p>
+<p>本版按用户对信息结构的纠正修订：<a href="revisions/v1.html">第一版结构记录</a>。</p>
+<table>
+<thead>
+<tr class="header">
+<th>区域</th>
+<th>内容与行为</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>统计周期</td>
+<td>今天、近 7 天、近 30 天、自定义起止日期；示例时钟固定为 2026-11-12 18:08（Asia/Shanghai）</td>
+</tr>
+<tr class="even">
+<td>全局筛选</td>
+<td>模型源、智能体、模型、调用来源；筛选同时作用于总览、分组、趋势和请求</td>
+</tr>
+<tr class="odd">
+<td>概况：今日额度</td>
+<td>网关状态、今日已记账费用、每日费用上限和剩余额度；限额可在原型内调整，状态只保留在当前页面</td>
+</tr>
+<tr class="even">
+<td>概况：摘要</td>
+<td>已知总 Token、请求数、已知记账费用、缓存读取占已知输入的比例</td>
+</tr>
+<tr class="odd">
+<td>用量趋势</td>
+<td>按天查看总 Token、输入、输出、缓存读取、请求数或记账费用；点击柱形进入当天请求</td>
+</tr>
+<tr class="even">
+<td>用量分布</td>
+<td>按模型源、智能体或模型分组；可按 Token、请求数和费用等列排序；占比跟随展示指标</td>
+</tr>
+<tr class="odd">
+<td>审计</td>
+<td>继承全局筛选，可按状态或模型 / 请求 ID 查找；多页才显示分页</td>
+</tr>
+<tr class="even">
+<td>单次请求</td>
+<td>桌面右侧面板，手机全屏二级页；呈现身份、状态、回执和价格快照；返回保留列表位置</td>
+</tr>
+<tr class="odd">
+<td>历史归档</td>
+<td>依照现有 48 小时保留规则，较早请求只显示聚合；选择已归档日期时说明原因</td>
+</tr>
+</tbody>
+</table>
+<p>「模型源」指实际处理调用的连接，如 WorkBuddy、OpenAI；「调用来源」指对话、任务、RSI 等业务入口。两个维度单独命名，避免把原接口的 <code>source=rsi</code> 当成供应商源。智能体先按现有类型 Roami、Codex、Claude Code、OpenCode、Pi 展示；未知归属单列，不凭模型名推测。</p>
+<p>总 Token = 输入 + 输出；缓存读取是输入的子集，不能再相加。未知用量 / 费用单独标记，汇总标示「已知」，不把未知记成 0。费用按本地价格快照记账，不能叠加云端账单或供应商积分；原型仅展示 USD 示例。正式版多币种须分币种展示，不直接相加。</p>
+<p>桌面沿用能力中心的主分类与左侧模型 Tab。内容铺满剩余空间，只有可选详情面板开启时占用宽度；主内容独立滚动。手机使用顶部栏、同级 Tab 与四入口底栏，筛选按需展开，汇总表改为列表。上下文中的其他能力分类和底部目的地仅用于展示壳层，不模拟完整产品导航。</p>
+<h2 id="用户故事">用户故事</h2>
+<ol type="1">
+<li>我想同时掌握用量和限额：进入「概况」，先查看今日额度，再按周期浏览汇总；在原型内调整限额后切换 Tab，选择仍保留。</li>
+<li>我想知道最近一周哪个模型源消耗最多：选择「近 7 天 / 按模型源 / 总 Token」，按降序看占比，进入「审计」查看该源请求。</li>
+<li>我想比较智能体的消耗：切到「按智能体」，在总 Token、输入 / 输出、请求数和费用之间切换，筛选某一模型进一步查看。</li>
+<li>我想解释某笔请求为什么贵：打开请求详情，核对输入、输出、缓存读取及请求时单价；缓存只按缓存价计费。</li>
+<li>我想排查未确认费用：进入「审计」，筛选「待核对」；缺失字段显示未知，不把请求当成免费。</li>
+<li>我在手机上查看：展开筛选、触摸打开请求详情，再返回时保留筛选与滚动位置；只保留一个可见返回栏。</li>
+<li>我想查旧记录：30 天统计继续显示累计用量，早于保留期的请求显示归档提示，不伪造逐条回执。</li>
+</ol>
+<h2 id="技术设计">技术设计</h2>
+<h3 id="产品接入架构">产品接入架构</h3>
+<table>
+<thead>
+<tr class="header">
+<th>模块</th>
+<th>后续实现方向</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>frontend/src/components/capabilities/ModelHub.tsx</code></td>
+<td>现有 <code>usage</code> 对应「概况」，含用量、限额和汇总；新增同级 <code>audit</code> 对应「审计」，建议路由 <code>capabilities/models/audit</code>；旧链接继续兼容概况</td>
+</tr>
+<tr class="even">
+<td><code>frontend/src/components/settings/gateway-settings.tsx</code></td>
+<td>限额表单与汇总保留在概况；逐条记录与详情归入审计，对账动作复用现有网关流程</td>
+</tr>
+<tr class="odd">
+<td><code>frontend/src/components/settings/model-usage-statistics.tsx</code></td>
+<td>复用汇总口径与已知 / 未知状态，拆分筛选、趋势、分组列表和请求详情；避免从最近 20 条请求推算统计</td>
+</tr>
+<tr class="even">
+<td><code>internal/modelgateway/ledger.go</code></td>
+<td>已有 <code>agentKind</code>、<code>sourceId</code>、<code>routeId</code>、<code>role</code> 和请求时价格快照，作为归属基础</td>
+</tr>
+<tr class="odd">
+<td><code>internal/modelgateway/statistics.go</code></td>
+<td>旧查询兼容保留；新增 <code>view=overview / audit</code> 查询分支，支持独立 <code>sourceId</code> / <code>unattributed</code>、智能体、模型、日期、状态、分页和搜索</td>
+</tr>
+<tr class="even">
+<td><code>internal/modelgateway/daily_retention.go</code></td>
+<td>单次回执默认保留 48 小时；schema v6 日汇总主键加入 <code>source_id</code>，新记录归档保持源归属；既有归档回填空 ID，明确显示未归属</td>
+</tr>
+</tbody>
+</table>
+<p>产品已接入自定义日期、模型 / 模型源聚合、服务端分页和搜索，审计回执携带请求时单价与完成时间。调用来源仍按现有可靠的 RSI / other 分类展示；对话 / 任务没有稳定映射，因此没有把原型里的四分类硬接为错误数据。正式版费用按币种分别展示，不相加折算。</p>
+<p>归属优先使用记录中的稳定 ID，名称从目录映射；源被删除或旧记录未归属时保留未知组。列表中的失败与费用结算状态正式接入时必须分别映射真实证据。未知费用不能仅凭失败状态归零。</p>
+<p>统计读取复用网关数据入口，避免每个分组自行轮询；切换条件取消过时请求，隐藏时暂停，错误退避，筛选切换保留用户输入。额度的准入与拦截仍由 Go 网关负责。</p>
+<h3 id="原型文件">原型文件</h3>
+<ul>
+<li><code>prototype.html</code>：内联脚本、样式和数据的独立原型；无需网络依赖，可直接用浏览器打开。</li>
+<li><code>assets/prototype.tsx</code>：示例数据与交互，直接复用项目 <code>useLayout()</code>、图标集及 <code>BackButton</code>。</li>
+<li><code>assets/prototype.css</code>：布局样式，颜色、字号、间距与圆角均引用现有令牌。</li>
+<li><code>assets/build.mjs</code>：打包入口，从 <code>index.css</code> / <code>theme.tsx</code> 读取基础与深浅色令牌；编译时仅替换偏好持久化适配，确保原型不会写入真实配置。</li>
+</ul>
+<p>原型文案遵循静态 HTML 的最小语言表规则，含中英文并按浏览器语言选择；<code>I18nProvider</code> 和返回按钮复用项目实现，偏好写入在打包时替换为空操作，语言只存本地。正式产品新增文案须迁入 <code>frontend/src/i18n/locales/</code>。</p>
+<p>在仓库已有前端依赖时重建：</p>
+<pre class="bash"><code>node docs/design/20261114-model-orchestration/history/20261112-model-usage-details/assets/build.mjs</code></pre>
+<p>如复用另一个 checkout 的已安装依赖，可使用 <code>ROAMI_PROTOTYPE_DEPS=/path/to/checkout/frontend</code> 指定位置。本次复用 <code>/home/ai/codes/ttmux/frontend</code> 的现有依赖，没有添加依赖或锁文件。</p>
+<p>概况 / 审计、源定价、聚合与监控已接入正式产品；补充页面的历史设计保留在同一静态原型中。</p>
+<h2 id="六个页面的完整设计">六个页面的完整设计</h2>
+<p>用户在确认概况 / 审计后，要求把大模型下每一页一起设计。静态原型补齐了以下页面。下表记录当时的设计；当前实际接入范围与模块见 <a href="product-integration.html">正式接入</a>，现有产品操作继续保留。</p>
+<table>
+<thead>
+<tr class="header">
+<th>页面</th>
+<th>产品设计与用户故事</th>
+<th>交互与模块</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>模型与连接</td>
+<td>我可以搜索连接、查看它提供的模型，添加或配置连接，并选择可用模型与调用策略</td>
+<td>自适应连接卡片、凭证保存状态、连接编辑器、模型选择、手动模型添加、固定 / 故障切换。桌面编辑器只在打开时占用右侧宽度，手机用全屏编辑页</td>
+</tr>
+<tr class="even">
+<td>概况</td>
+<td>我可以同时掌握今日额度、限额和周期汇总，按源 / 智能体 / 模型比较消耗</td>
+<td>今日额度不随统计筛选变化，限额内联编辑；趋势和分组下钻进入同级审计</td>
+</tr>
+<tr class="odd">
+<td>审计</td>
+<td>我可以从聚合进入逐条调用，按状态 / 关键词筛选，再核对回执与价格</td>
+<td>请求列表、分页、未知值、历史归档提示；桌面详情面板 / 手机全屏详情</td>
+</tr>
+<tr class="even">
+<td>价格与记账</td>
+<td>我可以配置默认单价，并为个别模型指定独立单价或恢复默认</td>
+<td>币种、每百万 Token 的普通输入 / 缓存 / 输出单价、模型覆盖价行内编辑；保存和未保存状态明确，历史账单保留快照</td>
+</tr>
+<tr class="odd">
+<td>网关接入</td>
+<td>我可以找到客户端接入地址，管理访问密钥并查看智能体接入关系</td>
+<td>地址复制、命名密钥创建、启用 / 停用、仅展示尾号、智能体接入列表；原型不会创建真实凭证</td>
+</tr>
+<tr class="even">
+<td>语音模型</td>
+<td>我可以配置独立的语音识别服务，选择语言并理解识别结果</td>
+<td>关闭 / OpenAI 兼容 / 火山引擎选项，服务地址与模型、凭证保留、语言、保存状态；识别演示明确标注为示例，不发起真实识别</td>
+</tr>
+</tbody>
+</table>
+<p><code>assets/model-management.tsx</code> 承载四个补充页面的静态交互，复用原型令牌、图标、布局入口与语言状态。组件保持挂载，使切换概况、审计或其他管理页后仍保留草稿；只有当前页面拥有滚动容器。源凭证不会显示已保存明文，新填凭证仅在当前原型内临时存在；示例网关域名使用保留域 <code>.example</code>。</p>
+<p>最新增补：聚合默认 smart，提供九种路由策略与模型权重；新增监控页按模型源对比，数据最多保留 24 小时，并设置条数和容量上限。这些增补已接入产品，接口规范继续暂缓。历史原型说明见 <a href="routing-monitoring.html">路由策略与监控</a>，当前实现见 <a href="product-integration.html">正式接入</a>。</p>
+<h2 id="用量与定价交互重做">用量与定价交互重做</h2>
+<p>针对上线反馈，新增 <a href="interaction-review.html">可点击交互稿</a> 与 <a href="interaction-review-notes.html">设计说明</a>。默认展示模型请求量、按小时分析，并明确源默认价、模型覆盖、生效来源和各自的保存边界。此稿先供交互评审，正式产品实现保持当前版本。</p>
+<p>最新交互修订：概况仅显示汇总、趋势和分布，明细集中在审计；模型源以卡片展示，点击卡片内「定价」进入该源设置，返回卡片列表。</p>
+<p>最新定价导航：定价全部归入模型源，侧栏无独立定价项；全局默认价从模型源页进入，各源和模型定价从卡片内进入。当前审阅以 <a href="interaction-review.html">新版交互原型</a> 为准。</p>
+<p><a href="interaction-implementation.html">新版概况与模型源定价实现及验收</a>：按确认稿接入小时分组分析、概况 / 审计分工、卡片定价、嵌套默认价和独立保存。</p>
+<p>插件源可从卡片「添加账号」创建独立实例；同包 10 个账号的并发、重启与登录隔离已验收。源详情顺序为连接、定价、调度，见 <a href="interaction-implementation.html#插件多账号与详情顺序">接入与多账号验收</a>。</p>
+<ul>
+<li><p><a href="local-time.html">用量本地时间修正</a>：设备时区、跨日筛选与结算边界。</p></li>
+<li><p><a href="aggregation-review.html">聚合策略与运行效果原型</a> · <a href="aggregation-effects.html">设计说明</a>。</p></li>
+<li><p><a href="source-cards.html">模型源卡片简化</a>：同尺寸卡片、顶部新建与详情内编辑。</p></li>
+</ul>
+<p>聚合 ID 编辑、按源批量选择与网关能力目录见 <a href="aggregation-editor.html">实现设计</a>。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

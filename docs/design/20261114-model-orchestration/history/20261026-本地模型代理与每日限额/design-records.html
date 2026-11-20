@@ -37,7 +37,7 @@
 </section>
 <section aria-label="文档正文">
 <article class="record" id="design-readme">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/README.md</code></p>
+<p class="muted">独立记录 <a href="index.html">index.html</a></p>
 <h2 id="design-readme--本地模型代理与每日限额">本地模型代理与每日限额</h2>
 <h3 id="design-readme--product-design">Product Design</h3>
 <p>2026-10-29 修订：在 Roami 进程内运行 Go 模型网关，Agent 的模型 HTTP 请求先经过本地记账和准入，再转发到原配置的云网关或模型服务。模型连接地址和密钥继续由既有模型设置管理。模型与连接页恢复「模型连接 / 代理与计费 / 模型单价」三个标签，使用本地 Go 账本；同时提供 CLI 和受现有登录保护的管理 API。本地统计与价格不依赖云端账单接口。</p>
@@ -134,7 +134,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 </ul>
 </article>
 <article class="record" id="design-records-readme">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/README.md</code></p>
+<p class="muted">独立记录 <a href="records/index.html">index.html</a></p>
 <h2 id="design-records-readme--本地模型代理与每日限额设计修订与验收记录">本地模型代理与每日限额：设计修订与验收记录</h2>
 <p><a href="#design-readme">返回主题入口</a></p>
 <table>
@@ -170,7 +170,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 <p>原文来源与迁移校验见<a href="#evidence-gateway-manifest">迁移清单</a>。历史验收结论按当时版本保留。</p>
 </article>
 <article class="record" id="design-records-2026-10-29-local-go-gateway">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/2026-10-29/local-go-gateway.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-10-29/local-go-gateway.html">local-go-gateway.html</a></p>
 <h2 id="design-records-2026-10-29-local-go-gateway--本地-go-模型网关验收--2026-10-29">本地 Go 模型网关验收 · 2026-10-29</h2>
 <p><a href="#design-readme">设计与使用</a></p>
 <h3 id="design-records-2026-10-29-local-go-gateway--自动回归">自动回归</h3>
@@ -196,7 +196,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 <p>未部署或重启用户现用服务。此修订提供后端和 CLI；不声明新增 Web 计费画面或手机交互验收。</p>
 </article>
 <article class="record" id="design-records-2026-10-29-restored-billing-page">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/2026-10-29/restored-billing-page.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-10-29/restored-billing-page.html">restored-billing-page.html</a></p>
 <h2 id="design-records-2026-10-29-restored-billing-page--恢复本地计费页面--2026-10-29">恢复本地计费页面 · 2026-10-29</h2>
 <p><a href="#design-readme">主题设计</a></p>
 <h3 id="design-records-2026-10-29-restored-billing-page--product-design">Product Design</h3>
@@ -227,7 +227,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 <p>验收汇总：<code>/tmp/roami-local-gateway-ui-20261029/acceptance.json</code>。隔离实例与任务创建的浏览器页在验收后关闭，用户现用服务未部署或重启。</p>
 </article>
 <article class="record" id="design-records-2026-11-03-daily-retention">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/2026-11-03/daily-retention.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-03/daily-retention.html">daily-retention.html</a></p>
 <h2 id="design-records-2026-11-03-daily-retention--计费明细保留与日账归并">计费明细保留与日账归并</h2>
 <h3 id="design-records-2026-11-03-daily-retention--product-design">Product Design</h3>
 <p>逐笔明细保留结算完成后的 48 小时，超期后按原账期日期、时区、模型、角色、智能体和 RSI/其他来源合并。费用、输入/输出/缓存 Token、请求数、失败数、费用未知数与用量未知数保留，逐笔请求 ID、响应元数据与核账理由到期清理。处理中请求不清理；延迟结算从结算时重新计时。未知费用不补零，仍只提示而不阻断调用。</p>
@@ -257,7 +257,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 <p>48 小时版本验收：全量 Go 与仓库 full 门禁通过；独立实例自动将 49 小时前的请求归入日账，保留 47 小时前与当天请求。汇总仍为 3 次、198 Token、3 笔未知，界面自动显示“2 天”。部署以前一版 OKR 重设计树 <code>36b932262c755cf7c1c5d842415002e3d6d74dd1</code> 为基底，前端源码与构建产物保持一致。</p>
 </article>
 <article class="record" id="design-records-2026-11-03-nonblocking-unknown-charges">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/2026-11-03/nonblocking-unknown-charges.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-03/nonblocking-unknown-charges.html">nonblocking-unknown-charges.html</a></p>
 <h2 id="design-records-2026-11-03-nonblocking-unknown-charges--未知费用仅提示不阻断调用">未知费用仅提示、不阻断调用</h2>
 <h3 id="design-records-2026-11-03-nonblocking-unknown-charges--product-design">Product Design</h3>
 <p>用户明确允许未知费用只提示、不阻断调用。每日限额只对已确认消费生效；未知金额不计入限额，不能据此判断实际消费没有超额。已有未知费用、错误码、回执和核账入口保留，不补造 token、不归零、不改日限额数值。核账后的金额继续参与准入判断。</p>
@@ -277,7 +277,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 </ul>
 </article>
 <article class="record" id="design-records-2026-11-03-rejected-request-accounting">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/2026-11-03/rejected-request-accounting.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-03/rejected-request-accounting.html">rejected-request-accounting.html</a></p>
 <h2 id="design-records-2026-11-03-rejected-request-accounting--上游拒绝误记未知费用">上游拒绝误记未知费用</h2>
 <h3 id="design-records-2026-11-03-rejected-request-accounting--product-design">Product Design</h3>
 <p>完整收到上游 3xx / 4xx 拒绝时，目录代理与协议转换路径按现有直连路径的规则记零费用，保留失败状态、HTTP 状态、错误码和上游回执，不补造 token。断流、5xx 和成功响应缺失用量仍记未知，启用日限额时继续阻止后续调用。</p>
@@ -295,7 +295,7 @@ roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.js
 </ul>
 </article>
 <article class="record" id="design-records-2026-11-03-request-token-records">
-<p class="muted">原稿 <code>history/20261026-本地模型代理与每日限额/records/2026-11-03/request-token-records.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-03/request-token-records.html">request-token-records.html</a></p>
 <h2 id="design-records-2026-11-03-request-token-records--逐笔-token-与未知费用请求记录">逐笔 Token 与未知费用请求记录</h2>
 <h3 id="design-records-2026-11-03-request-token-records--product-design">Product Design</h3>
 <p>费用未知与 Token 未知分开呈现。请求记录显示输入、输出、缓存 Token 及完整到秒的日期时间；有回执的数字照实显示，缺失字段显示“未知”，真实零保留为零。汇总用量缺失时显示“已知”数量或“未知”，不把缺失回执当作零用量。</p>

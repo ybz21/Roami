@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本地模型代理与每日限额</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="本地模型代理与每日限额">本地模型代理与每日限额</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<h2 id="product-design">Product Design</h2>
+<p>2026-10-29 修订：在 Roami 进程内运行 Go 模型网关，Agent 的模型 HTTP 请求先经过本地记账和准入，再转发到原配置的云网关或模型服务。模型连接地址和密钥继续由既有模型设置管理。模型与连接页恢复「模型连接 / 代理与计费 / 模型单价」三个标签，使用本地 Go 账本；同时提供 CLI 和受现有登录保护的管理 API。本地统计与价格不依赖云端账单接口。</p>
+<p>本地金额是按本机配置单价计算的消费账本，不发起云端余额扣款，不把上游已有账单再相加。未配置单价时使用默认价；默认价为零。初始币种 CNY、时区 UTC、无限额，设置价格和限额后对新请求生效。外部专业 CLI 继续使用它们各自的模型连接。</p>
+<h2 id="user-stories">User Stories</h2>
+<ul>
+<li>作为使用者，我能在本机配置每百万输入、输出、缓存读取 token 的价格，以及按指定时区重置的每日金额限额。</li>
+<li>主对话、后台任务、记忆和宿主机评测使用同一个本地入口，共享每日账本；容器评测沿用宿主机桥接，由宿主机请求同一本地 Go 网关。</li>
+<li>我能查看最近 1–90 天按日期、连接角色、模型和币种分组的请求数、token 和金额，以及最近 20 笔请求的状态。<code>usageUnknown</code> 单独标明缺失 token 的请求，人工核账后仍不伪造 token 数。评测请求保留已有评测角色、会话和请求标识。</li>
+<li>上游缺失用量、断流或进程崩溃时，非零单价请求保留费用未知状态并提示核账，不阻断后续调用；核对真实金额并填写理由后计入每日消费。</li>
+</ul>
+<h2 id="technical-design">Technical Design</h2>
+<pre class="text"><code>configured_provider / 宿主机评测模型
+  -&gt; LocalGatewayTransport (httpx，私有 Unix socket)
+  -&gt; internal/modelgateway.Handler
+     -&gt; Ledger.Admit：事务检查每日消费并持久化 pending
+     -&gt; 原模型地址：转发请求及流式响应
+     -&gt; Ledger.Settle：解析最终 usage，按请求接纳时的单价结算
+
+roami agent gateway / 已认证 Web API
+  -&gt; 同一个 Go 网关 socket
+  -&gt; 价格、限额、统计、未知费用核账</code></pre>
+<p>模块划分：<code>configuration.go</code> 校验设置并做整数金额换算；<code>pricing.go</code> 复用云网关的价格选择规则；<code>ledger.go</code> 负责迁移、配置、准入和幂等结算；<code>usage.go</code> 增量解析 OpenAI chat-completions 的 JSON/SSE usage；<code>statistics.go</code> 提供一致快照；<code>handler.go</code> 管理 HTTP 边界和转发；<code>service.go</code> 管理私有 socket、进程锁和关停。</p>
+<p>定价核心源自 <code>~/codes/llm-gateway/internal/observe/pricing.go</code>，版本 <code>1f1ffc1ab080c0da935d063ac79380d2f2a4a079</code>。保留精确模型、前缀、默认单价的优先级，并将重叠前缀改成确定性的最长前缀匹配。本地累计金额使用十亿分之一币种单位的整数；单笔采用有理数计算并四舍五入。OpenAI 的输入 token 含缓存部分，计算普通输入费时先减去缓存，再单独计算缓存价。</p>
+<p>本地账本注册到统一存储目录：<code>&lt;DatabaseRoot&gt;/models/gateway.db</code>，catalog ID 为 <code>model-gateway</code>，owner 为 <code>go-model-gateway</code>，随统一数据库备份和迁移处理。旧 Python <code>model_proxy_calls</code> 继续仅作历史账本，不参与新额度计算。</p>
+<p>Go launcher 在启动 Python 前开启网关，注入 <code>ROAMI_MODEL_GATEWAY_SOCKET</code>；Web supervisor 和 <code>roami agent serve</code> 共用相同生命周期。socket 权限 0600，路径与 Agent socket 等长，保留长路径回退能力。持久文件锁防止两个网关互相恢复在途记录；重启将非零价格的 pending 请求标记 unknown。关停先取消网络请求、等待结算，再释放进程锁。网关不可用时，已配置本地 transport 的客户端不回退直连。直接运行开发用 Python、没有 launcher 环境时保留原直连能力。</p>
+<p>价格在准入时快照保存；更新价格不重算历史金额。启用每日限额后，在途请求先结算再判断下一笔准入；已确认消费达到限额返回 402。2026-11-03 经用户明确确认，未知费用仅提示核账，不再返回 409 阻断后续调用，也不按零费用核销；未核清金额不计入限额，核账后立即计入。检查和 pending 插入处于同一 SQLite immediate 事务，防止并发同时放行。限额是请求前准入线，最后一笔调用仍可能超额；不是按 token 中途截流。未配置限额时不限制并发。币种或时区不能在仍有未决账目或最近账期已有调用时更换，避免重新解释账期绕过限额。</p>
+<p>仅持久化模型、角色、token、单价快照、金额、状态和已有不透明评测标识；不落请求正文、响应正文或密钥。SSE 逐块转发，解析缓冲有上限；收到合法终结 usage 和 DONE 后即保留已知费用，不因客户端先于 HTTP EOF 关闭而丢弃回执；模型等待期限沿用调用方配置，不叠加网关固定超时；缺失或非法 usage、未正常结束和服务端错误不记成免费。明确未连接成功、上游拒绝以及零单价调用可记零；HTTP 失败与费用未知分别保留。</p>
+<h2 id="使用">使用</h2>
+<p>Web 入口为「设置 → 模型与连接 → 代理与计费 / 模型单价」，保留原统计图、日期选择、单价编辑和草稿恢复；最近请求可核对未知费用。正常启动新版本 <code>roami server</code> 或 <code>roami agent serve</code> 后，也可使用 CLI：</p>
+<pre class="bash"><code>roami agent gateway settings
+roami agent gateway configure --file /path/to/gateway.json
+roami agent gateway usage --days 30
+roami agent gateway reconcile --call &lt;调用ID&gt; --file /path/to/receipt.json</code></pre>
+<p>配置为完整替换，价格单位是所选币种 / 百万 token：</p>
+<pre class="json"><code>{
+  &quot;currency&quot;: &quot;CNY&quot;,
+  &quot;timezone&quot;: &quot;Asia/Shanghai&quot;,
+  &quot;dailyLimit&quot;: 20,
+  &quot;pricing&quot;: {
+    &quot;default&quot;: {
+      &quot;input_per_million&quot;: 0,
+      &quot;output_per_million&quot;: 0,
+      &quot;cache_read_per_million&quot;: 0
+    },
+    &quot;models&quot;: {
+      &quot;your-model&quot;: {
+        &quot;input_per_million&quot;: 2,
+        &quot;output_per_million&quot;: 8,
+        &quot;cache_read_per_million&quot;: 0.5
+      }
+    }
+  }
+}</code></pre>
+<p><code>dailyLimit: null</code> 表示无限额；<code>0</code> 暂停新请求。示例单价仅展示结构，使用时填入实际价格。核账文件示例：<code>{"amount": 0.75, "reason": "已核对上游用量回执"}</code>；只允许核对 unknown 记录，保留原始错误与核账理由，不能覆盖已知消费。</p>
+<table>
+<thead>
+<tr class="header">
+<th>方法</th>
+<th>已认证 API</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET / PUT</td>
+<td><code>/api/agent/model-gateway/settings</code></td>
+<td>读取 / 替换本地价格与限额</td>
+</tr>
+<tr class="even">
+<td>GET</td>
+<td><code>/api/agent/model-gateway/usage?days=7</code></td>
+<td>1–90 天分组及最近调用，0 为累计；day=YYYY-MM-DD 查询指定日及分时</td>
+</tr>
+<tr class="odd">
+<td>PUT</td>
+<td><code>/api/agent/model-gateway/calls/:id</code></td>
+<td>核账未知费用</td>
+</tr>
+</tbody>
+</table>
+<p>新增英文帮助仅出现在用户 shell，属于 i18n 规范的终端输出例外。Web 新文案提供中英文。原 <code>/agent/model-usage</code> 仍读取已归档的 Python 历史账，恢复的页面读取 <code>/agent/model-gateway/*</code>。</p>
+<h2 id="acceptance">Acceptance</h2>
+<p>验收记录：<a href="records/2026-10-29/local-go-gateway.html">本地 Go 网关</a>、<a href="records/2026-10-29/restored-billing-page.html">恢复计费页面</a>。</p>
+<p><a href="records/2026-11-03/rejected-request-accounting.html">上游拒绝误记未知费用修复</a>。</p>
+<p><a href="records/2026-11-03/nonblocking-unknown-charges.html">未知费用仅提示、不阻断调用</a>。</p>
+<p><a href="records/2026-11-03/request-token-records.html">逐笔 Token 与未知费用请求记录</a>。</p>
+<p><a href="records/index.html">设计修订与验收记录</a></p>
+<ul>
+<li><a href="records/2026-11-03/daily-retention.html">计费明细保留与日账归并</a></li>
+</ul>
+
+</article>
+</main>
+</div>
+</body>
+</html>

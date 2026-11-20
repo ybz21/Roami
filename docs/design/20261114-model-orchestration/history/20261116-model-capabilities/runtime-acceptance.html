@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>runtime-acceptance</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1>runtime-acceptance</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<blockquote>
+<p>历史记录：以下证据对应简化前的 <code>40de2934</code>。独立会话切模、预校验和选模表已撤回；当前版本见 <a href="simplification-acceptance.html">简化验收</a>。</p>
+</blockquote>
+<h1 id="模型选模运行验收">模型选模运行验收</h1>
+<p>日期：2026-11-16。使用本任务私有实例 <code>/tmp/roami-model-implementation/instance</code>，启动与清理统一经过 <code>scripts/dev/isolated-roami.sh</code>；没有改动宿主模型设置。</p>
+<h2 id="cli-与真实推理链路">CLI 与真实推理链路</h2>
+<ul>
+<li><code>roami model list</code>：列出已接入模型与聚合池，展示能力声明与未知值。</li>
+<li><code>roami model list --refresh --all --json</code>：从本机协议夹具读取上游目录，未接入条目保持 <code>configured=false</code>。</li>
+<li><code>roami model list --capability image --json</code>：只保留声明支持图片的具体模型，不把聚合能力并集当作保证。</li>
+<li><code>roami agent new --model free-pool --free-only</code>：实际创建独立对话并保存选择。</li>
+<li><code>roami session new --kind roami --model mixed-pool --free-only --task ... --key model-selection-task --json</code>：原生任务执行成功；主执行请求落到免费成员 <code>fixture/free-text</code>，没有调用 <code>fixture/paid</code>。</li>
+<li>用同一个幂等键与同一请求重试，返回完全相同的会话、任务与对话 ID。</li>
+<li>桌面、手机均实际创建并完成原生任务。手机按图片能力筛选后选择 <code>free-vision</code> 并开启仅免费，主执行请求到达 <code>fixture/free-vision</code>；当前记录未出现 <code>fixture/paid</code> 调用。</li>
+<li>故意将夹具的免费计价规则改成未知后创建测试任务：结果为 <code>failed / MODEL_ROUTE_NO_AVAILABLE_MEMBER</code>，未回退付费成员；测试结束后恢复原计价规则。</li>
+<li>原生会话内从池切换到单模型，Worker 默认设置仍为 <code>default-worker</code>；重启隔离服务后选择记录保持。</li>
+<li>无效模型返回 400，未创建对话。调用记录中，独立的后台记忆工作仍使用保存的 Worker 默认模型；没有把单个任务的免费约束描述为整个节点费用承诺。</li>
+</ul>
+<h2 id="自动检查">自动检查</h2>
+<ul>
+<li>前端全量：259 个文件、1885 项通过。</li>
+<li>迁移回归：9 项通过；新增表的空状态不影响历史数据快照比较。</li>
+<li><code>scripts/dev/quality/check.sh full</code> 通过：Go 全量、Python 全量（4903 通过、48 跳过、6 项 subtests 通过）、i18n、hover、TypeScript 与生产构建均通过。</li>
+<li>首次实现提交的 <code>quick</code> 提交钩子通过；收尾改动再按影响范围运行 Go 与前端检查。</li>
+<li>受管智能体不能经新增 CLI 入口绕过注册的任务准入；CLI 在创建资源前拒绝此类调用。停用的已保存模型保持可见，需选择启用模型才能应用。</li>
+</ul>
+<h2 id="浏览器与手机">浏览器与手机</h2>
+<ul>
+<li>生产构建已运行。桌面 Chrome 检查 1280、1920、2560、3440 CSS px；详情面板打开时占用宽度，关闭后全部归还，文档与目录均无水平溢出。</li>
+<li>Redmi Note 8（Android 真机）：392 CSS px、粗指针、返回按钮 44 × 44；文档宽高均与视口一致。真实触控完成网关目录、详情、返回、新建会话、能力筛选、选模与提交。</li>
+<li>软键盘展开为 314 CSS px 时，表单仍在自己的滚动容器内，并成功提交，未依靠 DOM click 绕过触控命中。</li>
+<li>技术设计与原型 HTML 均已重新打开；无脚本异常，技术设计显示当前 <code>roami model list</code> 命令。</li>
+</ul>
+<h2 id="证据">证据</h2>
+<p>结构化回执见 <a href="runtime-acceptance.json">runtime-acceptance.json</a>。截图经 <code>scripts/dev/pr-shot.sh 939</code> 上传到独立的 <code>pr-shots</code> 分支，不提交截图到主分支。</p>
+<p><img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-directory-desktop.png" alt="模型目录" /> <img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-native-session-phone.png" alt="手机原生会话实测" /> <img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-cli.png" alt="CLI 运行与免费路线耗尽验证" /></p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

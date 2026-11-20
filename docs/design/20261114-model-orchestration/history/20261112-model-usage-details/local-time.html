@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用量本地时间修正</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="用量本地时间修正">用量本地时间修正</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<h2 id="产品设计">产品设计</h2>
+<p>概况和审计使用设备 IANA 时区。日期范围、今天、按小时曲线、时间段跳转及请求详情保持同一时区，跨午夜时也一致。监控现有的设备本地时间格式保持一致。</p>
+<p>额度的“今日费用”和每日限额使用原结算时区，在额度区说明该时区。已归档记录只剩日汇总，不能恢复跨时区的小时归属；仍保留结算日期，查询含归档数据且时区不同时显示一句提示。</p>
+<h2 id="用户故事">用户故事</h2>
+<ul>
+<li>北京时间刚过午夜时，今天应显示新日期，UTC 前一天 16 点的请求出现在今天 0 点。</li>
+<li>点击某小时查看审计时，看到的请求时间应落在这个本地小时内。</li>
+<li>不同设备时区可以查看自己的本地时间，额度和历史费用不会因查看时区发生变化。</li>
+</ul>
+<h2 id="技术设计">技术设计</h2>
+<p><code>model-usage-workspace-state.ts</code> 从 <code>Intl.DateTimeFormat().resolvedOptions().timeZone</code> 取得设备时区，附于概况及审计 GET 查询。<code>usage-workspace.go</code> 验证 IANA 时区，用本地午夜的毫秒边界筛选原始记录，返回显示时区和结算时区。</p>
+<p><code>usage-local-days.go</code> 根据原始记录实际涉及的日期建立查询内的本地日窗口，将明细按本地日重新汇总，不修改持久数据。夏令时按日历边界处理，重复小时包含两段记录；保留整数纳币金额。<code>Today</code> 仍读取原结算日且不受分析筛选影响。归档日表保留原日期，没有新增数据库表、迁移或常驻存储。</p>
+<p><code>ModelUsageWorkspace.tsx</code> 使用接口的显示时区格式化审计时间及详情，并说明结算和归档边界。</p>
+<h2 id="验收">验收</h2>
+<ul>
+<li>前端完整测试：240 个文件、1,766 项测试通过；时间修正专项 4 项通过。</li>
+<li>Go 用量专项：UTC / 本地跨日、源与模型筛选、审计钻取、纽约重复小时、印度半小时时差、Lord Howe 半小时夏令时切换、非法时区和归档保留日期。</li>
+<li>桌面实页：1280、1920、2560、3440 CSS px 无文档溢出；概况、审计和详情对应同一时区。</li>
+<li>Redmi Note 8 真机：392 CSS px、coarse pointer，无文档溢出；真实触控打开审计和请求详情，均显示 <code>11月14日 00:20</code>。</li>
+<li>隔离库三条收据：北京时间前一天 23:30、当天 00:15、00:20；“今天”仅包含后两条，0 点小时图为 2 次，接口和页面一致。</li>
+<li>检查未发送真实模型请求，未修改线上数据。截图留于 <code>/tmp/roami-local-time-20261114/</code>，不提交到 main。</li>
+</ul>
+<p>最终 <code>scripts/dev/quality/check.sh quick</code> 通过；中文深色、英文浅色实页通过。详细尺寸与时间断言见 <a href="local-time-evidence.json">local-time-evidence.json</a>。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

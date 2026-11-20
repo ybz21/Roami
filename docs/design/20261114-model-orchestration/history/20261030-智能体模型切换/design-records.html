@@ -55,7 +55,7 @@
 </section>
 <section aria-label="文档正文">
 <article class="record" id="design-readme">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/README.md</code></p>
+<p class="muted">独立记录 <a href="overview.html">overview.html</a></p>
 <h2 id="design-readme--能力中心统一模型网关与智能体">能力中心：统一模型网关与智能体</h2>
 <p>2026-10-31 修订。连接与模型合并管理，Roami 内置网关负责适配客户端协议。同一个上游、同一个模型可以供 CC、Codex、OpenCode、Pi 和 Roami 使用，不再为不同智能体重复建立来源。</p>
 <p>新增提案：<a href="gateway-billing.html">本地网关与 Agent 独立计费（HTML）</a>。覆盖本地模型库复用、本机连接导入、默认智能体各自的 Key、直接按智能体归账和托管会话明细，以及产品交互和技术迁移方案；目前仅设计，未改运行代码。<a href="#design-gateway-billing-review">原型验收</a>。</p>
@@ -152,7 +152,7 @@
 </ul>
 </article>
 <article class="record" id="design-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/acceptance.md</code></p>
+<p class="muted">独立记录 <a href="acceptance.html">acceptance.html</a></p>
 <h2 id="design-acceptance--第二版设计原型验证">第二版设计原型验证</h2>
 <p>真实产品的首版实现、测试与真机验收另见 <a href="#design-implementation">implementation.md</a>。本文件保留原型阶段的历史证据。</p>
 <p>2026-10-31。第一版的提案、独立 HTML 和验证已保留在 <a href="#design-records-2026-10-30-readme">2026-10-30 快照</a>。当前记录只针对新版模拟原型，不代表统一模型网关已实现。</p>
@@ -192,7 +192,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>未修改 frontend/src、Go 或 Python，未运行与文档无关的产品全量测试。原型未实现真实鉴权、协议转换、主备、发布事务或安装；正式落地仍需 README 所列协议、CLI、事务、计量及前端门禁。</p>
 </article>
 <article class="record" id="design-add-model-design">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/add-model-design.md</code></p>
+<p class="muted">独立记录 <a href="add-model-design.html">add-model-design.html</a></p>
 <h2 id="design-add-model-design--添加模型最短流程">添加模型：最短流程</h2>
 <p>2026-10-31 产品修订提案。用户要求简化添加，并将定价、聚合策略放到后面的选项卡。本文及 <a href="add-model.html">可交互稿</a> 用于评审，尚未改动产品运行代码。原型为中文开发评审文档、使用示例数据；正式实现的所有文案接入全局中英 i18n。</p>
 <h3 id="design-add-model-design--product-design">Product Design</h3>
@@ -407,7 +407,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>交互稿的验证记录见 <a href="#design-add-model-review">原型验收</a>。正式实现仍需完整前后端检查及真实云上游的配置验收。</p>
 </article>
 <article class="record" id="design-add-model-review">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/add-model-review.md</code></p>
+<p class="muted">独立记录 <a href="add-model-review.html">add-model-review.html</a></p>
 <h2 id="design-add-model-review--简化添加模型原型验收">简化添加模型：原型验收</h2>
 <p>2026-10-31。对应 <a href="#design-add-model-design">产品提案</a> 和 <a href="add-model.html">交互稿</a>。本轮仅设计文档与静态原型；不发送真实模型请求，不保存真实密钥，不修改运行中的网关或智能体配置。</p>
 <h3 id="design-add-model-review--桌面">桌面</h3>
@@ -448,7 +448,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>静态测试实例和本轮手机转发在验收后清理；可交互 HTML 和截图单独保留。未将一次性截图加入仓库，也未将原型接入产品路由或部署。</p>
 </article>
 <article class="record" id="design-claude-gateway-binding-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/claude-gateway-binding-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="claude-gateway-binding-acceptance.html">claude-gateway-binding-acceptance.html</a></p>
 <h2 id="design-claude-gateway-binding-acceptance--claude-本机网关接入修正">Claude 本机网关接入修正</h2>
 <p>2026-11-02。对应本机 Claude 仍直连上游、Roami 无法记录用量的问题。</p>
 <h3 id="design-claude-gateway-binding-acceptance--产品与用户故事">产品与用户故事</h3>
@@ -489,7 +489,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 </ul>
 </article>
 <article class="record" id="design-connections-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/connections-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="connections-acceptance.html">connections-acceptance.html</a></p>
 <h2 id="design-connections-acceptance--连接与模型合并验收">连接与模型合并验收</h2>
 <p>2026-10-31。用户指出模型与模型源分成两页；本轮将它们合并为按连接分组的模型管理。</p>
 <h3 id="design-connections-acceptance--产品与保存行为">产品与保存行为</h3>
@@ -520,7 +520,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>隔离实例通过同一 launcher 停止，移除本任务的手机调试转发；用户真实 CLI 配置和线上实例未被此轮验收修改。</p>
 </article>
 <article class="record" id="design-gateway-access-key">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-access-key.md</code></p>
+<p class="muted">独立记录 <a href="gateway-access-key.html">gateway-access-key.html</a></p>
 <h2 id="design-gateway-access-key--本机网关调用-key">本机网关调用 Key</h2>
 <h3 id="design-gateway-access-key--产品与用户场景">产品与用户场景</h3>
 <p>在“本机网关”标签配置其他本机客户端使用的调用 Key。用户可以输入、替换或确认停用；密钥输入在模型标签间切换时仅保存在内存中，不进入设置草稿的持久存储。保存后清空明文，只显示末尾八位。未配置时不新增调用凭据，已有智能体的自动密钥保持独立。</p>
@@ -537,7 +537,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>Go 回归覆盖设置与重新加载、明文不落库、不泄露、推理转发时使用上游凭据、独立用量归属、普通目录更新保留 Key、替换/停用失效、管理路由隔离、排队撤销和已有智能体密钥保持。前端覆盖保存后清明文、冲突恢复保留输入、确认后停用。</p>
 </article>
 <article class="record" id="design-gateway-adaptation">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-adaptation.md</code></p>
+<p class="muted">独立记录 <a href="gateway-adaptation.html">gateway-adaptation.html</a></p>
 <h2 id="design-gateway-adaptation--roami-内置网关协议适配验收">Roami 内置网关协议适配验收</h2>
 <p>2026-10-31。修正“按智能体协议重复配置来源”的问题：同一上游模型经 Roami 网关供 CC、Codex、OpenCode、Pi 和 Roami 选择。</p>
 <h3 id="design-gateway-adaptation--自动化覆盖">自动化覆盖</h3>
@@ -598,7 +598,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p><a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-before-desktop.png">桌面改前</a> · <a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-after-desktop.png">桌面改后</a> · <a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-before-phone.png">手机改前</a> · <a href="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-564/roami-agent-logo-after-phone.png">手机改后</a>。所有截图使用隔离实例；测试结束后清理本轮实例与手机转发。</p>
 </article>
 <article class="record" id="design-gateway-billing-implementation">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-billing-implementation.md</code></p>
+<p class="muted">独立记录 <a href="gateway-billing-implementation.html">gateway-billing-implementation.html</a></p>
 <h2 id="design-gateway-billing-implementation--默认智能体网关记账v1-实现与验收">默认智能体网关记账：V1 实现与验收</h2>
 <p>基线：<code>5d66fbe8</code>；分支：<code>feat/agent-gateway-billing</code>。本次实现直接使用 OpenCode、Claude Code、Codex、Pi、Roami，不新增接入身份。设计入口：<a href="gateway-billing.html">HTML</a>。</p>
 <h3 id="design-gateway-billing-implementation--最新交互修订">最新交互修订</h3>
@@ -648,7 +648,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>临时截图不提交主分支：<code>/tmp/gateway-billing-keys-desktop.png</code>、<code>/tmp/gateway-billing-usage-desktop.png</code>、<code>/tmp/gateway-billing-keys-phone.png</code>、<code>/tmp/gateway-billing-usage-phone.png</code>。此处验收为隔离实例，生产服务未部署本次改动。</p>
 </article>
 <article class="record" id="design-gateway-billing-review">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/gateway-billing-review.md</code></p>
+<p class="muted">独立记录 <a href="gateway-billing-review.html">gateway-billing-review.html</a></p>
 <h2 id="design-gateway-billing-review--本地网关与智能体独立计费修订-2">本地网关与智能体独立计费：修订 2</h2>
 <p>2026-11-01，基线 <code>5d66fbe8</code>。<a href="gateway-billing.html">最新 HTML</a>。按用户修订，直接使用节点现有默认智能体，不再增加自定义记账对象。</p>
 <h3 id="design-gateway-billing-review--本次修改">本次修改</h3>
@@ -671,7 +671,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p><a href="records/2026-11-01/gateway-billing-v1.html">初稿快照</a> · <a href="#design-records-2026-11-01-gateway-billing-v1-review">初稿验收</a>。以上验证为设计原型，不代表真实鉴权、Key 写入、会话覆盖配置或计费往返已实现。</p>
 </article>
 <article class="record" id="design-implementation">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/implementation.md</code></p>
+<p class="muted">独立记录 <a href="implementation.html">implementation.html</a></p>
 <h2 id="design-implementation--首版实现与验收">首版实现与验收</h2>
 <p>2026-10-31。交互已按后续反馈修订为“添加模型即全场景可选”，见 <a href="#design-readme">当前设计</a> 与 <a href="#design-revision-acceptance">修订验收</a>。以下保留首版实现和验收记录，发布相关步骤由修订替代。真实产品实现位于 <code>feat/agent-model-switch</code>；设计 HTML 与模拟状态不作为实现验收。</p>
 <h3 id="design-implementation--product-design">Product Design</h3>
@@ -757,7 +757,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>视频为实际页面操作记录；录制器压缩无画面变化的等待时间。已解码检查，1280×800、545 帧，文件约 816 KiB。</p>
 </article>
 <article class="record" id="design-modes-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/modes-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="modes-acceptance.html">modes-acceptance.html</a></p>
 <h2 id="design-modes-acceptance--原厂与自定义模式验收">原厂与自定义模式验收</h2>
 <p>2026-10-31。交付范围：能力 / 智能体中的安装、启动和模型模式；自定义配置为“模型源、模型”两步。</p>
 <h3 id="design-modes-acceptance--自动化覆盖">自动化覆盖</h3>
@@ -796,7 +796,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>使用本地测试源和专属 CLI 配置，不调用外部模型服务；用户真实 CC 继续保留上一轮确认的 DeepSeek 配置。测试实例通过同一隔离入口清理。</p>
 </article>
 <article class="record" id="design-native-model-discovery">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/native-model-discovery.md</code></p>
+<p class="muted">独立记录 <a href="native-model-discovery.html">native-model-discovery.html</a></p>
 <h2 id="design-native-model-discovery--原生智能体默认模型与目录切换">原生智能体默认模型与目录切换</h2>
 <h3 id="design-native-model-discovery--product-design">Product Design</h3>
 <p>Claude Code、Pi、OpenCode、Codex 接入 Roami 模型网关时，都可以选择“默认”，无需指定上游源。每次默认请求跟随节点保存的 Roami 主模型；工具自身的模型菜单可切换到网关已配置的任意路由。来源与固定模型选择继续保留。</p>
@@ -860,7 +860,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>扩展验收：Pi/OpenCode/Codex 的桌面与 Redmi Note 8 手机改前改后均已截图。三个桌面页面实际点击“网关 → 默认 → 应用 → 确认”后显示 Applied；手机三页均为 compact/coarse，视口宽度与文档 scrollWidth 同为 392，scrollTop 为 0。Pi 在真机以 ADB 实际点按网关、应用、确认，已应用状态与三个 touchend 事件同时确认；返回后回到智能体页，底栏保留。英文浅色与中文深色均实际打开验证。</p>
 </article>
 <article class="record" id="design-revision-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/revision-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="revision-acceptance.html">revision-acceptance.html</a></p>
 <h2 id="design-revision-acceptance--统一模型列表修订验收">统一模型列表修订验收</h2>
 <p>2026-10-31。取消“对外模型”与发布流程，模型保存后直接进入所有使用场景共用的目录。</p>
 <h3 id="design-revision-acceptance--自动化">自动化</h3>
@@ -908,7 +908,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>验收结束后清理独立实例及其中含临时真实上游凭据的配置目录，真实用户 CC 配置和所有权保护继续保留。</p>
 </article>
 <article class="record" id="design-source-catalog-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/source-catalog-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="source-catalog-acceptance.html">source-catalog-acceptance.html</a></p>
 <h2 id="design-source-catalog-acceptance--配置源与批量模型目录">配置源与批量模型目录</h2>
 <p>2026-11-03 补充：<a href="#design-records-2026-11-03-source-model-editing">已添加模型行内编辑与真机验收</a>。</p>
 <p>2026-11-01。沿用 <a href="#design-add-model-design">简化添加模型</a> 的连接与目录流程；本次聚焦配置源、读取完整目录和批量添加，不调整用量、定价或智能体模式。</p>
@@ -989,7 +989,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>截图保存在 <code>/tmp/roami-model-source-connection-desktop.png</code>、<code>/tmp/roami-model-source-catalog-desktop.png</code>、<code>/tmp/roami-model-source-catalog-phone.png</code>、<code>/tmp/roami-model-source-keyboard-fixed-phone.png</code> 和 <code>/tmp/roami-model-source-english-desktop.png</code> 及最终构建的 <code>/tmp/roami-model-source-keyboard-shipping-phone.png</code>。最终构建真机再次确认搜索结果 2 条、键盘展开时按钮底边 411.82px、底部留白 40px、无横向溢出。截图为隔离测试实例，不提交进主分支。</p>
 </article>
 <article class="record" id="design-records-20261110-lan-source">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/20261110-lan-source.md</code></p>
+<p class="muted">独立记录 <a href="records/20261110-lan-source.html">20261110-lan-source.html</a></p>
 <h2 id="design-records-20261110-lan-source--局域网模型源接入回归">局域网模型源接入回归</h2>
 <h3 id="design-records-20261110-lan-source--问题与行为">问题与行为</h3>
 <p>HTTP 模型地址原来只允许 localhost，私网地址导致目录拉取和保存按钮同时禁用，运行时节点路由也拒绝同类地址。现在目录、保存和节点路由一致允许私网 IP 的 HTTP 地址；公网 HTTP 仍保持原约束。</p>
@@ -1022,13 +1022,13 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>语音配置按用户后续要求改名“语音输入”，从模型列表移入最后一个独立标签。保留旧 speech URL 的直接访问和切换草稿恢复，模型目录不可用不再在语音页展示无关错误；语音配置仍由原 speech/config 接口读取与保存。</p>
 </article>
 <article class="record" id="design-records-2026-10-30-readme">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-30/README.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-10-30/index.html">index.html</a></p>
 <h2 id="design-records-2026-10-30-readme--2026-10-30-第一版">2026-10-30 第一版</h2>
 <p>历史方案，当前方案以<a href="#design-readme">主题入口</a>为准。</p>
 <p><a href="records/2026-10-30/prototype.html">原型</a> · <a href="#design-records-2026-10-30-proposal">产品提案</a> · <a href="#design-records-2026-10-30-acceptance">验收</a></p>
 </article>
 <article class="record" id="design-records-2026-10-30-acceptance">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-30/acceptance.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-10-30/acceptance.html">acceptance.html</a></p>
 <h2 id="design-records-2026-10-30-acceptance--设计原型验证">设计原型验证</h2>
 <p>2026-10-30。范围是本目录的交互提案和模拟数据，不是正式模型接入验收。</p>
 <h3 id="design-records-2026-10-30-acceptance--产物与复现">产物与复现</h3>
@@ -1104,7 +1104,7 @@ node --check docs/design/20261114-model-orchestration/history/20261030-智能体
 <p>截图留在 <code>/tmp/model-switch-*.png</code>，作为本次评审展示材料，不提交到主分支；若后续创建 PR，按仓库 <code>pr-shots</code> 流程上传。</p>
 </article>
 <article class="record" id="design-records-2026-10-30-proposal">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-30/proposal.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-10-30/proposal.html">proposal.html</a></p>
 <h2 id="design-records-2026-10-30-proposal--智能体模型切换">智能体模型切换</h2>
 <p>2026-10-30 · 产品交互提案，待评审。交付设计与演示原型，尚未接入真实配置写入。</p>
 <p><a href="records/2026-10-30/prototype.html">打开当时原型</a> · <a href="#design-records-2026-10-30-acceptance">当时验收</a></p>
@@ -1418,7 +1418,7 @@ ApplyOperation
 </ul>
 </article>
 <article class="record" id="design-records-2026-10-31-readme">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-10-31/README.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-10-31/index.html">index.html</a></p>
 <h2 id="design-records-2026-10-31-readme--能力中心大模型与智能体">能力中心：大模型与智能体</h2>
 <p>2026-10-31 · 第二版设计已进入首版实现。<a href="#design-implementation">实现范围与验收</a> 记录真实接口、配置写入和验证结果；下文保留完整产品方向。HTML 为设计原型，不调用模型或改写本机配置。</p>
 <p><a href="index.html">交互原型</a> · <a href="assets/prototype.tsx">源码</a> · <a href="#design-acceptance">验证记录</a> · <a href="#design-records-2026-10-30-readme">第一版快照</a></p>
@@ -1694,7 +1694,7 @@ RoutingReceipt: requestID, sourceID, publishedModelID, policyRevision,
 <p>当前核对了 <code>CapabilitiesPage.tsx</code>、<code>AgentCatalog.tsx</code>、<code>AgentModels.tsx</code>、<code>agent-settings.tsx</code>、<code>model-settings-route.ts</code>、<code>route-hash.ts</code>，以及两个 Go 模型模块。外部协议参考保留在<a href="#design-records-2026-10-30-proposal--%E8%B5%84%E6%96%99%E4%BE%9D%E6%8D%AE">第一版资料</a>，实现时按安装版本复核。页面与实体关系是产品建议，不依赖第三方网关的菜单结构。</p>
 </article>
 <article class="record" id="design-records-2026-11-01-gateway-billing-v1-review">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-11-01/gateway-billing-v1-review.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-01/gateway-billing-v1-review.html">gateway-billing-v1-review.html</a></p>
 <h2 id="design-records-2026-11-01-gateway-billing-v1-review--本地网关与-agent-独立计费设计稿验收">本地网关与 Agent 独立计费：设计稿验收</h2>
 <p>2026-11-01，基线 <code>5d66fbe8</code>。交付为 <a href="records/2026-11-01/gateway-billing-v1.html">单文件 HTML</a>，包含 Product Design、User Stories、Technical Design 和四组可操作示例；不修改产品代码、线上 Key、Agent 配置或账本。</p>
 <h3 id="design-records-2026-11-01-gateway-billing-v1-review--核心设计">核心设计</h3>
@@ -1720,7 +1720,7 @@ RoutingReceipt: requestID, sourceID, publishedModelID, policyRevision,
 截图为临时验收产物，不提交到主分支。正式实现仍需验证实际 OpenCode 版本的配置覆盖、Key 注入、真实鉴权与协议 / 计费往返；本稿不会把原型操作当作这些能力已实现。</p>
 </article>
 <article class="record" id="design-records-2026-11-03-source-model-editing">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-11-03/source-model-editing.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-03/source-model-editing.html">source-model-editing.html</a></p>
 <h2 id="design-records-2026-11-03-source-model-editing--模型源目录内编辑已添加模型">模型源目录内编辑已添加模型</h2>
 <h3 id="design-records-2026-11-03-source-model-editing--product-design">Product Design</h3>
 <p>已添加模型行保留状态与防重复选择行为，新增常显“编辑”按钮，复用现有模型编辑表单。保存或返回均回到原模型源页面，保留未提交的目录选择、手动输入及连接草稿。同一个上游模型对应多个本地模型时，分别提供带名称的编辑入口。</p>
@@ -1740,7 +1740,7 @@ RoutingReceipt: requestID, sourceID, publishedModelID, policyRevision,
 </ul>
 </article>
 <article class="record" id="design-records-2026-11-11-home-gateway-models">
-<p class="muted">原稿 <code>history/20261030-智能体模型切换/records/2026-11-11/home-gateway-models.md</code></p>
+<p class="muted">独立记录 <a href="records/2026-11-11/home-gateway-models.html">home-gateway-models.html</a></p>
 <h2 id="design-records-2026-11-11-home-gateway-models--首页选择网关模型">首页选择网关模型</h2>
 <h3 id="design-records-2026-11-11-home-gateway-models--product-design">Product Design</h3>
 <p>能力页已经保存 WorkBuddy 的 <code>WorkBuddy Hy4</code>、<code>hy4free</code>，但首页只读取当前直连服务的 <code>/models</code>。本机 Main 和 Worker 仍直连 Blade，返回的 11 个模型不包含这两个模型，因此首页搜索不到。</p>

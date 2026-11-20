@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>九种路由策略与监控</title>
+<link rel="stylesheet" href="../../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="九种路由策略与监控">九种路由策略与监控</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../../index.html">专题首页</a>
+<a href="../../../screens/index.html">逐页设计</a>
+<a href="../../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="../design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<p>按用户给出的规则，将聚合默认策略设为 smart，加入 order、drain、rotate、usage、pace、weight、fast、cheap，补齐双语规则、模型权重和有边界的策略数据演示。</p>
+<p>新增同级「监控」页，按源 / 模型比较可用率、首字延迟、输出速度与质量抽检；滚动保留最多 24 小时，同时以 10,000 条 / 64 MiB 指标数据限制内存队列。提供源详情与清理演示。真实存储还需对数据库和 WAL 等文件实行总预算。</p>
+<p>本轮只改静态原型，真实多账号路由、嵌套组编辑器和后端监控存储不属于已完成的产品实现。接口规范继续暂缓。完整产品、用户故事、技术设计与验收见 ../routing-monitoring.md。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

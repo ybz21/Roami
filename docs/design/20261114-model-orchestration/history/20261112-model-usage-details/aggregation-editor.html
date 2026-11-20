@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聚合编辑与网关模型目录</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="聚合编辑与网关模型目录">聚合编辑与网关模型目录</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<h2 id="product-design">Product Design</h2>
+<ul>
+<li>聚合的名称与对外模型 ID 均可编辑。改名保留旧 ID 的兼容入口，新的模型目录仅公布新 ID；已保存的嵌套引用统一为新 ID。</li>
+<li>添加成员先选源，再多选模型，可全选该源、按源公布的免费输入/输出价格筛选。已添加成员不重复选择。一次添加完整选择，不静默截断。</li>
+<li>聚合支持最多 64 个成员；展开嵌套后仍最多 64 个模型，路由展开仍最多 256 个账号/Key，嵌套深度与并发额度查询限制保持不变。普通故障转移仍最多 8 个候选。</li>
+<li>桌面编辑器旁显示草稿的调度预览；手机在编辑页中显示。顺序、用完再换、轮流与权重展示新调度周期的前 12 轮示意，支持模拟跳过一个不可用成员。智能、额度、到期、速度、价格展示判断顺序，不伪造实时指标或排名。保存后的渠道列表仍来自真实路由状态。</li>
+<li>网关页增加模型目录：按源、能力、名称/ID 搜索；区分已添加的网关模型和源中尚未添加的模型。展示上下文、最大输出、输入/输出类型、工具调用、推理和输入/输出美元标价。没有公布的数据显示“未提供”，不从模型名字推断能力。</li>
+<li>目录标价是源公布的美元每百万 token 输入/输出价格，实际路由与计费仍遵守用户在源内的定价规则。</li>
+</ul>
+<h2 id="user-stories">User Stories</h2>
+<ol type="1">
+<li>我可以把 hy4 改成 free，旧的调用配置继续有效，父聚合不会失去这个成员。</li>
+<li>我可以先选 OpenRouter，再筛选免费模型并全选，一次加入聚合；超过限制时先调整选择。</li>
+<li>我可以对比权重 3:1 与轮流分配的示意，并查看一个成员不可用时的分配变化。</li>
+<li>我可以在网关页查看每个源的完整模型列表，筛选支持图片或工具的模型，并分辨能力未知和明确支持。</li>
+</ol>
+<h2 id="technical-design">Technical Design</h2>
+<ul>
+<li><code>agentproviders.ReadSourceModelDetails</code> 复用既有源鉴权、禁止重定向、超时、Anthropic 分页、去重与 ID 过滤；只投影经过约束的能力字段。新详情读取上限 8 MiB，原有仅 ID 调用保留 1 MiB 限制；模型数仍有 1000 的边界。</li>
+<li><code>catalog/discover</code> 与 <code>catalog/source-models</code> 保持旧 <code>models: string[]</code> 响应兼容，附带 <code>details</code>。插件能力使用其已校验的模型数据。读取目录不保存配置、不发模型推理请求。</li>
+<li>聚合保留至多 32 个历史 ID。别名只能来自同一个已有聚合，禁止与其他模型/别名/默认入口碰撞，禁止凭空注入别名或吞并其他模型。网关请求、原生绑定和默认模型识别均支持兼容 ID；绑定使用记录归并到现 ID，删除保护覆盖历史 ID。</li>
+<li><code>source-model-directory.ts</code> 的组件内结果按源与配置 revision 区分，离开时取消请求，不轮询、不写数据库。<code>GatewayModelDirectory</code> 每源每页 30 个模型，避免手机一次渲染所有条目。</li>
+<li><code>routing-preview.ts</code> 只执行草稿示意的平滑权重/轮流计算，不调用运行中的调度器、不改变游标。动态策略使用优先级步骤和成员图，不把示意称为真实分配结果。</li>
+<li>不新增监控采集、持久化或保留期；原有 24 小时滚动监控限制保持原样。</li>
+</ul>
+<h2 id="acceptance">Acceptance</h2>
+<p>验收数据见 <a href="aggregation-editor-evidence.json">evidence</a>。</p>
+<ul>
+<li>桌面 1280、1920、2560、3440 CSS px，各验证编辑器打开与关闭；检查内部面板边界和文档无滚动溢出。</li>
+<li>Redmi Note 8 真机 392 CSS px、粗指针：单层返回栏可命中，ID 可编辑；真实触摸完成先选源、全选、添加、暂不可用模拟、滚动、返回和网关图片能力筛选。</li>
+<li>以公开 OpenRouter 目录快照（471 模型、17 个输入/输出免费模型）在隔离实例验收读取与展示，核对 1,048,576 上下文与 262,144 最大输出。源内全选超过 64 明确阻止添加，免费筛选的 17 个模型全部加入且无重复。</li>
+<li>改名后旧 ID、新 ID、父聚合调用与持久化重开由后端回归覆盖；历史绑定仍阻止删除。能力未知、异常价格、字段边界与单位转换有回归覆盖。</li>
+<li>前端 252 文件、1,810 测试通过；最后的首次创建聚合预览与绑定回归 28 项通过。typecheck、i18n、hover、production build 和 quick 质量门禁通过（含全部 Go 测试）。</li>
+<li>首次总检查命中已有会话取消测试的时序失败，单项及完整 quick 重跑均通过；没有修改该测试或会话取消逻辑。</li>
+<li>截图保留在私有 <code>/tmp/roami-aggregation-editor-20261114/</code>，没有把一次性图片放入主分支。尚未创建 PR 或部署。</li>
+</ul>
+<h2 id="成员排序交互">成员排序交互</h2>
+<h3 id="product-design-1">Product Design</h3>
+<p>路由策略决定实际优先级；配置顺序决定固定顺序策略的先后、轮流的轮转顺序，以及自动策略条件相同时的顺序。预览列表展示当前策略与对应的顺序说明。编辑状态直接在预览成员行里提供拖动手柄、上下移和权重；不再在两处重复列出编辑器。</p>
+<p>“整理顺序”支持按模型源分组（源内相对顺序不变）、按模型名称排序，操作直接调整待保存的候选顺序；它们是一次整理动作，不是持续覆盖手动顺序的路由策略。手动拖动后保留该顺序，点击保存后提交。</p>
+<h3 id="user-stories-1">User Stories</h3>
+<ul>
+<li>我可以直接拖动预览中的模型，把希望优先调用的放前面，马上看到前 12 轮分配更新。</li>
+<li>我可以先按模型源分组，再手动调整同源成员；权重始终跟着原来的成员。</li>
+<li>在手机上可以抓住手柄拖动；列表其他位置正常滚动，也可点上下移。键盘用户聚焦手柄后用上下键，Home/End 移到首尾，Escape 取消拖动。</li>
+<li>智能、速度、价格等自动策略解释手动顺序只在条件相同或相近时生效，不把手动顺序误当作实时排名。</li>
+</ul>
+<h3 id="technical-design-1">Technical Design</h3>
+<p><code>AggregationMemberOrder</code> 统一成员顺序、快捷整理和权重编辑。<code>useAggregationMemberDrag</code> 使用 Pointer Events 与指针捕获同时处理鼠标/触屏，仅手柄禁用原生触摸滚动；超过移动阈值后显示原行和插入位置，松开才修改草稿。拖到滚动区域边缘时使用 requestAnimationFrame 滚动所在面板，不滚动文档；取消、离开落点、丢失捕获、保存、切换编辑器或卸载时不提交意外排序并清理动画。</p>
+<p>候选以 source/model 身份移动，不按数组位置搬动权重。保存使用原有 candidates 数组；不增加数据库字段、后台排序任务或轮询。不同协议的源可以重新排列而不重定义聚合入口协议，调用时原有协议过滤继续执行。</p>
+<h3 id="acceptance-1">Acceptance</h3>
+<p>单元回归覆盖键盘首尾/上下移动、鼠标拖动在松开前不修改、取消及越界落点不修改、保存顺序与预览更新、权重随成员保留、源内稳定分组、保存时禁用，以及不同协议候选重新排序后的入口协议保持。</p>
+<p>排序交互验收见 <a href="aggregation-order-evidence.json">evidence</a>：桌面四种宽度与面板开关均无溢出，鼠标从首项拖到第三项、Escape 取消、源内稳定分组、键盘首尾移动、权重保持与保存回读通过。Redmi Note 8 真机验证 17 个成员的触摸拖动、取消、边缘持续滚动、源分组、上下移、正常滑动不排序、保存回读及页面无溢出。</p>
+<p>完整前端 253 文件、1,815 测试通过，新增排序与保存回归共 9 项；typecheck、i18n、hover、生产构建、Go 网关回归及完整 quick 门禁通过。验收中另修正服务端省略 false 时“仅用免费来源”被误显示为选中的问题，新增回归断言后 5 项聚合工作区测试通过；新建聚合仍默认仅用免费来源。</p>
+<p>截图保留在私有 <code>/tmp/roami-aggregation-editor-20261114/order-*.png</code>，未创建 PR、未部署。</p>
+<h2 id="卡片内容归属修正">卡片内容归属修正</h2>
+<h3 id="product-design-2">Product Design</h3>
+<p>聚合卡片是其运行状态、策略预览和成员的共同容器，不在卡片列表下方展示公共详情。列表初始仅显示身份、状态、策略和成员数；点击卡片中的“查看调度”展开该卡片，内部用“运行状态 / 调度预览”切换，默认显示真实渠道。切换聚合时收起原卡片，不重复聚合名称，也不同时堆叠示意成员与真实渠道。</p>
+<p>编辑时，桌面上的草稿预览及成员排序直接留在原卡片中，卡片标记“未保存”；新建聚合有独立草稿卡。右侧配置表单保持当前聚合身份，其他聚合的配置入口在保存/取消前禁用，避免丢失草稿。手机使用原有全屏配置页，预览随该聚合表单显示。</p>
+<p>宽屏预览在卡片内部把调度步骤/模拟与成员分配并排，窄屏顺排，不增加包围卡片或外部公共面板。</p>
+<h3 id="user-stories-2">User Stories</h3>
+<ul>
+<li>我展开哪个聚合，就在它的卡片里看到它的渠道；不会把下方公共区域误认为另一张卡片。</li>
+<li>我可以切到该卡的策略预览，按需查看模拟，不让示意内容和真实状态混在一起。</li>
+<li>编辑名称、ID 或成员时，原卡片立即展示草稿；新建聚合的预览也有自己的卡片。</li>
+</ul>
+<h3 id="technical-design-2">Technical Design</h3>
+<p><code>AggregationPoolCard</code> 负责单个聚合的标题、展开状态、操作以及卡内标签。真实状态在卡片展开且“运行状态”激活时挂载 <code>LiveChannels</code>，复用 <code>useRoutingStatus</code>；收起、切到预览或离开页面时停止查询。未保存的草稿不查询运行状态。</p>
+<p><code>ModelAggregationWorkspace</code> 只负责列表与表单协调，将原来列表外的公共状态、策略和草稿预览移除。<code>RoutingStrategyPreview</code> 使用内部网格组织模拟和成员区，在卡内标签中省去重复标题。保存接口、路由策略与监控存储均不改变。</p>
+<p>卡片归属验收见 <a href="aggregation-card-evidence.json">evidence</a>。三个聚合的展开/收起、卡内运行状态与预览切换、编辑草稿和新建草稿归属、鼠标及 Redmi Note 8 真实触摸排序、手机返回与滚动均通过；桌面 1280/1920/2560/3440 CSS px 的折叠、展开、编辑状态均无文档或卡片溢出。浅色英文也通过。展开项置前、卡片最多三列，避免全宽展开时产生顶部空行或把其他卡片标题挤碎。</p>
+<p>前端 253 文件、1,817 测试、typecheck/i18n/hover、生产构建和 full 门禁通过；此次只改前端与设计文档，不运行无关的 Go/Python 检查。PR 图片保留在私有 <code>/tmp/roami-aggregation-card-20261114/</code> 并按仓库规范上传 pr-shots，不写入主分支。</p>
+<h2 id="配置流程与模型源统一当前方案替代前版并排编辑">配置流程与模型源统一（当前方案，替代前版并排编辑）</h2>
+<h3 id="product-design-3">Product Design</h3>
+<p>聚合列表复用模型源的 <code>tt-model-connections</code> 网格和 <code>tt-model-connection</code> 卡片：图标、名称、ID、策略、状态、成员摘要，整张卡片进入配置。卡片不展开长表单、不放配置/启停/删除按钮组。启停和删除位于聚合详情内。</p>
+<p>点击卡片后与模型源一致，在保留大模型导航的完整详情页配置；手机使用一层全屏二级页。成员、调度、运行状态各有独立标签。先选源，直接在可搜索、可全选的模型目录里勾选，取消勾选立即从草稿移除；不再使用模型多选下拉后点击添加。选中项跨源、筛选和标签保留；目录每页最多 30 项，超过 64 成员的全选明确禁用并提示缩小范围，不截断选择。</p>
+<p>调度标签集中策略、说明、效果预览、成员拖动和权重，次要调用条件与故障切换折叠。运行状态仅展示该聚合已保存的真实渠道，不根据草稿 ID 查询。底部固定选择计数与取消/保存，只有内容区滚动。返回列表保留每个聚合各自的草稿，可以编辑其他聚合再回来继续；取消只清除当前草稿。</p>
+<h3 id="user-stories-3">User Stories</h3>
+<ul>
+<li>我可以像配置模型源一样，点击聚合卡片进入自己的详情，不用在左右两边寻找成员和保存按钮。</li>
+<li>我可以在某个源中搜索、批量勾选模型，再选另一个源，不重复点击添加。</li>
+<li>我可以在调度标签修改顺序或权重、立即查看示意，再回成员标签继续选择。</li>
+<li>我可以返回列表再进入，或者暂时编辑另一个聚合，原草稿仍在；保存失败也不丢输入。</li>
+<li>我可以在运行状态标签确认已保存配置的真实渠道，未保存的 ID 不触发错误状态请求。</li>
+</ul>
+<h3 id="technical-design-3">Technical Design</h3>
+<p><code>ModelAggregationWorkspace</code> 管理按原始 ID 区分的草稿及保存协调。<code>AggregationPoolCard</code> 复用模型源的现有卡片结构和样式，仅承载摘要与一个打开入口。<code>AggregationEditor</code> 统一桌面/手机的详情标签、一个滚动区与固定保存栏。<code>AggregationMemberPicker</code> 复用源目录读取、模型目录勾选模式与 64 成员校验，并保留原有协议、身份和权重语义。<code>AggregationRuntime</code> 由运行状态标签按需挂载，离开即停止既有状态轮询。没有新增后台轮询、接口、存储或监控记录。</p>
+<h3 id="acceptance-2">Acceptance</h3>
+<p>验收结果记录在 <a href="aggregation-config-evidence.json">evidence</a>。PR 图片走 pr-shots 分支，私有原始截图保留在 <code>/tmp/roami-aggregation-config-20261114/</code>。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

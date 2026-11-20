@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型工作台的产品事实</title>
+<link rel="stylesheet" href="assets/model-workspace-design.css">
+<link rel="stylesheet" href="assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="模型工作台的产品事实">模型工作台的产品事实</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="index.html">专题首页</a>
+<a href="screens/index.html">逐页设计</a>
+<a href="gateway-prototype.html#/workbench">统一原型</a>
+<a href="history/index.html">历史归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<h2 id="users">Users</h2>
+<p>管理多个模型源、插件账号和模型路由的个人或团队开发者。桌面需要快速配置与排查，手机通过局域网完成同样的管理任务。</p>
+<h2 id="tasks">Tasks</h2>
+<p>连接模型源，发现和管理模型，按源设置定价；把多个模型和账号组成可调用聚合，选择策略、调整顺序和权重，核对真实渠道状态并保存。</p>
+<h2 id="constraints">Constraints</h2>
+<p>本阶段只改模型源和聚合内部，能力顶部 Tabs 和模型左侧 Tabs 不变。模型请求协议、已有价格规则、账号 Key、ID 别名兼容、64 成员限制和 24 小时滚动监控保持既有语义。模型范围只来自源中已保存的非聚合主模型；上游发现目录、聚合引用和备用候选不能扩展源内清单。已有失效成员保留并明确提示，移除源模型不得连带删除聚合。CSS token、国际化、触屏命中与浏览器内滚动遵守仓库规则。</p>
+<h2 id="success">Success</h2>
+<p>沿用原有能力顶部和模型左侧导航；策略和预览共处顶部，下方全宽成员列表；手柄拖动和键盘排序可用，快捷置顶/移除可发现；真实状态、能力和源延迟与未知清晰区分；完整完成模型源和聚合的保存与回读。</p>
+<p>方向已由用户明确指定为 Linear/Vercel 深色后台风格与上下布局，采用 Tailwind + shadcn/Radix 逐步迁移。没有营销区块、虚构质量指标或付费能力声明。</p>
+<p>常用创建路径只填写聚合名称、选择源和模型，ID 自动生成且默认为智能策略。连接新源只先填写地址和 Key，名称与协议选项按需展开。源内模型与价格先展示当前内容，显式点击后编辑；保留免费确认、草稿和独立保存语义。</p>
+<p>聚合成员选择按用户确认采用左侧源、右侧模型；上方直接展示池内跨源成员和移除操作。模型很多时源与模型列表各自滚动；手机已选成员横向滑动，保存和来源切换保持可达。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

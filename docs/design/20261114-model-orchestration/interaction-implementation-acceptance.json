@@ -1,8 +1,8 @@
 {
   "date": "2026-11-16",
   "scope": "Production implementation of approved model workspace interaction design",
-  "design": "interaction-design.md",
-  "implementation": "interaction-implementation.md",
+  "design": "interaction-design.html",
+  "implementation": "interaction-implementation.html",
   "branch": "feat/model-hub-interactions",
   "fixtures": "Isolated development backend with synthetic catalog, local-only upstream and real save endpoints; no user production model calls",
   "frontendRegression": {

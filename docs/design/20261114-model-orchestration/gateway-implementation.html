@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本机网关实现与插件账号快捷入口</title>
+<link rel="stylesheet" href="assets/model-workspace-design.css">
+<link rel="stylesheet" href="assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="本机网关实现与插件账号快捷入口">本机网关实现与插件账号快捷入口</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="index.html">专题首页</a>
+<a href="screens/index.html">逐页设计</a>
+<a href="gateway-prototype.html#/workbench">统一原型</a>
+<a href="history/index.html">历史归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<p>基于 <a href="gateway-design.html">本机网关交互稿</a> 实现。能力顶部和大模型左侧导航保留；接入与密钥、模型目录继续作为网关内部页签。</p>
+<h2 id="product-design">Product Design</h2>
+<p>接入地址和 curl / Python 示例并排展示，编辑器展开后按可用内容宽度自动换列。示例仅列出已保存、已启用且存在可用来源的模型，凭据通过环境变量引用；回环地址明确标注只用于宿主。手机默认折叠示例。</p>
+<p>Key 使用统一列表，展示名称、末尾标识和启停状态。新建、改名、固定 Key 设置进入桌面检查器或手机全屏页，分别保留草稿。轮换与删除继续确认影响；生成或轮换后仅临时显示明文，离开页签或迟到响应均不重新展示。固定 Key 替换增加旧值立即失效的确认。</p>
+<p>模型目录显示对外调用名称，并在详情中区分上游 ID、来源、上下文、公布能力与标价。没有数据时保留“未提供”，不将未知值当零。支持按来源、类型、能力和名称筛选；仅上游目录模型引导先在源内启用。原有目录分页和 revision 缓存保留，隐藏页暂停尚未完成的目录读取。</p>
+<p>用户随后要求从已有插件快速添加账号：插件源卡片增加“添加账号”，调用现有克隆入口创建独立账号源，并在新账号连接页展开授权区。原账号保持独立；普通 API 卡片保持查看入口。</p>
+<h2 id="technical-design">Technical Design</h2>
+<ul>
+<li><code>ModelGatewayWorkspace</code> 负责两个页签和接入摘要；<code>gateway-call-example</code> 约束示例模型范围、回环地址识别和示例转义。</li>
+<li><code>GatewayAccessKeys</code> 管理具名 Key 列表和一次性凭据；<code>gateway-fixed-key</code> / <code>GatewayAccessKey</code> 保留固定 Key 独立接口、revision 校验与错误恢复。</li>
+<li>后端具名 Key 列表原本已经包含固定 Key。固定 Key 元数据仅补充现有非敏感 <code>id</code>，让界面精确识别该行，不按名称或后缀猜测，也不重复追加。</li>
+<li><code>GatewayInspector</code> 使用既有返回按钮和 <code>MobileSubPage</code>；检查器关闭后释放空间，并回到触发操作。</li>
+<li><code>GatewayModelDirectory</code> 保留源所有权和网关 ID 映射，调用源详情或聚合详情时走真实导航。</li>
+<li><code>ModelHub.addAccount</code> 复用现有插件账号创建；卡片按钮与整卡查看按钮为独立点击目标，新增账号授权区默认展开。</li>
+</ul>
+<p>没有新增接口规范，没有变更计价、限额、调度算法或监控 24 小时滚动与空间上限。新增产品文案进入中英文统一语言包。静态交互稿保留为设计历史。</p>
+<h2 id="acceptance">Acceptance</h2>
+<p>详见 <a href="gateway-implementation-acceptance.json">gateway-implementation-acceptance.json</a>。</p>
+<ul>
+<li>全量前端 257 文件 / 1,880 项通过；最终相关范围 5 文件 / 45 项通过，包含随后补充的模型身份检查。</li>
+<li>类型、国际化、悬停规则、生产构建、Go 模型网关测试、完整与快速质量入口通过。</li>
+<li>隔离实例真实完成具名 Key 创建、改名、启停、轮换、固定 Key 设置与替换；桌面 1280 / 1920 / 2560 / 3440 检查器开关无文档溢出，英文浅色通过。</li>
+<li>Redmi Note 8 经 LAN HTTPS 硬刷新验证输入、一次性凭据、停用确认、模型目录筛选、全屏详情返回、错误保留与内容滚动。</li>
+<li>插件账号快捷入口在桌面和真机使用合成插件传输验证单次创建、原账号保留和授权区展开，没有创建或登录真实外部账号。</li>
+</ul>
+<p>截图与日志保存在 <code>/tmp/roami-local-gateway-design-20261116/</code>；截图不进入主分支。验收使用独立数据目录、私有 tmux socket 和本地模拟上游，未部署线上服务。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

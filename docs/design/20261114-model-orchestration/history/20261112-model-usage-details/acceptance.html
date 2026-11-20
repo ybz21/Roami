@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>概况与审计原型验收 · 第二版</title>
+<link rel="stylesheet" href="../../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../../assets/model-design-diagrams.css">
+</head>
+<body>
+<header class="page-head"><h1 id="概况与审计原型验收--第二版">概况与审计原型验收 · 第二版</h1></header>
+<div class="workspace">
+<nav class="contents" aria-label="大模型设计导航">
+  <a href="../../index.html">专题首页</a>
+<a href="../../screens/index.html">逐页设计</a>
+<a href="../../gateway-prototype.html#/workbench">统一原型</a>
+<a href="design-records.html">专题归档</a>
+</nav>
+<main class="document archive">
+<article class="record converted-record">
+<p>验收日期：2026-11-12。状态：待用户确认，未开始产品前后端实现。</p>
+<h2 id="信息结构">信息结构</h2>
+<ul>
+<li>「概况」和「审计」是大模型下两个同级 Tab，默认打开概况。</li>
+<li>概况统一展示用量、每日限额、汇总、趋势和分组统计；今日额度不受统计筛选影响。</li>
+<li>审计直接呈现逐条请求，不显示概况的额度、汇总和趋势模块，也没有内部「概览 / 请求」Tab。</li>
+<li>点击概况分组或趋势进入审计，保留对应筛选条件；调用详情返回审计。</li>
+</ul>
+<h2 id="浏览器与真机验证">浏览器与真机验证</h2>
+<table>
+<thead>
+<tr class="header">
+<th>检查</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>独立静态 HTML</td>
+<td>打包通过，约 959 KiB；样式、脚本、图标与示例数据内联</td>
+</tr>
+<tr class="even">
+<td>桌面布局</td>
+<td>1280 / 1920 / 2560 / 3440 CSS px，导航展开 / 收起均通过，无文档级溢出</td>
+</tr>
+<tr class="odd">
+<td>审计详情面板</td>
+<td>四档宽度均检查开启后的边界，面板与主内容不重叠；关闭释放宽度</td>
+</tr>
+<tr class="even">
+<td>限额调整</td>
+<td>概况内可编辑示例每日金额、保存并切换 Tab；返回后保留修改，仅作用于原型页面</td>
+</tr>
+<tr class="odd">
+<td>分组与下钻</td>
+<td>切换智能体 / 模型源分组、进入审计、继承源筛选、打开单次请求并返回均通过</td>
+</tr>
+<tr class="even">
+<td>审计筛选</td>
+<td>状态筛选、请求搜索、空结果无分页、旧记录归档提示均通过</td>
+</tr>
+<tr class="odd">
+<td>主题与语言</td>
+<td>概况 / 审计可切换中文 / 英文、浅色 / 深色</td>
+</tr>
+<tr class="even">
+<td>真实后端隔离</td>
+<td>交互期间没有真实 <code>/api/</code> 请求；无浏览器运行错误</td>
+</tr>
+<tr class="odd">
+<td>仓库检查</td>
+<td><code>git diff --check</code> 和打包脚本 <code>node --check</code> 通过</td>
+</tr>
+</tbody>
+</table>
+<p>Android 设备为 Redmi Note 8（<code>216d6a43</code>），通过 LAN HTTPS 打开静态文件。实际为 compact / coarse，文档宽度与滚动宽度均为 392 CSS px，筛选控件命中高度均为 44 CSS px。用真实触摸事件切换两个同级 Tab、展开 / 收起筛选、滚动、进入全屏详情并返回；详情只有一个可见标题栏。列表滚动至约 419.64 CSS px，返回后恢复原位置；英文无横向溢出。</p>
+<p>结构化结果：<a href="evidence/acceptance.json">evidence/acceptance.json</a>。<a href="revisions/acceptance-v1.html">第一版验收</a>仅保留历史，不代表当前导航。</p>
+<h2 id="预览与截图">预览与截图</h2>
+<ul>
+<li>静态文件：<a href="prototype.html">prototype.html</a>。</li>
+<li>临时预览：<code>https://192.168.130.19:19312/prototype.html</code>，通过隔离启动器提供本设计目录，未启动产品后端。</li>
+<li>桌面截图：<code>/tmp/roami-usage-v2-overview.png</code>、<code>/tmp/roami-usage-v2-audit.png</code>、<code>/tmp/roami-usage-v2-audit-detail.png</code>、<code>/tmp/roami-usage-v2-audit-dark-en.png</code>。</li>
+<li>真机截图：<code>/tmp/roami-usage-v2-phone-overview.png</code>、<code>/tmp/roami-usage-v2-phone-audit.png</code>、<code>/tmp/roami-usage-v2-phone-detail.png</code>、<code>/tmp/roami-usage-v2-phone-dark-en.png</code>。</li>
+</ul>
+<p>截图保留在临时目录，不提交主分支。本次仍仅修改设计目录；没有修改业务前端、Go 或 Python 代码，未运行业务前端完整测试 / 产品构建或提交 / PR 门禁，原型已单独打包并完成上述交互验收。</p>
+<h2 id="后续六页设计与正式接入">后续：六页设计与正式接入</h2>
+<p>用户已确认第二版并要求实现概况 / 审计，同时追加大模型内每个页面的设计。当前 HTML 已扩展为六页完整交互原型，详见 <a href="index.html#六个页面的完整设计">六页设计</a>；正式产品接入与最新验收见 <a href="implementation.html">实现记录</a>。上面的第二版截图与数据只作为历史验收保留。</p>
+
+</article>
+</main>
+</div>
+</body>
+</html>

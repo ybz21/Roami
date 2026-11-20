@@ -42,7 +42,7 @@
 </section>
 <section aria-label="文档正文">
 <article class="record" id="design-readme">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/README.md</code></p>
+<p class="muted">独立记录 <a href="overview.html">overview.html</a></p>
 <h2 id="design-readme--模型能力与-auto-调度">模型能力与 Auto 调度</h2>
 <p><a href="technical-design.html">技术设计（HTML）</a> · <a href="prototype.html#/capabilities/models/gateway">统一原型（HTML）</a></p>
 <h3 id="design-readme--product-design">Product Design</h3>
@@ -109,7 +109,7 @@
 </ul>
 </article>
 <article class="record" id="design-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/acceptance.md</code></p>
+<p class="muted">独立记录 <a href="acceptance.html">acceptance.html</a></p>
 <h2 id="design-acceptance--设计稿验收--2026-11-16">设计稿验收 · 2026-11-16</h2>
 <p>范围：仅 HTML 设计文档与页面内演示。未实现产品模型能力、CLI 选模或 Auto 调度；未调用真实模型生成，未修改生产模型、账号、密钥、额度或路由。桌面使用本任务专用 Roami Chrome 标签页，手机使用 Redmi Note 8 的 Chrome 真机。</p>
 <h3 id="design-acceptance--跨会话统一最新">跨会话统一（最新）</h3>
@@ -208,7 +208,7 @@
 <p>本机验收目录：<code>/tmp/roami-model-capability-design/</code>，含 browser-verification.log、verification.json、quality-quick.log 与桌面/手机截图；一次性验收脚本为该目录的 <code>verify.mjs</code>。静态服务通过仓库隔离入口启动，收尾通过同入口 <code>--stop</code> 核对并清理测试服务器。</p>
 </article>
 <article class="record" id="design-catalog-picker-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/catalog-picker-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="catalog-picker-acceptance.html">catalog-picker-acceptance.html</a></p>
 <h2 id="design-catalog-picker-acceptance--聚合优先与网关目录统一">聚合优先与网关目录统一</h2>
 <p>日期：2026-11-17。</p>
 <h3 id="design-catalog-picker-acceptance--product-design">Product Design</h3>
@@ -242,7 +242,7 @@
 <p>会话准备时，宿主删除了稳定会话 <code>2026-1117-1551-t65g</code> 及占位 worktree/分支。当时尚无业务文件修改；已在原路径重建独立 <code>feat/gateway-model-catalog</code> 工作区并同步 <code>origin/main</code>，没有新建替代会话或更改宿主绑定。会话展示名曾成功设置为“模型网关聚合”，后续宿主已无法解析该稳定 ID。</p>
 </article>
 <article class="record" id="design-deployment-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/deployment-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="deployment-acceptance.html">deployment-acceptance.html</a></p>
 <h2 id="design-deployment-acceptance--模型目录发布mcp-完成证据">模型目录发布：MCP 完成证据</h2>
 <h3 id="design-deployment-acceptance--产品与用户故事">产品与用户故事</h3>
 <p>完成任务后，发布应在宿主确认没有进行中的输入和工具时继续。执行器的完成回复不代替宿主状态；不取消任务、不替用户验收、不重复执行结果不确定的外部操作。</p>
@@ -254,7 +254,7 @@
 <p>完整门禁、合入及本机部署结果保留在本次本机交付报告。</p>
 </article>
 <article class="record" id="design-gateway-options-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/gateway-options-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="gateway-options-acceptance.html">gateway-options-acceptance.html</a></p>
 <h2 id="design-gateway-options-acceptance--网关统一选模与能力展示">网关统一选模与能力展示</h2>
 <h3 id="design-gateway-options-acceptance--产品设计与用户故事">产品设计与用户故事</h3>
 <ul>
@@ -280,7 +280,7 @@
 </ul>
 </article>
 <article class="record" id="design-implementation">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/implementation.md</code></p>
+<p class="muted">独立记录 <a href="implementation.html">implementation.html</a></p>
 <h2 id="design-implementation--cli-与-roami-创建会话选模">CLI 与 Roami 创建会话选模</h2>
 <p>本轮保留模型能力目录、<code>roami model list</code>、Web / CLI 创建 Roami 会话时指定模型和仅免费约束。网关工作区复用本机网关会话的生产实现（<code>5f99951a</code>）；另一个会话的工作区不变。</p>
 <h3 id="design-implementation--产品行为与用户故事">产品行为与用户故事</h3>
@@ -379,7 +379,7 @@ roami session new 调研 --kind roami -model auto --task &quot;整理资料&quot
 <p>当前修订见 <a href="#design-simplification-acceptance">简化验收</a>。此前 <a href="#design-runtime-acceptance">运行验收</a> 保留原始历史证据，其中已撤回的会话切模功能不代表当前交付。</p>
 </article>
 <article class="record" id="design-naming-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/naming-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="naming-acceptance.html">naming-acceptance.html</a></p>
 <h2 id="design-naming-acceptance--模型名称与访问密钥">模型名称与访问密钥</h2>
 <p>本轮沿用现有模型目录和配置字段，统一界面用词；不迁移调用 ID、不轮换密钥、不新增选模服务。</p>
 <h3 id="design-naming-acceptance--产品设计与用户故事">产品设计与用户故事</h3>
@@ -447,7 +447,7 @@ roami session new 调研 --kind roami -model auto --task &quot;整理资料&quot
 <p>本机升级保护返回 <code>AGENT_UPGRADE_BUSY</code>；一项已有委派执行的停止状态未知。官方 <code>reconcile-session</code> 返回 <code>SESSION_RECONCILIATION_SCOPE_REQUIRED</code>，未能确认停止。未强制中断会话、改写任务状态或绕过升级保护；当前运行版本保持原状。</p>
 </article>
 <article class="record" id="design-openrouter-connector">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/openrouter-connector.md</code></p>
+<p class="muted">独立记录 <a href="openrouter-connector.html">openrouter-connector.html</a></p>
 <h2 id="design-openrouter-connector--openrouter-免费目录连接器">OpenRouter 免费目录连接器</h2>
 <h3 id="design-openrouter-connector--产品与使用场景">产品与使用场景</h3>
 <p>在模型源点「新建 → OpenRouter 免费模型」，填写 OpenRouter API Key 后拉取免费目录，勾选需要接入的模型。已保存的官方 OpenRouter Chat Completions 连接可以在「修改连接」里切换源类型。转换保留来源和模型 ID、密钥以及调度引用。既有接入模型仍在已接入列表，拉取后的可选列表只显示当次发现的免费变体。</p>
@@ -468,14 +468,14 @@ roami session new 调研 --kind roami -model auto --task &quot;整理资料&quot
 <p>API 目录读取按连接合并并缓存。调度页刷新目录证据，带工具或上下文约束的实际调用复用同一证据。自动检测使用目录和现有额度数据，首字延迟沿用真实调用记录。免费规则继续由 Go 网关核对已确认的定价和额度。</p>
 </article>
 <article class="record" id="design-picker-display">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/picker-display.md</code></p>
+<p class="muted">独立记录 <a href="picker-display.html">picker-display.html</a></p>
 <h2 id="design-picker-display--精简-main-选模列表">精简 Main 选模列表</h2>
 <p>在首页输入 <code>/model</code> 或点当前模型，都会打开同一个选择器。标题下直接显示搜索框，列表保留模型名称、原生或聚合类型、输入输出、能力及价格状态。切换生效说明在列表下方。调用 ID 从列表行移除，仍可用完整 ID 搜索同名模型，网关继续提供调用 ID 和复制入口。</p>
 <p>沿用现有 <code>AgentModelPicker</code>、<code>/model</code> 命令与网关目录，选模请求仍使用稳定 ID。桌面弹窗标题减少垂直留白，手机沿用全屏选择页和触摸返回。</p>
 <p>回归覆盖隐藏 ID 后按完整 ID 搜索同名模型并切换到正确路线，以及桌面和手机在 Main 工作中用 <code>/model</code> 打开选择器。</p>
 </article>
 <article class="record" id="design-runtime-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/runtime-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="runtime-acceptance.html">runtime-acceptance.html</a></p>
 <blockquote>
 <p>历史记录：以下证据对应简化前的 <code>40de2934</code>。独立会话切模、预校验和选模表已撤回；当前版本见 <a href="#design-simplification-acceptance">简化验收</a>。</p>
 </blockquote>
@@ -516,7 +516,7 @@ roami session new 调研 --kind roami -model auto --task &quot;整理资料&quot
 <img src="https://raw.githubusercontent.com/ybz21/Roami/pr-shots/pr-939/runtime-cli.png" alt="CLI 运行与免费路线耗尽验证" loading="lazy" /></p>
 </article>
 <article class="record" id="design-simplification-acceptance">
-<p class="muted">原稿 <code>history/20261116-model-capabilities/simplification-acceptance.md</code></p>
+<p class="muted">独立记录 <a href="simplification-acceptance.html">simplification-acceptance.html</a></p>
 <h2 id="design-simplification-acceptance--创建会话选模简化验收">创建会话选模简化验收</h2>
 <p>本修订撤回独立选模服务、会话选模表与 schema 29、选模预校验接口、三个专用请求头、目录版本握手、已有会话切模 Hook 和 <code>roami agent new</code> 的新增选模参数。</p>
 <p>保留 <code>roami model list</code>、新建 Roami 会话指定模型和免费限制。模型复用任务原有 <code>intent_json.model</code>；仅免费随任务记录保存，执行走原有 Provider 和 Go 网关目录路由。</p>
