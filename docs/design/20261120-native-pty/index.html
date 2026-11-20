@@ -19,7 +19,7 @@
     <article>
       <p class="date">2026-11-20 · 设计提案 · Roami 6108a657</p>
       <h1>三平台原生终端</h1>
-      <p class="lead"><strong>推荐 macOS、Linux 用现有 <code>creack/pty</code>，Windows 用系统 ConPTY 启动 PowerShell 7。让独立的 Go 会话宿主持有两类 PTY。</strong></p>
+      <p class="lead"><strong>推荐一套原生 Go 终端后端。macOS、Linux 复用 <code>creack/pty</code>，Windows 实现同一终端接口，通过系统 ConPTY 启动 PowerShell 7。</strong></p>
       <p>浏览器目前通过一个外层 PTY 运行 <code>tmux attach</code>。真正的 shell 和 Agent 在 tmux server 持有的窗格中。只换外层 PTY，底下仍要有 tmux server。三平台原生运行需要由 Roami 接手窗格进程、分离重连、屏幕捕获和退出观测。</p>
 
       <section aria-labelledby="platform">
@@ -45,7 +45,7 @@
             <thead><tr><th scope="col">方案</th><th scope="col">适配 Roami 的收益</th><th scope="col">成本与判断</th></tr></thead>
             <tbody>
               <tr>
-                <th scope="row">现有 Go 依赖 + 系统 API</th>
+                <th scope="row">统一 Go 接口 + 系统 API</th>
                 <td>复用现用的 <code>creack/pty v1.1.24</code> 和 <code>x/sys v0.41.0</code>。Go 宿主可控制创建、句柄、关闭顺序和进程事件。</td>
                 <td>推荐。Windows 平台适配器要负责参数与环境、关闭顺序和 Job Object，需真机测试。</td>
               </tr>
@@ -73,6 +73,13 @@
           </table>
         </div>
         <p class="source"><a href="../../../go.mod">Roami Go 依赖</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start.go">creack/pty Unix 启动</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start_windows.go">creack/pty Windows 占位</a> · <a href="https://github.com/golang/sys/blob/v0.41.0/windows/syscall_windows.go">x/sys Windows 绑定</a> · <a href="https://github.com/charmbracelet/x/blob/74ce264f24fc7e97da2a0a5beba634c65dcf4af1/conpty/conpty_windows.go">Charm ConPTY 源码</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a> · <a href="https://github.com/microsoft/node-pty">node-pty</a> · <a href="https://github.com/tmux/tmux/wiki/Getting-Started">tmux 架构</a></p>
+      </section>
+
+      <section aria-labelledby="adapter">
+        <h2 id="adapter">Windows 适配放在哪一层</h2>
+        <p><code>creack/pty</code> 的 Unix 接口交给调用方一个双向 <code>*os.File</code>，子进程由 <code>exec.Cmd</code> 启动和等待。Windows 版本的 <code>StartWithSize</code> 目前返回 <code>ErrUnsupported</code>。ConPTY 需要分别管理输入管道、输出管道、控制台句柄及进程句柄，启动时还要将控制台作为属性传给 <code>CreateProcessW</code>。</p>
+        <p>建议在 Roami 内封装这两种实现。对上只提供启动、读写、改尺寸、等待退出和关闭等行为，终端协议与会话宿主跨平台复用。若 fork <code>creack/pty</code> 硬套原签名，还得补管道封装与进程等待兼容，同样需要重新定义生命周期。</p>
+        <p class="source"><a href="https://github.com/creack/pty/blob/v1.1.24/run.go">creack/pty 启动接口</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start_windows.go">Windows 占位实现</a> · <a href="https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session">Microsoft ConPTY 建连</a></p>
       </section>
 
       <section aria-labelledby="decision">

@@ -18,7 +18,7 @@
   <main>
     <article>
       <h1>技术设计</h1>
-      <p class="lead">把平台 PTY 与会话策略解耦。一个窗格对应一个 PTY，Go 会话宿主负责持有进程、管理连接和提供可核对的生命周期。</p>
+      <p class="lead">三平台共用一套 Go 会话宿主和终端接口。一个窗格对应一个 PTY，宿主负责持有进程、管理连接和提供可核对的生命周期。</p>
 
       <section aria-labelledby="current">
         <h2 id="current">现有链路与改造落点</h2>
@@ -59,6 +59,8 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
 
       <section aria-labelledby="platform-detail">
         <h2 id="platform-detail">平台适配</h2>
+        <p>将接口和启动参数放在同一 Go 包，由构建标签选中 Unix 或 Windows 的实现。上层使用统一的列行尺寸、退出结果和字节流接口。Unix 的 <code>*os.File</code>、Windows 的管道和句柄留在各自适配器里。两种后端在现有 Go 依赖上即可实现，可随 Roami 按目标平台编译，无需为 PTY 层引入 CGO 或额外运行时。</p>
+        <p>同一组契约测试覆盖启动、双向输入输出、初始尺寸、在线调整、退出与重复关闭。能力存在平台差异时由适配器明确报告，例如信号、暂停和进程组观测，上层根据能力提供操作。</p>
         <h3>macOS / Linux</h3>
         <p>以 <code>StartWithSize</code> 建控制终端和初始尺寸，子进程使用登录 shell 或指定可执行文件。由 master 读写，以 <code>Setsize</code> 更新尺寸并由系统通知前台进程组。按进程身份回收目标进程。交互 shell 可能将作业放入不同进程组，不能只按 shell 的组判断已清理。Linux 可沿用现有 cgroup 能力，macOS 先验证会话内进程归属和未能确认的退出行为。验证 <code>TERM</code> 对应的终端能力和两边的 UTF-8 locale，避免向应用宣称尚未支持的控制序列。</p>
         <h3>Windows / PowerShell</h3>
