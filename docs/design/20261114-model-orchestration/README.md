@@ -1,5 +1,9 @@
 # 模型源与聚合：工作台重构
 
+2026-11-20 [全量功能、共用能力与逐页设计（HTML）](capability-plan.html)。覆盖调度与排查、模型源、插件与账号、聚合、本机网关、概况、监控、审计、语音输入、会话与委派。每项功能对应网关能力和界面反馈，附已有实现依据、缺口、实施依赖及跨页验收用例。
+
+桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 真机验证逐页定位、能力跳转、验收展开和原设计返回。核对 10 个 HTML 的 369 个本地链接与锚点，截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
+
 2026-11-20 [调度与排查原型（HTML）](gateway-prototype.html?v=workbench-20261120#/workbench) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
 
 新增「调度与排查」首屏。左侧显示当前聚合的可调度顺位和冷却时间，右侧按请求结果筛选，并在同页查看选中请求的尝试。由结果定位到完整审计、限流来源或聚合配置。七个管理入口可从工作台或「模型管理」打开。

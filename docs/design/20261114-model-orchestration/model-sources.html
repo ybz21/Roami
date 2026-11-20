@@ -18,6 +18,7 @@
   <a href="./model-audit.html">审计</a>
   <a href="./model-gateway.html">本机网关</a>
   <a href="./model-speech.html">语音输入</a>
+  <a href="./capability-plan.html#page-sources">模型源功能与能力</a>
 </nav>
 <main class="document" id="document">
 <section id="catalog" aria-labelledby="catalog-title">
@@ -33,6 +34,7 @@
   </div>
   <div class="copy step" id="magpie-registry"><h3>导入 Magpie 社区插件</h3>
     <a class="page-reference" href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins">打开完整插件目录</a>
+    <a class="page-reference" href="./capability-plan.html#page-plugins">插件与账号功能规划</a>
     <p>进入「新建 → 导入模型插件」自动读取 Magpie 的公开 <code>registry.json</code>。沿用生产目录接口的范围，展示有供应商的社区插件，默认同时列出已安装和未安装项。GitHub 不可达时尝试 jsDelivr 镜像，仍无法连接时显示随包快照并提供重试。搜索接受名称、包名、供应商、路径和对应 GitHub 链接。</p>
     <p>「检查更新」读取发布索引。初始化显示快照中的发行版本，点「检查更新」后核对线上版本。ZIP 和文件夹入口在「从文件导入」。</p>
     <p>下载来源可选 GitHub 官方、国内加速（jsDelivr）或 gh-hk。加速节点失败时尝试备用地址。包的版本与 SHA-512 来自分发索引，索引优先直连 GitHub。包校验通过后沿用只读插件包和现有宿主检查，账号授权在创建来源后进行。</p>
