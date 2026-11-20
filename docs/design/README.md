@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 三平台原生终端 | [20261120-native-pty](20261120-native-pty/README.md) | macOS / Linux PTY、Windows ConPTY 与 PowerShell 选型、会话宿主迁移 |
 | 创建任务时的互审会话 | [20261120-review-session](20261120-review-session/README.md) | 审查 Agent、双向会话消息和多轮复审原型 |
 | 顶部标签选中态 | [20261119-active-workspace-tab](20261119-active-workspace-tab/README.md) | 内容侧强调线、标题强调与桌面/真机验收 |
 | Agent 渲染视图宽度统一 | [20261119-agent-render-width](20261119-agent-render-width/README.md) | 所有 Agent 消息、输入及附属状态铺满可用宽度与桌面/真机验收 |
