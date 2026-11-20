@@ -5179,8 +5179,6 @@ const zhCN = {
   'hub.directory.sourceName': "来源名称（选填）",
   'hub.directory.autoName': "默认使用服务域名",
   'hub.directory.changeConnection': "修改连接",
-  'hub.directory.configureKey': "配置 API Key",
-  'hub.directory.replaceKey': "更换 API Key",
   'hub.gateway.keys': '网关访问密钥（API Key）',
   'hub.gateway.keyName': '密钥备注',
   'hub.gateway.generateKey': '生成访问密钥',

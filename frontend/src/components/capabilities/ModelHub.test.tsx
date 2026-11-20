@@ -103,6 +103,7 @@ it('shows connections and their models together and accepts old source-page link
 it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
+  expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(screen.getByLabelText('hub.name'))
   expect(screen.getByRole('combobox', { name: 'capabilities.models.protocol' }).closest('details')).toBeNull()
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
@@ -386,8 +387,9 @@ it('updates an existing source without fetching models and retains its stored ke
   fireEvent.click(await screen.findByRole('button', { name: 'hub.openSource' }))
   page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
   fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.changeConnection' }))
-  fireEvent.click(document.querySelector('.tt-model-source-options summary')!)
-  fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'Renamed source' } })
+  const name = await screen.findByLabelText('hub.name')
+  expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(name)
+  fireEvent.change(name, { target: { value: 'Renamed source' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   const dialog = await screen.findByRole('alertdialog')
   fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
@@ -441,41 +443,6 @@ it('lets new sources change their address after discovering a directory', async 
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://second.example/v1' } })
   expect(screen.queryByRole('checkbox', { name: 'old-directory-model' })).toBeNull()
   expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
-})
-
-it('opens key replacement from the source summary and saves only that source credential', async () => {
-  const original = vi.mocked(api).getMockImplementation()!
-  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
-    ? { data: { models: ['priced-model', 'available-model'] } }
-    : original(method, path, body, options))
-  mount('catalog/source/upstream')
-  fireEvent.click(await screen.findByRole('button', { name: 'modelInteraction.manageModels' }))
-  fireEvent.click(await screen.findByRole('checkbox', { name: 'available-model' }))
-  fireEvent.click(screen.getByRole('checkbox', { name: 'priced-model' }))
-
-  const replaceKey = () => fireEvent.click(screen.getByRole('button', { name: 'hub.directory.replaceKey' }))
-  replaceKey()
-  const input = screen.getByLabelText('modelIdentity.providerKey') as HTMLInputElement
-  expect(input.type).toBe('password')
-  expect(input.value).toBe('')
-  expect(screen.queryByLabelText('agent.models.baseUrl')).toBeNull()
-  expect(screen.getByText(catalog.sources[0].baseUrl)).toBeTruthy()
-  expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
-  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
-  expect(screen.getByRole('checkbox', { name: 'available-model' }).getAttribute('aria-checked')).toBe('true')
-  expect(screen.getByRole('checkbox', { name: 'priced-model' }).getAttribute('aria-checked')).toBe('false')
-
-  replaceKey()
-  fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'fixture-replacement' } })
-  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  const confirmation = await screen.findByRole('alertdialog', { name: 'hub.sourceApply' })
-  fireEvent.click(within(confirmation).getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
-    sources: [{ ...catalog.sources[0], apiKey: 'fixture-replacement' }],
-    models: catalog.models,
-  })))
-  await screen.findByRole('button', { name: 'hub.directory.replaceKey' })
-  expect(screen.queryByLabelText('modelIdentity.providerKey')).toBeNull()
 })
 
 
