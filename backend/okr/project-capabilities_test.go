@@ -80,6 +80,10 @@ func TestProjectWorkflowIsSeededOnlyForOKRAndPreservesProjectRules(t *testing.T)
 	if _, err := os.Stat(filepath.Join(project, "AGENTS.md")); !os.IsNotExist(err) {
 		t.Fatal("ordinary project acquired OKR instructions", err)
 	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(project, "materials")); err != nil {
+		t.Fatal(err)
+	}
 	custom := "# Existing project rules\nKeep the original inputs.\n"
 	if err := os.WriteFile(filepath.Join(project, "AGENTS.md"), []byte(custom), 0600); err != nil {
 		t.Fatal(err)
@@ -90,6 +94,12 @@ func TestProjectWorkflowIsSeededOnlyForOKRAndPreservesProjectRules(t *testing.T)
 	}
 	if body, _ := os.ReadFile(filepath.Join(project, "AGENTS.md")); string(body) != custom {
 		t.Fatal("existing project rules overwritten")
+	}
+	if target, err := os.Readlink(filepath.Join(project, "materials")); err != nil || target != outside {
+		t.Fatal("project-owned materials link replaced", target, err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "README.md")); !os.IsNotExist(err) {
+		t.Fatal("template wrote through the existing materials link", err)
 	}
 	workflow, err := okrtemplate.Files.ReadFile("okr-development/assets/.roami/okr/AGENTS.md")
 	if err != nil {
@@ -123,6 +133,19 @@ func TestSavedProjectGetsExecutableCanonicalResourcesWithoutInventedState(t *tes
 	}
 	if w.Config.Objective != testConfig().Objective || len(w.Observations) != 0 {
 		t.Fatal("template changed the user's objective or invented facts")
+	}
+	for _, name := range []string{"workspaces/README.md", "materials/README.md"} {
+		want, err := okrtemplate.Files.ReadFile("okr-development/assets/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := os.ReadFile(filepath.Join(project, name))
+		if err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("project workspace scaffold missing or changed: %s: %v", name, err)
+		}
+	}
+	if files, err := os.ReadDir(filepath.Join(project, "workspaces")); err != nil || len(files) != 1 {
+		t.Fatal("template fabricated a member workspace", files, err)
 	}
 	root := filepath.Join(project, bundleRoot)
 	for _, name := range []string{
@@ -170,11 +193,18 @@ func TestSavedProjectGetsExecutableCanonicalResourcesWithoutInventedState(t *tes
 		t.Fatal(err)
 	}
 	w.Config.Revision = w.Revision
+	workspaceReadme := filepath.Join(project, "workspaces", "README.md")
+	if err := os.WriteFile(workspaceReadme, []byte(custom), 0600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.Save("project", w.Config); err != nil {
 		t.Fatal(err)
 	}
 	if body, _ := os.ReadFile(name); string(body) != custom {
 		t.Fatal("template upgrade replaced existing project rules")
+	}
+	if body, err := os.ReadFile(workspaceReadme); err != nil || string(body) != custom {
+		t.Fatal("resaving replaced existing workspace instructions", err)
 	}
 	if info, err := os.Stat(filepath.Join(root, "data/source.sqlite3")); err != nil || info.Size() == 0 {
 		t.Fatal("resaving the template removed the initialized source database", err)

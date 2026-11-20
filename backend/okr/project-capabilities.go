@@ -60,6 +60,37 @@ func (s *Store) seedWorkflow(root *os.Root, projectID string) error {
 	return seedGuidance(project, "AGENTS.md", string(entry))
 }
 
+func (s *Store) seedProjectWorkspaceLayout(projectID string) error {
+	project, err := os.OpenRoot(s.projects()[projectID])
+	if err != nil {
+		return err
+	}
+	defer project.Close()
+	for _, directory := range []string{"workspaces", "materials"} {
+		info, err := project.Lstat(directory)
+		if err == nil && !info.IsDir() {
+			continue
+		}
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		name := path.Join(directory, "README.md")
+		if _, err := project.Lstat(name); err == nil {
+			continue
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		body, err := okrtemplate.Files.ReadFile("okr-development/assets/" + name)
+		if err != nil {
+			return err
+		}
+		if err := seedGuidance(project, name, string(body)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func seedProjectCapabilities(root *os.Root) error {
 	const prefix = "okr-development/assets/.roami/okr/"
 	return fs.WalkDir(okrtemplate.Files, strings.TrimSuffix(prefix, "/"), func(name string, item fs.DirEntry, err error) error {

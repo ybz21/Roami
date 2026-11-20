@@ -860,6 +860,11 @@ func (s *Store) mutateFilesLocked(root *os.Root, projectID string, revision int6
 	if err := change(w); err != nil {
 		return nil, err
 	}
+	if revision == 0 && writeDefinitions {
+		if err := s.seedProjectWorkspaceLayout(projectID); err != nil {
+			return nil, err
+		}
+	}
 	for _, review := range w.Reviews[reviews:] {
 		snapshot.Evidence[review.ID] = before
 	}
