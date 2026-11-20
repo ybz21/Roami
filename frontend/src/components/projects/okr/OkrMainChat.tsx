@@ -7,6 +7,7 @@ import { CloseIcon } from '../../../icons'
 import { currentNodeId, useCurrentNodeId } from '../../cluster/node-url'
 import type { OkrMessageReference } from '../../agent/notification-destination'
 import AgentConversation from '../../agent/AgentConversation'
+import { useAgentThread } from '../../agent/useAgentThread'
 import { agentFailure } from '../../agent/agent-request-failure'
 import ExecutorSessionChat from '../../chat/ExecutorSessionChat'
 import { useSessionOverview } from '../../../session-overview'
@@ -129,11 +130,15 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
   }
   const nativeSession = execution && sessions.value.filter(session => session.name === execution.sessionId && session.agent === execution.executor && session.projectKey === projectId && !session.dormant && !session.lifecycle)
   const nativeReady = !!nativeSession && nativeSession.length === 1 && !sessions.failed
+  const managedThread = useAgentThread(nativeReady && !reference?.messageId ? cid : '', '', node)
+  const mainTurnId = managedThread.view
+    ? managedThread.view.turns.find(turn => turn.state === 'running')?.id ?? null
+    : undefined
   const content = <aside className="okr-main-chat" data-embedded={embedded} data-conversation-id={cid}>
     {!secondaryPage && !embedded && <header className="okr-chat-head"><strong>{t('okr.chatTitle')}</strong><button type="button" className="tt-act" aria-label={t('okr.endChat')} onClick={onClose}><CloseIcon /></button></header>}
     {restoring && <Spin />}
     {(failed || upgradeRequired) && <div className="okr-error" role="alert"><p>{t(upgradeRequired ? 'okr.agentUpgradeRequired' : 'agent.requestFailed')}</p><Button onClick={() => { setFailed(false); setUpgradeRequired(false); void acquire().catch(() => setFailed(true)) }}>{t('inbox.retry')}</Button></div>}
-    {execution && !reference?.messageId ? nativeReady ? <ExecutorSessionChat key={execution.sessionId} sessionId={execution.sessionId} executor={execution.executor} onSend={sendNative} onCommand={async command => {
+    {execution && !reference?.messageId ? nativeReady ? <ExecutorSessionChat key={execution.sessionId} sessionId={execution.sessionId} executor={execution.executor} mainTurnId={mainTurnId} onSend={sendNative} onCommand={async command => {
       if (!['/model', '/status', '/stop', '/help', '/tasks', '/memory'].includes(command)) throw new Error(t('okr.nativeCommand'))
       await sendNative(command, true)
     }} onSession={onSession} /> : !sessions.loaded ? <Spin /> : <p role="status">{t('swarm.member.sessionUnavailable')}</p> : <AgentConversation cid={cid} branch={reference?.branchId || ''} focusMessage={reference?.messageId || ''} node={node} onSession={onSession} select={(conversationId, branchId = '', messageId = '') => { if (conversationId === cid) setLocalReference({ conversationId, branchId, messageId }) }} project={{

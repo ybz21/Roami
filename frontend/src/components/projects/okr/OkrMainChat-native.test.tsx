@@ -6,20 +6,23 @@ import { emptyConfiguration } from './okr-workspace'
 import { nativeMainRequest, transferMainDraft } from './okr-main-native-draft'
 import { sessionDraftKey } from '../../chat/session-draft'
 
-const state = vi.hoisted(() => ({ api: vi.fn(), sessions: [] as any[], failed: false }))
+const state = vi.hoisted(() => ({ api: vi.fn(), sessions: [] as any[], failed: false, turnState: "" }))
 vi.mock('../../../api', () => ({ api: state.api }))
 vi.mock('../../../layout', () => ({ useLayout: () => ({ phone: false, size: 'large' }) }))
 vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../../../session-overview', () => ({ useSessionOverview: () => ({ value: state.sessions, loaded: true, failed: state.failed }) }))
 vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, currentNodeId: () => null, nodeApi: (path: string) => '/api' + path }))
+vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (cid: string) => ({
+  view: cid && state.turnState ? { turns: [{ id: 'current-turn', state: state.turnState }] } : null,
+}) }))
 vi.mock('../../agent/AgentConversation', () => ({ default: ({ cid, focusMessage, project }: any) => <p>legacy:{cid}:{focusMessage}:{project.nativeModel || ''}:{String(project.modelControlsDisabled)}</p> }))
-vi.mock('../../chat/ExecutorSessionChat', () => ({ default: ({ executor, sessionId, onSend, onCommand }: any) => <><button onClick={() => { void onSend('Continue the original team').catch(() => {}) }}>native:{executor}:{sessionId}</button><button onClick={() => { void onCommand('/model').catch(() => {}) }}>model command</button></> }))
+vi.mock('../../chat/ExecutorSessionChat', () => ({ default: ({ executor, sessionId, mainTurnId, onSend, onCommand }: any) => <><output>{mainTurnId || "no running turn"}</output><button onClick={() => { void onSend('Continue the original team').catch(() => {}) }}>native:{executor}:{sessionId}</button><button onClick={() => { void onCommand('/model').catch(() => {}) }}>model command</button></> }))
 
 const configuration = () => ({ conversationId: 'original-main', projectId: 'project', generation: 1, executor: 'claude', model: 'free', sessionId: 'original-provider' })
 const props = () => ({ projectId: 'project', expectedConversationId: 'original-main', draft: emptyConfiguration(), workspace: null, onClose: vi.fn() })
 const draftKey = 'roami.okr.main.draft:local:project'
 beforeEach(() => {
-  localStorage.clear(); state.failed = false
+  localStorage.clear(); state.failed = false; state.turnState = ''
   state.sessions = [{ name: 'original-provider', agent: 'claude', projectKey: 'project', dormant: false }]
   state.api.mockReset().mockImplementation(async (_method, path) => ({ data:
     path === '/agent/status' ? { projectOkrMain: true, projectMainExecution: true, conversationIdentity: true, okrMessageContext: true }
@@ -124,4 +127,16 @@ it('model commands preserve an uncertain message key and its frozen context', as
   await waitFor(() => expect(state.api.mock.calls.filter(call => call[2]?.text === 'Continue the original team')).toHaveLength(2))
   expect(state.api.mock.calls.filter(call => call[2]?.text === 'Continue the original team')[1]).toEqual(sent)
   expect(state.api.mock.calls.find(call => call[2]?.text === '/model')?.[2]).not.toHaveProperty('okrContext')
+})
+
+it('forwards the bound Main running turn even before the native transcript can report it', async () => {
+  state.turnState = 'queued'
+  const view = render(<OkrMainChat {...props()} />)
+  await screen.findByText('no running turn')
+  state.turnState = 'running'
+  view.rerender(<OkrMainChat {...props()} />)
+  expect(screen.getByText('current-turn')).toBeTruthy()
+  state.turnState = 'completed'
+  view.rerender(<OkrMainChat {...props()} />)
+  expect(screen.getByText('no running turn')).toBeTruthy()
 })

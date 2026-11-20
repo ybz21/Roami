@@ -5,9 +5,17 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { ChatShell } from './ChatShell'
 import { I18nProvider } from '../../i18n'
 
-class ResizeObserverStub { observe() {} unobserve() {} disconnect() {} }
+const resizeCallbacks = new Map<Element, () => void>()
+class ResizeObserverStub {
+  private target?: Element
+  constructor(private readonly callback: () => void) {}
+  observe(target: Element) { this.target = target; resizeCallbacks.set(target, this.callback) }
+  unobserve() { if (this.target) resizeCallbacks.delete(this.target) }
+  disconnect() { this.unobserve() }
+}
 
 beforeEach(() => {
+  resizeCallbacks.clear()
   localStorage.clear()
   localStorage.setItem('ttmux-locale', 'zh-CN')
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
@@ -20,20 +28,21 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const messages = Array.from({ length: 60 }, (_, i) => ({ id: 'm' + i, role: 'assistant', blocks: [{ kind: 'text', text: 'm' + i }] }))
 
-function mount(load: () => Promise<void>) {
+function mount(load: () => Promise<void>, busy = false) {
   const view = render(
     <I18nProvider><AntApp>
       <ChatShell name="autoload" accent="var(--accent)" placeholder="说点什么"
-        messages={messages as any} renderMessage={(m) => <div>{m.id}</div>} hasEarlier onLoadEarlier={load} />
+        messages={messages as any} busy={busy} renderMessage={(m) => <div>{m.id}</div>} hasEarlier onLoadEarlier={load} />
     </AntApp></I18nProvider>,
   )
-  const box = view.container.querySelector('.conversation-transcript')!.parentElement as HTMLDivElement
+  const transcript = view.container.querySelector('.conversation-transcript')!
+  const box = transcript.parentElement as HTMLDivElement
   const metrics = (scrollHeight: number, clientHeight: number) => {
     Object.defineProperty(box, 'scrollHeight', { configurable: true, value: scrollHeight })
     Object.defineProperty(box, 'clientHeight', { configurable: true, value: clientHeight })
   }
   const scrollTo = (top: number) => { box.scrollTop = top; fireEvent.scroll(box) }
-  return { view, metrics, scrollTo }
+  return { view, metrics, scrollTo, box, transcript }
 }
 
 it('上滑到自己顶就自动往回翻一页，停在那儿只翻一次', async () => {
@@ -61,4 +70,19 @@ it('内容还没撑满一屏时不自动加载，留给那颗按钮', () => {
   metrics(800, 800)
   scrollTo(0)
   expect(load).not.toHaveBeenCalled()
+})
+
+it('follows growing live output only while the reader is pinned to the bottom', () => {
+  const { box, transcript, metrics, scrollTo } = mount(vi.fn(async () => {}), true)
+  const resize = resizeCallbacks.get(transcript)!
+  metrics(1500, 500)
+  scrollTo(1000)
+  metrics(1800, 500)
+  act(resize)
+  expect(box.scrollTop).toBe(1800)
+
+  scrollTo(600)
+  metrics(2100, 500)
+  act(resize)
+  expect(box.scrollTop).toBe(600)
 })

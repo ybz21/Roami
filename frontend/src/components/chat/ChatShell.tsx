@@ -31,7 +31,7 @@ import type { AgentStatus } from './status'
 // 数量很小（几条文本），且已发出的会话消息很快就会被转录对账掉，不会无限增长。
 const outboxStore = new Map<string, { id: number; text: string }[]>()
 
-export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend, onCommand }: {
+export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, mainTurnId, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend, onCommand }: {
   /** 这条 composer 发给谁：左端那枚亮着的 agent pill（22 设计 §3.3） */
   onSend?: (text: string) => Promise<void>
   onCommand?: (text: string) => Promise<void>
@@ -47,6 +47,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   renderMessage: (m: Msg, i: number) => ReactNode
   pending?: ReactNode
   busy?: boolean
+  mainTurnId?: string | null
   error?: string
   onOpenFile?: (path: string, line?: number) => void
   tasks?: TaskIndex
@@ -84,6 +85,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   const [dropMode, setDropMode] = useState<'upload' | 'path' | 'session'>('upload')
   const [uploading, setUploading] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
+  const transcriptRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const atBottom = useRef(true)
   const { message } = AntApp.useApp()
@@ -208,6 +210,17 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     }
     anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId }
   }, [messages, pending, visible, live])
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const transcript = transcriptRef.current
+    if (!live || !busy || !box || !transcript || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      if (atBottom.current) box.scrollTop = box.scrollHeight
+    })
+    observer.observe(transcript)
+    return () => observer.disconnect()
+  }, [busy, live])
+
 
   // 滑到接近顶部就自己往回翻一页，不用先去找那颗按钮。
   // 首屏窗口里还有没渲染的（hidden>0）先放本地的，放完再去后端要更早的。
@@ -423,7 +436,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
         )}
         <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
           <div ref={boxRef} onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: 'var(--sp-2) var(--sp-4)' }}>
-            <div className="conversation-transcript">
+            <div className="conversation-transcript" ref={transcriptRef}>
             {messages.length === 0 && !pending && <div style={{ color: 'var(--text-dim)', textAlign: 'center', marginTop: 30 }}>{emptyHint || t('chat.loadingTranscript')}</div>}
             {(hidden > 0 || hasEarlier) && (
               <div style={{ textAlign: 'center', margin: '2px 0 8px' }}>
@@ -448,7 +461,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
                 </div>
               </div>
             ))}
-            {live && (busy ? <LiveTail name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
+            {live && (busy ? <LiveTail key={mainTurnId} name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
             </div>
           </div>
           {/* 「回到底部」已并进下方状态条（带未读数）；状态条一个字段都没有时（刚进页面、

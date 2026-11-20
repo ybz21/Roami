@@ -1,4 +1,5 @@
 import { usePageEffect } from '../../page-activity'
+import { pollWhileVisible } from '../../visible-poll'
 // 实时回显（会话还在生成时，从终端 capture 里扒出来的那截）。
 //
 // 从前是把 TUI 尾巴原样倒出来的一坨 pre：`└` 框线、`✔ □` 字符图标、会话名、
@@ -66,20 +67,12 @@ export function LiveTail({ name, accent, idle, lastUser }: {
   const { t } = useI18n()
   const [raw, setRaw] = useState('')
   const [open, setOpen] = useState(true)
-  usePageEffect(() => {
-    let stop = false
-    const poll = async () => {
-      try {
-        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=40`)
-        const data = r.data || ''
-        // 交互式选择框交给 PromptPanel 专门渲染，这里不再重复显示（避免被截断/错乱）
-        if (!stop) setRaw(detectPrompt(data) ? '' : data)
-      } catch { /* 轮询失败就保持上一帧，别把卡片抖没 */ }
-    }
-    poll()
-    const timer = setInterval(poll, 800)
-    return () => { stop = true; clearInterval(timer) }
-  }, [name])
+  usePageEffect(() => pollWhileVisible(async signal => {
+    const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=40`, undefined, { signal })
+    const data = r.data || ''
+    // 交互选择只由 PromptPanel 渲染。
+    if (!signal.aborted) setRaw(detectPrompt(data) ? '' : data)
+  }, 800).stop, [name])
 
   const lines = useMemo(() => parseTail(raw, { session: name, lastUser }), [raw, name, lastUser])
   if (!lines.length) return <>{idle}</>
