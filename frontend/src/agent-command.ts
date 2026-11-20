@@ -15,8 +15,8 @@ export function agentCommand(kind: AgentKind, prefs: Preferences, defaultCommand
   return prefs.agentCommands?.[kind]?.trim() || (key ? String(prefs[key] || '').trim() : '') || defaultCommand || agentDefinition(kind)?.command || kind
 }
 
-export function agentLaunch(kind: AgentKind, prefs: Preferences, prompt?: string): string {
-  let cmd = agentCommand(kind, prefs)
+export function agentLaunch(kind: AgentKind, prefs: Preferences, prompt?: string, defaultCommand?: string): string {
+  let cmd = agentCommand(kind, prefs, defaultCommand)
   // Explicit permission settings in custom commands remain authoritative.
   if (kind === 'claude' && !/(?:^|\s)--(?:permission-mode|dangerously-skip-permissions)(?:[=\s]|$)/.test(cmd)) {
     cmd += ' --dangerously-skip-permissions'

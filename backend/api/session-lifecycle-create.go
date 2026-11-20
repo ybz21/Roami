@@ -234,6 +234,7 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 				return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_REVIEW_NOT_READY"))
 			}
 			prompt += authorReviewAppendix(reviewer.Session, o.Intent.Review.Trigger)
+			command = reviewAgentCommand(ctx, launch.Agent, command)
 		}
 		if runner := agent.Get(launch.Agent); runner != nil {
 			if flag := agent.Describe(runner).PromptFlag; flag != "" {

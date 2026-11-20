@@ -40,6 +40,8 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
   }
   const stageKey = 'session.lifecycle.stage.' + op.stage
   const errorKey = 'session.lifecycle.error.' + op.errorCode
+  const reviewSession = op.stage === 'review' && !op.cancelRequested ? op.receipts['review-endpoint-intent']?.session : undefined
+  const openReview = reviewSession && onOpen && <Button onClick={() => onOpen(reviewSession)}>{t('session.review.openReviewer')}</Button>
   const preparing = op.kind === 'create' && !lifecycleEnded(op) && op.state !== 'attention'
   if (preparing) return <div className="tt-lifecycle-wait">
     <div className="tt-lifecycle-wait-content">
@@ -49,6 +51,7 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
         <span>{t(stageKey)}</span>
       </div>
       <span className="tt-lifecycle-wait-name">{op.intent.name || op.resourceId}</span>
+      {openReview}
       {!op.cancelRequested && <Button loading={busy} onClick={() => void act('cancel')}>{t('session.lifecycle.cancel')}</Button>}
       <details className="tt-lifecycle-wait-draft">
         <summary>{t('session.lifecycle.draft')}</summary>
@@ -78,6 +81,7 @@ export function LifecycleOperationView({ op, onOpen }: { op: LifecycleOperation;
       {ready && <Button type="primary" disabled={!draft.trim()} loading={busy} onClick={() => void send()}>{t('session.lifecycle.sendDraft')}</Button>}
     </div>}
     <div className="tt-lifecycle-actions">
+      {openReview}
       {op.state === 'attention' && op.errorCode !== 'LIFECYCLE_RESULT_UNKNOWN' && <Button loading={busy} onClick={() => void act('retry')}>{t('session.lifecycle.retry')}</Button>}
       {op.kind === 'create' && op.stage === 'review' && op.state === 'attention' && op.intent.review && !op.cancelRequested &&
         <Button loading={busy} onClick={() => void act('continue-without-review')}>{t('session.review.continueWithout')}</Button>}
@@ -126,10 +130,10 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
   </>
 }
 
-export function PendingSessionLifecycle({ name }: { name: string }) {
+export function PendingSessionLifecycle({ name, onOpen }: { name: string; onOpen?: (name: string) => void }) {
   const { value } = useSessionLifecycle()
   const op = blockingLifecycle(value, name)
-  return op?.kind === 'create' ? <div className="tt-lifecycle-guard"><LifecycleOperationView key={op.operationId} op={op} /></div> : null
+  return op?.kind === 'create' ? <div className="tt-lifecycle-guard"><LifecycleOperationView key={op.operationId} op={op} onOpen={onOpen} /></div> : null
 }
 
 export function SessionLifecycleDraftNotice({ name }: { name: string }) {

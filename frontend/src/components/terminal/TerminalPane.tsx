@@ -1208,7 +1208,7 @@ export default function TerminalPane(props: {
             pointerEvents: termName === active && !curFile ? 'auto' : 'none',
             zIndex: termName === active && !curFile ? 1 : 0,
           }}>
-            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
+            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} onOpen={onOpenSession} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
               onContextMenu={({ x, y, selection }) => { setActive(termName); setCtx({ x, y, session: termName, selection }) }}
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}

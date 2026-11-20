@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import type { AgentDefinition } from '../../agent-registry'
-import { agentCommand } from '../../agent-command'
+import { agentLaunch } from '../../agent-command'
 import type { Preferences } from '../../preferences'
 import { AgentLogo, ChevronDown } from '../../icons'
 import { useI18n } from '../../i18n'
@@ -21,7 +21,7 @@ export function useReviewDraft(author: string, agents: AgentDefinition[], eligib
     toggle: () => setEnabled(value => !value),
     reset: () => { setEnabled(false); setChoice(''); setTrigger('submit') },
     intent: (prefs: Preferences): ReviewIntent | undefined => open && selected
-      ? { agent: selected.kind, command: agentCommand(selected.kind, prefs, selected.command), trigger }
+      ? { agent: selected.kind, command: agentLaunch(selected.kind, prefs, undefined, selected.command), trigger }
       : undefined,
   }
 }

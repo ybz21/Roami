@@ -21,7 +21,7 @@ export type LifecycleIntent = {
 export type LifecycleOperation = {
   operationId: string; resourceId: string; requestKey: string; kind: 'create' | 'close'; intent: LifecycleIntent
   state: 'queued' | 'running' | 'attention' | 'succeeded' | 'cancelled'; stage: string; revision: number
-  cancelRequested: boolean; receipts: Record<string, { result: any; durationMs: number }>; errorCode?: string; errorDetail?: string; acceptedAt: number; updatedAt: number
+  cancelRequested: boolean; receipts: Record<string, { result: any; durationMs: number; session?: string }>; errorCode?: string; errorDetail?: string; acceptedAt: number; updatedAt: number
 }
 export const lifecycleEnded = (op: LifecycleOperation) => op.state === 'succeeded' || op.state === 'cancelled'
 const useOperations = createSessionPoll<LifecycleOperation[]>('/session-lifecycle/operations', 3000, [], r => Array.isArray(r.data) ? r.data : [], ops => ops.some(op => !lifecycleEnded(op) && op.state !== 'attention'))

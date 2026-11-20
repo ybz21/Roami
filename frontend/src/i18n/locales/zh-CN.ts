@@ -3265,7 +3265,7 @@ const zhCN = {
   'session.review.round': '第 {round} 轮',
   'session.review.continueWithout': '关闭互审并开工',
   'session.lifecycle.stage.review': '准备审查会话',
-  'session.lifecycle.error.LIFECYCLE_REVIEW_NOT_READY': '审查 Agent 尚未就绪。请检查审查会话中的安装或登录，再重试。',
+  'session.lifecycle.error.LIFECYCLE_REVIEW_NOT_READY': '审查 Agent 尚未就绪。检查安装、登录或工作区信任确认后重试。',
   'session.lifecycle.error.LIFECYCLE_REVIEW_REPOSITORY': '互审需要一个已有提交的 Git 工作区。',
   'session.lifecycle.error.LIFECYCLE_REVIEW_INVALID': '请选择可用的审查 Agent 和交审方式。',
   'session.lifecycle.error.LIFECYCLE_REVIEW_WORKSPACE': '请保留工作区，或先关闭关联的审查会话再清理。',

@@ -3263,7 +3263,7 @@ const enUS = {
   'session.review.round': 'Round {round}',
   'session.review.continueWithout': 'Start without peer review',
   'session.lifecycle.stage.review': 'Prepare review session',
-  'session.lifecycle.error.LIFECYCLE_REVIEW_NOT_READY': 'The reviewer is not ready. Check its installation or sign-in in the review session, then retry.',
+  'session.lifecycle.error.LIFECYCLE_REVIEW_NOT_READY': 'The reviewer is not ready. Check installation, sign-in, or workspace trust, then retry.',
   'session.lifecycle.error.LIFECYCLE_REVIEW_REPOSITORY': 'Peer review requires a Git workspace with an existing commit.',
   'session.lifecycle.error.LIFECYCLE_REVIEW_INVALID': 'Choose a review agent and trigger.',
   'session.lifecycle.error.LIFECYCLE_REVIEW_WORKSPACE': 'Keep the worktree or close the associated review session before cleaning up.',
