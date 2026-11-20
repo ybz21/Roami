@@ -16,12 +16,13 @@ import { usePreferences } from '../../preferences'
 import { useRegisteredAgents } from '../../agent-registry'
 import type { AgentKind } from '../../agent-kind'
 import { sessionLabel } from './session-label'
-import { AutoComplete, Button, Checkbox, Input, Modal, Radio, Segmented, Select, Space, Tag, Tooltip, App as AntApp } from 'antd'
+import { AutoComplete, Button, Input, Modal, Radio, Segmented, Select, Space, Tag, Tooltip, App as AntApp } from 'antd'
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { relTime } from '../../time-format'
 import { submitLifecycle, lifecycleLaunchIntent, lifecycleRequestError } from './session-lifecycle'
+import { useReviewDraft, useSessionReviewControls } from './SessionReviewOptions'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
 // 由 prompt 首句推会话名：派活时用户只写了要干什么，名字不该再问一遍。
@@ -72,9 +73,10 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const [mainPath, setMainPath] = useState('')
   // 「已有」选中值：'wt:<路径>'（进这个工作区）/ 'br:<分支>'（为这条分支开一个工作区）
   const [existing, setExisting] = useState('')
-  const [autoReview, setAutoReview] = useState(false)
   const setup = useRepositorySetup(open ? dir.trim() : '')
   const isGitRepo = setup.ready
+  const review = useReviewDraft(agent, agents, isGitRepo && !!prompt.trim())
+  const reviewControls = useSessionReviewControls(review)
   const [creating, setCreating] = useState(false)
   // worktree 展开态（W1）：只选「基于」。分支不提前指定——后端按会话名占位，
   // Agent 开工后按任务 git branch -m 语义化（交互修订 4：先建会话再建 worktree）。
@@ -89,7 +91,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const [prefs] = usePreferences()
   useEffect(() => {
     if (!open) return
-    setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); setAutoReview(false)
+    setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); review.reset()
     setModelChoice({ model: 'auto', freeOnly: false }); nativeRequest.current = null
     setBase(''); setBranches([]); setRemoteBranches([]); setDefBranch(''); setExistingWts([]); setMainPath(''); setExisting('')
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
@@ -171,9 +173,10 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
         baseReq = { base: rest.slice(sep + 1), remote: rest.slice(0, sep) }
       }
       const op = await submitLifecycle('create', {
+        review: review.intent(prefs),
         name: finalName, task: prompt, dir: sessionDir, parent: parent && !nativeSessionId(parent) ? parent : undefined,
         worktree: !!(madeWt || adopt), ...(adopt ? { branch: adopt, existing: true } : baseReq),
-        launch: lifecycleLaunchIntent(agent, prefs, prompt, madeWt ? 'new' : adopt ? 'adopt' : isGitRepo ? 'repo' : 'plain', autoReview, t),
+        launch: lifecycleLaunchIntent(agent, prefs, prompt, madeWt ? 'new' : adopt ? 'adopt' : isGitRepo ? 'repo' : 'plain', false, t),
       })
       pushRecentDir(dir); message.success(t('session.lifecycle.accepted')); onClose(); onDone(op.resourceId)
 
@@ -315,12 +318,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
           <Input.TextArea placeholder={t('session.promptPlaceholder')} value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             autoSize={{ minRows: 3, maxRows: 8 }} />
-          <Tooltip placement="right" title={agent !== 'none' ? t('session.autoReviewTip') : t('session.autoReviewNeedsAgent')}>
-            <Checkbox checked={autoReview && agent !== 'none'} disabled={agent === 'none' || agent === 'native'}
-              onChange={(e) => setAutoReview(e.target.checked)} style={{ width: 'fit-content' }}>
-              <span style={{ fontSize: 13 }}>{t('session.autoReview')}</span>
-            </Checkbox>
-          </Tooltip>
+          {reviewControls.toggle}
+          {reviewControls.row}
         </Space>
   const title = parent ? t('session.fork.title', { parent }) : t('session.new')
   const submitLabel = parent ? t('session.fork.ok') : t('file.create')

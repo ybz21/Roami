@@ -201,8 +201,16 @@ after what it actually contains — the concrete domain concept (`session-identi
 
 Keep design proposals in `docs/design/YYYYMMDD-topic/`, with a `README.md` entry point and HTML
 proposals, assets, and revision snapshots alongside it. Update the same directory as the design evolves.
-Include Product Design, User Stories, and Technical Design, including code and module architecture.
-Record acceptance evidence in the matching design directory.
+
+For substantial requirements, keep these HTML files together in the topic directory.
+
+- `index.html` gives the design overview and links to `product.html` and `tech.html`.
+- `product.html` covers product design, user stories, and the prototype. Link a separate
+  `prototype.html` when the interactive prototype lives in its own file.
+- `tech.html` covers the implementation design, including code and module architecture.
+
+Link `index.html` from the topic's `README.md`. Use relative links between HTML pages and their
+assets. Record acceptance evidence in the matching design directory.
 
 `AGENTS.md` contains durable repository rules only. Do not append design proposals, prototypes,
 acceptance logs, task status, or command output here. Link to the relevant document instead.

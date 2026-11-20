@@ -196,7 +196,8 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
 
   if (initialProjectKey) {
     const project = projects?.find(project => project.key === initialProjectKey)
-    return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }} keepBottomNav>
+    return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }} keepBottomNav
+      action={project ? { label: t('mobile.proj.newTask'), icon: <PlusIcon size={20} />, onClick: () => onNewTask(project.dir) } : undefined}>
       {project ? <MobileProjectDetail projectId={project.key} dir={project.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} /> : <p role="status">{projects === null ? t('common.loading') : t('agent.activity.detailsUnavailable')}</p>}
     </MobileSubPage>
   }

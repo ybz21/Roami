@@ -95,7 +95,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
         <span className="ic">{s.agent ? <AgentLogo kind={s.agent} size={15} /> : <TerminalIcon size={15} />}</span>
         <span className="nm">{rowLabel(s)}</span>
         {s.dormant ? <span className="dot sleep" role="img" aria-label={t('tree.dormant')} /> : dot(s, t(s.waiting ? 'mobile.st.waiting' : 'mobile.st.running'))}
-        {s.at ? <span className="tm" title={absTime(s.at)}>{ago(s.at, t)}</span> : null}
+        {s.review?.role === 'reviewer' ? <span className="tm">{t(`session.review.phase.${s.review.phase}`)}</span> : s.at ? <span className="tm" title={absTime(s.at)}>{ago(s.at, t)}</span> : null}
       </button>
     </Dropdown>
   )

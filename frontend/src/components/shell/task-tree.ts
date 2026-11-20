@@ -1,3 +1,4 @@
+import type { SessionReview } from '../../session-overview'
 import type { SessionAgent as AgentKind } from '../sessions/session-record'
 // 左栏项目树的读模型：项目 → 任务（worktree）→ 会话（22 设计 §3.2）。
 //
@@ -26,6 +27,7 @@ export type TreeSession = {
   branch?: string
   /** 互审陪跑会话：树上显示被审会话的名称。 */
   reviewOf?: string
+  review?: SessionReview
 }
 
 export type TreeTask = {
@@ -58,7 +60,7 @@ type ProjIn = {
   needs?: { name: string; label?: string; running?: boolean; waiting?: boolean; agent?: AgentKind; state?: string }[] | null
 }
 type WtIn = { path: string; branch: string; isMain: boolean; committedAhead?: number; dirty?: number; untracked?: number; behind?: number; mergedInto?: string; pushed?: boolean; sessions?: { session: string; dormant?: boolean }[] | null }
-type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string; projectKey?: string; cwd?: string; worktree?: string; branch?: string }
+type SessIn = { name: string; label?: string; lastActivity?: number; agent?: AgentKind; parent?: string; projectKey?: string; cwd?: string; worktree?: string; branch?: string; review?: SessionReview }
 
 export function buildTaskTree(o: {
   projects: ProjIn[]
@@ -85,6 +87,7 @@ export function buildTaskTree(o: {
       label: s.label || cur.label,
       at: s.lastActivity || cur.at,
       parent: s.parent ?? cur.parent,
+      review: s.review ?? cur.review,
       cwd: s.cwd ?? cur.cwd,
       worktree: s.worktree ?? cur.worktree,
       branch: s.branch ?? cur.branch,
@@ -210,6 +213,7 @@ export function buildTaskTree(o: {
   for (const task of allTasks) for (const s of task.sessions) homeOf.set(s.name, task)
 
   const relocate = (s: TreeSession, from: TreeTask | null) => {
+    if (s.review) return false
     const author = authorOf(s.name)
     if (!author) return false
     s.parent ||= author

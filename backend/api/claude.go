@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/internal/agent"
+	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 // 工作目录 → ~/.claude/projects 下的目录名（非字母数字一律换成 -，与 Claude Code 一致）
@@ -239,7 +240,7 @@ func (a *API) SessionAgents(c *gin.Context) {
 // runningAgentProcs 一次扫描：会话 → 正在跑的 agent 进程（种类、cwd、pid）。
 // 会话 ↔ 对话 id 的对账（agent-transcript-link.go）要 cwd 和 pid，绿点判活跃只要种类。
 func runningAgentProcs() map[string]agentProc {
-	out, err := exec.Command("tmux", "list-panes", "-a", "-F", "#{session_name}\t#{pane_pid}\t#{pane_current_path}").Output()
+	out, err := runtime.New().TmuxOutput("list-panes", "-a", "-F", "#{session_name}\t#{pane_pid}\t#{pane_current_path}")
 	if err != nil {
 		return nil
 	}
