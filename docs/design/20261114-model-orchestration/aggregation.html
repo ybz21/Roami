@@ -17,7 +17,7 @@
 <main class="doc">
 <section>
   <h2>多个模型，一个稳定的调用名</h2>
-  <p class="lead">成员从已启用的模型里挑。上面是正在编辑的草稿，下面是此刻真正生效的顺位。没保存之前，新请求继续走生效的那一套。</p>
+  <p class="lead">成员从已启用的模型里挑。调度页先显示当前生效的顺位，再显示待保存的策略和成员顺序。保存后，新请求使用更新后的配置。</p>
   <div class="board solo">
   <figure>
     <figcaption>桌面 · 日常编码</figcaption>
@@ -34,6 +34,13 @@
             <span class="btn primary">保存</span>
           </div>
           <div class="pane">
+            <h3>此刻生效 · 观测于 14:28</h3>
+            <dl class="facts">
+              <div><dt>配置首选</dt><dd>WorkBuddy · DS</dd></div>
+              <div><dt>下一条请求先试</dt><dd>OpenRouter · Qwen<em>首选冷却中</em></dd></div>
+              <div><dt>近 30 分钟切换后恢复</dt><dd>5<em> 次 · 跨来源 3 次</em></dd></div>
+            </dl>
+            <span class="btn quiet">看一次跨来源恢复 →</span>
             <div class="toolbar" style="padding-inline:0">
               <span class="seg"><span class="on">按顺序</span><span>轮流</span><span>按权重</span></span>
               <span class="grow"></span>
@@ -47,13 +54,6 @@
                 <tr><td><strong>3 · 本机 · Qwen</strong></td><td>文本</td><td>价格未知</td><td><span class="st ok">可调度</span></td><td><span class="btn quiet">移除</span></td></tr>
               </tbody>
             </table>
-            <h3>此刻生效 · 观测于 14:28</h3>
-            <dl class="facts">
-              <div><dt>配置首选</dt><dd>WorkBuddy · DS</dd></div>
-              <div><dt>下一条请求先试</dt><dd>OpenRouter · Qwen<em>首选冷却中</em></dd></div>
-              <div><dt>近 30 分钟切换后恢复</dt><dd>5<em> 次 · 跨来源 3 次</em></dd></div>
-            </dl>
-            <span class="btn quiet">看一次跨来源恢复 →</span>
           </div>
         </div>
       </div>
