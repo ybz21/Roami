@@ -11,6 +11,8 @@ from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_coordination_admission import for_turn
+from roami_agent.storage.swarm_memory import project_guidance_references
 from roami_agent.storage.swarm_repository import (
     changed,
     dependency_ready,
@@ -289,25 +291,34 @@ class SwarmPlans:
             return await write_memory(self, owner, sid, spec)
 
     async def context(self, turn):
-        groups = await self.db.call(
-            lambda db: rows(
-                db,
-                "SELECT DISTINCT g.id FROM swarm_groups g LEFT JOIN swarm_work_items w ON w.swarm_id=g.id "
-                "WHERE g.owner_id=? AND g.archived=0 AND (g.conversation_id=? OR w.task_id=?) "
-                "ORDER BY g.updated_ms DESC LIMIT 5",
-                (
-                    turn["owner_id"],
-                    turn["conversation_id"],
-                    turn.get("taskId")
-                    or (
-                        row(
-                            db,
-                            "SELECT task_id FROM task_attempts WHERE id=?",
-                            (turn.get("executionRunId"),),
-                        )
-                        or {}
-                    ).get("task_id"),
-                ),
+        batch = (
+            await self.db.call(lambda db: for_turn(db, turn))
+            if turn.get("native_project_main")
+            else None
+        )
+        groups = (
+            [{"id": batch["swarm_id"]}]
+            if batch
+            else await self.db.call(
+                lambda db: rows(
+                    db,
+                    "SELECT DISTINCT g.id FROM swarm_groups g LEFT JOIN swarm_work_items w ON w.swarm_id=g.id "
+                    "WHERE g.owner_id=? AND g.archived=0 AND (g.conversation_id=? OR w.task_id=?) "
+                    "ORDER BY g.updated_ms DESC LIMIT 5",
+                    (
+                        turn["owner_id"],
+                        turn["conversation_id"],
+                        turn.get("taskId")
+                        or (
+                            row(
+                                db,
+                                "SELECT task_id FROM task_attempts WHERE id=?",
+                                (turn.get("executionRunId"),),
+                            )
+                            or {}
+                        ).get("task_id"),
+                    ),
+                )
             )
         )
         values = []
@@ -315,6 +326,8 @@ class SwarmPlans:
             memory = await self.memory_read(turn["owner_id"], value["id"])
             if isinstance(memory.get("content"), str) and len(memory["content"]) > 8000:
                 memory = {**memory, "content": memory["content"][:8000], "truncated": True}
+            if batch:
+                memory = project_guidance_references(memory)
             values.append({"swarmId": value["id"], "teamMemory": memory})
         return values
 
