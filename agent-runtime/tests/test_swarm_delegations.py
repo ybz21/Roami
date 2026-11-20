@@ -371,3 +371,39 @@ async def test_legacy_browser_context_cannot_create_or_restore_authority(delegat
         lambda db: row(db, "SELECT content_json FROM messages WHERE id=?", (accepted["messageId"],))
     )
     assert retained["content_json"] == body
+
+
+async def test_roster_retirement_cannot_silently_change_scheduled_scope(delegated_team):
+    runtime, service, team, _, _, binding, spec = delegated_team
+    sid = team["id"]
+    enabled = await service.enable("alice", sid, spec, binding=binding)
+    removed, *remaining = spec["memberIds"]
+    retire = {
+        "commandKey": "retire-role",
+        "expectedRevision": 2,
+        "action": "retire",
+        "memberIds": [removed],
+    }
+    with pytest.raises(DomainError, match="SWARM_MEMBER_DELEGATION_ACTIVE"):
+        await runtime.swarms.change_members("alice", sid, retire)
+    updated = await service.enable(
+        "alice",
+        sid,
+        {
+            **spec,
+            "commandKey": "new-scope",
+            "expectedDelegationRevision": 1,
+            "memberIds": remaining,
+        },
+        binding=binding,
+    )
+    assert updated["delegationId"] != enabled["delegationId"]
+    assert (await runtime.swarms.change_members("alice", sid, retire))["revision"] == 3
+    with pytest.raises(DomainError, match="SWARM_MEMBER_REQUIRED"):
+        await service.enable(
+            "alice",
+            sid,
+            {**spec, "commandKey": "old-scope", "expectedDelegationRevision": 2},
+            binding=binding,
+        )
+    assert json.loads((await service.current("alice", sid))["member_ids_json"]) == remaining

@@ -81,6 +81,7 @@ type member struct {
 	WorkID       string          `json:"workId"`
 	TaskID       string          `json:"taskId"`
 	TaskRevision int             `json:"taskRevision"`
+	RetiredAtMS  int64           `json:"retiredAtMs,omitempty"`
 	RoundCount   int             `json:"roundCount"`
 	MemoryPath   string          `json:"memoryPath"`
 }
@@ -98,6 +99,7 @@ type snapshot struct {
 	State              string          `json:"state"`
 	Target             json.RawMessage `json:"target"`
 	Members            []member        `json:"members"`
+	RetiredMembers     []member        `json:"retiredMembers"`
 	Work               []workItem      `json:"work"`
 	Posts              []post          `json:"posts"`
 	MainMessages       []mainMessage   `json:"mainMessages"`

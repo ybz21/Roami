@@ -799,3 +799,38 @@ async def test_native_failure_returns_registered_call_id_for_real_blocker_eviden
     with pytest.raises(DomainError, match="SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED"):
         await runtime.db.call(lambda db: failed_step(db, binding, result["requestId"]))
     assert await runtime.main_capabilities.call("native_unavailable", payload, "alice") == result
+
+
+async def test_native_main_updates_its_existing_roster_through_signed_capabilities(native_main):
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    scope = {"swarmId": group["id"]}
+    registration = request(
+        context,
+        {
+            **scope,
+            "expectedRevision": 1,
+            "members": [{"name": "review", "executor": "claude", "duty": "Review references"}],
+        },
+        key="new-review-role",
+    )
+    added = await runtime.main_capabilities.call("swarm_members_register", registration, "alice")
+    assert added["state"] == "succeeded"
+    ident = added["result"]["members"][0]["id"]
+    retirement = request(
+        context,
+        {**scope, "expectedRevision": 2, "action": "retire", "memberIds": [ident]},
+        key="remove-review-role",
+    )
+    retired = await runtime.main_capabilities.call("swarm_members_lifecycle", retirement, "alice")
+    assert retired["state"] == "succeeded" and retired["result"]["members"][0]["id"] == ident
+    assert (
+        await runtime.main_capabilities.call("swarm_members_lifecycle", retirement, "alice")
+        == retired
+    )
+    status = await runtime.main_capabilities.call(
+        "swarm_status", request(context, scope, key="roster"), "alice"
+    )
+    snapshot = status["result"]
+    assert snapshot["mainConversationId"] == main["id"] and not snapshot["members"]
+    assert snapshot["retiredMembers"][0]["id"] == ident

@@ -151,3 +151,38 @@ func TestMemberRegistrationUsesAgentRegistry(t *testing.T) {
 		})
 	}
 }
+
+func TestMemberLifecycleSendsExplicitActionAndRevision(t *testing.T) {
+	for _, action := range []string{"retire", "restore"} {
+		t.Run(action, func(t *testing.T) {
+			calls := 0
+			rt := fixtureRuntime(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Method != "POST" || r.URL.Path != "/v1/swarms/"+fixtureID+"/members/lifecycle" {
+					t.Errorf("unexpected endpoint %s %s", r.Method, r.URL)
+				}
+				var request struct {
+					Action           string
+					CommandKey       string
+					ExpectedRevision int
+					MemberIDs        []string
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Fatal(err)
+				}
+				if request.Action != action || request.CommandKey != "roster-1" || request.ExpectedRevision != 4 || len(request.MemberIDs) != 1 || request.MemberIDs[0] != stableMemberFixtureID {
+					t.Errorf("unexpected lifecycle request: %+v", request)
+				}
+				apiReply(w, map[string]any{"id": fixtureID, "revision": 5})
+			})
+			input := strings.NewReader(`{"action":"` + action + `","commandKey":"roster-1","expectedRevision":4,"memberIds":["` + stableMemberFixtureID + `"]}`)
+			var out strings.Builder
+			if err := runCommand(t.Context(), rt, []string{"member", "lifecycle", fixtureID, "--file", "-", "--json"}, &out, input); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 || !strings.Contains(out.String(), `"revision":5`) {
+				t.Fatalf("missing lifecycle receipt: %d %s", calls, out.String())
+			}
+		})
+	}
+}

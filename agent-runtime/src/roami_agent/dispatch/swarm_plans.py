@@ -155,7 +155,7 @@ class SwarmPlans:
                 goal
                 + "\n\nSwarm collaboration ID: "
                 + result["id"]
-                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_members_register, swarm_plan and swarm_status using tool_list. Register genuine long-lived roles first, then assign work with their stable memberId. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. For later rounds reuse the existing named member and task via task_steer; never append r2/r3 members to replace its conversation. task_steer forwards the current user request and records it in the group/member thread. swarm_post only writes discussion; it does not deliver work. Use session_send only for a verified unrelated legacy session with its durable reply channel. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
+                + ". You are the existing Roami Main coordinating this swarm. Discover swarm_members_register, swarm_plan and swarm_status using tool_list. Register new roles required by the user, then assign work with their stable memberId. For a requested reduction in scope, discover swarm_members_lifecycle and retire the exact stopped member IDs. Restore the same identity when its role returns. Plan named members with appropriate executors, goals and acceptance criteria; create a final integration item with verified dependencies. Use swarm_post for shared discussion and swarm_memory_read/write for durable team knowledge. Declare artifact or external_action deliverables when the requested outcome needs files or real external actions; plans and URLs are not completion. For later rounds reuse the existing named member and task via task_steer; never append r2/r3 members to replace its conversation. task_steer forwards the current user request and records it in the group/member thread. swarm_post only writes discussion; it does not deliver work. Use session_send only for a verified unrelated legacy session with its durable reply channel. Do not start a separate commander or use legacy swarm add. Report blockers and verified deliverables here."
                 + " Use the exact registered CLI command and input schema returned by tool_list or roami swarm help. Submit each managed command alone: no cd prefix, shell chaining or pipes; the host binds the execution context. Never probe a write operation with placeholder goals or acceptance criteria. Planning dispatches real tasks, so every item must carry its complete actual instructions and acceptance before submission."
             )
             start = await self.conversations.accept(
@@ -234,6 +234,12 @@ class SwarmPlans:
         async with self.lock(sid):
             return await self.db.call(write, write=True)
 
+    async def change_members(self, owner, sid, spec):
+        from roami_agent.dispatch.swarm_member_lifecycle import change_members
+
+        async with self.lock(sid):
+            return await self.db.call(lambda db: change_members(db, owner, sid, spec), write=True)
+
     async def migrate_execution(self, owner, sid, spec):
         from roami_agent.dispatch.swarm_execution_migration import migrate_members
         from roami_agent.dispatch.swarm_provider_generations import (
@@ -267,7 +273,14 @@ class SwarmPlans:
 
         def read(db):
             info = snapshot(db, owner, sid)
-            member = next((item for item in info["members"] if item["id"] == member_id), None)
+            member = next(
+                (
+                    item
+                    for item in info["members"] + info["retiredMembers"]
+                    if item["id"] == member_id
+                ),
+                None,
+            )
             if not member:
                 raise DomainError("SWARM_MEMBER_NOT_FOUND", 404)
             member["duty"] = row(db, "SELECT duty FROM swarm_members WHERE id=?", (member_id,))[
@@ -340,9 +353,18 @@ class SwarmPlans:
             def apply():
                 value = group(db, owner, sid)
                 self.mutable(value, spec)
-                existing = rows(db, "SELECT * FROM swarm_work_items WHERE swarm_id=?", (sid,))
+                existing = rows(
+                    db,
+                    "SELECT w.*,m.retired_ms FROM swarm_work_items w "
+                    "LEFT JOIN swarm_member_work b ON b.work_id=w.id "
+                    "LEFT JOIN swarm_members m ON m.id=b.member_id WHERE w.swarm_id=?",
+                    (sid,),
+                )
                 by_name = {item["member_name"]: item["id"] for item in existing}
                 retired_names = {
+                    item["member_name"] for item in existing if item["retired_ms"] is not None
+                }
+                reassignable_names = {
                     item["member_name"]
                     for item in existing
                     if item["task_id"] is None
@@ -369,7 +391,7 @@ class SwarmPlans:
                         name.casefold() in {"leader", "main"}
                         or name in seen_names
                         or name in by_name
-                        and name not in retired_names
+                        and name not in reassignable_names
                         or len(name) > 80
                         or len(item["title"]) > 80
                         or len(item["goal"]) > 30000
@@ -457,7 +479,9 @@ class SwarmPlans:
                                 ).get("revision", 1),
                             }
                             for name in by_name
-                            if name != item["member"].strip() and name not in known
+                            if name != item["member"].strip()
+                            and name not in known
+                            and name not in retired_names
                         )
                     for dep in dependencies:
                         if not isinstance(dep.get("member"), str) or (
@@ -615,6 +639,7 @@ class SwarmPlans:
             def apply():
                 from roami_agent.dispatch.swarm_message_binding import bound_member
                 from roami_agent.storage.swarm_inbox import record_post
+                from roami_agent.storage.swarm_members import assert_member_active
 
                 value = group(db, owner, sid)
                 if value["archived"]:
@@ -631,6 +656,7 @@ class SwarmPlans:
                     if not target or not target["task_id"]:
                         raise DomainError("SWARM_MEMBER_TASK_REQUIRED", 409)
                     task_id = target["task_id"]
+                    assert_member_active(db, task_id)
                     revision = spec.get("taskRevision")
                     if type(revision) is not int or revision < 1:
                         raise DomainError("TASK_REVISION_REQUIRED", 409)
@@ -904,6 +930,12 @@ class SwarmPlans:
                 )
                 if not work:
                     raise DomainError("SWARM_MEMBER_TASK_REQUIRED", 404)
+                if row(
+                    db,
+                    "SELECT 1 FROM swarm_members WHERE current_work_id=? AND retired_ms IS NOT NULL",
+                    (work["id"],),
+                ):
+                    raise DomainError("SWARM_MEMBER_RETIRED", 409)
                 if work["task_id"]:
                     task = row(
                         db, "SELECT state,revision FROM tasks WHERE id=?", (work["task_id"],)

@@ -105,7 +105,7 @@ class SwarmDelegations:
                 for member_id in members:
                     member = row(
                         db,
-                        "SELECT m.id,w.task_id FROM swarm_members m LEFT JOIN swarm_work_items w ON w.id=m.current_work_id WHERE m.swarm_id=? AND m.id=?",
+                        "SELECT m.id,w.task_id FROM swarm_members m LEFT JOIN swarm_work_items w ON w.id=m.current_work_id WHERE m.swarm_id=? AND m.id=? AND m.retired_ms IS NULL",
                         (swarm_id, member_id),
                     )
                     if not member:

@@ -137,6 +137,17 @@ explicitly rather than registering a replacement with a suffix. Saving
 `agents/team.json` describes the desired team; it does not launch an agent or
 prove that registration or execution succeeded.
 
+When the user changes the team's size, compare the desired roles with
+`swarm_status`. Register new roles, then write their workspace instructions and
+assign work. Use `swarm_members_lifecycle` with the current revision and exact
+member IDs to retire settled members. If the host reports pending work or an
+active scheduled delegation, resolve that condition before retrying. Restore a
+returning role by its original ID and reuse its workspace, task and memory.
+Scheduled authorization is managed separately from the current roster.
+For OKRs with explicit bindings, use the confirmed project configuration tool
+to update `team.roles` to the requested roster, following the durable bindings
+procedure. Reread both the Swarm and the confirmed OKR before reporting success.
+
 The project Main owns each member's first `workspaces/<member-key>/AGENTS.md`.
 Copy [the member workspace template](parts/roles/workspace/AGENTS.md) for each
 selected member and fill its role, inputs, outputs, permitted operations, and

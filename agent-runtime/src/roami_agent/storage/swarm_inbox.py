@@ -73,10 +73,16 @@ def record_post(db, group, spec, author, task_id, binding, delivery_key):
         )
         if not parent:
             raise DomainError("SWARM_MESSAGE_SCOPE_CONFLICT", 409)
-    if recipient is not None and not row(
-        db, "SELECT id FROM swarm_members WHERE id=? AND swarm_id=?", (recipient, group["id"])
-    ):
-        raise DomainError("SWARM_MESSAGE_SCOPE_CONFLICT", 409)
+    if recipient is not None:
+        target = row(
+            db,
+            "SELECT retired_ms FROM swarm_members WHERE id=? AND swarm_id=?",
+            (recipient, group["id"]),
+        )
+        if not target:
+            raise DomainError("SWARM_MESSAGE_SCOPE_CONFLICT", 409)
+        if target["retired_ms"] is not None:
+            raise DomainError("SWARM_MEMBER_RETIRED", 409)
     post_id = db.execute(
         "INSERT INTO swarm_posts(swarm_id,author,text,task_id,created_ms,delivery_key) VALUES(?,?,?,?,?,?)",
         (group["id"], author, spec["text"].strip(), task_id, now_ms(), delivery_key),
@@ -109,8 +115,14 @@ def record_post(db, group, spec, author, task_id, binding, delivery_key):
     elif kind == "reply" and parent:
         if recipient and (not source or recipient != source["id"]):
             targets.add((None, recipient))
-        elif parent["author_member_id"] and (
-            not source or parent["author_member_id"] != source["id"]
+        elif (
+            parent["author_member_id"]
+            and (not source or parent["author_member_id"] != source["id"])
+            and row(
+                db,
+                "SELECT 1 FROM swarm_members WHERE id=? AND retired_ms IS NULL",
+                (parent["author_member_id"],),
+            )
         ):
             targets.add((None, parent["author_member_id"]))
         elif parent["author_kind"] == "main" and author_kind != "main":
