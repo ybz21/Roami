@@ -35,6 +35,8 @@ cp -R "$okr_skill_dir/parts/connectors/github/." \
 | connectors/<name>/connector.json | 来源/账号、窗口、文件与指标绑定；新宿主支持 Skill schema2 | 不执行任意 command 字段 |
 | agents/main.json / main.md | 项目 Main 的指引和已支持技能列表；职责是协调、指挥与核验 | 不写首页 Main 或另造 conversation ID |
 | agents/team.json | schema1、稳定角色 id、名称、executor、职责；空 roles 也合法 | 不把期望职责当真实成员/实例 |
+| 项目 workspaces/<成员目录键>/AGENTS.md | Main 为每个长期成员准备规则，使用登记回执关联稳定成员，草稿放对应子目录 | 不写入 schema1 team 字段，不借文件改受管执行目录 |
+| 项目 materials/ | 团队共享的交接、正式交付和证据，按日期与主题组织 | 成员只更新任务约定的路径，保留已冻结与历史产物 |
 | agents/swarm.json | 受管团队登记后取得的真实绑定；未建团队先为空 | 不复制其他项目团队 ID |
 | skills/ | 项目规划、采集协调、执行等工作流；Connector 包单独在 connectors/ | 不把一轮任务写成新职责/新实例 |
 | skills/daily-operations/ | 外部日程唤醒脚本与开工/复盘提示；填真实项目/Main、IANA时区和语义时段，先dry-run | 不让Main自己运行，不把accepted当执行，不从旧运行时回退send |

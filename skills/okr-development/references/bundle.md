@@ -29,11 +29,15 @@ PROJECT/
     evidence/                        original review evidence
     state/current.json               atomic confirmed-version pointer
     state/confirmed-revisions/       immutable confirmed snapshots
-  materials/YYYY-MM-DD/             readable topic deliverables and acceptance evidence
+  workspaces/MEMBER_KEY/AGENTS.md    role rules and draft workspace maintained with Main
+  materials/YYYY-MM-DD/             team handoffs, deliverables and acceptance evidence
 ```
 
 `save` creates the core bundle. Member notes and dated deliverables are created
-when used, not fabricated during setup. Existing instructions and history are
+when used, not fabricated during setup. Main drafts the workspace rules through
+the OKR Skill, checks actual host directory support and records the bound member.
+These workspace documents are project files outside the schema1 team payload.
+Existing instructions and history are
 preserved. SQLite remains the legacy archive and ownership index for OKR files;
 live task/conversation identities remain owned by the managed runtime.
 

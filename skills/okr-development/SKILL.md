@@ -137,6 +137,15 @@ explicitly rather than registering a replacement with a suffix. Saving
 `agents/team.json` describes the desired team; it does not launch an agent or
 prove that registration or execution succeeded.
 
+The project Main owns each member's first `workspaces/<member-key>/AGENTS.md`.
+Copy [the member workspace template](parts/roles/workspace/AGENTS.md) for each
+selected member and fill its role, inputs, outputs, permitted operations, and
+acceptance from the confirmed project. Record the returned stable member ID with
+the reusable directory key, then keep that directory across rounds. Instances
+with the same duty get distinct directories. Use the existing project
+`materials/` directory for shared handoffs and evidence. See
+[workspace creation and verification](assets/.roami/okr/manuals/team.md#成员工作目录).
+
 Dispatch only requested work with `swarm_plan` and actual registered member IDs.
 Continue later rounds with the original member/task and `task_steer`. Keep each
 member's memory and original provider conversation. Unknown execution results
