@@ -198,19 +198,6 @@
             </div>
             <div class="toolbar-group agent-tools">
               <div class="toolbar-group author-choices" role="group" data-label="author">
-                <button class="icon-button pill" type="button" data-author="claude" aria-label="Claude Code" title="Claude Code">
-                  <svg aria-hidden="true"><use href="#icon-claude"/></svg>
-                </button>
-                <button class="icon-button pill" type="button" data-author="codex" aria-label="Codex" title="Codex">
-                  <svg aria-hidden="true"><use href="#icon-codex"/></svg>
-                </button>
-                <button class="icon-button pill" type="button" aria-label="OpenCode" disabled>
-                  <svg aria-hidden="true" class="opencode-dark"><use href="#icon-opencode"/></svg>
-                  <svg aria-hidden="true" class="opencode-light"><use href="#icon-opencode-light"/></svg>
-                </button>
-                <button class="icon-button pill" type="button" aria-label="Pi" disabled>
-                  <svg aria-hidden="true"><use href="#icon-pi"/></svg>
-                </button>
                 <button class="icon-button pill" type="button" data-label="terminal" disabled>
                   <svg aria-hidden="true"><use href="#icon-terminal"/></svg>
                 </button>
@@ -231,14 +218,7 @@
             </div>
           </div>
           <div class="review-toolbar" id="review-options" role="group" aria-labelledby="review-toggle" hidden>
-            <div class="toolbar-group review-choices" role="group" data-label="reviewer">
-              <button type="button" class="icon-button pill" data-reviewer="claude" aria-label="Claude Code" title="Claude Code">
-                <svg aria-hidden="true"><use href="#icon-claude"/></svg>
-              </button>
-              <button type="button" class="icon-button pill" data-reviewer="codex" aria-label="Codex" title="Codex">
-                <svg aria-hidden="true"><use href="#icon-codex"/></svg>
-              </button>
-            </div>
+            <div class="toolbar-group review-choices" role="group" data-label="reviewer"></div>
             <select id="review-trigger" class="pill" data-label="trigger">
               <option value="submit" data-t="bySubmit"></option>
               <option value="idle" data-t="byIdle"></option>

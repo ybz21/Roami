@@ -361,8 +361,6 @@ textarea {
 .branch-select { max-width: 100%; }
 #review-trigger { padding-right: var(--sp-1); }
 #review-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
-.opencode-light, [data-theme="light"] .opencode-dark { display: none; }
-[data-theme="light"] .opencode-light { display: block; }
 .prompt-details { margin-top: var(--sp-2); }
 .prompt-details summary {
   display: flex;

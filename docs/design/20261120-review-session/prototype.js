@@ -91,7 +91,7 @@ document.title = t.pageTitle
 
 const all = (selector) => [...document.querySelectorAll(selector)]
 const byId = (id) => document.getElementById(id)
-const agentNames = { codex: 'Codex', claude: 'Claude Code' }
+const agentNames = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode', pi: 'Pi' }
 const exampleIds = { author: '2026-1120-1600-a001', reviewer: '2026-1120-1600-r001' }
 const revisions = ['b7a18c2', 'e124dc0', 'd80ae91']
 const messageKinds = {
@@ -113,8 +113,26 @@ promptInput.value = t.exampleTask
 
 function setMark(svg, name) {
   const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
-  use.setAttribute('href', '#icon-' + name)
+  const mark = name === 'opencode' && root.dataset.theme === 'light' ? 'opencode-light' : name
+  use.setAttribute('href', '#icon-' + mark)
   svg.replaceChildren(use)
+}
+
+function populateAgentChoices(group, role) {
+  const firstStaticControl = group.firstElementChild
+  for (const [kind, name] of Object.entries(agentNames)) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'icon-button pill'
+    button.dataset[role] = kind
+    button.title = name
+    button.setAttribute('aria-label', name)
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('aria-hidden', 'true')
+    setMark(svg, kind)
+    button.append(svg)
+    group.insertBefore(button, firstStaticControl)
+  }
 }
 
 const nav = byId('mobile-nav')
@@ -327,6 +345,8 @@ function createTask(event) {
   showSession('author')
 }
 
+populateAgentChoices(document.querySelector('.author-choices'), 'author')
+populateAgentChoices(document.querySelector('.review-choices'), 'reviewer')
 all('[data-author]').forEach((button) => button.addEventListener('click', () => {
   authorAgent = button.dataset.author
   renderForm()

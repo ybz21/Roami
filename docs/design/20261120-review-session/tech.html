@@ -29,7 +29,7 @@
         <p>作者与审查者各有一个独立的普通 Agent 终端会话，绑定同一个任务工作区。宿主启动两个会话，给审查者绑定只读快照来源，并在开工前记录父子关系。每次互审最多审 3 轮。</p>
         <ol>
           <li>宿主用现有创建意图受理任务。互审配置仅带 Agent 类型和交审方式。用户省略互审时沿用原有创建流程。</li>
-          <li>准备 worktree 和作者会话，以同一创建操作预留 <code>review</code> 的稳定 ID，保存父子关系、同一个工作区归属和审查者角色。核对所选 Agent 在当前节点可启动。</li>
+          <li>准备 worktree 和作者会话，以同一创建操作预留 <code>review</code> 的稳定 ID，保存父子关系、同一个工作区归属和审查者角色。按当前节点注册表核对审查 Agent 和它的启动参数，检查安装与登录状态。未就绪时保留选择并提示恢复。</li>
           <li>先启动审查者，将作者 ID、任务范围、约定和版本访问方式一起注入启动 Prompt。Agent 就绪后启动作者，注入 <code>review</code> ID 和对应的交审指令。然后展示「等待交审」。</li>
           <li>宿主持久化操作、会话身份和启动阶段回执。回执已确认则复用现有子会话。提交结果未知时先核对接收端身份和实际状态。准备失败时可以重试，或关闭互审后继续开工。</li>
         </ol>
@@ -92,7 +92,7 @@ roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=e124dc0 已核
       <section id="modules">
         <h2>代码落点</h2>
         <dl>
-          <div><dt>创建表单</dt><dd>复用 Agent 注册表、图标和 i18n。<a href="../../../frontend/src/components/sessions/TaskComposer.tsx">TaskComposer</a> 与 <a href="../../../frontend/src/components/sessions/NewSessionModal.tsx">NewSessionModal</a> 共享互审配置和创建意图。</dd></div>
+          <div><dt>创建表单</dt><dd>作者和审查者都从同一个 <a href="../../../frontend/src/agent-registry.ts">Agent 注册表</a> 获取当前节点的 Agent，复用图标和 i18n。<a href="../../../frontend/src/components/sessions/TaskComposer.tsx">TaskComposer</a> 与 <a href="../../../frontend/src/components/sessions/NewSessionModal.tsx">NewSessionModal</a> 共享互审配置和创建意图。</dd></div>
           <div><dt>宿主生命周期</dt><dd>在 <a href="../../../backend/api/session-lifecycle-create.go">创建生命周期</a> 的作者启动前准备 review 会话与回执。启动指令按双方角色绑定对端稳定 ID。旧 <code>autoReview</code> 布尔值兼容原有路径；新的互审记录走单一流程。</dd></div>
           <div><dt>状态与投递</dt><dd>宿主记录作者 ID、review ID、交审方式、上限、当前轮次、版本快照、消息状态和核对结果。普通会话使用既有会话发送路径，审查数据复用 <a href="../../../plugins/reviewmesh/reviewmesh.go">Review Mesh</a> 可用的差异读取与意见结构。</dd></div>
           <div><dt>会话树与终端</dt><dd><a href="../../../frontend/src/components/shell/task-tree.ts">项目树</a> 先读父子绑定与角色，旧陪跑会话保留兼容。桌面标签和手机入口进入现有会话视图。</dd></div>
