@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -41,6 +42,40 @@ func startClaudeTask(t *testing.T, s Service, binding SessionBinding, key string
 		t.Fatal(err)
 	}
 	return spec
+}
+
+func TestClaudeSubmissionAwaitingProviderKeepsExclusiveWriter(t *testing.T) {
+	s, binding := sessionFixture(t)
+	seedClaudeSession(t, s, binding)
+	spec := Spec{Key: "claude-long", Executor: "claude", SessionID: binding.ID, Prompt: strings.Repeat("long input\n", 30000)}
+	status, err := s.Launch(context.Background(), spec)
+	if err != nil || status.State != "unknown" || status.ObservationErrorCode != "SESSION_SUBMISSION_UNCONFIRMED" || status.Result != nil {
+		t.Fatalf("missing submission observation: %+v %v", status, err)
+	}
+	if release, err := s.claimWorkspace(context.Background(), binding.Directory, "another-writer"); err == nil {
+		release()
+		t.Fatal("unconfirmed submission released the original writer")
+	}
+	if _, err := s.Launch(context.Background(), spec); err != nil {
+		t.Fatal(err)
+	}
+	submits, err := os.ReadFile(filepath.Join(s.Runtime.DataDir, "submits"))
+	if err != nil || strings.Count(string(submits), "submitted") != 1 {
+		t.Fatalf("unconfirmed input was replayed: %v", err)
+	}
+	prompt, err := os.ReadFile(filepath.Join(s.Runtime.DataDir, "prompt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ack := claudeEvent("UserPromptSubmit", "long-current")
+	ack.Prompt = string(prompt)
+	if err := s.applySessionEvent("claude", binding, ack); err != nil {
+		t.Fatal(err)
+	}
+	status, err = s.Status(spec.Key)
+	if err != nil || status.State != "running" || status.ObservationErrorCode != "" || status.Result != nil {
+		t.Fatalf("provider acknowledgement did not advance delivery: %+v %v", status, err)
+	}
 }
 
 func TestClaudeNeedsStopThenMatchingIdleAndRetainsOriginalSession(t *testing.T) {

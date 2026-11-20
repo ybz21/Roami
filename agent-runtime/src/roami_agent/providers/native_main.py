@@ -10,9 +10,12 @@ from roami_agent.protocol.serialization import encoded
 
 
 class NativeMain:
-    def __init__(self, binding, turn, command, *, sleep=asyncio.sleep, capabilities=None):
+    def __init__(
+        self, binding, turn, command, *, sleep=asyncio.sleep, capabilities=None, delivery=None
+    ):
         self.binding, self.turn, self.command, self.sleep = binding, turn, command, sleep
         self.capabilities = capabilities
+        self.delivery = delivery
         self.stream_count = 0
         self.model = binding["model"]
         self.provider_key = "native-cli:" + binding["executor"] + ":" + binding["provider_id"]
@@ -122,9 +125,23 @@ class NativeMain:
                     admission_waits += 1
                     await self.sleep(min(admission_waits, 10))
             unknown_polls = 0
+            delivery_pending = False
             while True:
                 self.verify(receipt)
                 result = receipt.get("result")
+                if self.delivery:
+                    if (
+                        not delivery_pending
+                        and receipt.get("state") == "unknown"
+                        and receipt.get("observationErrorCode") == "SESSION_SUBMISSION_UNCONFIRMED"
+                    ):
+                        await self.delivery(key, "awaiting_native")
+                        delivery_pending = True
+                    elif delivery_pending and (
+                        result is not None or receipt.get("state") in {"running", "cancelling"}
+                    ):
+                        await self.delivery(key, "closed")
+                        delivery_pending = False
                 if result is not None:
                     if (
                         result.get("inputStopped") is not True
