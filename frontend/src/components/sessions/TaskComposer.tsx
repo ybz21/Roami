@@ -173,7 +173,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         ...(adopt ? { branch: adopt, existing: true } : baseReq),
         launch: lifecycleLaunchIntent(agent, prefs, prompt, wantWt ? 'new' : adopt ? 'adopt' : isGit ? 'repo' : 'plain', false, t),
       })
-      setPrompt(''); message.success(t('session.lifecycle.accepted')); openTerm(op.resourceId); onCreated?.(op.resourceId)
+      setPrompt(''); review.reset(); message.success(t('session.lifecycle.accepted')); openTerm(op.resourceId); onCreated?.(op.resourceId)
     } catch (e: any) { message.error(lifecycleRequestError(e, t)) }
     finally { setCreating(false) }
   }

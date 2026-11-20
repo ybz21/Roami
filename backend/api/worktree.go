@@ -6,7 +6,9 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -237,6 +239,17 @@ func (a *API) SessionAnnotations(c *gin.Context) {
 // SessionWorktreeStatus GET /sessions/:name/worktree-status —— W7 关闭前预检。
 func (a *API) SessionWorktreeStatus(c *gin.Context) {
 	name := a.sessionTarget(c)
+	if a.Lifecycle != nil {
+		pending, err := a.Lifecycle.PendingCreation(name)
+		if err == nil {
+			c.JSON(http.StatusOK, gin.H{"data": gin.H{"pendingCreation": pending}})
+			return
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			lifecycleError(c, err)
+			return
+		}
+	}
 	ctx, cancel := wtCtx(c)
 	defer cancel()
 	identity, identityErr := lifecycleRuntime(ctx).SessionIdentity(name)

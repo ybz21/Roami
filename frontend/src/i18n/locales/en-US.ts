@@ -109,6 +109,7 @@ const enUS = {
   'session.lifecycle.sendDraft': "Send follow-up",
   'session.lifecycle.retry': "Retry this step",
   'session.lifecycle.cancel': "Cancel preparation",
+  'session.lifecycle.cancelFromClose': 'Cancelling closes the session and preserves any workspace with changes.',
   'session.lifecycle.retain': "Keep workspace",
   'session.lifecycle.open': "Open session",
   'session.lifecycle.records': "Execution records",

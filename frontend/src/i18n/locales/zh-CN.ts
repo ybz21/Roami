@@ -109,6 +109,7 @@ const zhCN = {
   'session.lifecycle.sendDraft': "发送补充",
   'session.lifecycle.retry': "重试当前步骤",
   'session.lifecycle.cancel': "取消准备",
+  'session.lifecycle.cancelFromClose': '取消后会关闭会话，保留有改动的工作区。',
   'session.lifecycle.retain': "改为保留",
   'session.lifecycle.open': "进入会话",
   'session.lifecycle.records': "执行记录",

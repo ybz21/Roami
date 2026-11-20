@@ -1,7 +1,7 @@
 import { taskSessionError } from '../agent/task-session-error'
 import { refreshTask } from '../agent/agent-task-events'
 import { api } from '../../api'
-import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
+import { submitLifecycle, lifecycleAction, lifecycleRequestError } from './session-lifecycle'
 import { nodeApi } from '../cluster/node-url'
 import type { TaskDetail } from '../agent/agent-task-protocol'
 import { nativeSessionId } from './session-record'
@@ -27,6 +27,7 @@ async function nativeTask(name: string) {
 export async function closeSession(name: string) {
   if (!nativeSessionId(name)) {
     const st = (await api('GET', '/sessions/' + encodeURIComponent(name) + '/worktree-status')).data
+    if (st.pendingCreation) return lifecycleAction(st.pendingCreation, 'cancel')
     return submitLifecycle('close', { mode: 'keep', path: st.path, sessionIdentity: st.sessionIdentity }, name)
   }
   const { path, detail } = await nativeTask(name)

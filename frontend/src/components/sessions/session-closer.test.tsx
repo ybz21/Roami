@@ -4,14 +4,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
 import { useSessionCloser } from './session-closer'
 import { closeSession } from './session-actions'
-import { submitLifecycle } from './session-lifecycle'
+import { lifecycleAction, submitLifecycle } from './session-lifecycle'
 
 const ui = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), confirm: vi.fn() }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('antd', async original => ({ ...await original<typeof import('antd')>(), App: { useApp: () => ({ message: ui, modal: { confirm: ui.confirm } }) } }))
 vi.mock('./session-actions', () => ({ closeSession: vi.fn(), sessionActionError: () => 'failed' }))
-vi.mock('./session-lifecycle', () => ({ submitLifecycle: vi.fn(), lifecycleRequestError: () => 'failed' }))
+vi.mock('./session-lifecycle', () => ({ submitLifecycle: vi.fn(), lifecycleAction: vi.fn(), lifecycleRequestError: () => 'failed' }))
 
 beforeEach(() => { vi.resetAllMocks(); vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -62,6 +62,19 @@ it('opens unfinished worktree choices after the first check completes', async ()
   expect(checkDialog(result.current).props.info).toEqual({ name: 'session', st: status })
   expect(checkDialog(result.current).props.checking).toBe(false)
   expect(ui.confirm).not.toHaveBeenCalled()
+})
+
+it('cancels the pending creation instead of starting a conflicting close', async () => {
+  const pending = { operationId: 'pending-create', revision: 4 }
+  vi.mocked(api).mockResolvedValue({ data: { pendingCreation: pending } })
+  const closed = vi.fn()
+  const { result } = renderHook(() => useSessionCloser(closed))
+  await act(() => result.current.beginClose('session'))
+  render(result.current.node)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'session.lifecycle.cancel' })) })
+  expect(lifecycleAction).toHaveBeenCalledWith(pending, 'cancel')
+  expect(submitLifecycle).not.toHaveBeenCalled()
+  expect(closed).toHaveBeenCalledWith('session')
 })
 
 it('opens native session confirmation without a worktree check', async () => {

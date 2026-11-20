@@ -1069,7 +1069,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const beginClose = async (n: string) => {
     let st: any = null
     try { if (!nativeSessionId(n)) st = (await api('GET', `/sessions/${encodeURIComponent(n)}/worktree-status`))?.data } catch {}
-    if (!st?.inWorktree || st.external) {
+    if (!st?.pendingCreation && (!st?.inWorktree || st.external)) {
       Modal.confirm({
         title: t('session.closeConfirm', { name: sessionLabel(n) }),
         onOk: async () => { try { await closeSession(n); refreshSessionLists(); message.success(t('session.closed')); closeTerm(n); refresh() } catch (e: any) { message.error(sessionActionError(e, t)) } },
