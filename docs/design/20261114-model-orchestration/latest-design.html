@@ -18,7 +18,7 @@
 </nav>
 <main class="document gateway-overview" id="document">
 <section id="technical" aria-labelledby="latest-title">
-  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-19">2026 年 11 月 19 日</time></div><a class="diagram-action" href="./gateway-prototype.html#/aggregate">打开交互原型</a></header>
+  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-20">2026 年 11 月 20 日</time></div><a class="diagram-action" href="./gateway-prototype.html#/aggregate">打开交互原型</a></header>
   <figure class="layer-diagram" aria-label="网关三层设计">
     <div class="diagram-lane">
       <h3><a href="./model-gateway.html#interaction">人机交互</a></h3>
@@ -61,11 +61,16 @@
 </section>
 <section id="workspace-ux" aria-labelledby="workspace-ux-title">
   <header class="section-head"><h2 id="workspace-ux-title">排查工作台</h2><a class="page-reference" href="./gateway-prototype.html#/aggregate">试用原型</a></header>
-  <ol class="delivery-sequence">
-    <li><strong>看生效顺位</strong><small>调用名、首选、备选在同一条线路</small></li>
-    <li><strong>按结果查请求</strong><small>趋势按时段点选，来源比较保留独立视图</small></li>
-    <li><strong>核对实际尝试</strong><small>手机用独立详情页，返回保留筛选</small></li>
-  </ol>
+  <figure class="layer-diagram" aria-label="排查路径">
+    <div class="diagram-lane">
+      <h3>首屏</h3>
+      <ol>
+        <li><a href="./gateway-prototype.html#/aggregate">看生效顺位<small>首选、备选、来源与可调度数</small></a></li>
+        <li><a href="./gateway-prototype.html#/monitoring">查异常<small>请求趋势和结果分布联动</small></a></li>
+        <li><a href="./gateway-prototype.html#/audit?demo=gateway&amp;case=fallback">看请求结论<small>返回结果和上游尝试时间线</small></a></li>
+      </ol>
+    </div>
+  </figure>
 </section>
 <section id="sequence" aria-labelledby="sequence-title">
   <header class="section-head"><h2 id="sequence-title">实施顺序</h2><a class="page-reference" href="./model-gateway.html#control-api">接口和验收条件</a></header>

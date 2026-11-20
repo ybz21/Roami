@@ -38,22 +38,34 @@ export default function AggregationRuntime({ model, catalog, status, hasDraft, o
   const latest = observations?.latest
   const latestSwitch = observations?.latestSwitch
   const cooling = [...channels.values()].filter(group => group.some(channel => (channel.restUntil || 0) > snapshot.now)).length
+  const sourceName = (sourceId: string) => sourceId === '@group' ? t('pool.groups') : catalog.sources.find(row => row.id === sourceId)?.name
   const resolved = observations ? observations.requests - observations.uncertain : 0
 
   return <section className="tt-pool-status">
     <div className="tt-request-section-head">
       <h3>{t('pool.runtimeOrder')}</h3>
-      <small>{t('pool.strategy.' + model.strategy)}</small>
+      <div className="tt-pool-runtime-meta"><small>{t('pool.strategy.' + model.strategy)}</small>
+        <span className={ready.length ? 'is-ready' : 'is-blocked'}>{t('pool.runtimeAvailable', { count: number.format(ready.length), total: number.format(members.size) })}</span>
+      </div>
     </div>
     {hasDraft && <p className="agent-settings-hint">{t('pool.savedRuntime')}</p>}
-    {!ranks.size && <p className="agent-settings-hint">{t('pool.noneAvailable')}</p>}
-    <ol className="tt-pool-route">
-      <li><span>{t('gatewayWorkspace.gatewayName')}</span><strong>{model.id}</strong></li>
-      <li><span>{t('gatewayTrace.primary')}</span><strong>{ready.length ? name(members.get(ready[0])!) : t('pool.noneAvailable')}</strong></li>
-      {ready.length > 1 && <li><span>{t('gatewayTrace.backup')}</span><strong>{name(members.get(ready[1])!)}</strong></li>}
-    </ol>
+    {!ready.length ? <p className="tt-pool-unavailable">{t('pool.noneAvailable')}</p> :
+      <ol className="tt-pool-route">
+        {ready.slice(0, 2).map((key, index) => {
+          const member = members.get(key)!
+          return <li key={key}>
+            <span className="tt-pool-route-rank" aria-hidden="true">{number.format(index + 1)}</span>
+            <div><small>{t(index ? 'gatewayTrace.backup' : 'gatewayTrace.primary')}</small><strong>{name(member)}</strong>
+              {sourceName(member.sourceId) && <span>{sourceName(member.sourceId)}</span>}
+            </div>
+          </li>
+        })}
+        {ready.length === 1 && members.size > 1 && <li className="tt-pool-route-unavailable">
+          <span className="tt-pool-route-rank" aria-hidden="true">2</span>
+          <div><strong>{t('gatewayTrace.noBackup')}</strong></div>
+        </li>}
+      </ol>}
     <dl className="tt-request-totals">
-      <div><dt>{t('pool.ready')}</dt><dd>{number.format(ready.length)} / {number.format(members.size)}</dd></div>
       <div><dt>{t('gatewayTrace.coolingMembers')}</dt><dd>{number.format(cooling)}</dd></div>
       <div><dt>{t('gatewayTrace.recentFailureRate')}</dt><dd>{observations && resolved > 0 ? new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(observations.failed / resolved) : t('monitor.pending')}</dd></div>
       <div><dt>{t('gatewayTrace.recentSwitches')}</dt><dd>{observations?.requests ? number.format(observations.sameSource + observations.crossSource) : t('monitor.pending')}</dd></div>
@@ -63,11 +75,11 @@ export default function AggregationRuntime({ model, catalog, status, hasDraft, o
       {latestSwitch && latestSwitch.requestId !== latest?.requestId && <Button onClick={() => onRequest(latestSwitch.requestId)}>{t('gatewayTrace.latestSwitch')}</Button>}
       {latestSwitch && observations && <small>{t('gatewayTrace.switchCounts', { same: number.format(observations.sameSource), cross: number.format(observations.crossSource) })}</small>}
     </div>}
-    <details className="tt-routing-guide">
+    <details className="tt-routing-guide" open={!ready.length || undefined}>
     <summary><ChevronRight />{t('gatewayTrace.memberStatus')}</summary>
     {order.map(key => {
       const member = members.get(key)!, rank = ranks.get(key), block = blocks.get(key), group = channels.get(key) || []
-      const source = member.sourceId === '@group' ? t('pool.groups') : catalog.sources.find(row => row.id === member.sourceId)?.name
+      const source = sourceName(member.sourceId)
       return <div className="tt-routing-channel" key={key}>
         <span>{rank ? t('pool.runtimeRank', { rank: number.format(rank) }) : t('pool.runtimeSkipped')}</span>
         <div><strong>{name(member)}</strong>{source && <small>{source}</small>}</div>

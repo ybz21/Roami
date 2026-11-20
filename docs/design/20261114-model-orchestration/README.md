@@ -2,6 +2,10 @@
 
 2026-11-19 [统一交互原型（HTML）](gateway-prototype.html#/aggregate) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
 
+2026-11-20 [排查工作台改版](latest-design.html#workspace-ux)。聚合把首选、备选及来源摆在首屏，调度模拟按需展开。监控并列趋势和结果分布，独立清除时段或结果筛选。审计先显示请求结论，再按顺序显示上游尝试、状态和原因。沿用 UI/UX Pro Max 的图表与触控指引、Impeccable 的层级评审、Vercel Web Design Guidelines 的控件标签和焦点规则。
+
+桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 验证展开调度模拟、趋势与结果联合筛选、进入审计再回到原请求焦点。离线打开统一原型，核对来源顺位、切换恢复筛选和请求时间线。改前改后见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
+
 后续交互在 `gateway-prototype/` 增量维护。保留旧网关原型的模型目录与接入密钥，七个工作台页面由同一导航切换。调度顺位图、请求链路和监控图表使用演示数据。单独查方案时，从下表打开对应设计子页。旧版原型在[历史快照](history/model-workspace.html)。
 
 原型的工作台、局部交互、排序和来源创建分别维护在 `entry.tsx`、`workspace-samples.js`、`order-drag.js` 和 `source-creation.js`。加场景时复用现有路由和审计入口。执行 `node docs/design/20261114-model-orchestration/gateway-prototype/build.mjs` 可重新生成可离线打开的 HTML。

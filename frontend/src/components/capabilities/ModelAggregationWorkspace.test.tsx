@@ -132,7 +132,7 @@ it('shows saved routing order alongside the existing editor with one status requ
  fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'unsaved-name' } })
  expect(screen.queryByRole('tab', { name: 'pool.runtime' })).toBeNull()
  const status = (await screen.findByText('pool.runtimeOrder')).closest('section')!
- expect([...status.querySelectorAll('.tt-pool-route strong')].map(row => row.textContent)).toEqual(['pool-a', 'native-b', 'native-a'])
+ expect([...status.querySelectorAll('.tt-pool-route strong')].map(row => row.textContent)).toEqual(['native-b', 'native-a'])
  status.querySelector('details')!.open = true
  expect([...status.querySelectorAll('.tt-routing-channel strong')].map(row => row.textContent)).toEqual(['native-b', 'native-a', 'no-tools'])
  expect(within(status).getAllByText('pool.runtimeRank')).toHaveLength(2)

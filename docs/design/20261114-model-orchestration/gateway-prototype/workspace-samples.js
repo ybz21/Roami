@@ -27,16 +27,20 @@ export function mountWorkspaceSamples(root) {
     const empty = mode === 'empty'
     const view = empty ? routeCases.ready : routeCases[mode]
     byId('route-ready').textContent = view.count
+    byId('route-ready').parentElement.dataset.state = mode
     const ready = savedOrder.filter(index => view.state[index] === '可调度')
     const positions = [...ready, ...savedOrder.filter(index => !ready.includes(index))]
     const first = members[ready[0]]?.name
-    byId('route-first').textContent = first ? '首选 ' + first : view.first
-    byId('route-flow-first').textContent = first || view.first
+    byId('route-flow').hidden = !first
+    byId('route-unavailable').hidden = !!first
+    byId('route-unavailable').textContent = view.first
+    byId('route-flow-first').textContent = first || ''
+    byId('route-flow-first-source').textContent = members[ready[0]]?.source || ''
+    byId('route-flow-next-source').textContent = members[ready[1]]?.source || ''
     byId('route-flow-next').textContent = members[ready[1]]?.name || ''
     byId('route-flow-next-node').hidden = ready.length < 2
     byId('route-path-action').hidden = mode === 'unknown'
     byId('route-path-action').href = '#/troubleshoot?case=' + (mode === 'blocked' ? 'blocked' : 'fallback')
-    byId('route-total').textContent = empty ? '0' : '200'
     byId('route-failure').textContent = empty ? '暂无样本' : '2.0%'
     byId('route-failure-note').hidden = empty
     byId('route-fallback').textContent = empty ? '0 次' : '3 次'
@@ -75,12 +79,10 @@ export function mountWorkspaceSamples(root) {
     6: [[216,38,4,12],[283,46,7,14],[264,53,4,22],[299,61,4,33],[379,78,6,18],[277,71,10,23]],
     24: [[818,84,27,64],[721,58,31,24],[963,102,20,55],[949,113,36,87],[1216,220,38,95],[1024,183,26,77]],
   }
-  const metricValues = {
-    1: { p95:'5.38 s', speed:'82' },
-    6: { p95:'7.12 s', speed:'74' },
-    24: { p95:'8.10 s', speed:'71' },
+  const recoveryCounts = {
+    0: [], 1: [2, 4, 2, 3, 5, 4], 6: [6, 9, 15, 12, 18, 19], 24: [25, 71, 32, 47, 65, 39],
   }
-  const failureTypes = ['限流 429','鉴权失败','其他']
+  const failureTypes = ['限流 429','鉴权失败','其他失败','切换后恢复']
   let selectedBucket = -1
   let selectedFailure = -1
   const total = row => row.reduce((sum,n) => sum + n,0)
@@ -107,26 +109,29 @@ export function mountWorkspaceSamples(root) {
     const peak = Math.max(1,...buckets.map(total))
     const window = interval(hours,selectedBucket)
     byId('monitor-total').textContent = fmt.format(requests)
-    byId('monitor-success').textContent = requests ? (full[0] / requests * 100).toFixed(1) + '%' : '暂无样本'
-    byId('monitor-count').textContent = fmt.format(requests) + ' 个完成样本'
-    byId('monitor-first').textContent = metricValues[hours]?.p95 || '样本不足'
-    byId('monitor-speed').textContent = metricValues[hours]?.speed || '样本不足'
-    byId('monitor-selection').textContent = requests ? window + ' · 成功 ' + fmt.format(local[0]) + ' · 失败 ' + fmt.format(failed) : '该时段暂无调用'
-    byId('failure-scope').textContent = requests ? window + ' · 共 ' + fmt.format(failed) + ' 次失败' : '暂无失败样本'
+    const recovered = total(recoveryCounts[hours])
+    const localRecovered = selectedBucket < 0 ? recovered : recoveryCounts[hours][selectedBucket]
+    byId('monitor-failed').textContent = fmt.format(total(full.slice(1)))
+    byId('monitor-recovered').textContent = fmt.format(recovered)
+    byId('monitor-selection').textContent = requests ? window + ' · ' + fmt.format(total(local)) + ' 个请求' : '该时段暂无调用'
+    byId('failure-scope').textContent = requests ? window : '暂无样本'
     byId('monitor-chart').hidden = !requests
     const audit = byId('monitor-audit')
-    audit.hidden = !failed
-    const query = new URLSearchParams({ demo:'monitor', range:window, reason:failureTypes[selectedFailure] || '全部失败' })
+    audit.hidden = !failed && !localRecovered
+    audit.textContent = selectedFailure < 0 ? '查看请求' : '查看所选请求'
+    const query = new URLSearchParams({ demo:'monitor', range:window, reason:failureTypes[selectedFailure] || '全部结果' })
     audit.href = '#/audit?' + query
     byId('monitor-chart').innerHTML = buckets.map((row,index) => {
       const errors = total(row.slice(1))
-      const label = interval(hours,index) + '，成功 ' + row[0] + '，失败 ' + errors
-      return `<button type="button" data-bucket="${index}" aria-label="${label}" aria-pressed="${selectedBucket===index}"><span class="stack" aria-hidden="true"><span class="succeeded" style="height:${row[0] / peak * 100}%"></span><span class="failed" style="height:${errors / peak * 100}%"></span></span><time>${interval(hours,index).slice(0,5)}</time></button>`
+      const switched = recoveryCounts[hours][index]
+      const label = interval(hours,index) + '，成功 ' + row[0] + '，切换后恢复 ' + switched + '，失败 ' + errors
+      return `<button type="button" data-bucket="${index}" aria-label="${label}" aria-pressed="${selectedBucket===index}"><span class="stack" aria-hidden="true"><span class="succeeded" style="height:${(row[0] - switched) / peak * 100}%"></span><span class="recovered" style="height:${switched / peak * 100}%"></span><span class="failed" style="height:${errors / peak * 100}%"></span></span><time>${interval(hours,index).slice(0,5)}</time></button>`
     }).join('')
-    byId('failure-list').innerHTML = failed ? failureTypes.map((label,index) => {
-      const count = local[index + 1]
-      const percent = failed ? (count / failed * 100) : 0
-      return `<li><button type="button" data-failure="${index}" aria-pressed="${selectedFailure===index}"><span>${label}</span><small>${fmt.format(count)} 次 · ${percent.toFixed(1)}%</small><span class="meter" aria-hidden="true"><span style="width:${percent}%"></span></span></button></li>`
+    const outcomes = [...local.slice(1), localRecovered]
+    const maximum = Math.max(1,...outcomes)
+    byId('failure-list').innerHTML = (failed || localRecovered) ? failureTypes.map((label,index) => {
+      const count = outcomes[index]
+      return `<li><button type="button" data-failure="${index}" aria-pressed="${selectedFailure===index}"><span>${label}</span><small>${fmt.format(count)}</small><span class="meter" aria-hidden="true"><span class="${index === 3 ? 'recovered' : ''}" style="width:${count / maximum * 100}%"></span></span></button></li>`
     }).join('') : ''
   }
 
@@ -296,6 +301,7 @@ export function mountWorkspaceSamples(root) {
       byId('gateway-audit-record').hidden = false
       byId('audit-context').textContent = entry.caller + ' · 演示'
       byId('gateway-audit-outcome').textContent = entry.outcome
+      byId('gateway-audit-outcome').dataset.result = name
       byId('gateway-audit-response').textContent = entry.response
       byId('gateway-audit-return').href = '#/troubleshoot?case=' + name
       renderGatewayTimeline(byId('gateway-audit-timeline'), entry.timeline)
