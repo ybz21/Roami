@@ -318,6 +318,19 @@ def snapshot(db, owner, swarm_id):
         "ORDER BY CASE state WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,created_ms DESC,rowid DESC LIMIT 1",
         (value["conversation_id"],),
     )
+    if main_turn and main_turn["state"] == "running":
+        submission = row(
+            db,
+            "SELECT json_extract(e.payload_json,'$.state') AS state,e.created_ms AS observedAtMs "
+            "FROM events e JOIN turns t ON t.id=e.turn_id JOIN conversations c ON c.id=t.conversation_id "
+            "AND c.active_branch_id=t.branch_id JOIN project_okr_mains m ON m.conversation_id=c.id "
+            "AND m.owner_id=c.owner_id AND m.project_id=? WHERE e.turn_id=? "
+            "AND e.kind='turn.native_delivery' AND json_extract(e.payload_json,'$.leaseEpoch')=t.lease_epoch "
+            "ORDER BY e.id DESC LIMIT 1",
+            (value["scope_project_id"], main_turn["id"]),
+        )
+    else:
+        submission = None
     model_wait = (
         row(
             db,
@@ -370,5 +383,8 @@ def snapshot(db, owner, swarm_id):
         "posts": posts,
         "mainMessages": main_messages,
         "mainState": main_turn["state"] if main_turn else "idle",
+        "mainSubmission": submission
+        if submission and submission["state"] == "awaiting_native"
+        else None,
         "mainModelWait": model_wait,
     }

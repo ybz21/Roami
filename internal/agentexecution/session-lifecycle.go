@@ -579,7 +579,14 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State, status.ObservationErrorCode = "unknown", state.UnknownReason
 		if status.ObservationErrorCode == "" {
-			status.ObservationErrorCode = "SESSION_LIFECYCLE_UNKNOWN"
+			if state.Executor == "claude" && state.State == "submitting" && !state.Structured && !state.InitialLaunch &&
+				state.Binding.ProviderID != "" &&
+				state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.PID == binding.PID &&
+				state.Binding.resourceID() == binding.resourceID() && state.Binding.Directory == binding.Directory {
+				status.ObservationErrorCode = "SESSION_SUBMISSION_UNCONFIRMED"
+			} else {
+				status.ObservationErrorCode = "SESSION_LIFECYCLE_UNKNOWN"
+			}
 		}
 		if state.LaunchKey != key {
 			status.ObservationErrorCode = "SESSION_LAUNCH_MISMATCH"

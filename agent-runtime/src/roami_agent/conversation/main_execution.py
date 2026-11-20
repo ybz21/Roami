@@ -2,6 +2,7 @@
 
 import json
 import logging
+import sqlite3
 from copy import copy
 
 from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
@@ -156,8 +157,41 @@ class MainExecutions:
             return loop
         binding["binding"] = json.loads(binding.pop("binding_json"))
         selected = copy(loop)
+
+        async def observe_delivery(launch_key, state):
+            def write(db):
+                current = main_binding(db, turn["owner_id"], turn["conversation_id"])
+                if not current or current["generation"] != binding["generation"]:
+                    return
+                active = row(
+                    db,
+                    "SELECT 1 FROM turns t JOIN conversations c ON c.id=t.conversation_id "
+                    "AND c.active_branch_id=t.branch_id WHERE t.id=? AND c.id=? AND t.state='running' "
+                    "AND t.lease_epoch=? AND c.deleted_ms IS NULL",
+                    (turn["id"], turn["conversation_id"], turn["lease_epoch"]),
+                )
+                key = f"native-delivery:{launch_key}:{turn['lease_epoch']}:{state}"
+                if active and not row(db, "SELECT 1 FROM events WHERE event_key=?", (key,)):
+                    event(
+                        db,
+                        turn["conversation_id"],
+                        "turn.native_delivery",
+                        {"state": state, "leaseEpoch": turn["lease_epoch"]},
+                        turn_id=turn["id"],
+                        key=key,
+                    )
+
+            try:
+                await self.db.call(write, write=True)
+            except (DomainError, OSError, sqlite3.Error):
+                log.debug("Native delivery observation could not be recorded", exc_info=True)
+
         selected.model = NativeMain(
-            binding, turn, self.executor.command, capabilities=self.capabilities
+            binding,
+            turn,
+            self.executor.command,
+            capabilities=self.capabilities,
+            delivery=observe_delivery,
         )
         return selected
 

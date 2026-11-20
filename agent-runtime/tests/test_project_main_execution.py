@@ -1,3 +1,4 @@
+import asyncio
 import copy
 from types import SimpleNamespace
 
@@ -111,6 +112,78 @@ async def test_actual_main_turn_uses_native_provider_and_original_reply_pipeline
     assert launches[0][2]["spec"]["sessionId"] == "native-session"
     assert main["id"] in launches[0][2]["spec"]["prompt"]
     assert runtime.loop.model.model == "injected-model"
+
+
+async def test_bound_main_reports_pending_native_submission_until_provider_acknowledges(
+    wake_runtime, store, monkeypatch
+):
+    runtime, main, spec, proof, calls = await setup_main(wake_runtime, monkeypatch)
+    await runtime.main_executions.configure("alice", main["id"], spec)
+    team = await runtime.swarms.create(
+        "alice",
+        {
+            "commandKey": "delivery-team",
+            "name": "Original team",
+            "goal": "Coordinate the existing work",
+            "mainConversationId": main["id"],
+            "target": {"kind": "project", "projectId": "project"},
+        },
+    )
+    acknowledgement = asyncio.Event()
+    finish = asyncio.Event()
+    pending = {
+        "session": proof["sessionId"],
+        "sessionBinding": proof["sessionBinding"],
+        "state": "unknown",
+        "observationErrorCode": "SESSION_SUBMISSION_UNCONFIRMED",
+    }
+    polls = 0
+
+    async def command(sub, *args, **kwargs):
+        nonlocal polls
+        calls.append((sub, args, kwargs))
+        if sub == "launch":
+            return pending
+        binding = {**fixture_binding(), "binding": proof["sessionBinding"]}
+        if sub == "cancel":
+            return stopped(binding, state="cancelled")
+        assert sub == "status"
+        polls += 1
+        if polls == 1:
+            await acknowledgement.wait()
+            return {**pending, "state": "running", "observationErrorCode": ""}
+        await finish.wait()
+        return stopped(binding)
+
+    runtime.main_executions.executor.command = command
+    await runtime.start()
+    reply = await runtime.chat.submit("alice", main["id"], "typed-once", "Perform existing work")
+
+    def delivery(db, state):
+        return row(
+            db,
+            "SELECT id FROM events WHERE turn_id=? AND kind='turn.native_delivery' "
+            "AND json_extract(payload_json,'$.state')=?",
+            (reply["turnId"], state),
+        )
+
+    await until(store, lambda db: delivery(db, "awaiting_native"))
+    snapshot = await runtime.swarms.snapshot("alice", team["id"], include_memory=False)
+    assert snapshot["mainState"] == "running"
+    assert snapshot["mainSubmission"]["state"] == "awaiting_native"
+    assert snapshot["mainModelWait"] is None
+    acknowledgement.set()
+    await until(store, lambda db: delivery(db, "closed"))
+    snapshot = await runtime.swarms.snapshot("alice", team["id"], include_memory=False)
+    assert snapshot["mainSubmission"] is None and snapshot["mainState"] == "running"
+    finish.set()
+    await until(
+        store,
+        lambda db: row(
+            db, "SELECT id FROM turns WHERE id=? AND state='completed'", (reply["turnId"],)
+        ),
+    )
+    assert sum(sub == "launch" for sub, _, _ in calls) == 1
 
 
 @pytest.mark.parametrize(
