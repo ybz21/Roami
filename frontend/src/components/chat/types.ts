@@ -8,4 +8,6 @@ export interface Block {
   toolUseId?: string    // tool_result 对应的 tool_use id
   isError?: boolean
 }
-export interface Msg { role: string; blocks: Block[]; ts?: string; id?: string }
+export interface Msg { role: string; blocks: Block[]; ts?: string; id?: string; final?: boolean }
+
+export type NativeMainTurn = { id: string; startedMs?: number }

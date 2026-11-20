@@ -368,6 +368,7 @@ func parseCodexItem(payload json.RawMessage, ts string) *cMsg {
 	var p struct {
 		Type    string `json:"type"`
 		Role    string `json:"role"`
+		Phase   string `json:"phase"`
 		Content []struct {
 			Text string `json:"text"`
 		} `json:"content"`
@@ -403,7 +404,7 @@ func parseCodexItem(payload json.RawMessage, ts string) *cMsg {
 			}
 			role = "user"
 		}
-		return &cMsg{Role: role, Ts: ts, Blocks: []cBlock{{Kind: "text", Text: clip(t)}}}
+		return &cMsg{Role: role, Ts: ts, Final: role == "assistant" && p.Phase == "final_answer", Blocks: []cBlock{{Kind: "text", Text: clip(t)}}}
 	case "reasoning":
 		var b strings.Builder
 		for _, s := range p.Summary {
