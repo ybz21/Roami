@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>审计 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../assets/model-screen-design.css">
+<script defer src="../assets/model-screen-review.js"></script>
+</head>
+<body>
+<header class="page-head screen-header">
+  <div><a class="screen-parent" href="index.html">大模型页面设计</a><h1>审计</h1></div>
+  <nav class="screen-links" aria-label="相关资料"><a href="../capability-plan.html#page-audit">功能与能力</a><a href="../model-audit.html">技术与沿革</a><a href="../gateway-prototype.html#/audit?demo=gateway&amp;case=fallback">统一交互原型</a></nav>
+</header>
+<div class="workspace">
+<nav class="contents screen-sidebar" aria-label="页面设计">
+<a href="workbench.html">调度与排查</a>
+<a href="sources.html">模型源</a>
+<a href="plugins.html">插件与账号</a>
+<a href="aggregation.html">聚合</a>
+<a href="gateway.html">本机网关</a>
+<a href="usage.html">概况</a>
+<a href="monitor.html">监控</a>
+<a href="audit.html" aria-current=page>审计</a>
+<a href="speech.html">语音输入</a>
+<a href="agent.html">会话与委派选模</a>
+</nav>
+<main class="document screen-main" id="document">
+<section class="screen-intro" aria-labelledby="preview-title">
+  <header class="section-head"><h2 id="preview-title">界面设计</h2><a href="#cases" class="page-reference">查看流程与状态</a></header>
+  <p class="copy">用一条记录回答三件事：请求怎么结束，命中了谁，实际记了多少费用。</p>
+  <div class="screen-board">
+    <figure>
+      <figcaption>桌面 · 从筛选结果查看单次请求</figcaption>
+      <div class="mock">
+        <div class="mock-head">
+          <strong>请求审计</strong>
+          <a class="mock-action" href="monitor.html">返回监控</a>
+        </div>
+        <div class="mock-controls" aria-label="继承自监控的筛选">
+          <span class="mock-field">11 月 20 日 · 14:00–14:30</span>
+          <span class="mock-field">聚合 · 日常编码</span>
+          <span class="mock-filter selected">全部终态</span>
+          <a class="mock-action" href="#case-find">调整筛选</a>
+        </div>
+        <div class="mock-split">
+          <div>
+            <ul class="mock-list" aria-label="近期异常与恢复">
+              <li class="selected">
+                <div><strong><time datetime="14:27:42">14:27:42</time> · 日常编码</strong><small>OpenRouter · Qwen · ¥0.00</small></div>
+                <span class="mock-status ok">切换后恢复</span>
+              </li>
+              <li>
+                <div><a href="#case-trace"><strong><time datetime="14:21:09">14:21:09</time> · 日常编码</strong></a><small>尝试 2 次 · 费用未知</small></div>
+                <span class="mock-status danger">候选用尽</span>
+              </li>
+              <li>
+                <div><a href="#case-trace"><strong><time datetime="14:19:30">14:19:30</time> · 日常编码</strong></a><small>零次尝试 · 费用策略</small></div>
+                <span class="mock-status danger">准入被拒</span>
+              </li>
+              <li>
+                <div><a href="#case-trace"><strong><time datetime="14:17:43">14:17:43</time> · 日常编码</strong></a><small>HTTP 200 · 已输出部分内容</small></div>
+                <span class="mock-status danger">流中断</span>
+              </li>
+            </ul>
+          </div>
+          <div class="mock-detail">
+            <h3>切换后恢复</h3>
+            <dl class="mock-facts">
+              <div><dt>实际命中</dt><dd>OpenRouter · Qwen</dd></div>
+              <div><dt>总用时</dt><dd>992 ms</dd></div>
+              <div><dt>上游尝试</dt><dd>2 次</dd></div>
+              <div><dt>记账费用</dt><dd>¥0.00</dd></div>
+            </dl>
+            <ol class="mock-timeline" aria-label="请求时间线">
+              <li><time datetime="14:27:42.108">14:27:42.108</time><div><strong>通过准入</strong><small class="mock-sub">使用日常编码的生效策略和当时剩余额度。</small></div></li>
+              <li><time datetime="14:27:42.303">14:27:42.303</time><div><strong>首次尝试 · WorkBuddy 限流</strong><small class="mock-sub">HTTP 429，按顺位由备选接续。</small></div></li>
+              <li><time datetime="14:27:43.021">14:27:43.021</time><div><strong>第二次尝试 · OpenRouter 开始响应</strong><small class="mock-sub">收到 HTTP 200。</small></div></li>
+              <li><time datetime="14:27:43.100">14:27:43.100</time><div><strong>正常结束</strong><small class="mock-sub">已确认免费，共记录 842 Token。</small></div></li>
+            </ol>
+            <a class="mock-action" href="#case-billing">费用明细</a>
+            <a class="mock-action" href="#case-find">技术详情</a>
+            <a class="mock-action" href="aggregation.html">查看聚合策略</a>
+          </div>
+        </div>
+      </div>
+    </figure>
+    <figure>
+      <figcaption>手机 · 单次请求详情</figcaption>
+      <div class="mock mock-phone">
+        <div class="mock-head"><div class="mock-identity"><a class="mock-back" href="monitor.html" aria-label="返回监控"></a><strong>请求详情</strong></div></div>
+        <div class="mock-panel">
+          <h3>切换后恢复</h3>
+          <span class="mock-status ok">正常结束</span>
+          <dl class="mock-facts">
+            <div><dt>实际命中</dt><dd>OpenRouter · Qwen</dd></div>
+            <div><dt>记账费用</dt><dd>¥0.00</dd></div>
+            <div><dt>上游尝试</dt><dd>2 次 · 992 ms</dd></div>
+          </dl>
+        </div>
+        <div class="mock-panel">
+          <h3>请求经过</h3>
+          <ol class="mock-timeline" aria-label="上游尝试与终态">
+            <li><time datetime="14:27:42">14:27:42</time><div><strong>WorkBuddy · DS 返回 429</strong><small>首选限流，转给备选。</small></div></li>
+            <li><time datetime="14:27:43">14:27:43</time><div><strong>OpenRouter · Qwen 接续</strong><small>HTTP 200，流正常结束。</small></div></li>
+          </ol>
+        </div>
+        <div class="mock-panel">
+          <a class="mock-action" href="#case-billing">费用明细</a>
+          <a class="mock-action" href="#case-find">技术详情</a>
+          <a class="mock-action" href="workbench.html">查看调度</a>
+        </div>
+      </div>
+    </figure>
+  </div>
+  <dl class="screen-annotations">
+    <div><dt>先看最终结果</dt><dd>成功、切换后恢复、选路被拒、候选用尽和流中断分别标注。收到响应头和流正常结束各记录一次，便于解释 200 后失败。</dd></div>
+    <div><dt>返回原入口</dt><dd>监控保留时间、异常分类与来源筛选。聚合保留所选池及请求。概况保留日期和账单范围。桌面关闭详情回到该行，手机返回恢复列表位置。</dd></div>
+    <div><dt>按需看明细</dt><dd>费用带状态和口径。技术详情折叠展示网关请求关联号及各次上游请求 ID，并各自提供复制。</dd></div>
+  </dl>
+</section>
+<section id="cases" class="screen-cases" aria-labelledby="cases-title">
+  <header class="section-head"><h2 id="cases-title">流程与状态</h2></header>
+  <details id="case-find">
+    <summary>筛选请求与技术详情</summary>
+    <p>初始使用来路传入的时间和范围。普通筛选包括终态、模型、来源和 Agent。需要定位单次调用时展开技术查询，支持按网关请求关联号精确查询。请求详情的技术区默认折叠，展开后可以分别复制网关 ID 与上游尝试 ID。</p>
+    <dl class="screen-spec">
+      <div><dt>网关请求关联号</dt><dd><code>req_example_142742</code> · 关联准入、尝试与账本</dd></div>
+      <div><dt>上游请求 ID</dt><dd>OpenRouter · <code>up_example_142743</code>；WorkBuddy 未返回</dd></div>
+      <div><dt>无结果</dt><dd>显示当前时间窗、可查范围，提供调整时间或清除筛选入口。</dd></div>
+    </dl>
+  </details>
+  <details id="case-trace">
+    <summary>四种容易混淆的请求结果</summary>
+    <p>按事件顺序还原准入、响应、换路与终态。遇到 503 时记录有无上游尝试，遇到 200 时保留流的最终状态。</p>
+    <ul class="mock-list" aria-label="审计案例">
+      <li><div><a href="../gateway-prototype.html#/troubleshoot?case=blocked"><strong>准入被拒 · HTTP 503</strong></a><small>候选被费用策略或目录条件排除，网关未联系上游。</small></div><span class="mock-status danger">0 次尝试</span></li>
+      <li><div><a href="../gateway-prototype.html#/troubleshoot?case=exhausted"><strong>候选用尽 · HTTP 503</strong></a><small>首选返回 429，备选返回 402。</small></div><span class="mock-status danger">2 次尝试</span></li>
+      <li><div><a href="../gateway-prototype.html#/troubleshoot?case=fallback"><strong>切换后恢复 · HTTP 200</strong></a><small>首选限流，备选开始响应并完成流。</small></div><span class="mock-status ok">2 次尝试</span></li>
+      <li><div><a href="../gateway-prototype.html#/troubleshoot?case=stream"><strong>输出中断 · HTTP 200</strong></a><small>已向客户端发送部分内容，随后中断。</small></div><span class="mock-status danger">终态失败</span></li>
+    </ul>
+  </details>
+  <details id="case-billing">
+    <summary>核对费用与限额</summary>
+    <p>费用以请求账本为准。明细按尝试展示用量、计价依据与记账状态。零次上游尝试显示未消耗；已尝试但缺少价格或用量时标为费用未知。可跳回概况核对同一作用域的限额。</p>
+    <div class="mock-callout"><strong>已确认免费 · ¥0.00</strong><p>OpenRouter · Qwen 完成请求，记录 842 Token。</p></div>
+    <a class="mock-action" href="usage.html">查看限额与用量</a>
+  </details>
+</section>
+<section id="acceptance" aria-labelledby="acceptance-title">
+  <header class="section-head"><h2 id="acceptance-title">实现与验收</h2></header>
+  <dl class="screen-spec"><div><dt>首屏</dt><dd>终态、真实命中、尝试次数、费用；技术详情在折叠区</dd></div>
+<div><dt>来源</dt><dd>请求事件、上游尝试及账本按请求关联</dd></div>
+<div><dt>验收</dt><dd>四种情形分别显示尝试次数与终态。技术详情折叠且支持分项复制。验证从监控、聚合和概况往返后，时间范围、来源、所选行与滚动位置恢复。</dd></div></dl>
+  <nav class="screen-links" aria-label="设计关联"><a href="../capability-plan.html#page-audit">功能与能力</a><a href="../model-audit.html">技术与沿革</a><a href="../gateway-prototype.html#/audit?demo=gateway&amp;case=fallback">统一交互原型</a></nav>
+</section>
+<nav class="screen-next" aria-label="前后页面"><a href="monitor.html">上一页 · 监控</a><a href="speech.html">下一页 · 语音输入</a></nav>
+</main>
+</div>
+</body>
+</html>

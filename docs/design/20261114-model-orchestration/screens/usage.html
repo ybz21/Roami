@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>概况 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../assets/model-screen-design.css">
+<script defer src="../assets/model-screen-review.js"></script>
+</head>
+<body>
+<header class="page-head screen-header">
+  <div><a class="screen-parent" href="index.html">大模型页面设计</a><h1>概况</h1></div>
+  <nav class="screen-links" aria-label="相关资料"><a href="../capability-plan.html#page-usage">功能与能力</a><a href="../model-usage.html">技术与沿革</a><a href="../gateway-prototype.html#/usage">统一交互原型</a></nav>
+</header>
+<div class="workspace">
+<nav class="contents screen-sidebar" aria-label="页面设计">
+<a href="workbench.html">调度与排查</a>
+<a href="sources.html">模型源</a>
+<a href="plugins.html">插件与账号</a>
+<a href="aggregation.html">聚合</a>
+<a href="gateway.html">本机网关</a>
+<a href="usage.html" aria-current=page>概况</a>
+<a href="monitor.html">监控</a>
+<a href="audit.html">审计</a>
+<a href="speech.html">语音输入</a>
+<a href="agent.html">会话与委派选模</a>
+</nav>
+<main class="document screen-main" id="document">
+<section class="screen-intro" aria-labelledby="preview-title">
+  <header class="section-head"><h2 id="preview-title">界面设计</h2><a href="#cases" class="page-reference">查看流程与状态</a></header>
+  <p class="copy">查看消耗、限额与重置时间，按来源核对费用。</p>
+  <div class="screen-board">
+    <figure>
+      <figcaption>桌面 · 界面示例</figcaption>
+<div class="mock">
+  <div class="mock-head"><strong>概况</strong><a class="mock-action" href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20">看区间审计</a></div>
+  <div class="mock-controls">
+    <span class="mock-field">11 月 14–20 日</span><span class="mock-field">分析时区 · UTC+8</span>
+    <span class="mock-filter selected">费用</span><span class="mock-filter">Token</span><span class="mock-filter">请求</span>
+  </div>
+  <div class="mock-panel">
+    <dl class="mock-facts mock-metrics">
+      <div><dt>已记账费用</dt><dd>¥3.42</dd></div>
+      <div><dt>估算 · 6 次</dt><dd>约 ¥0.37</dd></div>
+      <div><dt>费用未知</dt><dd>4 次</dd></div>
+      <div><dt>总请求</dt><dd>128 次</dd></div>
+    </dl>
+  </div>
+  <div class="mock-split wide-list">
+    <div class="mock-panel">
+      <h3>每日已记账费用</h3>
+      <ul class="mock-plot" aria-label="11 月 14–20 日每日已记账费用，合计 3.42 元">
+        <li><span class="bar" aria-hidden="true"><span style="--value:53.57%;--series:var(--accent-solid)"></span></span><small>11/14<span class="mock-sub">0.45 元</span></small></li>
+        <li><span class="bar" aria-hidden="true"><span style="--value:32.14%;--series:var(--accent-solid)"></span></span><small>11/15<span class="mock-sub">0.27 元</span></small></li>
+        <li><span class="bar" aria-hidden="true"><span style="--value:67.86%;--series:var(--accent-solid)"></span></span><small>11/16<span class="mock-sub">0.57 元</span></small></li>
+        <li><span class="bar" aria-hidden="true"><span style="--value:65.48%;--series:var(--accent-solid)"></span></span><small>11/17<span class="mock-sub">0.55 元</span></small></li>
+        <li><span class="bar" aria-hidden="true"><span style="--value:64.29%;--series:var(--accent-solid)"></span></span><small>11/18<span class="mock-sub">0.54 元</span></small></li>
+        <li><span class="bar" aria-hidden="true"><span style="--value:23.81%;--series:var(--accent-solid)"></span></span><small>11/19<span class="mock-sub">0.20 元</span></small></li>
+        <li class="selected"><span class="bar" aria-hidden="true"><span style="--value:100.00%;--series:var(--accent-solid)"></span></span><small>11/20<span class="mock-sub">0.84 元</span></small></li>
+      </ul>
+      <div class="mock-legend"><span style="--series:var(--accent-solid)">已记账费用</span></div>
+      <p class="muted">11 月 20 日 · 全部来源 · ¥0.84</p>
+      <a class="mock-action" href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20&amp;day=2026-11-20">查 11 月 20 日明细</a>
+    </div>
+    <div class="mock-detail">
+      <h3>今日限额</h3>
+      <dl class="mock-facts"><div><dt>已用 / 每日限额</dt><dd>¥0.84 / ¥2.00</dd></div><div><dt>剩余</dt><dd>¥1.16</dd></div></dl>
+      <span class="mock-meter" aria-hidden="true"><span style="--value:42%"></span></span>
+      <p>节点额度 · 11 月 21 日 00:00 重置</p><small>记账时区 Asia/Shanghai（UTC+8）</small>
+      <a class="mock-action primary" href="#case-limits">调整节点限额</a>
+    </div>
+  </div>
+  <div class="mock-panel">
+    <h3>按来源分组</h3>
+    <table class="mock-table">
+      <thead><tr><th scope="col">来源</th><th scope="col">请求</th><th scope="col">费用与状态</th></tr></thead>
+      <tbody>
+        <tr><td><a href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20&amp;sourceId=id%3Aworkbuddy">WorkBuddy</a></td><td>38</td><td>¥3.42 已记账<small class="mock-sub">6 次估算、4 次未知</small></td></tr>
+        <tr><td><a href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20&amp;sourceId=id%3Aopenrouter">OpenRouter 免费</a></td><td>86</td><td>¥0.00 · 已确认免费</td></tr>
+        <tr><td><a href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20&amp;sourceId=unknown">未归因</a></td><td>4</td><td>未发往上游<small class="mock-sub">网关准入拒绝</small></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+    </figure>
+    <figure>
+      <figcaption>手机 · 关键子页</figcaption>
+<div class="mock mock-phone">
+  <div class="mock-head"><strong>概况</strong></div>
+  <div class="mock-controls"><span class="mock-field">11 月 14–20 日 · UTC+8</span></div>
+  <div class="mock-panel">
+    <h3>今日限额</h3>
+    <strong>剩余 ¥1.16</strong>
+    <small class="mock-sub">节点额度 · 已用 ¥0.84 / ¥2.00</small>
+    <span class="mock-meter" aria-hidden="true"><span style="--value:42%"></span></span>
+    <small class="mock-sub">11 月 21 日 00:00 重置 · UTC+8</small>
+    <a class="mock-action" href="#case-limits">调整节点限额</a>
+  </div>
+  <div class="mock-panel">
+    <h3>所选区间 · 128 次请求</h3>
+    <ul class="mock-list">
+      <li><div><strong>已记账费用</strong></div>¥3.42</li>
+      <li><div><strong>估算 · 6 次</strong></div>约 ¥0.37</li>
+      <li><div><strong>已确认免费 · 86 次</strong></div>¥0.00</li>
+      <li><div><strong>费用未知</strong></div><a class="mock-action" href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20&amp;sourceId=id%3Aworkbuddy&amp;state=unknown">查 4 次</a></li>
+    </ul>
+    <a class="mock-action" href="../gateway-prototype.html#/audit?usageView=audit&amp;days=-1&amp;start=2026-11-14&amp;end=2026-11-20">看区间审计</a>
+  </div>
+</div>
+    </figure>
+  </div>
+  <dl class="screen-annotations"><div><dt>限额在用量上下文中</dt><dd>额度、已用、剩余和重置时间放在同一处。来源与日期筛选只改变下方用量，节点额度始终按记账时区更新。</dd></div>
+<div><dt>费用分组明确</dt><dd>免费显示 ¥0.00，估算带「约」，未知显示请求数。准入拒绝列在未归因，能进审计查原因。</dd></div>
+<div><dt>筛选一起下钻</dt><dd>点日柱带上所选日期，点来源带上区间与来源。返回恢复图表选择、列表滚动和焦点。</dd></div></dl>
+</section>
+<section id="cases" class="screen-cases" aria-labelledby="cases-title">
+  <header class="section-head"><h2 id="cases-title">流程与状态</h2></header>
+  <details id="case-date">
+  <summary>按日期与维度看数据</summary>
+  <p>趋势按分析时区聚合，包含起止日期。切换费用、Token 和请求保留时段与来源。归档只剩日汇总时，明确提示后切回按日查看。</p>
+  <div class="mock-callout "><strong>11 月 14–20 日没有记录</strong>
+<p>切换日期，或清除当前来源筛选。</p></div>
+</details>
+<details id="case-limits">
+  <summary>调整节点每日限额</summary>
+  <p>点「调整节点限额」后在额度区展开。编辑每日限额、币种与记账时区，保存失败保留输入。账户和密钥上的额度由各自页面管理。当天记录仍待核对时，将剩余显示为「待核对」。</p>
+  <div class="mock-callout "><strong>每日限额已更新为 ¥2.00</strong>
+<p>当前节点额度，下次按 Asia/Shanghai 的 00:00 重置。</p></div>
+</details>
+<details id="case-unknown">
+  <summary>核对费用未知和拒绝</summary>
+  <p>点击未知数量，将日期、来源与「未知」状态带到审计。已记账、估算、确认免费与准入拒绝保留各自状态，可按同一日期范围复查。</p>
+  <div class="mock-callout "><strong>4 条请求费用未知</strong>
+<p>审计显示所选日期、WorkBuddy 来源及「费用未知」。</p></div>
+</details>
+</section>
+<section id="acceptance" aria-labelledby="acceptance-title">
+  <header class="section-head"><h2 id="acceptance-title">实现与验收</h2></header>
+  <dl class="screen-spec"><div><dt>首屏</dt><dd>总费用、请求、Token、费用未知、额度和重置时间</dd></div>
+<div><dt>来源</dt><dd>从 Go 网关账本及当前限额配置计算</dd></div>
+<div><dt>验收</dt><dd>图表七天合计 ¥3.42，三个来源共 128 次。今日限额剩余 ¥1.16。跨午夜时，分析日期与额度的重置时间保持各自时区。</dd></div></dl>
+  <nav class="screen-links" aria-label="设计关联"><a href="../capability-plan.html#page-usage">功能与能力</a><a href="../model-usage.html">技术与沿革</a><a href="../gateway-prototype.html#/usage">统一交互原型</a></nav>
+</section>
+<nav class="screen-next" aria-label="前后页面"><a href="gateway.html">上一页 · 本机网关</a><a href="monitor.html">下一页 · 监控</a></nav>
+</main>
+</div>
+</body>
+</html>

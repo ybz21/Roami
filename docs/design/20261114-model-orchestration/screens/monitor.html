@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>监控 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../assets/model-screen-design.css">
+<script defer src="../assets/model-screen-review.js"></script>
+</head>
+<body>
+<header class="page-head screen-header">
+  <div><a class="screen-parent" href="index.html">大模型页面设计</a><h1>监控</h1></div>
+  <nav class="screen-links" aria-label="相关资料"><a href="../capability-plan.html#page-monitor">功能与能力</a><a href="../model-monitoring.html">技术与沿革</a><a href="../gateway-prototype.html#/monitoring">统一交互原型</a></nav>
+</header>
+<div class="workspace">
+<nav class="contents screen-sidebar" aria-label="页面设计">
+<a href="workbench.html">调度与排查</a>
+<a href="sources.html">模型源</a>
+<a href="plugins.html">插件与账号</a>
+<a href="aggregation.html">聚合</a>
+<a href="gateway.html">本机网关</a>
+<a href="usage.html">概况</a>
+<a href="monitor.html" aria-current=page>监控</a>
+<a href="audit.html">审计</a>
+<a href="speech.html">语音输入</a>
+<a href="agent.html">会话与委派选模</a>
+</nav>
+<main class="document screen-main" id="document">
+<section class="screen-intro" aria-labelledby="preview-title">
+  <header class="section-head"><h2 id="preview-title">界面设计</h2><a href="#cases" class="page-reference">查看流程与状态</a></header>
+  <p class="copy">先找到失败集中的时段，再判断影响的是请求结果、单一来源，还是聚合的备用链路。</p>
+  <div class="screen-board">
+    <figure>
+      <figcaption>桌面 · 请求趋势与来源健康（示例）</figcaption>
+      <div class="mock">
+        <div class="mock-head"><strong>监控</strong><small>UTC+8 · 更新于 14:30</small></div>
+        <div class="mock-controls">
+          <span class="mock-field">14:00–14:30</span>
+          <span class="mock-field">聚合 · 全部</span>
+          <a class="mock-action" href="#case-source">来源与模型</a>
+          <span class="mock-filter selected">请求结果</span>
+          <a class="mock-action" href="#case-source">来源健康</a>
+        </div>
+        <div class="mock-panel">
+          <dl class="mock-facts mock-metrics">
+            <div><dt>总请求</dt><dd>128</dd></div>
+            <div><dt>直接完成</dt><dd>115</dd></div>
+            <div><dt>切换后恢复</dt><dd>5</dd></div>
+            <div><dt>最终失败</dt><dd>8</dd></div>
+          </dl>
+        </div>
+        <div class="mock-split wide-list">
+          <div class="mock-panel">
+            <h3>请求终态趋势</h3>
+            <ul class="mock-plot" aria-label="每 5 分钟的请求终态">
+              <li><span class="bar" aria-hidden="true"><span style="--value:62.96%;--series:var(--accent-solid)"></span></span><small aria-label="14:00，直接完成 17 次">14:00<span class="mock-sub">17 次</span></small></li>
+              <li><span class="bar" aria-hidden="true"><span style="--value:66.67%;--series:var(--accent-solid)"></span></span><small aria-label="14:05，直接完成 18 次">14:05<span class="mock-sub">18 次</span></small></li>
+              <li><span class="bar" aria-hidden="true"><span style="--value:74.07%;--series:var(--accent-solid)"></span></span><small aria-label="14:10，直接完成 20 次">14:10<span class="mock-sub">20 次</span></small></li>
+              <li class="selected"><span class="bar" aria-hidden="true"><span style="--value:51.85%;--series:var(--accent-solid)"></span><span style="--value:11.11%;--series:var(--ok)"></span><span style="--value:18.52%;--series:var(--danger)"></span></span><small aria-label="选中 14:15，直接完成 14 次，恢复 3 次，失败 5 次">14:15<span class="mock-sub">22 次</span></small></li>
+              <li><span class="bar" aria-hidden="true"><span style="--value:77.78%;--series:var(--accent-solid)"></span><span style="--value:3.70%;--series:var(--ok)"></span><span style="--value:7.41%;--series:var(--danger)"></span></span><small aria-label="14:20，直接完成 21 次，恢复 1 次，失败 2 次">14:20<span class="mock-sub">24 次</span></small></li>
+              <li><span class="bar" aria-hidden="true"><span style="--value:92.59%;--series:var(--accent-solid)"></span><span style="--value:3.70%;--series:var(--ok)"></span><span style="--value:3.70%;--series:var(--danger)"></span></span><small aria-label="14:25，直接完成 25 次，恢复 1 次，失败 1 次">14:25<span class="mock-sub">27 次</span></small></li>
+            </ul>
+            <div class="mock-legend">
+              <span style="--series:var(--accent-solid)">直接完成</span>
+              <span style="--series:var(--ok)">切换后恢复</span>
+              <span style="--series:var(--danger)">最终失败</span>
+            </div>
+            <a class="mock-action" href="#case-filter">查看筛选、固定时段与返回</a>
+          </div>
+          <div class="mock-detail">
+            <h3>14:15–14:20 · 最终失败 5 次</h3>
+            <ul class="mock-list">
+              <li><div><a class="mock-action" href="#case-filter">上游限流</a><small class="mock-sub">WorkBuddy</small></div>3 次</li>
+              <li><div><strong>候选用尽</strong><small class="mock-sub">聚合请求</small></div>1 次</li>
+              <li><div><strong>响应流中断</strong><small class="mock-sub">HTTP 200 后中断</small></div>1 次</li>
+            </ul>
+            <p class="mock-sub">另有 3 次切换后恢复 · 同源 1 次，跨源 2 次</p>
+            <a class="mock-action" href="audit.html">查这段的请求</a>
+            <a class="mock-action" href="workbench.html">看切换链路</a>
+          </div>
+        </div>
+        <div class="mock-panel">
+          <h3>来源健康 · 14:00–14:30</h3>
+          <table class="mock-table">
+            <thead><tr><th scope="col">来源</th><th scope="col">上游尝试</th><th scope="col">首字 P95</th><th scope="col">观测</th></tr></thead>
+            <tbody>
+              <tr><td><a href="sources.html">WorkBuddy</a></td><td>50</td><td>1.9 秒</td><td><span class="mock-status warn">429 共 7 次</span></td></tr>
+              <tr><td>OpenRouter 免费</td><td>89</td><td>840 毫秒</td><td><span class="mock-status ok">近期可用</span></td></tr>
+              <tr><td>局域网模型</td><td>0</td><td>样本不足</td><td><span class="mock-status">未检测</span></td></tr>
+            </tbody>
+          </table>
+          <small>延迟仅统计收到首字的样本。同一请求的每次上游尝试分别计入对应来源。</small>
+          <a class="mock-action" href="#case-probe">主动抽检</a>
+        </div>
+      </div>
+    </figure>
+    <figure>
+      <figcaption>手机 · 已选异常时间段（示例）</figcaption>
+      <div class="mock mock-phone">
+        <div class="mock-head"><strong>监控</strong><small>UTC+8</small></div>
+        <div class="mock-controls">
+          <span class="mock-field">近 30 分钟</span><span class="mock-field">全部聚合</span>
+          <a class="mock-action" href="#case-source">来源与模型</a>
+        </div>
+        <div class="mock-panel">
+          <h3>14:15–14:20</h3>
+          <dl class="mock-facts">
+            <div><dt>直接完成</dt><dd>14</dd></div>
+            <div><dt>切换恢复</dt><dd>3</dd></div>
+            <div><dt>最终失败</dt><dd>5</dd></div>
+          </dl>
+          <a class="mock-action" href="#case-filter">调整时段与结果</a>
+        </div>
+        <div class="mock-panel">
+          <h3>失败原因</h3>
+          <ul class="mock-list">
+            <li><div><a class="mock-action" href="#case-filter">上游限流</a><small class="mock-sub">WorkBuddy</small></div>3 次</li>
+            <li><div><strong>候选用尽</strong><small class="mock-sub">聚合请求</small></div>1 次</li>
+            <li><div><strong>响应流中断</strong><small class="mock-sub">HTTP 200 后中断</small></div>1 次</li>
+          </ul>
+          <a class="mock-action primary" href="audit.html">查看这段请求</a>
+        </div>
+        <div class="mock-panel">
+          <h3>切换去向</h3>
+          <p>同源备用恢复 1 次，跨源备用恢复 2 次。</p>
+          <a class="mock-action" href="workbench.html">看切换链路</a>
+          <a class="mock-action" href="#case-source">看来源健康</a>
+        </div>
+      </div>
+    </figure>
+  </div>
+  <dl class="screen-annotations">
+    <div><dt>趋势和异常联动</dt><dd>选择时间段后固定窗口，失败构成与恢复去向随该时段更新。再点原因可调出对应请求。</dd></div>
+    <div><dt>请求与上游各有分母</dt><dd>最终完成、切换后完成、最终失败按一次请求归类。上游 429、首字延迟归到接收尝试的来源，主动抽检单列。</dd></div>
+    <div><dt>查完回到同一现场</dt><dd>桌面趋势与原因并排。手机选中柱后进入结果子页。下钻到审计、来源或调度后，返回还原筛选、焦点与所选区间。</dd></div>
+  </dl>
+</section>
+<section id="cases" class="screen-cases" aria-labelledby="cases-title">
+  <header class="section-head"><h2 id="cases-title">流程与状态</h2></header>
+  <details id="case-filter">
+    <summary>选中异常时段和原因</summary>
+    <p>点击 14:15 的柱，固定 14:15–14:20。点「上游限流」，审计携带时间、聚合、来源、模型及失败条件。移除原因后恢复该段所有结果。未结束的最后一桶标记「进行中」，流中断按请求终态计入失败。</p>
+    <div class="mock-callout"><strong>14:15–14:20 · 上游限流</strong><p>3 条失败请求符合条件。此段另有 3 条切换恢复，见切换链路。</p></div>
+    <nav class="screen-links" aria-label="下钻"><a href="audit.html">打开请求审计设计</a><a href="workbench.html">打开调度设计</a></nav>
+  </details>
+  <details id="case-source">
+    <summary>对比来源和模型的真实样本</summary>
+    <p>先按来源筛选，再选该来源可用模型。切换来源时清除已经不适用的模型筛选。来源选项显示免费标记，模型选择保留调用名。来源延迟旁显示首字样本和时间窗口。</p>
+    <div class="mock-callout"><strong>局域网模型暂无样本</strong><p>可以发起主动抽检。真实调用到达后显示样本与延迟。</p></div>
+  </details>
+  <details id="case-probe">
+    <summary>抽检来源或模型</summary>
+    <p>选来源、模型与抽检规则后发起。运行时显示状态，同目标的重复操作复用当前检查。抽检结果独立保留时间、用时和失败原因，失败后可重试。</p>
+    <div class="mock-callout"><strong>14:28 抽检超时</strong><p>有效响应未能在检查时间内返回。最近一次成功检查为 14:10，真实请求统计保持原样。</p></div>
+  </details>
+</section>
+<section id="acceptance" aria-labelledby="acceptance-title">
+  <header class="section-head"><h2 id="acceptance-title">实现与验收</h2></header>
+  <dl class="screen-spec"><div><dt>首屏</dt><dd>终态趋势、异常分布、来源比较及样本数</dd></div>
+<div><dt>来源</dt><dd>请求终态、上游尝试和主动抽检三组观测</dd></div>
+<div><dt>验收</dt><dd>14:15 选中段有 22 个请求，5 次终态失败，其中 3 次限流。进入审计再返回核对时间与原因。验证切换恢复路径可定位同源或跨源，抽检超时只改变抽检结果。</dd></div></dl>
+  <nav class="screen-links" aria-label="设计关联"><a href="../capability-plan.html#page-monitor">功能与能力</a><a href="../model-monitoring.html">技术与沿革</a><a href="../gateway-prototype.html#/monitoring">统一交互原型</a></nav>
+</section>
+<nav class="screen-next" aria-label="前后页面"><a href="usage.html">上一页 · 概况</a><a href="audit.html">下一页 · 审计</a></nav>
+</main>
+</div>
+</body>
+</html>

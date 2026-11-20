@@ -71,11 +71,11 @@
     <dd>复用现有语音适配器及凭据，统一设置和测试结果。语音转写配置的启用状态与聊天模型的音频输入能力分别读取。<small><a href="../../../frontend/src/components/capabilities/ModelHub.tsx">当前代码依据</a></small></dd></div></dl>
 </section>
 <section id="screen-design" aria-labelledby="screen-design-title">
-  <header class="section-head"><h2 id="screen-design-title">逐页设计</h2></header>
+  <header class="section-head"><h2 id="screen-design-title">逐页设计</h2><a href="./screens/index.html" class="page-reference">独立界面设计目录</a></header>
   <div class="plan-page-links" aria-label="逐页跳转"><a href="#page-workbench">调度与排查</a><a href="#page-sources">模型源</a><a href="#page-plugins">插件与账号</a><a href="#page-aggregation">聚合</a><a href="#page-gateway">本机网关</a><a href="#page-usage">概况</a><a href="#page-monitor">监控</a><a href="#page-audit">审计</a><a href="#page-speech">语音输入</a><a href="#page-agent">会话与委派选模</a></div>
 </section>
 <section id="page-workbench" aria-labelledby="page-workbench-title">
-  <header class="section-head"><h2 id="page-workbench-title">调度与排查</h2><div class="actions"><a href="latest-design.html#workspace-ux" class="page-reference">对应设计</a><a href="gateway-prototype.html#/workbench" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-workbench-title">调度与排查</h2><div class="actions"><a href="./screens/workbench.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/workbench" class="page-reference">当前原型</a></div></header>
   <p class="copy">打开工作台，先判断哪个聚合需要处理，再从失败直接到原因。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>顶部 · 聚合选择 / 时间范围</li>
     <li>左 · 当前顺位 / 冷却 / 无候选原因</li>
     <li>右 · 异常列表 / 选中请求预览</li></ol><p class="muted">手机先显示首选和异常请求，点一条进入全屏详情。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>选择聚合、范围与环境，沿用上次有效选择</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-routing">策略发布与调度</a></li>
@@ -92,7 +92,7 @@
     <dd class="plan-feedback">原因旁直接跳来源、聚合或限额，返回恢复条件、滚动与焦点。</dd></div></dl><p class="plan-coverage"><strong>现有原型</strong>正式 Web 已有聚合运行态、监控和审计；联合首屏目前在统一原型。</p>
 </section>
 <section id="page-sources" aria-labelledby="page-sources-title">
-  <header class="section-head"><h2 id="page-sources-title">模型源</h2><div class="actions"><a href="model-sources.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#/catalog" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-sources-title">模型源</h2><div class="actions"><a href="./screens/sources.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/catalog" class="page-reference">当前原型</a></div></header>
   <p class="copy">接入新来源，只启用需要的模型，并能停用和清理。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>顶部 · 查找来源 / 新建来源</li>
     <li>主区 · 来源列表 / 连接与启用情况</li>
     <li>详情 · 连接 / 模型 / 定价 / 账号顺位</li></ol><p class="muted">新建和详情使用全屏子页；类型选中后只出现相关字段。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>按名称、类型、模型搜索；区分 API、OpenRouter 免费、Magpie</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-connections">连接、发现与删除</a></li>
@@ -111,7 +111,7 @@
     <dd class="plan-feedback">分连接、模型、定价与账号；有引用时列出影响和解除路径。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>已有连接、发现、定价与引用检查；自动能力检测证据和整页恢复状态需收口。</p>
 </section>
 <section id="page-plugins" aria-labelledby="page-plugins-title">
-  <header class="section-head"><h2 id="page-plugins-title">插件与账号</h2><div class="actions"><a href="model-sources.html#plugin-lifecycle" class="page-reference">对应设计</a><a href="gateway-prototype.html#/catalog/plugins" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-plugins-title">插件与账号</h2><div class="actions"><a href="./screens/plugins.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/catalog/plugins" class="page-reference">当前原型</a></div></header>
   <p class="copy">找到未安装的插件，安装后选供应商、建号、授权，管理版本。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>左 · 社区目录 / 已安装筛选</li>
     <li>右上 · 说明 / 生效、线上与待应用版本</li>
     <li>右下 · 供应商 / 账号 / 积分与签到</li></ol><p class="muted">单列表进入插件详情，再进账号页，返回保留关键词与选项。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>加载并搜索 Magpie 目录，区分安装、未安装及可更新</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-plugins">插件与账号生命周期</a></li>
@@ -126,7 +126,7 @@
     <dd class="plan-feedback">账号详情仅在插件声明能力时展示授权后的积分和签到结果。</dd></div></dl><p class="plan-coverage"><strong>部分实现</strong>Go 已有社区、导入、检查包和建账号的接口；原型证明目录可在线加载，版本应用与 WorkBuddy 签到交互仍为演示。</p>
 </section>
 <section id="page-aggregation" aria-labelledby="page-aggregation-title">
-  <header class="section-head"><h2 id="page-aggregation-title">聚合</h2><div class="actions"><a href="model-aggregation.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#/aggregate" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-aggregation-title">聚合</h2><div class="actions"><a href="./screens/aggregation.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/aggregate" class="page-reference">当前原型</a></div></header>
   <p class="copy">把启用模型组成稳定的调用入口，并能解释为何切换。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>顶部 · 名称 / 调用名 / 已生效策略</li>
     <li>中间 · 成员顺位 / 添加 / 拖动</li>
     <li>观测 · 当前可调度 / 历史命中与降级</li></ol><p class="muted">已选成员常驻可见；长列表使用手柄排序，普通滑动保持滚动。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>创建草稿、发布、重命名、停用或删除</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-directory">模型目录与能力证据</a></li>
@@ -146,7 +146,7 @@
     <dd class="plan-feedback">运行区按时段显示同源、跨源切换与成员样本，点异常进审计。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>已有编辑、拖动、策略预览和部分运行观测；模拟与真实承载扩展已有原型。</p>
 </section>
 <section id="page-gateway" aria-labelledby="page-gateway-title">
-  <header class="section-head"><h2 id="page-gateway-title">本机网关</h2><div class="actions"><a href="model-gateway.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#directory" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-gateway-title">本机网关</h2><div class="actions"><a href="./screens/gateway.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#directory" class="page-reference">当前原型</a></div></header>
   <p class="copy">知道当前可调用什么、如何接入，安全地交付调用名与凭据。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>目录 · 聚合优先 / 能力过滤 / 调用名</li>
     <li>接入 · 地址 / 模型 / curl 与 SDK 示例</li>
     <li>密钥 · 作用域 / 轮换 / 撤销</li></ol><p class="muted">把模型详情和密钥编辑做成全屏子页，复制动作保留在对应行。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>默认聚合优先，搜索可调用目录，筛类型、价格及能力</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-directory">模型目录与能力证据</a></li>
@@ -165,7 +165,7 @@
     <dd class="plan-feedback">密钥管理与连接示例同页；敏感值首次发放显示，列表显示尾号。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>已有目录、凭据和调用示例；统一试调跳转与发布证据呈现需补齐。</p>
 </section>
 <section id="page-usage" aria-labelledby="page-usage-title">
-  <header class="section-head"><h2 id="page-usage-title">概况</h2><div class="actions"><a href="model-usage.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#/usage" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-usage-title">概况</h2><div class="actions"><a href="./screens/usage.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/usage" class="page-reference">当前原型</a></div></header>
   <p class="copy">知道用多少、花多少、何时重置，以及在哪设限。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>顶部 · 日期 / 额度与重置</li>
     <li>趋势 · Token / 费用 / 请求</li>
     <li>分组 · 来源 / 模型 / Agent / 密钥</li></ol><p class="muted">将趋势下的分组表改为可下钻的两行数据列表。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>选择日期、节点时区，看总用量和趋势</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-ledger">用量、计费与限额</a></li></ul></dd>
@@ -182,7 +182,7 @@
     <dd class="plan-feedback">给予可读状态与账本入口；未知价格和 0 成本保持不同标签。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>已有概况、用量分组和限额；细粒度归因与跳转参数需按统一口径验收。</p>
 </section>
 <section id="page-monitor" aria-labelledby="page-monitor-title">
-  <header class="section-head"><h2 id="page-monitor-title">监控</h2><div class="actions"><a href="model-monitoring.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#/monitoring" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-monitor-title">监控</h2><div class="actions"><a href="./screens/monitor.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/monitoring" class="page-reference">当前原型</a></div></header>
   <p class="copy">先判断异常范围，然后判断是调用失败、上游不稳还是降级后恢复。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>顶部 · 时间 / 聚合 / 来源 / 模型</li>
     <li>图表 · 请求终态趋势 / 异常构成</li>
     <li>列表 · 来源健康 / 抽检 / 最近异常</li></ol><p class="muted">图表点按改筛选，详情页返回保留时间段与焦点。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>看终态趋势、异常构成和恢复率，联合筛选</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-trace">请求、尝试与降级事件</a></li></ul></dd>
@@ -199,7 +199,7 @@
     <dd class="plan-feedback">明确未检测、抽检失败和无记录；抽检与真实请求数据可分别打开。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>已有终态、上游尝试和抽检；按模型切换链与观测可信度待合并验收。</p>
 </section>
 <section id="page-audit" aria-labelledby="page-audit-title">
-  <header class="section-head"><h2 id="page-audit-title">审计</h2><div class="actions"><a href="model-audit.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#/audit" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-audit-title">审计</h2><div class="actions"><a href="./screens/audit.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/audit" class="page-reference">当前原型</a></div></header>
   <p class="copy">解释单次调用如何结束，以及费用怎么算出来。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>列表 · 当前筛选 / 请求 / 用量与费用</li>
     <li>详情首屏 · 结论 / 最终命中 / 费用</li>
     <li>展开 · 准入 / 尝试时间线 / 技术详情</li></ol><p class="muted">单次请求为独立子页；返回找回原请求行。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>按时间、模型、来源、结果、Agent 或密钥查记录</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-trace">请求、尝试与降级事件</a></li>
@@ -218,7 +218,7 @@
     <dd class="plan-feedback">返回保留筛选，提供到对应来源、聚合、额度配置的链接。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>现有请求追踪和费用记录给出基础；逐尝试费用与终态归因需补齐时保持现有口径。</p>
 </section>
 <section id="page-speech" aria-labelledby="page-speech-title">
-  <header class="section-head"><h2 id="page-speech-title">语音输入</h2><div class="actions"><a href="model-speech.html" class="page-reference">对应设计</a><a href="gateway-prototype.html#/speech" class="page-reference">当前原型</a></div></header>
+  <header class="section-head"><h2 id="page-speech-title">语音输入</h2><div class="actions"><a href="./screens/speech.html" class="page-reference">界面设计详页</a><a href="gateway-prototype.html#/speech" class="page-reference">当前原型</a></div></header>
   <p class="copy">设置正确的转写服务，并用一段录音确认能识别。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>顶部 · 当前服务 / 可用状态</li>
     <li>配置 · 服务特定字段 / 保存</li>
     <li>测试 · 录音 / 识别结果 / 恢复入口</li></ol><p class="muted">识别结果紧随录音控件，保留回原会话的路径。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>选择语音识别服务、查看本机或远端支持情况</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-speech">语音输入服务</a></li></ul></dd>
@@ -231,7 +231,7 @@
     <dd class="plan-feedback">一组录音控制和结果，错误区分浏览器权限、网络与识别服务。</dd></div></dl><p class="plan-coverage"><strong>已有实现</strong>已有服务配置；从试录到结构化诊断仍需用可运行版本验收。</p>
 </section>
 <section id="page-agent" aria-labelledby="page-agent-title">
-  <header class="section-head"><h2 id="page-agent-title">会话与委派选模</h2><div class="actions"><a href="history/20261116-model-capabilities/technical-design.html" class="page-reference">对应设计</a></div></header>
+  <header class="section-head"><h2 id="page-agent-title">会话与委派选模</h2><div class="actions"><a href="./screens/agent.html" class="page-reference">界面设计详页</a></div></header>
   <p class="copy">创建会话或委派时匹配任务所需模型，设一次参数即可动态选路。</p><figure class="plan-zones"><figcaption>页面结构</figcaption><ol class="plan-flow plan-zone-flow"><li>会话与委派表单 · 模型 / Auto / 仅免费</li>
     <li>选择面板 · 聚合 / 原生 / 能力与价格</li>
     <li>运行反馈 · 当前或命中模型 / 等待原因</li></ol><p class="muted">复用可搜索的全屏选择面板；关面板回原表单，保留草稿。</p></figure><h3>功能、依赖能力与界面反馈</h3><dl class="plan-function-list"><div><dt>选择 Agent 默认、Auto 或指定模型，并按任务能力筛选</dt><dd><ul class="plan-dependencies" aria-label="依赖能力"><li><a href="#cap-agent">Agent 选模与任务约束</a></li>

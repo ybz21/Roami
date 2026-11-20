@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型源 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../assets/model-screen-design.css">
+<script defer src="../assets/model-screen-review.js"></script>
+</head>
+<body>
+<header class="page-head screen-header">
+  <div><a class="screen-parent" href="index.html">大模型页面设计</a><h1>模型源</h1></div>
+  <nav class="screen-links" aria-label="相关资料"><a href="../capability-plan.html#page-sources">功能与能力</a><a href="../model-sources.html">技术与沿革</a><a href="../gateway-prototype.html#/catalog">统一交互原型</a></nav>
+</header>
+<div class="workspace">
+<nav class="contents screen-sidebar" aria-label="页面设计">
+<a href="workbench.html">调度与排查</a>
+<a href="sources.html" aria-current=page>模型源</a>
+<a href="plugins.html">插件与账号</a>
+<a href="aggregation.html">聚合</a>
+<a href="gateway.html">本机网关</a>
+<a href="usage.html">概况</a>
+<a href="monitor.html">监控</a>
+<a href="audit.html">审计</a>
+<a href="speech.html">语音输入</a>
+<a href="agent.html">会话与委派选模</a>
+</nav>
+<main class="document screen-main" id="document">
+<section class="screen-intro" aria-labelledby="preview-title">
+  <header class="section-head"><h2 id="preview-title">界面设计</h2><a href="#cases" class="page-reference">查看流程与状态</a></header>
+  <p class="copy">接好来源，确认要启用的模型、能力和价格，再发布到本机网关。</p>
+  <div class="screen-board">
+    <figure>
+      <figcaption>桌面 · 来源列表与已启用模型</figcaption>
+      <div class="mock">
+        <div class="mock-head"><strong>模型源</strong><a class="mock-action primary" href="#case-create">新建来源</a></div>
+        <div class="mock-controls"><span class="mock-field">搜索来源或模型</span><span class="mock-filter selected">全部</span><span class="mock-filter">API 连接</span><span class="mock-filter">OpenRouter 免费</span><span class="mock-filter">Magpie 插件</span></div>
+        <div class="mock-split">
+          <div>
+            <ul class="mock-list">
+              <li class="selected"><div><strong>WorkBuddy · 国内账号</strong><small>Magpie 插件 · 2 个已启用</small></div><span class="mock-status ok">已连接</span></li>
+              <li><div><strong>OpenRouter 免费</strong><small>专用连接 · 1 个已启用</small></div><span class="mock-status ok">已连接</span></li>
+              <li><div><strong>测试节点</strong><small>API 连接 · 尚未启用模型</small></div><span class="mock-status warn">待验证</span></li>
+            </ul>
+          </div>
+          <div class="mock-detail">
+            <div class="mock-head"><strong>WorkBuddy · 国内账号</strong><a class="mock-action" href="plugins.html">查看插件账号</a></div>
+            <div class="mock-tabs"><span class="selected">模型</span><a href="#case-create">连接</a><a href="#case-discover">定价</a><a href="#case-discover">账号顺位</a></div>
+            <div class="mock-panel">
+              <h3>已启用 2 个</h3>
+              <table class="mock-table" aria-label="已启用模型与能力证据">
+                <thead><tr><th scope="col">模型 / 调用名</th><th scope="col">输入 / 输出</th><th scope="col">能力证据</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>DS 代码助手</strong><small class="mock-sub">wb-ds</small></td><td>文本 → 文本</td><td><span class="mock-status ok">探测通过</span><small class="mock-sub">今天 14:32</small></td></tr>
+                  <tr><td><strong>混元 Flash</strong><small class="mock-sub">hy4-flash</small></td><td>文本 / 图片 → 文本<small class="mock-sub">来源声明</small></td><td><span class="mock-status">未检测</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mock-callout"><strong>发现 6 个其他模型</strong><p>上次发现 14:19。启用后会加入网关目录。</p></div>
+            <a class="mock-action primary" href="#case-discover">管理模型</a><a class="mock-action" href="gateway.html">查看可调用目录</a>
+          </div>
+        </div>
+      </div>
+    </figure>
+    <figure>
+      <figcaption>手机 · 发现并确认变更</figcaption>
+      <div class="mock mock-phone">
+        <div class="mock-head"><div class="mock-identity"><a class="mock-back" href="#preview-title" aria-label="返回界面设计"></a><strong>管理模型</strong></div></div>
+        <div class="mock-controls"><span class="mock-field">搜索可发现模型</span><span class="mock-filter selected">全部</span></div>
+        <ul class="mock-list">
+          <li><div><strong>DS 代码助手</strong><small>wb-ds · 文本输入 · 已检测</small></div><span class="mock-status ok">保持启用</span></li>
+          <li><div><strong>混元 Flash</strong><small>hy4-flash · 图片能力未检测</small></div><span class="mock-status warn">待移除</span></li>
+          <li><div><strong>混元 Lite</strong><small>hy4-lite · 文本输入 · 价格未知</small></div><span class="mock-status info">待启用</span></li>
+        </ul>
+        <div class="mock-panel"><p>新增 1 个、移除 1 个。保存后更新网关目录。</p><a class="mock-action primary" href="#case-discover">确认变更</a></div>
+      </div>
+    </figure>
+  </div>
+  <dl class="screen-annotations">
+    <div><dt>先看来源连通与启用数量</dt><dd>搜索匹配来源名和已启用模型。筛选沿用创建类型的名称，查看或修改具体协议时进入连接详情。</dd></div>
+    <div><dt>保留能力证据与手动选择</dt><dd>区分自动检测、供应商声明和未检测。发现或检测失败时，保留已启用的选择与上次成功结果。</dd></div>
+    <div><dt>手机只保留一个确认入口</dt><dd>管理模型用全屏子页。勾选跨搜索保留，底部显示新增与移除数量。返回来源列表恢复搜索和选中来源。</dd></div>
+  </dl>
+</section>
+<section id="cases" class="screen-cases" aria-labelledby="cases-title">
+  <header class="section-head"><h2 id="cases-title">流程与状态</h2></header>
+  <details id="case-create">
+    <summary>创建或重连来源</summary>
+    <dl class="screen-spec">
+      <div><dt>API 连接</dt><dd>填写地址、协议和凭据，连接验证成功后可发现模型。连接失败时保留填写内容，显示地址、认证或网络错误。</dd></div>
+      <div><dt>OpenRouter 免费</dt><dd>固定服务地址。填写凭据后自动加载当前免费候选，用户选择要启用的模型。</dd></div>
+      <div><dt>Magpie 插件</dt><dd>从插件目录选择已安装或未安装的插件，完成供应商账号授权后发现模型。<a href="plugins.html">查看插件与账号</a></dd></div>
+      <div><dt>连接管理</dt><dd>同一账号可重连和编辑。授权失效仍显示已启用模型与上次检测结果。<a href="#case-delete">删除来源</a></dd></div>
+    </dl>
+  </details>
+  <details id="case-discover">
+    <summary>发现、检测、定价与生效</summary>
+    <dl class="screen-spec">
+      <div><dt>发现与探测</dt><dd>发现结果显示更新时间。模型能力详情给出来源、探测时间及结果；超时与未验证沿用上一份有效证据，并可重试对应模型。</dd></div>
+      <div><dt>价格范围</dt><dd>定价页区分来源默认规则、模型覆盖和最终生效价。价格未知单独显示，免费状态来自当前生效规则或有证据的供应商报价。</dd></div>
+      <div><dt>账号顺位</dt><dd>多账号来源按生效顺位展示可用与冷却状态。编辑账号顺位时保留已启用模型，保存后显示当前顺位。</dd></div>
+      <div><dt>确认变更</dt><dd>先列新增、移除与受影响的调用名。保存成功后，在 <a href="gateway.html">本机网关</a>核对可调用范围。保存冲突时保留选择并重新核对。</dd></div>
+    </dl>
+  </details>
+  <details id="case-delete">
+    <summary>停用模型或删除来源</summary>
+    <div class="mock-callout warn"><strong>暂时不能删除 WorkBuddy · 国内账号</strong><p>「日常编码」仍在使用 wb-ds。先处理该聚合中的引用。</p><a class="mock-action" href="aggregation.html">查看日常编码聚合</a></div>
+    <p>停用模型从管理模型发起，删除来源从连接详情发起。确认页列出受影响的模型、聚合、草稿和 Agent 绑定。服务端保存时再次检查引用，成功后从调用目录移除。</p>
+  </details>
+</section>
+<section id="acceptance" aria-labelledby="acceptance-title">
+  <header class="section-head"><h2 id="acceptance-title">实现与验收</h2></header>
+  <dl class="screen-spec"><div><dt>首屏</dt><dd>连接状态、已启用数量、当前来源与模型</dd></div>
+<div><dt>来源</dt><dd>已保存目录与发现目录分开读取；模型能力有时间和来源</dd></div>
+<div><dt>验收</dt><dd>发现的 Kimi 待启用时不会出现在网关。wb-ds 启用成功后可调用。验证检测超时、未知价格和有聚合引用的三种路径。</dd></div></dl>
+  <nav class="screen-links" aria-label="设计关联"><a href="../capability-plan.html#page-sources">功能与能力</a><a href="../model-sources.html">技术与沿革</a><a href="../gateway-prototype.html#/catalog">统一交互原型</a></nav>
+</section>
+<nav class="screen-next" aria-label="前后页面"><a href="workbench.html">上一页 · 调度与排查</a><a href="plugins.html">下一页 · 插件与账号</a></nav>
+</main>
+</div>
+</body>
+</html>

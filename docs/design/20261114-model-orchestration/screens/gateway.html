@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本机网关 · Roami 大模型设计</title>
+<link rel="stylesheet" href="../assets/model-workspace-design.css">
+<link rel="stylesheet" href="../assets/model-screen-design.css">
+<script defer src="../assets/model-screen-review.js"></script>
+</head>
+<body>
+<header class="page-head screen-header">
+  <div><a class="screen-parent" href="index.html">大模型页面设计</a><h1>本机网关</h1></div>
+  <nav class="screen-links" aria-label="相关资料"><a href="../capability-plan.html#page-gateway">功能与能力</a><a href="../model-gateway.html">技术与沿革</a><a href="../gateway-prototype.html#directory">统一交互原型</a></nav>
+</header>
+<div class="workspace">
+<nav class="contents screen-sidebar" aria-label="页面设计">
+<a href="workbench.html">调度与排查</a>
+<a href="sources.html">模型源</a>
+<a href="plugins.html">插件与账号</a>
+<a href="aggregation.html">聚合</a>
+<a href="gateway.html" aria-current=page>本机网关</a>
+<a href="usage.html">概况</a>
+<a href="monitor.html">监控</a>
+<a href="audit.html">审计</a>
+<a href="speech.html">语音输入</a>
+<a href="agent.html">会话与委派选模</a>
+</nav>
+<main class="document screen-main" id="document">
+<section class="screen-intro" aria-labelledby="preview-title">
+  <header class="section-head"><h2 id="preview-title">界面设计</h2><a href="#cases" class="page-reference">查看流程与状态</a></header>
+  <p class="copy">查可调用模型，发放密钥和复制接入示例。</p>
+  <div class="screen-board">
+    <figure>
+      <figcaption>桌面 · 已发布目录</figcaption>
+      <div class="mock">
+        <div class="mock-head"><strong>本机网关</strong><a class="mock-action" href="#case-connect">接入当前模型</a></div>
+        <div class="mock-tabs"><span class="selected">模型目录</span><a class="mock-action" href="#case-connect">接入与密钥</a></div>
+        <div class="mock-controls">
+          <span class="mock-field">搜索展示名、调用名或别名</span>
+          <span class="mock-filter selected">已发布</span>
+          <span class="mock-filter">类型</span>
+          <span class="mock-filter">输入</span>
+          <span class="mock-filter">输出</span>
+        </div>
+        <table class="mock-table" aria-label="已发布模型，聚合优先排列">
+          <thead><tr><th scope="col">模型</th><th scope="col">类型 / 来源</th><th scope="col">输入</th><th scope="col">输出</th><th scope="col">工具 / 费用</th></tr></thead>
+          <tbody>
+            <tr class="selected">
+              <td><strong>日常编码</strong><small class="mock-sub"><code>coding-auto</code></small></td>
+              <td><strong>聚合</strong><small class="mock-sub">3 个成员</small></td><td>文本、图片</td><td>文本</td>
+              <td><span class="mock-status ok">有兼容成员</span><small class="mock-sub">随命中来源</small></td>
+            </tr>
+            <tr>
+              <td><strong>DS 代码助手</strong><small class="mock-sub"><code>wb-ds</code></small></td>
+              <td><strong>原生</strong><small class="mock-sub">WorkBuddy</small></td><td>文本</td><td>文本</td>
+              <td><span class="mock-status">未验证</span><small class="mock-sub">价格未知</small></td>
+            </tr>
+            <tr>
+              <td><strong>Qwen 免费</strong><small class="mock-sub"><code>or-qwen-free</code></small></td>
+              <td><strong>原生</strong><small class="mock-sub">OpenRouter</small></td><td>文本、图片</td><td>文本</td>
+              <td><span class="mock-status ok">已验证</span><small class="mock-sub">已确认免费</small></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="mock-panel">
+          <h3>日常编码 · 模型详情</h3>
+          <dl class="mock-facts">
+            <div><dt>调用名</dt><dd><code>coding-auto</code></dd></div>
+            <div><dt>兼容别名</dt><dd><code>coding</code></dd></div>
+            <div><dt>图片输入证据</dt><dd>14:23 试调通过</dd></div>
+          </dl>
+          <p class="muted">试调命中 Qwen 免费。实际调用时按输入、输出和协议选择兼容成员。</p>
+          <a class="mock-action primary" href="#case-connect">查看调用示例</a><a class="mock-action" href="aggregation.html">查看聚合成员</a>
+        </div>
+      </div>
+    </figure>
+    <figure>
+      <figcaption>手机 · 接入与密钥</figcaption>
+      <div class="mock mock-phone">
+        <div class="mock-head"><div class="mock-identity"><a class="mock-back" href="#preview-title" aria-label="返回界面设计"></a><strong>接入与密钥</strong></div></div>
+        <div class="mock-panel">
+          <h3>调用模型</h3><strong>日常编码</strong><small class="mock-sub"><code>coding-auto</code></small>
+          <a class="mock-action" href="#case-directory">查看模型详情</a>
+        </div>
+        <div class="mock-panel">
+          <h3>API 地址</h3><code>http://127.0.0.1:8787/v1</code>
+          <p class="muted">仅网关所在节点可达。</p>
+          <a class="mock-action primary" href="#case-connect">查看调用示例</a>
+        </div>
+        <div class="mock-panel">
+          <h3>访问密钥</h3>
+          <ul class="mock-list"><li><div><strong>OKR 指标任务</strong><small class="mock-sub">尾号 52B84F17</small></div><span class="mock-status ok">生效</span></li></ul>
+          <a class="mock-action" href="#case-key">管理密钥</a>
+        </div>
+      </div>
+    </figure>
+  </div>
+  <dl class="screen-annotations">
+    <div><dt>可调用目录聚合优先</dt><dd>首屏呈现已发布入口。原生行显示来源，聚合行显示成员数量。跳到聚合或模型源后返回，沿用搜索、筛选和滚动位置。</dd></div>
+    <div><dt>能力按输入和输出分列</dt><dd>支持、未验证与不支持各有状态。详情说明证据来源及验证时间。聚合的已知能力由可选成员证明，每次请求仍检查组合能力。</dd></div>
+    <div><dt>显示名、调用名、凭据各有用途</dt><dd>展示名用于浏览，调用名用于 API、CLI 和 Agent，旧别名在详情标记兼容。访问密钥在网关管理，连接供应商的凭据在模型源管理。</dd></div>
+  </dl>
+</section>
+<section id="cases" class="screen-cases" aria-labelledby="cases-title">
+  <header class="section-head"><h2 id="cases-title">流程与状态</h2></header>
+  <details id="case-directory">
+    <summary>搜索与核对能力证据</summary>
+    <p>搜索支持展示名、调用名和历史别名。输入和输出可独立筛选。详情可按「声明」「网关验证」「未验证」「明确不支持」查看依据及时间，调用入口仍受当前启用和授权范围约束。</p>
+    <div class="mock-callout"><strong>没有符合条件的已发布模型</strong><p>清除一项条件，或去模型源查看和启用可发现的模型。</p><a class="mock-action" href="sources.html">打开模型源</a></div>
+  </details>
+  <details id="case-connect">
+    <summary>打开接入示例与受控试调</summary>
+    <p>按模型支持的协议生成示例，默认复制稳定调用名。复制地址时同时展示可达范围。试调前提示会发送一次请求，结束后显示命中模型并提供审计入口。</p>
+    <div class="mock-callout warn"><strong>此地址仅在网关所在节点可达</strong><p>手机可查看和复制示例。运行示例时选择网关所在节点的终端。</p></div>
+    <pre class="mock-code"><code>curl "$ROAMI_GATEWAY_BASE_URL/chat/completions" \
+  -H "Authorization: Bearer $ROAMI_GATEWAY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"coding-auto","messages":[{"role":"user","content":"返回 pong"}]}'</code></pre>
+    <a class="mock-action" href="audit.html">查看试调审计设计</a>
+  </details>
+  <details id="case-key">
+    <summary>发放、轮换与撤销访问密钥</summary>
+    <p>创建和轮换后完整值只显示一次。常态列表展示名称、尾号和状态。轮换或撤销前说明原凭据即刻失效，已知引用按可信绑定列出。</p>
+    <div class="mock-callout danger"><strong>立即撤销「OKR 指标任务」密钥？</strong><p>客户端继续使用尾号 52B84F17 的密钥时，下次调用会被拒绝。</p></div>
+    <a class="mock-action" href="sources.html">管理供应商凭据</a>
+  </details>
+</section>
+<section id="acceptance" aria-labelledby="acceptance-title">
+  <header class="section-head"><h2 id="acceptance-title">实现与验收</h2></header>
+  <dl class="screen-spec"><div><dt>首屏</dt><dd>类型、展示名、调用名、独立的输入与输出、工具和费用</dd></div>
+<div><dt>来源</dt><dd>Web 与 CLI 读取同一份目录。API 按调用方授权和协议返回可调用模型。</dd></div>
+<div><dt>验收</dt><dd>目录默认聚合优先，未发布模型留在模型源。验证别名搜索、输入输出独立筛选、回到同一目录位置、旧密钥撤销后返回认证失败。</dd></div></dl>
+  <nav class="screen-links" aria-label="设计关联"><a href="../capability-plan.html#page-gateway">功能与能力</a><a href="../model-gateway.html">技术与沿革</a><a href="../gateway-prototype.html#directory">统一交互原型</a></nav>
+</section>
+<nav class="screen-next" aria-label="前后页面"><a href="aggregation.html">上一页 · 聚合</a><a href="usage.html">下一页 · 概况</a></nav>
+</main>
+</div>
+</body>
+</html>
