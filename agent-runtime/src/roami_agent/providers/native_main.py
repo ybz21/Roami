@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import re
 
+from roami_agent.context.native_prompt import INLINE_LIMIT, NativePrompt
 from roami_agent.protocol.errors import DomainError, NativeRouteUnavailable
 from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.serialization import encoded
@@ -55,12 +56,10 @@ class NativeMain:
         ):
             raise DomainError("PROJECT_MAIN_IDENTITY_MISMATCH", 409)
         payload = encoded(messages)
+        payload_bytes = payload.encode()
         self.stream_count += 1
         key = (
-            "project-main:"
-            + self.turn["id"]
-            + ":"
-            + hashlib.sha256(payload.encode()).hexdigest()[:24]
+            "project-main:" + self.turn["id"] + ":" + hashlib.sha256(payload_bytes).hexdigest()[:24]
         )
         retry = self.turn.get("native_route_retry", 0)
         if retry:
@@ -80,24 +79,41 @@ class NativeMain:
                     "turnId": self.turn["id"],
                 }
             )
-            + "\nThe following is the host-prepared conversation context, with its original roles:\n"
-            + payload
         )
-        if self.capabilities:
-            schemas = [
-                tool for tool in tools or [] if tool.get("function", {}).get("name") != "reply"
-            ]
+        prepared = None
+        launch_turn = {**self.turn, "native_launch_key": key}
+        if (
+            self.capabilities
+            and self.binding["executor"] == "claude"
+            and self.turn.get("trigger_kind") == "continuation"
+            and len(payload_bytes) > INLINE_LIMIT
+        ):
+            packet = NativePrompt(messages)
+            if packet.batch_index is not None:
+                prepared = packet
+        if prepared is None:
             prompt += (
-                "\nHost capability schemas for this turn follow. These are not native tools: "
-                "invoke their exact names and arguments through the signed capability call below. "
-                "Core read supports retained artifact:// paths; do not recover syntax or signed "
-                "contexts from old transcripts.\n"
-                + encoded(schemas)
-                + "\nEnd host capability schemas.\n"
+                "\nThe following is the host-prepared conversation context, with its original roles:\n"
+                + payload
             )
-            prompt += await self.capabilities.brief(
-                self.binding, {**self.turn, "native_launch_key": key}
-            )
+        if self.capabilities:
+            if prepared is not None:
+                prompt += await self.capabilities.brief(
+                    self.binding, launch_turn, prepared_context=prepared
+                )
+            else:
+                schemas = [
+                    tool for tool in tools or [] if tool.get("function", {}).get("name") != "reply"
+                ]
+                prompt += (
+                    "\nHost capability schemas for this turn follow. These are not native tools: "
+                    "invoke their exact names and arguments through the signed capability call below. "
+                    "Core read supports retained artifact:// paths; do not recover syntax or signed "
+                    "contexts from old transcripts.\n"
+                    + encoded(schemas)
+                    + "\nEnd host capability schemas.\n"
+                )
+                prompt += await self.capabilities.brief(self.binding, launch_turn)
         spec = {
             "key": key,
             "executor": self.binding["executor"],
@@ -178,3 +194,6 @@ class NativeMain:
             if result.get("inputStopped") is not True or result.get("outcomeKnown") is not True:
                 raise DomainError("SESSION_STOP_UNCONFIRMED", 409) from None
             raise
+        finally:
+            if prepared is not None:
+                self.capabilities.release_prompt(launch_turn)
