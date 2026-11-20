@@ -218,7 +218,9 @@
             </div>
           </div>
           <div class="review-toolbar" id="review-options" role="group" aria-labelledby="review-toggle" hidden>
-            <div class="toolbar-group review-choices" role="group" data-label="reviewer"></div>
+            <div class="toolbar-group review-choices" role="group" aria-labelledby="review-agent-label">
+              <span class="review-agent-label" id="review-agent-label" data-t="reviewer"></span>
+            </div>
             <select id="review-trigger" class="pill" data-label="trigger">
               <option value="submit" data-t="bySubmit"></option>
               <option value="idle" data-t="byIdle"></option>

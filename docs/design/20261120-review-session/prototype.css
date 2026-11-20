@@ -335,6 +335,13 @@ textarea {
   padding-top: var(--sp-2);
   border-top: 1px solid var(--border-subtle);
 }
+.review-agent-label {
+  margin-inline-end: var(--sp-1);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .task-actions { margin-inline-start: auto; }
 .pill {
   display: inline-flex;
@@ -386,6 +393,7 @@ pre {
 }
 
 @media (pointer: coarse) {
+  .review-choices { gap: var(--sp-1); }
   .button, .icon-button, select, .tree-row, .prompt-details summary, .pill { min-height: var(--tap); }
   .pill select { min-height: var(--tap); }
   .icon-button { width: var(--tap); }

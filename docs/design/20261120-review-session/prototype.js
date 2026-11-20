@@ -7,7 +7,7 @@ const zh = {
   exampleTask: '修复会话列表的活跃时间\n恢复会话后刷新活跃时间，并验证列表排序。',
   newWorkspace: '新建 worktree', existingWorkspace: '已有', base: '基于',
   terminal: '终端', voice: '语音输入', attach: '添加附件',
-  author: '作者', reviewer: '审查 Agent', review: '互审',
+  author: '作者', reviewer: '审查者', review: '互审',
   trigger: '交审方式', bySubmit: '主动交审', byIdle: '空闲交审',
   authorPrompt: '作者', reviewerPrompt: '审查者', messages: '会话记录', sessions: '任务会话',
   openReviewer: '打开 review', openAuthor: '打开作者会话',
@@ -45,7 +45,7 @@ const en = {
   exampleTask: 'Fix session activity timestamps\nRefresh activity on resume and verify the session list order.',
   newWorkspace: 'New worktree', existingWorkspace: 'Existing', base: 'From',
   terminal: 'Terminal', voice: 'Voice input', attach: 'Attach files',
-  author: 'Author', reviewer: 'Review agent', review: 'Peer review',
+  author: 'Author', reviewer: 'Reviewer', review: 'Peer review',
   trigger: 'Review trigger', bySubmit: 'Author submits', byIdle: 'When idle',
   authorPrompt: 'Author', reviewerPrompt: 'Reviewer', messages: 'Session transcript', sessions: 'Task sessions',
   openReviewer: 'Open review', openAuthor: 'Open author session',
@@ -119,7 +119,7 @@ function setMark(svg, name) {
 }
 
 function populateAgentChoices(group, role) {
-  const firstStaticControl = group.firstElementChild
+  const firstStaticControl = group.querySelector('button')
   for (const [kind, name] of Object.entries(agentNames)) {
     const button = document.createElement('button')
     button.type = 'button'
