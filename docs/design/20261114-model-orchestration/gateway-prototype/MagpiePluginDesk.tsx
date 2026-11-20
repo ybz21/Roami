@@ -6,7 +6,7 @@ import { ChevronRight, SearchIcon } from '../../../../frontend/src/icons'
 import { useI18n } from '../../../../frontend/src/i18n'
 import { useLayout } from '../../../../frontend/src/layout'
 import { addDemoPluginSource, readPluginSources } from './fixture'
-import { applyPluginRelease, magpiePlugins, pluginAccounts, pluginRelease, registryURL, rollBackPluginRelease, stagePluginRelease } from './plugin-fixture'
+import { applyPluginRelease, loadMagpieRegistry, loadMagpieReleases, pluginAccounts, pluginRelease, readMagpiePlugins, registryURL, rollBackPluginRelease, stagePluginRelease } from './plugin-fixture'
 import './magpie-plugin-desk.css'
 
 const hub = '#/catalog/plugins'
@@ -25,6 +25,9 @@ export function MagpiePluginDesk({ pluginId, action, itemId, syncSources }: Prop
   const [installedOnly, setInstalledOnly] = useState(false)
   const [channel, setChannel] = useState<Channel>('github')
   const [, refresh] = useReducer(value => value + 1, 0)
+  const [directoryState, setDirectoryState] = useState<'loading' | 'live' | 'snapshot'>('loading')
+  const [directoryAttempt, retryDirectory] = useReducer(value => value + 1, 0)
+  const [checkingRelease, setCheckingRelease] = useState(false)
   const [receipt, setReceipt] = useState<{ plugin: string; text: string }>()
   const [rollback, setRollback] = useState('')
   const detailTitle = useRef<HTMLHeadingElement>(null)
@@ -35,11 +38,23 @@ export function MagpiePluginDesk({ pluginId, action, itemId, syncSources }: Prop
       detailTitle.current?.focus({ preventScroll: true })
     }
   }, [pluginId, action, itemId])
+  useEffect(() => {
+    let active = true
+    setDirectoryState('loading')
+    void loadMagpieRegistry().then(
+      () => { if (active) setDirectoryState('live') },
+      () => { if (active) setDirectoryState('snapshot') },
+    )
+    return () => { active = false }
+  }, [directoryAttempt])
   const sources = readPluginSources()
-  const term = normalized(query)
+  const term = normalized(query).replace(/^packages\//, '')
+  const magpiePlugins = readMagpiePlugins()
   const matches = magpiePlugins.filter(row =>
     (!installedOnly || pluginRelease(row.id).active) &&
-    [row.name, row.path, ...row.providers.map(provider => provider.name)].some(value => value.toLowerCase().includes(term)))
+    [row.name, row.package, row.path || '', ...row.providers.flatMap(provider => [provider.id, provider.name])]
+      .some(value => value.toLowerCase().includes(term)))
+    .sort((a, b) => Number(!!pluginRelease(b.id).active) - Number(!!pluginRelease(a.id).active) || a.name.localeCompare(b.name, locale))
   const selected = pluginId ? magpiePlugins.find(row => row.id === pluginId) : phone ? undefined : matches[0]
   const state = selected && pluginRelease(selected.id)
   const pluginHref = selected ? hub + '/' + selected.id : hub
@@ -56,41 +71,62 @@ export function MagpiePluginDesk({ pluginId, action, itemId, syncSources }: Prop
   const showDirectory = !phone || !selected
   const showDetails = !!selected && (!phone || !!pluginId)
   const actionLabel = action === 'add' ? word('添加账号', 'Add account') : word('创建模型源', 'Create source')
+  const checkRelease = async () => {
+    if (checkingRelease || !selected || !state) return
+    setCheckingRelease(true)
+    try {
+      await loadMagpieReleases()
+      const latest = readMagpiePlugins().find(plugin => plugin.id === selected.id)?.available
+      state.checkedAt = Date.now()
+      complete(!latest ? word('发布索引暂无此插件的版本', 'No release in the distribution index')
+        : state.active === latest ? word('当前已是最新版本', 'Version is up to date')
+          : word('发现可用版本 ', 'Release available ') + latest)
+    } catch {
+      complete(word('暂时无法核对发布索引，已保留缓存版本。', 'The release index is unavailable. Cached versions are shown.'))
+    } finally { setCheckingRelease(false) }
+  }
 
   return <div className="magpie-desk">
     {showDirectory && <section className="magpie-desk-directory" aria-labelledby="magpie-directory-title">
       <header className="tt-pagehead magpie-desk-head"><BackLink href="#/catalog" /><h2 id="magpie-directory-title">{word('模型源插件', 'Model-source plugins')}</h2></header>
       <div className="magpie-desk-scroll">
         <div className="magpie-directory-tools">
-          <Input prefix={<SearchIcon />} aria-label={word('搜索插件或路径', 'Search plugin or path')} placeholder={word('插件名、仓库路径或链接', 'Plugin name, path, or URL')} value={query} onChange={event => setQuery(event.target.value)} allowClear />
+          <Input prefix={<SearchIcon />} aria-label={word('搜索插件或路径', 'Search plugin or path')} placeholder={word('插件名、包名、仓库路径或链接', 'Plugin name, package, path, or URL')} value={query} onChange={event => setQuery(event.target.value)} allowClear />
           <Button aria-pressed={installedOnly} onClick={() => setInstalledOnly(value => !value)}>{word('仅已安装', 'Installed only')}</Button>
+        </div>
+        <div className="magpie-directory-meta">
+          <p className="magpie-desk-muted" role="status">
+            {!!matches.length && word('显示 ' + matches.length + ' 个插件 · ', matches.length + ' plugins shown · ')}{directoryState === 'live' ? word('已同步 Magpie 目录', 'Synced with Magpie')
+              : directoryState === 'loading' ? word('正在同步目录', 'Syncing registry') : word('离线目录快照', 'Offline registry snapshot')}
+          </p>
+          {directoryState === 'snapshot' && <Button type="text" onClick={retryDirectory}>{t('agent.retry')}</Button>}
+        </div>
+        <div className="magpie-desk-links">
+          <a href={registryURL} target="_blank" rel="noreferrer">{word('Magpie 社区目录', 'Magpie registry')}<ChevronRight /></a>
+          <a href="#/catalog/import?view=file">{word('从文件导入', 'Import from a file')}<ChevronRight /></a>
         </div>
         <ul className="magpie-directory-list">
           {matches.map(plugin => {
             const release = pluginRelease(plugin.id)
             const count = sources.filter(row => row.pluginId === plugin.id).length
             const status = !release.active ? word('未安装', 'Available')
-              : release.active !== plugin.available ? word('可更新', 'Update available')
+              : plugin.available && release.active !== plugin.available ? word('可更新', 'Update available')
                 : word('已安装', 'Installed')
             return <li key={plugin.id}><a href={hub + '/' + plugin.id} aria-current={selected?.id === plugin.id ? 'page' : undefined}>
-              <span><strong>{plugin.name}</strong><small>{plugin.path}</small></span>
+              <span><strong>{plugin.name}</strong><small>{plugin.path || plugin.package}</small></span>
               <span className="magpie-directory-status"><small>{status}</small>{!!count && <small>{word(count + ' 个账号', count + ' accounts')}</small>}</span>
               <ChevronRight />
             </a></li>
           })}
         </ul>
         {!matches.length && <p className="magpie-desk-muted">{word('没有匹配的插件。', 'No matching plugins.')}</p>}
-        <div className="magpie-desk-links">
-          <a href={registryURL} target="_blank" rel="noreferrer">{word('Magpie 社区目录', 'Magpie registry')}<ChevronRight /></a>
-          <a href="#/catalog/import?view=file">{word('从文件导入', 'Import from a file')}<ChevronRight /></a>
-        </div>
       </div>
     </section>}
     {showDetails && selected && state && <section className="magpie-desk-detail" aria-labelledby="magpie-detail-title">
       <header className="tt-pagehead magpie-desk-head">
         {(phone || action) && <BackLink href={action ? pluginHref : hub} />}
         <h2 id="magpie-detail-title" ref={detailTitle} tabIndex={-1}>{activeAccount?.name || (creating ? actionLabel : selected.name)}</h2>
-        {!action && <a href={'https://github.com/magpie-community/plugins/tree/main/' + selected.path} target="_blank" rel="noreferrer">{word('插件说明', 'Plugin guide')}<ChevronRight /></a>}
+        {!action && <a href={selected.path ? 'https://github.com/magpie-community/plugins/tree/main/' + selected.path : registryURL} target="_blank" rel="noreferrer">{selected.path ? word('插件说明', 'Plugin guide') : word('查看目录来源', 'View registry')}<ChevronRight /></a>}
       </header>
       <div className="magpie-desk-scroll" ref={detailScroll}>
         {activeAccount ? <>
@@ -128,15 +164,12 @@ export function MagpiePluginDesk({ pluginId, action, itemId, syncSources }: Prop
             <h3 id="magpie-version-title">{word('插件版本', 'Plugin versions')}</h3>
             <dl className="magpie-version-facts">
               <div><dt>{word('当前生效', 'Active')}</dt><dd>{state.active || word('未安装', 'Not installed')}</dd></div>
-              <div><dt>{word('线上版本', 'Available release')}</dt><dd>{selected.available}</dd></div>
+              <div><dt>{word('发布版本', 'Available release')}</dt><dd>{selected.available || word('暂无版本', 'No release')}</dd></div>
               {state.staged && <div><dt>{word('已下载，待应用', 'Downloaded, ready to apply')}</dt><dd>{state.staged}</dd></div>}
             </dl>
             <div className="magpie-desk-actions">
-              <Button onClick={() => {
-                state.checkedAt = Date.now()
-                complete(state.active === selected.available ? word('当前已是最新版本', 'Version is up to date') : word('发现可用版本 ', 'Release available ') + selected.available)
-              }}>{word('检查更新', 'Check for updates')}</Button>
-              {state.active !== selected.available && !state.staged && <>
+              <Button loading={checkingRelease} onClick={() => void checkRelease()}>{word('检查更新', 'Check for updates')}</Button>
+              {!!selected.available && state.active !== selected.available && !state.staged && <>
                 <label>{word('下载来源', 'Download source')} <select value={channel} onChange={event => setChannel(event.target.value as Channel)}>
                   {readChannel.map(value => <option key={value} value={value}>{t('hub.plugin.channel.' + value)}</option>)}</select></label>
                 <Button type="primary" onClick={() => {

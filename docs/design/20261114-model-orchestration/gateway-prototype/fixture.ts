@@ -2,7 +2,7 @@ import type { ModelCatalog, ModelSource } from '../../../../frontend/src/compone
 import type { PriceRule, SourcePricing } from '../../../../frontend/src/components/capabilities/model-routing-api'
 import type { GatewayConfiguration } from '../../../../frontend/src/components/settings/local-model-gateway'
 import { checkSource, now, reconcileCall, requestMonitor, requestObservation, sourceMonitor, traces, usage } from './activity-fixture'
-import { downloadedPackages, inspectPlugin, magpiePlugins, pluginAccounts, pluginProvider, stagePluginRelease } from './plugin-fixture'
+import { downloadedPackages, inspectPlugin, readMagpiePlugins, pluginAccounts, pluginProvider, stagePluginRelease } from './plugin-fixture'
 export { traceCases } from './activity-fixture'
 
 const protocol = 'openai-completions'
@@ -43,8 +43,8 @@ let keyCount = 2
 let keys = [{ id: 'demo-dev', name: 'Development', suffix: '7c2a', disabled: false }, { id: 'demo-ci', name: 'CI', suffix: 'e9f0', disabled: true }]
 let fixed = { hasKey: false, suffix: '', id: 'demo-fixed' }
 const authOptions: Record<string, Record<string, boolean>> = {}
-const demoProvider = (id: string, signedIn: boolean) => {
-  const provider = pluginProvider(id)
+const demoProvider = (pluginId: string, id: string, signedIn: boolean) => {
+  const provider = pluginProvider(pluginId, id)
   return {
     id, name: provider?.name || id, signedIn,
     methods: [{ type: 'api', label: 'Demo sign-in', keyless: true, labels: { 'zh-CN': '演示授权', en: 'Demo sign-in' } }],
@@ -63,7 +63,7 @@ function modelDetails(model: string, sourceId: string) {
 }
 function directoryFor(source: ModelSource) {
   const account = pluginAccounts.find(row => row.sourceId === source.id)
-  if (account) return account.authorized ? pluginProvider(account.providerId)?.models || [] : []
+  if (account) return account.authorized ? pluginProvider(account.pluginId, account.providerId)?.models || [] : []
   return discovery[source.id] || (source.connector ? discovery.openrouter : discovery['demo-api'])
 }
 function directory() {
@@ -108,7 +108,7 @@ export function readPluginSources() {
   })
 }
 export function addDemoPluginSource(pluginId: string, providerId: string, name = '') {
-  const provider = pluginProvider(providerId)!
+  const provider = pluginProvider(pluginId, providerId)!
   const id = pluginId + '-account-' + revision
   const source: ModelSource = { id, name: name.trim() || provider.name + ' · ' + revision, pluginSourceId: id, protocol, authMode: 'plugin', baseUrl: 'https://magpie.invalid/' + id }
   pluginAccounts.push({ sourceId: id, authId: id, pluginId, providerId, authorized: false, claimed: false })
@@ -118,7 +118,7 @@ export function addDemoPluginSource(pluginId: string, providerId: string, name =
 const data = (value: unknown) => Response.json({ data: value })
 const missing = (code = 'DEMO_ENDPOINT_UNAVAILABLE') => Response.json({ error: { code } }, { status: 404 })
 
-// The offline artifact has no network transport, including when served by the live file API.
+// Model and account actions use fixtures. Public Magpie metadata is read separately.
 export function installFixture() {
   window.fetch = async (input, init) => {
     init?.signal?.throwIfAborted()
@@ -189,8 +189,8 @@ export function installFixture() {
     }
     if (path === 'plugins/packages') return data(downloadedPackages())
     if (path === 'plugins/community') {
-      if (!write) return data(magpiePlugins.map(plugin => ({ package: plugin.path, name: plugin.name, providers: plugin.providers.map(row => row.id), version: plugin.available })))
-      const plugin = magpiePlugins.find(row => row.path === body.package)
+      if (!write) return data(readMagpiePlugins().map(plugin => ({ package: plugin.package, name: plugin.name, providers: plugin.providers.map(row => row.id), version: plugin.available })))
+      const plugin = readMagpiePlugins().find(row => row.package === body.package)
       return plugin ? data(stagePluginRelease(plugin.id)) : missing()
     }
     if (path === 'plugins/import' && init?.body instanceof FormData) {
@@ -198,11 +198,11 @@ export function installFixture() {
     }
     if (path === 'plugins/inspect') {
       const plugin = inspectPlugin(body.packageId)
-      return plugin ? data(plugin.providers.map(row => demoProvider(row.id, false))) : missing()
+      return plugin ? data(plugin.providers.map(row => demoProvider(plugin.id, row.id, false))) : missing()
     }
     if (path === 'plugins/sources') {
       const previous = pluginAccounts.find(row => row.authId === body.sourceId)
-      const plugin = previous ? magpiePlugins.find(row => row.id === previous.pluginId) : inspectPlugin(body.packageId || '')
+      const plugin = previous ? readMagpiePlugins().find(row => row.id === previous.pluginId) : inspectPlugin(body.packageId || '')
       const providerId = previous?.providerId || body.providerId
       return plugin?.providers.some(row => row.id === providerId) ? data(addDemoPluginSource(plugin.id, providerId)) : missing()
     }
@@ -210,7 +210,7 @@ export function installFixture() {
       const [, , id, action] = path.split('/')
       const account = pluginAccounts.find(row => row.authId === id)
       if (!account) return missing()
-      if (action === 'info') return data({ provider: demoProvider(account.providerId, account.authorized), options: authOptions[id] || {} })
+      if (action === 'info') return data({ provider: demoProvider(account.pluginId, account.providerId, account.authorized), options: authOptions[id] || {} })
       if (action === 'auth') {
         if (body.action === 'apiKey') account.authorized = true
         return data({ ok: account.authorized })

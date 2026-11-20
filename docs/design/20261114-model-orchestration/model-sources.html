@@ -32,40 +32,41 @@
     <p>有聚合、备用路由、草稿或模型绑定引用时，详情列出相关模型，用户解除引用后再删除。服务端保存时再次校验引用。Magpie 来源删除沿用账号解绑逻辑，插件安装和版本操作仍在插件详情。</p>
   </div>
   <div class="copy step" id="magpie-registry"><h3>导入 Magpie 社区插件</h3>
-    <a class="page-reference" href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins">打开插件与账号原型</a>
-    <p>进入「新建 → 导入模型插件」自动读取上游目录。按插件名、供应商或 <code>packages/workbuddy</code> 搜索，也可粘贴对应 GitHub 目录链接。选中后可对照线上版本和本机已经下载的版本。点「下载并查看供应商」，确认供应商后再创建模型源。ZIP 和文件夹上传保留在「从文件导入」。</p>
+    <a class="page-reference" href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins">打开完整插件目录</a>
+    <p>进入「新建 → 导入模型插件」自动读取 Magpie 的公开 <code>registry.json</code>。沿用生产目录接口的范围，展示有供应商的社区插件，默认同时列出已安装和未安装项。GitHub 不可达时尝试 jsDelivr 镜像，仍无法连接时显示随包快照并提供重试。搜索接受名称、包名、供应商、路径和对应 GitHub 链接。</p>
+    <p>「检查更新」读取发布索引。初始化显示快照中的发行版本，点「检查更新」后核对线上版本。ZIP 和文件夹入口在「从文件导入」。</p>
     <p>下载来源可选 GitHub 官方、国内加速（jsDelivr）或 gh-hk。加速节点失败时尝试备用地址。包的版本与 SHA-512 来自分发索引，索引优先直连 GitHub。包校验通过后沿用只读插件包和现有宿主检查，账号授权在创建来源后进行。</p>
     <ul class="references"><li><a href="https://github.com/magpie-community/plugins/blob/main/registry.json">Magpie 社区目录</a></li><li><a href="https://github.com/magpie-community/plugins/blob/dist/index.json">发布索引</a></li></ul>
   </div>
 </section>
 
 <section id="plugin-lifecycle" aria-labelledby="plugin-lifecycle-title">
-  <header class="section-head"><h2 id="plugin-lifecycle-title">插件与账号</h2><a class="page-reference" href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins/workbuddy">试用 WorkBuddy</a></header>
+  <header class="section-head"><h2 id="plugin-lifecycle-title">插件与账号</h2><a class="page-reference" href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins/workbuddy">试用 WorkBuddy</a></header>
   <figure class="layer-diagram" aria-label="插件接入与版本维护">
     <div class="diagram-lane">
       <h3>创建来源</h3>
       <ol>
-        <li><a href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins">找到插件<small>安装状态、账号数、仓库路径</small></a></li>
-        <li><a href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins/workbuddy/create/workbuddy-ai">选择供应商<small>WorkBuddy 与 WorkBuddy AI 独立授权</small></a></li>
-        <li><a href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins/workbuddy/add/workbuddy">创建并授权<small>可添加多个来源账号，授权后管理模型</small></a></li>
+        <li><a href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins">找到插件<small>安装状态、账号数、仓库路径</small></a></li>
+        <li><a href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins/workbuddy/create/workbuddy-ai">选择供应商<small>WorkBuddy 与 WorkBuddy AI 独立授权</small></a></li>
+        <li><a href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins/workbuddy/add/workbuddy">创建并授权<small>可添加多个来源账号，授权后管理模型</small></a></li>
       </ol>
     </div>
     <div class="diagram-lane">
       <h3>版本更新</h3>
       <ol>
-        <li><a href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins/workbuddy">检查版本<small>当前生效与线上版本</small></a></li>
+        <li><a href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins/workbuddy">检查版本<small>当前生效与线上版本</small></a></li>
         <li><span>下载待应用<small>选择下载来源，校验安装包</small></span></li>
         <li><span>应用或回退<small>保留已有账号绑定，记录上一生效版本</small></span></li>
       </ol>
     </div>
   </figure>
-  <p class="copy">原型使用离线目录和演示授权。生产接入先读取目录与发布索引，下载和校验完成后才允许应用。应用步骤应核对新版供应商和已绑定账号的兼容性，失败时保留当前生效版本。账号登录使用所选供应商的授权方式。</p>
+  <p class="copy">原型在线读取公开目录与发布索引，安装、账号授权和应用版本使用演示操作。生产应用时核对新版供应商与已绑定账号的兼容性，失败时保留当前生效版本。账号登录使用所选供应商的授权方式。</p>
 </section>
 
 <section id="workbuddy" aria-labelledby="workbuddy-title">
   <header class="section-head"><h2 id="workbuddy-title">WorkBuddy · 在插件里管理账号</h2><small>插件 / WorkBuddy</small></header>
   <p class="copy">模型源的「查看插件」定位到已授权账号，在插件详情看套餐、周期积分、额外积分、重置时间和读取时间。「管理模型」回到原有模型源筛选和启用流程。「仅免费模型」沿用插件选项。</p>
-  <a class="page-reference" href="./gateway-prototype.html?v=magpie-lifecycle-20261120#/catalog/plugins/workbuddy/account/workbuddy">查看 WorkBuddy 账号和签到原型</a>
+  <a class="page-reference" href="./gateway-prototype.html?v=magpie-registry-20261120#/catalog/plugins/workbuddy/account/workbuddy">查看 WorkBuddy 账号和签到原型</a>
   <ul class="copy">
     <li>本机装包 WorkBuddy 0.2.26 的国内版账号有签到钩子。Roami 的插件宿主支持对应调用。仅在插件与当前授权账号都支持时开放签到。<a href="https://github.com/yetone/magpie/blob/main/docs/subsystems/provider-plugins.md">Magpie 插件接口说明</a></li>
     <li>用户点击后按账号去重，回执区分已领取、今日已签、需重新授权和需在官方客户端操作。只有收到成功回执才更新积分，并重新读取该账号额度。原型中的积分变化用于演示。<a href="https://raw.githubusercontent.com/magpie-community/plugins/main/packages/workbuddy/README.md">WorkBuddy 插件说明</a></li>

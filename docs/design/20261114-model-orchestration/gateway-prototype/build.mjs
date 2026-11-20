@@ -29,7 +29,7 @@ const html = `<!doctype html>
 <html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src https://raw.githubusercontent.com/magpie-community/plugins/main/registry.json https://raw.githubusercontent.com/magpie-community/plugins/dist/index.json https://cdn.jsdelivr.net/gh/magpie-community/plugins@main/registry.json https://cdn.jsdelivr.net/gh/magpie-community/plugins@dist/index.json">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Roami · 大模型工作台原型</title>
 <style>${css}</style>

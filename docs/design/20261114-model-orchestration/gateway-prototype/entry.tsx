@@ -74,7 +74,7 @@ function Prototype() {
 
   return <div className="model-prototype">
     <div className="model-prototype-bar">
-      <div><strong>{zh ? 'Roami 大模型工作台' : 'Roami Model Workspace'}</strong><small>{zh ? '离线演示' : 'Offline demo'}</small></div>
+      <div><strong>{zh ? 'Roami 大模型工作台' : 'Roami Model Workspace'}</strong><small>{pluginDesk ? (zh ? '操作演示' : 'Action demo') : (zh ? '离线演示' : 'Offline demo')}</small></div>
       <nav aria-label={zh ? '原型导航' : 'Prototype navigation'}>
         {workbench ? <a href="#/catalog">{zh ? '模型管理' : 'Manage models'}</a>
           : <a href="#/workbench">{zh ? '调度与排查' : 'Routing & incidents'}</a>}

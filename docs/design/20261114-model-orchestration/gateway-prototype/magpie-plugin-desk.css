@@ -8,6 +8,8 @@
 .magpie-directory-tools { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-block-end:var(--sp-3); }
 .magpie-directory-tools > span { flex:1 1 18ch; min-width:0; }
 .magpie-directory-tools button[aria-pressed=true] { border-color:var(--accent-border); background:var(--accent-soft); }
+.magpie-directory-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-2); }
+.magpie-directory-meta p { margin:0; }
 .magpie-desk ul { margin:0; padding:0; list-style:none; }
 .magpie-desk button, .magpie-desk select { min-height:var(--tap); }
 .magpie-desk a:not(.tt-back) { min-height:var(--tap); color:var(--accent); display:inline-flex; align-items:center; gap:var(--sp-1); }
@@ -26,7 +28,7 @@
 .magpie-desk-actions, .magpie-desk-links { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2) var(--sp-3); }
 .magpie-desk-actions label { display:inline-flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); }
 .magpie-desk select { font:inherit; padding-inline:var(--sp-2); color:var(--text-bright); background:var(--bg-container); border:1px solid var(--border); border-radius:var(--r-sm); }
-.magpie-desk-links { margin-block-start:var(--sp-2); }
+.magpie-desk-links { margin-block:var(--sp-1); }
 .magpie-version-history summary { min-height:var(--tap); display:flex; align-items:center; gap:var(--sp-1); cursor:pointer; }
 .magpie-version-history[open] summary svg { transform:rotate(90deg); }
 .magpie-provider-list li { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); padding-block:var(--sp-1); border-block-end:1px solid var(--border-subtle); }
