@@ -5170,6 +5170,8 @@ const enUS = {
   'hub.directory.sourceName': "Source name (optional)",
   'hub.directory.autoName': "Uses the service domain by default",
   'hub.directory.changeConnection': "Edit connection",
+  'hub.directory.configureKey': "Set API key",
+  'hub.directory.replaceKey': "Replace API key",
   'hub.gateway.keys': 'Gateway access keys (API Key)',
   'hub.gateway.keyName': 'Key label',
   'hub.gateway.generateKey': 'Generate access key',

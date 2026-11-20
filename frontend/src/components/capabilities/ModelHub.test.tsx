@@ -443,6 +443,41 @@ it('lets new sources change their address after discovering a directory', async 
   expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
 })
 
+it('opens key replacement from the source summary and saves only that source credential', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['priced-model', 'available-model'] } }
+    : original(method, path, body, options))
+  mount('catalog/source/upstream')
+  fireEvent.click(await screen.findByRole('button', { name: 'modelInteraction.manageModels' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'available-model' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'priced-model' }))
+
+  const replaceKey = () => fireEvent.click(screen.getByRole('button', { name: 'hub.directory.replaceKey' }))
+  replaceKey()
+  const input = screen.getByLabelText('modelIdentity.providerKey') as HTMLInputElement
+  expect(input.type).toBe('password')
+  expect(input.value).toBe('')
+  expect(screen.queryByLabelText('agent.models.baseUrl')).toBeNull()
+  expect(screen.getByText(catalog.sources[0].baseUrl)).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
+  expect(screen.getByRole('checkbox', { name: 'available-model' }).getAttribute('aria-checked')).toBe('true')
+  expect(screen.getByRole('checkbox', { name: 'priced-model' }).getAttribute('aria-checked')).toBe('false')
+
+  replaceKey()
+  fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'fixture-replacement' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  const confirmation = await screen.findByRole('alertdialog', { name: 'hub.sourceApply' })
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: [{ ...catalog.sources[0], apiKey: 'fixture-replacement' }],
+    models: catalog.models,
+  })))
+  await screen.findByRole('button', { name: 'hub.directory.replaceKey' })
+  expect(screen.queryByLabelText('modelIdentity.providerKey')).toBeNull()
+})
+
 
 it('opens a saved source directory from its card and saves additions and removals without losing other sources', async () => {
   const other = { ...catalog.sources[0], id: 'other', name: 'Other source' }
