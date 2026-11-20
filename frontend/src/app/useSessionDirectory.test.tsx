@@ -6,7 +6,7 @@ import { useSessionDirectory } from './useSessionDirectory'
 const snapshot = vi.hoisted(() => ({ value: [], closingNames: new Set<string>() }))
 vi.mock('../session-overview', () => ({ useSessionOverview: () => snapshot }))
 vi.mock('../components/sessions/native-session-list', () => ({ useNativeSessionList: () => ({ value: [], loaded: true }) }))
-vi.mock('../api', () => ({ api: vi.fn(async () => [{ id: '$1', name: 'closing' }, { id: '$2', name: 'remaining' }]) }))
+vi.mock('../api', () => ({ api: vi.fn(async () => [{ id: '$1', name: 'closing' }, { id: '$2', name: 'remaining', last_activity: '1795161193' }]) }))
 afterEach(cleanup)
 it('removes closing sessions from stale CLI lists and workspace identities', async () => {
   snapshot.closingNames = new Set()
@@ -17,4 +17,11 @@ it('removes closing sessions from stale CLI lists and workspace identities', asy
   view.rerender()
   expect(view.result.current.sessList.map(session => session.name)).toEqual(['remaining'])
   expect(view.result.current.sessIds).toEqual({ byId: { '$2': 'remaining' }, byName: { remaining: '$2' } })
+})
+
+it('reads the session timestamp from the CLI list used by the project tree', async () => {
+  snapshot.closingNames = new Set()
+  const { result } = renderHook(() => useSessionDirectory())
+  await waitFor(() => expect(result.current.sessListLoaded).toBe(true))
+  expect(result.current.sessList[1].lastActivity).toBe(1795161193)
 })

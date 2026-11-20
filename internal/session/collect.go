@@ -27,7 +27,7 @@ import (
 // sessionListFormat 一次问齐列表要用的字段。两个出口共用同一份格式串，
 // 免得字段顺序在两边悄悄分叉。
 const sessionListFormat = "#{session_name}\t#{session_windows}\t#{session_created}\t" +
-	"#{session_attached}\t#{session_activity}\t#{window_activity}\t#{session_id}\t#{" + runtime.LabelOption + "}\t#{@roam_pause_reason}\t#{@roam_memory_resume_until}"
+	"#{session_attached}\t" + runtime.WindowActivityTimesFormat + "\t#{session_id}\t#{" + runtime.LabelOption + "}\t#{@roam_pause_reason}\t#{@roam_memory_resume_until}"
 
 // Collect 返回本机所有会话：tmux 里活着的，加上台账里**休眠**的
 // （机器重启带走了 tmux 那一半，点开即恢复）。
@@ -246,31 +246,26 @@ func parseSessionLines(out string, exclude map[string]bool) []sessionInfo {
 		}
 		windows, _ := strconv.Atoi(parts[1])
 		attached, _ := strconv.Atoi(parts[3])
-		lastActivity := ""
+		created, _ := strconv.ParseInt(parts[2], 10, 64)
+		lastActivity := created
 		if len(parts) > 4 {
-			lastActivity = parts[4]
-		}
-		if len(parts) > 5 {
-			// window_activity 补 session_activity 的盲区：tmux 只在 attach/输入/焦点变化时
-			// 刷新 session_activity，后台无人 attach 的会话即便一直有输出（agent 干活）也不动。
-			lastActivity = maxNumeric(lastActivity, parts[5])
+			lastActivity = runtime.LastWindowActivity(created, parts[4])
 		}
 		tmuxID := ""
-		if len(parts) > 6 {
-			tmuxID = parts[6]
+		if len(parts) > 5 {
+			tmuxID = parts[5]
 		}
 		label := ""
-		if len(parts) > 7 {
-			label = strings.TrimSpace(parts[7])
+		if len(parts) > 6 {
+			label = strings.TrimSpace(parts[6])
 		}
-		created, _ := strconv.ParseInt(parts[2], 10, 64)
 		reason := ""
 		var resumeUntil int64
-		if len(parts) > 8 {
-			reason = parts[8]
+		if len(parts) > 7 {
+			reason = parts[7]
 		}
-		if len(parts) > 9 {
-			resumeUntil, _ = strconv.ParseInt(parts[9], 10, 64)
+		if len(parts) > 8 {
+			resumeUntil, _ = strconv.ParseInt(parts[8], 10, 64)
 		}
 		row := runtime.SessionRow{Name: parts[0], Label: label, TmuxID: tmuxID, Created: created}
 		sessions = append(sessions, sessionInfo{
@@ -281,7 +276,7 @@ func parseSessionLines(out string, exclude map[string]bool) []sessionInfo {
 			Windows:      windows,
 			Created:      parts[2],
 			Attached:     attached,
-			LastActivity: lastActivity,
+			LastActivity: strconv.FormatInt(lastActivity, 10),
 			State:        "live",
 			pauseReason:  reason,
 			resumeUntil:  resumeUntil,

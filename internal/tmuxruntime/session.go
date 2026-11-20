@@ -368,16 +368,26 @@ type SessionState struct {
 	Activity int64 // 最后一次有动静（unix 秒）
 }
 
+// WindowActivityTimesFormat includes background windows in the same list-sessions scan.
+const WindowActivityTimesFormat = "#{W:#{window_activity} }"
+
+// LastWindowActivity uses pane output because attaching and focusing a client also bump session_activity.
+func LastWindowActivity(created int64, windowActivityTimes string) int64 {
+	latest := created
+	for _, field := range strings.Fields(windowActivityTimes) {
+		if activity, err := strconv.ParseInt(field, 10, 64); err == nil && activity > latest {
+			latest = activity
+		}
+	}
+	return latest
+}
+
 // sessionStateFormat：label 仍放最后，理由同 sessionRowFormat。
-const sessionStateFormat = "#{session_id}\t#{session_created}\t#{session_activity}\t" +
-	"#{window_activity}\t#{session_attached}\t#{session_name}\t#{" + LabelOption + "}"
+const sessionStateFormat = "#{session_id}\t#{session_created}\t" + WindowActivityTimesFormat +
+	"\t#{session_attached}\t#{session_name}\t#{" + LabelOption + "}"
 
 // SessionStates 返回全部活会话的状态。tmux 盲态返回 nil——同 SessionRows，
 // 「看不见的时候不下判断」。
-//
-// activity 取 session_activity 与 window_activity 的较大者：tmux 只在
-// attach/输入/焦点变化时刷新 session_activity，后台没人看的会话即便一直在输出
-// （agent 正干活）也不动，光看前者会把干得最欢的会话判成「安静了一天」。
 func (r Runtime) SessionStates() []SessionState {
 	out, err := r.TmuxOutput("list-sessions", "-F", sessionStateFormat)
 	if err != nil {
@@ -388,30 +398,21 @@ func (r Runtime) SessionStates() []SessionState {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "\t", 7)
-		if len(parts) < 6 {
+		parts := strings.SplitN(line, "\t", 6)
+		if len(parts) < 5 {
 			continue
 		}
 		created, _ := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
-		sa, _ := strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64)
-		wa, _ := strconv.ParseInt(strings.TrimSpace(parts[3]), 10, 64)
-		attached, _ := strconv.Atoi(strings.TrimSpace(parts[4]))
+		attached, _ := strconv.Atoi(strings.TrimSpace(parts[3]))
 		st := SessionState{
-			SessionRow: SessionRow{TmuxID: strings.TrimSpace(parts[0]), Created: created, Name: parts[5]},
+			SessionRow: SessionRow{TmuxID: strings.TrimSpace(parts[0]), Created: created, Name: parts[4]},
 			Attached:   attached > 0,
-			Activity:   max64(sa, wa),
+			Activity:   LastWindowActivity(created, parts[2]),
 		}
-		if len(parts) > 6 {
-			st.Label = strings.TrimSpace(parts[6])
+		if len(parts) > 5 {
+			st.Label = strings.TrimSpace(parts[5])
 		}
 		states = append(states, st)
 	}
 	return states
-}
-
-func max64(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
 }

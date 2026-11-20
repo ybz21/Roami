@@ -26,7 +26,7 @@ export function useSessionDirectory() {
         for (const s of Array.isArray(list) ? list : []) {
           if (s?.name && isInfraSession(s.name)) continue
           if (s?.id && s?.name) { byId[s.id] = s.name; byName[s.name] = s.id }
-          if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined, parent: s.parent || undefined })
+          if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: Number(s.last_activity) || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined, parent: s.parent || undefined })
         }
         const ids = Object.keys(byId)
         setSessIds(current => current && ids.length === Object.keys(current.byId).length && ids.every(id => current.byId[id] === byId[id]) ? current : { byId, byName })
