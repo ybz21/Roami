@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN" data-pointer="fine">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>互审会话设计总览 · Roami</title>
+  <link rel="stylesheet" href="./design.css">
+</head>
+<body>
+  <header class="tt-pagehead doc-header">
+    <h1>互审会话设计总览</h1>
+    <a href="./prototype.html?lang=zh">打开原型</a>
+  </header>
+  <main class="scroll doc-scroll">
+    <article class="doc-content">
+      <section aria-label="设计概要">
+        <p>创建任务时选择审查 Agent 和交审方式。开工时同步创建 <code>review</code> 子会话，双方用 <code>roami session send</code> 交审、回传意见和提交修复。默认最多 3 轮，通过即停。</p>
+        <nav class="design-links" aria-label="设计文档">
+          <a href="./product.html">
+            <strong>产品设计</strong>
+            <span>创建入口、审查会话、用户故事和交互原型</span>
+          </a>
+          <a href="./tech.html">
+            <strong>技术实现</strong>
+            <span>会话创建、Prompt、消息协议、轮次和代码落点</span>
+          </a>
+        </nav>
+      </section>
+      <p class="scope"><a href="./acceptance.md">原型验收记录</a></p>
+    </article>
+  </main>
+</body>
+</html>

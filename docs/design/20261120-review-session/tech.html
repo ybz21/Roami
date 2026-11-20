@@ -4,46 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>互审会话技术设计 · Roami</title>
-  <link rel="stylesheet" href="./prototype.css">
-  <style>
-    body { display: flex; flex-direction: column; }
-    .doc-header { padding: calc(var(--sp-3) + var(--safe-t)) var(--pad-page) var(--sp-3); }
-    .doc-header a { display: inline-flex; align-items: center; white-space: nowrap; }
-    .doc-scroll { padding: var(--sp-5) var(--pad-page) calc(var(--sp-5) + var(--safe-b)); }
-    .doc-content { max-width: var(--content-form); margin-inline: auto; overflow-wrap: anywhere; }
-    .doc-content section { padding: var(--sp-5) 0; border-bottom: 1px solid var(--border-subtle); }
-    .doc-content section:first-of-type { padding-top: 0; }
-    .doc-content section:last-child { border: 0; }
-    h2 { margin-bottom: var(--sp-2); }
-    h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-body); }
-    p + p { margin-top: var(--sp-2); }
-    ol, ul { margin: var(--sp-2) 0 0; padding-inline-start: var(--sp-5); }
-    li + li { margin-top: var(--sp-1); }
-    a { color: var(--accent); text-underline-offset: var(--sp-1); }
-    a:focus-visible { outline-offset: var(--sp-1); }
-    .contents { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-5); }
-    .contents a { display: inline-flex; align-items: center; min-height: var(--ctl-h); }
-    dl { margin: var(--sp-3) 0 0; }
-    dl div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); gap: var(--sp-3); padding: var(--sp-2) 0; }
-    dl div + div { border-top: 1px solid var(--border-subtle); }
-    dt { font-weight: 600; }
-    dd { margin: 0; }
-    pre { background: var(--bg-container); }
-    .scope { margin-top: var(--sp-2); color: var(--text-dim); }
-    @media (pointer: coarse) {
-      .contents a, .doc-header a { min-height: var(--tap); }
-    }
-    @media (max-width: 599px) {
-      .doc-header h1 { font-size: var(--fs-title); }
-      .doc-header, .doc-scroll { padding-inline: max(var(--pad-page), var(--safe-l)) max(var(--pad-page), var(--safe-r)); }
-      dl div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
-    }
-  </style>
+  <link rel="stylesheet" href="./design.css">
 </head>
 <body>
   <header class="tt-pagehead doc-header">
-    <h1>互审会话技术设计</h1>
-    <a href="./prototype.html?lang=zh">打开原型</a>
+    <div class="doc-title">
+      <a class="doc-back" href="./index.html" aria-label="返回总览"></a>
+      <h1>互审技术实现</h1>
+    </div>
+    <a href="./product.html">产品设计</a>
   </header>
   <main class="scroll doc-scroll">
     <article class="doc-content">
@@ -57,7 +26,7 @@
 
       <section id="creation">
         <h2>会话创建</h2>
-        <p>「开任务」上排点击「互审」启用，下面展开 Agent Logo 和交审方式。作者与审查者各有一个独立的普通 Agent 终端会话，共用同一个任务工作区的变更来源。审查者在项目树中显示为作者的 <code>review</code> 子会话。开工时双方已绑定，默认最多审 3 轮。</p>
+        <p>作者与审查者各有一个独立的普通 Agent 终端会话，绑定同一个任务工作区。宿主启动两个会话，给审查者绑定只读快照来源，并在开工前记录父子关系。每次互审最多审 3 轮。</p>
         <ol>
           <li>宿主用现有创建意图受理任务。互审配置仅带 Agent 类型和交审方式。用户省略互审时沿用原有创建流程。</li>
           <li>准备 worktree 和作者会话，以同一创建操作预留 <code>review</code> 的稳定 ID，保存父子关系、同一个工作区归属和审查者角色。核对所选 Agent 在当前节点可启动。</li>

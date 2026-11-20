@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>互审产品设计 · Roami</title>
+  <link rel="stylesheet" href="./design.css">
+</head>
+<body>
+  <header class="tt-pagehead doc-header">
+    <div class="doc-title">
+      <a class="doc-back" href="./index.html" aria-label="返回总览"></a>
+      <h1>互审产品设计</h1>
+    </div>
+    <a href="./prototype.html?lang=zh">打开原型</a>
+  </header>
+  <main class="scroll doc-scroll">
+    <article class="doc-content">
+      <nav class="contents" aria-label="文档目录">
+        <a href="#create">创建任务</a>
+        <a href="#review">会话与复审</a>
+        <a href="#stories">用户故事</a>
+        <a href="#prototype">交互原型</a>
+      </nav>
+      <section id="create">
+        <h2>创建任务</h2>
+        <p>沿用现有「开任务」弹窗。「互审」位于上排工具条，默认收起。点击后下方展开审查 Agent Logo 和交审方式，再点收起时保留已选设置。</p>
+        <dl>
+          <div><dt>审查 Agent</dt><dd>推荐由另一种 Agent 审查。可点 Logo 改选，明确选择后保留该选择。</dd></div>
+          <div><dt>主动交审</dt><dd>作者在有可审版本时发送首轮请求，适合明确知道何时收敛的任务。</dd></div>
+          <div><dt>空闲交审</dt><dd>作者空闲且有新变更时自动开始首轮，之后由作者提交修复版本。</dd></div>
+        </dl>
+      </section>
+      <section id="review">
+        <h2>会话与复审</h2>
+        <p>点击「开干」时同时准备独立的 <code>review</code> 子会话。桌面从项目树或会话标签进入，手机从项目列表或作者会话的对端入口进入。审查者启动后先显示「等待交审」。</p>
+        <ol>
+          <li>作者提交可审版本，审查者在自己的终端里核对任务范围和改动。</li>
+          <li>审查者发出结论。作者在原会话直接收到完整意见，可继续修复和验证。</li>
+          <li>作者提交新版本，原 <code>review</code> 会话继续下一轮。每轮可通过或发回修改。</li>
+          <li>通过即停。最多 3 轮，无需在开工时设置。达到上限时保留末轮意见和历史。</li>
+        </ol>
+        <p class="scope">开工指令由宿主下发。发送命令可以从实际执行记录展开查看。</p>
+      </section>
+      <section id="stories">
+        <h2>用户故事</h2>
+        <ul>
+          <li>创建任务时，我用两个 Logo 区分作者和审查者，选好何时交审即可开工。</li>
+          <li>开工后，我从作者下方打开 <code>review</code>，看到所选 Agent 正在等待或审查。</li>
+          <li>审查者发回意见后，我在作者会话查看涉及的文件、问题和依据，能在两边来回核对同一轮版本。</li>
+          <li>准备失败时，我能用原配置重试，或收起互审后继续任务。</li>
+        </ul>
+      </section>
+      <section id="prototype">
+        <h2>交互原型</h2>
+        <p>点上排「互审」，选择审查 Agent，再点「开干」。进入 <code>review</code> 后可演示交审、发回意见、提交修复和通过，再切回作者查看收到的意见。</p>
+        <p><a href="./prototype.html?lang=zh">打开交互原型</a> · <a href="./tech.html">技术实现</a></p>
+        <p class="scope">原型用示例任务和会话演示流程。语音、附件及其他执行器图标用于还原现有工具条。</p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>
