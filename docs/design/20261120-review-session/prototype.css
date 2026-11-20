@@ -222,7 +222,7 @@ svg { width: var(--sp-4); height: var(--sp-4); flex: none; }
 .session-content { background: var(--bg-term); }
 .conversation { overflow-wrap: anywhere; }
 .conversation :is(#task-message, #messages) { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-.inbound, #messages li p { white-space: pre-wrap; }
+#task-message, #messages li p { white-space: pre-wrap; }
 .inbound {
   padding: var(--sp-2) var(--sp-3);
   background: var(--bg-elevated);
