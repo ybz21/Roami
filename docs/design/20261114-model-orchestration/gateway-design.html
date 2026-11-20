@@ -14,11 +14,11 @@
   <a href="index.html">专题首页</a>
 <a href="screens/index.html">逐页设计</a>
 <a href="gateway-prototype.html#/workbench">统一原型</a>
-<a href="history/index.html">历史归档</a>
+<a href="capability-plan.html">能力规划</a>
 </nav>
 <main class="document archive">
 <article class="record converted-record">
-<p><a href="./history/prototypes/gateway-prototype.html">打开可交互稿</a>。使用合成模型和凭据；所有保存、生成、轮换、停用与删除均只影响当前页面内存，不连接网关，不发送模型请求。顶部与左侧导航保留现有形式。本轮只设计本机网关，未修改正式页面或线上服务。</p>
+<p><a href="gateway-prototype.html#directory">打开网关原型</a>。使用合成模型和凭据；所有保存、生成、轮换、停用与删除均只影响当前页面内存，不连接网关，不发送模型请求。顶部与左侧导航保留现有形式。本轮只设计本机网关，未修改正式页面或线上服务。</p>
 <h2 id="product-design">Product Design</h2>
 <p>截图中的问题是接入地址、生成 Key 与固定 Key 编辑分散在通栏区块里：操作离对象过远，低频表单一直占据主流程，且“服务商提供的 API Key”会使用户混淆网关调用凭据与上游源凭据。</p>
 <p>默认页保留“接入与密钥 / 模型目录”两个任务入口。接入页先给 Base URL 和可复制的调用示例，再展示独立调用方的 Key 列表。地址和复制按钮紧邻；调用模型切换会同步更新 curl / Python 示例。复制示例只引用环境变量，不写入明文 Key。</p>
@@ -68,7 +68,7 @@
 <p>Key 生成、轮换、固定值更新继续使用现有 revision 校验；失败保留输入，冲突按现有恢复入口处理。调用示例和模型选项使用当前已接入目录；不把上游发现目录当作可调用集合。目录详情关闭后保留筛选，编辑区关闭后释放宽度；草稿分别归属于新建、改名和固定 Key，避免互相覆盖。</p>
 <h2 id="acceptance">Acceptance</h2>
 <p>设计检查使用 UI/UX Pro Max。首条 <code>settings progressive disclosure</code> 查询只返回无关的标题排版规则，未采纳；缩窄为 <code>Form Labels</code> 后，采用关联标签与明确提交反馈建议。配色、字号、布局和组件约束以仓库设计规范为准。</p>
-<p>桌面、手机交互与尺寸证据记录于 <a href="gateway-acceptance.json">gateway-acceptance.json</a>。屏幕截图保存在 <code>/tmp/roami-local-gateway-design-20261116/</code>，不提交进主分支；这是演示稿验收，不代表正式网关实现或真实凭据生命周期已经更新。</p>
+<p>桌面和手机的界面验收条件见 <a href="screens/gateway.html#acceptance">本机网关设计</a>。正式实现与验证见 <a href="gateway-implementation.html">网关实现与验收</a>。</p>
 
 </article>
 </main>

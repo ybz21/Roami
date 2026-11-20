@@ -14,13 +14,13 @@
   <a href="index.html">专题首页</a>
 <a href="screens/index.html">逐页设计</a>
 <a href="gateway-prototype.html#/workbench">统一原型</a>
-<a href="history/index.html">历史归档</a>
+<a href="capability-plan.html">能力规划</a>
 </nav>
 <main class="document archive">
 <article class="record converted-record">
 <h2 id="product-design">Product Design</h2>
 <p>面向管理多个 API、插件账号和聚合路由的用户。目标是在桌面和手机上都能看清当前配置、完成一个明确操作、核对生效范围，并能返回继续未完成的编辑。模式为 Operate；沿用 Roami 的中性深浅主题、字号、间距、控件和触摸规则，不替换现有视觉系统。</p>
-<p><a href="./history/prototypes/interaction-prototype.html">打开可交互 HTML</a>。文件可以离线打开。所有模型能力、价格、账号、请求和监控均为合成示例；授权、保存、Key 生成与质量检查只修改当前页面的演示状态，不连接真实服务。界面支持中英文与深浅主题。</p>
+<p><a href="gateway-prototype.html#/workbench">打开统一原型</a>。文件可以离线打开。所有模型能力、价格、账号、请求和监控均为合成示例；授权、保存、Key 生成与质量检查只修改当前页面的演示状态，不连接真实服务。界面支持中英文与深浅主题。</p>
 <p>能力顶部 Tabs、模型左侧 Tabs 及七个目的地保持：模型源、聚合、概况、监控、审计、本机网关、语音输入。手机使用原有的顶部模型导航，内容详情用全屏返回页。</p>
 <h2 id="走查结论">走查结论</h2>
 <table>
@@ -172,13 +172,13 @@
 <p>生产实现继续使用现有 React、antd 与本地 Radix / shadcn 控件，不在此阶段整体替换 UI 框架。交互统一先于跨页样式替换。没有提出新后端接口，也不修改限额、定价优先级或 24 小时清理边界。</p>
 <h3 id="原型实现">原型实现</h3>
 <ul>
-<li><code>interaction-prototype.html</code> 为自包含离线文件；源文件在 <code>interaction-prototype/</code>，以 <code>node interaction-prototype/build.mjs</code> 重新构建。</li>
+<li><code>gateway-prototype.html</code> 是统一原型。源文件在 <code>gateway-prototype/</code>，用 <code>node gateway-prototype/build.mjs</code> 重新构建。</li>
 <li>构建脚本从 <code>frontend/src/index.css</code> 和 <code>theme.tsx</code> 提取现有 token，从 <code>icons.tsx</code> 序列化 SVG；使用同一 <code>useLayout()</code> 更新尺寸、触摸、键盘和减少动态效果状态。没有另建断点或颜色系统。</li>
 <li>静态 HTML 内置中英文小字典，符合静态页面的国际化规则；正式实现的新增文案仍进入 <code>frontend/src/i18n/</code>。</li>
 <li>交互状态仅在当前页面内存中，刷新或“重置演示”回到合成初始数据；语言选择在浏览器本地保存。没有业务请求或真实账号凭据。</li>
 </ul>
 <h2 id="acceptance">Acceptance</h2>
-<p>验收记录保存在 <a href="interaction-acceptance.json">interaction-acceptance.json</a>，覆盖桌面四档、检查器开关、手机实机、源创建和插件多实例、定价范围与免费确认、聚合跨源草稿及触摸排序、按小时进入审计、Key 确认、错误 / 空状态、深浅主题和中英文。设计稿确认后再按此模块边界落地生产页面。</p>
+<p>各页面的桌面与手机验收条件见 <a href="screens/index.html">逐页设计</a>。正式实现的检查记录见 <a href="interaction-implementation.html">页面实现与验收</a>。</p>
 <p>桌面四档、Android 实机及离线异时区检查通过；原型无业务网络请求。独立初审指出手机密钥列表拥挤、模型定价来源标签错误两项问题，修复并经真机保存 / 触摸操作验证后，两项定向复核获 <code>ship</code>；该结论仅覆盖这两项修复及直接回归。完整前端现有测试 1,843 项通过，它们是生产代码回归检查，原型交互验收另行记录。</p>
 
 </article>

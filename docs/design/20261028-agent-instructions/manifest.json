@@ -2,7 +2,7 @@
   "source_file": "AGENTS.md",
   "source_revision": "ac6a97b539ea03ac6379f91fbc1e703dc377d35e",
   "source_sha256": "4adbcba85b2eacdea173b39bac819a5ea4aab2c93560800f666ea54c0b4a1b48",
-  "archived_entries": 79,
+  "archived_entries": 77,
   "original_bytes": 315525,
   "core_bytes": 18345,
   "core_lines": 301,
@@ -62,16 +62,6 @@
       "topic": "20261022-roami-agent-rsi"
     },
     {
-      "id": "unpriced-model-zero-default-20261028",
-      "title": "未配置模型单价按零使用 · 2026-10-28",
-      "date": "2026-10-28",
-      "file": "docs/design/20261114-model-orchestration/history/20261026-本地模型代理与每日限额/records/2026-10-28/unpriced-model-zero-default-20261028.html",
-      "original_line": 286,
-      "original_sha256": "a1d7c44c2dd30aa84cc4d4be5dc71320d400c63bbaff5569520509664ddaf35f",
-      "archived_fragment_sha256": "a1d7c44c2dd30aa84cc4d4be5dc71320d400c63bbaff5569520509664ddaf35f",
-      "topic": "20261026-本地模型代理与每日限额"
-    },
-    {
       "id": "task-followup-routing-20261026",
       "title": "任务续办、完整交办与会话名称 · 2026-10-26",
       "date": "2026-10-26",
@@ -80,16 +70,6 @@
       "original_sha256": "c6fb822157185d815c8350d84ad6495e9e481a1039f4afd1162d25bbeade2fae",
       "archived_fragment_sha256": "c6fb822157185d815c8350d84ad6495e9e481a1039f4afd1162d25bbeade2fae",
       "topic": "20261021-主会话任务交接"
-    },
-    {
-      "id": "local-model-proxy-20261026",
-      "title": "本地模型代理与每日限额 · 2026-10-26",
-      "date": "2026-10-26",
-      "file": "docs/design/20261114-model-orchestration/history/20261026-本地模型代理与每日限额/records/2026-10-26/local-model-proxy-20261026.html",
-      "original_line": 313,
-      "original_sha256": "6efd16031dd5aad1d56c5c7dd7efd1e655c19c91854b66a35416ce4571d9a8d2",
-      "archived_fragment_sha256": "6efd16031dd5aad1d56c5c7dd7efd1e655c19c91854b66a35416ce4571d9a8d2",
-      "topic": "20261026-本地模型代理与每日限额"
     },
     {
       "id": "capabilities-hub-design",
