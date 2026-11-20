@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { App } from 'antd'
 import { Alert, Button, Checkbox, Input, Select, Popconfirm, Pagination } from './model-controls'
 import { api } from '../../api'
@@ -6,6 +6,14 @@ import { useI18n } from '../../i18n'
 import { ChevronDown, LinkIcon, PlusIcon, SearchIcon } from '../../icons'
 import { configuredSourceModels } from './configured-source-models'
 import { catalogFailure, modelProtocols, openRouterConnection, type ModelCatalog, type ModelSource } from './model-hub-api'
+
+const discoveryErrors: Record<string, string> = {
+  MODEL_LIST_UNAUTHORIZED: 'hub.directory.unauthorized',
+  MODEL_LIST_UNSUPPORTED: 'hub.directory.unsupported',
+  MODEL_LIST_REDIRECT: 'hub.directory.redirect',
+  MODEL_LIST_TLS_CERTIFICATE: 'hub.directory.certificate',
+  MODEL_LIST_FAILED: 'hub.directory.failed',
+}
 
 export type SourceDraft = {
   source: ModelSource
@@ -22,10 +30,18 @@ export type SourceDraft = {
   manualOpen: boolean
 }
 export const initialSourceDraft = (source: ModelSource, existing: boolean): SourceDraft => ({ source: { ...source, apiKey: '' }, original: source, editing: !existing, directory: null, selected: [], query: '', manual: '', manualOpen: false })
-const connectionKey = (source: ModelSource) => JSON.stringify([source.id, source.connector, source.baseUrl, source.apiKey, source.protocol, source.authMode])
+const connectionKey = (source: ModelSource) => JSON.stringify([source.id, source.connector, source.baseUrl, source.apiKey, source.protocol, source.authMode, !!source.skipTlsVerification])
+const normalizeURL = (value: string) => value.trim().replace(/\/+$/, '')
 const sourceName = (source: ModelSource) => {
   if (source.name.trim()) return source.name.trim()
   try { return new URL(source.baseUrl).host } catch { return source.baseUrl }
+}
+function parseSourceURL(value: string) {
+  if (value.length > 2000 || !/^https?:\/\/[^/\\\s]/i.test(value)) return null
+  try {
+    const url = new URL(value)
+    return url.username || url.password || url.search || url.hash ? null : url
+  } catch { return null }
 }
 
 export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management, initialAuthorizationOpen = false }: {
@@ -34,26 +50,29 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   pricing?: ReactNode; initialAuthorizationOpen?: boolean; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
+  const urlHintId = useId()
   const [confirming, setConfirming] = useState(false), [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
   const request = useRef<AbortController | null>(null)
   const current = useRef(draft); current.current = draft
   const source = draft.source, existing = catalog.sources.find(row => row.id === source.id)
   const key = connectionKey(source)
+  const normalizedURL = normalizeURL(source.baseUrl)
+  const url = parseSourceURL(normalizedURL)
+  const urlError = !!normalizedURL && !url
+  const urlHint = urlError ? 'hub.directory.invalidBaseUrl' : url?.protocol === 'http:' ? 'hub.directory.plainHttp' : ''
   useEffect(() => { request.current?.abort(); request.current = null; setLoading(false); setReadError(''); return () => request.current?.abort() }, [key])
   const patch = (next: Partial<SourceDraft>) => onChange({ ...draft, ...next })
   const updateSource = (next: Partial<ModelSource>) => {
     const updated = { ...source, ...next }
+    if (next.baseUrl !== undefined && normalizeURL(next.baseUrl) !== normalizedURL) updated.skipTlsVerification = undefined
     if (connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, fetchRequested: false }) }
     else patch({ source: updated })
   }
-  const normalizedURL = source.baseUrl.trim().replace(/\/+$/, '')
   const openRouter = source.connector === openRouterConnection.connector
   const canChangeConnector = !!existing && normalizedURL === openRouterConnection.baseUrl && source.protocol === openRouterConnection.protocol
-  let validURL = false
-  try { const url = new URL(normalizedURL); validURL = normalizedURL.length <= 2000 && !url.username && !url.password && !url.search && !url.hash && (url.protocol === 'https:' || url.protocol === 'http:' && (['localhost', '[::1]'].includes(url.hostname) || /^(127|10)\.\d+\.\d+\.\d+$|^192\.168\.\d+\.\d+$|^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$|^\[f[cd][\da-f]{2}:/i.test(url.hostname))) } catch { /* Validated before reading or saving. */ }
   const needsKey = !!existing?.hasKey && normalizedURL !== existing.baseUrl && !source.apiKey
-  const validConnection = validURL && !needsKey
+  const validConnection = !!url && !needsKey
   const attached = configuredSourceModels(catalog.models, source.id)
   const added = new Set(attached.map(model => model.candidates[0].model))
   const manual = [...new Set(draft.manual.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
@@ -98,7 +117,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         onChange({ ...current.current, directory: data.models, directoryNames, managing: true, editing: false, fetchRequested: false, selected: current.current.selected.filter(value => data.models.includes(value)) })
       }
     } catch (cause: any) {
-      if (!abort.signal.aborted) { onChange({ ...current.current, fetchRequested: false }); setReadError(cause?.apiError?.code === 'MODEL_LIST_UNAUTHORIZED' ? 'hub.directory.unauthorized' : cause?.apiError?.code === 'MODEL_LIST_UNSUPPORTED' ? 'hub.directory.unsupported' : cause?.apiError?.code === 'MODEL_LIST_FAILED' ? 'hub.directory.failed' : catalogFailure(cause)) }
+      if (!abort.signal.aborted) { onChange({ ...current.current, fetchRequested: false }); setReadError(discoveryErrors[cause?.apiError?.code] || catalogFailure(cause)) }
     } finally { if (request.current === abort) { request.current = null; setLoading(false) } }
   }
   useEffect(() => {
@@ -125,13 +144,18 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
         {source.pluginSourceId && draft.editing ? <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} onChange={event => updateSource({ name: event.target.value })} /></label> : draft.editing ? <>
           {canChangeConnector && <label className="agent-settings-field">{t('modelInteraction.sourceType')}<Select virtual={false} aria-label={t('modelInteraction.sourceType')} value={source.connector || 'api'} options={[{ value: 'api', label: t('modelInteraction.sourceType.api') }, { value: 'openrouter-free', label: t('hub.openRouter.name') }]} onChange={value => updateSource(value === 'openrouter-free' ? openRouterConnection : { connector: undefined })} /></label>}
-          <label className="agent-settings-field">{t('agent.models.baseUrl')}<Input aria-label={t('agent.models.baseUrl')} type="url" value={source.baseUrl} readOnly={openRouter} maxLength={2000} placeholder="https://api.example.com/v1" onChange={event => updateSource({ baseUrl: event.target.value })} /></label>
+          <label className="agent-settings-field">
+            {t('agent.models.baseUrl')}
+            <Input aria-label={t('agent.models.baseUrl')} aria-describedby={urlHint ? urlHintId : undefined} status={urlError ? 'error' : undefined} type="url" value={source.baseUrl} readOnly={openRouter} maxLength={2000} placeholder="https://api.example.com/v1" onChange={event => updateSource({ baseUrl: event.target.value })} />
+            {urlHint && <span id={urlHintId} className={urlError ? 'tt-model-source-warning' : 'agent-settings-hint'} role={urlError ? 'alert' : undefined}>{t(urlHint)}</span>}
+          </label>
           {!openRouter && <label className="agent-settings-field">{t('capabilities.models.protocol')}<Select virtual={false} aria-label={t('capabilities.models.protocol')} value={source.protocol} options={modelProtocols.map(value => ({ value, label: t('capabilities.models.protocol.' + value) }))} onChange={protocol => updateSource({ protocol })} /></label>}
           <label className="agent-settings-field">{t('modelIdentity.providerKey')}<Input.Password aria-label={t('modelIdentity.providerKey')} autoComplete="new-password" visibilityToggle={false} value={source.apiKey} maxLength={8192} placeholder={t(source.hasKey ? 'agent.models.keyKept' : 'agent.models.keyPlaceholder')} onChange={event => updateSource({ apiKey: event.target.value })} /></label>
           {needsKey && <p className="tt-model-source-warning" role="alert">{t('agent.models.newEndpointKey')}</p>}
           <details className="tt-model-source-options"><summary>{t('hub.connectionOptions')}<ChevronDown /></summary><div>
             <label className="agent-settings-field">{t('hub.directory.sourceName')}<Input aria-label={t('hub.name')} value={source.name} maxLength={100} placeholder={t('hub.directory.autoName')} onChange={event => updateSource({ name: event.target.value })} /></label>
             {!openRouter && <label className="agent-settings-field">{t('capabilities.models.authMode')}<Select virtual={false} aria-label={t('capabilities.models.authMode')} value={source.authMode} options={['api_key', 'bearer'].map(value => ({ value, label: t('capabilities.models.auth.' + value) }))} onChange={authMode => updateSource({ authMode })} /></label>}
+            {url?.protocol === 'https:' && <Checkbox checked={source.skipTlsVerification} onChange={event => updateSource({ skipTlsVerification: event.target.checked })}>{t('hub.directory.skipTlsVerification')}</Checkbox>}
           </div></details>
         </> : <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy || draft.managing} onClick={() => patch({ editing: true, managing: false })}>{t('hub.directory.changeConnection')}</button></div>}
         {!connectionOnly && <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!canRead || busy} onClick={() => void read()}>{t(openRouter ? 'hub.openRouter.fetch' : existing && !draft.managing ? 'modelInteraction.manageModels' : existing && draft.directory === null ? 'hub.directory.updateModels' : draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{!existing && draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>}

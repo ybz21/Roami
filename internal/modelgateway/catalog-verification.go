@@ -10,7 +10,10 @@ import (
 
 // Loopback URLs and aliases stay unchanged when an upstream credential or route changes.
 func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
-	type route struct{ URL, Protocol, AuthMode, Credential, Model string }
+	type route struct {
+		URL, Protocol, AuthMode, Credential, Model string
+		SkipTLSVerification                        bool `json:",omitempty"`
+	}
 	sources := map[string]ModelSource{}
 	for _, source := range catalog.Sources {
 		sources[source.ID] = source
@@ -20,7 +23,7 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		routes := []route{}
 		for _, candidate := range model.Candidates {
 			source := sources[candidate.SourceID]
-			routes = append(routes, route{source.BaseURL, source.Protocol, source.AuthMode, source.APIKey + source.PluginRevision, candidate.Model})
+			routes = append(routes, route{source.BaseURL, source.Protocol, source.AuthMode, source.APIKey + source.PluginRevision, candidate.Model, source.SkipTLSVerification})
 		}
 		raw, err := json.Marshal(struct {
 			Protocol, Strategy string

@@ -552,7 +552,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 					return pluginSource.ProviderID
 				}(), out, upstreamBody)
 			} else {
-				response, e = h.Client.Do(out)
+				response, e = h.sourceClient(source).Do(out)
 			}
 			if e != nil {
 				var op *net.OpError

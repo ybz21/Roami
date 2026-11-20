@@ -8,6 +8,8 @@
 
 [连接合并验收](connections-acceptance.md) · [网关适配验收](gateway-adaptation.md) · [模式切换验收](modes-acceptance.md) · [早期实现记录](implementation.md) · [历史设计](records/2026-10-31/README.md)
 
+[模型源 HTTP 与 HTTPS 证书配置验收](records/20261120-model-source-transport.md)
+
 ## Product Design
 
 能力并列“大模型”和“智能体”。大模型保留三个页签：

@@ -119,6 +119,57 @@ it('saves a LAN HTTP source and manual models without fetching the directory', a
   expect((writes[0][2] as ModelCatalog).models[0]).toEqual(catalog.models[0])
 })
 
+it('allows discovery and manual save for public HTTP sources and limits certificate settings to HTTPS', async () => {
+  mount('catalog/source/new')
+  const endpoint = await screen.findByLabelText('agent.models.baseUrl')
+  const fetchModels = screen.getByRole<HTMLButtonElement>('button', { name: 'hub.directory.fetch' })
+  fireEvent.change(endpoint, { target: { value: 'ftp://203.0.113.22/v1' } })
+  expect(screen.getByRole('alert').textContent).toBe('hub.directory.invalidBaseUrl')
+  expect(fetchModels.disabled).toBe(true)
+  fireEvent.change(endpoint, { target: { value: 'http://203.0.113.22/v1' } })
+  expect(endpoint.getAttribute('aria-describedby')).toBe(screen.getByText('hub.directory.plainHttp').id)
+  expect(endpoint.getAttribute('aria-invalid')).toBeNull()
+  expect(fetchModels.disabled).toBe(false)
+  expect(screen.queryByRole('checkbox', { name: 'hub.directory.skipTlsVerification' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'vendor/model@256k' } })
+  const save = screen.getByRole<HTMLButtonElement>('button', { name: 'hub.directory.saveModels' })
+  expect(save.disabled).toBe(false)
+  fireEvent.click(save)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'http://203.0.113.22/v1' })]),
+  })))
+})
+
+it('sends the selected HTTPS certificate policy on discovery and save, and resets it on endpoint changes', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (!path.endsWith('/discover')) return original(method, path, body, options)
+    if (body.source.skipTlsVerification) return { data: { models: ['listed-model'] } }
+    throw Object.assign(new Error('certificate'), { apiError: { code: 'MODEL_LIST_TLS_CERTIFICATE' } })
+  })
+  mount('catalog/source/new')
+  const endpoint = await screen.findByLabelText('agent.models.baseUrl')
+  fireEvent.change(endpoint, { target: { value: 'https://first.example/v1' } })
+  fireEvent.click(screen.getByText('hub.connectionOptions'))
+  const skip = screen.getByRole('checkbox', { name: 'hub.directory.skipTlsVerification' })
+  expect(skip.getAttribute('aria-checked')).toBe('false')
+  fireEvent.click(skip)
+  fireEvent.change(endpoint, { target: { value: 'https://second.example/v1' } })
+  expect(skip.getAttribute('aria-checked')).toBe('false')
+
+  const fetchModels = screen.getByRole('button', { name: 'hub.directory.fetch' })
+  fireEvent.click(fetchModels)
+  await screen.findByText('hub.directory.certificate')
+  fireEvent.click(skip)
+  fireEvent.click(fetchModels)
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'listed-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'https://second.example/v1', skipTlsVerification: true })]),
+  })))
+})
+
 it('opens a dedicated OpenRouter connector and only adds models selected from its directory', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
