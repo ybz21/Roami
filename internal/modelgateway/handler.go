@@ -3,9 +3,9 @@ package modelgateway
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"github.com/ybz21/Roami/internal/modelplugins"
 	"io"
 	"log"
 	"net"
@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 type Handler struct {
@@ -23,6 +25,7 @@ type Handler struct {
 	Catalog        *CatalogStore
 	Ledger         *Ledger
 	Client         *http.Client
+	uncheckedTLS   *http.Client
 	wait           sync.WaitGroup
 	mu             sync.Mutex
 	closing        bool
@@ -32,7 +35,24 @@ type Handler struct {
 
 func NewHandler(ledger *Ledger) *Handler {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	return &Handler{Ledger: ledger, Client: &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	unchecked := transport.Clone()
+	if unchecked.TLSClientConfig == nil {
+		unchecked.TLSClientConfig = &tls.Config{}
+	}
+	unchecked.TLSClientConfig.InsecureSkipVerify = true // Only selected by an explicit catalog source setting.
+	noRedirect := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &Handler{
+		Ledger:       ledger,
+		Client:       &http.Client{Transport: transport, CheckRedirect: noRedirect},
+		uncheckedTLS: &http.Client{Transport: unchecked, CheckRedirect: noRedirect},
+	}
+}
+
+func (h *Handler) sourceClient(source ModelSource) *http.Client {
+	if source.SkipTLSVerification {
+		return h.uncheckedTLS
+	}
+	return h.Client
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

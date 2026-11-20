@@ -105,7 +105,7 @@ func (h *Handler) readSourceModels(w http.ResponseWriter, r *http.Request, sourc
 	}
 	if err != nil {
 		code := err.Error()
-		if !containsField([]string{"MODEL_LIST_UNAUTHORIZED", "MODEL_LIST_UNSUPPORTED", "MODEL_LIST_FAILED"}, code) {
+		if !containsField([]string{"MODEL_LIST_UNAUTHORIZED", "MODEL_LIST_UNSUPPORTED", "MODEL_LIST_REDIRECT", "MODEL_LIST_TLS_CERTIFICATE"}, code) {
 			code = "MODEL_LIST_FAILED"
 		}
 		reject(w, 502, code)
@@ -171,7 +171,7 @@ func (h *Handler) fetchSourceModels(ctx context.Context, source ModelSource) ([]
 			}
 		}
 	} else {
-		details, err = agentproviders.ReadSourceModelDetails(ctx, agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey})
+		details, err = agentproviders.ReadSourceModelDetails(ctx, agentproviders.Profile{BaseURL: source.BaseURL, Protocol: source.Protocol, AuthMode: source.AuthMode, APIKey: source.APIKey}, h.sourceClient(source))
 		if source.Connector == openRouterFreeConnector {
 			details = slices.DeleteFunc(details, func(row agentproviders.SourceModelDetail) bool { return !openRouterFreeModel(row) })
 		}

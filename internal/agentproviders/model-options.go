@@ -2,7 +2,9 @@ package agentproviders
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,7 +60,11 @@ func (s *Store) ModelOptions(ctx context.Context, kind string, query ModelQuery)
 
 // ReadSourceModels lists models from an already validated source.
 func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
-	rows, err := readSourceModelDetails(ctx, profile, maxFileSize)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	rows, err := readSourceModelDetails(ctx, profile, client, maxFileSize)
+	if err != nil && (err.Error() == "MODEL_LIST_TLS_CERTIFICATE" || err.Error() == "MODEL_LIST_REDIRECT") {
+		err = errors.New("MODEL_LIST_FAILED")
+	}
 	ids := make([]string, 0, len(rows))
 	for _, row := range rows {
 		ids = append(ids, row.ID)
@@ -66,11 +72,11 @@ func ReadSourceModels(ctx context.Context, profile Profile) ([]string, error) {
 	return ids, err
 }
 
-func ReadSourceModelDetails(ctx context.Context, profile Profile) ([]SourceModelDetail, error) {
-	return readSourceModelDetails(ctx, profile, 8*maxFileSize)
+func ReadSourceModelDetails(ctx context.Context, profile Profile, client *http.Client) ([]SourceModelDetail, error) {
+	return readSourceModelDetails(ctx, profile, client, 8*maxFileSize)
 }
 
-func readSourceModelDetails(ctx context.Context, profile Profile, maxBytes int64) ([]SourceModelDetail, error) {
+func readSourceModelDetails(ctx context.Context, profile Profile, client *http.Client, maxBytes int64) ([]SourceModelDetail, error) {
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	endpoint, err := url.Parse(profile.BaseURL)
@@ -83,7 +89,6 @@ func readSourceModelDetails(ctx context.Context, profile Profile, maxBytes int64
 	} else {
 		endpoint = endpoint.JoinPath("models")
 	}
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	models := map[string]SourceModelDetail{}
 	cursors := map[string]bool{}
 	remaining := maxBytes
@@ -105,6 +110,10 @@ func readSourceModelDetails(ctx context.Context, profile Profile, maxBytes int64
 		req.Header.Set("Accept", "application/json")
 		response, err := client.Do(req)
 		if err != nil {
+			var certificateError *tls.CertificateVerificationError
+			if errors.As(err, &certificateError) {
+				return nil, errors.New("MODEL_LIST_TLS_CERTIFICATE")
+			}
 			return nil, fmt.Errorf("MODEL_LIST_FAILED")
 		}
 		body, readErr := io.ReadAll(io.LimitReader(response.Body, remaining+1))
@@ -114,6 +123,9 @@ func readSourceModelDetails(ctx context.Context, profile Profile, maxBytes int64
 		}
 		if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusMethodNotAllowed {
 			return nil, fmt.Errorf("MODEL_LIST_UNSUPPORTED")
+		}
+		if response.StatusCode >= 300 && response.StatusCode < 400 && response.Header.Get("Location") != "" {
+			return nil, errors.New("MODEL_LIST_REDIRECT")
 		}
 		if response.StatusCode != http.StatusOK || readErr != nil || int64(len(body)) > remaining {
 			return nil, fmt.Errorf("MODEL_LIST_FAILED")

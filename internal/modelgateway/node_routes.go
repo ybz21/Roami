@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -155,7 +156,7 @@ func readNodeModels(paths metadb.Paths, role string) (nodeModelRoute, error) {
 			return nodeModelRoute{}, invalidNodeRoute()
 		}
 	}
-	if !allowedModelSourceURL(target) {
+	if !allowedNodeModelURL(target) {
 		return nodeModelRoute{}, invalidNodeRoute()
 	}
 	if secret == "" {
@@ -207,6 +208,11 @@ func readNodeModels(paths metadb.Paths, role string) (nodeModelRoute, error) {
 		}
 	}
 	return route, nil
+}
+
+func allowedNodeModelURL(u *url.URL) bool {
+	ip := net.ParseIP(u.Hostname())
+	return u.Scheme == "https" || u.Scheme == "http" && (u.Hostname() == "localhost" || ip != nil && (ip.IsLoopback() || ip.IsPrivate()))
 }
 
 func routeString(values map[string]any, key, fallback string) (string, error) {
