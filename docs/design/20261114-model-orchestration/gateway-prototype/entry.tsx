@@ -6,10 +6,10 @@ import { ThemeProvider, useThemeMode } from '../../../../frontend/src/theme'
 import { useLayout } from '../../../../frontend/src/layout'
 import { WorkspaceStateProvider } from '../../../../frontend/src/view-state'
 import ModelHub from '../../../../frontend/src/components/capabilities/ModelHub'
-import { BackLink } from '../../../../frontend/src/components/BackButton'
-import { SunIcon, MoonIcon } from '../../../../frontend/src/icons'
+import { ChevronRight, SunIcon, MoonIcon } from '../../../../frontend/src/icons'
 import { installFixture, traceCases } from './fixture'
 import { RoutingWorkbench } from './RoutingWorkbench'
+import { MagpiePluginDesk } from './MagpiePluginDesk'
 import '../../../../frontend/src/components/capabilities/model-controls.css'
 import '../../../../frontend/src/index.css'
 import '../../../../frontend/src/mobile-material.css'
@@ -22,24 +22,13 @@ const route = () => location.hash.slice(1)
 const cases = Object.keys(traceCases)
 const docPages: Record<string, string> = { catalog: 'sources', aggregate: 'aggregation', usage: 'usage', monitor: 'monitoring', audit: 'audit', gateway: 'gateway', speech: 'speech' }
 
-function WorkBuddyDemo({ zh, claimed, claim }: { zh: boolean; claimed: boolean; claim: () => void }) {
-  const copy = zh
-    ? ['WorkBuddy · 账号', '方案演示', '周期积分', '已用 120 / 500 · 11 天后重置', '额外积分', '立即签到', '今日未签', '今日已签 · 领取 20 积分', '返回模型源']
-    : ['WorkBuddy account', 'Design preview', 'Cycle credits', '120 / 500 used · resets in 11 days', 'Bonus credits', 'Check in', 'Not checked in today', 'Checked in · 20 credits claimed', 'Back to model sources']
-  return <section className="model-prototype-account">
-    <header className="tt-pagehead"><BackLink href="#/catalog/source/workbuddy" label={copy[8]} /><h2>{copy[0]}</h2><small>{copy[1]}</small></header>
-    <dl><div><dt>{copy[2]}</dt><dd>{copy[3]}</dd></div><div><dt>{copy[4]}</dt><dd>{claimed ? 60 : 40}</dd></div></dl>
-    <div className="model-prototype-account-actions"><Button type="primary" disabled={claimed} onClick={claim}>{copy[5]}</Button><span role="status">{copy[claimed ? 7 : 6]}</span></div>
-  </section>
-}
-
 function Prototype() {
   const { locale, setLocale } = useI18n()
   const zh = locale === 'zh-CN'
   const theme = useThemeMode()
   useLayout()
   const [hash, setHash] = useState(route)
-  const [claimed, setClaimed] = useState(false)
+  const [catalogVersion, setCatalogVersion] = useState(0)
   const [page, query] = hash.replace(/^\//, '').replace(/^capabilities\/models\/?/, '').split('?')
   const [requested] = page.split('/')
   const params = new URLSearchParams(query)
@@ -49,7 +38,13 @@ function Prototype() {
   const tab = trace ? 'audit' : paths[requested] || (requested === 'access' || requested === 'directory' ? 'gateway' : requested) || 'catalog'
   const pool = params.get('demo') === 'route'
   const workbench = !page || page === 'workbench'
-  const account = page === 'catalog/workbuddy-account'
+  const workBuddyAccount = page === 'catalog/workbuddy-account'
+  const pluginsPage = page === 'catalog/plugins' || page.startsWith('catalog/plugins/')
+  const fileImport = page === 'catalog/import' && params.get('view') === 'file'
+  const pluginDesk = workBuddyAccount || pluginsPage || (page === 'catalog/import' && !fileImport)
+  const [, , pluginId, pluginAction, pluginItem] = page.split('/')
+  const fromPlugin = params.get('from') === 'plugins' && page.startsWith('catalog/source/')
+  const previousPlugin = params.get('plugin') || ''
   const fromWorkbench = params.get('from') === 'workbench' || /^audit\/request\/[^/]+\/workbench$/.test(page)
   const detail = trace ? '/request/' + sample : pool ? '/request/fallback/aggregate/free' : page.slice(requested.length)
 
@@ -92,13 +87,19 @@ function Prototype() {
     {trace && <div className="model-prototype-scenarios" aria-label={zh ? '网关请求演示' : 'Request scenarios'}>
       {cases.filter(key => key !== 'success').map(key => <a key={key} href={'#/troubleshoot?case=' + key} aria-current={key === sample ? 'page' : undefined}>{traceCases[key as keyof typeof traceCases].label[zh ? 0 : 1]}</a>)}
     </div>}
-    {!account && page.startsWith('catalog/source/workbuddy') && <div className="model-prototype-scenarios"><a href="#/catalog/workbuddy-account">{zh ? '查看 WorkBuddy 签到方案' : 'Preview WorkBuddy check-in'}</a></div>}
+    {page === 'catalog' && <div className="model-prototype-scenarios"><a href="#/catalog/plugins">{zh ? '插件与账号' : 'Plugins and accounts'}<ChevronRight /></a></div>}
+    {!pluginDesk && page === 'catalog/source/workbuddy' && <div className="model-prototype-scenarios"><a href="#/catalog/workbuddy-account">{zh ? '查看 WorkBuddy 账号' : 'Open the WorkBuddy account'}<ChevronRight /></a></div>}
     <main className="model-prototype-main">
       <div className="model-prototype-workspace" hidden={!workbench}><RoutingWorkbench showStrategy={workbench && params.get('view') === 'strategy'} /></div>
-      {account && <WorkBuddyDemo zh={zh} claimed={claimed} claim={() => setClaimed(true)} />}
-      <div className="model-prototype-workspace" hidden={account || workbench}><ModelHub sub={account || workbench ? 'catalog' : tab + detail} onNav={path => {
+      {pluginDesk && <MagpiePluginDesk pluginId={workBuddyAccount ? 'workbuddy' : pluginId}
+        action={workBuddyAccount ? 'account' : pluginAction} itemId={workBuddyAccount ? 'workbuddy' : pluginItem}
+        syncSources={() => setCatalogVersion(value => value + 1)} />}
+      <div className="model-prototype-workspace" hidden={pluginDesk || workbench}><ModelHub key={catalogVersion} sub={pluginDesk || workbench ? 'catalog' : tab + detail} onNav={path => {
         const next = path.slice('capabilities/models/'.length)
-        if (fromWorkbench && next === tab) location.hash = '/workbench'
+        if (fromPlugin && next === 'catalog') location.hash = '/catalog/plugins/' + encodeURIComponent(previousPlugin) + '/account/' + page.split('/')[2]
+        else if (fromPlugin && next.startsWith('catalog/source/')) location.hash = '/' + next + '?from=plugins&plugin=' + encodeURIComponent(previousPlugin)
+        else if (fileImport && next === 'catalog') location.hash = '/catalog/plugins'
+        else if (fromWorkbench && next === tab) location.hash = '/workbench'
         else if (fromWorkbench && next.startsWith('catalog/source/') && page.startsWith('catalog/source/')) location.hash = '/' + next + '?from=workbench'
         else location.hash = '/' + next
       }} /></div>

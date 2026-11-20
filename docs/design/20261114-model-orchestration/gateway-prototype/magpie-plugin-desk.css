@@ -1,0 +1,41 @@
+.magpie-desk { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 2.5fr); height:100%; min-height:0; min-width:0; }
+.magpie-desk > section { display:flex; flex-direction:column; min-height:0; min-width:0; }
+.magpie-desk-head { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); padding:var(--sp-2) var(--pad-page); border-bottom:1px solid var(--border-subtle); }
+.magpie-desk-head h2 { margin:0; font-size:var(--fs-lg); }
+.magpie-desk-head > a:last-child:not(.tt-back) { margin-inline-start:auto; }
+.magpie-desk-detail { border-inline-start:1px solid var(--border-subtle); }
+.magpie-desk-scroll { flex:1; min-height:0; min-width:0; overflow:auto; padding:var(--sp-3) var(--pad-page); }
+.magpie-directory-tools { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-block-end:var(--sp-3); }
+.magpie-directory-tools > span { flex:1 1 18ch; min-width:0; }
+.magpie-directory-tools button[aria-pressed=true] { border-color:var(--accent-border); background:var(--accent-soft); }
+.magpie-desk ul { margin:0; padding:0; list-style:none; }
+.magpie-desk button, .magpie-desk select { min-height:var(--tap); }
+.magpie-desk a:not(.tt-back) { min-height:var(--tap); color:var(--accent); display:inline-flex; align-items:center; gap:var(--sp-1); }
+.magpie-desk a svg { flex:none; }
+.magpie-desk a:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.magpie-desk .magpie-directory-list a { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:var(--sp-2); width:100%; min-height:var(--tap); padding:var(--sp-2); color:var(--text-bright); text-decoration:none; border-block-end:1px solid var(--border-subtle); }
+.magpie-directory-list a[aria-current=page] { background:var(--sel-bg); border-block-end-color:var(--accent-border); }
+.magpie-directory-list a > span { min-width:0; overflow-wrap:anywhere; }
+.magpie-directory-list small, .magpie-provider-list small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.magpie-directory-status { text-align:end; }
+.magpie-desk-section { padding-block:var(--sp-3); border-block-end:1px solid var(--border-subtle); }
+.magpie-desk h3 { margin:0 0 var(--sp-2); font-size:var(--fs-body); }
+.magpie-version-facts { display:flex; gap:var(--sp-3) var(--sp-5); flex-wrap:wrap; margin:0 0 var(--sp-3); }
+.magpie-version-facts dt, .magpie-desk-muted { color:var(--text-dim); font-size:var(--fs-meta); }
+.magpie-version-facts dd { margin:var(--sp-1) 0 0; font-weight:600; }
+.magpie-desk-actions, .magpie-desk-links { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2) var(--sp-3); }
+.magpie-desk-actions label { display:inline-flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2); }
+.magpie-desk select { font:inherit; padding-inline:var(--sp-2); color:var(--text-bright); background:var(--bg-container); border:1px solid var(--border); border-radius:var(--r-sm); }
+.magpie-desk-links { margin-block-start:var(--sp-2); }
+.magpie-version-history summary { min-height:var(--tap); display:flex; align-items:center; gap:var(--sp-1); cursor:pointer; }
+.magpie-version-history[open] summary svg { transform:rotate(90deg); }
+.magpie-provider-list li { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); padding-block:var(--sp-1); border-block-end:1px solid var(--border-subtle); }
+.magpie-provider-list li:last-child { border:0; }
+.magpie-account-title { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-2) var(--sp-3); margin-block-end:var(--sp-3); }
+.magpie-account-title span { color:var(--text-dim); }
+.magpie-account-form { display:grid; gap:var(--sp-3); width:min(100%, 56ch); }
+.magpie-account-form button { justify-self:start; }
+.magpie-desk-no-selection { color:var(--text-dim); padding:var(--sp-4) var(--pad-page); }
+:where(html[data-pointer="fine"]) .magpie-directory-list a:not([aria-current=page]):hover { background:var(--list-hover); }
+html:is([data-size="compact"], [data-size="medium"]) .magpie-desk { grid-template-columns:minmax(0, 1fr); }
+html:is([data-size="compact"], [data-size="medium"]) .magpie-desk-detail { border-inline:0; }

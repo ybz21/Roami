@@ -12,10 +12,3 @@
 html[data-size="compact"] .model-prototype-bar { gap:0; }
 
 .model-prototype-workspace { height:100%; }
-.model-prototype-account { height:100%; min-height:0; overflow:auto; padding:var(--sp-4) var(--pad-page); }
-.model-prototype-account header { flex-wrap:wrap; }
-.model-prototype-account small, .model-prototype-account dt { color:var(--text-dim); }
-.model-prototype-account dl { display:flex; flex-wrap:wrap; gap:var(--sp-4) var(--sp-5); padding-block:var(--sp-4); border-block:1px solid var(--border-subtle); }
-.model-prototype-account dd { margin:0; font-weight:600; }
-.model-prototype-account-actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-3); }
-.model-prototype-account-actions > button { min-height:var(--tap); }

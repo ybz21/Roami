@@ -2,12 +2,13 @@ import type { ModelCatalog, ModelSource } from '../../../../frontend/src/compone
 import type { PriceRule, SourcePricing } from '../../../../frontend/src/components/capabilities/model-routing-api'
 import type { GatewayConfiguration } from '../../../../frontend/src/components/settings/local-model-gateway'
 import { checkSource, now, reconcileCall, requestMonitor, requestObservation, sourceMonitor, traces, usage } from './activity-fixture'
+import { downloadedPackages, inspectPlugin, magpiePlugins, pluginAccounts, pluginProvider, stagePluginRelease } from './plugin-fixture'
 export { traceCases } from './activity-fixture'
 
 const protocol = 'openai-completions'
 const origins: ModelSource[] = [
   { id: 'demo-api', name: 'Demo API', baseUrl: 'https://models.example.invalid/v1', protocol, authMode: 'bearer', hasKey: true },
-  { id: 'workbuddy', name: 'WorkBuddy · Demo', baseUrl: '', protocol, authMode: 'plugin', pluginSourceId: 'workbuddy-demo' },
+  { id: 'workbuddy', name: 'WorkBuddy · Demo', baseUrl: 'https://magpie.invalid/workbuddy', protocol, authMode: 'plugin', pluginSourceId: 'workbuddy-demo' },
   { id: 'openrouter', name: 'OpenRouter · Free', baseUrl: 'https://openrouter.ai/api/v1', protocol, authMode: 'bearer', connector: 'openrouter-free', hasKey: true },
 ]
 const discovery: Record<string, string[]> = {
@@ -41,9 +42,16 @@ let speech: Record<string, unknown> = { provider: 'volcano', volcano: {} }
 let keyCount = 2
 let keys = [{ id: 'demo-dev', name: 'Development', suffix: '7c2a', disabled: false }, { id: 'demo-ci', name: 'CI', suffix: 'e9f0', disabled: true }]
 let fixed = { hasKey: false, suffix: '', id: 'demo-fixed' }
-const installed = { id: 'workbuddy', name: 'WorkBuddy', version: '0.2.26' }
-const packages = [installed]
-const provider = { id: 'workbuddy', name: 'WorkBuddy', signedIn: true, methods: [{ type: 'api', label: 'Demo sign-in', keyless: true }], options: [] }
+const authOptions: Record<string, Record<string, boolean>> = {}
+const demoProvider = (id: string, signedIn: boolean) => {
+  const provider = pluginProvider(id)
+  return {
+    id, name: provider?.name || id, signedIn,
+    methods: [{ type: 'api', label: 'Demo sign-in', keyless: true, labels: { 'zh-CN': '演示授权', en: 'Demo sign-in' } }],
+    options: [],
+    models: provider?.models.map(id => ({ id, name: id })) || [],
+  }
+}
 
 function modelDetails(model: string, sourceId: string) {
   const vision = model.includes('vision')
@@ -54,6 +62,8 @@ function modelDetails(model: string, sourceId: string) {
   return { id: model, name: model, protocol, pricing, capabilities, contextWindow: vision ? 128000 : 64000, maxOutputTokens: 8192, inputModalities: vision ? ['text', 'image'] : ['text'], outputModalities: ['text'] }
 }
 function directoryFor(source: ModelSource) {
+  const account = pluginAccounts.find(row => row.sourceId === source.id)
+  if (account) return account.authorized ? pluginProvider(account.providerId)?.models || [] : []
   return discovery[source.id] || (source.connector ? discovery.openrouter : discovery['demo-api'])
 }
 function directory() {
@@ -89,9 +99,19 @@ function sourceSettings(id: string, update?: SourcePricing) {
   const effective = (source ? directoryFor(source) : []).map(model => make(model, policy.models?.[model] || policy.default, policy.models?.[model] ? 'model' : 'source'))
   return { data: policy, currency: settings.currency, effective, summary: make('', policy.default, 'source') }
 }
-function addPluginSource() {
-  const id = 'workbuddy-demo-' + revision
-  const source = { ...origins[1], id, name: 'WorkBuddy · Demo ' + revision, pluginSourceId: id }
+export function readPluginSources() {
+  return pluginAccounts.flatMap(account => {
+    const source = catalog.sources.find(row => row.id === account.sourceId)
+    if (!source) return []
+    const models = catalog.models.filter(row => !row.aggregate && row.candidates.some(member => member.sourceId === source.id)).length
+    return [{ ...account, name: source.name, models }]
+  })
+}
+export function addDemoPluginSource(pluginId: string, providerId: string, name = '') {
+  const provider = pluginProvider(providerId)!
+  const id = pluginId + '-account-' + revision
+  const source: ModelSource = { id, name: name.trim() || provider.name + ' · ' + revision, pluginSourceId: id, protocol, authMode: 'plugin', baseUrl: 'https://magpie.invalid/' + id }
+  pluginAccounts.push({ sourceId: id, authId: id, pluginId, providerId, authorized: false, claimed: false })
   catalog = { ...catalog, revision: 'demo-' + ++revision, sources: [...catalog.sources, source] }
   return { sourceId: id, catalog }
 }
@@ -167,22 +187,38 @@ export function installFixture() {
       if (method === 'POST' && !id) keys = [...keys, { id: 'demo-' + ++keyCount, name: body.name, suffix: apiKey.slice(-4), disabled: false }]
       return data({ keys, revision: 'demo', ...(method === 'POST' ? { apiKey } : {}) })
     }
-    if (path === 'plugins/packages') return data(packages)
+    if (path === 'plugins/packages') return data(downloadedPackages())
     if (path === 'plugins/community') {
-      const available = { ...installed, package: 'packages/workbuddy', providers: ['WorkBuddy'], version: '0.2.27' }
-      if (!write) return data([available])
-      const next = { ...installed, id: 'workbuddy-update', version: available.version }
-      if (!packages.some(row => row.id === next.id)) packages.push(next)
-      return data(next)
+      if (!write) return data(magpiePlugins.map(plugin => ({ package: plugin.path, name: plugin.name, providers: plugin.providers.map(row => row.id), version: plugin.available })))
+      const plugin = magpiePlugins.find(row => row.path === body.package)
+      return plugin ? data(stagePluginRelease(plugin.id)) : missing()
     }
     if (path === 'plugins/import' && init?.body instanceof FormData) {
-      return data({ packages: [installed], skipped: [] })
+      return data({ packages: [stagePluginRelease('workbuddy')], skipped: [] })
     }
-    if (path === 'plugins/inspect') return data([provider])
-    if (path === 'plugins/sources') return data(addPluginSource())
+    if (path === 'plugins/inspect') {
+      const plugin = inspectPlugin(body.packageId)
+      return plugin ? data(plugin.providers.map(row => demoProvider(row.id, false))) : missing()
+    }
+    if (path === 'plugins/sources') {
+      const previous = pluginAccounts.find(row => row.authId === body.sourceId)
+      const plugin = previous ? magpiePlugins.find(row => row.id === previous.pluginId) : inspectPlugin(body.packageId || '')
+      const providerId = previous?.providerId || body.providerId
+      return plugin?.providers.some(row => row.id === providerId) ? data(addDemoPluginSource(plugin.id, providerId)) : missing()
+    }
     if (path.startsWith('plugins/sources/')) {
-      if (path.endsWith('/info')) return data({ provider, options: {} })
-      if (path.endsWith('/auth') || path.endsWith('/options')) return data({})
+      const [, , id, action] = path.split('/')
+      const account = pluginAccounts.find(row => row.authId === id)
+      if (!account) return missing()
+      if (action === 'info') return data({ provider: demoProvider(account.providerId, account.authorized), options: authOptions[id] || {} })
+      if (action === 'auth') {
+        if (body.action === 'apiKey') account.authorized = true
+        return data({ ok: account.authorized })
+      }
+      if (action === 'options') {
+        authOptions[id] = body.options
+        return data({})
+      }
     }
     return missing()
   }
