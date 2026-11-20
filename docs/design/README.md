@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 三平台原生终端 | [20261120-native-pty](20261120-native-pty/README.md) | 跨平台 PTY 选型、Unix 宿主升级、tmux 能力迁移及 Windows 整包移植 |
 | 会话请求频率优化 | [20261121-session-request-budget](20261121-session-request-budget/README.md) | 请求来源、30 秒受控复现与分阶段降频方案 |
 | 创建任务时的互审会话 | [20261120-review-session](20261120-review-session/README.md) | 审查 Agent、双向会话消息、按版本持续复审设计 |
 | 大模型工作台 | [设计首页（HTML）](20261114-model-orchestration/index.html) · [交互原型（HTML）](20261114-model-orchestration/current.html) | 模型源、聚合、网关、用量、监控、审计、选模与语音的页面设计 |
