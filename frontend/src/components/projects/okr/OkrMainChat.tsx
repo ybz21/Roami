@@ -131,7 +131,7 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
   const nativeSession = execution && sessions.value.filter(session => session.name === execution.sessionId && session.agent === execution.executor && session.projectKey === projectId && !session.dormant && !session.lifecycle)
   const nativeReady = !!nativeSession && nativeSession.length === 1 && !sessions.failed
   const managedThread = useAgentThread(nativeReady && !reference?.messageId ? cid : '', '', node)
-  const mainTurnId = managedThread.view
+  const mainTurnId = managedThread.view && !managedThread.failed
     ? managedThread.view.turns.find(turn => turn.state === 'running')?.id ?? null
     : undefined
   const content = <aside className="okr-main-chat" data-embedded={embedded} data-conversation-id={cid}>
