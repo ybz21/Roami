@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 创建任务时的互审会话 | [20261120-review-session](20261120-review-session/README.md) | 审查 Agent、交审方式、双向 Prompt 与会话交互原型 |
 | 顶部标签选中态 | [20261119-active-workspace-tab](20261119-active-workspace-tab/README.md) | 内容侧强调线、标题强调与桌面/真机验收 |
 | Agent 渲染视图宽度统一 | [20261119-agent-render-width](20261119-agent-render-width/README.md) | 所有 Agent 消息、输入及附属状态铺满可用宽度与桌面/真机验收 |
 | Main 工作中切换模型 | [20261117-main-model-switch](20261117-main-model-switch/README.md) | 请求边界切换、模型连接排空、命令入口及桌面/真机验收 |
