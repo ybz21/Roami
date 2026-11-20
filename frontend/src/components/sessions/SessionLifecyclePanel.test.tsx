@@ -18,6 +18,14 @@ const content = (value: LifecycleOperation) => <I18nProvider><AntApp><LifecycleO
 beforeEach(() => { state.operations = []; state.native = []; localStorage.clear(); localStorage.setItem('ttmux-locale', 'en-US'); vi.mocked(lifecycleAction).mockReset(); vi.mocked(sendSessionPrompt).mockReset(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); vi.stubGlobal('matchMedia', () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} })) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
+it.each(['running', 'attention'] as const)('opens the exact review session during %s', state => {
+  const onOpen = vi.fn()
+  const pending = { ...op, state, stage: 'review', receipts: { 'review-endpoint-intent': { result: null, durationMs: 0, session: 'review-child' } } }
+  render(<I18nProvider><AntApp><LifecycleOperationView op={pending} onOpen={onOpen} /></AntApp></I18nProvider>)
+  fireEvent.click(screen.getByRole('button', { name: 'Open review' }))
+  expect(onOpen).toHaveBeenCalledWith('review-child')
+})
+
 it('saves drafts across navigation and never sends while preparing', async () => {
   const view = render(content(op))
   expect(document.querySelector('details')?.open).toBe(false)

@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agent"
+	"github.com/ybz21/Roami/internal/agentlifecycle"
 	"github.com/ybz21/Roami/internal/id"
 	"github.com/ybz21/Roami/internal/memguard"
 	life "github.com/ybz21/Roami/internal/sessionlifecycle"
@@ -77,6 +80,10 @@ func (a *API) lifecycleReview(ctx context.Context, o life.Operation) (any, error
 	if !o.Has("review-launch-intent") {
 		prompt := reviewerPromptForPair(author.Session, o.Intent.Launch.Task)
 		command := spec.Command
+		if command == runner.Bin() {
+			command = strings.Join(append([]string{command}, runner.InteractiveArgs(agent.StartOpts{Permission: "dangerously-skip-permissions"})...), " ")
+		}
+		command = reviewAgentCommand(ctx, spec.Agent, command)
 		if flag := agent.Describe(runner).PromptFlag; flag != "" {
 			command += " " + flag
 		}
@@ -109,6 +116,24 @@ func (a *API) lifecycleReview(ctx context.Context, o life.Operation) (any, error
 		return nil, err
 	}
 	return reviewer, nil
+}
+
+func reviewAgentCommand(ctx context.Context, kind, command string) string {
+	args := strings.Fields(command)
+	if kind != "codex" || len(args) == 0 || slices.Contains(args, "--no-daemon") {
+		return command
+	}
+	binary := strings.Trim(args[0], "'\"")
+	if filepath.Base(binary) != "codex" {
+		return command
+	}
+	// The review CLI must run under its pane; Codex's shared daemon uses the daemon's session context.
+	probe, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if agentlifecycle.CodexSupportsLocalLaunch(probe, binary) {
+		return command + " --no-daemon"
+	}
+	return command
 }
 
 func (a *API) reviewCheckpoint(o life.Operation, key string, value any) (life.Operation, error) {
@@ -308,7 +333,7 @@ func (a *API) stopLifecycleReview(ctx context.Context, o life.Operation) error {
 }
 
 func reviewerPromptForPair(author, task string) string {
-	return fmt.Sprintf("# Original task\n\n%s\n\n# Peer review\n\nYou are the reviewer. Acknowledge readiness with %s on a line of its own, then wait for a [review.request] from the paired author. Read the immutable patch at Read-only patch, use the original task as the review criteria, and leave the workspace unchanged. Send one verdict with concrete evidence. Substitute the exact round and full revision from the request. Use one of:\n\nroami session send %s '[review.changes_requested] rN rev=REVISION File:line, issue, evidence and suggested fix'\nroami session send %s '[review.approved] rN rev=REVISION What was checked and the result'\n\nAfter submitting, wait for the next request. Approval or round %d ends the review.", task, reviewReadyLine, author, author, sessionreview.MaxRounds)
+	return fmt.Sprintf("# Peer review\n\nYou are the reviewer. Start by replying with %s on a line of its own. Wait for a [review.request] from the paired author before using tools or inspecting files. Read the immutable patch at Read-only patch, use the original task as the review criteria, and leave the workspace unchanged. Send one verdict with concrete evidence. Substitute the exact round and full revision from the request. Use one of:\n\nroami session send %s '[review.changes_requested] rN rev=REVISION File:line, issue, evidence and suggested fix'\nroami session send %s '[review.approved] rN rev=REVISION What was checked and the result'\n\nAfter submitting, wait for the next request. Approval or round %d ends the review.\n\n# Original task for reference\n\n%s", reviewReadyLine, author, author, sessionreview.MaxRounds, task)
 }
 
 func authorReviewAppendix(reviewer string, trigger string) string {

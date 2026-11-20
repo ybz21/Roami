@@ -251,11 +251,11 @@ func (r Runtime) InjectEnv(sess string) error {
 		if err := r.Tmux("set-environment", "-t", target, key, val); err != nil {
 			return err
 		}
-		if err := r.Tmux("send-keys", "-t", target, "export "+line, "C-m"); err != nil {
+		if err := r.Tmux("send-keys", "-t", target+":", "export "+line, "C-m"); err != nil {
 			return err
 		}
 	}
-	return r.Tmux("send-keys", "-t", target, "clear", "C-m")
+	return r.Tmux("send-keys", "-t", target+":", "clear", "C-m")
 }
 
 var promptSequence atomic.Uint64

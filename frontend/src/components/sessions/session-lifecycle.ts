@@ -21,7 +21,7 @@ export type LifecycleIntent = {
 export type LifecycleOperation = {
   operationId: string; resourceId: string; requestKey: string; kind: 'create' | 'close'; intent: LifecycleIntent
   state: 'queued' | 'running' | 'attention' | 'succeeded' | 'cancelled'; stage: string; revision: number
-  cancelRequested: boolean; receipts: Record<string, { result: any; durationMs: number }>; errorCode?: string; errorDetail?: string; acceptedAt: number; updatedAt: number
+  cancelRequested: boolean; receipts: Record<string, { result: any; durationMs: number; session?: string }>; errorCode?: string; errorDetail?: string; acceptedAt: number; updatedAt: number
 }
 export const lifecycleEnded = (op: LifecycleOperation) => op.state === 'succeeded' || op.state === 'cancelled'
 const useOperations = createSessionPoll<LifecycleOperation[]>('/session-lifecycle/operations', 3000, [], r => Array.isArray(r.data) ? r.data : [], ops => ops.some(op => !lifecycleEnded(op) && op.state !== 'attention'))
@@ -113,7 +113,7 @@ export function lifecycleLaunchIntent(agent: AgentKind | 'none', prefs: Preferen
   return { command: agentLaunch(agent, prefs), agent, task, preamble: briefPreamble({ kind: where, ...vars } as BriefWhere, vars.sess, autoReview, t), taskHeading: t('session.wt.briefTask'), setupHeading: t('session.wt.briefSetup'), fileBase: nodeApi('/file'), autoReview }
 }
 
-export async function lifecycleAction(op: LifecycleOperation, action: 'retry' | 'cancel' | 'retain' | 'retain-branch' | 'continue-without-review') {
+export async function lifecycleAction(op: Pick<LifecycleOperation, 'operationId' | 'revision'>, action: 'retry' | 'cancel' | 'retain' | 'retain-branch' | 'continue-without-review') {
   const scope = nodeApi('/session-lifecycle/operations')
   const request = await durableRequestKey(JSON.stringify({ scope, id: op.operationId, action, revision: op.revision }))
   if (nodeApi('/session-lifecycle/operations') !== scope) throw new Error('LIFECYCLE_NODE_CHANGED')

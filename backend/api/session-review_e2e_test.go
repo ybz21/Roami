@@ -23,6 +23,24 @@ import (
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
+func TestReviewCodexLaunchKeepsToolsInPane(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "codex")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' --no-daemon\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	command := shellQuote(binary) + " -m fixture"
+	local := reviewAgentCommand(context.Background(), "codex", command)
+	if local != command+" --no-daemon" || reviewAgentCommand(context.Background(), "codex", local) != local {
+		t.Fatalf("expected a single local-launch flag: %q", local)
+	}
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'older codex'\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if got := reviewAgentCommand(context.Background(), "codex", command); got != command {
+		t.Fatalf("changed unsupported launch: %q", got)
+	}
+}
+
 func TestSessionReviewHarness(t *testing.T) {
 	mode := os.Getenv("ROAMI_REVIEW_FIXTURE_MODE")
 	if mode == "" {
@@ -104,6 +122,9 @@ func TestSessionReviewIsolatedE2E(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 65*time.Second)
 	defer cancel()
 	rt := runtime.New()
+	if err := os.WriteFile(rt.EnvFile, []byte("ROAMI_REVIEW_FIXTURE_ENV=enabled\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	handler := New(ttmux.New("roami"), "", rt.DataDir, "")
 	fixture, repo := t.TempDir(), t.TempDir()
 	git := func(args ...string) {
