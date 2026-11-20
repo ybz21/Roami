@@ -64,6 +64,7 @@ func TestClaudeProviderTranscriptMatchesExactFilename(t *testing.T) {
 
 func managedHistoryFixture(t *testing.T, executor string) (name, file, stateFile string) {
 	t.Helper()
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	root := t.TempDir()
 	for _, key := range []string{"HOME", "ROAMI_HOME", "ROAMI_DATA", "ROAM_HOME", "ROAM_DATA", "TTMUX_HOME", "TTMUX_DATA", "ROAMI_DATABASE_DIR", "ROAM_DATABASE_DIR", "TTMUX_DATABASE_DIR"} {
 		t.Setenv(key, root)
@@ -146,5 +147,53 @@ func TestUnknownManagedClaudeHistoryStaysReadable(t *testing.T) {
 	after, err := os.ReadFile(stateFile)
 	if err != nil || string(after) != string(state) {
 		t.Fatalf("history read changed execution state: %v", err)
+	}
+}
+
+func TestManagedClaudeHistoryUsesConfiguredProfile(t *testing.T) {
+	name, defaultFile, _ := managedHistoryFixture(t, "claude")
+	config := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", config)
+	dir := filepath.Join(config, "projects", "fixture")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, filepath.Base(defaultFile))
+	if err := os.WriteFile(file, []byte(`{"type":"assistant","uuid":"isolated","message":{"content":[{"type":"text","text":"Configured profile"}]}}`+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	r := gin.New()
+	r.GET("/sessions/:name/transcript", (&API{}).ClaudeTranscript)
+	path := "/sessions/" + name + "/transcript?boff=1"
+	for _, suffix := range []string{"", "&file=" + file} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path+suffix, nil))
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Configured profile") || strings.Contains(w.Body.String(), "Existing history") {
+			t.Fatalf("wrong configured profile: %d %s", w.Code, w.Body.String())
+		}
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path+"&file="+defaultFile, nil))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("other profile accepted: %d", w.Code)
+	}
+}
+
+func TestNativeTranscriptMarksFinalAssistantText(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		msg  *cMsg
+		want bool
+	}{
+		{"claude final", parseLine(`{"type":"assistant","message":{"stop_reason":"end_turn","content":[{"type":"text","text":"Final"}]}}`), true},
+		{"claude commentary", parseLine(`{"type":"assistant","message":{"stop_reason":"tool_use","content":[{"type":"text","text":"Interim"}]}}`), false},
+		{"codex final", parseCodexItem(json.RawMessage(`{"type":"message","role":"assistant","phase":"final_answer","content":[{"text":"Final"}]}`), ""), true},
+		{"codex commentary", parseCodexItem(json.RawMessage(`{"type":"message","role":"assistant","phase":"commentary","content":[{"text":"Interim"}]}`), ""), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.msg == nil || tt.msg.Final != tt.want {
+				t.Fatalf("final marker mismatch: %+v", tt.msg)
+			}
+		})
 	}
 }

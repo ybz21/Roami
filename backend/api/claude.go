@@ -310,6 +310,7 @@ type cMsg struct {
 	Role   string   `json:"role"` // user | assistant | tool
 	Blocks []cBlock `json:"blocks"`
 	Ts     string   `json:"ts,omitempty"`
+	Final  bool     `json:"final,omitempty"`
 	ID     string   `json:"id,omitempty"` // 行 uuid，供前端做稳定 key（保住折叠态）
 }
 
@@ -362,8 +363,9 @@ func parseLine(line string) *cMsg {
 		Ts      string `json:"timestamp"`
 		UUID    string `json:"uuid"`
 		Message struct {
-			Role    string          `json:"role"`
-			Content json.RawMessage `json:"content"`
+			Role       string          `json:"role"`
+			StopReason string          `json:"stop_reason"`
+			Content    json.RawMessage `json:"content"`
 		} `json:"message"`
 	}
 	if json.Unmarshal([]byte(line), &raw) != nil {
@@ -425,7 +427,7 @@ func parseLine(line string) *cMsg {
 	if len(blocks) == 0 {
 		return nil
 	}
-	return &cMsg{Role: role, Ts: raw.Ts, ID: raw.UUID, Blocks: blocks}
+	return &cMsg{Role: role, Ts: raw.Ts, ID: raw.UUID, Blocks: blocks, Final: role == "assistant" && raw.Message.StopReason == "end_turn"}
 }
 
 // cStatus：会话的「当前状态」，随转录响应一起回给前端画状态条。
@@ -543,12 +545,21 @@ func scanStatus(line string, st cStatus) cStatus {
 	return st
 }
 
+func claudeTranscriptRoot() string {
+	config := os.Getenv("CLAUDE_CONFIG_DIR")
+	if config == "" {
+		home, _ := os.UserHomeDir()
+		config = filepath.Join(home, ".claude")
+	}
+	return filepath.Join(config, "projects")
+}
+
 // ClaudeTranscript GET /sessions/:name/transcript?file=...&offset=N
 // 解析 JSONL 为对话；offset 为已消费的物理行数，仅返回其后的新内容（供前端增量轮询）。
 func (a *API) ClaudeTranscript(c *gin.Context) {
 	file := c.Query("file")
-	providerHome, _ := os.UserHomeDir()
-	if file != "" && !transcriptFileWithin(filepath.Join(providerHome, ".claude", "projects"), file) {
+	root := claudeTranscriptRoot()
+	if file != "" && !transcriptFileWithin(root, file) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_FILE"}})
 		return
 	}
@@ -556,8 +567,7 @@ func (a *API) ClaudeTranscript(c *gin.Context) {
 		file = bound
 	} else if file == "" { // 未传则按会话现场定位
 		if dir, pid := paneClaudeProc(a.sessionTarget(c)); dir != "" {
-			home, _ := os.UserHomeDir()
-			file = pickTranscript(filepath.Join(home, ".claude", "projects", encodeProject(dir)), processArgv(pid), processStart(pid))
+			file = pickTranscript(filepath.Join(root, encodeProject(dir)), processArgv(pid), processStart(pid))
 		}
 	}
 	// agent 刚起、一句没说（比如还卡在启动的信任确认上）时转录文件根本不存在。
@@ -567,11 +577,8 @@ func (a *API) ClaudeTranscript(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"data": gin.H{"messages": []cMsg{}, "nextOffset": 0, "file": ""}})
 		return
 	}
-	// 安全：限制在 ~/.claude/projects 下
-	home, _ := os.UserHomeDir()
-	root := filepath.Join(home, ".claude", "projects")
-	file = filepath.Clean(file)
-	if !strings.HasPrefix(file, root) {
+	relative, err := filepath.Rel(root, file)
+	if err != nil || !transcriptFileWithin(root, file) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_FILE"}})
 		return
 	}
@@ -589,7 +596,13 @@ func (a *API) ClaudeTranscript(c *gin.Context) {
 		offset = 0
 	}
 
-	f, err := os.Open(file)
+	profile, err := os.OpenRoot(root)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"messages": []cMsg{}, "nextOffset": 0, "file": file}})
+		return
+	}
+	defer profile.Close()
+	f, err := profile.Open(relative)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"data": gin.H{"messages": []cMsg{}, "nextOffset": 0, "file": file}})
 		return

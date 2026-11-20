@@ -31,7 +31,7 @@ import type { AgentStatus } from './status'
 // 数量很小（几条文本），且已发出的会话消息很快就会被转录对账掉，不会无限增长。
 const outboxStore = new Map<string, { id: number; text: string }[]>()
 
-export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, mainTurnId, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend, onCommand }: {
+export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, liveOutput = true, mainTurnId, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend, onCommand }: {
   /** 这条 composer 发给谁：左端那枚亮着的 agent pill（22 设计 §3.3） */
   onSend?: (text: string) => Promise<void>
   onCommand?: (text: string) => Promise<void>
@@ -47,7 +47,8 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   renderMessage: (m: Msg, i: number) => ReactNode
   pending?: ReactNode
   busy?: boolean
-  mainTurnId?: string | null
+  liveOutput?: boolean
+  mainTurnId?: string
   error?: string
   onOpenFile?: (path: string, line?: number) => void
   tasks?: TaskIndex
@@ -195,31 +196,18 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   // 放在 useEffect 里补，用户会先看见跳一下再跳回来。
   const anchor = useRef({ height: 0, top: 0, firstId: '' })
   useLayoutEffect(() => {
-    const el = boxRef.current
-    if (!el || !live) return
-    const firstId = visible[0]?.id || ''
-    if (atBottom.current) {
-      el.scrollTop = el.scrollHeight
-      seenCount.current = messages.length
-      setUnread(0)
-    } else {
-      if (anchor.current.firstId && firstId !== anchor.current.firstId) {
-        el.scrollTop = anchor.current.top + (el.scrollHeight - anchor.current.height)
-      }
-      setUnread(Math.max(0, messages.length - seenCount.current))
-    }
-    anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId }
-  }, [messages, pending, visible, live])
-  useLayoutEffect(() => {
     const box = boxRef.current
     const transcript = transcriptRef.current
-    if (!live || !busy || !box || !transcript || typeof ResizeObserver === 'undefined') return
+    if (!live || !box || !transcript || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(() => {
-      if (atBottom.current) box.scrollTop = box.scrollHeight
+      if (!atBottom.current) return
+      box.scrollTop = box.scrollHeight
+      anchor.current = { ...anchor.current, height: box.scrollHeight, top: box.scrollTop }
     })
     observer.observe(transcript)
+    observer.observe(box)
     return () => observer.disconnect()
-  }, [busy, live])
+  }, [live])
 
 
   // 滑到接近顶部就自己往回翻一页，不用先去找那颗按钮。
@@ -249,8 +237,10 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     // 锚点跟着手走：补位要用「此刻」的位置和高度。只靠上面那个布局效应记录的话，
     // 纯上滚（没有新消息、不触发重渲染）这段时间里锚点停在很久以前的底部位置，
     // 插进来的更早一页就会按错误的高度差补位，一下弹走。
+    const scrolledUp = el.scrollTop < anchor.current.top - 1
+    // Resizing the composer or transcript can move the bottom without a user scroll.
+    atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80 || (atBottom.current && !scrolledUp)
     anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId: visible[0]?.id || '' }
-    atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     setShowJump(!atBottom.current)
     if (atBottom.current) { seenCount.current = messages.length; setUnread(0) }
     reachEarlier(el)
@@ -275,6 +265,22 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   // 于是"切一下会话再切回来，排队中的气泡凭空消失"，其实消息已经发出去、真排在 TUI 队列里，
   // 消失的只是本地这个提示气泡。按会话名存到组件外面，卸载/重挂都读得到同一份。
   const [outbox, setOutboxState] = useState<{ id: number; text: string }[]>(() => outboxStore.get(name) || [])
+  useLayoutEffect(() => {
+    const el = boxRef.current
+    if (!el || !live) return
+    const firstId = visible[0]?.id || ''
+    if (atBottom.current) {
+      el.scrollTop = el.scrollHeight
+      seenCount.current = messages.length
+      setUnread(0)
+    } else {
+      if (anchor.current.firstId && firstId !== anchor.current.firstId) {
+        el.scrollTop = anchor.current.top + (el.scrollHeight - anchor.current.height)
+      }
+      setUnread(Math.max(0, messages.length - seenCount.current))
+    }
+    anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId }
+  }, [messages, outbox.length, pending, visible, live])
   const setOutbox = (fn: (q: { id: number; text: string }[]) => { id: number; text: string }[]) => {
     setOutboxState((q) => {
       const next = fn(q)
@@ -435,7 +441,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
           </div>
         )}
         <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
-          <div ref={boxRef} onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: 'var(--sp-2) var(--sp-4)' }}>
+          <div ref={boxRef} onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowAnchor: 'none', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: 'var(--sp-2) var(--sp-4)' }}>
             <div className="conversation-transcript" ref={transcriptRef}>
             {messages.length === 0 && !pending && <div style={{ color: 'var(--text-dim)', textAlign: 'center', marginTop: 30 }}>{emptyHint || t('chat.loadingTranscript')}</div>}
             {(hidden > 0 || hasEarlier) && (
@@ -461,7 +467,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
                 </div>
               </div>
             ))}
-            {live && (busy ? <LiveTail key={mainTurnId} name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
+            {live && (busy && liveOutput ? <LiveTail key={mainTurnId} name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
             </div>
           </div>
           {/* 「回到底部」已并进下方状态条（带未读数）；状态条一个字段都没有时（刚进页面、

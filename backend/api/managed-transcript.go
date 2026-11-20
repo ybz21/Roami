@@ -2,7 +2,6 @@ package api
 
 import (
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -18,10 +17,9 @@ func managedTranscript(name, executor string) (string, bool) {
 	if err != nil || !codexSessionID.MatchString(provider) {
 		return "", true
 	}
-	home, _ := os.UserHomeDir()
 	root, suffix := codexSessionsRoot(), "-"+provider+".jsonl"
 	if executor == "claude" {
-		root, suffix = filepath.Join(home, ".claude", "projects"), provider+".jsonl"
+		root, suffix = claudeTranscriptRoot(), provider+".jsonl"
 	} else if executor == "pi" {
 		root, suffix = piSessionsRoot(), "_"+provider+".jsonl"
 	}

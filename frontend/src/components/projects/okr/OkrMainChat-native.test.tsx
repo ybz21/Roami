@@ -14,10 +14,10 @@ vi.mock('../../../session-overview', () => ({ useSessionOverview: () => ({ value
 vi.mock('../../cluster/node-url', () => ({ useCurrentNodeId: () => null, currentNodeId: () => null, nodeApi: (path: string) => '/api' + path }))
 vi.mock('../../agent/useAgentThread', () => ({ useAgentThread: (cid: string) => ({
   failed: state.threadFailed,
-  view: cid && state.turnState ? { turns: [{ id: 'current-turn', state: state.turnState }] } : null,
+  view: cid && state.turnState ? { turns: [{ id: 'current-turn', state: state.turnState }], messages: [{ turn_id: 'current-turn', role: 'assistant', created_ms: 123 }] } : null,
 }) }))
 vi.mock('../../agent/AgentConversation', () => ({ default: ({ cid, focusMessage, project }: any) => <p>legacy:{cid}:{focusMessage}:{project.nativeModel || ''}:{String(project.modelControlsDisabled)}</p> }))
-vi.mock('../../chat/ExecutorSessionChat', () => ({ default: ({ executor, sessionId, mainTurnId, onSend, onCommand }: any) => <><output>{mainTurnId || "no running turn"}</output><button onClick={() => { void onSend('Continue the original team').catch(() => {}) }}>native:{executor}:{sessionId}</button><button onClick={() => { void onCommand('/model').catch(() => {}) }}>model command</button></> }))
+vi.mock('../../chat/ExecutorSessionChat', () => ({ default: ({ executor, sessionId, mainTurn, onSend, onCommand }: any) => <><output>{mainTurn ? mainTurn.id + ":" + mainTurn.startedMs : "no running turn"}</output><button onClick={() => { void onSend('Continue the original team').catch(() => {}) }}>native:{executor}:{sessionId}</button><button onClick={() => { void onCommand('/model').catch(() => {}) }}>model command</button></> }))
 
 const configuration = () => ({ conversationId: 'original-main', projectId: 'project', generation: 1, executor: 'claude', model: 'free', sessionId: 'original-provider' })
 const props = () => ({ projectId: 'project', expectedConversationId: 'original-main', draft: emptyConfiguration(), workspace: null, onClose: vi.fn() })
@@ -136,7 +136,7 @@ it('forwards the bound Main running turn even before the native transcript can r
   await screen.findByText('no running turn')
   state.turnState = 'running'
   view.rerender(<OkrMainChat {...props()} />)
-  expect(screen.getByText('current-turn')).toBeTruthy()
+  expect(screen.getByText('current-turn:123')).toBeTruthy()
   state.threadFailed = true
   view.rerender(<OkrMainChat {...props()} />)
   expect(screen.getByText('no running turn')).toBeTruthy()

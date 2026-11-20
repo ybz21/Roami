@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { App as AntApp } from 'antd'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { ChatShell } from './ChatShell'
 import { I18nProvider } from '../../i18n'
 
 const resizeCallbacks = new Map<Element, () => void>()
 class ResizeObserverStub {
-  private target?: Element
+  private readonly targets = new Set<Element>()
   constructor(private readonly callback: () => void) {}
-  observe(target: Element) { this.target = target; resizeCallbacks.set(target, this.callback) }
-  unobserve() { if (this.target) resizeCallbacks.delete(this.target) }
-  disconnect() { this.unobserve() }
+  observe(target: Element) { this.targets.add(target); resizeCallbacks.set(target, this.callback) }
+  unobserve(target: Element) { this.targets.delete(target); resizeCallbacks.delete(target) }
+  disconnect() { for (const target of this.targets) this.unobserve(target) }
 }
 
 beforeEach(() => {
@@ -77,7 +77,8 @@ it('follows growing live output only while the reader is pinned to the bottom', 
   const resize = resizeCallbacks.get(transcript)!
   metrics(1500, 500)
   scrollTo(1000)
-  metrics(1800, 500)
+  metrics(1800, 400)
+  scrollTo(1000)
   act(resize)
   expect(box.scrollTop).toBe(1800)
 
@@ -85,4 +86,18 @@ it('follows growing live output only while the reader is pinned to the bottom', 
   metrics(2100, 500)
   act(resize)
   expect(box.scrollTop).toBe(600)
+})
+
+it('keeps a newly sent message in view as the outbox grows', async () => {
+  const { view, box, transcript, scrollTo } = mount(vi.fn(async () => {}))
+  Object.defineProperty(box, 'clientHeight', { configurable: true, value: 500 })
+  Object.defineProperty(box, 'scrollHeight', {
+    configurable: true,
+    get: () => transcript.querySelector('.cc-queued') ? 1800 : 1500,
+  })
+  scrollTo(1000)
+  fireEvent.change(view.getByPlaceholderText('说点什么'), { target: { value: 'Review notes' } })
+  fireEvent.click(view.getByRole('button', { name: /^发送$/ }))
+  await waitFor(() => expect(transcript.querySelector('.cc-queued')).toBeTruthy())
+  expect(box.scrollTop).toBe(1800)
 })

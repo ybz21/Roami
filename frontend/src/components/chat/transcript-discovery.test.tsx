@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { useTranscript } from './useTranscript'
+import { hasNativeFinal, useTranscript } from './useTranscript'
 
 const state = vi.hoisted(() => ({ api: vi.fn() }))
 vi.mock('../../api', () => ({ api: (...args: unknown[]) => state.api(...args) }))
@@ -118,4 +118,15 @@ it('retains loaded history and retries the same older cursor after a failure', a
   expect(state.api.mock.calls[2][1]).toBe(state.api.mock.calls[1][1])
   expect(hook.result.current.err).toBe('')
   expect(hook.result.current.msgs.map(m => m.id)).toEqual(['older', 'latest'])
+})
+
+it('only replaces live output once the current turn has a native final reply', () => {
+  const startedMs = Date.parse('2026-11-20T09:00:00Z')
+  const old = { ...message('old'), final: true, ts: '2026-11-20T08:59:59Z' }
+  const interim = { ...message('interim'), ts: '2026-11-20T09:00:01Z' }
+  expect(hasNativeFinal([old], startedMs)).toBe(false)
+  expect(hasNativeFinal([old, interim], startedMs)).toBe(false)
+  const final = { ...interim, final: true }
+  expect(hasNativeFinal([old, final])).toBe(false)
+  expect(hasNativeFinal([old, final], startedMs)).toBe(true)
 })
