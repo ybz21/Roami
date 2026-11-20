@@ -47,6 +47,27 @@ const sampleRows = "$0\t1785233330\t2026-0728-1808-0000\t我的会话\n" +
 // 写死会让 CI（UTC）与开发机（+08）对不上。
 var legacyID = id.ForSession(sampleCreated, "$2")
 
+func TestLastWindowActivity(t *testing.T) {
+	const created = 100
+	cases := []struct {
+		name  string
+		times string
+		want  int64
+	}{
+		{name: "empty", times: "", want: created},
+		{name: "invalid fields", times: "unknown 125ms 9223372036854775808", want: created},
+		{name: "older than creation", times: "70 90 80", want: created},
+		{name: "latest valid time", times: "120 unknown 150 130 ", want: 150},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := LastWindowActivity(created, tc.times); got != tc.want {
+				t.Errorf("LastWindowActivity(%d, %q) = %d, want %d", created, tc.times, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSessionRowsParsesLabels(t *testing.T) {
 	rows := fakeTmux(t, sampleRows).SessionRows()
 	if len(rows) != 3 {

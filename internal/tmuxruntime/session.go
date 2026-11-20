@@ -372,9 +372,9 @@ type SessionState struct {
 const WindowActivityTimesFormat = "#{W:#{window_activity} }"
 
 // LastWindowActivity uses pane output because attaching and focusing a client also bump session_activity.
-func LastWindowActivity(created int64, windows string) int64 {
+func LastWindowActivity(created int64, windowActivityTimes string) int64 {
 	latest := created
-	for _, field := range strings.Fields(windows) {
+	for _, field := range strings.Fields(windowActivityTimes) {
 		if activity, err := strconv.ParseInt(field, 10, 64); err == nil && activity > latest {
 			latest = activity
 		}
