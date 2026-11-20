@@ -423,6 +423,8 @@ class Runtime:
 
     async def _run_turn(self, turn, *args, **kwargs):
         loop = await self.main_executions.loop_for(self.loop, turn)
+        if loop is not self.loop and turn.get("trigger_kind") == "continuation":
+            turn = {**turn, "native_project_main": True}
         if self.improvement is None or not self.improvement.ledger.path.exists():
             return await loop.run(turn, *args, **kwargs)
 
