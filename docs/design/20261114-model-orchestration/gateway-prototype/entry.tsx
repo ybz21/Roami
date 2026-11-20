@@ -15,6 +15,7 @@ import '../../../../frontend/src/index.css'
 import '../../../../frontend/src/mobile-material.css'
 import './styles.css'
 import './routing-workbench.css'
+import './pool-strategy-observation.css'
 
 const paths: Record<string, string> = { overview: 'usage', monitoring: 'monitor' }
 const route = () => location.hash.slice(1)
@@ -93,7 +94,7 @@ function Prototype() {
     </div>}
     {!account && page.startsWith('catalog/source/workbuddy') && <div className="model-prototype-scenarios"><a href="#/catalog/workbuddy-account">{zh ? '查看 WorkBuddy 签到方案' : 'Preview WorkBuddy check-in'}</a></div>}
     <main className="model-prototype-main">
-      <div className="model-prototype-workspace" hidden={!workbench}><RoutingWorkbench /></div>
+      <div className="model-prototype-workspace" hidden={!workbench}><RoutingWorkbench showStrategy={workbench && params.get('view') === 'strategy'} /></div>
       {account && <WorkBuddyDemo zh={zh} claimed={claimed} claim={() => setClaimed(true)} />}
       <div className="model-prototype-workspace" hidden={account || workbench}><ModelHub sub={account || workbench ? 'catalog' : tab + detail} onNav={path => {
         const next = path.slice('capabilities/models/'.length)

@@ -5,6 +5,7 @@ import { ChevronRight } from '../../../../frontend/src/icons'
 import { candidateIdentity } from '../../../../frontend/src/components/capabilities/routing-preview'
 import type { RequestOutcome } from '../../../../frontend/src/components/capabilities/gateway-request-api'
 import { readWorkbench } from './fixture'
+import { PoolStrategyObservation } from './PoolStrategyObservation'
 
 const failed = ['blocked', 'exhausted', 'interrupted', 'failed']
 const outcomeGroups = ['success', 'recovered', 'failed'] as const
@@ -15,7 +16,7 @@ const pages = [
   ['monitor', '#/monitor/requests'], ['audit', '#/audit'], ['gateway', '#directory'], ['speech', '#/speech'],
 ]
 
-export function RoutingWorkbench() {
+export function RoutingWorkbench({ showStrategy = false }: { showStrategy?: boolean }) {
   const { t, locale } = useI18n()
   const { phone } = useLayout()
   const zh = locale === 'zh-CN'
@@ -24,7 +25,8 @@ export function RoutingWorkbench() {
   const [group, setGroup] = useState<Group | ''>('')
   const [chosen, setChosen] = useState('')
   const pathHeading = useRef<HTMLHeadingElement>(null)
-  const { pools, pool, poolRoute, requests, sources, traces } = readWorkbench(poolId, hours)
+  const data = readWorkbench(poolId, hours)
+  const { pools, pool, poolRoute, requests, sources, traces } = data
   const sourceName = (id: string) => sources.find(source => source.id === id)?.name || t('gatewayTrace.sourceRemoved')
   const sourceLink = (id: string) => '#/catalog/source/' + encodeURIComponent(id) + '?from=workbench'
   const editPoolLink = pool && '#/aggregate/' + encodeURIComponent(pool.id) + '?from=workbench'
@@ -88,6 +90,7 @@ export function RoutingWorkbench() {
             <span>{member.restUntil ? (zh ? '冷却至 ' : 'Cooling down until ') + clock.format(member.restUntil) : t('pool.unchecked')}</span></li>)}</ul>
         </details>}
         <a className="routing-workbench-more" href="#/monitor/sources">{zh ? '对比来源表现' : 'Compare model sources'}<ChevronRight /></a>
+        <a className="routing-workbench-more pool-strategy-jump" href="#/workbench?view=strategy">{zh ? '策略与承载观测' : 'Strategy & member activity'}<ChevronRight /></a>
       </section>
 
       <section className="routing-workbench-requests" aria-labelledby="workbench-requests">
@@ -153,6 +156,7 @@ export function RoutingWorkbench() {
         </> : <p className="routing-workbench-empty">{t('gatewayTrace.empty')}</p>}
       </section>
     </div>}
+    {pool && <PoolStrategyObservation key={pool.id} data={data} focus={showStrategy} hours={hours} />}
     <nav className="routing-workbench-nav" aria-label={zh ? '模型管理页面' : 'Model management pages'}>
       {pages.map(([key, link]) => <a key={key} href={link}>{t('hub.tab.' + key)}<ChevronRight /></a>)}
     </nav>

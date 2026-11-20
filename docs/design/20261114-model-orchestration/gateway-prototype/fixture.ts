@@ -23,7 +23,7 @@ let revision = 1
 let catalog: ModelCatalog = {
   revision: 'demo-1', sources: origins, baseUrl: 'http://127.0.0.1:41155', drafts: [], uses: { free: ['Roami'] },
   models: [
-    { id: 'free', name: 'free', aggregate: true, enabled: true, protocol, strategy: 'order', onLimit: true, onExhausted: true, cooldownSeconds: 60, candidates: configured.slice(0, 3).map(([sourceId, model]) => ({ sourceId, model })) },
+    { id: 'free', name: 'free', aggregate: true, enabled: true, protocol, strategy: 'order', onLimit: true, onExhausted: true, cooldownSeconds: 60, weights: { 'openrouter/ernie-flash:free': 3, 'workbuddy/hy4-flash': 1 }, candidates: configured.slice(0, 3).map(([sourceId, model]) => ({ sourceId, model })) },
     { id: 'vision', name: 'Vision fallback', aggregate: true, enabled: true, protocol, strategy: 'smart', candidates: [{ sourceId: 'demo-api', model: 'vision-pro' }] },
     ...configured.map(([sourceId, model, id]) => ({ id, name: model, protocol, strategy: 'fixed' as const, enabled: true, candidates: [{ sourceId, model }] })),
   ],

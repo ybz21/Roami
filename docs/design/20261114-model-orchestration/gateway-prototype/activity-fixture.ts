@@ -18,12 +18,12 @@ const origins = [
   { sourceId: 'workbuddy', model: 'hy4-flash' },
 ]
 const attemptError: Record<number, string> = { 429: 'MODEL_UPSTREAM_RATE_LIMITED', 402: 'MODEL_UPSTREAM_QUOTA_EXHAUSTED' }
-const makeTrace = (key: keyof typeof traceCases, offset: number, suffix = '') => {
+const makeTrace = (key: keyof typeof traceCases, offset: number, suffix = '', members = origins) => {
   const entry = traceCases[key]
   const requestId = key + suffix
   const at = now - offset * minute
   const attempts = entry.attempts.map((status, index) => ({
-    attempt: index + 1, ...origins[index], status, at: at + index * 850,
+    attempt: index + 1, ...members[index], status, at: at + index * 850,
     success: status === 200 && key !== 'stream', error: attemptError[status] || (key === 'stream' ? traceCases.stream.error : undefined),
   }))
   const last = attempts[attempts.length - 1]
@@ -31,7 +31,7 @@ const makeTrace = (key: keyof typeof traceCases, offset: number, suffix = '') =>
     requestId, at, routeId: 'free', model: 'free', caller: key === 'blocked' ? 'claude' : 'roami',
     outcome: entry.outcome, sourceId: last?.sourceId || '', upstreamModel: last?.model,
     status: entry.status, durationMs: attempts.length ? 1100 + attempts.length * 570 : 8,
-    attempts: attempts.length, switch: attempts.length > 1 ? 'source' : undefined,
+    attempts: attempts.length, switch: attempts.length > 1 ? (attempts[0].sourceId === last?.sourceId ? 'model' : 'source') : undefined,
     error: 'error' in entry ? entry.error : undefined, blocks: 'blocks' in entry ? entry.blocks : undefined,
     revision: 'demo-1',
   }
@@ -39,6 +39,7 @@ const makeTrace = (key: keyof typeof traceCases, offset: number, suffix = '') =>
 }
 export const traces = [
   makeTrace('fallback', 3), makeTrace('blocked', 9), makeTrace('exhausted', 16), makeTrace('stream', 27), makeTrace('success', 41),
+  makeTrace('fallback', 52, '-same-source', [origins[1], { sourceId: 'workbuddy', model: 'deepseek-flash' }]),
   ...Array.from({ length: 18 }, (_, i) => makeTrace(i % 5 === 0 ? 'fallback' : i % 4 === 0 ? 'exhausted' : 'success', 65 + i * 75, '-' + i)),
 ]
 const requestTotals = (rows: GatewayRequest[]): RequestTotals => ({
@@ -46,7 +47,7 @@ const requestTotals = (rows: GatewayRequest[]): RequestTotals => ({
   failed: rows.filter(row => ['blocked', 'exhausted', 'interrupted', 'failed'].includes(row.outcome)).length,
   recovered: rows.filter(row => row.outcome === 'recovered').length,
   uncertain: 0,
-  sameSource: 0,
+  sameSource: rows.filter(row => row.switch === 'model').length,
   crossSource: rows.filter(row => row.switch === 'source').length,
 })
 export const requestObservation = {
@@ -79,7 +80,8 @@ export function requestMonitor(query: URLSearchParams) {
   }
 }
 
-const events: MonitorEvent[] = traces.flatMap(row => row.attempts).map((row, index) => ({
+type PoolEvent = MonitorEvent & { requestId?: string }
+const events: PoolEvent[] = traces.flatMap(({ request, attempts }) => attempts.map(attempt => ({ ...attempt, requestId: request.requestId }))).map((row, index) => ({
   ...row, sequence: index + 1, error: row.error || '', durationMs: 1150 + index * 30,
   firstTokenMs: row.success ? 260 + index * 20 : null, tokensPerSecond: row.success ? 57 + index : null,
   quality: '',
@@ -95,6 +97,11 @@ function sourceTotals(rows: typeof events) {
   const time = success.map(row => row.firstTokenMs || 0).sort((a, b) => a - b)
   const speed = success.map(row => row.tokensPerSecond || 0).sort((a, b) => a - b)
   return { requests: rows.length, failed: rows.length - success.length, success: rows.length ? success.length / rows.length : null, firstTokenP95: time[Math.ceil(time.length * .95) - 1] ?? null, outputP50: speed[Math.floor(speed.length / 2)] ?? null, quality: graded.length ? graded.filter(row => row.quality === 'pass').length / graded.length : null, graded: graded.length }
+}
+export function poolMemberMetrics(ids: ReadonlySet<string>, sourceId: string, model: string) {
+  const rows = events.filter(row => row.requestId && ids.has(row.requestId) && row.sourceId === sourceId && row.model === model)
+  const totals = sourceTotals(rows)
+  return { attempts: totals.requests, successes: totals.requests - totals.failed, firstTokenP95: totals.firstTokenP95, outputP50: totals.outputP50 }
 }
 export function sourceMonitor(query: URLSearchParams) {
   const hours = Number(query.get('hours')) || 24
