@@ -3,41 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Roami 大模型设计</title>
-<link rel="stylesheet" href="assets/model-workspace-design.css">
-<link rel="stylesheet" href="assets/model-design-diagrams.css">
+<title>大模型工作台 · 设计</title>
+<link rel="stylesheet" href="assets/design.css">
 </head>
 <body>
-<header class="page-head"><h1 id="模型源与聚合工作台重构">Roami 大模型设计</h1></header>
+<header class="page-head">
+  <h1>大模型工作台</h1>
+  <span class="spacer"></span>
+</header>
 <div class="workspace">
-<nav class="contents" aria-label="大模型设计导航">
-  <a href="index.html" aria-current="page">专题首页</a>
-<a href="screens/index.html">逐页设计</a>
-<a href="gateway-prototype.html#/workbench">统一原型</a>
-<a href="capability-plan.html">能力规划</a>
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div>
+  <a href="index.html" aria-current="page">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a>
+  <a href="plugins.html">插件与账号</a>
+  <a href="aggregation.html">聚合</a>
+  <a href="gateway.html">本机网关</a>
+  <a href="usage.html">用量</a>
+  <a href="monitor.html">监控</a>
+  <a href="audit.html">审计</a>
+  <a href="agent.html">选模</a>
+  <a href="speech.html">语音</a>
 </nav>
-<main class="document archive">
-<section aria-labelledby="topic-nav">
-  <header class="section-head"><h2 id="topic-nav">大模型工作台</h2><a class="page-reference" href="latest-design.html">最新图解</a></header>
-  <ul class="scenario-diagram">
-      <li><a href="screens/index.html"><strong>逐页界面</strong><small>十个独立页面，均有桌面和手机设计</small></a></li>
-      <li><a href="gateway-prototype.html#/workbench"><strong>统一交互原型</strong><small>从调度工作台进入配置、监控和审计</small></a></li>
-      <li><a href="capability-plan.html"><strong>功能与能力规划</strong><small>页面操作、网关能力和实施顺序</small></a></li>
-      <li><a href="model-monitoring-and-aggregation.html"><strong>当前设计汇编</strong><small>按功能查看设计与跨页流程</small></a></li>
+<main class="doc">
+<section>
+  <h2>一个地方接模型、组调用、查一次请求</h2>
+  <p class="lead">模型工作台是能力页里的一组页面，给在本机节点上接供应商、把多个模型组成一个稳定调用名、再排查调用结果的人用。桌面和手机走同一套页面，手机把详情做成全屏子页。</p>
+  <ol class="flow">
+    <li><strong>1 接入</strong><span>连接供应商或插件账号，只启用要用的模型。</span></li>
+    <li><strong>2 发布</strong><span>把启用的模型组成聚合，得到一个稳定调用名。</span></li>
+    <li><strong>3 使用</strong><span>会话、委派和外部程序都用这个调用名。</span></li>
+    <li><strong>4 排查</strong><span>一次请求的终态、尝试和费用在同一条记录里。</span></li>
+  </ol>
+</section>
+<section>
+  <h2>页面</h2>
+  <ul class="cards">
+    <li><a href="sources.html"><strong>模型源</strong><small>连接供应商，发现模型，决定启用哪些。入口就是现有的「模型源」页。</small></a></li>
+    <li><a href="plugins.html"><strong>插件与账号</strong><small>安装社区插件、给供应商建账号并授权。从模型源的「插件」入口进入。</small></a></li>
+    <li><a href="aggregation.html"><strong>聚合</strong><small>选成员、定顺位和策略，发布成一个调用名，并看到它实际怎么被调用。</small></a></li>
+    <li><a href="gateway.html"><strong>本机网关</strong><small>看当前可调用的模型，复制调用名和接入示例，管理访问密钥。</small></a></li>
+    <li><a href="usage.html"><strong>用量</strong><small>按日期看消耗和费用，按来源、模型、智能体下钻，设置每日限额。</small></a></li>
+    <li><a href="monitor.html"><strong>监控</strong><small>看请求趋势、失败原因和来源健康。</small></a></li>
+    <li><a href="audit.html"><strong>审计</strong><small>分页查看请求，展开尝试时间线和费用。</small></a></li>
+    <li><a href="agent.html"><strong>选模</strong><small>新建会话和委派时选 Auto、固定模型或仅免费，并看到实际命中了谁。</small></a></li>
+    <li><a href="speech.html"><strong>语音</strong><small>选转写服务，录一段确认能识别。和聊天模型的能力无关。</small></a></li>
   </ul>
 </section>
-<section aria-labelledby="topic-reference">
-  <header class="section-head"><h2 id="topic-reference">设计资料</h2></header>
-  <nav class="gateway-jump" aria-label="专题设计资料">
-    <a href="model-gateway.html">网关三层设计</a>
-    <a href="gateway-design.html">网关技术说明</a>
-    <a href="interaction-design.html">页面交互细则</a>
-    <a href="PRODUCT.html">产品目标</a>
-    <a href="DESIGN.html">视觉规范</a>
-    <a href="MASTER.html">设计约定</a>
-    <a href="gateway-implementation.html">网关实现与验收</a>
-    <a href="interaction-implementation.html">页面实现与验收</a>
-  </nav>
+<section>
+  <h2>这版定下来的事</h2>
+  <dl class="decisions">
+    <dt>导航保持现状</dt>
+    <dd>能力页顶部和模型区左侧的页签不动。本设计只重做各页内部。</dd>
+    <dt>监控和审计各自成页</dt>
+    <dd>在监控选定时段和结果后直接打开审计。审计按页查看单次请求，返回恢复筛选和选中的记录。</dd>
+    <dt>名字和调用名分开</dt>
+    <dd>列表一律用展示名。调用名只在网关、接入示例和选模时出现，并且可以复制。重命名保留旧调用名作为别名。</dd>
+    <dt>状态只写查得到的</dt>
+    <dd>可用、冷却、未检测、价格未知各自成文案。检测没跑过不显示成失败，价格没配不显示成 0。</dd>
+    <dt>一次请求一条记录</dt>
+    <dd>发出前被拒、候选试完仍失败、中途切换后成功、已输出内容后中断，是四种不同终态。前两种现在都返回同一个 503，记录里要能分开。</dd>
+    <dt>草稿和生效分开</dt>
+    <dd>聚合改了没保存时，运行中的请求继续用已生效的顺位。页面上两套顺位同时可见。</dd>
+  </dl>
+</section>
+<section>
+  <h2>不变的约束</h2>
+  <dl class="decisions">
+    <dt>目录只收录已启用的模型</dt>
+    <dd>供应商发现出来但没启用的模型不进网关、不进选模。移除一个模型不连带删除引用它的聚合，而是把该成员标成失效并给处理入口。</dd>
+    <dt>配额在网关</dt>
+    <dd>准入、切换和记账由 Go 网关决定。智能体运行时只记录用量和传递网关的结论，不另设限额。</dd>
+    <dt>密钥分两种</dt>
+    <dd>供应商凭据只供网关访问上游。发给外部程序的是网关访问密钥，它不能读配置和审计。</dd>
+    <dt>视觉沿用现有规范</dt>
+    <dd>颜色、字号、圆角、间距用 <code>docs/development/ui-design-system.md</code> 的令牌。页面底色 <code>--bg-base</code>，相邻区域靠一条分隔线而不是套卡片。</dd>
+  </dl>
 </section>
 </main>
 </div>

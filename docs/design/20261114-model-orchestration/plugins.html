@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>插件与账号 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>插件与账号</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a><a href="plugins.html" aria-current="page">插件与账号</a><a href="aggregation.html">聚合</a><a href="gateway.html">本机网关</a><a href="usage.html">用量</a><a href="monitor.html">监控</a><a href="audit.html">审计</a><a href="agent.html">选模</a><a href="speech.html">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>先装插件，再给供应商建账号</h2>
+  <p class="lead">从模型源的「新建来源 → 插件」进入。左边是社区目录，右边是选中插件的版本和账号。账号授权完成后回到<a href="sources.html">模型源</a>启用模型。</p>
+  <div class="board">
+  <figure>
+    <figcaption>桌面</figcaption>
+    <div class="app">
+      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
+        <div class="app-main">
+          <div class="toolbar"><span class="btn quiet">← 模型源</span><h2>插件</h2><span class="search">搜索插件</span><span class="seg"><span class="on">全部</span><span>已安装</span><span>可更新</span></span><span class="grow"></span><span class="chip">目录更新于 14:05</span></div>
+          <div class="split" style="grid-template-columns:300px minmax(0,1fr)">
+            <ul class="rows">
+              <li class="on"><div><strong>WorkBuddy</strong><small>已安装 · 3 个供应商</small></div><span class="st ok">最新</span></li>
+              <li><div><strong>硅基流动</strong><small>未安装</small></div><span class="st">可安装</span></li>
+              <li><div><strong>DeepSeek 账号</strong><small>已安装 · 有新版本</small></div><span class="st warn">可更新</span></li>
+            </ul>
+            <div class="pane">
+              <h3>WorkBuddy</h3>
+              <dl class="facts">
+                <div><dt>正在使用</dt><dd>1.4.2</dd></div>
+                <div><dt>目录中的版本</dt><dd>1.4.2</dd></div>
+                <div><dt>账号</dt><dd>2<em> 个已授权</em></dd></div>
+              </dl>
+              <table class="grid">
+                <thead><tr><th>供应商</th><th>账号</th><th>授权</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td>国内</td><td>主账号</td><td><span class="st ok">有效</span><small>最近成功 14:32</small></td><td><span class="btn quiet">重新授权</span></td></tr>
+                  <tr><td>国内</td><td>备用</td><td><span class="st warn">已过期</span></td><td><span class="btn quiet">重新授权</span></td></tr>
+                </tbody>
+              </table>
+              <div style="margin-top:var(--sp-3)"><span class="btn">添加账号</span> <span class="btn quiet">从文件导入</span></div>
+              <div class="callout"><strong>积分与签到只在插件声明支持时出现</strong><p>WorkBuddy 声明了这两项，所以主账号下显示余额 1,280、每日重置 00:00，以及一次手动签到。</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  <figure>
+    <figcaption>手机 · 插件详情</figcaption>
+    <div class="phone">
+      <header><svg class="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><strong>WorkBuddy</strong></header>
+      <div class="block"><h3>版本</h3><strong>1.4.2 · 已是最新</strong></div>
+      <ul class="rows">
+        <li><div><strong>主账号</strong><small>国内 · 最近成功 14:32</small></div><span class="st ok">有效</span></li>
+        <li><div><strong>备用</strong><small>国内</small></div><span class="st warn">已过期</span></li>
+      </ul>
+      <div class="block"><span class="btn primary">添加账号</span></div>
+      <footer><span>首页</span><span class="on">模型</span><span>工具</span><span>设置</span></footer>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>行为</h2>
+  <dl class="decisions">
+    <dt>目录读不到时用缓存</dt>
+    <dd>顶部标明目录的读取时间。读取失败时继续展示上次的目录，并给出重试，不把列表清空。</dd>
+    <dt>更新先下载校验再替换</dt>
+    <dd>应用前列出受影响的账号。校验失败或应用失败都保留正在使用的版本，账号不需要重新授权。</dd>
+    <dt>授权和启用是两页的事</dt>
+    <dd>这里只负责账号授权。授权完成回到模型源，由用户决定启用哪些模型。</dd>
+    <dt>解绑前检查引用</dt>
+    <dd>账号被某个来源使用时不能直接删除，先列出使用它的来源。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>

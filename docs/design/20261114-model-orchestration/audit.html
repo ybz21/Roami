@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN" class="trace-layout">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>审计 · Roami 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+<link rel="stylesheet" href="assets/observation.css">
+<script defer src="assets/observation.js"></script>
+</head>
+<body data-view="audit">
+<header class="page-head trace-header">
+  <a class="trace-back trace-home trace-icon" href="index.html" aria-label="返回大模型工作台"><span aria-hidden="true"></span></a>
+  <a class="crumb trace-home" href="index.html">大模型工作台</a>
+  <h1 id="page-title">审计</h1>
+  <span class="spacer"></span>
+  <span class="trace-sample">模拟数据</span>
+  <a id="peer" class="trace-action" href="monitor.html">监控</a>
+</header>
+<div class="workspace trace-workspace">
+  <nav class="side" aria-label="大模型页面">
+    <a href="index.html">设计首页</a>
+    <a href="sources.html">模型源</a>
+    <a href="plugins.html">插件与账号</a>
+    <a href="aggregation.html">聚合</a>
+    <a href="gateway.html">本机网关</a>
+    <a href="usage.html">用量</a>
+    <a href="monitor.html">监控</a>
+    <a href="audit.html" aria-current="page">审计</a>
+    <a href="agent.html">选模</a>
+    <a href="speech.html">语音</a>
+  </nav>
+  <main class="trace-content" id="trace-content">
+
+    <div class="trace-audit" id="audit-workspace">
+      <section class="trace-audit-list" id="audit-list" aria-labelledby="audit-heading">
+        <div class="trace-heading">
+          <div><h2 id="audit-heading" tabindex="-1">请求记录</h2><p>11 月 20 日 · 节点时区 UTC+8</p></div>
+          <a class="trace-action" id="return-monitor" href="monitor.html" hidden>返回监控</a>
+        </div>
+        <form class="trace-filters" aria-label="审计筛选">
+
+    <label>时间范围<select id="window" name="window"><option value="30">过去 30 分钟</option><option value="60">过去 60 分钟</option></select></label>
+    <label>调用入口<select id="pool" name="pool"><option value="">全部入口</option><option value="coding">日常编码</option><option value="okr">OKR 工作流</option><option value="direct">原生直调</option></select></label>
+    <label>上游来源<select id="source" name="source"><option value="">全部来源</option><option value="workbuddy">WorkBuddy</option><option value="openrouter">OpenRouter</option><option value="lan">本机 Qwen</option></select></label>
+          <label>请求结果<select id="result" name="result"><option value="">全部结果</option><option value="success">直接成功</option><option value="recovered">切换后恢复</option><option value="failed">最终失败</option><option value="rejected">准入拒绝</option><option value="exhausted">候选用尽</option><option value="interrupted">输出中断</option></select></label>
+          <label class="trace-search">搜索名称<input type="search" name="q" id="q" placeholder="调用入口、来源或命中模型"></label>
+        </form>
+        <div class="trace-context" id="audit-context" hidden></div>
+        <div class="trace-list" id="request-list" aria-live="polite"></div>
+        <div class="trace-pagination" id="pagination" hidden></div>
+        <details class="trace-notes">
+          <summary>交互与记录口径</summary>
+          <ul>
+            <li>打开单次请求后，桌面在右侧查看，手机全屏。返回恢复该页、滚动位置和原请求焦点。</li>
+            <li>切换筛选回到第一页。发出前被拒与候选用尽依实际的上游尝试区分。</li>
+            <li>技术关联号放在详情里的折叠区。列表只显示时间、调用、终态和费用。</li>
+          </ul>
+        </details>
+      </section>
+      <aside class="trace-detail" id="request-detail" aria-label="请求详情" hidden></aside>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

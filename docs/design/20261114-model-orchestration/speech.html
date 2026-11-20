@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>语音 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>语音</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a><a href="plugins.html">插件与账号</a><a href="aggregation.html">聚合</a><a href="gateway.html">本机网关</a><a href="usage.html">用量</a><a href="monitor.html">监控</a><a href="audit.html">审计</a><a href="agent.html">选模</a><a href="speech.html" aria-current="page">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>选一个转写服务，录一段验证</h2>
+  <p class="lead">语音转写和聊天模型是两套配置。这里的「启用」不影响模型目录里谁支持音频输入。</p>
+  <div class="board">
+  <figure>
+    <figcaption>桌面</figcaption>
+    <div class="app">
+      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
+        <div class="app-main">
+          <div class="toolbar"><h2>语音输入</h2><span class="select">火山引擎</span><span class="st ok">可用</span><span class="grow"></span><span class="btn primary">保存</span></div>
+          <div class="split" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+            <div class="pane">
+              <h3>配置</h3>
+              <table class="grid">
+                <tbody>
+                  <tr><td>接口密钥</td><td><code>· · · ·</code> <span class="btn quiet">修改</span></td></tr>
+                  <tr><td>识别模式</td><td>标准版<small>当前应用只开通了标准版</small></td></tr>
+                </tbody>
+              </table>
+              <p class="lead">换服务后只显示该服务需要的字段。没保存的内容在离开页面前保留。</p>
+            </div>
+            <div class="pane">
+              <h3>试一试</h3>
+              <div class="callout ok"><strong>识别结果</strong><p>把模型源的定价改成按次计费。</p></div>
+              <span class="btn">重新录一段</span>
+              <p class="lead">录音、转写、结果在同一块区域。失败时区分是浏览器没给麦克风权限、网络不通，还是识别服务返回了错误。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  <figure>
+    <figcaption>手机</figcaption>
+    <div class="phone">
+      <header><strong>语音输入</strong></header>
+      <div class="block"><h3>服务</h3><strong>火山引擎 · 可用</strong></div>
+      <div class="block"><h3>试一试</h3><span class="btn primary">按住录音</span><p class="lead">结果直接出现在按钮下面。</p></div>
+      <footer><span>首页</span><span class="on">模型</span><span>工具</span><span>设置</span></footer>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>行为</h2>
+  <dl class="decisions">
+    <dt>字段跟着服务走</dt>
+    <dd>选 OpenAI 显示地址、密钥、模型名和语言；选火山引擎显示它自己的密钥和识别模式。不相关的字段不出现。</dd>
+    <dt>错误指向下一步</dt>
+    <dd>没有麦克风权限时给出回到浏览器权限设置的说明；密钥错误指向配置；配额用尽写明是识别服务的配额，不和聊天模型的限额混在一起。</dd>
+    <dt>凭据不回显</dt>
+    <dd>已保存的密钥显示为占位，修改时单独输入。试录的音频不保留。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>
