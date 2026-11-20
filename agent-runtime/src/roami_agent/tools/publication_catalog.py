@@ -11,9 +11,18 @@ from roami_agent.tools.publication_media_catalog import register_publication_med
 
 
 def register_publication_tools(
-    registry, database, artifacts, reviewer, media=None, *, native_review_input=None
+    registry,
+    database,
+    artifacts,
+    reviewer,
+    media=None,
+    *,
+    native_review_input=None,
+    native_artifact_view=None,
 ):
-    register_publication_media_tools(registry, database, artifacts, media)
+    register_publication_media_tools(
+        registry, database, artifacts, media, native_artifact_view=native_artifact_view
+    )
 
     async def prepare(args, binding):
         scope = {

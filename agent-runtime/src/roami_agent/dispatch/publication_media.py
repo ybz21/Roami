@@ -21,7 +21,7 @@ class PublicationMedia:
         self.db, self.artifacts, self.decoder = database, artifacts, decoder
         self.transcriber = transcriber
 
-    async def image(self, binding, version_id, artifact_id):
+    async def image(self, binding, version_id, artifact_id, *, native_artifact_view=None):
         await self.db.call(lambda db: current_version(db, binding, version_id))
         artifact = await self.db.call(
             lambda db: media_tool_artifact(
@@ -33,7 +33,11 @@ class PublicationMedia:
         source = json.loads(artifact["metadata_json"])["mediaSource"]
         if source["versionId"] != version_id:
             raise DomainError("PUBLICATION_MEDIA_IMAGE_UNAVAILABLE", 409)
-        await self.artifacts.verified_path(binding["owner"], artifact_id)
+        native_path = None
+        if native_artifact_view is not None and binding.get("nativeCapabilityCall"):
+            native_path = await native_artifact_view(binding, artifact_id)
+        else:
+            await self.artifacts.verified_path(binding["owner"], artifact_id)
         await self.db.call(lambda db: current_version(db, binding, version_id))
         return {
             "mediaImage": {
@@ -43,6 +47,7 @@ class PublicationMedia:
                 "sourceArtifactId": source["artifactId"],
                 "sourceSha256": source["sha256"],
             },
+            **({"nativeReadPath": native_path} if native_path else {}),
             "publicationAuthorized": False,
         }
 

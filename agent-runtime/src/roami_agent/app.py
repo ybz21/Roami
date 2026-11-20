@@ -286,6 +286,9 @@ class Runtime:
             self.artifacts,
             lambda: self.reply_review,
             native_review_input=lambda binding: self.main_capabilities.capability_input(binding),
+            native_artifact_view=lambda binding, artifact: self.main_capabilities.artifact_view(
+                binding, artifact
+            ),
         )
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
@@ -410,6 +413,15 @@ class Runtime:
         return configured_provider(settings, actual)
 
     async def run_turn(self, turn, *args, **kwargs):
+        try:
+            return await self._run_turn(turn, *args, **kwargs)
+        finally:
+            try:
+                self.main_capabilities.artifact_views.release(turn["id"], turn.get("lease_epoch"))
+            except OSError:
+                log.exception("Native artifact view cleanup failed")
+
+    async def _run_turn(self, turn, *args, **kwargs):
         loop = await self.main_executions.loop_for(self.loop, turn)
         if self.improvement is None or not self.improvement.ledger.path.exists():
             return await loop.run(turn, *args, **kwargs)
@@ -442,6 +454,10 @@ class Runtime:
         self.mcp.start()
         await self.mcp.refresh()
         await self.professional_capabilities.recover()
+        try:
+            self.main_capabilities.artifact_views.recover()
+        except (DomainError, OSError):
+            log.exception("Native artifact view recovery failed")
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
@@ -641,6 +657,10 @@ class Runtime:
         await asyncio.gather(*running, return_exceptions=True)
         await self.native_sessions.flush()
         await self.main_capabilities.close()
+        try:
+            self.main_capabilities.artifact_views.close()
+        except OSError:
+            log.exception("Native artifact view cleanup failed")
         await self.professional_capabilities.close()
         await self.capability_markets.close()
         await self.mcp.close()

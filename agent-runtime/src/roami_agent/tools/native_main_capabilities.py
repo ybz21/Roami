@@ -14,11 +14,16 @@ from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import event, row
+from roami_agent.storage.native_artifact_views import NativeArtifactViews
 from roami_agent.storage.transcript_repository import message
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
 
 
 class NativeMainCapabilities(ProfessionalCapabilities):
+    def __init__(self, runtime):
+        super().__init__(runtime)
+        self.artifact_views = NativeArtifactViews(self.db.data_root)
+
     @staticmethod
     def admitted(db, context, owner):
         turn = row(
@@ -95,11 +100,11 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             "checkpoint requires failedToolCallId. "
             "The context is private and expires when this turn stops or its lease/provider changes. "
             "Do not export it, invent task/run IDs, use human swarm say to impersonate Main, or "
-            "bypass the registered verification and publication rules. Return your final answer "
+            "bypass the registered verification and authorization rules. Return your final answer "
             "normally; the host owns final reply delivery, so do not call reply here.\n"
         )
 
-    async def capability_input(self, binding):
+    def admitted_capability(self, db, binding):
         native = binding.get("nativeCapabilityCall")
         if native is None:
             raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
@@ -110,27 +115,28 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             "leaseEpoch": binding["leaseEpoch"],
         }
 
-        def admitted_call(db):
-            self.admitted(db, context, binding["owner"])
-            start = row(
-                db,
-                "SELECT 1 FROM events WHERE event_key=? AND kind='capability.started' "
-                "AND turn_id=? AND conversation_id=? AND message_id=? "
-                "AND json_extract(payload_json,'$.name')=? "
-                "AND json_extract(payload_json,'$.requestId')=?",
-                (
-                    "capability:" + binding["toolCallId"] + ":start",
-                    binding["turnId"],
-                    binding["conversation"],
-                    binding["assistantMessageId"],
-                    native["name"],
-                    native["requestId"],
-                ),
-            )
-            if not start:
-                raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
+        self.admitted(db, context, binding["owner"])
+        start = row(
+            db,
+            "SELECT 1 FROM events WHERE event_key=? AND kind='capability.started' "
+            "AND turn_id=? AND conversation_id=? AND message_id=? "
+            "AND json_extract(payload_json,'$.name')=? "
+            "AND json_extract(payload_json,'$.requestId')=?",
+            (
+                "capability:" + binding["toolCallId"] + ":start",
+                binding["turnId"],
+                binding["conversation"],
+                binding["assistantMessageId"],
+                native["name"],
+                native["requestId"],
+            ),
+        )
+        if not start:
+            raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
+        return native
 
-        await self.db.call(admitted_call)
+    async def capability_input(self, binding):
+        native = await self.db.call(lambda db: self.admitted_capability(db, binding))
         try:
             proof = await self.runtime.main_executions.executor.command(
                 "capability-input",
@@ -143,7 +149,7 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             )
         except DomainError as error:
             raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409) from error
-        await self.db.call(admitted_call)
+        await self.db.call(lambda db: self.admitted_capability(db, binding))
         if (
             not isinstance(proof, dict)
             or set(proof) != {"providerId", "promptId", "requestSha256", "capabilities", "images"}
@@ -158,6 +164,17 @@ class NativeMainCapabilities(ProfessionalCapabilities):
         ):
             raise DomainError("NATIVE_CAPABILITY_INPUT_UNCONFIRMED", 409)
         return proof
+
+    async def artifact_view(self, binding, artifact_id):
+        await self.db.call(lambda db: self.admitted_capability(db, binding))
+        reference, blob = await self.runtime.artifacts.verified_path(binding["owner"], artifact_id)
+        await self.db.call(lambda db: self.admitted_capability(db, binding))
+        try:
+            return self.artifact_views.issue(
+                binding["turnId"], binding["leaseEpoch"], reference, blob
+            )
+        except OSError as error:
+            raise DomainError("NATIVE_ARTIFACT_VIEW_UNAVAILABLE", 409) from error
 
     async def invoke(self, name, payload, owner):
         if self.closed:

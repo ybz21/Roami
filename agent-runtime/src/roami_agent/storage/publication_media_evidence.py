@@ -117,7 +117,9 @@ def media_snapshot(db, binding, version_id, required):
     return snapshots
 
 
-def reviewed_media_images(db, binding, version_id, snapshots):
+def reviewed_media_images(db, binding, version_id, snapshots, *, native_input=None):
+    if native_input is not None:
+        return native_media_images(db, binding, version_id, snapshots, native_input["images"])
     manifest = row(
         db,
         "SELECT id,parts_json FROM prompt_manifests WHERE turn_id=? "
@@ -183,3 +185,61 @@ def reviewed_media_images(db, binding, version_id, snapshots):
                 raise DomainError("PUBLICATION_MEDIA_IMAGE_NOT_REVIEWED", 409)
             proof.append(found)
     return proof
+
+
+def native_media_images(db, binding, version_id, snapshots, images):
+    proven = {(image["mime"], image["sha256"]) for image in images}
+    result = []
+    for snapshot in snapshots:
+        for frame in snapshot["images"]:
+            if (frame["mimeType"], frame["sha256"]) not in proven:
+                raise DomainError("PUBLICATION_MEDIA_IMAGE_NOT_REVIEWED", 409)
+            reads = rows(
+                db,
+                "SELECT x.id,m.id AS result_id,native_content(m.content_json) AS body FROM tool_calls x "
+                "JOIN messages m ON m.id=x.result_message_id "
+                "JOIN messages current ON current.id=? AND current.turn_id=x.turn_id "
+                "WHERE x.turn_id=? AND x.tool_name='swarm_publication_media' AND x.state='succeeded' "
+                "AND json_extract(x.arguments_json,'$.operation')='image' "
+                "AND json_extract(x.arguments_json,'$.versionId')=? "
+                "AND json_extract(x.arguments_json,'$.artifactId')=? "
+                "AND m.turn_id=x.turn_id AND m.conversation_id=? AND m.branch_id=current.branch_id "
+                "AND m.role='tool' AND m.status='completed' AND m.deleted_ms IS NULL AND m.seq<current.seq "
+                "AND NOT EXISTS(SELECT 1 FROM context_omissions o WHERE o.owner_id=? AND o.message_id=m.id) "
+                "ORDER BY m.seq DESC",
+                (
+                    binding["assistantMessageId"],
+                    binding["turnId"],
+                    version_id,
+                    frame["id"],
+                    binding["conversation"],
+                    binding["owner"],
+                ),
+            )
+            expected = {
+                "artifactId": frame["id"],
+                "sha256": frame["sha256"],
+                "versionId": version_id,
+                "sourceArtifactId": snapshot["sourceArtifactId"],
+                "sourceSha256": snapshot["sourceSha256"],
+            }
+            for read in reads:
+                try:
+                    body = json.loads(json.loads(read["body"])["text"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if not isinstance(body, dict) or body.get("mediaImage") != expected:
+                    continue
+                result.append(
+                    {
+                        "artifactId": frame["id"],
+                        "sha256": frame["sha256"],
+                        "toolCallId": read["id"],
+                        "resultMessageId": read["result_id"],
+                        "source": "claude_model_input",
+                    }
+                )
+                break
+            else:
+                raise DomainError("PUBLICATION_MEDIA_IMAGE_NOT_REVIEWED", 409)
+    return result
