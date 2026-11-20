@@ -61,12 +61,20 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const url = parseSourceURL(normalizedURL)
   const urlError = !!normalizedURL && !url
   const urlHint = urlError ? 'hub.directory.invalidBaseUrl' : url?.protocol === 'http:' ? 'hub.directory.plainHttp' : ''
+  const connectionOnly = !!existing && draft.editing
   useEffect(() => { request.current?.abort(); request.current = null; setLoading(false); setReadError(''); return () => request.current?.abort() }, [key])
   const patch = (next: Partial<SourceDraft>) => onChange({ ...draft, ...next })
+  const editConnection = () => {
+    request.current?.abort()
+    request.current = null
+    setLoading(false)
+    setReadError('')
+    patch({ editing: true, fetchRequested: false })
+  }
   const updateSource = (next: Partial<ModelSource>) => {
     const updated = { ...source, ...next }
     if (next.baseUrl !== undefined && normalizeURL(next.baseUrl) !== normalizedURL) updated.skipTlsVerification = undefined
-    if (connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, fetchRequested: false }) }
+    if (!connectionOnly && connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, fetchRequested: false }) }
     else patch({ source: updated })
   }
   const openRouter = source.connector === openRouterConnection.connector
@@ -85,10 +93,15 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const changedConnection = !!existing && (connectionKey({ ...existing, apiKey: '' }) !== key || source.name.trim() !== existing.name)
   const overLimit = catalog.models.length - removedCount + additions.length > 1000
   const managing = !existing || !!draft.managing
-  const connectionOnly = !!existing && draft.editing
+  const removesModels = !connectionOnly && removedCount > 0
   const hasKey = !!(source.hasKey || source.apiKey?.trim())
   const canRead = validConnection && (!openRouter || hasKey)
-  const canSave = !sourceConflict && validConnection && (!openRouter || hasKey) && !invalidManual && !overLimit && (connectionOnly ? changedConnection : additions.length > 0 || removedCount > 0) && !busy && !loading
+  const canSave = !sourceConflict && canRead && !busy && !loading && (connectionOnly ? changedConnection : !invalidManual && !overLimit && (additions.length > 0 || removesModels))
+  const cancel = () => {
+    if (!existing) return
+    if (connectionOnly && !sourceConflict) patch({ source: { ...existing, apiKey: '' }, editing: false })
+    else onChange(initialSourceDraft(existing, true))
+  }
   const number = (value: number) => new Intl.NumberFormat(locale).format(value)
   const query = draft.query.trim().toLowerCase()
   const savedNames = new Map<string, string[]>()
@@ -132,11 +145,11 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }
   const submit = () => {
     if (!canSave) return
-    if (connectionOnly || removedCount > 0) setConfirming(true)
+    if (connectionOnly || removesModels) setConfirming(true)
     else void save()
   }
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
-    <Popconfirm danger={removedCount > 0} open={confirming} onOpenChange={setConfirming} title={t(removedCount ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removedCount ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
+    <Popconfirm danger={removesModels} open={confirming} onOpenChange={setConfirming} title={t(removesModels ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removesModels ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
     <div className="tt-model-source-content">
       {authentication && <details className="tt-model-source-authorization" open={initialAuthorizationOpen || undefined}><summary>{t('modelInteraction.authorization')}</summary><div>{authentication}</div></details>}
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
@@ -157,7 +170,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
             {!openRouter && <label className="agent-settings-field">{t('capabilities.models.authMode')}<Select virtual={false} aria-label={t('capabilities.models.authMode')} value={source.authMode} options={['api_key', 'bearer'].map(value => ({ value, label: t('capabilities.models.auth.' + value) }))} onChange={authMode => updateSource({ authMode })} /></label>}
             {url?.protocol === 'https:' && <Checkbox checked={source.skipTlsVerification} onChange={event => updateSource({ skipTlsVerification: event.target.checked })}>{t('hub.directory.skipTlsVerification')}</Checkbox>}
           </div></details>
-        </> : <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy || draft.managing} onClick={() => patch({ editing: true, managing: false })}>{t('hub.directory.changeConnection')}</button></div>}
+        </> : <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy} onClick={editConnection}>{t('hub.directory.changeConnection')}</button></div>}
         {!connectionOnly && <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!canRead || busy} onClick={() => void read()}>{t(openRouter ? 'hub.openRouter.fetch' : existing && !draft.managing ? 'modelInteraction.manageModels' : existing && draft.directory === null ? 'hub.directory.updateModels' : draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{!existing && draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>}
         {readError && <Alert type="warning" role="alert" message={t(readError)} />}
       </section>
@@ -177,9 +190,9 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         <button type="button" className="tt-act" aria-expanded={draft.manualOpen} onClick={() => patch({ manualOpen: !draft.manualOpen })}><PlusIcon />{t('hub.directory.manual')}</button>
         {draft.manualOpen && <label className="agent-settings-field">{t('hub.directory.manualHint')}<Input.TextArea aria-label={t('hub.directory.manual')} rows={4} value={draft.manual} onChange={event => patch({ manual: event.target.value })} />{invalidManual && <span className="tt-model-source-warning" role="alert">{t('hub.directory.invalidManual')}</span>}</label>}
       </section>}
-      {overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
+      {!connectionOnly && overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
             {management}
     </div>
-    {(draft.editing || draft.managing || !existing) && <footer className="tt-model-source-footer"><span role="status">{t(connectionOnly ? 'modelInteraction.connectionScope' : removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing ? 'hub.directory.unchanged' : 'hub.directory.choose', { count: number(additions.length), removed: number(removedCount) })}</span><div className="tt-model-source-footer-actions">{existing && <Button disabled={busy || loading} onClick={() => onChange(initialSourceDraft(existing, true))}>{t('common.cancel')}</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(!connectionOnly && existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : !connectionOnly && additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></div></footer>}
+    {(draft.editing || draft.managing || !existing) && <footer className="tt-model-source-footer"><span role="status">{t(connectionOnly ? 'modelInteraction.connectionScope' : removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing ? 'hub.directory.unchanged' : 'hub.directory.choose', { count: number(additions.length), removed: number(removedCount) })}</span><div className="tt-model-source-footer-actions">{existing && <Button disabled={busy || loading} onClick={cancel}>{t('common.cancel')}</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(!connectionOnly && existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : !connectionOnly && additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></div></footer>}
   </form>
 }

@@ -397,6 +397,52 @@ it('updates an existing source without fetching models and retains its stored ke
   expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
 })
 
+it('opens connection editing after fetching an existing source and keeps model changes out of the connection save', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['priced-model', 'new-model'] } }
+    : original(method, path, body, options))
+  mount('catalog/source/upstream')
+  fireEvent.click(await screen.findByRole('button', { name: 'modelInteraction.manageModels' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'new-model' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'priced-model' }))
+
+  const edit = () => fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
+  const changeAddress = () => fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://updated.example/v1' } })
+  edit()
+  changeAddress()
+  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
+  expect(screen.getByRole('checkbox', { name: 'new-model' }).getAttribute('aria-checked')).toBe('true')
+  expect(screen.getByRole('checkbox', { name: 'priced-model' }).getAttribute('aria-checked')).toBe('false')
+
+  edit()
+  expect((screen.getByLabelText('agent.models.baseUrl') as HTMLInputElement).value).toBe(catalog.sources[0].baseUrl)
+  changeAddress()
+  fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'fixture-replacement' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  fireEvent.click(within(await screen.findByRole('alertdialog', { name: 'hub.sourceApply' })).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: [expect.objectContaining({ id: 'upstream', baseUrl: 'https://updated.example/v1', apiKey: 'fixture-replacement' })],
+    models: catalog.models,
+  })))
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
+})
+
+it('lets new sources change their address after discovering a directory', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['old-directory-model'] } }
+    : original(method, path, body, options))
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://first.example/v1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'old-directory-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
+  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://second.example/v1' } })
+  expect(screen.queryByRole('checkbox', { name: 'old-directory-model' })).toBeNull()
+  expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
 
 it('opens a saved source directory from its card and saves additions and removals without losing other sources', async () => {
   const other = { ...catalog.sources[0], id: 'other', name: 'Other source' }
@@ -581,7 +627,7 @@ it('shows saved source models read-only until management is requested and cancel
  expect(screen.queryByRole('button',{name:'agent.models.save'})).toBeNull()
  fireEvent.click(screen.getByRole('button',{name:'modelInteraction.manageModels'}))
  fireEvent.click(await screen.findByRole('checkbox',{name:'available-model'}))
- expect((screen.getByRole('button',{name:'hub.directory.changeConnection'}) as HTMLButtonElement).disabled).toBe(true)
+ expect((screen.getByRole('button',{name:'hub.directory.changeConnection'}) as HTMLButtonElement).disabled).toBe(false)
  fireEvent.click(screen.getByRole('button',{name:'common.cancel'}))
  expect(screen.queryByRole('checkbox')).toBeNull()
  expect(vi.mocked(api).mock.calls.filter(([method])=>method==='PUT')).toHaveLength(0)
