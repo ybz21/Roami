@@ -27,7 +27,7 @@
     <div class="diagram-lane">
       <h3>调度</h3>
       <ol>
-        <li><a href="./gateway-prototype.html#/aggregate">已生效顺位<small>首选 · 备选 · 跳过</small></a></li>
+        <li><a href="./gateway-prototype.html#/aggregate/free">已生效顺位<small>首选 · 备选 · 跳过</small></a></li>
         <li><a href="./gateway-prototype.html#/troubleshoot?case=fallback">实际尝试<small>来源 · 上游结果</small></a></li>
         <li><a href="./gateway-prototype.html#/audit?demo=gateway&amp;case=fallback">审计终态<small>恢复 · 耗尽 · 中断</small></a></li>
       </ol>
@@ -36,15 +36,15 @@
       <h3>编辑</h3>
       <ol>
         <li><a href="#member-filter">选择候选<small>仅看免费可选</small></a></li>
-        <li><a href="./gateway-prototype.html#/aggregate">拖动草稿<small>蓝色插入线</small></a></li>
-        <li><a href="./gateway-prototype.html#/aggregate">保存并应用<small>刷新生效顺位</small></a></li>
+        <li><a href="./gateway-prototype.html#/aggregate/free">拖动草稿<small>蓝色插入线</small></a></li>
+        <li><a href="./gateway-prototype.html#/aggregate/free">保存并应用<small>刷新生效顺位</small></a></li>
       </ol>
     </div>
   </figure>
   <div class="copy step" id="member-filter">
     <h3>仅看免费模型</h3>
     <p>筛选放在「成员」的候选列表上方，默认关闭，与搜索同时生效。开启后只列出已确认免费的候选。已选成员留在列表上方，仍按保存的成员和顺序参与调度。</p>
-    <a class="page-reference" href="./gateway-prototype.html#/aggregate">试用免费候选筛选</a>
+    <a class="page-reference" href="./gateway-prototype.html#/aggregate/free/members">试用免费候选筛选</a>
     <p>候选与<a href="./model-gateway.html">本机网关目录</a>共用价格依据。保存只提交成员和调度配置。网关读取旧版聚合时忽略残留的免费筛选字段，<code>wb-ds</code> 仍可调度已加入的 DeepSeek。请求显式指定免费和网关记账仍沿用原有规则。</p>
   </div>
   <details class="step"><summary>调度状态与统计口径</summary>

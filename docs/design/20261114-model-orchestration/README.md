@@ -1,16 +1,16 @@
 # 模型源与聚合：工作台重构
 
-2026-11-19 [统一交互原型（HTML）](gateway-prototype.html#/aggregate) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
+2026-11-20 [统一交互原型（HTML）](gateway-prototype.html#/catalog) · [最新图解设计（HTML）](latest-design.html) · [当前设计（HTML）](model-monitoring-and-aggregation.html) · [历史设计与验收（HTML）](history/index.html)。
 
 2026-11-20 [排查工作台改版](latest-design.html#workspace-ux)。聚合把首选、备选及来源摆在首屏，调度模拟按需展开。监控并列趋势和结果分布，独立清除时段或结果筛选。审计先显示请求结论，再按顺序显示上游尝试、状态和原因。沿用 UI/UX Pro Max 的图表与触控指引、Impeccable 的层级评审、Vercel Web Design Guidelines 的控件标签和焦点规则。
 
 桌面 1280、1920、2560、3440 CSS px 和 Redmi Note 8 验证展开调度模拟、趋势与结果联合筛选、进入审计再回到原请求焦点。离线打开统一原型，核对来源顺位、切换恢复筛选和请求时间线。改前改后见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
 
-后续交互在 `gateway-prototype/` 增量维护。保留旧网关原型的模型目录与接入密钥，七个工作台页面由同一导航切换。调度顺位图、请求链路和监控图表使用演示数据。单独查方案时，从下表打开对应设计子页。旧版原型在[历史快照](history/model-workspace.html)。
+以部署版 `okr-settled-coordination-012a0761` 的七个入口为基准，通过 `roami chrome` 打开列表和详情，对照字段、操作和返回路径。统一原型直接加载本分支的 `ModelHub` 及其子页面。页面标签、业务控件、表格和布局随正式组件更新。
 
-原型的工作台、局部交互、排序和来源创建分别维护在 `entry.tsx`、`workspace-samples.js`、`order-drag.js` 和 `source-creation.js`。加场景时复用现有路由和审计入口。执行 `node docs/design/20261114-model-orchestration/gateway-prototype/build.mjs` 可重新生成可离线打开的 HTML。
+原型的入口在 [entry.tsx](gateway-prototype/entry.tsx)，假目录、计费和调度记录由 [fixture.ts](gateway-prototype/fixture.ts) 与 [activity-fixture.ts](gateway-prototype/activity-fixture.ts) 提供。运行 `node docs/design/20261114-model-orchestration/gateway-prototype/build.mjs` 生成一个自包含 HTML。演示操作写入当前页内存，刷新恢复样本。WorkBuddy 签到页和请求故障用例可从设计总览直接打开。
 
-桌面 1280、1920、2560、3440 CSS px 与 Redmi Note 8 验证了调度拖动和应用、四条调用路径、监控筛选到审计的往返，以及新建来源后在网关目录查看模型。截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
+本轮在 Chrome 文件页、Roami 文件接口和 Redmi Note 8 真机打开统一原型。桌面 1280、1920、2560、3440 CSS px 核对工作区宽度。桌面和手机均点通连接定价、插件版本、聚合成员、额度与逐笔审计、模型源抽检、按结果筛选并返回、网关目录和语音配置。四个请求故障用例与 WorkBuddy 签到使用合成数据。检查 38 个 HTML 的 581 条本地引用，修复归档中的两条返回链接。浏览器截图见 [PR #989](https://github.com/ybz21/Roami/pull/989)。
 
 排查工作台实现。聚合编辑页顶部展示生效顺位、近一小时失败率和切换次数。监控默认展示请求终态，来源比较保留上游尝试与抽检。点时段后固定范围，返回时保留条件。请求审计展示已发出的尝试与终态，关联号放进技术详情。
 

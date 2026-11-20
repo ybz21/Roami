@@ -28,9 +28,9 @@ Key 列表只展示名称、末尾标识、启停状态与行尾菜单。主动�
 
 ## Technical Design
 
-本稿源文件在 `gateway-prototype/`，执行 `node docs/design/20261114-model-orchestration/gateway-prototype/build.mjs` 生成自包含 HTML。直接使用现有 `useLayout()`、`icons.tsx`，构建时提取 `index.css` 与 `theme.tsx` 令牌，没有网络字体、外部运行时或新设计色阶。
+当前统一原型的源文件在 `gateway-prototype/`。执行 `node docs/design/20261114-model-orchestration/gateway-prototype/build.mjs` 生成自包含 HTML。直接使用现有 `useLayout()`、`icons.tsx`，构建时提取 `index.css` 与 `theme.tsx` 令牌，没有网络字体、外部运行时或新设计色阶。
 
-依照静态 HTML 的双语要求，演示文案集中在 `gateway-copy.ts`，支持简体中文与英文；这是独立离线交互稿的文案表，正式实现必须迁入产品统一 i18n，不能复制一份页面私有语言系统。主题与语言工具仅供设计评审。
+当前统一原型复用正式页面文案和主题，支持简体中文与英文。演示入口的文案和合成数据随原型维护。
 
 建议正式落地职责如下；不新增接口规范或改变现有 API：
 

@@ -18,7 +18,7 @@
 </nav>
 <main class="document gateway-overview" id="document">
 <section id="technical" aria-labelledby="latest-title">
-  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-20">2026 年 11 月 20 日</time></div><a class="diagram-action" href="./gateway-prototype.html#/aggregate">打开交互原型</a></header>
+  <header class="section-head"><div><h2 id="latest-title">LLM Gateway 与聚合观测</h2><time class="muted" datetime="2026-11-20">2026 年 11 月 20 日</time></div><a class="diagram-action" href="./gateway-prototype.html#/aggregate/free">打开交互原型</a></header>
   <figure class="layer-diagram" aria-label="网关三层设计">
     <div class="diagram-lane">
       <h3><a href="./model-gateway.html#interaction">人机交互</a></h3>
@@ -55,17 +55,40 @@
     <li><a href="./gateway-prototype.html#/troubleshoot?case=stream"><small>已经发送部分内容</small><strong>输出中断</strong><span class="error-result">HTTP 200 · 最终失败</span></a></li>
   </ul>
   <nav class="gateway-jump" aria-label="观测原型">
-    <a href="./gateway-prototype.html#/aggregate">调度顺位与来源健康</a>
+    <a href="./gateway-prototype.html#/aggregate/free">调度顺位与来源健康</a>
     <a href="./gateway-prototype.html#/monitoring">趋势与失败构成</a>
   </nav>
 </section>
+<section id="workspace-coverage" aria-labelledby="workspace-coverage-title">
+  <header class="section-head"><h2 id="workspace-coverage-title">按现网页面走查</h2><a class="page-reference" href="./gateway-prototype.html#/catalog">打开完整工作台</a></header>
+  <figure class="layer-diagram" aria-label="七个工作台入口">
+    <div class="diagram-lane">
+      <h3>接入与调度</h3>
+      <ol>
+        <li><a href="./gateway-prototype.html#/catalog">模型源<small>搜索、创建、连接、定价与账号调度</small></a></li>
+        <li><a href="./gateway-prototype.html#/aggregate">聚合<small>列表、成员编辑、拖动排序与生效顺位</small></a></li>
+        <li><a href="./gateway-prototype.html#directory">本机网关<small>目录、能力、接入示例与密钥</small></a></li>
+        <li><a href="./gateway-prototype.html#/speech">语音输入<small>识别服务及各服务的配置项</small></a></li>
+      </ol>
+    </div>
+    <div class="diagram-lane">
+      <h3>用量与排查</h3>
+      <ol>
+        <li><a href="./gateway-prototype.html#/usage">概况<small>日期、用量分组、趋势与每日限额</small></a></li>
+        <li><a href="./gateway-prototype.html#/monitor/sources">监控<small>请求终态、来源对比、异常与抽检</small></a></li>
+        <li><a href="./gateway-prototype.html#/audit">审计<small>逐笔用量、费用和请求详情</small></a></li>
+        <li><a href="./gateway-prototype.html#/catalog/workbuddy-account">WorkBuddy 账号<small>积分与签到 · 方案演示</small></a></li>
+      </ol>
+    </div>
+  </figure>
+</section>
 <section id="workspace-ux" aria-labelledby="workspace-ux-title">
-  <header class="section-head"><h2 id="workspace-ux-title">排查工作台</h2><a class="page-reference" href="./gateway-prototype.html#/aggregate">试用原型</a></header>
+  <header class="section-head"><h2 id="workspace-ux-title">排查工作台</h2><a class="page-reference" href="./gateway-prototype.html#/aggregate/free">试用原型</a></header>
   <figure class="layer-diagram" aria-label="排查路径">
     <div class="diagram-lane">
       <h3>首屏</h3>
       <ol>
-        <li><a href="./gateway-prototype.html#/aggregate">看生效顺位<small>首选、备选、来源与可调度数</small></a></li>
+        <li><a href="./gateway-prototype.html#/aggregate/free">看生效顺位<small>首选、备选、来源与可调度数</small></a></li>
         <li><a href="./gateway-prototype.html#/monitoring">查异常<small>请求趋势和结果分布联动</small></a></li>
         <li><a href="./gateway-prototype.html#/audit?demo=gateway&amp;case=fallback">看请求结论<small>返回结果和上游尝试时间线</small></a></li>
       </ol>

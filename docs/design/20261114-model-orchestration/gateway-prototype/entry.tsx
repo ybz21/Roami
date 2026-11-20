@@ -1,164 +1,97 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRoot } from '../../../../frontend/node_modules/react-dom/client'
+import { App, Button } from 'antd'
+import { I18nProvider, useI18n } from '../../../../frontend/src/i18n'
+import { ThemeProvider, useThemeMode } from '../../../../frontend/src/theme'
 import { useLayout } from '../../../../frontend/src/layout'
-import { PlusIcon, CopyIcon, MoreIcon, ChevronLeft, ChevronRight, CloseIcon, ChevronDown, LinkIcon, ShieldIcon, SearchIcon, SunIcon, MoonIcon, AppsIcon, FolderIcon } from '../../../../frontend/src/icons'
-import { gatewayCopy, type CopyKey } from './gateway-copy'
-import samples from './workspace-samples.template'
-import { mountWorkspaceSamples } from './workspace-samples.js'
+import { WorkspaceStateProvider } from '../../../../frontend/src/view-state'
+import ModelHub from '../../../../frontend/src/components/capabilities/ModelHub'
+import { BackLink } from '../../../../frontend/src/components/BackButton'
+import { SunIcon, MoonIcon } from '../../../../frontend/src/icons'
+import { installFixture, traceCases } from './fixture'
+import '../../../../frontend/src/components/capabilities/model-controls.css'
+import '../../../../frontend/src/index.css'
+import '../../../../frontend/src/mobile-material.css'
+import './styles.css'
 
-const modelPages = ['catalog', 'aggregate', 'overview', 'monitoring', 'audit', 'gateway', 'speech'] as const
-const designPages: Record<string, string> = {
-  catalog: 'sources', aggregate: 'aggregation', overview: 'usage',
-  monitoring: 'monitoring', audit: 'audit', gateway: 'gateway', speech: 'speech',
-}
-const sampleMarkup = { __html: samples }
-const currentPage = () => {
-  const name = location.hash.slice(2).split('?')[0]
-  return modelPages.some(page => page === name) || name === 'troubleshoot' ? name : 'gateway'
+const paths: Record<string, string> = { overview: 'usage', monitoring: 'monitor' }
+const route = () => location.hash.slice(1)
+const cases = Object.keys(traceCases)
+const docPages: Record<string, string> = { catalog: 'sources', aggregate: 'aggregation', usage: 'usage', monitor: 'monitoring', audit: 'audit', gateway: 'gateway', speech: 'speech' }
+
+function WorkBuddyDemo({ zh, claimed, claim }: { zh: boolean; claimed: boolean; claim: () => void }) {
+  const copy = zh
+    ? ['WorkBuddy · 账号', '方案演示', '周期积分', '已用 120 / 500 · 11 天后重置', '额外积分', '立即签到', '今日未签', '今日已签 · 领取 20 积分', '返回模型源']
+    : ['WorkBuddy account', 'Design preview', 'Cycle credits', '120 / 500 used · resets in 11 days', 'Bonus credits', 'Check in', 'Not checked in today', 'Checked in · 20 credits claimed', 'Back to model sources']
+  return <section className="model-prototype-account">
+    <header className="tt-pagehead"><BackLink href="#/catalog/source/workbuddy" label={copy[8]} /><h2>{copy[0]}</h2><small>{copy[1]}</small></header>
+    <dl><div><dt>{copy[2]}</dt><dd>{copy[3]}</dd></div><div><dt>{copy[4]}</dt><dd>{claimed ? 60 : 40}</dd></div></dl>
+    <div className="model-prototype-account-actions"><Button type="primary" disabled={claimed} onClick={claim}>{copy[5]}</Button><span role="status">{copy[claimed ? 7 : 6]}</span></div>
+  </section>
 }
 
-function WorkspaceSamples({ page }: { page: string }) {
-  const root = useRef<HTMLDivElement>(null)
+function Prototype() {
+  const { locale, setLocale } = useI18n()
+  const zh = locale === 'zh-CN'
+  const theme = useThemeMode()
+  useLayout()
+  const [hash, setHash] = useState(route)
+  const [claimed, setClaimed] = useState(false)
+  const [page, query] = hash.replace(/^\//, '').replace(/^capabilities\/models\/?/, '').split('?')
+  const [requested] = page.split('/')
+  const params = new URLSearchParams(query)
+  const trace = requested === 'troubleshoot' || params.get('demo') === 'gateway'
+  const example = params.get('case') || 'blocked'
+  const sample = cases.includes(example) ? example : 'blocked'
+  const tab = trace ? 'audit' : paths[requested] || (requested === 'access' || requested === 'directory' ? 'gateway' : requested) || 'catalog'
+  const pool = params.get('demo') === 'route'
+  const account = page === 'catalog/workbuddy-account'
+  const detail = trace ? '/request/' + sample : pool ? '/request/fallback/aggregate/free' : page.slice(requested.length)
+
   useEffect(() => {
-    if (root.current) return mountWorkspaceSamples(root.current)
+    const read = () => setHash(route())
+    window.addEventListener('hashchange', read)
+    return () => window.removeEventListener('hashchange', read)
   }, [])
   useEffect(() => {
-    if (!root.current) return
-    root.current.querySelectorAll<HTMLElement>('[data-prototype-view]').forEach(section => {
-      section.hidden = section.dataset.prototypeView !== page
-    })
-  }, [page])
-  return <div ref={root} className="workspace-samples" lang="zh-CN" dangerouslySetInnerHTML={sampleMarkup} />
-}
-
-const endpoint = 'http://127.0.0.1:41155/v1'
-const demoKey = 'DEMO_ONLY_NOT_A_VALID_CREDENTIAL'
-type AccessKey = { id: string; name: string; suffix: string; enabled: boolean; fixed?: boolean }
-type Model = { id: string; source: string; kind: 'pool' | 'native' | 'upstream'; context: string; abilities: CopyKey[]; upstream?: string }
-const modelRows: Model[] = [
-  { id: 'free', source: '聚合 / Pool', kind: 'pool', context: '—', abilities: ['text', 'toolCalls'] },
-  { id: 'coding-pool', source: '聚合 / Pool', kind: 'pool', context: '—', abilities: ['text', 'reasoning', 'toolCalls'] },
-  { id: 'deepseek-chat', upstream: 'deepseek-chat', source: 'DeepSeek', kind: 'native', context: '128K', abilities: ['text', 'toolCalls'] },
-  { id: 'deepseek-reasoner', upstream: 'deepseek-reasoner', source: 'DeepSeek', kind: 'native', context: '128K', abilities: ['text', 'reasoning'] },
-  { id: 'qwen3-coder-free', upstream: 'qwen/qwen3-coder:free', source: 'OpenRouter · Free', kind: 'native', context: '262K', abilities: ['text', 'toolCalls'] },
-  { id: 'hy4free', upstream: 'hy4free', source: 'WorkBuddy · 01', kind: 'native', context: '128K', abilities: ['text', 'vision', 'toolCalls'] },
-  { id: 'qwen/qwen3-vl:free', source: 'OpenRouter · Free', kind: 'upstream', context: '128K', abilities: ['text', 'vision'] },
-]
-const initialKeys: AccessKey[] = [{ id: 'dev', name: 'Development', suffix: '7c2a', enabled: true }, { id: 'codex', name: 'Codex CLI', suffix: '9e41', enabled: true }, { id: 'old', name: 'Staging', suffix: 'b30f', enabled: false }]
-type Panel = { kind: 'create' | 'rename' | 'fixed' | 'issued' | 'model'; id?: string }
-type Confirmation = { kind: 'disable' | 'rotate' | 'remove'; row: AccessKey }
-
-function Button({ children, icon, primary = false, quiet = false, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; primary?: boolean; quiet?: boolean }) { return <button type="button" {...props} className={`btn ${primary ? 'primary' : quiet ? 'tt-act' : ''} ${props.className || ''}`}>{icon}{children}</button> }
-
-function App() {
-  const layout = useLayout()
-  const [locale, setLocale] = useState(() => localStorage.getItem('roami-gateway-prototype-locale') || 'zh-CN')
-  const [theme, setTheme] = useState('dark'), [scene, setScene] = useState('normal'), [collapsed, setCollapsed] = useState(false)
-  const [page, setPage] = useState(currentPage)
-  const gateway = page === 'gateway'
-  const currentMenu = page === 'troubleshoot' ? 'gateway' : page
-  const [tab, setTab] = useState(location.hash.includes('directory') ? 'directory' : 'access')
-  const [addedModels, setAddedModels] = useState<Model[]>([])
-  const [keys, setKeys] = useState(initialKeys), [panel, setPanel] = useState<Panel | null>(null), [confirm, setConfirm] = useState<Confirmation | null>(null)
-  const [menu, setMenu] = useState<string | null>(null), [draft, setDraft] = useState(''), [renameDraft, setRenameDraft] = useState(''), [fixedDraft, setFixedDraft] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  const [query, setQuery] = useState(''), [source, setSource] = useState(''), [kind, setKind] = useState('all'), [sampleModel, setSampleModel] = useState('free'), [codeType, setCodeType] = useState('curl'), [sampleOpen, setSampleOpen] = useState(false), [notice, setNotice] = useState('')
-  const sampleScroll = useRef<HTMLDivElement | null>(null)
-  const opener = useRef<HTMLElement | null>(null), panelRef = useRef<HTMLElement | null>(null), confirmRef = useRef<HTMLDialogElement | null>(null), timer = useRef<ReturnType<typeof setTimeout>>()
-  const t = (key: CopyKey, values: Record<string, string | number> = {}) => Object.entries(values).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), gatewayCopy[key][locale === 'zh-CN' ? 0 : 1] as string)
-  useEffect(() => { document.documentElement.dataset.theme = theme; document.documentElement.lang = locale; localStorage.setItem('roami-gateway-prototype-locale', locale) }, [theme, locale])
-  useEffect(() => { const change = () => { setPage(currentPage()); setTab(location.hash.includes('directory') ? 'directory' : 'access'); setPanel(null); setMenu(null) }; addEventListener('hashchange', change); return () => removeEventListener('hashchange', change) }, [])
-  useEffect(() => { sampleScroll.current?.scrollTo({ top: 0 }) }, [page])
-  useEffect(() => {
-    const append = (event: Event) => {
-      const { source, ids } = (event as CustomEvent<{source: string, ids: string[]}>).detail
-      setAddedModels(previous => {
-        const usedNames = new Set([...modelRows, ...previous].map(model => model.id))
-        const next: Model[] = []
-        for (const upstream of ids) {
-          const base = usedNames.has(upstream) ? source + '/' + upstream : upstream
-          let id = base
-          for (let number = 2; usedNames.has(id); number++) id = base + '-' + number
-          usedNames.add(id)
-          next.push({ id, upstream, source, kind: 'native', context: '—', abilities: ['text'] })
-        }
-        return [...previous, ...next]
-      })
+    const target = ['access', 'directory'].includes(requested) ? '.tt-gateway-tabs [data-node-key="' + requested + '"]'
+      : page === 'monitor/sources' ? '.tt-monitor-workspace [data-node-key="sources"]'
+      : page === 'monitor/requests' ? '.tt-monitor-workspace [data-node-key="requests"]'
+      : page.startsWith('aggregate/') && page.endsWith('/members') ? '.tt-aggregate-tabs [data-node-key="members"]'
+      : null
+    if (!target) return
+    const activate = () => {
+      const button = document.querySelector(target)
+      if (!button) return false
+      button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+      return true
     }
-    window.addEventListener('prototype-source-saved', append)
-    return () => window.removeEventListener('prototype-source-saved', append)
-  }, [])
-  useEffect(() => { if (panel && layout.phone) panelRef.current?.focus({ preventScroll: true }) }, [panel, layout.phone])
-  useEffect(() => { if (confirm) confirmRef.current?.showModal() }, [confirm])
-  useEffect(() => { const close = (event: MouseEvent) => { if (!(event.target as HTMLElement).closest('.menu-wrap')) setMenu(null) }; addEventListener('click', close); return () => { removeEventListener('click', close); clearTimeout(timer.current) } }, [])
-  const notify = (value: string) => { setNotice(value); clearTimeout(timer.current); timer.current = setTimeout(() => setNotice(''), 2800) }
-  const copy = async (value: string) => { try { await navigator.clipboard.writeText(value); notify(t('copied')) } catch { notify(t('copyFailed')) } }
-  const closePanel = () => { setPanel(null); setError(''); setMenu(null); setTimeout(() => opener.current?.focus(), 0) }
-  const openPanel = (next: Panel) => { opener.current = document.activeElement as HTMLElement; setPanel(next); setMenu(null); setError(''); if (next.kind === 'rename') setRenameDraft(keys.find(key => key.id === next.id)?.name || '') }
-  const currentKeys = scene === 'empty' ? [] : keys
-  const models = scene === 'empty' ? [] : [...modelRows, ...addedModels]
-  const available = models.filter(model => model.kind !== 'upstream')
-  const selected = models.find(model => model.id === panel?.id)
-  const code = codeType === 'curl'
-    ? `curl ${endpoint}/chat/completions \\\n  -H "Authorization: Bearer $ROAMI_GATEWAY_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"${sampleModel}","messages":[{"role":"user","content":"Hello"}]}'`
-    : `from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url="${endpoint}",\n    api_key=os.environ["ROAMI_GATEWAY_KEY"],\n)\nresponse = client.chat.completions.create(\n    model="${sampleModel}",\n    messages=[{"role": "user", "content": "Hello"}],\n)`
-  const savePanel = async (event: React.FormEvent) => {
-    event.preventDefault()
-    const keyName = panel?.kind === 'rename' ? renameDraft : draft
-    if (panel?.kind === 'fixed' ? !/^[\x21-\x7e]{16,512}$/.test(fixedDraft) : !keyName.trim()) { setError(t(panel?.kind === 'fixed' ? 'invalidKey' : 'nameRequired')); return }
-    setBusy(true); await new Promise(resolve => setTimeout(resolve, 350)); setBusy(false)
-    if (panel?.kind === 'create') { const id = 'demo-' + Date.now(); setKeys(previous => [...previous, { id, name: draft.trim(), suffix: 'd3a9', enabled: true }]); setDraft(''); setScene('normal'); setPanel({ kind: 'issued', id }) }
-    else if (panel?.kind === 'rename') { setKeys(previous => previous.map(key => key.id === panel.id ? { ...key, name: keyName.trim() } : key)); closePanel(); notify(t('saved')) }
-    else { setKeys(previous => [...previous.filter(key => !key.fixed), { id: 'fixed', name: t('fixedKey'), suffix: fixedDraft.slice(-4), enabled: true, fixed: true }]); setFixedDraft(''); setScene('normal'); closePanel(); notify(t('saved')) }
-  }
-  const applyConfirmation = () => {
-    if (!confirm) return
-    const { kind: action, row } = confirm
-    if (action === 'remove') setKeys(previous => previous.filter(key => key.id !== row.id))
-    else setKeys(previous => previous.map(key => key.id === row.id ? { ...key, enabled: action === 'rotate', ...(action === 'rotate' ? { suffix: 'e5b2' } : {}) } : key))
-    if (action === 'rotate') openPanel({ kind: 'issued', id: row.id }); else notify(t('saved'))
-    setConfirm(null); setMenu(null)
-  }
-  const Status = ({ enabled }: { enabled: boolean }) => <span className={`status ${enabled ? 'ready' : ''}`}>{t(enabled ? 'enabled' : 'disabled')}</span>
-  const ActionMenu = ({ row }: { row: AccessKey }) => <div className="menu-wrap"><Button className="icon-btn" aria-label={t('manage', { name: row.name })} aria-expanded={menu === row.id} onClick={() => setMenu(menu === row.id ? null : row.id)} icon={<MoreIcon />} />{menu === row.id && <div className="action-menu" aria-label={t('manage', { name: row.name })}>
-    {row.fixed ? <Button quiet onClick={() => openPanel({ kind: 'fixed' })}>{t('editFixed')}</Button> : <Button quiet onClick={() => openPanel({ kind: 'rename', id: row.id })}>{t('rename')}</Button>}
-    <Button quiet onClick={() => { if (row.enabled) setConfirm({ kind: 'disable', row }); else setKeys(previous => previous.map(key => key.id === row.id ? { ...key, enabled: true } : key)); setMenu(null) }}>{t(row.enabled ? 'disable' : 'enable')}</Button>
-    {!row.fixed && <Button quiet onClick={() => { setConfirm({ kind: 'rotate', row }); setMenu(null) }}>{t('rotate')}</Button>}
-    <Button quiet className="danger" onClick={() => { setConfirm({ kind: 'remove', row }); setMenu(null) }}>{t('remove')}</Button>
-  </div>}</div>
-  const visibleRows = models.filter(model => (!source || model.source === source) && (kind === 'all' || model.kind === kind) && (model.id + model.source).toLowerCase().includes(query.toLowerCase()))
-  const closeKey = (event: React.KeyboardEvent) => { if (event.key === 'Escape') { if (menu) setMenu(null); else if (panel) closePanel() } }
-  const panelTitle: CopyKey = panel?.kind === 'create' ? 'newKey' : panel?.kind === 'rename' ? 'rename' : panel?.kind === 'fixed' ? 'manual' : panel?.kind === 'issued' ? 'generated' : 'details'
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  useEffect(() => { if (error) inputRef.current?.focus() }, [error])
+    if (activate()) return
+    const observer = new MutationObserver(() => { if (activate()) observer.disconnect() })
+    observer.observe(document.querySelector('.model-prototype-main')!, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [page, requested])
 
-  return <div className={`shell ${collapsed ? 'nav-collapsed' : ''} ${panel && layout.phone ? 'has-phone-panel' : ''}`} onKeyDown={closeKey}>
-    <header className="appbar"><h1>{t('prototypeTitle')}</h1><div className="prototype-tools"><span>{t('demo')}</span>{gateway && <select aria-label={t('scene')} value={scene} onChange={event => { setScene(event.target.value); setPanel(null) }}>{(['normal', 'empty', 'loading', 'failed'] as const).map(value => <option key={value} value={value}>{t(value)}</option>)}</select>}<Button quiet className="icon-btn" aria-label={t('theme')} icon={theme === 'dark' ? <SunIcon /> : <MoonIcon />} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} /><Button quiet onClick={() => setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')} aria-label={t('language')}>{locale === 'zh-CN' ? 'EN' : '中'}</Button></div></header>
-    <nav className="cap-tabs" aria-label={t('capability')}><a href="#access" aria-current="page">{t('models')}</a><a href="./latest-design.html">{t('designOverview')}</a></nav>
-    <div className="workspace"><nav className="model-nav" aria-label={t('models')}>{modelPages.map(value => <a key={value} href={value === 'gateway' ? '#access' : '#/' + value} aria-current={value === currentMenu ? 'page' : undefined}>{t(value)}</a>)}<Button quiet className="collapse-nav" icon={collapsed ? <ChevronRight /> : <ChevronLeft />} aria-label={t(collapsed ? 'expand' : 'collapse')} onClick={() => setCollapsed(!collapsed)} /></nav>
-      <main className="main"><header className="tt-pagehead"><h2>{t(currentMenu as CopyKey)}</h2><a className="prototype-design-link" href={'./model-' + designPages[currentMenu] + '.html'}>{t('design')}</a></header>
-        {currentMenu === 'gateway' && <nav className="subtabs" aria-label={t('gateway')}>{['access', 'directory', 'troubleshoot'].map(value => <a key={value} href={value === 'troubleshoot' ? '#/troubleshoot' : '#' + value} aria-current={(gateway ? tab : page) === value ? 'page' : undefined}>{t(value as CopyKey)}</a>)}</nav>}
-        <div className="scroll" ref={sampleScroll} hidden={gateway}><WorkspaceSamples page={page} /></div>
-        <div hidden={!gateway} className="gateway-content">        <div className="content-layout"><div className="scroll" aria-hidden={panel && layout.phone ? true : undefined}>
-          {scene === 'failed' && <div className="error-banner" role="alert"><div><strong>{t('loadError')}</strong><p>{t('retained')}</p></div><Button onClick={() => setScene('normal')}>{t('retry')}</Button></div>}
-          {scene === 'loading' ? <div className="loading" role="status" aria-busy="true">{t('loading')}<div /><div /><div /></div> : tab === 'access' ? <>
-            <div className="access-grid"><section className="connection-card"><div className="section-head"><h3><LinkIcon />{t('baseUrl')}</h3><span className="badge">{t('local')}</span></div><div className="field"><div className="copy-field"><code>{endpoint}</code><Button quiet className="icon-btn" icon={<CopyIcon />} aria-label={`${t('copy')} ${t('baseUrl')}`} onClick={() => copy(endpoint)} /></div></div><p className="muted">{t('localHint')}</p><a className="inline-link" href="#directory">{t('directoryLink')}<ChevronRight /></a></section>
-            <section className="sample-card"><div className="section-head"><h3>{layout.phone ? <Button quiet className="sample-toggle" aria-expanded={sampleOpen} onClick={() => setSampleOpen(!sampleOpen)} icon={<ChevronDown />}>{t('sample')}</Button> : t('sample')}</h3>{(!layout.phone || sampleOpen) && <><div className="segments">{['curl', 'Python'].map(value => <Button key={value} quiet aria-pressed={codeType === value} onClick={() => setCodeType(value)}>{value}</Button>)}</div><Button quiet className="icon-btn" aria-label={`${t('copy')} ${t('sample')}`} icon={<CopyIcon />} onClick={() => copy(code)} disabled={!available.length} /></>}</div>{(!layout.phone || sampleOpen) && (available.length ? <><label className="field sample-model"><span>{t('sampleModel')}</span><select value={sampleModel} onChange={event => setSampleModel(event.target.value)}>{available.map(model => <option key={model.id}>{model.id}</option>)}</select></label><pre tabIndex={0}>{code}</pre><p className="muted">{t('sampleHint')}</p></> : <div className="empty"><p>{t('noModels')}</p><a className="inline-link" href="#/catalog">{t('configure')}<ChevronRight /></a></div>)}</section></div>
-            <section className="keys-section"><div className="section-head"><h3>{t('keys')}{currentKeys.length > 0 && <span className="count">{new Intl.NumberFormat(locale).format(currentKeys.length)}</span>}</h3><div className="section-actions"><Button primary icon={<PlusIcon />} onClick={() => openPanel({ kind: 'create' })}>{t('newKey')}</Button><div className="menu-wrap"><Button quiet className="icon-btn" aria-label={t('more')} aria-expanded={menu === 'fixed'} icon={<MoreIcon />} onClick={() => setMenu(menu === 'fixed' ? null : 'fixed')} />{menu === 'fixed' && <div className="action-menu"><Button quiet onClick={() => openPanel({ kind: 'fixed' })}>{t(keys.some(key => key.fixed) ? 'editFixed' : 'manual')}</Button></div>}</div></div></div><p className="muted">{t('keyHint')}</p>
-              {currentKeys.length ? <div className="key-list"><div className="key-list-header"><span>{t('keyName')}</span><span>{t('identifier')}</span><span>{t('state')}</span><span /></div>{currentKeys.map(key => <article className={`key-row ${key.enabled ? '' : 'is-disabled'}`} key={key.id}><div className="key-identity"><span className="key-icon"><ShieldIcon /></span><strong>{key.fixed ? t('fixedKey') : key.name}</strong></div><code className="suffix">…{key.suffix}</code><Status enabled={key.enabled} /><ActionMenu row={key} /></article>)}</div> : <div className="empty"><ShieldIcon size={24} /><p>{t('noKeys')}</p></div>}
-            </section>
-          </> : <section className="directory-section"><div className="directory-toolbar"><label className="search"><SearchIcon /><input aria-label={t('modelSearch')} placeholder={t('modelSearch')} value={query} onChange={event => setQuery(event.target.value)} /></label><select aria-label={t('source')} value={source} onChange={event => setSource(event.target.value)}><option value="">{t('allSources')}</option>{[...new Set(models.map(model => model.source))].map(value => <option key={value}>{value}</option>)}</select><select aria-label={t('kind')} value={kind} onChange={event => setKind(event.target.value)}>{['all', 'pool', 'native', 'upstream'].map(value => <option key={value} value={value}>{t(value as CopyKey)}</option>)}</select></div>
-            <div className="model-list"><div className="model-list-header"><span>{t('model')}</span><span>{t('source')}</span><span>{t('context')}</span><span>{t('abilities')}</span><span /></div>{visibleRows.map(model => <article className="model-row" key={model.id}><button className="model-identity" type="button" onClick={() => openPanel({ kind: 'model', id: model.id })}><strong>{model.id}</strong><small><span className={`availability ${model.kind === 'upstream' ? '' : 'ready'}`}>{t(model.kind === 'upstream' ? 'upstream' : 'callable')}</span><span>{t(model.kind === 'pool' ? 'pool' : 'native')}</span></small></button><span className="model-source">{model.source}</span><code className="model-context">{model.context}</code><div className="model-abilities">{model.abilities.map(ability => <span key={ability} className="badge">{t(ability)}</span>)}</div><Button quiet className="icon-btn" aria-label={t(model.kind === 'upstream' ? 'details' : 'copyModel')} icon={model.kind === 'upstream' ? <ChevronRight /> : <CopyIcon />} onClick={() => model.kind === 'upstream' ? openPanel({ kind: 'model', id: model.id }) : copy(model.id)} /></article>)}</div>{!visibleRows.length && <div className="empty"><p>{t(models.length ? 'noMatches' : 'noModels')}</p>{models.length ? <Button onClick={() => { setQuery(''); setSource(''); setKind('all') }}>{t('reset')}</Button> : <a className="inline-link" href="#/catalog">{t('configure')}</a>}</div>}</section>}
-        </div>
-        {panel && <aside className="inspector" aria-label={t(panelTitle)} ref={panelRef} tabIndex={-1}><header className="tt-pagehead"><Button quiet className="icon-btn" icon={<ChevronLeft />} aria-label={t('back')} onClick={closePanel} /><h2>{t(panelTitle)}</h2>{!layout.phone && <Button quiet className="icon-btn panel-close" icon={<CloseIcon />} aria-label={t('close')} onClick={closePanel} />}</header>
-          {panel.kind === 'model' && selected ? <><div className="panel-scroll"><h3 className="model-title">{selected.id}</h3><span className={`availability ${selected.kind !== 'upstream' ? 'ready' : ''}`}>{t(selected.kind === 'upstream' ? 'upstream' : 'callable')}</span><dl>{[[t('source'), selected.source], [t('kind'), t(selected.kind)], ...(selected.kind === 'pool' ? [[t('policy'), t('smart')], [t('aggregate'), t('members', { count: 3 })]] : [[t('upstreamId'), selected.upstream || selected.id]]), [t('context'), selected.context]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><div className="model-abilities">{selected.abilities.map(ability => <span className="badge" key={ability}>{t(ability)}</span>)}</div>{selected.kind === 'upstream' && <p className="notice">{t('upstreamHint')}</p>}</div><footer className="panel-footer"><a className="btn" href={selected.kind === 'pool' ? '#/aggregate' : '#/catalog'}>{t(selected.kind === 'pool' ? 'poolDetail' : 'sourceDetail')}</a>{selected.kind !== 'upstream' && <Button primary icon={<CopyIcon />} onClick={() => copy(selected.id)}>{t('copyModel')}</Button>}</footer></>
-          : panel.kind === 'issued' ? <><div className="panel-scroll"><p className="notice">{t('once')}</p><label className="field"><span>{keys.find(key => key.id === panel.id)?.name}</span><textarea readOnly value={demoKey} onFocus={event => event.target.select()} /></label><p className="muted">{t('demoCredential')}</p><Button icon={<CopyIcon />} onClick={() => copy(demoKey)}>{t('copy')}</Button></div><footer className="panel-footer"><Button primary onClick={closePanel}>{t('done')}</Button></footer></>
-          : <form onSubmit={savePanel} className="panel-form"><div className="panel-scroll"><p className="muted">{t(panel.kind === 'fixed' ? 'fixedHint' : panel.kind === 'rename' ? 'renameHint' : 'createHint')}</p><label className="field"><span>{t(panel.kind === 'fixed' ? 'fixedValue' : 'keyName')}</span><input ref={inputRef} type={panel.kind === 'fixed' ? 'password' : 'text'} autoComplete={panel.kind === 'fixed' ? 'new-password' : 'off'} aria-invalid={!!error} aria-describedby={error ? 'field-error' : undefined} maxLength={panel.kind === 'fixed' ? 512 : 80} value={panel.kind === 'fixed' ? fixedDraft : panel.kind === 'rename' ? renameDraft : draft} placeholder={panel.kind === 'fixed' ? '' : t('namePlaceholder')} onChange={event => { if (panel.kind === 'fixed') setFixedDraft(event.target.value); else if (panel.kind === 'rename') setRenameDraft(event.target.value); else setDraft(event.target.value); setError('') }} /></label>{error && <p id="field-error" className="error" role="alert">{error}</p>}{panel.kind === 'fixed' && keys.some(key => key.fixed) && <p className="notice warning">{t('fixedReplace')}</p>}</div><footer className="panel-footer"><Button disabled={busy} onClick={closePanel}>{t('cancel')}</Button><Button primary type="submit" disabled={busy}>{t(busy ? 'busy' : panel.kind === 'create' ? 'generate' : 'save')}</Button></footer></form>}
-        </aside>}
-        </div></div>
-      </main></div>
-    <nav className="bottom-nav" aria-label={t('capability')}><a href="#/catalog"><AppsIcon size={20} /><span>{t('models')}</span></a><a href="./latest-design.html"><FolderIcon size={20} /><span>{t('design')}</span></a></nav>
-    {confirm && <dialog ref={confirmRef} className="confirmation" onCancel={() => setConfirm(null)} onClose={() => setConfirm(null)}><h2>{t(confirm.kind)}</h2><strong>{confirm.row.fixed ? t('fixedKey') : confirm.row.name}</strong><p>{t(confirm.kind === 'disable' ? 'confirmDisable' : confirm.kind === 'rotate' ? 'confirmRotate' : 'confirmDelete')}</p><div className="panel-footer"><Button onClick={() => setConfirm(null)}>{t('cancel')}</Button><Button className="danger" onClick={applyConfirmation}>{t(confirm.kind)}</Button></div></dialog>}
-    {notice && <div className="toast" role="status">{notice}</div>}
+  return <div className="model-prototype">
+    <div className="model-prototype-bar">
+      <div><strong>{zh ? 'Roami 大模型工作台' : 'Roami Model Workspace'}</strong><small>{zh ? '离线演示' : 'Offline demo'}</small></div>
+      <nav aria-label={zh ? '设计文档' : 'Design documents'}>
+        <a href="./latest-design.html">{zh ? '设计总览' : 'Design overview'}</a>
+        <a href={'./model-' + (docPages[tab] || 'gateway') + '.html'}>{zh ? '本页设计' : 'Page design'}</a>
+        <Button type="text" aria-label={zh ? '切换主题' : 'Switch theme'} icon={theme.mode === 'dark' ? <SunIcon /> : <MoonIcon />} onClick={theme.toggle} />
+        <Button type="text" aria-label={zh ? 'Switch to English' : '切换为中文'} onClick={() => setLocale(zh ? 'en-US' : 'zh-CN')}>{zh ? 'EN' : '中文'}</Button>
+      </nav>
+    </div>
+    {trace && <div className="model-prototype-scenarios" aria-label={zh ? '网关请求演示' : 'Request scenarios'}>
+      {cases.filter(key => key !== 'success').map(key => <a key={key} href={'#/troubleshoot?case=' + key} aria-current={key === sample ? 'page' : undefined}>{traceCases[key as keyof typeof traceCases].label[zh ? 0 : 1]}</a>)}
+    </div>}
+    {!account && page.startsWith('catalog/source/workbuddy') && <div className="model-prototype-scenarios"><a href="#/catalog/workbuddy-account">{zh ? '查看 WorkBuddy 签到方案' : 'Preview WorkBuddy check-in'}</a></div>}
+    <main className="model-prototype-main">
+      {account && <WorkBuddyDemo zh={zh} claimed={claimed} claim={() => setClaimed(true)} />}
+      <div className="model-prototype-workspace" hidden={account}><ModelHub sub={account ? 'catalog' : tab + detail} onNav={path => { location.hash = '/' + path.slice('capabilities/models/'.length) }} /></div>
+    </main>
   </div>
 }
-createRoot(document.getElementById('app')!).render(<App />)
+
+installFixture()
+createRoot(document.getElementById('root')!).render(<I18nProvider><ThemeProvider><App><WorkspaceStateProvider><Prototype /></WorkspaceStateProvider></App></ThemeProvider></I18nProvider>)
