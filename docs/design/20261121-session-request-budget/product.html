@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>场景与验收 · 会话请求频率优化</title>
+  <link rel="stylesheet" href="../../../frontend/src/index.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="document-width heading-row">
+      <a href="index.html" class="back" aria-label="返回方案总览"></a>
+      <h1>场景与验收</h1>
+    </div>
+  </header>
+  <main>
+    <article class="document-width">
+      <p class="lead">用户能从标签和项目列表看到哪些会话在运行、哪些在等确认。进入会话后，仍可及时看到输出、回答 TUI 提示、浏览旧消息及恢复 Codex 会话。</p>
+
+      <section aria-labelledby="scenarios">
+        <h2 id="scenarios">用户操作与预期</h2>
+        <dl class="endpoint-list">
+          <div><dt>打开多个标签，回到项目或文件</dt><dd>标签按现有样式显示 Agent 与待输入状态，工作台可继续切回原会话。收起终端坞或文件覆盖会话后，暂停该会话的交互抓屏与转录读取。</dd></div>
+          <div><dt>切到一个正在运行的会话</dt><dd>先显示当前会话已缓存的内容，同时校验会话身份并立即追读。桌面保留用户选的显示模式。手机按既有规则打开对话，用户手动切回终端后保持该选择。</dd></div>
+          <div><dt>出现权限确认或选项菜单</dt><dd>可见会话及时显示实际问题。选择后立即复核屏幕，同一道题是否仍在决定要不要补发 Enter。后台待输入状态继续由共享概览更新。</dd></div>
+          <div><dt>Codex 连接恢复</dt><dd>在可见会话检测恢复入口。操作时重新读取屏幕和关联对话，保留草稿备份、单次中断与回到 shell 后继续的顺序。</dd></div>
+          <div><dt>离开浏览器或遇到断网</dt><dd>暂停会话读取，保留最近内容；恢复时从现有游标追上。在加载较早消息时维持滚动位置，断线重连和切换节点时按各自的会话身份恢复。</dd></div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="acceptance">
+        <h2 id="acceptance">实施后要验证的行为</h2>
+        <ul>
+          <li>可见交互提示的常规抓屏预算沿用 1.2 秒；活跃对话的增量轮询沿用 1.5 秒。用实际 TUI 测量确认出现到可点击、消息写入到可读的 P95 延迟，与同环境现状对照。</li>
+          <li>打开终端坞、回到浏览器以及发送消息时立即追读。保留草稿、用户选择和阅读位置。切到另一个节点、同名会话重建或切换执行器时，旧数据不得写进新会话。</li>
+          <li>覆盖 Claude、Codex、OpenCode、Pi、普通 shell 与原生会话。原生 Main 的回合状态和转录最终消息继续按现有口径显示。</li>
+          <li>交互回归包含同一会话的工作台与项目 Main 双入口、独立会话页、桌面文件标签、慢请求、断网和回前台。桌面覆盖 1280、1920、2560、3440 CSS px，手机在 Android 真机上点按并切换前后台。</li>
+        </ul>
+      </section>
+
+      <nav class="document-links" aria-label="设计分册">
+        <a href="tech.html"><strong>技术方案</strong><span>数据来源、请求预算和回归矩阵</span></a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

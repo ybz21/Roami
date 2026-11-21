@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>会话请求频率优化 · Roami</title>
+  <link rel="stylesheet" href="../../../frontend/src/index.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="document-width"><h1>会话请求频率优化</h1></div>
+  </header>
+  <main>
+    <article class="document-width">
+      <p class="lead">工作台对每个已打开的 CLI 会话重复探测 Agent 并抓屏。桌面终端坞收起时组件仍然挂载，隐藏的对话也会持续读取转录和提示。优先复用现有批量状态，并让每个可见会话共享一份实时读取。</p>
+
+      <section aria-labelledby="baseline">
+        <h2 id="baseline">30 秒受控复现</h2>
+        <dl class="metrics">
+          <div><dt>逐会话 Agent 探测</dt><dd class="metric-value">144 次</dd><dd class="metric-note">8 个会话 × 3 种 Agent × 6 轮</dd></div>
+          <div><dt>收起终端坞的抓屏</dt><dd class="metric-value">81 次</dd><dd class="metric-note">标签状态 56 次，终端提示 25 次</dd></div>
+          <div><dt>共享的 Agent 种类查询</dt><dd class="metric-value">5 次</dd><dd class="metric-note">两个订阅者共用一轮</dd></div>
+        </dl>
+        <p class="note">各项来自独立计时场景，使用当前组件和固定 API 响应，排除挂载首轮。数字对应前端发起的调用，生产网络及 CPU、内存数据需另测。</p>
+      </section>
+
+      <section aria-labelledby="evidence">
+        <h2 id="evidence">截图里的请求从哪里来</h2>
+        <dl class="endpoint-list">
+          <div><dt><code>codex</code> / <code>opencode</code></dt><dd>每轮对所有打开的 CLI 标签依次请求 <code>claude</code>、<code>codex</code> 和 <code>opencode</code>，所以 Network 会出现成批的同名条目。后端即使返回未运行，也已经查过 tmux 与进程树。</dd></div>
+          <div><dt><code>capture?lines=50</code></dt><dd>标签每 4 秒逐个抓屏，终端和对话中的交互提示每 1.2 秒再读一份。项目详情也在针对所属会话抓屏。</dd></div>
+          <div><dt><code>transcript?offset=…</code></dt><dd>渲染对话以字节游标增量读取。可见时约 1.5 秒一轮，后台对话约 6 秒一轮。同一会话有两个视图订阅时，可以发出相同游标的两次请求。</dd></div>
+          <div><dt><code>agents</code></dt><dd><code>/sessions/agents</code> 是已共享的批量种类查询，正常间隔 6 秒。单条记录与现有设计一致。</dd></div>
+        </dl>
+        <p class="note">截图仅显示请求名称和部分查询参数，且开启了 Keep log。还需完整 URL、Initiator 和固定时间窗口来确认各条记录的会话归属与实际频率。用户原图保留在本机。</p>
+      </section>
+
+      <section aria-labelledby="delivery">
+        <h2 id="delivery">先去掉随标签数量增长的请求</h2>
+        <ol>
+          <li>用现有批量接口供工作台和项目详情显示 Agent 种类、运行和等待状态。只为可见会话读取所需的 Agent 详情。</li>
+          <li>让当前会话的交互提示、恢复检测和实时尾行共用抓屏。收起终端坞、切换到文件或隐藏浏览器时暂停相应消费者。</li>
+          <li>合并同一对话的增量读取。恢复时沿用字节游标，空闲会话降频，发送或重新打开时立即追上。</li>
+        </ol>
+      </section>
+
+      <nav class="document-links" aria-label="设计分册">
+        <a href="product.html"><strong>场景与验收</strong><span>桌面和手机应看到的状态与响应目标</span></a>
+        <a href="tech.html"><strong>技术方案</strong><span>调用链、共享边界、请求预算与分阶段上线</span></a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

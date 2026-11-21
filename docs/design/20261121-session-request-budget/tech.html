@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>技术方案 · 会话请求频率优化</title>
+  <link rel="stylesheet" href="../../../frontend/src/index.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="document-width heading-row">
+      <a href="index.html" class="back" aria-label="返回方案总览"></a>
+      <h1>技术方案</h1>
+    </div>
+  </header>
+  <main>
+    <article class="document-width">
+      <section aria-labelledby="diagnosis">
+        <h2 id="diagnosis">请求放大路径</h2>
+        <ol>
+          <li><strong>工作台探测。</strong> 桌面把全部 <code>terms</code> 传给 <code>useTerminalRuntime</code>，手机仅在会话覆盖层打开时传入当前会话。每个 CLI 会话串行查三个提供方，不同会话并发，每次启动立即查。<code>terms</code> 依赖 <code>sessIds</code>，后者随概览数据变化重新构建。即使会话名完全相同，数组引用改变也会重启探测和标签抓屏。固定间隔的慢请求可能重叠。<a href="../../../frontend/src/app/useTerminalRuntime.ts">运行时轮询</a> · <a href="../../../frontend/src/app/useSessionDirectory.ts">会话索引</a> · <a href="../../../frontend/src/app/useTaskWorkspace.ts">标签集合</a></li>
+          <li><strong>抓屏。</strong> <code>TerminalPane</code> 每 4 秒给所有 CLI 标签读取 50 行，标记等待和恢复状态。工作台折叠时 <code>Workspace</code> 仍保留终端坞的子树。终端 <code>PromptDialog</code> 和对话 <code>PromptPanel</code> 分别走 1.2 秒抓屏，隐藏的对话仍挂载提示组件。仅可见且需要实时输出的对话还可触发 <code>LiveTail</code> 的 40 行、800 毫秒周期。项目详情在每 5 秒刷新树和注解后重建 <code>cliMine</code>，可能提前重启 6 秒的逐会话探测，已展开工作区另有 8 行尾行预览。<a href="../../../frontend/src/components/terminal/TerminalPane.tsx">终端面板</a> · <a href="../../../frontend/src/components/prompt.tsx">交互提示</a> · <a href="../../../frontend/src/components/projects/Projects.tsx">项目详情</a></li>
+          <li><strong>转录。</strong> 各实例单独保存游标并安排下一次请求。<code>active=false</code> 只把下次间隔改为 6 秒。现有轮询没有文档可见性暂停、取消或失败退避。工作台与项目原生 Main 可经不同入口渲染相同 CLI 会话，截图里相同参数与这种机制相符，实际发起方需看 Initiator。<a href="../../../frontend/src/components/chat/useTranscript.ts">增量读取</a> · <a href="../../../frontend/src/components/chat/ExecutorSessionChat.tsx">执行器对话入口</a></li>
+        </ol>
+        <p>状态接口会执行 tmux 查询并遍历进程树，命中 Claude/Codex 时还要定位转录，命中 OpenCode 时会抓屏并查 SQLite。<code>capture</code> 经会话 CLI 读取 tmux 屏幕。带 <code>boff=1</code> 的 Claude 转录使用字节游标，重复调用仍会过鉴权、文件定位或打开与读取。浏览器请求数和服务端工作量都需要测量。<a href="../../../backend/api/claude.go">Claude 与批量探测</a> · <a href="../../../backend/api/codex.go">Codex</a> · <a href="../../../backend/api/opencode-chat.go">OpenCode</a> · <a href="../../../backend/api/api.go">抓屏入口</a></p>
+      </section>
+
+      <section aria-labelledby="plan">
+        <h2 id="plan">实施顺序</h2>
+        <h3>一 · 共享状态并收窄 Agent 详情</h3>
+        <p>工作台、独立会话页和项目详情共用 <code>useAgentKinds</code> 与 <code>useSessionOverview</code>。前者给进程种类，后者给活状态，<code>running</code> 表示正在响应。项目详情用概览的 <code>waiting</code> 和 <code>tail</code>，展开预览需要完整尾行时再按需取。先按稳定的会话身份与订阅可见性更新集合，避免普通概览变化重跑探测。</p>
+        <p>只有可见且需要路径、对话 ID 或恢复命令的会话请求对应 Agent 详情。首次进入、进程换代、显式启动与恢复时立即校验，前台以 5 秒周期保底。批量种类只有每会话一个结果，遇到刚启动、快照未确认或多 pane 匹配歧义时，当前会话可有界补探并保留已有正确绑定。核验手动切换视图、不同提供方和普通 shell 启停。</p>
+
+        <h3>二 · 同一可见会话共享屏幕快照</h3>
+        <p>待输入标记取概览；可交互的 <code>PromptDialog</code>、<code>PromptPanel</code>、<code>LiveTail</code> 和恢复检测共享同一读源。使用经验证足够的 50 行读取窗口，再按各消费者当前的 40/50 行口径裁剪。普通确认按 1.2 秒间隔，实时尾行有需求时可用较快的 800 毫秒间隔。按键结果复核与恢复动作前使用新读，保留原有时序与安全校验。</p>
+        <p>可见性由页面活动、终端坞模式、活跃文件或终端标签以及文档可见性共同决定。只给订阅终端详情的可见会话调度；最后一个消费者离开就取消请求和定时器。继续使用已有 <code>pollWhileVisible</code> 的串行、超时和退避语义。失败时保留上次观测并停止通过旧提示执行按键；恢复后立即刷新。</p>
+
+        <h3>三 · 合并转录读取，按活动调整间隔</h3>
+        <p>以节点、稳定会话身份、提供方和已验证的转录来源或执行代次绑定读源。默认只为可见消费者运行一条增量链。若两个入口后端确认同一来源，则共用请求和游标，分别保留滚动位置、草稿和各入口的业务回合状态。从 <code>offset</code> 继续追读，活跃时约 1.5 秒、确认空闲连续多轮后按 10 秒预算，下发消息、恢复可见和重连时提前唤醒。</p>
+        <p>首屏 50 条、<code>before</code> 历史分页、Pi 窗口替换和受管绑定仍走各自协议。转录轮转、截断或进程换代重建游标，丢弃晚到的旧响应；普通隐藏或断网恢复沿原游标补读。在现有工作区有界缓存中保留可重建快照。收到鉴权或绑定变化就失效，切换节点时立即终止旧节点请求。</p>
+        <p>三步分别验证、提交和回滚。已有会话生命周期事件继续触发状态刷新。只有生产对照仍显示明显开销时，再评估服务端共享采样与可携带游标的推送，并验证断线追赶。</p>
+      </section>
+
+      <section aria-labelledby="budget">
+        <h2 id="budget">请求预算</h2>
+        <p>下面只计入所列请求，取同一客户端、30 秒稳定窗口。基线来自本次受控样本或标注的周期推算，目标为实现后的验收上限。</p>
+        <dl class="endpoint-list">
+          <div><dt>8 个 CLI 标签，终端坞收起</dt><dd>逐会话 Agent 探测 <strong>144 → 0</strong>，抓屏 <strong>81 → 0</strong>。共享 <code>/sessions/agents</code> 约 5 次，<code>/sessions/overview</code> 约 6 次。路由本身若显示会话详情，另按对应预算计。</dd></div>
+          <div><dt>一个可见的 CLI 终端或对话</dt><dd>单提供方详情最多 6 次。普通交互抓屏最多 25 次，有实时尾行需求时最多 38 次，两种模式共享读源。显式按键复核和恢复动作单独计数。</dd></div>
+          <div><dt>同一转录的两个可见入口</dt><dd>按两个 1.5 秒订阅推算约 40 次。合并后活跃最多 20 次，达到空闲档后最多 3 次。所有消费者隐藏时为 0。首轮、手动历史翻页和恢复追读单独计数。</dd></div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="verification">
+        <h2 id="verification">上线前复测</h2>
+        <ol>
+          <li>同一生产构建配置、节点、客户端和会话集，首屏稳定后采集 30 秒 HAR/CDP。场景包含 0/1/8/20 个 CLI 标签、坞开合、文件、项目详情、同会话双入口、独立页、隐藏与恢复。分开记录首屏、稳态与恢复阶段。</li>
+          <li>按方法、路径、会话、查询参数和 Initiator 归类，同一目的的请求记录状态、取消、重叠、空增量比例和传输字节数。共享证据时只保留归类后的计数，移除会话路径和敏感参数。使用 <code>scripts/dev/isolated-roami.sh</code> 启停本地测试实例。</li>
+          <li>同批记录 Go 端实际的请求时长、<code>list-panes</code> 和 <code>capture-pane</code> 执行次数、转录读取量以及服务端 CPU/RSS，另测 Chrome 主线程和内存。请求下降比例只用于描述请求。</li>
+          <li>测试乱序响应、慢响应、短暂无文件、旧版本节点、节点切换、多 pane 同名 Agent、会话原地重启、同名会话重建、转录换文件及权限失败。持续检查用户可见行为，并以相同阶段的预算和实测为准。</li>
+        </ol>
+      </section>
+      <nav class="document-links" aria-label="设计分册">
+        <a href="product.html"><strong>场景与验收</strong><span>保留的用户行为和响应目标</span></a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>
