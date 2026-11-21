@@ -13,6 +13,7 @@ import (
 
 type routeChannel struct {
 	RestUntil         time.Time
+	RestStatus        int
 	ExhaustedUntil    time.Time
 	Input, Output     int64
 	RecentAt          time.Time

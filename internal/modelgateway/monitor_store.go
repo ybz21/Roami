@@ -22,20 +22,30 @@ const monitorSlotBytes = 4096
 const monitorDiskBudget = 64 << 20
 
 type MonitorRecord struct {
-	Sequence        uint64   `json:"sequence"`
-	At              int64    `json:"at"`
-	SourceID        string   `json:"sourceId"`
-	Model           string   `json:"model"`
-	RouteID         string   `json:"routeId,omitempty"`
-	Account         string   `json:"account,omitempty"`
-	Success         bool     `json:"success"`
-	Status          int      `json:"status"`
-	Error           string   `json:"error,omitempty"`
-	Duration        int64    `json:"durationMs"`
-	FirstToken      *float64 `json:"firstTokenMs"`
-	TokensPerSecond *float64 `json:"tokensPerSecond"`
-	Quality         string   `json:"quality"`
-	QualityRule     string   `json:"qualityRule,omitempty"`
+	Sequence        uint64         `json:"sequence"`
+	At              int64          `json:"at"`
+	SourceID        string         `json:"sourceId"`
+	Model           string         `json:"model"`
+	RouteID         string         `json:"routeId,omitempty"`
+	Account         string         `json:"account,omitempty"`
+	Success         bool           `json:"success"`
+	Status          int            `json:"status"`
+	Error           string         `json:"error,omitempty"`
+	Duration        int64          `json:"durationMs"`
+	FirstToken      *float64       `json:"firstTokenMs"`
+	TokensPerSecond *float64       `json:"tokensPerSecond"`
+	Quality         string         `json:"quality"`
+	QualityRule     string         `json:"qualityRule,omitempty"`
+	RequestID       string         `json:"requestId,omitempty"`
+	CallID          string         `json:"callId,omitempty"`
+	Outcome         string         `json:"outcome,omitempty"`
+	Caller          string         `json:"caller,omitempty"`
+	Revision        string         `json:"revision,omitempty"`
+	UpstreamModel   string         `json:"upstreamModel,omitempty"`
+	Attempts        int            `json:"attempts,omitempty"`
+	Attempt         int            `json:"attempt,omitempty"`
+	Switch          string         `json:"switch,omitempty"`
+	Blocks          map[string]int `json:"blocks,omitempty"`
 }
 type MonitorStore struct {
 	mu                        sync.Mutex
@@ -102,7 +112,7 @@ func openMonitorStore(path string, capacity int, now func() time.Time) (*Monitor
 	return store, nil
 }
 func validMonitorRecord(record MonitorRecord) bool {
-	return record.Sequence > 0 && record.At > 0 && len(record.SourceID) <= 160 && len(record.Model) <= 200 && len(record.RouteID) <= 160 && len(record.Account) <= 200 && len(record.Error) <= 100 && record.Duration >= 0 && containsField([]string{"pass", "fail", "unchecked"}, record.Quality) && (record.FirstToken == nil || !math.IsNaN(*record.FirstToken) && !math.IsInf(*record.FirstToken, 0) && *record.FirstToken >= 0) && (record.TokensPerSecond == nil || !math.IsNaN(*record.TokensPerSecond) && !math.IsInf(*record.TokensPerSecond, 0) && *record.TokensPerSecond >= 0)
+	return record.Sequence > 0 && len(record.RequestID) <= 36 && len(record.CallID) <= 36 && len(record.Caller) <= 120 && len(record.Revision) <= 160 && len(record.UpstreamModel) <= 200 && record.At > 0 && len(record.SourceID) <= 160 && len(record.Model) <= 200 && len(record.RouteID) <= 160 && len(record.Account) <= 200 && len(record.Error) <= 100 && record.Duration >= 0 && containsField([]string{"pass", "fail", "unchecked"}, record.Quality) && (record.FirstToken == nil || !math.IsNaN(*record.FirstToken) && !math.IsInf(*record.FirstToken, 0) && *record.FirstToken >= 0) && (record.TokensPerSecond == nil || !math.IsNaN(*record.TokensPerSecond) && !math.IsInf(*record.TokensPerSecond, 0) && *record.TokensPerSecond >= 0)
 }
 func (s *MonitorStore) pruneLocked(now time.Time) error {
 	for slot, record := range s.records {

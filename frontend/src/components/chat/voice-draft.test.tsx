@@ -7,10 +7,10 @@ import { api, transcribe } from '../../api'
 
 class TestBlob extends Blob { async arrayBuffer() { return new Uint8Array([1, 2, 3]).buffer } }
 
-const state = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn(), trackStop: vi.fn(), recorders: [] as any[] }))
+const state = vi.hoisted(() => ({ coarse: false, error: vi.fn(), info: vi.fn(), success: vi.fn(), trackStop: vi.fn(), recorders: [] as any[] }))
 vi.mock('../../api', () => ({ api: vi.fn(), transcribe: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock('../../layout', () => ({ useLayout: () => ({ coarse: false }) }))
+vi.mock('../../layout', () => ({ useLayout: () => ({ coarse: state.coarse }) }))
 vi.mock('../shell/keybindings', () => ({ useKeybindings: () => ({ voice: { key: null, label: 'Ctrl+Shift+S' } }), matchHotkey: vi.fn(() => false), isHotkeyKeyUp: () => false }))
 vi.mock('antd', () => ({ App: { useApp: () => ({ message: state }) }, Tooltip: ({ children }: any) => children }))
 
@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.stubGlobal('AudioContext', class { async decodeAudioData() { return { duration: 1 } } close() {} })
   vi.stubGlobal('OfflineAudioContext', class { destination = {}; createBufferSource() { return { connect() {}, start() {}, buffer: null } } async startRendering() { return { getChannelData: () => new Float32Array(16000) } } })
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); state.recorders = [] })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); state.recorders = []; state.coarse = false })
 const props = { inline: true, scope: 'one', accent: 'var(--accent)', onResult: vi.fn() }
 async function record() {
   await act(async () => {})
@@ -51,6 +51,21 @@ it('adds a transcript through the latest draft callback without sending a messag
   expect(original).not.toHaveBeenCalled()
   expect(latest).toHaveBeenCalledWith('补充验收步骤')
   expect(api).toHaveBeenCalledTimes(1)
+})
+
+it('lets a touch user tap to start and stop a settings transcription test', async () => {
+  state.coarse = true
+  vi.mocked(transcribe).mockResolvedValue('语音转写验收')
+  const result = vi.fn()
+  render(<VoiceInput {...props} test onResult={result} />)
+  const start = await screen.findByRole('button', { name: 'voice.dictation' }) as HTMLButtonElement
+  await waitFor(() => expect(start.disabled).toBe(false))
+  fireEvent.click(start)
+  await waitFor(() => expect(state.recorders).toHaveLength(1))
+  vi.mocked(Date.now).mockReturnValue(1800)
+  fireEvent.click(screen.getByRole('button', { name: 'voice.stopDictation' }))
+  await waitFor(() => expect(result).toHaveBeenCalledWith('语音转写验收'))
+  expect(state.trackStop).toHaveBeenCalledOnce()
 })
 
 it('discards a pending transcript after the conversation changes', async () => {

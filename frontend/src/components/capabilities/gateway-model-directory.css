@@ -1,5 +1,5 @@
 .tt-gateway-directory{min-width:0}
-.tt-directory-filters{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:var(--sp-3);margin-bottom:var(--sp-4)}
+.tt-directory-filters{display:grid;grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));gap:var(--sp-3);margin-bottom:var(--sp-4)}
 .tt-directory-filters>*{min-width:0}
 .tt-gateway-directory-source,.tt-directory-groups{margin-bottom:var(--sp-5)}
 .tt-directory-source-head{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-3);margin-bottom:var(--sp-2)}
@@ -33,5 +33,3 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model>.tt-direct
 html:is([data-size="compact"],[data-size="medium"]) .tt-gateway-model>button:last-child{grid-column:2;grid-row:1/4}
 html[data-pointer="coarse"] .tt-directory-model-name{min-height:var(--tap);position:relative}
 html[data-pointer="coarse"] .tt-directory-model-name::after{content:'';position:absolute;inset:0 calc(var(--sp-1)*-1)}
-
-.tt-directory-tabs .ant-tabs-nav { margin-bottom: var(--sp-3); }

@@ -12,7 +12,7 @@ import (
 
 func pluginFailure(w http.ResponseWriter, err error) {
 	code := err.Error()
-	if !containsField([]string{"INVALID_MODEL_PLUGIN_PACKAGE", "MODEL_PLUGIN_DESKTOP_UNAVAILABLE", "MODEL_PLUGIN_DESKTOP_APP_MISSING", "MODEL_PLUGIN_DESKTOP_PACKAGE_UNTRUSTED", "MODEL_PLUGIN_BUN_UNAVAILABLE", "MODEL_PLUGIN_SANDBOX_UNAVAILABLE", "MODEL_PLUGIN_BUSY", "MODEL_PLUGIN_PROVIDER_NOT_FOUND", "MODEL_PLUGIN_SIGN_IN_FAILED", "MODEL_PLUGIN_MODELS_REQUIRED"}, code) {
+	if !containsField([]string{"INVALID_MODEL_PLUGIN_PACKAGE", "MODEL_PLUGIN_DESKTOP_UNAVAILABLE", "MODEL_PLUGIN_DESKTOP_APP_MISSING", "MODEL_PLUGIN_DESKTOP_PACKAGE_UNTRUSTED", "MODEL_PLUGIN_BUN_UNAVAILABLE", "MODEL_PLUGIN_SANDBOX_UNAVAILABLE", "MODEL_PLUGIN_BUSY", "MODEL_PLUGIN_PROVIDER_NOT_FOUND", "MODEL_PLUGIN_SIGN_IN_FAILED", "MODEL_PLUGIN_MODELS_REQUIRED", "MODEL_PLUGIN_COMMUNITY_UNAVAILABLE", "MODEL_PLUGIN_COMMUNITY_INTEGRITY"}, code) {
 		code = "MODEL_PLUGIN_FAILED"
 	}
 	reject(w, 400, code)
@@ -35,6 +35,10 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 	}
 	if r.Method == "GET" && r.URL.Path == route+"/packages" {
 		writeJSON(w, 200, map[string]any{"data": h.Plugins.Packages()})
+		return true
+	}
+	if r.URL.Path == route+"/community" {
+		h.communityPlugins(w, r)
 		return true
 	}
 	if r.Method == "POST" && r.URL.Path == route+"/import" {
@@ -157,15 +161,14 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 	}
 	switch {
 	case len(parts) == 2 && parts[1] == "info" && r.Method == "GET":
-		provider, err := h.Plugins.CachedProvider(source)
-		if err != nil || r.URL.Query().Get("refresh") == "1" {
-			provider, err = h.Plugins.Provider(r.Context(), source)
-		}
+		provider, err := h.pluginAccountProvider(r, source)
 		if err != nil {
 			pluginFailure(w, err)
 			return true
 		}
 		writeJSON(w, 200, map[string]any{"data": map[string]any{"provider": publicProvider(provider), "options": source.Options, "desktopUnavailable": modelplugins.DesktopUnavailable(source.ProviderID), "desktopAppMissing": modelplugins.DesktopAppMissing(source.ProviderID)}})
+	case len(parts) == 2 && (parts[1] == "usage" || parts[1] == "check-in" || parts[1] == "calls"):
+		h.pluginAccountCapability(w, r, source, parts[1])
 	case len(parts) == 2 && parts[1] == "options" && r.Method == "POST":
 		var input struct {
 			Options map[string]any `json:"options"`
@@ -232,6 +235,41 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 		reject(w, 404, "MODEL_GATEWAY_ROUTE_NOT_FOUND")
 	}
 	return true
+}
+
+func (h *Handler) communityPlugins(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		channel := r.URL.Query().Get("channel")
+		if !modelplugins.ValidCommunityChannel(channel) {
+			reject(w, 400, "INVALID_MODEL_PLUGIN_PACKAGE")
+			return
+		}
+		rows, err := h.Plugins.CommunityPlugins(r.Context(), channel)
+		if err != nil {
+			pluginFailure(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"data": rows})
+	case http.MethodPost:
+		var input struct {
+			Channel string `json:"channel"`
+			Package string `json:"package"`
+			Version string `json:"version"`
+		}
+		if decodeBody(w, r, &input) != nil || !modelplugins.ValidCommunityChannel(input.Channel) {
+			reject(w, 400, "INVALID_MODEL_PLUGIN_PACKAGE")
+			return
+		}
+		pkg, err := h.Plugins.ImportCommunity(r.Context(), input.Channel, input.Package, input.Version)
+		if err != nil {
+			pluginFailure(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"data": pkg})
+	default:
+		reject(w, 405, "METHOD_NOT_ALLOWED")
+	}
 }
 func (h *Handler) importModelPlugin(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, modelplugins.MaxExpandedBytes+(8<<20))

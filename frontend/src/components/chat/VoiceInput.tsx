@@ -9,6 +9,7 @@ import { api, transcribe } from '../../api'
 import { useI18n } from '../../i18n'
 import { MicrophoneIcon } from '../../icons'
 import { isHotkeyKeyUp, matchHotkey, useKeybindings } from '../shell/keybindings'
+import { Button } from '../ui/button'
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'transcribing'
 
@@ -32,7 +33,7 @@ const HOLD_MS = 350
  * 只有当前视图的那枚传 true，不然一个键按下去几路一起录。
  * 键盘开的录音没有「松手」：再按一次识别，Esc 取消。
  */
-export function VoiceInput({ accent, onResult, inline = false, toolbar = false, hotkey = false, disabled = false, scope = '' }: { accent: string; onResult: (text: string) => void; inline?: boolean; toolbar?: boolean; hotkey?: boolean; disabled?: boolean; scope?: string }) {
+export function VoiceInput({ accent, onResult, inline = false, toolbar = false, test = false, hotkey = false, disabled = false, scope = '' }: { accent: string; onResult: (text: string) => void; inline?: boolean; toolbar?: boolean; test?: boolean; hotkey?: boolean; disabled?: boolean; scope?: string }) {
   const pageActive = usePageActive()
   disabled = disabled || !pageActive
   const { t } = useI18n()
@@ -40,7 +41,7 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
   const kb = useKeybindings().voice
   // 鼠标：点一下开录、再点一下识别（GPT 那种）；触屏：按住说话、上滑取消（微信那种）
   const { coarse } = useLayout()
-  const clickMode = !coarse
+  const clickMode = test || !coarse
   const maxTimer = useRef<number | undefined>(undefined)
   const HOTKEY_LABEL = kb.label
   const hkRef = useRef(kb.key); hkRef.current = kb.key
@@ -236,6 +237,13 @@ export function VoiceInput({ accent, onResult, inline = false, toolbar = false, 
     : btn)
   const mm = String(Math.floor(secs / 60)).padStart(2, '0')
   const ss = String(secs % 60).padStart(2, '0')
+  if (test) {
+    const label = t(phase === 'transcribing' ? 'composer.transcribing' : active ? 'voice.stopDictation' : 'voice.dictation')
+    return <>
+      <Button disabled={disabled || !micUsable || !configured || phase === 'transcribing'} onClick={() => phase === 'idle' ? void begin(0) : end()}><MicrophoneIcon size={16} />{label}</Button>
+      <span role="status">{!micUsable ? micHint : active ? `${mm}:${ss}` : ''}</span>
+    </>
+  }
 
   return (
     <>

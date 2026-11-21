@@ -169,6 +169,15 @@ func (s *CatalogStore) snapshot() ModelCatalog {
 	raw, _ := json.Marshal(s.value)
 	var v ModelCatalog
 	_ = json.Unmarshal(raw, &v)
+	// Aggregate member filtering must not become a request cost policy.
+	for _, models := range [][]CatalogModel{v.Models, v.Drafts} {
+		for i := range models {
+			if models[i].Aggregate {
+				models[i].FreeOnly = false
+				models[i].AllowPlan = false
+			}
+		}
+	}
 	v.Token = s.value.Token
 	v.AccessKey = s.value.AccessKey
 	v.AccessKeys = append([]gatewayAccessKey(nil), s.value.AccessKeys...)

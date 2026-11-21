@@ -1,0 +1,6 @@
+.tt-speech-test { padding:var(--sp-4) var(--pad-page); border-block-start:1px solid var(--border-subtle); }
+.tt-speech-test h3 { font-size:var(--fs-lg); margin:0 0 var(--sp-3); }
+.tt-speech-test-actions { display:flex; align-items:center; gap:var(--sp-3); }
+.tt-speech-test-actions > span:empty,.tt-speech-test > p:empty { display:none; }
+.tt-speech-test > p { overflow-wrap:anywhere; white-space:pre-wrap; }
+html[data-pointer="coarse"] .tt-speech-test button { min-height:var(--tap); }

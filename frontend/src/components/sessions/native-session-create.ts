@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { api } from '../../api'
 import type { useI18n } from '../../i18n'
-import type { ModelChoice } from '../capabilities/ModelSelectionFields'
+import { modelChoiceRequest, type ModelChoice } from '../capabilities/ModelSelectionFields'
 import { nodeApi } from '../cluster/node-url'
 import { refreshSessionLists } from './native-session-list'
 import { lifecycleRequestError } from './session-lifecycle'
@@ -15,7 +15,7 @@ export function useNativeSessionCreate() {
       const destination = nodeApi(route)
       const body = {
         title: title.slice(0, 80), task, directory: directory || undefined,
-        model: choice.model !== 'auto' || choice.freeOnly ? choice.model : undefined, freeOnly: choice.freeOnly,
+        ...modelChoiceRequest(choice),
       }
       const signature = JSON.stringify([destination, body])
       if (request.current?.signature !== signature) request.current = { signature, key: crypto.randomUUID() }

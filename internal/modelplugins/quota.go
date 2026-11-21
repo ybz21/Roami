@@ -7,6 +7,7 @@ import (
 
 type QuotaWindow struct {
 	Name         string   `json:"name"`
+	Display      string   `json:"display,omitempty"`
 	Used         *float64 `json:"used"`
 	ResetsAt     string   `json:"resetsAt"`
 	ResetSeconds int64    `json:"resetSecs"`
@@ -30,6 +31,8 @@ type QuotaResets struct {
 	} `json:"each"`
 }
 type Quota struct {
+	Plan       string        `json:"plan,omitempty"`
+	Balance    string        `json:"balance,omitempty"`
 	Resets     *QuotaResets  `json:"resets"`
 	Error      string        `json:"error"`
 	SignIn     string        `json:"signIn"`

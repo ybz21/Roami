@@ -3,13 +3,15 @@ import { App } from 'antd'
 import { Alert, Button, Checkbox, Input, Select, Spin } from './model-controls'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { pluginFailure, type PluginProvider } from './MagpiePluginImport'
+import { pluginFailure } from './MagpiePluginImport'
+import { pluginCapabilityLabels, type PluginProvider } from './magpie-provider'
+import MagpieAccountCapabilities from './MagpieAccountCapabilities'
 
 type Prompt = { key: string; message: string; type: string; placeholder?: string; options?: { label: string; value: string }[] }
 type SignIn = { session: string; url: string; instructions: string; method: string }
-export default function MagpieSourceSettings({ sourceId, onChanged }: { sourceId: string; onChanged: () => void }) {
+export default function MagpieSourceSettings({ sourceId, onChanged, initiallyOpen = false }: { sourceId: string; onChanged: () => void; initiallyOpen?: boolean }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
-  const path = '/agent/model-gateway/plugins/sources/' + sourceId
+  const path = '/agent/model-gateway/plugins/sources/' + encodeURIComponent(sourceId)
   const fresh = useRef(false)
   const [info, setInfo] = useState<{ provider: PluginProvider; options: Record<string, boolean>; desktopUnavailable: boolean; desktopAppMissing?: boolean } | null>(null)
   const [version, setVersion] = useState(0), [error, setError] = useState(''), [busy, setBusy] = useState(false)
@@ -74,6 +76,8 @@ export default function MagpieSourceSettings({ sourceId, onChanged }: { sourceId
   }
   let loginURL = ''
   try { if (signIn?.url && new URL(signIn.url).protocol === 'https:') loginURL = signIn.url } catch { /* Only browser URLs may be opened. */ }
+  const provider = info?.provider
+  const hasActions = provider?.usage || provider?.checkin || provider?.calls
   return <section className="tt-model-plugin-settings" aria-label={t('hub.plugin.settings')} onKeyDown={event=>{if(event.key==='Enter'&&event.target instanceof HTMLInputElement)event.preventDefault()}}>
     {error && <Alert type="error" role="alert" message={t(error)} action={<Button disabled={busy || !!job} onClick={() => { fresh.current = true; setVersion(previous => previous + 1) }}>{t('capabilities.models.reread')}</Button>} />}
     {!info ? !error && <Spin /> : <>
@@ -81,12 +85,20 @@ export default function MagpieSourceSettings({ sourceId, onChanged }: { sourceId
       {info.desktopUnavailable && <Alert type="warning" message={t('hub.plugin.desktopUnavailable')} />}
       {info.desktopAppMissing && <Alert type="warning" message={t('hub.plugin.desktopMissing')} />}
       <p role="status">{t(info.provider.signedIn ? 'hub.plugin.signedIn' : 'hub.plugin.notSignedIn')}</p>
-      <label className="agent-settings-field">{t('hub.plugin.loginMethod')}<Select<number> virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.plugin.loginMethod')} value={method} disabled={busy || !!job} options={info.provider.methods.map((row, index) => ({ value: index, label: row.labels?.[locale] || row.labels?.[locale.startsWith('zh') ? 'zh' : 'en'] || row.labels?.[locale.startsWith('zh') ? 'zh' : 'en'] || row.label }))} onChange={value => { setMethod(value); setPrompt(null); setInputs({}); setSignIn(null); setKey(''); setCode('') }} /></label>
-      {info.provider.methods[method]?.type === 'api' && !info.provider.methods[method].keyless && <label className="agent-settings-field">{t('agent.models.apiKey')}<Input.Password aria-label={t('agent.models.apiKey')} autoComplete="new-password" value={key} visibilityToggle={false} onChange={event => setKey(event.target.value)} /></label>}
-      {prompt && <label className="agent-settings-field">{prompt.message}{prompt.type === 'select' ? <Select<string> virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={prompt.message} value={answer || undefined} options={prompt.options} onChange={setAnswer} /> : <Input aria-label={prompt.message} placeholder={prompt.placeholder} value={answer} onChange={event => setAnswer(event.target.value)} />}</label>}
-      {!signIn && <Button type="primary" disabled={busy || info.desktopUnavailable || info.desktopAppMissing || (!prompt && info.provider.methods[method]?.type === 'api' && !info.provider.methods[method]?.keyless && !key.trim())} loading={busy} onClick={() => void login()}>{t(prompt ? 'hub.plugin.next' : 'hub.plugin.signIn')}</Button>}
-      {signIn && <div className="tt-model-plugin-signin">{signIn.instructions && <p>{signIn.instructions}</p>}{loginURL && <a href={loginURL} target="_blank" rel="noreferrer">{t('hub.plugin.openLogin')}</a>}{signIn.method === 'code' && <><Input aria-label={t('hub.plugin.loginCode')} value={code} onChange={event => setCode(event.target.value)} /><Button disabled={!code || !!job} onClick={() => void callback(signIn).catch(cause => setError(pluginFailure(cause)))}>{t('hub.plugin.finishLogin')}</Button></>}{job && <Spin />}<Button onClick={() => { setJob(''); setSignIn(null); setCode('') }}>{t('common.cancel')}</Button></div>}
-      {info.provider.options?.length > 0 && <div className="tt-model-plugin-options">{info.provider.options.map(row => <Checkbox key={row.key} disabled={busy || !!job} checked={info.options?.[row.key] ?? row.default} onChange={event => void option(row.key, event.target.checked)}>{row.labels?.[locale] || row.labels?.[locale.startsWith('zh') ? 'zh' : 'en'] || row.label}</Checkbox>)}</div>}
+      {!info.provider.signedIn && <p className="agent-settings-hint">{pluginCapabilityLabels(info.provider).map(label => t(label)).join(' · ') || t('hub.plugin.noAccountCapabilities')}</p>}
+      {info.provider.signedIn && !info.desktopUnavailable && !info.desktopAppMissing && hasActions && <MagpieAccountCapabilities key={path} path={path} provider={info.provider} disabled={busy || !!job} />}
+      <details className="tt-model-source-authorization" open={initiallyOpen || !info.provider.signedIn || undefined}>
+        <summary>{t('modelInteraction.authorization')}</summary>
+        <div>
+          {info.provider.signedIn && info.provider.renews && <p className="agent-settings-hint">{t('hub.plugin.renewsCredentials')}</p>}
+          <label className="agent-settings-field">{t('hub.plugin.loginMethod')}<Select<number> virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.plugin.loginMethod')} value={method} disabled={busy || !!job} options={info.provider.methods.map((row, index) => ({ value: index, label: row.labels?.[locale] || row.labels?.[locale.startsWith('zh') ? 'zh' : 'en'] || row.labels?.[locale.startsWith('zh') ? 'zh' : 'en'] || row.label }))} onChange={value => { setMethod(value); setPrompt(null); setInputs({}); setSignIn(null); setKey(''); setCode('') }} /></label>
+          {info.provider.methods[method]?.type === 'api' && !info.provider.methods[method].keyless && <label className="agent-settings-field">{t('agent.models.apiKey')}<Input.Password aria-label={t('agent.models.apiKey')} autoComplete="new-password" value={key} visibilityToggle={false} onChange={event => setKey(event.target.value)} /></label>}
+          {prompt && <label className="agent-settings-field">{prompt.message}{prompt.type === 'select' ? <Select<string> virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={prompt.message} value={answer || undefined} options={prompt.options} onChange={setAnswer} /> : <Input aria-label={prompt.message} placeholder={prompt.placeholder} value={answer} onChange={event => setAnswer(event.target.value)} />}</label>}
+          {!signIn && <Button type="primary" disabled={busy || info.desktopUnavailable || info.desktopAppMissing || (!prompt && info.provider.methods[method]?.type === 'api' && !info.provider.methods[method]?.keyless && !key.trim())} loading={busy} onClick={() => void login()}>{t(prompt ? 'hub.plugin.next' : 'hub.plugin.signIn')}</Button>}
+          {signIn && <div className="tt-model-plugin-signin">{signIn.instructions && <p>{signIn.instructions}</p>}{loginURL && <a href={loginURL} target="_blank" rel="noreferrer">{t('hub.plugin.openLogin')}</a>}{signIn.method === 'code' && <><Input aria-label={t('hub.plugin.loginCode')} value={code} onChange={event => setCode(event.target.value)} /><Button disabled={!code || !!job} onClick={() => void callback(signIn).catch(cause => setError(pluginFailure(cause)))}>{t('hub.plugin.finishLogin')}</Button></>}{job && <Spin />}<Button onClick={() => { setJob(''); setSignIn(null); setCode('') }}>{t('common.cancel')}</Button></div>}
+          {info.provider.options?.length > 0 && <div className="tt-model-plugin-options">{info.provider.options.map(row => <Checkbox key={row.key} disabled={busy || !!job} checked={info.options?.[row.key] ?? row.default} onChange={event => void option(row.key, event.target.checked)}>{row.labels?.[locale] || row.labels?.[locale.startsWith('zh') ? 'zh' : 'en'] || row.label}</Checkbox>)}</div>}
+        </div>
+      </details>
     </>}
   </section>
 }

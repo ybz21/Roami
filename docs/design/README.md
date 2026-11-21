@@ -5,13 +5,11 @@
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
 | 创建任务时的互审会话 | [20261120-review-session](20261120-review-session/README.md) | 审查 Agent、双向会话消息和多轮复审原型 |
+| 大模型工作台 | [设计首页（HTML）](20261114-model-orchestration/index.html) · [交互原型（HTML）](20261114-model-orchestration/current.html) | 模型源、聚合、网关、用量、监控、审计、选模与语音的页面设计 |
 | 顶部标签选中态 | [20261119-active-workspace-tab](20261119-active-workspace-tab/README.md) | 内容侧强调线、标题强调与桌面/真机验收 |
 | Agent 渲染视图宽度统一 | [20261119-agent-render-width](20261119-agent-render-width/README.md) | 所有 Agent 消息、输入及附属状态铺满可用宽度与桌面/真机验收 |
-| Main 工作中切换模型 | [20261117-main-model-switch](20261117-main-model-switch/README.md) | 请求边界切换、模型连接排空、命令入口及桌面/真机验收 |
-| 模型网关与能力选择统一 | [20261116-model-capabilities](20261116-model-capabilities/README.md) | 统一模型目录、原生/聚合展示、CLI 与 Agent 选模委派及运行验收 |
 | 会话标签行尾间距 | [20261116-session-tab-spacing](20261116-session-tab-spacing/README.md) | 鼠标端动作紧邻排列、统一尺寸与桌面/真机验收 |
 | 后台任务确认与停止核对 | [20261116-task-confirmation](20261116-task-confirmation/README.md) | 停止检查重试、回报旁确认入口与桌面/真机验收 |
-| 模型源与聚合工作台 | [20261114-model-orchestration](20261114-model-orchestration/README.md) | 紧凑导航、Tailwind/Radix 控件、全宽拖拽排序与桌面/真机验收 |
 | 会话与文件导航 | [20261114-session-file-navigation](20261114-session-file-navigation/README.md) | 智能体 Logo 与会话名直达对话，有打开文件时才显示下拉，含历版快照（未改产品） |
 | 页面状态保留与统一仓库 | [20261113-文件工作区状态](20261113-文件工作区状态/README.md) | 主导航页面保留、后台活动暂停与桌面 / 真机验收 |
 | 旧会话记录分批加载 | [20261113-transcript-paging](20261113-transcript-paging/README.md) | 最新 50 条首屏、向前游标分页、只读历史身份校验与桌面/真机验收 |
@@ -22,7 +20,6 @@
 | 压缩状态反馈 | [20261112-compact-status](20261112-compact-status/README.md) | 状态行反馈、按需读取摘要与手机全屏详情，修复重复清空造成的闪烁 |
 | 浏览器导航等待与卡死检测 | [20261112-browser-navigation-recovery](20261112-browser-navigation-recovery/README.md) | 慢导航保留连接、超时恢复、新标签回执与桌面/手机验收 |
 | 首页委派任务与对话排版 | [20261112-home-delegated-activity](20261112-home-delegated-activity/README.md) | 委派工具步骤收在详情；正文阅读排版、紧凑输入区与整行任务导航 |
-| 大模型用量、聚合与监控 | [20261112-model-usage-details](20261112-model-usage-details/README.md) | 概况 / 审计、源定价、九种路由策略与 24 小时滚动监控 |
 | 派生任务提示词与 Main 回复 | [20261111-derived-task-prompts](20261111-derived-task-prompts/README.md) | Markdown 任务置顶、旧执行校验兼容与回复交付记录收拢 |
 | 技能市场失败恢复 | [20261111-skill-market-recovery](20261111-skill-market-recovery/README.md) | 原请求重试、错误原因与桌面/手机验收 |
 | 设置智能体入口整理 | [20261111-settings-agent-navigation](20261111-settings-agent-navigation/README.md) | 去掉旧模型入口、统一记忆迁入 Roami、旧链接兼容与桌面/真机验收 |
@@ -30,10 +27,8 @@
 | 会话关闭首次点击反馈 | [20261111-session-close-feedback](20261111-session-close-feedback/README.md) | 检查状态即时反馈、等待请求去重、失败重试 |
 | 热门技能与本机 Agent 安装 | [20261111-popular-skills](20261111-popular-skills/README.md) | skills.sh 热门榜、固定版本审核、本机与全部 Agent 安装 |
 | 会话关闭阻塞 | [20261110-native-close-blockers](20261110-native-close-blockers/README.md) | 原生会话保留未知历史归档，分离 HEAD 工作区支持确认和清理 |
-| Magpie 插件模型源 | [20261110-magpie-model-sources](20261110-magpie-model-sources/README.md) | WorkBuddy、豆包工作导入、隔离运行与网关 Key 管理 |
 | 长期会话增量整理 | [20261109-incremental-context](20261109-incremental-context/README.md) | 复用有效摘要、保留完整来源与记忆版本校验 |
 | OKR 发布后的动态取数 | [20261108-okr-publication-data](20261108-okr-publication-data/README.md) | 项目 SQLite 发布登记、稳定集合来源与 Main 确认边界 |
-| 语音识别模型配置 | [20261107-speech-model-settings](20261107-speech-model-settings/README.md) | 能力中心入口、旧链接兼容与桌面/真机验收 |
 | 任务创建与关闭异步化 | [20261108-async-task-lifecycle](20261108-async-task-lifecycle/README.md) | 持久受理、后台准备与清理、草稿恢复及桌面／手机实现验收 |
 | 会话内存误杀与恢复 | [20261107-memory-scope-recovery](20261107-memory-scope-recovery/README.md) | 两次退出原因、原对话恢复与测试限额隔离回归 |
 | 后台任务详情展示 | [20261106-task-detail-polish](20261106-task-detail-polish/README.md) | 结果优先、命令用途、窄栏溢出修复与桌面/真机验收 |
@@ -49,7 +44,6 @@
 | 思考强度四档与对齐 | [20261102-thinking-levels](20261102-thinking-levels/README.md) | 竞品调研、四档提案与旧配置兼容 |
 | 任务结果文件预览 | [20261102-task-file-preview](20261102-task-file-preview/README.md) | 独立预览页、手机全屏阅读与文件入口 |
 | 公网首次加载诊断 | [20261102-initial-load](20261102-initial-load/README.md) | 公网响应传输、消息分页与数据库布局排查 |
-| 大模型与智能体统一管理 | [20261030-智能体模型切换](20261030-智能体模型切换/README.md) | 多上游、聚合策略与能力入口第二版 |
 | Roami Agent RSI | [20261022-roami-agent-rsi](20261022-roami-agent-rsi/README.md) | [42 条](20261022-roami-agent-rsi/records/README.md) |
 | 对话体验优化 | [20261018-对话体验优化](20261018-对话体验优化/README.md) | [1 条](20261018-对话体验优化/records/README.md) |
 | 对话输入交互 | [20261019-对话输入交互](20261019-对话输入交互/README.md) | [2 条](20261019-对话输入交互/records/README.md) |
@@ -66,7 +60,6 @@
 | 任务会话与工作习惯 | [20261022-任务会话与工作习惯](20261022-任务会话与工作习惯/README.md) | [2 条](20261022-任务会话与工作习惯/records/README.md) |
 | 运行时分发与安装 | [20261023-运行时分发与安装](20261023-运行时分发与安装/README.md) | [1 条](20261023-运行时分发与安装/records/README.md) |
 | 手机文档预览 | [20261024-手机文档预览](20261024-手机文档预览/README.md) | [1 条](20261024-手机文档预览/records/README.md) |
-| 本地模型代理与每日限额 | [20261026-本地模型代理与每日限额](20261026-本地模型代理与每日限额/README.md) | [2 条](20261026-本地模型代理与每日限额/records/README.md) |
 | 设置分类 | [20261027-设置分类](20261027-设置分类/README.md) | [2 条](20261027-设置分类/records/README.md) |
 | 关闭会话后的 worktree 清理 | [20261106-session-worktree-cleanup](20261106-session-worktree-cleanup/README.md) | 断连收尾、已关闭会话重试与 squash 恢复回归 |
 | 关闭会话合入状态 | [20261112-worktree-merge-status](20261112-worktree-merge-status/README.md) | 关闭预检即时同步远端、离线本地状态刷新与隔离回归 |

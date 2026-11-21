@@ -1,0 +1,12 @@
+.tt-magpie-account-capabilities { display:grid; gap:var(--sp-3); min-width:0; }
+.tt-magpie-account-capabilities > div { border-block-start:1px solid var(--border-subtle); padding-block-start:var(--sp-3); }
+.tt-magpie-capability-head { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); }
+.tt-magpie-capability-head h4 { margin:0; font-size:var(--fs-body); }
+.tt-magpie-account-capabilities :is(dl,p) { margin:var(--sp-2) 0 0; }
+.tt-magpie-account-capabilities dl > div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--sp-2); padding-block:var(--sp-2); border-block-end:1px solid var(--border-subtle); }
+.tt-magpie-account-capabilities :is(dt,dd,p) { overflow-wrap:anywhere; }
+.tt-magpie-account-capabilities dd { margin:0; font-variant-numeric:tabular-nums; }
+.tt-magpie-account-capabilities small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-magpie-account-capabilities summary { cursor:pointer; padding-block:var(--sp-2); }
+html[data-pointer="coarse"] .tt-magpie-account-capabilities summary { min-height:var(--tap); }
+html[data-pointer="coarse"] .tt-magpie-capability-head button { min-height:var(--tap); }

@@ -39,6 +39,53 @@ async function emit(cid: string, event: AgentEvent) {
   state.snapshots.set(cid, projectAgentEvent(state.snapshots.get(cid), event).view)
   await act(async () => { state.streams.get(cid)!.enqueue(new TextEncoder().encode('data: ' + JSON.stringify(event) + '\n\n')) })
 }
+it.each([false, true])('sends the native delegation model and free policy (phone=%s)', async phone => {
+  state.phone = phone
+  const original = state.api.getMockImplementation()!
+  const requests: { requestKey: string; freeOnly: boolean }[] = []
+  state.api.mockImplementation(async (method, path, body) => {
+    if (path === '/agent/model-gateway/models') return { data: { models: [{ id: 'free-pool', name: 'Free Coding', kind: 'aggregate', configured: true, enabled: true, protocol: 'openai-completions', freeOnly: true, capabilities: {} }] } }
+    if (method === 'POST' && path === '/agent/tasks') {
+      requests.push(body)
+      if (!phone && requests.length < 3) throw new Error('Response unavailable')
+    }
+    return original(method, path, body)
+  })
+  render(<App><AgentChat cid="home" branch="" node={null} inbox={{ conversations: [{ id: 'home' }], refresh: vi.fn() } as any} inboxOpen={false} select={vi.fn()} notifications={vi.fn()} projects={[]} onSession={vi.fn()} onOverview={vi.fn()} /></App>)
+  await waitFor(() => expect(state.streams.has('home')).toBe(true))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.composer.more' }))
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: 'agent.composer.taskMode' }))
+  fireEvent.click(screen.getByRole('button', { name: 'agent.executor' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Roami' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'agent.composer.model' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'modelSelection.freeOnly' }))
+  const picker = screen.getByRole<HTMLInputElement>('combobox', { name: 'agent.composer.model' })
+  await waitFor(() => expect(picker.disabled).toBe(false))
+  fireEvent.mouseDown(picker)
+  fireEvent.click(await screen.findByText(/Free Coding/))
+  fireEvent.click(screen.getByRole('button', { name: phone ? 'common.back' : 'Close' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'agent.message' }), { target: { value: 'Review the repository' } })
+  fireEvent.click(screen.getByRole('button', { name: 'composer.createTask' }))
+  await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/tasks', expect.objectContaining({
+    conversationId: 'home', goal: 'Review the repository', executor: 'native', model: 'free-pool',
+    freeOnly: true, target: { kind: 'new_session' },
+  })))
+  if (!phone) {
+    const send = screen.getByRole<HTMLButtonElement>('button', { name: 'composer.createTask' })
+    await waitFor(() => expect(send.disabled).toBe(false))
+    fireEvent.click(send)
+    await waitFor(() => expect(requests).toHaveLength(2))
+    expect(requests[1].requestKey).toBe(requests[0].requestKey)
+    await waitFor(() => expect(send.disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: 'agent.composer.model' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'modelSelection.freeOnly' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(send)
+    await waitFor(() => expect(requests).toHaveLength(3))
+    expect(requests[2].freeOnly).toBe(false)
+    expect(requests[2].requestKey).not.toBe(requests[1].requestKey)
+  }
+})
 it.each([false, true])('keeps /compact inline, reads context only on click and never polls the summary (phone=%s)', async phone => {
   state.phone = phone
   const original = state.api.getMockImplementation()!

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用量 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>用量</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a><a href="plugins.html">插件与账号</a><a href="aggregation.html">聚合</a><a href="gateway.html">本机网关</a><a href="usage.html" aria-current="page">用量</a><a href="monitor.html">监控</a><a href="audit.html">审计</a><a href="agent.html">选模</a><a href="speech.html">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>今天用了多少，限额还剩多少</h2>
+  <p class="lead">日期、汇总数和下面的分组用同一个口径。点一行分组进入<a href="audit.html">审计</a>，带上这里的日期和范围。</p>
+  <div class="board">
+  <figure>
+    <figcaption>桌面 · 11 月 20 日</figcaption>
+    <div class="app">
+      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
+        <div class="app-main">
+          <div class="toolbar"><h2>用量</h2><span class="select">11 月 20 日</span><span class="chip">节点时区 UTC+8</span><span class="grow"></span></div>
+          <div class="pane">
+            <dl class="facts">
+              <div><dt>费用</dt><dd>¥12.40<em>含 3 笔价格未知</em></dd></div>
+              <div><dt>Token</dt><dd>1.8M</dd></div>
+              <div><dt>请求</dt><dd>642<em>拒绝 17</em></dd></div>
+              <div><dt>今日限额</dt><dd>62%<em>¥50 中已用 ¥31 · 00:00 重置</em></dd></div>
+            </dl>
+            <div class="bars" aria-hidden="true"><div class="col" style="--h:40%"><b class="ok" style="--p:100%"></b></div><div class="col" style="--h:55%"><b class="ok" style="--p:100%"></b></div><div class="col" style="--h:48%"><b class="ok" style="--p:100%"></b></div><div class="col" style="--h:70%"><b class="ok" style="--p:100%"></b></div><div class="col" style="--h:64%"><b class="ok" style="--p:100%"></b></div><div class="col" style="--h:80%"><b class="ok" style="--p:100%"></b></div><div class="col" style="--h:92%"><b class="ok" style="--p:100%"></b></div></div>
+            <div class="legend"><span><b style="--c:var(--accent-solid)"></b>费用</span><span>按小时 · 与上方同一天</span></div>
+            <div class="toolbar" style="padding-inline:0"><span class="seg"><span class="on">来源</span><span>模型</span><span>智能体</span><span>密钥</span></span></div>
+            <table class="grid">
+              <thead><tr><th>来源</th><th>请求</th><th>Token</th><th>费用</th></tr></thead>
+              <tbody>
+                <tr><td>WorkBuddy<small>2 笔价格未知</small></td><td>410</td><td>1.1M</td><td>¥9.10</td></tr>
+                <tr><td>OpenRouter<small>已确认免费</small></td><td>188</td><td>0.6M</td><td>¥0.00</td></tr>
+                <tr><td>本机<small>价格未知</small></td><td>44</td><td>0.1M</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  <figure>
+    <figcaption>手机 · 限额就在数字旁边</figcaption>
+    <div class="phone">
+      <header><strong>用量</strong><span class="grow"></span><span class="chip">11 月 20 日</span></header>
+      <div class="block"><h3>费用</h3><strong>¥12.40</strong><p class="lead">3 笔价格未知，未计入。</p></div>
+      <div class="block"><h3>今日限额</h3><strong>¥31 / ¥50</strong><p class="lead">00:00 重置 · <span class="btn quiet">调整限额</span></p></div>
+      <ul class="rows">
+        <li><div><strong>WorkBuddy</strong><small>410 次请求</small></div><span>¥9.10</span></li>
+        <li><div><strong>OpenRouter</strong><small>已确认免费</small></div><span>¥0.00</span></li>
+      </ul>
+      <footer><span>首页</span><span class="on">模型</span><span>工具</span><span>设置</span></footer>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>行为</h2>
+  <dl class="decisions">
+    <dt>四种费用状态不合并</dt>
+    <dd>已确认免费显示 ¥0.00，估算、价格未知、被拒绝各自标注。价格未知不参与费用合计，并在合计旁写明笔数。</dd>
+    <dt>限额写清范围</dt>
+    <dd>限额卡片标明作用于整节点还是单个密钥、单位、剩余和下一次重置时间。修改入口就在卡片上，不另开页面。</dd>
+    <dt>下钻带着条件走</dt>
+    <dd>从来源行进入请求页时，带上日期和来源。返回时回到同一天和同一个分组。</dd>
+    <dt>拒绝的请求单独计数</dt>
+    <dd>发出前被限额拦住的请求计入「拒绝」，不计入 Token 和费用。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>

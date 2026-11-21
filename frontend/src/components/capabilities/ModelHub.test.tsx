@@ -100,6 +100,17 @@ it('shows connections and their models together and accepts old source-page link
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })
 
+it('saves a connection before any models are enabled', async () => {
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://separate-source.example.test/v1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'https://separate-source.example.test/v1' })]),
+    models: catalog.models,
+  })))
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})
+
 it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
@@ -430,7 +441,7 @@ it('opens connection editing after fetching an existing source and keeps model c
   expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
 })
 
-it('lets new sources change their address after discovering a directory', async () => {
+it('lets new sources change their address and save without carrying over the old directory selection', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
     ? { data: { models: ['old-directory-model'] } }
@@ -442,7 +453,11 @@ it('lets new sources change their address after discovering a directory', async 
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://second.example/v1' } })
   expect(screen.queryByRole('checkbox', { name: 'old-directory-model' })).toBeNull()
-  expect((screen.getByRole('button', { name: 'agent.models.save' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'https://second.example/v1' })]),
+    models: catalog.models,
+  })))
 })
 
 
@@ -479,9 +494,12 @@ it('keeps the gateway information in its own tab and omits the duplicate agent c
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/gateway')
   page.rerender(<App><ModelHub sub="gateway" onNav={navigate} /></App>)
   expect(await screen.findByText(catalog.baseUrl + '/v1')).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'modelInteraction.gateway.access' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByRole('region', { name: 'directory.title' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'gatewayWorkspace.chooseModel' }))
   expect(screen.getByRole('region', { name: 'directory.title' })).toBeTruthy()
-  fireEvent.mouseDown(screen.getByRole('tab', { name: 'modelInteraction.gateway.directory' }))
-  expect(screen.getByRole('region', { name: 'directory.title' })).toBeTruthy()
+  expect(screen.getByRole('tab', { name: 'modelInteraction.gateway.directory' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.queryByRole('region', { name: 'agent.models.baseUrl' })).toBeNull()
   expect(document.querySelector('.tt-model-connection')).toBeNull()
 })
 
@@ -520,7 +538,7 @@ it('keeps the card read-only and opens editing, pricing, routing and deletion in
   expect(screen.queryByLabelText('hub.name')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
   expect(screen.getByLabelText('hub.name')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'capabilities.models.deleteAction' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'hub.deleteSource' })).toBeTruthy()
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'pricing.section.prices' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream/prices')
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'pricing.section.routing' }))
@@ -530,10 +548,24 @@ it('keeps the card read-only and opens editing, pricing, routing and deletion in
 it('deletes a source from its connection settings and returns to the catalog', async () => {
   const navigate = vi.fn()
   mount('catalog/source/upstream', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.deleteSource' }))
   fireEvent.click(await screen.findByRole('button', { name: 'capabilities.models.deleteAction' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'common.confirm' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [], models: [] })))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog')
+})
+
+it('shows the referencing aggregate and preserves the source until it is released', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  const pool = { ...catalog.models[0], id: 'wb-ds', name: 'WB DS', aggregate: true }
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (method === 'GET' && path === '/agent/model-gateway/catalog') return { data: { ...catalog, models: [...catalog.models, pool] } }
+    return original(method, path, body, options)
+  })
+  mount('catalog/source/upstream')
+  const remove = await screen.findByRole('button', { name: 'hub.deleteSource' }) as HTMLButtonElement
+  expect(remove.disabled).toBe(true)
+  expect(within(remove.closest('.tt-model-source-connection')!).getByText('hub.sourceInUse')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.some(([method]) => method === 'PUT')).toBe(false)
 })
 
 it('offers published pools as a source and does not discover an upstream for a routing group', async () => {

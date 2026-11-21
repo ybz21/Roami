@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>选模 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>选模</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a><a href="plugins.html">插件与账号</a><a href="aggregation.html">聚合</a><a href="gateway.html">本机网关</a><a href="usage.html">用量</a><a href="audit.html">审计</a><a href="agent.html" aria-current="page">选模</a><a href="speech.html">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>这次用哪个模型</h2>
+  <p class="lead">新建会话和委派共用一个选择器。三个选项：沿用角色默认、Auto、指定模型。费用策略只对这一次生效。候选和排除原因来自<a href="gateway.html">网关目录</a>，不另维护一份清单。</p>
+  <div class="board">
+  <figure>
+    <figcaption>桌面 · 新建会话</figcaption>
+    <div class="app">
+      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
+        <div class="app-main">
+          <div class="toolbar"><h2>新建会话</h2><span class="chip">智能体 · Roami</span><span class="chip">项目 · OKR</span><span class="grow"></span></div>
+          <div class="split" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+            <div class="pane">
+              <h3>本次选模</h3>
+              <div class="seg"><span>沿用默认</span><span class="on">Auto</span><span>指定模型</span></div>
+              <dl class="facts" style="margin-top:var(--sp-4);grid-template-columns:1fr 1fr 1fr">
+                <div><dt>输入</dt><dd style="font-size:var(--fs-body)">图片</dd></div>
+                <div><dt>输出</dt><dd style="font-size:var(--fs-body)">文本</dd></div>
+                <div><dt>需要</dt><dd style="font-size:var(--fs-body)">工具调用</dd></div>
+              </dl>
+              <span class="chip on">仅免费 · 仅本次有效</span>
+            </div>
+            <div class="pane">
+              <h3>符合条件 · 1</h3>
+              <ul class="rows">
+                <li><div><strong>Qwen 免费</strong><small>OpenRouter · 图片、文本、工具均已验证</small></div><span class="st ok">已确认免费</span></li>
+              </ul>
+              <h3>已排除 · 2</h3>
+              <ul class="rows">
+                <li><div><strong>日常编码</strong><small>聚合 · 成员费用未全部确认</small></div><span class="st">非免费</span></li>
+                <li><div><strong>DS 代码助手</strong><small>图片输入未验证</small></div><span class="st">能力未确认</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  <figure>
+    <figcaption>手机 · 任务在等一个免费模型</figcaption>
+    <div class="phone">
+      <header><svg class="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><strong>委派任务</strong></header>
+      <div class="block"><h3>核对项目截图</h3><strong>Auto · 仅免费</strong><p class="lead">图片输入 · 工具调用</p></div>
+      <div class="block">
+        <h3>进度</h3>
+        <ol class="time" style="grid-template-columns:none"><li style="grid-template-columns:64px 1fr"><time>14:26</time><div><strong>已核对 2 / 5 张</strong><small>进度已保存</small></div></li></ol>
+        <div class="callout"><strong>14:29 重试</strong><p>OpenRouter 的 Qwen 正在限流。恢复后从第 3 张继续。</p></div>
+        <span class="btn quiet">改用其他模型</span>
+      </div>
+      <footer><span>首页</span><span class="on">项目</span><span>工具</span><span>设置</span></footer>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>行为</h2>
+  <dl class="decisions">
+    <dt>默认和本次选择互不影响</dt>
+    <dd>设置页改的是 Main 和 Worker 的默认模型。「沿用默认」显示当前用的是哪个角色的哪个模型。会话里的显式选择只存在于这一次。</dd>
+    <dt>指定模型时说清差在哪</dt>
+    <dd>选一个能力未验证的模型，保留选择并写明哪一项没确认，同时给出符合条件的替代。不直接禁掉。</dd>
+    <dt>Auto 事后说人话</dt>
+    <dd>创建时展示符合条件的候选和被排除的原因。跑起来之后，会话里显示这一轮实际命中的模型，点开能看到原因，并链到<a href="audit.html">审计</a>记录。</dd>
+    <dt>模型策略由网关处理</dt>
+    <dd>客户端提交模型与费用偏好，网关负责选路和准入。仅免费请求尚未发给上游、且网关知道可用时间时，网关随 503 返回标准 <code>Retry-After</code>。任务调度沿用通用生命周期。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型源 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>模型源</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html" aria-current="page">模型源</a><a href="plugins.html">插件与账号</a><a href="aggregation.html">聚合</a><a href="gateway.html">本机网关</a><a href="usage.html">用量</a><a href="monitor.html">监控</a><a href="audit.html">审计</a><a href="agent.html">选模</a><a href="speech.html">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>接上供应商，只启用要用的模型</h2>
+  <p class="lead">左侧选来源，右侧管它的连接、模型和定价。发现出来的模型默认不启用，启用后才进入网关和选模。</p>
+  <div class="board">
+  <figure>
+    <figcaption>桌面</figcaption>
+    <div class="app">
+      <div class="app-top"><span class="brand">Roami</span><nav><span>智能体</span><span class="on">模型</span><span>插件</span></nav></div>
+      <div class="app-body">
+        <div class="app-side"><span class="on">模型源</span><span>聚合</span><span>用量</span><span>监控</span><span>审计</span><span>本机网关</span><span>语音</span></div>
+        <div class="app-main">
+          <div class="toolbar"><h2>模型源</h2><span class="search">搜索来源或模型</span><span class="grow"></span><span class="btn primary">新建来源</span></div>
+          <div class="split">
+            <ul class="rows">
+              <li class="on"><div><strong>WorkBuddy</strong><small>插件 · 2 个模型已启用</small></div><span class="st ok">已连接</span></li>
+              <li><div><strong>OpenRouter 免费</strong><small>专用连接 · 1 个已启用</small></div><span class="st ok">已连接</span></li>
+              <li><div><strong>内部测试</strong><small>API 连接 · 还没启用模型</small></div><span class="st warn">未验证</span></li>
+            </ul>
+            <div class="pane">
+              <div class="tabs"><span class="on">模型</span><span>连接</span><span>定价</span></div>
+              <h3>已启用</h3>
+              <table class="grid">
+                <thead><tr><th>模型</th><th>调用名</th><th>能力</th><th>检测</th></tr></thead>
+                <tbody>
+                  <tr><td>DS 代码助手</td><td><code>wb-ds</code></td><td>文本</td><td><span class="st ok">今天 14:32 通过</span></td></tr>
+                  <tr><td>混元 Flash</td><td><code>hy4-flash</code></td><td>文本、图片<small>供应商声明，未验证</small></td><td><span class="st">未检测</span></td></tr>
+                </tbody>
+              </table>
+              <div class="callout"><strong>还有 6 个模型没启用</strong><p>上次发现于 14:19。启用后才会出现在网关和选模里。</p></div>
+              <span class="btn">管理模型</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  <figure>
+    <figcaption>手机 · 管理模型</figcaption>
+    <div class="phone">
+      <header><svg class="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><strong>管理模型</strong></header>
+      <div class="block"><span class="search">搜索</span></div>
+      <ul class="rows">
+        <li><div><strong>DS 代码助手</strong><small>文本 · 已检测</small></div><span class="st ok">启用</span></li>
+        <li><div><strong>混元 Flash</strong><small>图片未验证</small></div><span class="st warn">将移除</span></li>
+        <li><div><strong>混元 Lite</strong><small>文本 · 价格未知</small></div><span class="st info">将启用</span></li>
+      </ul>
+      <div class="block"><strong>新增 1 个，移除 1 个</strong><p class="lead">保存后更新网关目录。</p><span class="btn primary">保存</span></div>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>行为</h2>
+  <dl class="decisions">
+    <dt>新建来源按类型分流</dt>
+    <dd>API 连接填地址和密钥；OpenRouter 免费用固定地址，验证后直接列出免费候选；插件走<a href="plugins.html">插件与账号</a>，授权完回到这里发现模型。</dd>
+    <dt>先保存连接，再启用模型</dt>
+    <dd>名称是连接表单首项，留空时用服务地址命名。新建来源修改地址后只可保存连接或重新拉取目录，旧目录的勾选随之清除。已有连接取消编辑时恢复原地址和原勾选。</dd>
+    <dt>选择连接与证书策略</dt>
+    <dd>HTTP 地址显示明文传输提示。HTTPS 默认验证证书，可信自签名服务可在连接选项调整验证策略。更换地址会清除旧地址的证书例外。<a href="../20261030-智能体模型切换/records/20261120-model-source-transport.md">查看连接配置验收记录</a>。</dd>
+    <dt>发现和启用是两步</dt>
+    <dd>发现失败时保留上次成功的结果和当前的启用选择。检测超时的模型维持「未检测」，不改写成失败。</dd>
+    <dt>删除要先处理引用</dt>
+    <dd>来源或模型被聚合、草稿或智能体默认使用时，删除按钮不可用，并列出这些引用和各自的入口。服务端保存时再查一次。</dd>
+    <dt>定价分三层</dt>
+    <dd>来源默认价、单个模型的覆盖价、最终生效价分开显示。没有规则就写「价格未知」，不显示 0。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>

@@ -30,9 +30,11 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 	}
 	for _, route := range []struct{ method, path string }{
 		{"GET", "/agent/model-gateway/plugins/packages"}, {"POST", "/agent/model-gateway/plugins/import"}, {"POST", "/agent/model-gateway/plugins/inspect"}, {"POST", "/agent/model-gateway/plugins/sources"}, {"GET", "/agent/model-gateway/plugins/sources/:source/info"}, {"POST", "/agent/model-gateway/plugins/sources/:source/options"}, {"POST", "/agent/model-gateway/plugins/sources/:source/auth"}, {"GET", "/agent/model-gateway/plugins/sources/:source/auth-jobs/:job"}, {"DELETE", "/agent/model-gateway/plugins/sources/:source/auth-jobs/:job"},
+		{"GET", "/agent/model-gateway/plugins/community"}, {"POST", "/agent/model-gateway/plugins/community"},
+		{"GET", "/agent/model-gateway/plugins/sources/:source/usage"}, {"POST", "/agent/model-gateway/plugins/sources/:source/check-in"}, {"GET", "/agent/model-gateway/plugins/sources/:source/calls"},
 		{"GET", "/agent/model-gateway/access-keys"}, {"POST", "/agent/model-gateway/access-keys"}, {"PATCH", "/agent/model-gateway/access-keys/:id"}, {"DELETE", "/agent/model-gateway/access-keys/:id"}, {"POST", "/agent/model-gateway/access-keys/:id/rotate"},
 		{"GET", "/agent/model-gateway/access-key"}, {"PUT", "/agent/model-gateway/access-key"}, {"DELETE", "/agent/model-gateway/access-key"},
-		{"POST", "/agent/model-gateway/monitor/check"}, {"GET", "/agent/model-gateway/monitor"}, {"GET", "/agent/model-gateway/settings/sources/:source"}, {"PUT", "/agent/model-gateway/settings/sources/:source"},
+		{"POST", "/agent/model-gateway/monitor/check"}, {"GET", "/agent/model-gateway/monitor"}, {"GET", "/agent/model-gateway/monitor/requests/:request"}, {"GET", "/agent/model-gateway/settings/sources/:source"}, {"PUT", "/agent/model-gateway/settings/sources/:source"},
 		{"GET", "/agent/model-gateway/settings"}, {"PUT", "/agent/model-gateway/settings"},
 		{"GET", "/agent/model-gateway/models"}, {"GET", "/agent/model-gateway/catalog/routing"}, {"GET", "/agent/model-gateway/catalog"}, {"PUT", "/agent/model-gateway/catalog"}, {"POST", "/agent/model-gateway/catalog/apply"},
 		{"POST", "/agent/model-gateway/catalog/discover"}, {"POST", "/agent/model-gateway/catalog/roles"}, {"POST", "/agent/model-gateway/catalog/source-models"},

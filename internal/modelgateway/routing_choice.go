@@ -3,6 +3,7 @@ package modelgateway
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ type routingChoice struct {
 	nodes                 map[string]*routingNode
 	targets               []routeTarget
 	blocks                map[ModelCandidate]string
+	skips                 map[string]int
 	contexts              map[ModelCandidate]int
 	ordered               []routeTarget
 	cursor                int
@@ -383,6 +385,14 @@ func (c *routingChoice) nextLocked() (routingLeaf, bool, error) {
 		node := c.nodes[target.ID]
 		target.Channel = *c.handler.routing.channel(target.ID, now)
 		if !availableTarget(target, now) {
+			reason := "cooldown"
+			if target.Channel.ExhaustedUntil.After(now) || target.Quota.Remaining != nil && *target.Quota.Remaining <= 0 {
+				reason = "quota"
+			}
+			if c.skips == nil {
+				c.skips = map[string]int{}
+			}
+			c.skips[reason]++
 			c.cursor++
 			continue
 		}
@@ -429,11 +439,78 @@ func (c *routingChoice) nextLocked() (routingLeaf, bool, error) {
 	}
 	return routingLeaf{}, false, nil
 }
+func (c *routingChoice) unavailableReasons() map[string]int {
+	result := map[string]int{}
+	for _, reason := range c.blocks {
+		result[reason]++
+	}
+	for reason, count := range c.skips {
+		result[reason] += count
+	}
+	for _, node := range c.nodes {
+		if node.child != nil && node.child.initialized {
+			for reason, count := range node.child.unavailableReasons() {
+				result[reason] += count
+			}
+		}
+	}
+	return result
+}
+
 func (c *routingChoice) Next() (routingLeaf, bool, error) {
 	c.handler.routing.mu.Lock()
 	defer c.handler.routing.mu.Unlock()
 	return c.nextLocked()
 }
+
+func (c *routingChoice) nextAvailableAt() time.Time {
+	c.handler.routing.mu.Lock()
+	defer c.handler.routing.mu.Unlock()
+	now := c.handler.Ledger.now()
+	at := c.readyAtLocked(now)
+	if !at.After(now) {
+		return time.Time{}
+	}
+	return at
+}
+
+func (c *routingChoice) readyAtLocked(now time.Time) time.Time {
+	var earliest time.Time
+	for _, target := range c.targets {
+		channel := c.handler.routing.channel(target.ID, now)
+		if channel.RestUntil.After(now) && channel.RestStatus != http.StatusTooManyRequests && channel.RestStatus != http.StatusPaymentRequired {
+			continue
+		}
+		at := now
+		for _, blockedUntil := range []time.Time{channel.RestUntil, channel.ExhaustedUntil} {
+			if blockedUntil.After(at) {
+				at = blockedUntil
+			}
+		}
+		if target.Quota.Remaining != nil && *target.Quota.Remaining <= 0 {
+			if !target.Quota.RetryAt.After(now) {
+				continue
+			}
+			if target.Quota.RetryAt.After(at) {
+				at = target.Quota.RetryAt
+			}
+		}
+		if child := c.nodes[target.ID].child; child != nil {
+			childAt := child.readyAtLocked(now)
+			if childAt.IsZero() {
+				continue
+			}
+			if childAt.After(at) {
+				at = childAt
+			}
+		}
+		if earliest.IsZero() || at.Before(earliest) {
+			earliest = at
+		}
+	}
+	return earliest
+}
+
 func (h *Handler) restRoute(leaf routingLeaf, model CatalogModel, status int, retry time.Duration) {
 	h.routing.mu.Lock()
 	defer h.routing.mu.Unlock()
@@ -444,6 +521,7 @@ func (h *Handler) restRoute(leaf routingLeaf, model CatalogModel, status int, re
 		duration = retry
 	}
 	channel.RestUntil = now.Add(duration)
+	channel.RestStatus = status
 	if status == 402 {
 		channel.ExhaustedUntil = channel.RestUntil
 	}

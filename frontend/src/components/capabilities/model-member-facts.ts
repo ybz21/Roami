@@ -48,5 +48,5 @@ export function useModelMemberFacts(model: CatalogModel, saved: CatalogModel | u
       sourceLatencyMs: typeof latency === 'number' && latency >= 0 ? latency : undefined,
     }
   }
-  return { facts, failed: status.failed || monitor.failed }
+  return { facts, status }
 }

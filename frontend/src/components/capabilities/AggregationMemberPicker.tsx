@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Checkbox, Input, Pagination } from './model-controls'
+import { Button, Checkbox, Input, Pagination, Spin } from './model-controls'
 import { CloseIcon, SearchIcon } from '../../icons'
 import { useI18n } from '../../i18n'
 import type { CatalogModel, ModelCatalog, ModelCandidate } from './model-hub-api'
 import { configuredSourceModelIds } from './configured-source-models'
 import { candidateIdentity, MAX_AGGREGATE_MEMBERS } from './routing-preview'
+import { useAgentData } from '../agent/useAgentData'
+import type { GatewayModelCatalog } from './gateway-model-catalog'
 
-export default function AggregationMemberPicker({ model, original, catalog, disabled, onChange, onSource }: {
-  model: CatalogModel; original: string | null; catalog: ModelCatalog; disabled: boolean
+export default function AggregationMemberPicker({ model, original, catalog, active, disabled, onChange, onSource }: {
+  model: CatalogModel; original: string | null; catalog: ModelCatalog; active: boolean; disabled: boolean
   onChange: (patch: Partial<CatalogModel>) => void; onSource: (source: string) => void
 }) {
   const { t, locale } = useI18n()
@@ -15,6 +17,11 @@ export default function AggregationMemberPicker({ model, original, catalog, disa
   const sources = [...catalog.sources.map(row => ({ id: row.id, name: row.name })), ...(pools.length ? [{ id: '@group', name: t('pool.groups') }] : [])]
   const [sourceId, setSource] = useState(model.candidates[0]?.sourceId || sources[0]?.id || '')
   const [query, setQuery] = useState(''), [page, setPage] = useState(1)
+  const [freeOnly, setFreeOnly] = useState(false)
+  const freeDirectory = useAgentData<GatewayModelCatalog>(freeOnly ? '/agent/model-gateway/models?free=true&revision=' + encodeURIComponent(catalog.revision) : null, 30000, 0, 'GET', active)
+  const free = useMemo(() => new Set((freeDirectory.value?.models || [])
+    .filter(row => row.configured && row.enabled)
+    .flatMap(row => row.kind === 'aggregate' ? ['@group/' + row.id] : (row.candidates || []).slice(0, 1).map(candidateIdentity))), [freeDirectory.value])
   const source = sources.find(row => row.id === sourceId) || sources[0]
   const grouped = source?.id === '@group'
   const configured = useMemo(() => new Map(catalog.sources.map(row => [row.id, new Set(configuredSourceModelIds(catalog.models, row.id))])), [catalog.sources, catalog.models])
@@ -22,7 +29,7 @@ export default function AggregationMemberPicker({ model, original, catalog, disa
   const rows = grouped ? pools.map(row => ({ id: row.id, sourceId: '@group', name: row.name })) : [...(configured.get(source?.id || '') || [])].map(id => ({ id, sourceId: source!.id, name: '' }))
   const selected = new Set(model.candidates.map(candidateIdentity))
   const key = (row: { id: string; sourceId: string }) => candidateIdentity({ sourceId: row.sourceId, model: row.id })
-  const visible = rows.filter(row => (row.id + ' ' + row.name).toLowerCase().includes(query.trim().toLowerCase()))
+  const visible = rows.filter(row => (!freeOnly || free.has(key(row))) && (row.id + ' ' + row.name).toLowerCase().includes(query.trim().toLowerCase()))
   const additions = visible.filter(row => !selected.has(key(row))), all = !!visible.length && !additions.length
   const overLimit = model.candidates.length + additions.length > MAX_AGGREGATE_MEMBERS
   const currentPage = Math.min(page, Math.max(1, Math.ceil(visible.length / 30)))
@@ -60,10 +67,15 @@ export default function AggregationMemberPicker({ model, original, catalog, disa
         {source && <>
           <div className="tt-member-picker-heading"><h3>{source.name}</h3><span role="status">{t('pool.sourceCount', { count: count(rows.filter(row => selected.has(key(row))).length) })}</span></div>
           {(rows.length > 8 || query) && <Input aria-label={t('hub.directory.search')} placeholder={t('hub.directory.search')} prefix={<SearchIcon />} onPressEnter={event => event.preventDefault()} value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} />}
-          {rows.length > 1 && <div className="tt-member-model-actions"><Checkbox disabled={disabled || !visible.length || (!all && overLimit)} checked={all} indeterminate={!all && visible.some(row => selected.has(key(row)))} onChange={event => select(visible.map(row => ({ sourceId: row.sourceId, model: row.id })), event.target.checked)}>{t(query ? 'hub.directory.selectMatches' : 'pool.selectAll')}</Checkbox></div>}
+          <div className="tt-member-model-actions">
+            <Checkbox disabled={disabled} checked={freeOnly} onChange={event => { setFreeOnly(event.target.checked); setPage(1) }}>{t('pool.filterFree')}</Checkbox>
+            {rows.length > 1 && <Checkbox disabled={disabled || !visible.length || (!all && overLimit)} checked={all} indeterminate={!all && visible.some(row => selected.has(key(row)))} onChange={event => select(visible.map(row => ({ sourceId: row.sourceId, model: row.id })), event.target.checked)}>{t(freeOnly ? 'pool.selectFiltered' : query ? 'hub.directory.selectMatches' : 'pool.selectAll')}</Checkbox>}
+          </div>
           {overLimit && <p className="agent-settings-hint">{t('pool.bulkLimit', { count: MAX_AGGREGATE_MEMBERS })}</p>}
           <div className="tt-member-model-grid">{visible.slice((currentPage - 1) * 30, currentPage * 30).map(row => <div className="tt-member-model" key={key(row)} data-selected={selected.has(key(row)) || undefined}><Checkbox aria-label={row.id} checked={selected.has(key(row))} disabled={disabled || (!selected.has(key(row)) && model.candidates.length >= MAX_AGGREGATE_MEMBERS)} onChange={event => select([{ sourceId: row.sourceId, model: row.id }], event.target.checked)}><strong>{row.id}</strong>{row.name && row.name !== row.id && <small>{row.name}</small>}</Checkbox></div>)}</div>
-          {!visible.length && <p className="agent-settings-hint">{t(rows.length ? 'hub.directory.noMatches' : 'orchestration.noConfiguredModels')}{!rows.length && !grouped && <> <button type="button" className="tt-act" onClick={() => onSource(source.id)}>{t('hub.configure')}</button></>}</p>}
+          {!visible.length && (freeDirectory.loading ? <Spin size="small" /> : freeDirectory.failed && !freeDirectory.value
+            ? <Button onClick={freeDirectory.refresh}>{t('pool.filterFreeRetry')}</Button>
+            : <p className="agent-settings-hint">{t(rows.length ? freeOnly && !query ? 'pool.filterFreeEmpty' : 'hub.directory.noMatches' : 'orchestration.noConfiguredModels')}{!rows.length && !grouped && <> <button type="button" className="tt-act" onClick={() => onSource(source.id)}>{t('hub.configure')}</button></>}</p>)}
           {visible.length > 30 && <Pagination current={currentPage} total={visible.length} pageSize={30} onChange={setPage} />}
         </>}
       </section>

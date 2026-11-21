@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { App as AntApp, Button, Input, Select } from 'antd'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
+import SpeechTranscriptionTest from './SpeechTranscriptionTest'
+import './speech-settings.css'
 
 const SPEECH_DEFAULTS = {
   openai: { baseURL: 'https://api.openai.com/v1', model: 'whisper-1' },
@@ -45,7 +47,13 @@ export function SpeechSettings() {
   }
   if (readState) return readState
   const dirty = JSON.stringify(cfg) !== JSON.stringify(baseline)
-  if (!editing && !dirty) return <section className="tt-speech-summary"><div><h3>{t('settings.speechProvider')}</h3><strong>{cfg.provider==='openai' ? 'OpenAI' : cfg.provider==='volcano' ? 'Volcano Engine' : t('settings.speechProviderNone')}</strong>{cfg.provider==='openai' && <><code>{cfg.openai.model}</code><p className="agent-settings-hint">{cfg.openai.baseURL}</p></>}</div><Button onClick={()=>setEditing(true)}>{t('capabilities.edit')}</Button></section>
+  if (!editing && !dirty) {
+    const canTranscribe = cfg.provider === 'openai' ? !!cfg.openai.apiKey : cfg.provider === 'volcano' && !!(cfg.volcano.apiKey || (cfg.volcano.appId && cfg.volcano.accessToken))
+    return <>
+      <section className="tt-speech-summary"><div><h3>{t('settings.speechProvider')}</h3><strong>{cfg.provider==='openai' ? 'OpenAI' : cfg.provider==='volcano' ? 'Volcano Engine' : t('settings.speechProviderNone')}</strong>{cfg.provider==='openai' && <><code>{cfg.openai.model}</code><p className="agent-settings-hint">{cfg.openai.baseURL}</p></>}</div><Button onClick={()=>setEditing(true)}>{t('capabilities.edit')}</Button></section>
+      {canTranscribe && <SpeechTranscriptionTest />}
+    </>
+  }
   return <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); void save() }}>
     {draftNotice}
     <p className="agent-settings-hint">{t('hub.speechHint')}</p>

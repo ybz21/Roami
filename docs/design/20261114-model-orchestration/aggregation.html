@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聚合 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>聚合</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a><a href="plugins.html">插件与账号</a><a href="aggregation.html" aria-current="page">聚合</a><a href="gateway.html">本机网关</a><a href="usage.html">用量</a><a href="monitor.html">监控</a><a href="audit.html">审计</a><a href="agent.html">选模</a><a href="speech.html">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>多个模型，一个稳定的调用名</h2>
+  <p class="lead">成员从已启用的模型里挑。调度页先显示当前生效的顺位，再显示待保存的策略和成员顺序。保存后，新请求使用更新后的配置。</p>
+  <div class="board solo">
+  <figure>
+    <figcaption>桌面 · 日常编码</figcaption>
+    <div class="app">
+      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
+        <div class="app-main">
+          <div class="toolbar">
+            <span class="btn quiet">← 聚合</span>
+            <h2>日常编码</h2>
+            <span class="chip">调用名 <code>coding-auto</code></span>
+            <span class="grow"></span>
+            <span class="st warn">有未保存的改动</span>
+            <span class="btn">放弃</span>
+            <span class="btn primary">保存</span>
+          </div>
+          <div class="pane">
+            <h3>此刻生效 · 观测于 14:28</h3>
+            <dl class="facts">
+              <div><dt>配置首选</dt><dd>WorkBuddy · DS</dd></div>
+              <div><dt>下一条请求先试</dt><dd>OpenRouter · Qwen<em>首选冷却中</em></dd></div>
+              <div><dt>近 30 分钟切换后恢复</dt><dd>5<em> 次 · 跨来源 3 次</em></dd></div>
+            </dl>
+            <span class="btn quiet">看一次跨来源恢复 →</span>
+            <div class="toolbar" style="padding-inline:0">
+              <span class="seg"><span class="on">按顺序</span><span>轮流</span><span>按权重</span></span>
+              <span class="grow"></span>
+              <span class="btn">添加成员</span>
+            </div>
+            <table class="grid">
+              <thead><tr><th>草稿顺位</th><th>能力</th><th>费用</th><th>当前状态</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><strong>1 · OpenRouter · Qwen</strong><small>从第 2 位移上来</small></td><td>文本、图片</td><td>免费</td><td><span class="st ok">可调度</span></td><td><span class="btn quiet">移除</span></td></tr>
+                <tr><td><strong>2 · WorkBuddy · DS</strong><small>已生效配置里的首选</small></td><td>文本</td><td>价格未知</td><td><span class="st warn">冷却至 14:29</span></td><td><span class="btn quiet">移除</span></td></tr>
+                <tr><td><strong>3 · 本机 · Qwen</strong></td><td>文本</td><td>价格未知</td><td><span class="st ok">可调度</span></td><td><span class="btn quiet">移除</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>先看生效顺位，再调整调度策略</h2>
+  <p class="lead">参考免费池调度，把首选、备选、冷却数、失败率和切换次数放在聚合详情的「调度」首屏。桌面并排显示，手机先看顺位，再看统计。</p>
+  <p><a class="btn" href="current.html#/aggregate/free">打开聚合调度原型</a></p>
+  <ol class="flow">
+    <li><strong>看当前顺位</strong><span>同屏看生效策略、可调度成员数及首选和备选。</span></li>
+    <li><strong>展开成员状态</strong><span>查看冷却、跳过原因和下一次可用时间。</span></li>
+    <li><strong>预览策略</strong><span>模拟成员冷却，查看备选。按顺序时仍可拖动或置顶。</span></li>
+    <li><strong>查一次切换</strong><span>打开请求记录，核对实际尝试及最终命中。</span></li>
+  </ol>
+  <p class="lead">成员状态可进一步展示同一时间窗内的首字延时 P95、吞吐 P50 和成功次数。无样本显示「待观测」。费用由模型源的生效规则判定，「只看免费」继续用于添加候选。</p>
+</section>
+<section>
+  <h2>添加成员</h2>
+  <div class="board">
+  <figure>
+    <figcaption>桌面 · 左来源、右模型，已选的始终在上方</figcaption>
+    <div class="app">
+      <div class="app-body" style="grid-template-columns:minmax(0,1fr)">
+        <div class="app-main">
+          <div class="toolbar"><h2>添加成员</h2><span class="search">搜索模型</span><span class="chip on">只看免费</span><span class="grow"></span><span class="btn primary">完成</span></div>
+          <div class="pane" style="border-bottom:1px solid var(--border-subtle)"><span class="chip">WorkBuddy · DS ×</span> <span class="chip">OpenRouter · Qwen ×</span> <span class="st">已选 2 个</span></div>
+          <div class="split" style="grid-template-columns:200px minmax(0,1fr);min-height:240px">
+            <ul class="rows"><li class="on"><div><strong>OpenRouter</strong><small>1 个已启用</small></div></li><li><div><strong>WorkBuddy</strong><small>2 个已启用</small></div></li><li><div><strong>本机</strong><small>1 个已启用</small></div></li></ul>
+            <ul class="rows">
+              <li><div><strong>Qwen Vision</strong><small>图片 · 免费</small></div><span class="st ok">已选</span></li>
+              <li><div><strong>Qwen Text</strong><small>文本 · 免费</small></div><span class="btn quiet">添加</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+  <figure>
+    <figcaption>手机 · 已选成员横向保留，下面选来源</figcaption>
+    <div class="phone">
+      <header><svg class="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><strong>添加成员</strong></header>
+      <div class="block"><span class="chip">DS ×</span> <span class="chip">Qwen ×</span><p class="lead">已选 2 个，切换来源不会清掉。</p></div>
+      <div class="block"><span class="select">来源 · OpenRouter</span></div>
+      <ul class="rows"><li><div><strong>Qwen Text</strong><small>文本 · 免费</small></div><span class="btn quiet">添加</span></li></ul>
+      <div class="block"><span class="btn primary">完成</span></div>
+    </div>
+  </figure>
+  </div>
+</section>
+<section>
+  <h2>行为</h2>
+  <dl class="decisions">
+    <dt>排序只有一个结果</dt>
+    <dd>拖动手柄、键盘方向键、手机上的上移下移和置顶改的是同一套顺位。拖动时用一条蓝色线标出松手后的位置。手机上滑行内容区照常滚动，不触发排序。</dd>
+    <dt>候选筛选不改变费用</dt>
+    <dd>「只看免费」只过滤添加时的候选列表。已经在池子里的成员和它们的计费规则不受影响。</dd>
+    <dt>模拟不发请求</dt>
+    <dd>可以按当前草稿预览「按顺序」「轮流」「按权重」各自的首选，也可以临时去掉冷却中的成员看结果。预览不消耗额度、不写入统计。</dd>
+    <dt>保存冲突时留住草稿</dt>
+    <dd>别人先保存了，提示重新读取，本地改过的顺位和权重保留，由用户决定怎么并。</dd>
+    <dt>失效成员留在列表里</dt>
+    <dd>来源里删掉了模型，聚合里的对应成员标成「已失效」并给出处理入口，不静默消失。成员上限 64 维持现状。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>

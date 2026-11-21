@@ -44,10 +44,10 @@ function parseSourceURL(value: string) {
   } catch { return null }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management, initialAuthorizationOpen = false }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
-  pricing?: ReactNode; initialAuthorizationOpen?: boolean; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
+  pricing?: ReactNode; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
   const urlHintId = useId()
@@ -74,7 +74,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const updateSource = (next: Partial<ModelSource>) => {
     const updated = { ...source, ...next }
     if (next.baseUrl !== undefined && normalizeURL(next.baseUrl) !== normalizedURL) updated.skipTlsVerification = undefined
-    if (!connectionOnly && connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, fetchRequested: false }) }
+    if (!connectionOnly && connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, selected: [], fetchRequested: false }) }
     else patch({ source: updated })
   }
   const openRouter = source.connector === openRouterConnection.connector
@@ -96,7 +96,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const removesModels = !connectionOnly && removedCount > 0
   const hasKey = !!(source.hasKey || source.apiKey?.trim())
   const canRead = validConnection && (!openRouter || hasKey)
-  const canSave = !sourceConflict && canRead && !busy && !loading && (connectionOnly ? changedConnection : !invalidManual && !overLimit && (additions.length > 0 || removesModels))
+  const canSave = !sourceConflict && canRead && !busy && !loading && (connectionOnly ? changedConnection : !invalidManual && !overLimit && (!existing || additions.length > 0 || removesModels))
   const cancel = () => {
     if (!existing) return
     if (connectionOnly && !sourceConflict) patch({ source: { ...existing, apiKey: '' }, editing: false })
@@ -151,7 +151,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   return <form className="tt-model-source-editor" onSubmit={event => { event.preventDefault(); submit() }}>
     <Popconfirm danger={removesModels} open={confirming} onOpenChange={setConfirming} title={t(removesModels ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removesModels ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
     <div className="tt-model-source-content">
-      {authentication && <details className="tt-model-source-authorization" open={initialAuthorizationOpen || undefined}><summary>{t('modelInteraction.authorization')}</summary><div>{authentication}</div></details>}
+      {authentication}
       {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
@@ -174,9 +174,10 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
             {url?.protocol === 'https:' && <Checkbox checked={source.skipTlsVerification} onChange={event => updateSource({ skipTlsVerification: event.target.checked })}>{t('hub.directory.skipTlsVerification')}</Checkbox>}
           </div></details>
         </>}
-        {!draft.editing && <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy} onClick={editConnection}>{t('hub.directory.changeConnection')}</button></div>}
+        {!draft.editing && <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{!source.pluginSourceId && sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy} onClick={editConnection}>{t('hub.directory.changeConnection')}</button></div>}
         {!connectionOnly && <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!canRead || busy} onClick={() => void read()}>{t(openRouter ? 'hub.openRouter.fetch' : existing && !draft.managing ? 'modelInteraction.manageModels' : existing && draft.directory === null ? 'hub.directory.updateModels' : draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{!existing && draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>}
         {readError && <Alert type="warning" role="alert" message={t(readError)} />}
+        {management}
       </section>
       {pricing}
       {!connectionOnly && (draft.directory !== null || !!existing) && <section className="tt-model-directory" aria-label={t('hub.directory.title')} aria-busy={loading}>
@@ -195,8 +196,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         {draft.manualOpen && <label className="agent-settings-field">{t('hub.directory.manualHint')}<Input.TextArea aria-label={t('hub.directory.manual')} rows={4} value={draft.manual} onChange={event => patch({ manual: event.target.value })} />{invalidManual && <span className="tt-model-source-warning" role="alert">{t('hub.directory.invalidManual')}</span>}</label>}
       </section>}
       {!connectionOnly && overLimit && <Alert type="warning" role="alert" message={t('hub.directory.limit')} />}
-            {management}
     </div>
-    {(draft.editing || draft.managing || !existing) && <footer className="tt-model-source-footer"><span role="status">{t(connectionOnly ? 'modelInteraction.connectionScope' : removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing ? 'hub.directory.unchanged' : 'hub.directory.choose', { count: number(additions.length), removed: number(removedCount) })}</span><div className="tt-model-source-footer-actions">{existing && <Button disabled={busy || loading} onClick={cancel}>{t('common.cancel')}</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(!connectionOnly && existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : !connectionOnly && additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></div></footer>}
+    {(draft.editing || draft.managing || !existing) && <footer className="tt-model-source-footer"><span role="status">{t(connectionOnly ? 'modelInteraction.connectionScope' : removedCount ? 'hub.directory.changes' : additions.length ? 'hub.directory.selected' : existing ? 'hub.directory.unchanged' : 'hub.directory.connectionOnly', { count: number(additions.length), removed: number(removedCount) })}</span><div className="tt-model-source-footer-actions">{existing && <Button disabled={busy || loading} onClick={cancel}>{t('common.cancel')}</Button>}<Button type="primary" htmlType="submit" loading={busy} disabled={!canSave}>{t(!connectionOnly && existing && (additions.length || removedCount) ? 'hub.directory.applyModels' : !connectionOnly && additions.length ? 'hub.directory.saveModels' : 'agent.models.save', { count: number(additions.length) })}</Button></div></footer>}
   </form>
 }

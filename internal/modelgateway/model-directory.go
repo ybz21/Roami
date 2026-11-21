@@ -142,6 +142,7 @@ func advertisedCapabilities(detail agentproviders.SourceModelDetail) map[string]
 func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, all bool) []ModelDirectoryRow {
 	pricing, _ := s.ledger.Configuration()
 	details := map[ModelCandidate]agentproviders.SourceModelDetail{}
+	pluginFree := map[ModelCandidate]bool{}
 	for _, source := range catalog.Sources {
 		s.mu.Lock()
 		entry := s.directory[source.ID]
@@ -155,7 +156,11 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 			if saved, err := s.plugins.ReadSource(source.PluginSourceID); err == nil {
 				if provider, err := s.plugins.CachedProvider(saved); err == nil && !provider.FellBack {
 					for _, model := range provider.Models {
-						if _, exists := details[ModelCandidate{source.ID, model.ID}]; exists {
+						candidate := ModelCandidate{source.ID, model.ID}
+						if provider.SignedIn && accountPricingModel(&model, len(provider.Accounts)).Free {
+							pluginFree[candidate] = true
+						}
+						if _, exists := details[candidate]; exists {
 							continue
 						}
 						tools, reasoning := model.Tools, model.Reasoning
@@ -168,11 +173,47 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 							detail.InputPrice = &zero
 							detail.OutputPrice = &zero
 						}
-						details[ModelCandidate{source.ID, model.ID}] = detail
+						details[candidate] = detail
 					}
 				}
 			}
 		}
+	}
+	confirmedFree := func(candidate ModelCandidate) bool {
+		if rule, exists := pricing.Pricing.sourceRule(candidate.SourceID, candidate.Model); exists {
+			return rule.Mode == "free" && rule.Confirmed
+		}
+		return pluginFree[candidate]
+	}
+	freeRoutePrice := func(id string) bool {
+		price, overridden := pricing.Pricing.lookup(id)
+		return !overridden || price == (ModelPricing{})
+	}
+	byID := map[string]CatalogModel{}
+	for _, model := range catalog.Models {
+		byID[model.ID] = model
+	}
+	var allMembersFree func(CatalogModel, int) bool
+	freePools := map[string]bool{}
+	allMembersFree = func(model CatalogModel, depth int) bool {
+		if depth > 8 || len(model.Candidates) == 0 {
+			return false
+		}
+		if result, seen := freePools[model.ID]; seen {
+			return result
+		}
+		freePools[model.ID] = false
+		for _, candidate := range model.Candidates {
+			if candidate.SourceID == groupSource {
+				if !allMembersFree(byID[candidate.Model], depth+1) {
+					return false
+				}
+			} else if !confirmedFree(candidate) {
+				return false
+			}
+		}
+		freePools[model.ID] = true
+		return true
 	}
 	configured := map[ModelCandidate]bool{}
 	rows := []ModelDirectoryRow{}
@@ -184,6 +225,8 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 		entry := ModelDirectoryRow{ID: model.ID, Name: model.Name, Kind: kind, Protocol: model.Protocol, Configured: true, Enabled: model.enabled(), FreeOnly: model.FreeOnly, Pricing: "unknown", Capabilities: unknownCapabilities(), Candidates: model.Candidates}
 		if model.FreeOnly {
 			entry.Pricing = "free-only"
+		} else if model.Aggregate && freeRoutePrice(model.ID) && allMembersFree(model, 0) {
+			entry.Pricing = "confirmed-free"
 		}
 		if !model.Aggregate && len(model.Candidates) == 1 {
 			candidate := model.Candidates[0]
@@ -199,12 +242,10 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 					entry.Pricing = "metered"
 				}
 			}
-			if rule, exists := pricing.Pricing.sourceRule(candidate.SourceID, candidate.Model); exists {
-				if rule.Mode == "free" && rule.Confirmed {
-					entry.Pricing = "confirmed-free"
-				} else if rule.Mode == "tokens" {
-					entry.Pricing = "metered"
-				}
+			if confirmedFree(candidate) && freeRoutePrice(model.ID) {
+				entry.Pricing = "confirmed-free"
+			} else if rule, exists := pricing.Pricing.sourceRule(candidate.SourceID, candidate.Model); exists && rule.Mode == "tokens" {
+				entry.Pricing = "metered"
 			}
 		}
 		// An aggregate's union is not a promise that the next selected member supports it.

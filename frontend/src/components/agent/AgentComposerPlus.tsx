@@ -10,17 +10,18 @@ import type { useAgentModels } from './useAgentModels'
 
 type SkillChoice = { name: string; description?: string; enabled: boolean }
 
-export default function AgentComposerPlus({ models, disabled, canCompact, onFiles, onCompact, onCommands, onSkill, onTask, canDelegate = false, node = null, modelTrigger = false, modelRequest = 0, contextUsage, onContext, mode, options }: {
+export default function AgentComposerPlus({ models, disabled, canCompact, onFiles, onCompact, onCommands, onSkill, onTask, canDelegate = false, node = null, modelTrigger = false, modelRequest = 0, contextUsage, onContext, mode, options, onTaskModel }: {
   mode?: { task: boolean; onChange: (task: boolean) => void }; options?: ReactNode
   contextUsage?: { cid: string; model: string; revision: string; active: boolean }; onContext?: () => void
   models: ReturnType<typeof useAgentModels>; disabled: boolean; canCompact: boolean
   onFiles: () => void; onCompact: () => void; onCommands: () => void; modelTrigger?: boolean; modelRequest?: number
-  onSkill?: (name: string) => void; onTask?: () => void; canDelegate?: boolean; node?: string | null
+  onSkill?: (name: string) => void; onTask?: () => void; canDelegate?: boolean; node?: string | null; onTaskModel?: () => void
 }) {
   const { t } = useI18n(), [open, setOpen] = useState(false)
   const [skills, setSkills] = useState<SkillChoice[]>([]), [skillsLoading, setSkillsLoading] = useState(false), [skillsFailed, setSkillsFailed] = useState(false), [skillsVersion, setSkillsVersion] = useState(0)
   const showSkills = !!onSkill
   const trigger = useRef<HTMLButtonElement>(null), [geometry, setGeometry] = useState<{ left: number; width: number; bottom: number; height: number }>()
+  const returnFocus = useRef(true)
   const measure = useCallback(() => {
     if (!trigger.current) return
     const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sp-4')) || 0
@@ -50,13 +51,13 @@ export default function AgentComposerPlus({ models, disabled, canCompact, onFile
   }, [open, node, showSkills, skillsVersion])
   const close = (action: () => void) => { setOpen(false); action() }
   const row = (label: string, icon: ReactNode, action: () => void, description?: string, blocked = false) => <button key={label} type="button" className="agent-plus-row agent-plus-action" role="menuitem" disabled={blocked} onClick={action}>{icon}<span><strong>{label}</strong>{description && <small>{description}</small>}</span></button>
-  const show = () => { measure(); setOpen(true) }
+  const show = () => { returnFocus.current = true; measure(); setOpen(true) }
   if (modelTrigger) return <AgentModelPicker models={models} disabled={disabled} node={node} openRequest={modelRequest} />
   return <>
     <button ref={trigger} type="button" className="tt-pill ico agent-plus-trigger" aria-label={t('agent.composer.more')} disabled={disabled} aria-haspopup="dialog" aria-expanded={open} onClick={show}><PlusIcon size={20} /></button>
-    <Modal open={open} onCancel={() => setOpen(false)} footer={null} title={null} closable={false} destroyOnClose maskClosable keyboard width={geometry?.width} className="agent-composer-dialog" wrapClassName="agent-composer-dialog-wrap" style={{ left: geometry?.left, bottom: geometry?.bottom, top: 'auto', margin: 0, padding: 0 }} afterClose={() => trigger.current?.focus({ preventScroll: true })}>
+    <Modal open={open} onCancel={() => setOpen(false)} footer={null} title={null} closable={false} destroyOnClose maskClosable keyboard width={geometry?.width} className="agent-composer-dialog" wrapClassName="agent-composer-dialog-wrap" style={{ left: geometry?.left, bottom: geometry?.bottom, top: 'auto', margin: 0, padding: 0 }} focusTriggerAfterClose={false} afterClose={() => { if (returnFocus.current) trigger.current?.focus({ preventScroll: true }) }}>
     <div className="agent-plus-menu" style={{ '--agent-menu-available': geometry ? geometry.height + 'px' : undefined } as CSSProperties} role="menu" aria-label={t('agent.composer.more')}>
-      {mode && <><p className="agent-menu-section">{t('agent.composer.mode')}</p><div className="agent-plus-modes">{[false, true].map(task => <button type="button" key={String(task)} role="menuitemradio" aria-checked={mode.task === task} disabled={task && !canDelegate} onClick={() => mode.onChange(task)}><span>{t(task ? 'agent.composer.taskMode' : 'agent.composer.chatMode')}</span>{mode.task === task && <CheckIcon size={16} />}</button>)}</div>{mode.task && <div className="conversation-composer-options">{options}</div>}<div className="agent-menu-divider" /></>}
+      {mode && <><p className="agent-menu-section">{t('agent.composer.mode')}</p><div className="agent-plus-modes">{[false, true].map(task => <button type="button" key={String(task)} role="menuitemradio" aria-checked={mode.task === task} disabled={task && !canDelegate} onClick={() => mode.onChange(task)}><span>{t(task ? 'agent.composer.taskMode' : 'agent.composer.chatMode')}</span>{mode.task === task && <CheckIcon size={16} />}</button>)}</div>{mode.task && <><div className="conversation-composer-options">{options}</div>{onTaskModel && row(t('agent.composer.model'), <GearIcon size={20} />, () => { returnFocus.current = false; close(onTaskModel) }, undefined, disabled)}</>}<div className="agent-menu-divider" /></>}
       {contextUsage?.cid && onContext && <><AgentContextUsage {...contextUsage} node={node} menuItem onOpen={() => close(onContext)} />{row(t('agent.compactNow'), <ArchiveIcon size={20} />, () => close(onCompact), t('agent.composer.compactHint'), !canCompact)}<div className="agent-menu-divider" /></>}
       <p className="agent-menu-section">{t('agent.composer.addSection')}</p>
       {row(t('agent.composer.addFiles'), <PaperclipIcon size={20} />, () => close(onFiles), t('agent.composer.filesHint'))}

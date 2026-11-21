@@ -19,8 +19,8 @@ export default function CapabilitiesPage({ sub = '', onNav, onLaunchAgent }: { s
   const { phone } = useLayout()
   const node = useCurrentNodeId()
   const [requested, ...rest] = sub.split('/')
-  const active = kinds.includes(requested as CapabilityKind) ? requested as CapabilityKind : 'agents'
-  const content = (kind: CapabilityKind) => kind === 'models' ? <Suspense fallback={<Spin />}><ModelHub sub={rest.join('/')} onNav={onNav} /></Suspense> : kind === 'agents' ? <AgentCatalog initialKind={rest[0]} initialSection={rest[1]} onSelect={id => onNav('capabilities/agents' + (id ? '/' + id : ''))} onLaunch={onLaunchAgent} /> : kind === 'plugins'
+  const active = kinds.includes(requested as CapabilityKind) ? requested as CapabilityKind : requested === 'import' ? 'models' : 'agents'
+  const content = (kind: CapabilityKind) => kind === 'models' ? <Suspense fallback={<Spin />}><ModelHub sub={requested === 'import' ? 'import' : rest.join('/')} onNav={onNav} /></Suspense> : kind === 'agents' ? <AgentCatalog initialKind={rest[0]} initialSection={rest[1]} onSelect={id => onNav('capabilities/agents' + (id ? '/' + id : ''))} onLaunch={onLaunchAgent} /> : kind === 'plugins'
     ? <Suspense fallback={<Spin />}><PluginsPanel initialId={rest.join('/') || undefined} onSelect={id => onNav('capabilities/plugins' + (id ? '/' + id : ''))} /></Suspense>
     : kind === 'markets' ? <Suspense fallback={<Spin />}><CapabilityMarket /></Suspense> : <CapabilityCatalog kind={kind} />
   return <div className="tt-capabilities" key={node || 'local'}>

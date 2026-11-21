@@ -65,6 +65,9 @@ func summarizeMonitor(rows []MonitorRecord) monitorTotals {
 	return result
 }
 func (h *Handler) monitorManagement(w http.ResponseWriter, r *http.Request) bool {
+	if h.requestMonitorManagement(w, r) {
+		return true
+	}
 	if r.URL.Path == "/v1/model-gateway/monitor/check" {
 		h.runQualityProbe(w, r)
 		return true
@@ -103,6 +106,9 @@ func (h *Handler) monitorManagement(w http.ResponseWriter, r *http.Request) bool
 	rows := []MonitorRecord{}
 	sourceModels := map[string]map[string]bool{}
 	for _, row := range all {
+		if row.Outcome != "" {
+			continue
+		}
 		if sourceModels[row.SourceID] == nil {
 			sourceModels[row.SourceID] = map[string]bool{}
 		}

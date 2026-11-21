@@ -300,19 +300,23 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		reject(w, 400, "MODEL_NOT_CONFIGURED")
 		return
 	}
+	observed := &observedRequestWriter{ResponseWriter: w}
+	trace := newRequestObservation(observed, catalog, *model, kind)
+	w = observed
+	defer trace.finish(r, observed, h)
 	if !model.enabled() {
 		reject(w, 503, "MODEL_ROUTE_DISABLED")
 		return
 	}
+	var freeOnlyRequested bool
 	if raw, present := payload["roami_free_only"]; present {
-		var freeOnly bool
-		if json.Unmarshal(raw, &freeOnly) != nil {
+		if json.Unmarshal(raw, &freeOnlyRequested) != nil {
 			reject(w, 400, "INVALID_MODEL_CONFIG")
 			return
 		}
 		delete(payload, "roami_free_only")
 		body, _ = json.Marshal(payload)
-		if freeOnly {
+		if freeOnlyRequested {
 			model.FreeOnly, model.AllowPlan = true, false
 		}
 	}
@@ -351,6 +355,16 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				return
 			}
 			if !ok {
+				if trace.Attempts == 0 {
+					trace.Blocks = choice.unavailableReasons()
+					if index == 0 && model.FreeOnly {
+						wait := choice.nextAvailableAt().Sub(h.Ledger.now())
+						if wait > 0 {
+							seconds := (wait-time.Nanosecond)/time.Second + 1
+							w.Header().Set("Retry-After", strconv.FormatInt(int64(seconds), 10))
+						}
+					}
+				}
 				reject(w, 503, "MODEL_ROUTE_NO_AVAILABLE_MEMBER")
 				return
 			}
@@ -475,7 +489,10 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			}
 		}
 		admissionStarted := time.Now()
-		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, Free: leaf.Free, PricingRevision: leaf.PricingRevision})
+		call, e := h.admit(r.Context(), role, candidate.Model, session, r.Header.Get("X-Request-Id"), validate, CallAttribution{
+			AgentKind: agentKind, KeyID: keyID, SourceID: source.ID, RouteID: model.ID, ObservationRequestID: trace.RequestID,
+			Free: leaf.Free, PricingRevision: leaf.PricingRevision,
+		})
 		admissionDuration += time.Since(admissionStarted)
 		w.Header().Set("X-Roami-Model-Admission-Ms", strconv.FormatInt(admissionDuration.Milliseconds(), 10))
 		if e != nil {
@@ -500,7 +517,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 		// Each attempted source settles independently, including zero-send connection failures.
 		attempt := func() bool {
 			observation := newResponseObservation(source.Protocol, time.Now())
-			defer func() { h.observeAttempt(r, leaf, call, status, code, usage, observation) }()
+			delivered := false
+			defer func() {
+				record := h.observeAttempt(r, leaf, call, status, code, usage, observation, trace.RequestID, trace.Attempts+1)
+				trace.attempt(record, candidate, delivered, notSent)
+			}()
 
 			defer func() {
 				if err := h.Ledger.Settle(call, usage, status, code, notSent); err != nil {
@@ -614,6 +635,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 					return false
 				}
 				complete, conversionError := bridge.forward(w, response, &capture)
+				delivered = complete && conversionError == nil
 				usage = capture.finish(complete)
 				if conversionError != nil {
 					code = protocolCode(conversionError)
@@ -645,6 +667,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 				}
 			}
 			if status >= 200 && status < 300 {
+				delivered = complete
 				usage = capture.finish(complete)
 				if usage != nil {
 					code = ""

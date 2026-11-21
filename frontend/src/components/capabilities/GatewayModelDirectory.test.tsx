@@ -2,6 +2,7 @@
 import { App } from 'antd'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { installRadixTestEvents } from '../ui/radix-test-events'
 import { api } from '../../api'
 import { clearAgentDataCache } from '../agent/agent-data-cache'
 import GatewayModelDirectory from './GatewayModelDirectory'
@@ -9,7 +10,7 @@ import type { ModelCatalog } from './model-hub-api'
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false }) }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
-beforeEach(() => { window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
+beforeEach(() => { installRadixTestEvents(); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })) })
 afterEach(() => { cleanup(); clearAgentDataCache(); vi.clearAllMocks() })
 const catalog: ModelCatalog = { revision: 'r1', baseUrl: '', drafts: [], uses: { 'team-model': ['roami', 'roami', 'codex'], pool: ['claude'] }, models: [{ id: 'team-model', name: 'Team alias', protocol: 'openai-completions', strategy: 'fixed', candidates: [{ sourceId: 'a', model: 'vendor/model' }] }, { id: 'pool', name: 'Team pool', aggregate: true, protocol: 'openai-completions', strategy: 'order', freeOnly: true, candidates: [{ sourceId: 'a', model: 'vendor/model' }] }], sources: [{ id: 'a', name: 'Source A', baseUrl: 'https://example.test', protocol: 'openai-completions', authMode: 'bearer' }] }
 const row = (id: string, patch = {}) => ({ id, name: id, kind: 'single', configured: false, enabled: true, capabilities: {}, candidates: [{ sourceId: 'a', model: id }], ...patch })
@@ -34,7 +35,9 @@ it('defaults to configured routes with aggregates first and shows per-route user
 it('keeps paid upstream models out of the default directory and never infers free pricing from a source name', async () => {
  vi.mocked(api).mockResolvedValue({ data: { revision:'r1', models:[row('paid-claude',{name:'Claude paid',pricing:'metered',inputModalities:['text','image'],outputModalities:['text']})] } })
  render(<App><GatewayModelDirectory catalog={{...catalog,sources:[{...catalog.sources[0],name:'openrouter-free'}]}} onSource={vi.fn()} /></App>)
- fireEvent.click(screen.getByRole('tab',{name:'gatewayWorkspace.kind.upstream'}))
+ expect(screen.queryByRole('tab')).toBeNull()
+ fireEvent.keyDown(screen.getByRole('combobox',{name:'gatewayWorkspace.kind'}),{key:'ArrowDown'})
+ fireEvent.keyDown(await screen.findByRole('option',{name:'gatewayWorkspace.kind.upstream'}),{key:'Enter'})
  expect(await screen.findByText('Claude paid')).toBeTruthy()
  expect(screen.getByText('gatewayOptions.price.metered')).toBeTruthy()
  expect(screen.queryByText('gatewayOptions.price.confirmed-free')).toBeNull()

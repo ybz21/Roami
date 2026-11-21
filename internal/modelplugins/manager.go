@@ -57,6 +57,9 @@ type Account struct {
 type Provider struct {
 	Accounts       []Account       `json:"accounts"`
 	Usage          bool            `json:"usage"`
+	CheckIn        *bool           `json:"checkin,omitempty"`
+	Calls          *bool           `json:"calls,omitempty"`
+	Renews         bool            `json:"renews"`
 	ID             string          `json:"id"`
 	Name           string          `json:"name"`
 	NPM            string          `json:"npm"`
@@ -76,6 +79,7 @@ type Source struct {
 }
 type worker struct {
 	configMu      sync.Mutex
+	checkInMu     sync.Mutex
 	configuration string
 	host          *Host
 	egress        *Egress

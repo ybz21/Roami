@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN" class="trace-layout">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>监控 · Roami 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+<link rel="stylesheet" href="assets/observation.css">
+<script defer src="assets/observation.js"></script>
+</head>
+<body data-view="monitor">
+<header class="page-head trace-header">
+  <a class="trace-back trace-home trace-icon" href="index.html" aria-label="返回大模型工作台"><span aria-hidden="true"></span></a>
+  <a class="crumb trace-home" href="index.html">大模型工作台</a>
+  <h1 id="page-title">监控</h1>
+  <span class="spacer"></span>
+  <span class="trace-sample">模拟数据</span>
+  <a id="peer" class="trace-action" href="audit.html">审计</a>
+</header>
+<div class="workspace trace-workspace">
+  <nav class="side" aria-label="大模型页面">
+    <a href="index.html">设计首页</a>
+    <a href="sources.html">模型源</a>
+    <a href="plugins.html">插件与账号</a>
+    <a href="aggregation.html">聚合</a>
+    <a href="gateway.html">本机网关</a>
+    <a href="usage.html">用量</a>
+    <a href="monitor.html" aria-current="page">监控</a>
+    <a href="audit.html">审计</a>
+    <a href="agent.html">选模</a>
+    <a href="speech.html">语音</a>
+  </nav>
+  <main class="trace-content" id="trace-content">
+
+    <section class="trace-monitor" aria-labelledby="overview-heading">
+      <div class="trace-heading">
+        <div><h2 id="overview-heading">请求概览</h2><p>11 月 20 日 · 节点时区 UTC+8 · 截至 14:30</p></div>
+        <a class="trace-action trace-primary" id="review-audits" href="audit.html">查看请求审计</a>
+      </div>
+      <form class="trace-filters" aria-label="监控筛选">
+
+    <label>时间范围<select id="window" name="window"><option value="30">过去 30 分钟</option><option value="60">过去 60 分钟</option></select></label>
+    <label>调用入口<select id="pool" name="pool"><option value="">全部入口</option><option value="coding">日常编码</option><option value="okr">OKR 工作流</option><option value="direct">原生直调</option></select></label>
+    <label>上游来源<select id="source" name="source"><option value="">全部来源</option><option value="workbuddy">WorkBuddy</option><option value="openrouter">OpenRouter</option><option value="lan">本机 Qwen</option></select></label>
+      </form>
+      <dl class="trace-metrics" id="metrics"></dl>
+      <div class="trace-analysis">
+        <section class="trace-panel" aria-labelledby="trend-heading">
+          <div class="trace-heading"><div><h3 id="trend-heading">请求结果趋势</h3><p>每 5 分钟 · 点时段筛选</p></div></div>
+          <div class="trace-plot" id="plot" aria-label="按 5 分钟选择时间段"></div>
+          <ul class="trace-legend"><li data-kind="success">直接成功</li><li data-kind="recovered">切换后恢复</li><li data-kind="failed">最终失败</li></ul>
+        </section>
+        <section class="trace-panel trace-causes" aria-labelledby="causes-heading">
+          <div class="trace-heading"><div><h3 id="causes-heading">失败原因</h3><p id="cause-scope">当前时间范围</p></div></div>
+          <div class="trace-breakdown" id="causes"></div>
+          <div class="trace-selection" id="selection" hidden></div>
+        </section>
+      </div>
+    </section>
+    <section class="trace-panel trace-sources" aria-labelledby="health-heading">
+      <div class="trace-heading"><div><h2 id="health-heading">来源健康</h2><p>按上游尝试统计 · 独立于请求终态</p></div></div>
+      <div id="source-health"></div>
+      <p id="probe-result" class="trace-probe" role="status" hidden></p>
+    </section>
+    <details class="trace-notes">
+      <summary>交互与数据口径</summary>
+      <ul>
+        <li>点时段和失败原因可组合筛选。再点已选项可取消。查看审计时带上时间、来源和原因。</li>
+        <li>请求只有一个终态。切换后恢复计入成功，失败尝试仍进入来源统计。</li>
+        <li>抽检保留自己的采样时间。示例抽检结果独立展示。</li>
+      </ul>
+    </details>
+
+  </main>
+</div>
+</body>
+</html>

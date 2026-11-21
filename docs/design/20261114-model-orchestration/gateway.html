@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>本机网关 · 大模型工作台</title>
+<link rel="stylesheet" href="assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">大模型工作台</a><h1>本机网关</h1></header>
+<div class="workspace">
+<nav class="side" aria-label="设计目录">
+  <div class="group">总览</div><a href="index.html">设计首页</a>
+  <div class="group">页面</div>
+  <a href="sources.html">模型源</a><a href="plugins.html">插件与账号</a><a href="aggregation.html">聚合</a><a href="gateway.html" aria-current="page">本机网关</a><a href="usage.html">用量</a><a href="monitor.html">监控</a><a href="audit.html">审计</a><a href="agent.html">选模</a><a href="speech.html">语音</a>
+</nav>
+<main class="doc">
+<section>
+  <h2>接入与密钥</h2>
+  <p class="lead">打开网关先看到调用地址和复制按钮。向下查看调用示例和访问密钥。</p>
+  <p><a class="btn" href="current.html#/gateway">打开网关原型</a></p>
+  <div class="app">
+    <div class="app-main">
+      <div class="tabs" aria-hidden="true"><span class="on">接入与密钥</span><span>模型列表</span></div>
+      <div class="callout">
+        <strong>API 地址</strong>
+        <p><code>http://127.0.0.1:41155/v1</code> · 仅本机可访问</p>
+      </div>
+      <div class="toolbar"><span>调用示例</span><span class="chip">curl / Python</span></div>
+      <div class="toolbar"><span>访问密钥</span><span class="chip">新建密钥</span></div>
+    </div>
+  </div>
+</section>
+<section>
+  <h2>模型列表</h2>
+  <p class="lead">在同一个列表里按类型、来源、能力或费用筛选。默认显示全部已接入模型，聚合排在前面。</p>
+  <p><a class="btn" href="current.html#/directory">打开模型列表原型</a></p>
+  <div class="app">
+    <div class="app-main">
+      <div class="tabs" aria-hidden="true"><span>接入与密钥</span><span class="on">模型列表</span></div>
+      <div class="toolbar"><span class="search">搜索模型</span><span class="select">全部已接入</span><span class="select">所有来源</span><span class="select">全部能力</span><span class="select">全部费用</span></div>
+      <table class="grid">
+        <thead><tr><th>模型</th><th>类型</th><th>输入</th><th>输出</th></tr></thead>
+        <tbody>
+          <tr><td>日常编码</td><td>聚合</td><td>文本、图片</td><td>文本</td></tr>
+          <tr><td>DS 代码助手</td><td>原生 · WorkBuddy</td><td>文本</td><td>文本</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <dl class="decisions">
+    <dt>筛选类型</dt>
+    <dd>可选全部已接入、聚合模型、原生模型或上游目录。上游目录用于查看尚未接入的模型。接入后可在模型详情复制调用名。</dd>
+    <dt>管理密钥</dt>
+    <dd>网关访问密钥在创建时完整显示一次。上游凭据在<a href="sources.html">模型源</a>管理。</dd>
+  </dl>
+</section>
+</main>
+</div>
+</body>
+</html>
