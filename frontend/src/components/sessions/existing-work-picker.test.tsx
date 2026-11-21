@@ -56,6 +56,7 @@ describe('开任务 · 「已有」选择器', () => {
       if (u.endsWith('/session-lifecycle/operations')) {
         return jsonResponse({ data: { operationId: 'op', resourceId: 'sess-1' } })
       }
+      if (u.endsWith('/agent/native-sessions')) return jsonResponse({ data: { session: 'native:session-1' } })
       return jsonResponse({ data: {} })
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -126,5 +127,25 @@ describe('开任务 · 「已有」选择器', () => {
     await waitFor(() => expect(body('/session-lifecycle/operations')).toHaveLength(1))
     expect(body('/session-lifecycle/operations')[0].intent).toMatchObject({ dir: '/repo/.worktrees/a', worktree: false })
     expect(body('/worktree-sessions')).toHaveLength(0)
+  })
+
+  it('切换项目时保留任务和 Roami 选项，按新项目目录提交', async () => {
+    const openTerm = vi.fn()
+    const composer = (dir: string) => <I18nProvider><AntApp>
+      <TaskComposer dir={dir} isGit allowNative openTerm={openTerm} />
+    </AntApp></I18nProvider>
+    const { rerender } = render(composer('/repo'))
+    fireEvent.change(screen.getByRole('textbox', { name: '描述任务' }), { target: { value: '检查项目选择' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Roami' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '仅免费' }))
+
+    rerender(composer('/other-project'))
+    fireEvent.click(screen.getByRole('button', { name: /开\s*干/ }))
+
+    await waitFor(() => expect(openTerm).toHaveBeenCalledWith('native:session-1'))
+    expect(body('/agent/native-sessions')).toEqual([expect.objectContaining({
+      task: '检查项目选择', directory: '/other-project', model: 'auto', freeOnly: true,
+    })])
+    expect(body('/session-lifecycle/operations')).toHaveLength(0)
   })
 })

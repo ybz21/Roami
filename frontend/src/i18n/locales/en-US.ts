@@ -4033,6 +4033,7 @@ const enUS = {
   'project.back': 'Back to projects',
   'project.wtManage': 'Worktrees',
   'project.composerPlaceholder': 'Describe a task and press Enter — the agent works in an isolated worktree and names the branch itself…',
+  'project.taskPrompt': 'Describe the task',
   'project.where.new': 'New worktree',
   'project.where.repo': 'Main repo',
   'project.where.existing': 'Existing ({count})',

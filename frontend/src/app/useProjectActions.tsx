@@ -10,7 +10,7 @@ import { useAgentKinds, type AgentKind } from '../agent-kind'
 import { api } from '../api'
 import { nativeSessionId } from '../components/sessions/session-record'
 import { NewProjectModal } from '../components/projects/Projects'
-import { NewSessionModal } from '../components/sessions/NewSessionModal'
+import MobileSubPage from '../components/MobileSubPage'
 import RenameSessionModal from '../components/sessions/RenameSessionModal'
 import { TaskComposer } from '../components/sessions/TaskComposer'
 import { useSessionCloser } from '../components/sessions/session-closer'
@@ -29,6 +29,7 @@ import type { ProjectDirectory } from './useProjectDirectory'
 import type { SessionDirectory } from './useSessionDirectory'
 import type { TaskWorkspace } from './useTaskWorkspace'
 import type { useTerminalRuntime } from './useTerminalRuntime'
+import './project-task-form.css'
 
 type ProjectActionOptions = {
   data: SessionDirectory
@@ -55,7 +56,6 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   const [renameInTree, setRenameInTree] = useState<string | null>(null)
   const [renameTask, setRenameTask] = useState<{ key: TaskKey; name: string } | null>(null)
   const [renameTaskVal, setRenameTaskVal] = useState('')
-  const [newSessionOpen, setNewSessionOpen] = useState(false)
   const [newTaskDir, setNewTaskDir] = useState<string | null>(null)
   const quickTaskOpening = useRef(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
@@ -153,6 +153,17 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
     title: t('project.removeConfirm'), okText: t('project.remove'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     onOk: async () => { try { await api('DELETE', `/projects/${encodeURIComponent(key)}`); antMessage.success(t('project.removed')); directory.refresh() } catch (e: any) { antMessage.error(e.message) } },
   })
+  const newTask = (dir?: string) => {
+    const current = dir || treeSrcRef.current.projects[0]?.dir
+    if (current) { setNewTaskDir(current); return }
+    if (directory.projectsLoaded && !directory.projectsError) { setNewProjectOpen(true); return }
+    void api('GET', '/projects').then(response => {
+      const projects = response.data?.projects || []
+      setTreeSrc(cur => ({ ...cur, projects }))
+      if (projects.length) setNewTaskDir(projects[0].dir)
+      else setNewProjectOpen(true)
+    }).catch((error: Error) => antMessage.error(error.message))
+  }
   const desktopDialogs = <>
     <RenameSessionModal session={renameInTree} onClose={() => setRenameInTree(null)} onDone={renameOpenTerm} />
     {closer.node}
@@ -171,27 +182,29 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
       <div style={{ marginTop: 'var(--sp-2)', color: 'var(--text-dimmer)', fontSize: 'var(--fs-meta)' }}>{t('tree.taskNameHint')}</div>
     </Modal>
   </>
+  const closeTaskForm = () => setNewTaskDir(null)
+  const taskFormTitle = t('tree.newTask')
+  const taskForm = newTaskDir && <>
+    <label htmlFor="new-task-project" className="tt-project-task-label">{t('tree.projectField')}</label>
+    <Select id="new-task-project" className="tt-project-task-select" value={newTaskDir} onChange={setNewTaskDir}
+      classNames={isMobile ? { popup: { root: 'tt-project-task-options' } } : undefined} optionLabelProp="projectName"
+      options={treeSrc.projects.map(p => ({ value: p.dir, projectName: p.name, label: isMobile ? p.name : <span>{p.name} <span className="tt-project-task-path">{p.dir}</span></span> }))} />
+    <TaskComposer dir={newTaskDir} isGit={treeSrc.projects.find(p => p.dir === newTaskDir)?.git !== false}
+      allowNative openTerm={workspace.openTerm} onCreated={() => { directory.refresh(); closeTaskForm() }} autoFocus={!isMobile} />
+  </>
   const dialogs = <>
-    <NewSessionModal open={newSessionOpen} onClose={() => setNewSessionOpen(false)} onDone={name => { data.refresh(); directory.refresh(); openTerm(name) }} />
-    <Modal className="tt-newtask-modal" open={!!newTaskDir} footer={null} width={860} destroyOnClose onCancel={() => setNewTaskDir(null)} title={t('tree.newTask')}>
-      {newTaskDir && (
-        <>
-          <div className="tt-lbl">{t('tree.projectField')}</div>
-          <Select value={newTaskDir} onChange={(v) => setNewTaskDir(v)} style={{ width: '100%', marginBottom: 'var(--sp-3)' }}
-            options={treeSrc.projects.map((p: any) => ({ value: p.dir, label: isMobile ? p.name : <span>{p.name} <span style={{ color: 'var(--text-dimmer)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-micro)', marginLeft: 'var(--sp-2)' }}>{p.dir}</span></span> }))} />
-          <TaskComposer key={newTaskDir} dir={newTaskDir} isGit={treeSrc.projects.find((p: any) => p.dir === newTaskDir)?.git !== false}
-            openTerm={openTerm} onCreated={() => setNewTaskDir(null)} autoFocus={!isMobile} />
-        </>
-      )}
-    </Modal>
+    {isMobile ? taskForm && <MobileSubPage title={taskFormTitle} dialogLabel={taskFormTitle} onBack={closeTaskForm} search={false}>
+      <div className="tt-project-task-page">{taskForm}</div>
+    </MobileSubPage> : <Modal open={!!taskForm} footer={null} width={860} destroyOnClose onCancel={closeTaskForm} title={taskFormTitle}>
+      {taskForm}
+    </Modal>}
     {/* 建完立刻刷树：项目列表 15s 一轮、worktree 60s 一轮，不刷就得等 */}
     <NewProjectModal open={newProjectOpen} onClose={() => setNewProjectOpen(false)} onCreated={() => directory.refresh()} />
 
   </>
   return {
     tree, openTerm, closeTerm, renameOpenTerm, onTreeTask, onTreeProject, newTerminalInTask, newTerminalAt, activeTaskLabel, finishTask, removeProject,
-    newSession: () => setNewSessionOpen(true),
-    newTask: (dir?: string) => { const d = dir || treeSrc.projects[0]?.dir; if (d) setNewTaskDir(d); else setNewProjectOpen(true) },
+    newTask,
     setNewTaskDir, addProject: () => setNewProjectOpen(true), renameSession: setRenameInTree,
     renameTask: (key: TaskKey, name: string) => { setRenameTask({ key, name }); setRenameTaskVal(prefs.taskNames?.[key] || name) },
     kill: (name: string) => { void closer.beginClose(name) }, desktopDialogs, dialogs
