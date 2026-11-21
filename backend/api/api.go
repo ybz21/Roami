@@ -92,6 +92,10 @@ func New(tt *ttmux.Client, browserHome, dataDir, fallbackBin string) *API {
 
 // json 透传 ttmux 的 --json 输出
 func (a *API) json(c *gin.Context, args ...string) {
+	a.writeCLIJSON(c, nil, args...)
+}
+
+func (a *API) writeCLIJSON(c *gin.Context, transform func([]byte) []byte, args ...string) {
 	// 只认 stdout。日志走 stderr（插件 SDK 的 Logf 就是这么写的），混进来会让整份
 	// 响应不再是 JSON，浏览器那边只剩一句「Unexpected token 'r'」——定时任务保存
 	// 明明成功了，界面上却是一条报错，就是这么来的。
@@ -115,7 +119,11 @@ func (a *API) json(c *gin.Context, args ...string) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "BAD_JSON", "message": msg}})
 		return
 	}
-	c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(body))
+	payload := []byte(body)
+	if transform != nil {
+		payload = transform(payload)
+	}
+	c.Data(http.StatusOK, "application/json; charset=utf-8", payload)
 }
 
 // firstLine 截第一行给错误消息用：命令失败时输出可能是一整屏。
@@ -239,10 +247,10 @@ func (a *API) resolveSession(token string) string {
 // 节点带 parent/children，供 W2 父子分组）；缺省平铺（兼容旧调用方）。
 func (a *API) Sessions(c *gin.Context) {
 	if c.Query("tree") == "1" {
-		a.json(c, "ls", "--tree", "--json")
+		a.writeCLIJSON(c, a.Live.projectSessionActivity, "ls", "--tree", "--json")
 		return
 	}
-	a.json(c, "ls", "--json")
+	a.writeCLIJSON(c, a.Live.projectSessionActivity, "ls", "--json")
 }
 func (a *API) NewSession(c *gin.Context) {
 	var b struct {

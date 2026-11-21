@@ -20,12 +20,13 @@ import (
 
 // liveSnap 探测循环每轮写一份：会话此刻在干什么
 type liveSnap struct {
-	Agent   string // claude | codex | pi | opencode | ""
-	Busy    bool   // agent 正在响应；进程停在提示符时不算“在跑”
-	Waiting bool
-	YesNo   bool // 等的是「允许 / 拒绝」这种二选一，首页能直接给两个按钮；自由选择题不给
-	Tail    string
-	At      time.Time
+	Agent    string // claude | codex | pi | opencode | ""
+	Busy     bool   // agent 正在响应；进程停在提示符时不算“在跑”
+	Waiting  bool
+	YesNo    bool // 等的是「允许 / 拒绝」这种二选一，首页能直接给两个按钮；自由选择题不给
+	Tail     string
+	At       time.Time
+	Activity sessionActivity
 }
 
 func (s liveSnap) running() bool { return s.Agent != "" && s.Busy && !s.Waiting }
@@ -126,10 +127,8 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		if strings.HasPrefix(s.Name, "_ttmux-") {
 			continue
 		}
-		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: rawInt(s.LastActivity), Dormant: s.State == "dormant"}
-		if s.TmuxID != "" && s.Created != "" {
-			it.Identity = s.TmuxID + ":" + s.Created
-		}
+		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: a.Live.sessionActivity(s), Dormant: s.State == "dormant"}
+		it.Identity = s.identity()
 		it.Mem = s.Mem
 		if review, ok := reviews[s.Name]; ok {
 			it.Review = &review

@@ -200,6 +200,7 @@ func (a *API) SessionEventLoop() {
 			continue
 		}
 		sessions := map[string]string{}
+		rows := make(map[string]sessListItem, len(list))
 		reviewAuthors, paused := map[string]bool{}, map[string]bool{}
 		for _, s := range list {
 			if s.State == "dormant" || strings.HasPrefix(s.Name, "_ttmux-") {
@@ -210,13 +211,26 @@ func (a *API) SessionEventLoop() {
 				label = s.Name
 			}
 			sessions[s.Name] = label
+			rows[s.Name] = s
 			reviewAuthors[s.Name] = true
 			if s.Parent != "" {
 				reviewAuthors[s.Parent] = true
 			}
 			paused[s.Name] = s.Mem != nil && s.Mem.Paused
 		}
-		procs := runningAgentProcs()
+		panes := scanSessionPanes(rt)
+		procs, _ := agentProcsByPane(panes, false)
+		panesBySession := make(map[string][]sessionPane, len(sessions))
+		activePanes := make(map[string]string, len(sessions))
+		for _, pane := range panes {
+			if row, ok := rows[pane.session]; !ok || row.identity() != pane.identity {
+				continue
+			}
+			panesBySession[pane.session] = append(panesBySession[pane.session], pane)
+			if pane.active {
+				activePanes[pane.session] = pane.id
+			}
+		}
 		if time.Since(openCodeAt) >= 10*time.Second {
 			openCodeActive = scanOpenCodeActive(procs, openCodeDirs)
 			openCodeAt = time.Now()
@@ -225,16 +239,29 @@ func (a *API) SessionEventLoop() {
 		for name, p := range procs {
 			agents[name] = p.Kind != ""
 		}
-		// 这一轮的抓屏只抓一次：observe 用，overview 的活状态也用
-		caps := map[string]string{}
-		capture := func(n string) string {
-			if c, ok := caps[n]; ok {
-				return c
-			}
-			c := captureTerminalSession(rt, n, 60)
-			caps[n] = c
-			return c
+		// Share captures between session events, status, and activity.
+		type paneCapture struct {
+			text string
+			ok   bool
 		}
+		caps := map[string]paneCapture{}
+		capturePane := func(target string) (string, bool) {
+			if c, ok := caps[target]; ok {
+				return c.text, c.ok
+			}
+			screen, ok := captureTerminalTarget(rt, target, 60)
+			caps[target] = paneCapture{screen, ok}
+			return screen, ok
+		}
+		capture := func(name string) string {
+			target := activePanes[name]
+			if target == "" {
+				target = "=" + name + ":"
+			}
+			screen, _ := capturePane(target)
+			return screen
+		}
+		observedAt := time.Now().Unix()
 		lastTurn := func(name string) lastTurnInfo {
 			p, ok := procs[name]
 			if !ok || p.Kind != "claude" {
@@ -259,7 +286,9 @@ func (a *API) SessionEventLoop() {
 		now := time.Now()
 		for name := range sessions {
 			cap := capture(name)
-			snap := liveSnap{Waiting: sessionWaiting(cap), At: now}
+			prior, _ := a.Live.get(name)
+			activity := prior.Activity.observe(rows[name], panesBySession[name], observedAt, capturePane)
+			snap := liveSnap{Waiting: sessionWaiting(cap), At: now, Activity: activity}
 			if p, ok := procs[name]; ok && p.Kind != "" {
 				snap.Agent = p.Kind
 				snap.Busy = screenBusy(cap) || (p.Kind == "opencode" && openCodeActive[name])

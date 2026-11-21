@@ -250,28 +250,23 @@ func runningAgentProcs() map[string]agentProc {
 }
 
 func scanAgentPanes(includeAlternatives bool) (map[string]agentProc, map[string][]string) {
-	out, err := runtime.New().TmuxOutput("list-panes", "-a", "-F", "#{session_name}\t#{pane_pid}\t#{pane_current_path}")
-	if err != nil {
+	return agentProcsByPane(scanSessionPanes(runtime.New()), includeAlternatives)
+}
+
+func agentProcsByPane(panes []sessionPane, includeAlternatives bool) (map[string]agentProc, map[string][]string) {
+	if panes == nil {
 		return nil, nil
 	}
 	children := procChildren()
 	running := map[string]agentProc{}
 	alternatives := map[string][]string{}
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		parts := strings.SplitN(line, "\t", 3)
-		if len(parts) != 3 {
-			continue
-		}
-		name := parts[0]
+	for _, pane := range panes {
+		name := pane.session
 		primary := running[name]
-		if primary.Kind != "" && !includeAlternatives {
+		if pane.pid <= 0 || (primary.Kind != "" && !includeAlternatives) {
 			continue
 		}
-		pid, err := strconv.Atoi(parts[1])
-		if err != nil {
-			continue
-		}
-		kind, found := registeredAgentInTree(pid, children, func(pid int) []string {
+		kind, found := registeredAgentInTree(pane.pid, children, func(pid int) []string {
 			if procStopped(pid) {
 				return nil
 			}
@@ -281,7 +276,7 @@ func scanAgentPanes(includeAlternatives bool) (map[string]agentProc, map[string]
 			continue
 		}
 		if primary.Kind == "" {
-			running[name] = agentProc{Kind: kind, Dir: parts[2], Pid: found}
+			running[name] = agentProc{Kind: kind, Dir: pane.dir, Pid: found}
 		} else if primary.Kind != kind && !slices.Contains(alternatives[name], kind) {
 			alternatives[name] = append(alternatives[name], kind)
 		}
