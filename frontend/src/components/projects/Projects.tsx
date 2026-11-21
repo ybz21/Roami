@@ -309,27 +309,31 @@ export function Lifec({ done, cur }: { done: number; cur?: number }) {
 }
 
 export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }: { openTerm: (n: string) => void; closeTerm: (n: string) => void; initialKey?: string; activeTerm?: string | null }) {
-  const [data, setData] = useState<{ projects: Proj[]; loose: ProjSession[]; overview: OverviewItem[] | null }>({ projects: [], loose: [], overview: null })
+  const [data, setData] = useState<{ projects: Proj[]; loose: ProjSession[] }>({ projects: [], loose: [] })
   const [loaded, setLoaded] = useState(false)
   const native = useNativeSessionList()
-  const displayed = useMemo(() => ({ ...data, projects: mergeProjectSessions(data.projects, native.value),
+  const overview = useSessionOverview()
+  const items = overview.loaded ? overview.value : null
+  const displayed = useMemo(() => ({
+    projects: mergeProjectSessions(mergeProjectActivity(data.projects, items), native.value),
     loose: [...data.loose, ...native.value.filter(session => !data.projects.some(project => project.key === session.projectId)).map(session => ({ ...nativeSessionRecord(session), attached: false }))],
-    overview: data.overview && [...data.overview, ...native.value.map(session => {
+    overview: items && [...items, ...native.value.map(session => {
       const project = data.projects.find(project => project.key === session.projectId)
       return { ...nativeSessionRecord(session), project: project?.name, projectDir: project?.dir }
     })],
-  }), [data, native.value])
-  const load = async () => {
-    const [projects, overview] = await Promise.allSettled([api('GET', '/projects'), api('GET', '/sessions/overview')])
-    if (projects.status !== 'fulfilled') return
-    const items: OverviewItem[] | null = overview.status === 'fulfilled' ? overview.value?.data?.items || [] : null
-    setData({
-      projects: mergeProjectActivity(projects.value?.data?.projects || [], items),
-      loose: projects.value?.data?.loose || [], overview: items,
-    })
-    setLoaded(true)
-  }
-  usePageEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i) }, [])
+  }), [data, items, native.value])
+  const projectPoll = useRef<ReturnType<typeof pollWhileVisible>>()
+  usePageEffect(() => {
+    const poll = pollWhileVisible(async signal => {
+      const result = await api('GET', '/projects', undefined, { signal })
+      if (signal.aborted) return
+      setData({ projects: result?.data?.projects || [], loose: result?.data?.loose || [] })
+      setLoaded(true)
+    }, 5000)
+    projectPoll.current = poll
+    return () => { projectPoll.current = undefined; poll.stop() }
+  }, [])
+  const load = () => { void projectPoll.current?.refresh(); refreshSessionLists() }
 
   return (
     <>

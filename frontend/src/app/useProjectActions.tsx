@@ -44,7 +44,7 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   const { terms, active, activeTask, activeTaskRef, projTable, keyOf, space, returnToTask } = workspace
   const { sessIds, sessList, sessListLoaded } = data
   const { treeSrc, treeSrcRef, setTreeSrc } = directory
-  const { claudeMap, codexMap, termRefs } = runtime
+  const { termRefs } = runtime
   const [prefs] = usePreferences()
   const { t } = useI18n()
   const openTerm = (name: string, task?: TaskKey) => {
@@ -90,10 +90,10 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
   const tree = useMemo(() => buildTaskTree({
     projects: treeSrc.projects, worktrees: treeSrc.worktrees, sessions: sessList, placement: projTable,
     nameOf: (p) => prefs.taskNames?.[p] || undefined,
-    agentOf: (n) => agentKinds[n] || (claudeMap[n]?.running ? 'claude' : codexMap[n]?.running ? 'codex' : undefined),
+    agentOf: (n) => agentKinds[n],
     sessionsLoaded: sessListLoaded,
     nameOfId: (id) => sessIds?.byId[id],
-  }), [treeSrc, sessList, agentKinds, claudeMap, codexMap, projTable, prefs.taskNames, sessIds, sessListLoaded])
+  }), [treeSrc, sessList, agentKinds, projTable, prefs.taskNames, sessIds, sessListLoaded])
 
   const onTreeTask = (key: TaskKey) => {
     const open = terms.filter((n) => keyOf(n) === key)

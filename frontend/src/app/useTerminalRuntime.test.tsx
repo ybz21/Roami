@@ -5,8 +5,12 @@ import { api } from '../api'
 import { useTerminalRuntime } from './useTerminalRuntime'
 
 vi.mock('../api', () => ({ api: vi.fn() }))
-vi.mock('../session-overview', () => ({ useSessionOverview: () => ({ value: [] }) }))
-vi.mock('../components/sessions/native-session-list', () => ({ useNativeSessionList: () => ({ value: [] }) }))
+const sources = vi.hoisted(() => ({
+  overview: vi.fn(() => ({ value: [] })),
+  native: vi.fn(() => ({ value: [] })),
+}))
+vi.mock('../session-overview', () => ({ useSessionOverview: sources.overview }))
+vi.mock('../components/sessions/native-session-list', () => ({ useNativeSessionList: sources.native }))
 
 const inventory = {
   loaded: true, failed: false,
@@ -40,4 +44,16 @@ it('still discovers the chat options for a session with different Agents in its 
   }, false))
   await advance(0)
   expect(vi.mocked(api).mock.calls.map(([, path]) => path)).toEqual(['/sessions/one/codex', '/sessions/one/claude'])
+})
+
+it('subscribes only to the session family needed by a standalone terminal', () => {
+  const options = { workspaceActivity: false, desktopClaude: false }
+  const view = renderHook(({ session }) => useTerminalRuntime(session, inventory, false, options), {
+    initialProps: { session: 'one' },
+  })
+  expect(sources.overview).toHaveBeenLastCalledWith(true)
+  expect(sources.native).toHaveBeenLastCalledWith(false)
+  view.rerender({ session: 'roami:native-example' })
+  expect(sources.overview).toHaveBeenLastCalledWith(false)
+  expect(sources.native).toHaveBeenLastCalledWith(true)
 })

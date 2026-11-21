@@ -20,13 +20,15 @@ function sameProbe(a: ClaudeInfo | undefined, b: ClaudeInfo | undefined): boolea
 
 const EMPTY_DETAILS: Record<string, ClaudeInfo> = {}
 
-export function useTerminalRuntime(visible: string | null, inventory: ReturnType<typeof useAgentKindInventory>, isMobile: boolean, desktopClaude = true) {
+export function useTerminalRuntime(visible: string | null, inventory: ReturnType<typeof useAgentKindInventory>, isMobile: boolean, options: { workspaceActivity?: boolean; desktopClaude?: boolean } = {}) {
+  const { workspaceActivity = true, desktopClaude = true } = options
   const node = useCurrentNodeId()
   const [detailNode, setDetailNode] = useState(node)
   const [fontSize, setFontSize] = useState(13)
   const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
-  const sessionOverview = useSessionOverview()
-  const native = useNativeSessionList()
+  const nativeVisible = !!(visible && nativeSessionId(visible))
+  const sessionOverview = useSessionOverview(workspaceActivity || (!!visible && !nativeVisible))
+  const native = useNativeSessionList(workspaceActivity || nativeVisible)
   const activityMap = useMemo(() => Object.fromEntries([...sessionOverview.value, ...native.value.map(nativeSessionRecord)].map(item =>
     [item.name, { running: item.running, waiting: item.waiting, identity: 'identity' in item ? item.identity as string | undefined : undefined }])), [sessionOverview.value, native.value])
   const termRefs = useRef<Record<string, TermHandle | null>>({})

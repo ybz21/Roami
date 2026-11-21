@@ -199,22 +199,22 @@ function promptIdentity(prompt: Prompt | null) {
 
 const answering = new Set<string>()
 
-function usePromptControl(name: string, enabled = true) {
+function usePromptControl(name: string, enabled: boolean, sessionIdentity?: string) {
   const active = usePageActive()
   const node = useCurrentNodeId()
-  const key = JSON.stringify([node, name])
+  const key = JSON.stringify([node, name, sessionIdentity])
   const context = useMemo(() => ({ key, enabled: enabled && active }), [key, enabled, active])
   const scope = useRef<typeof context | null>(null)
   useLayoutEffect(() => {
     scope.current = context
     return () => { scope.current = null }
   }, [context])
-  const { raw, fresh } = useSessionScreen(enabled ? name : null)
+  const { raw, fresh } = useSessionScreen(enabled ? name : null, { identity: sessionIdentity })
   const p = useMemo(() => detectPrompt(raw), [raw])
-  const [busy, setBusy] = useState(false)
+  const [busyKey, setBusyKey] = useState<string>()
 
   const valid = () => scope.current === context && context.enabled && currentNodeId() === node && !document.hidden
-  const read = async () => valid() ? detectPrompt(await readSessionScreen(name, node) || '') : null
+  const read = async () => valid() ? detectPrompt(await readSessionScreen(name, node, sessionIdentity) || '') : null
   const keys = async (values: string[]) => {
     if (!valid()) return
     await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys: values })
@@ -227,7 +227,7 @@ function usePromptControl(name: string, enabled = true) {
   const answer = async (send: (before: Prompt) => Promise<void>) => {
     if (!p || !fresh || !valid() || answering.has(key)) return
     answering.add(key)
-    setBusy(true)
+    setBusyKey(key)
     try {
       const before = await read()
       if (before && promptIdentity(before) === promptIdentity(p)) await send(before)
@@ -235,7 +235,7 @@ function usePromptControl(name: string, enabled = true) {
       console.error('failed to send prompt keys', error)
     } finally {
       answering.delete(key)
-      setBusy(false)
+      setBusyKey(previous => previous === key ? undefined : previous)
     }
   }
 
@@ -264,12 +264,14 @@ function usePromptControl(name: string, enabled = true) {
     await afterKeys()
   })
 
-  return { p: enabled && active ? p : null, busy: busy || !fresh, press, choose }
+  return { p: enabled && active ? p : null, busy: busyKey === key || !fresh, press, choose, key }
 }
 
 // 选择框面板：检测到 TUI 提示时显示在输入框上方，点击即注入按键完成选择
-export function PromptPanel({ name, accent, enabled = true }: { name: string; accent: string; enabled?: boolean }) {
-  const { p, busy, press, choose } = usePromptControl(name, enabled)
+type PromptView = { name: string; accent: string; enabled?: boolean; sessionIdentity?: string }
+
+export function PromptPanel({ name, accent, enabled = true, sessionIdentity }: PromptView) {
+  const { p, busy, press, choose } = usePromptControl(name, enabled, sessionIdentity)
   const { t } = useI18n()
 
   if (!p) return null
@@ -282,11 +284,11 @@ export function PromptPanel({ name, accent, enabled = true }: { name: string; ac
   )
 }
 
-export function PromptDialog({ name, accent, enabled = true }: { name: string; accent: string; enabled?: boolean }) {
-  const { p, busy, press, choose } = usePromptControl(name, enabled)
+export function PromptDialog({ name, accent, enabled = true, sessionIdentity }: PromptView) {
+  const { p, busy, press, choose, key } = usePromptControl(name, enabled, sessionIdentity)
   const { t } = useI18n()
   const [dismissedKey, setDismissedKey] = useState<string | null>(null)
-  const promptKey = p ? `${p.kind}:${p.question}:${p.choices.map((c) => `${c.num}:${c.label}`).join('|')}` : ''
+  const promptKey = p ? JSON.stringify([key, promptIdentity(p)]) : ''
   if (!enabled || !p || dismissedKey === promptKey) return null
   return (
     <Modal

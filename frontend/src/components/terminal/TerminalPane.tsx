@@ -45,7 +45,7 @@ import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { useLayout } from '../../layout'
 import { savePreferences, saveWorkspace, usePreferences } from '../../preferences'
 import { PromptDialog } from '../prompt'
-import { useSessionScreen } from './session-screen'
+import { readSessionScreen, useSessionScreen } from './session-screen'
 import { SessionTitle, TabName, sessionDisplay, sessionLabel, useSessionLabel } from '../sessions/session-label'
 import { sessionProject, useSessionProject } from '../sessions/session-project'
 import AdaptivePanel from '../shell/AdaptivePanel'
@@ -221,7 +221,8 @@ export default function TerminalPane(props: {
   // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框。
   const { coarse: isTouch, phone: isPhone } = useLayout()
   const visibleSession = sessionVisible && !curFile && active && !preparingSession(active) ? active : null
-  const recoveryScreenSnapshot = useSessionScreen(isPhone ? visibleSession : null)
+  const activeIdentity = active ? activityMap?.[active]?.identity : undefined
+  const recoveryScreenSnapshot = useSessionScreen(isPhone ? visibleSession : null, { identity: activeIdentity })
   const reconnectFailure = !!visibleSession && codexReconnectFailed(recoveryScreenSnapshot.raw)
   const showClaudeChat = (name: string) => (claudeView[name] === true || (isPhone && claudeView[name] !== false)) &&
     (claudeMap[name]?.running || (isPhone && !claudeMap[name] && agentKinds[name] === 'claude'))
@@ -386,7 +387,7 @@ export default function TerminalPane(props: {
   const [recoveryInterrupted, setRecoveryInterrupted] = useState(false)
   const recoveryActionBusy = useRef(false)
   const recoveryCaptureSeq = useRef(0)
-  useEffect(() => { recoveryCaptureSeq.current++; setRecoveryOpen(false) }, [active])
+  useEffect(() => { recoveryCaptureSeq.current++; setRecoveryOpen(false) }, [active, activeIdentity, node])
   const openRecovery = async () => {
     if (!active) return
     const name = active
@@ -400,11 +401,11 @@ export default function TerminalPane(props: {
     setRecoveryCopyFailed(false)
     setRecoveryInterrupted(false)
     const [screen, codex] = await Promise.allSettled([
-      api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=50`),
+      readSessionScreen(name, node, activeIdentity),
       api('GET', `/sessions/${encodeURIComponent(name)}/codex`),
     ])
-    if (seq !== recoveryCaptureSeq.current) return
-    if (screen.status === 'fulfilled') setRecoveryScreen(screen.value.data || '')
+    if (seq !== recoveryCaptureSeq.current || currentNodeId() !== node) return
+    if (screen.status === 'fulfilled') setRecoveryScreen(screen.value || '')
     else { setRecoveryCopyFailed(true); message.error(screen.reason.message) }
     if (codex.status === 'fulfilled') setRecoveryCommand(codexResumeCommand(codex.value.data?.file || codexMap[name]?.file))
   }
@@ -1264,7 +1265,7 @@ export default function TerminalPane(props: {
     // 软键盘悬浮覆盖时(见 main.tsx/index.html)，
     // 把整块内容抬到键盘之上，让终端和快捷键栏不被遮住。桌面无虚拟键盘 → 0，无影响。
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: 'max(var(--kb), env(keyboard-inset-height, 0px))', transition: 'padding-bottom .15s ease-out' }}>
-      {active && <PromptDialog name={active} accent="var(--accent)" enabled={active === visibleSession && !inChat && !promptOff} />}
+      {active && <PromptDialog name={active} sessionIdentity={activeIdentity} accent="var(--accent)" enabled={active === visibleSession && !inChat && !promptOff} />}
       <Modal
         open={pasteOpen}
         title={t('terminal.pasteTitle')}

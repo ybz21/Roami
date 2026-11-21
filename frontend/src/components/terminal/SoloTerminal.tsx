@@ -12,10 +12,10 @@ import { useLayout } from '../../layout'
 import { useTerminalRuntime } from '../../app/useTerminalRuntime'
 
 export default function SoloTerminal({ name }: { name: string }) {
-  const inventory = useAgentKindInventory()
+  const inventory = useAgentKindInventory(!nativeSessionId(name))
   const agentKinds = inventory.value.kinds
   const { phone } = useLayout()
-  const runtime = useTerminalRuntime(name, inventory, phone, false)
+  const runtime = useTerminalRuntime(name, inventory, phone, { workspaceActivity: false, desktopClaude: false })
   const label = useSessionLabel(name)
 
   // 独立页没有会话列表轮询，自己拉一次拿展示名（标题要显示「名字（id）」）

@@ -491,7 +491,7 @@ export function ChatShell({ name, sessionIdentity, accent, placeholder, messages
                 </div>
               </div>
             ))}
-            {live && (busy && liveOutput ? <LiveTail key={mainTurnId} name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
+            {live && (busy && liveOutput ? <LiveTail key={mainTurnId} name={name} sessionIdentity={sessionIdentity} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
             </div>
           </div>
           {/* 「回到底部」已并进下方状态条（带未读数）；状态条一个字段都没有时（刚进页面、
@@ -504,7 +504,7 @@ export function ChatShell({ name, sessionIdentity, accent, placeholder, messages
           )}
         </div>
         {/* 交互式选择框（权限确认/选项菜单）：检测到才显示，可点选 */}
-        <PromptPanel name={name} accent={accent} enabled={live} />
+        <PromptPanel name={name} sessionIdentity={sessionIdentity} accent={accent} enabled={live} />
         {errMsg && <div style={{ color: '#f85149', fontSize: 12, padding: '2px 12px' }}>{errMsg}</div>}
         <div className="conversation-composer-dock">
           <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; if (files.length) void doUpload(files) }} />

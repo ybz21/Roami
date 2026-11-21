@@ -1,10 +1,11 @@
 import { useI18n } from '../../i18n'
 import { useSessionOverview } from '../../session-overview'
+import { nativeSessionId } from './session-record'
 import './session-review.css'
 
 export default function SessionReviewStatus({ name, open }: { name: string; open?: (name: string) => void }) {
   const { t } = useI18n()
-  const { value } = useSessionOverview()
+  const { value } = useSessionOverview(!nativeSessionId(name))
   const review = value.find(item => item.name === name)?.review
   if (!review) return null
   const showPeer = open && value.some(item => item.name === review.peer)

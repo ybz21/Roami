@@ -18,7 +18,7 @@ type Capture = {
 const captures = new Map<string, Capture>()
 
 const intervalOf = (capture: Capture) => Math.min(...Array.from(capture.readers, reader => reader.interval))
-const screenKey = (node: string | null, name: string) => JSON.stringify([node, name])
+const screenKey = (node: string | null, name: string, identity?: string) => JSON.stringify([node, name, identity])
 const capturePath = (name: string) => `/sessions/${encodeURIComponent(name)}/capture?lines=50`
 
 function publish(capture: Capture, next: Screen) {
@@ -27,9 +27,10 @@ function publish(capture: Capture, next: Screen) {
   capture.readers.forEach(reader => reader.notify())
 }
 
-export async function readSessionScreen(name: string, node: string | null, signal?: AbortSignal) {
+export async function readSessionScreen(name: string, node: string | null, identity?: string, signal?: AbortSignal) {
   if (currentNodeId() !== node) return
-  const entry = captures.get(screenKey(node, name))
+  const key = screenKey(node, name, identity)
+  const entry = captures.get(key)
   const revision = entry ? ++entry.revision : 0
   const current = () => !signal?.aborted && currentNodeId() === node
   try {
@@ -39,14 +40,14 @@ export async function readSessionScreen(name: string, node: string | null, signa
     if (entry?.revision === revision) publish(entry, { raw, fresh: true })
     return raw
   } catch (error) {
-    if (currentNodeId() === node && entry?.revision === revision && captures.get(screenKey(node, name)) === entry) {
+    if (currentNodeId() === node && entry?.revision === revision && captures.get(key) === entry) {
       publish(entry, { ...entry.snapshot, fresh: false })
     }
     throw error
   }
 }
 
-function subscribeScreen(key: string, name: string, node: string | null, reader: Reader) {
+function subscribeScreen(key: string, name: string, node: string | null, identity: string | undefined, reader: Reader) {
   let capture = captures.get(key)
   if (!capture) {
     capture = { snapshot: empty, readers: new Set(), revision: 0 }
@@ -56,7 +57,7 @@ function subscribeScreen(key: string, name: string, node: string | null, reader:
   const previousInterval = intervalOf(entry)
   entry.readers.add(reader)
   if (!entry.poll) {
-    entry.poll = pollWhileVisible(signal => readSessionScreen(name, node, signal), () => intervalOf(entry))
+    entry.poll = pollWhileVisible(signal => readSessionScreen(name, node, identity, signal), () => intervalOf(entry))
   } else if (reader.interval < previousInterval) {
     void entry.poll.refresh()
   }
@@ -69,13 +70,13 @@ function subscribeScreen(key: string, name: string, node: string | null, reader:
   }
 }
 
-export function useSessionScreen(name: string | null, interval = 1200): Screen {
+export function useSessionScreen(name: string | null, { interval = 1200, identity }: { interval?: number; identity?: string } = {}): Screen {
   const node = useCurrentNodeId()
   const active = usePageActive()
-  const key = name && active && !nativeSessionId(name) ? screenKey(node, name) : null
+  const key = name && active && !nativeSessionId(name) ? screenKey(node, name, identity) : null
   const subscribe = useCallback((notify: () => void) =>
-    key && name ? subscribeScreen(key, name, node, { interval, notify }) : () => {},
-  [key, name, node, interval])
+    key && name ? subscribeScreen(key, name, node, identity, { interval, notify }) : () => {},
+  [key, name, node, identity, interval])
   const snapshot = useCallback(() => key ? captures.get(key)?.snapshot || empty : empty, [key])
   return useSyncExternalStore(subscribe, snapshot, () => empty)
 }

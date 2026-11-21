@@ -54,8 +54,9 @@ export function parseTail(raw: string, opts: { session?: string; lastUser?: stri
   return out.slice(-10)
 }
 
-export function LiveTail({ name, accent, idle, lastUser }: {
+export function LiveTail({ name, sessionIdentity, accent, idle, lastUser }: {
   name: string
+  sessionIdentity?: string
   accent: string
   /** 还没扒到任何东西时显示的东西（「正在生成」那颗省略号） */
   idle?: ReactNode
@@ -63,7 +64,7 @@ export function LiveTail({ name, accent, idle, lastUser }: {
   lastUser?: string
 }) {
   const { t } = useI18n()
-  const { raw } = useSessionScreen(name, 800)
+  const { raw } = useSessionScreen(name, { interval: 800, identity: sessionIdentity })
   const [open, setOpen] = useState(true)
   const lines = useMemo(() => detectPrompt(raw) ? [] : parseTail(raw, { session: name, lastUser }), [raw, name, lastUser])
   if (!lines.length) return <>{idle}</>
