@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三平台原生终端 · 调研与选型</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html" aria-current="page">调研与选型</a>
+      <a href="product.html">产品设计</a>
+      <a href="tech.html">技术设计</a>
+      <a href="acceptance.md">验证记录</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <p class="date">2026-11-20 · 设计提案 · Roami 6108a657</p>
+      <h1>三平台原生终端</h1>
+      <p class="lead"><strong>推荐一套原生 Go 终端后端。macOS、Linux 复用 <code>creack/pty</code>，Windows 实现同一终端接口，通过系统 ConPTY 启动 PowerShell 7。</strong></p>
+      <p>浏览器目前通过一个外层 PTY 运行 <code>tmux attach</code>。真正的 shell 和 Agent 在 tmux server 持有的窗格中。只换外层 PTY，底下仍要有 tmux server。三平台原生运行需要由 Roami 接手窗格进程、分离重连、屏幕捕获和退出观测。</p>
+
+      <section aria-labelledby="platform">
+        <h2 id="platform">建议支持范围</h2>
+        <div class="table" role="region" aria-label="平台支持范围" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">平台</th><th scope="col">PTY</th><th scope="col">交互 shell</th><th scope="col">首轮实机验收</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">macOS</th><td>系统 PTY，经 <code>creack/pty</code></td><td>用户登录 shell，通常为 zsh</td><td>arm64；保留 amd64 构建，发布前实测</td></tr>
+              <tr><th scope="row">Linux</th><td>Unix 98 PTY，经 <code>creack/pty</code></td><td>用户登录 shell，通常为 bash，也支持显式配置</td><td>amd64；保留 arm64 构建，发布前实测</td></tr>
+              <tr><th scope="row">Windows</th><td>系统 ConPTY，经 <code>x/sys/windows</code></td><td><code>pwsh.exe</code>（PowerShell 7），缺失时给出安装提示</td><td>Windows 11 24H2 或更新的受支持版本，先 x64，再验 arm64</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Windows 的 API 自 Windows 10 1809 起可用。产品首发建议从 Windows 11 24H2 起验收，因为 ConPTY 关闭行为在该版本改变。Windows PowerShell 5.1 的 <code>powershell.exe</code> 与 PowerShell 7 并存，留作后续独立兼容项。Windows Server、WSL 和旧版 Windows 暂不承诺。</p>
+        <p class="source"><a href="https://man7.org/linux/man-pages/man7/pty.7.html">Linux PTY 手册</a> · <a href="https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/tty_ptmx.c">Apple XNU PTY</a> · <a href="https://learn.microsoft.com/en-us/windows/console/createpseudoconsole">Microsoft ConPTY</a> · <a href="https://learn.microsoft.com/en-us/windows/console/closepseudoconsole">ConPTY 关闭行为</a> · <a href="https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows">PowerShell 安装</a></p>
+      </section>
+
+      <section aria-labelledby="options">
+        <h2 id="options">候选方案比较</h2>
+        <div class="table" role="region" aria-label="PTY 候选方案比较" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">方案</th><th scope="col">适配 Roami 的收益</th><th scope="col">成本与判断</th></tr></thead>
+            <tbody>
+              <tr>
+                <th scope="row">统一 Go 接口 + 系统 API</th>
+                <td>复用现用的 <code>creack/pty v1.1.24</code> 和 <code>x/sys v0.41.0</code>。Go 宿主可控制创建、句柄、关闭顺序和进程事件。</td>
+                <td>推荐。Windows 平台适配器要负责参数与环境、关闭顺序和 Job Object，需真机测试。</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>charmbracelet/x/conpty</code> v0.2.0</th>
+                <td>Go Windows 封装，提供建管道、启动、读写、调尺寸与关闭。原型可以快速接入。</td>
+                <td>备选。审阅的 <code>Spawn</code> 收起了主线程句柄，若要挂 Job 后再放行，需验证或扩展接口。<code>Close</code> 调用原生关闭后才关输出读端，必须保持输出排空。</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>aymanbagabas/go-pty</code> v0.2.3</th>
+                <td>把 Unix PTY 与 Windows ConPTY 统一为 Go 的启动、读写、尺寸和等待接口。</td>
+                <td>调研版本要求 Go 1.25，仓库基线为 1.24。统一接口仍需补会话宿主和进程组治理，可作为平台适配参考。</td>
+              </tr>
+              <tr>
+                <th scope="row"><code>microsoft/node-pty</code></th>
+                <td>支持三平台，VS Code 等使用。适合作 PowerShell 和 ConPTY 行为对照。</td>
+                <td>作为默认宿主会引入 Node 进程和按平台发布的原生扩展，增加安装、升级和故障定位链路。</td>
+              </tr>
+              <tr>
+                <th scope="row">Unix 保留 tmux，Windows 使用 WSL</th>
+                <td>最快保住现有分屏和会话用法，可用作过渡期对照。</td>
+                <td>WSL 中的 tmux 持有的是 Linux PTY。原生 Windows PowerShell 路线仍需 Windows 控制台语义和独立验收。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="source"><a href="../../../go.mod">Roami Go 依赖</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start.go">creack/pty Unix 启动</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start_windows.go">creack/pty Windows 占位</a> · <a href="https://github.com/golang/sys/blob/v0.41.0/windows/syscall_windows.go">x/sys Windows 绑定</a> · <a href="https://github.com/charmbracelet/x/blob/74ce264f24fc7e97da2a0a5beba634c65dcf4af1/conpty/conpty_windows.go">Charm ConPTY 源码</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a> · <a href="https://github.com/microsoft/node-pty">node-pty</a> · <a href="https://github.com/tmux/tmux/wiki/Getting-Started">tmux 架构</a></p>
+      </section>
+
+      <section aria-labelledby="adapter">
+        <h2 id="adapter">Windows 适配放在哪一层</h2>
+        <p><code>creack/pty</code> 的 Unix 接口交给调用方一个双向 <code>*os.File</code>，子进程由 <code>exec.Cmd</code> 启动和等待。Windows 版本的 <code>StartWithSize</code> 目前返回 <code>ErrUnsupported</code>。ConPTY 需要分别管理输入管道、输出管道、控制台句柄及进程句柄，启动时还要将控制台作为属性传给 <code>CreateProcessW</code>。</p>
+        <p>建议在 Roami 内封装这两种实现。对上只提供启动、读写、改尺寸、等待退出和关闭等行为，终端协议与会话宿主跨平台复用。若 fork <code>creack/pty</code> 硬套原签名，还得补管道封装与进程等待兼容，同样需要重新定义生命周期。</p>
+        <p class="source"><a href="https://github.com/creack/pty/blob/v1.1.24/run.go">creack/pty 启动接口</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start_windows.go">Windows 占位实现</a> · <a href="https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session">Microsoft ConPTY 建连</a></p>
+      </section>
+
+      <section aria-labelledby="decision">
+        <h2 id="decision">先验证三件事</h2>
+        <ol>
+          <li><strong>系统 PTY。</strong> 验证原生 shell 双向交互、尺寸变化、Ctrl+C、退出码和进程树清理。先验 Windows 的关闭排空与 Job Object，再决定可复用多少上游代码。</li>
+          <li><strong>会话宿主。</strong> 让 Web 与 CLI 断开后仍可接回同一窗格，并在 Web 服务重启后恢复屏幕和输入。用 Codex、Claude Code 和 vim 检查备用屏、中文、鼠标与多行粘贴。</li>
+          <li><strong>Roami 迁移。</strong> 原生后端先承接新建普通会话。待分屏、受管任务、停止对账和安装发布逐项达标，再扩大默认范围。运行中的旧会话继续由创建它的 tmux 后端持有。</li>
+        </ol>
+        <p>本次已在 Linux 验证独立 PTY 的基本交互，macOS 与 Windows 已完成轻量探针的交叉编译。完整应用和三平台运行验收列在<a href="acceptance.md">验证记录</a>。</p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

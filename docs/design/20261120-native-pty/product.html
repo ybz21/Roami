@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三平台原生终端 · 产品设计</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">调研与选型</a>
+      <a href="product.html" aria-current="page">产品设计</a>
+      <a href="tech.html">技术设计</a>
+      <a href="acceptance.md">验证记录</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>产品设计</h1>
+      <p class="lead">用同一套 Roami 会话入口，在 macOS、Linux 和 Windows 上接回正在运行的原生终端。</p>
+
+      <section aria-labelledby="scope">
+        <h2 id="scope">第一阶段体验</h2>
+        <p>现有 CLI 和 Web 的普通会话入口继续使用稳定会话 ID。创建时由宿主根据平台与设置选 shell，用户可以覆盖。原生会话首轮提供单窗格、新建、连接、分离、重连、会话列表、捕获和关闭。普通会话支持现有的文本与按键入口。Windows 从原生 PowerShell 7 起步。</p>
+        <p>桌面和手机可同时查看一个会话。最近一次显式取得控制的客户端可输入和调整终端尺寸。后台标签、失焦和关闭客户端保留最近有效尺寸。新接入的只读客户端用当前尺寸查看，取得控制后才按它的视口调整。</p>
+        <p>窗口、分屏、会话内上下文和受管任务是后续切换条件。原生后端按检测到的能力开放操作，例如 Windows 的暂停能力需要单独设计与验证。切换默认值之前，正在运行的旧会话继续通过旧入口可用。</p>
+      </section>
+
+      <section aria-labelledby="stories">
+        <h2 id="stories">用户故事与场景原型</h2>
+        <p>展开查看每种操作对应的会话状态和可见反馈。</p>
+        <details>
+          <summary>在 Windows 打开 PowerShell</summary>
+          <p>作为 Windows 用户，我要在项目目录里打开原生 PowerShell，使用本机 Git、脚本和终端工具。</p>
+          <ol>
+            <li>在项目中创建终端。节点用项目目录和当前授权用户启动 PowerShell 7。</li>
+            <li>看到 PowerShell 提示符。输入、输出、中文路径和窗口尺寸走同一个终端连接。</li>
+            <li>节点缺少 PowerShell 7 时，创建返回可处理的安装提示。安装后可以用原目录重试。</li>
+          </ol>
+        </details>
+        <details>
+          <summary>在手机上接回桌面的终端</summary>
+          <p>作为开发者，我要离开电脑后能继续操作正在运行的程序。</p>
+          <ol>
+            <li>桌面关闭终端页面，程序继续运行。手机从会话列表打开同一个会话。</li>
+            <li>手机收到屏幕快照和后续输出。点击终端取得控制后，输入和有效尺寸跟随手机。</li>
+            <li>同一个程序继续运行。若它在离线期间退出，页面显示退出结果和最后的可用输出。</li>
+          </ol>
+        </details>
+        <details>
+          <summary>服务更新后继续工作</summary>
+          <p>作为节点使用者，我要升级 Web 服务之后仍能接回现有终端。</p>
+          <ol>
+            <li>Web 服务重启后重新连接会话宿主。宿主身份一致时接回原进程和状态。</li>
+            <li>宿主暂时不可达时显示状态待确认。输入和继续任务等待宿主状态或其他可靠证据。</li>
+            <li>确认宿主或窗格已退出后，按现有恢复策略保留历史。符合条件的会话可以新建进程并接续已识别的 Agent 对话。</li>
+          </ol>
+        </details>
+        <details>
+          <summary>继续运行中的旧会话</summary>
+          <p>作为已有 Roami 用户，我要在试用新终端时继续接回 tmux 中原有的工作。</p>
+          <ol>
+            <li>同一会话列表展示旧会话与试用期的新会话，连接时按各自的后端归属路由。</li>
+            <li>退出试用后，新建会话回到原来的默认后端。仍在运行的原生会话保留自己的连接路径。</li>
+            <li>旧会话退出后，可在原项目目录新建原生会话。如果用户明确恢复支持的 Agent 对话，保留恢复来源关系。</li>
+          </ol>
+        </details>
+      </section>
+
+      <section aria-labelledby="release">
+        <h2 id="release">切换默认值的条件</h2>
+        <ul>
+          <li>三平台真实终端通过交互验收，Web、CLI 和 Android 同一会话重连无重复与丢失。</li>
+          <li>CLI 窗口和分屏、Web 活跃窗格与屏幕捕获达到相应验收项，或在试用范围明确标注可用功能。</li>
+          <li>Codex 与 Claude Code 的启动和继续按节点能力验收。托管任务以宿主和执行器的结构化证据更新状态。</li>
+          <li>对已纳入支持范围的平台，打包、安装、升级和回滚都经过实测。</li>
+        </ul>
+      </section>
+    </article>
+  </main>
+</body>
+</html>
