@@ -76,6 +76,8 @@ type projectSummary struct {
 
 // sessListItem 兼容解析 roami session ls --json（数值字段 CLI 可能给字符串）。
 type sessListItem struct {
+	TmuxID       string          `json:"tmux_id"`
+	Created      string          `json:"created"`
 	Name         string          `json:"name"`
 	Label        string          `json:"label"`
 	Parent       string          `json:"parent,omitempty"`

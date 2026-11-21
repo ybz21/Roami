@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>会话请求频率优化 · Roami</title>
+  <link rel="stylesheet" href="../../../frontend/src/index.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="document-width"><h1>会话请求频率优化</h1></div>
+  </header>
+  <main>
+    <article class="document-width">
+      <div class="lead">
+        <p>桌面上，每过 5 秒，工作台就给每个打开的命令行会话发三条请求，分别查 Claude、Codex、OpenCode 在不在跑。</p>
+        <p>开了 8 个会话，一轮就是 24 条请求，收起终端区也照问。截图里成批的 <code>codex</code> 和 <code>opencode</code> 多半就来自这里。</p>
+        <p>你正在看的对话还会每隔约 1.5 秒问有没有新消息。同一个对话如果在两个地方打开，两边会各问一次。</p>
+      </div>
+
+      <section aria-labelledby="evidence">
+        <h2 id="evidence">Network 里其余几项是什么</h2>
+        <dl class="endpoint-list">
+          <div><dt><code>capture?lines=50</code></dt><dd>工作台每 4 秒看一遍各会话的终端画面，判断哪个标签在等你。权限确认框还会每 1.2 秒自己看一遍。项目详情也会为自己的会话发这类请求。</dd></div>
+          <div><dt><code>transcript</code></dt><dd>对话用这条请求读取新消息。切到别的标签后，原来的对话还会每隔约 6 秒查一次。</dd></div>
+          <div><dt><code>agents</code></dt><dd>如果完整路径是 <code>/sessions/agents</code>，这是工作台每 6 秒发一次的请求，一次查出所有会话各用哪个 Agent。</dd></div>
+        </dl>
+        <p class="note">截图开了 Keep log，列表里可能有之前留下来的请求。要看当前频率，可以清空 Network 后重新计时。</p>
+      </section>
+
+      <section aria-labelledby="baseline">
+        <h2 id="baseline">开 8 个会话，30 秒会发多少次</h2>
+        <dl class="metrics">
+          <div><dt>挨个问是哪种 Agent</dt><dd class="metric-value">144 次</dd><dd class="metric-note">每轮 24 次，30 秒发 6 轮</dd></div>
+          <div><dt>收起终端区后读取画面</dt><dd class="metric-value">81 次</dd><dd class="metric-note">标签 56 次，当前会话的确认提示 25 次</dd></div>
+          <div><dt>一次查所有会话的 Agent</dt><dd class="metric-value">5 次</dd><dd class="metric-note">两个地方要查，工作台只发一份</dd></div>
+        </dl>
+        <p class="note">这三项分开计时，跳过页面打开时的第一轮请求。测试用固定响应核对请求次数。正式环境的速度和资源用量留待实施后实测。</p>
+      </section>
+
+      <section aria-labelledby="delivery">
+        <h2 id="delivery">准备怎么改</h2>
+        <p>先让标签和项目列表共用一次状态查询。打开会话后，权限确认和恢复功能共用一份终端画面。同一个对话也只发一份新消息请求。收起终端区或切走后，工作台就停止读这些详情。</p>
+      </section>
+
+      <nav class="document-links" aria-label="设计分册">
+        <a href="product.html"><strong>场景与验收</strong><span>改完你会看到什么，以及怎样自己验收</span></a>
+        <a href="tech.html"><strong>技术方案</strong><span>请求从哪里发出，以及每一步怎么改</span></a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

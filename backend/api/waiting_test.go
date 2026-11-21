@@ -88,3 +88,20 @@ func TestSessionTailSkipsOpenCodeProgress(t *testing.T) {
 		t.Fatalf("tail = %q", got)
 	}
 }
+
+func TestSessionWaitingAcceptsUnnumberedTrustMenu(t *testing.T) {
+	choices := "Trust this folder?\n   ❯ No, exit\n     Yes, I trust this folder\n"
+	if !sessionWaiting(choices + "   Enter to confirm · Esc to cancel\n") {
+		t.Fatal("trust menu must stay visible in the shared waiting status")
+	}
+	if sessionWaiting(choices + "   Shift+Tab to cycle\n") {
+		t.Fatal("indented text alone is not a prompt")
+	}
+}
+
+func TestSessionWaitingIgnoresMenuAboveNewOutput(t *testing.T) {
+	old := "Would you like to run this command?\n   ❯ 1. Yes\n     2. No\n   Enter to select\n"
+	if sessionWaiting(old + strings.Repeat("fixture output\n", 30)) {
+		t.Fatal("history must not keep the waiting indicator active")
+	}
+}

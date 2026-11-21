@@ -4,136 +4,225 @@
 // 后端 2026-08-30 把它从行号改成字节偏移，这里一行没动——行号逼着后端每次轮询
 // 从第 1 行重数一遍，一次请求就分配一整个文件（见 backend/api/transcript-read.go）。
 // Claude 与 Codex 共用，只是 path 不同(transcript / codex-transcript)。
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { api } from '../../api'
+import { usePageActive } from '../../page-activity'
+import { pollWhileVisible } from '../../visible-poll'
+import { useWorkspaceStateStore } from '../../view-state'
+import type { ViewStateScope, WorkspaceStateStore } from '../../workspace-state'
+import { currentNodeId, useCurrentNodeId } from '../cluster/node-url'
 import type { Block, Msg } from './types'
 import type { RawStatus } from './status'
 
-/** 首屏只取最近这么多条。整卷搬过来的代价见 backend/api/transcript-window.go。 */
 export const FIRST_PAGE = 50
 
-export function useTranscript(name: string, file: string | undefined, path: string, interval = 1500) {
-  const [msgs, setMsgs] = useState<Msg[]>([])
-  const [err, setErr] = useState('')
-  // 后端这轮定位到的转录文件：undefined=第一轮还没回来，''=后端也没找到（agent 一句没说）。
-  // 空状态那行字靠它区分「加载中」和「还没有对话」，光看调用方传没传 file 会把两者混成一句。
-  const [resolvedFile, setResolvedFile] = useState<string | undefined>(undefined)
-  // 状态是「上次成交价」：这一轮没扫到新行后端就回空，保留上次的值。
-  // 会话闲着不动百分比就不动——那是对的，没发生新对话上下文确实没变。
-  const [status, setStatus] = useState<RawStatus>({})
-  const [refreshKey, setRefreshKey] = useState(0)
-  // 还有更早的没取：后端截过头才为真。前端不再自己算「隐藏了几条」——它手里根本没有全量。
-  const [hasEarlier, setHasEarlier] = useState(false)
-  const [serverPending, setServerPending] = useState<boolean | undefined>(undefined)
-  const [tail, setTail] = useState(FIRST_PAGE)
-  const refresh = useCallback(() => setRefreshKey((n) => n + 1), [])
-  // 间隔走 ref：后台会话把间隔放宽时不能重启 effect——重启等于清空重拉整个首屏
-  const intervalRef = useRef(interval)
-  intervalRef.current = interval
-  const earlierRef = useRef<() => Promise<void>>(async () => {})
-  const loadEarlier = useCallback(() => earlierRef.current(), [])
-  useEffect(() => {
-    let stop = false
-    let offset = 0
-    let f = file
-    let lastFile = file || ''
-    let before: number | undefined
-    let loadingEarlier = false
-    let revision = 0
-    setMsgs([]); setErr(''); setStatus({}); setResolvedFile(undefined); setServerPending(undefined); setHasEarlier(false)
-    earlierRef.current = async () => {
-      // Older providers still expose a growing tail window instead of a cursor.
-      if (before === undefined) { setTail((n) => n + FIRST_PAGE); return }
-      if (loadingEarlier || before <= 0 || !f) return
-      loadingEarlier = true
-      const requestedFile = f
-      const requestedRevision = revision
-      try {
-        const q = new URLSearchParams({ before: String(before), tail: String(FIRST_PAGE), boff: '1', file: f })
-        const { data: d } = await api('GET', `/sessions/${encodeURIComponent(name)}/${path}?${q}`)
-        if (stop || revision !== requestedRevision || f !== requestedFile || d.file !== requestedFile) return
-        setErr('')
-        before = d.before
-        setHasEarlier(d.truncated === true)
-        if (d.messages?.length) setMsgs((m) => [...d.messages, ...m])
-      } catch (e: any) { if (!stop) setErr(e.message) }
-      finally { loadingEarlier = false }
-    }
-    const poll = async () => {
-      try {
-        // boff=1：告诉后端这个 offset 是字节偏移（升级前的页面不会带，后端据此重新锚定）
-        const q = new URLSearchParams({ offset: String(offset), boff: '1' })
-        // 只有首屏带 tail：增量轮询要的是「新行」，一条都不能丢。
-        if (offset === 0 || path === 'pi-transcript') q.set('tail', String(tail))
-        if (f) q.set('file', f)
-        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/${path}?${q.toString()}`)
-        const d = r.data
-        if (stop) return
-        setErr('') // 这轮通了就把上一轮的报错擦掉，否则一次抖动的红字会一直挂到重开面板
-        if (typeof d.file === 'string') setResolvedFile(d.file)
-        if (d.file && d.file !== lastFile) {
-          revision++
-          f = d.file
-          lastFile = d.file
-          before = undefined
-          setHasEarlier(false)
-          setMsgs([])
-          // A discovered file already includes its first page. Only an old
-          // file's nonzero cursor requires another request from the beginning.
-          if (offset > 0) {
-            offset = 0
-            return
-          }
-        }
-        if (typeof d.nextOffset === 'number' && d.nextOffset < offset) {
-          revision++
-          before = undefined
-          setHasEarlier(false)
-          offset = 0
-          setMsgs([])
+type Snapshot = {
+  msgs: Msg[]
+  err: string
+  status: RawStatus
+  resolvedFile?: string
+  serverPending?: boolean
+  hasEarlier: boolean
+  offset: number
+  before?: number
+  tail: number
+}
+const empty: Snapshot = { msgs: [], err: '', status: {}, hasEarlier: false, offset: 0, tail: FIRST_PAGE }
+type Options = { identity?: string; active?: boolean; source?: string; busy?: boolean; interval?: number }
+type Reader = { interval: number; adaptive: boolean; busy?: boolean }
+type Feed = ReturnType<typeof createFeed>
+const openFeeds = new WeakMap<WorkspaceStateStore, Map<string, Feed>>()
+
+function feedsFor(store: WorkspaceStateStore) {
+  let feeds = openFeeds.get(store)
+  if (!feeds) { feeds = new Map(); openFeeds.set(store, feeds) }
+  return feeds
+}
+
+function createFeed(scope: ViewStateScope, node: string | null, name: string, path: string, file?: string) {
+  let current = scope.get<Snapshot>('snapshot') || empty
+  let revision = 0, quiet = 0
+  let validate = true
+  let source: string | undefined
+  let earlier: AbortController | undefined
+  let poll: ReturnType<typeof pollWhileVisible> | undefined
+  const readers = new Set<Reader>()
+  const basePath = `/sessions/${encodeURIComponent(name)}/${path}`
+
+  const update = (next: Snapshot) => {
+    if (Object.keys(next).every(key => Object.is(next[key as keyof Snapshot], current[key as keyof Snapshot])) &&
+        Object.keys(next).length === Object.keys(current).length) return
+    current = next
+    scope.set('snapshot', next, 'cache')
+  }
+  const eligible = (signal: AbortSignal, requestRevision: number) =>
+    !signal.aborted && currentNodeId() === node && requestRevision === revision
+
+  const failure = (error: unknown) => {
+    const e = error as Error & { status?: number }
+    const denied = e?.status === 401 || e?.status === 403 || e?.message === 'UNAUTHORIZED'
+    validate = true
+    if (denied) { revision++; earlier?.abort() }
+    update({ ...(denied ? empty : current), err: e?.message || String(error) })
+  }
+  const load = async (signal: AbortSignal) => {
+    if (currentNodeId() !== node) return
+    const requestRevision = revision, snapshot = current
+    const cursor = snapshot.offset
+    const requestedFile = validate ? file : snapshot.resolvedFile || file
+    const query = new URLSearchParams({ offset: String(cursor), boff: '1' })
+    if (cursor === 0 || path === 'pi-transcript') query.set('tail', String(snapshot.tail))
+    if (requestedFile) query.set('file', requestedFile)
+    try {
+      const { data: d } = await api('GET', basePath + '?' + query, undefined, { signal })
+      if (!eligible(signal, requestRevision)) return
+      validate = false
+
+      const resolvedFile = typeof d.file === 'string' ? d.file : current.resolvedFile
+      const replaced = resolvedFile !== current.resolvedFile && current.resolvedFile !== undefined
+      const truncated = typeof d.nextOffset === 'number' && d.nextOffset < cursor
+      if (replaced || truncated) {
+        revision++
+        earlier?.abort()
+        quiet = 0
+        if (cursor > 0) {
+          update({ ...empty, resolvedFile, tail: current.tail })
           return
         }
-        if (d.status || typeof d.quota === 'number') {
-          setStatus((prev) => mergeStatus(prev, d.status, d.quota))
-        }
-        if (offset === 0 || (path === 'pi-transcript' && d.replace === true)) {
-          before = typeof d.before === 'number' ? d.before : undefined
-          if (typeof d.truncated === 'boolean') setHasEarlier(d.truncated)
-        }
-        if (typeof d.pending === 'boolean') setServerPending(d.pending)
-        if (path === 'pi-transcript' && d.replace === true) {
-          setMsgs(d.messages || [])
-          offset = d.nextOffset
-        }
-        else if (d.messages?.length) {
-          setMsgs((m) => {
-            if (path !== 'opencode-transcript') return [...m, ...d.messages]
-            const ids = new Map<string, number>()
-            const merged = [...m]
-            let changed = false
-            merged.forEach((item, i) => { if (item.id) ids.set(item.id, i) })
-            for (const item of d.messages as Msg[]) {
-              const at = item.id ? ids.get(item.id) : undefined
-              if (at === undefined) { if (item.id) ids.set(item.id, merged.length); merged.push(item); changed = true }
-              else if (JSON.stringify(merged[at]) !== JSON.stringify(item)) { merged[at] = item; changed = true }
-            }
-            return changed ? merged : m
-          })
-          offset = d.nextOffset
-        }
-        else if (typeof d.nextOffset === 'number') offset = d.nextOffset
-      } catch (e: any) { if (!stop) setErr(e.message) }
+      }
+      const previous = replaced || truncated ? empty : current
+      const replaceWindow = path === 'pi-transcript' && d.replace === true
+      const messages: Msg[] = d.messages || []
+      const msgs = replaceWindow ? messages : mergeMessages(previous.msgs, messages, path === 'opencode-transcript')
+      const offset = typeof d.nextOffset === 'number' ? d.nextOffset : previous.offset
+      const pending = typeof d.pending === 'boolean' ? d.pending : previous.serverPending
+      quiet = msgs === previous.msgs && offset === cursor && !!resolvedFile && !(pending ?? isPending(msgs)) ? quiet + 1 : 0
+      const page = cursor === 0 || replaceWindow
+      update({
+        msgs, offset, resolvedFile, serverPending: pending, tail: current.tail, err: '',
+        status: mergeStatus(previous.status, d.status, d.quota),
+        before: page ? d.before : previous.before,
+        hasEarlier: page && typeof d.truncated === 'boolean' ? d.truncated : previous.hasEarlier,
+      })
+    } catch (error) {
+      if (eligible(signal, requestRevision)) failure(error)
+      throw error
     }
-    let t: ReturnType<typeof setTimeout> | undefined
-    const tick = async () => {
-      await poll()
-      if (!stop) t = setTimeout(tick, intervalRef.current)
+  }
+  const refresh = () => { quiet = 0; void poll?.refresh() }
+  const setSource = (hint?: string) => {
+    if (!hint || source === hint) return
+    source = hint
+    if (current.resolvedFile && current.resolvedFile !== hint) {
+      revision++
+      validate = true
+      earlier?.abort()
+      update(empty)
+      refresh()
     }
-    void tick()
-    return () => { stop = true; clearTimeout(t) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, file, path, refreshKey, tail])
-  return { msgs, err, refresh, status, hasEarlier, loadEarlier, resolvedFile, serverPending }
+  }
+  const visibility = () => {
+    if (document.hidden) { validate = true; quiet = 0; earlier?.abort() }
+  }
+  const attach = (reader: Reader, onEmpty: () => void) => {
+    readers.add(reader)
+    if (!poll) {
+      document.addEventListener('visibilitychange', visibility)
+      poll = pollWhileVisible(load, () => {
+        const interval = Math.min(...Array.from(readers, r => r.interval))
+        return quiet >= 3 && Array.from(readers).every(r => r.adaptive && !r.busy) ? 10_000 : interval
+      })
+    }
+    return () => {
+      readers.delete(reader)
+      if (readers.size) return
+      document.removeEventListener('visibilitychange', visibility)
+      poll?.stop()
+      earlier?.abort()
+      onEmpty()
+    }
+  }
+  const loadEarlier = async () => {
+    const { before, resolvedFile } = current
+    if (earlier || !readers.size || document.hidden || currentNodeId() !== node) return
+    if (before === undefined) {
+      revision++
+      validate = true
+      update({ ...empty, tail: current.tail + FIRST_PAGE })
+      refresh()
+      return
+    }
+    if (before <= 0 || !resolvedFile) return
+    const controller = new AbortController(), requestRevision = revision
+    earlier = controller
+    try {
+      const query = new URLSearchParams({ before: String(before), tail: String(FIRST_PAGE), boff: '1', file: resolvedFile })
+      const { data: d } = await api('GET', basePath + '?' + query, undefined, { signal: controller.signal })
+      if (!eligible(controller.signal, requestRevision) || d.file !== resolvedFile) return
+      update({ ...current, before: d.before, hasEarlier: d.truncated === true, err: '', msgs: d.messages?.length ? [...d.messages, ...current.msgs] : current.msgs })
+    } catch (error) {
+      if (eligible(controller.signal, requestRevision)) failure(error)
+    } finally {
+      if (earlier === controller) earlier = undefined
+    }
+  }
+  return { attach, setSource, refresh, loadEarlier }
+}
+
+export function useTranscript(name: string, file: string | undefined, path: string, options: number | Options = 1500) {
+  const store = useWorkspaceStateStore(), node = useCurrentNodeId(), pageActive = usePageActive()
+  const active = pageActive && (typeof options === 'number' || options.active !== false)
+  const interval = typeof options === 'number' ? options : options.interval ?? 1500
+  const adaptive = typeof options !== 'number'
+  const identity = typeof options === 'number' ? undefined : options.identity
+  const source = typeof options === 'number' ? undefined : options.source
+  const busy = typeof options === 'number' ? undefined : options.busy
+  const key = JSON.stringify([node, name, identity || '', path, file || ''])
+  const scope = useMemo(() => store.node(node).child('session-transcript', key), [store, node, key])
+  const subscribe = useCallback((listener: () => void) => active ? scope.subscribe('snapshot', listener) : () => {}, [scope, active])
+  const getSnapshot = useCallback(() => scope.get<Snapshot>('snapshot') || empty, [scope])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  // The reader stays registered across busy-state updates so an in-flight fetch isn't cancelled.
+  const reader = useMemo<Reader>(() => ({ interval, adaptive }), [interval, adaptive, key])
+  reader.busy = busy
+
+  useEffect(() => {
+    if (!active || !name) return
+    const feeds = feedsFor(store)
+    let feed = feeds.get(key)
+    if (!feed) { feed = createFeed(scope, node, name, path, file); feeds.set(key, feed) }
+    return feed.attach(reader, () => feeds.delete(key))
+  }, [active, file, key, name, node, path, reader, scope, store])
+
+  useEffect(() => {
+    if (active) feedsFor(store).get(key)?.setSource(source)
+  }, [active, key, source, store])
+
+  const refresh = useCallback(() => feedsFor(store).get(key)?.refresh(), [key, store])
+  useEffect(() => { if (active && busy) refresh() }, [active, busy, refresh])
+  const loadEarlier = useCallback(async () => feedsFor(store).get(key)?.loadEarlier(), [key, store])
+  return { ...snapshot, refresh, loadEarlier }
+}
+
+function mergeMessages(current: Msg[], messages: Msg[], mergeById: boolean) {
+  if (!messages.length) return current
+  if (!mergeById) return [...current, ...messages]
+  const ids = new Map<string, number>()
+  const merged = [...current]
+  let changed = false
+  current.forEach((item, i) => { if (item.id) ids.set(item.id, i) })
+  for (const item of messages) {
+    const index = item.id ? ids.get(item.id) : undefined
+    if (index === undefined) {
+      if (item.id) ids.set(item.id, merged.length)
+      merged.push(item)
+      changed = true
+    } else if (JSON.stringify(merged[index]) !== JSON.stringify(item)) {
+      merged[index] = item
+      changed = true
+    }
+  }
+  return changed ? merged : current
 }
 
 // 只有非空字段才覆盖：后端每轮只回它这次扫到的东西，缺的字段不该把已知值抹掉。

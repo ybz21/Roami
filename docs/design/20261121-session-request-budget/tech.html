@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>技术方案 · 会话请求频率优化</title>
+  <link rel="stylesheet" href="../../../frontend/src/index.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="document-width heading-row">
+      <a href="index.html" class="back" aria-label="返回方案总览"></a>
+      <h1>技术方案</h1>
+    </div>
+  </header>
+  <main>
+    <article class="document-width">
+      <section aria-labelledby="diagnosis">
+        <h2 id="diagnosis">现在是谁在发请求</h2>
+
+        <h3>工作台每轮都查三个 Agent</h3>
+        <p>在桌面，<code>useTerminalRuntime</code> 每 5 秒给每个打开的命令行会话依次请求 <code>/claude</code>、<code>/codex</code> 和 <code>/opencode</code>。不同会话同时查。手机只在打开会话时查当前会话。固定的计时器会照常开下一轮，所以慢请求可能重叠。 <a href="../../../frontend/src/app/useTerminalRuntime.ts">运行时轮询</a></p>
+        <p>会话概览只要有内容变化，例如更新了最后活动时间，工作台就会重新生成标签清单。即使还是同一批会话，前端也会重启 Agent 查询和标签抓屏，立即发出新一轮请求。 <a href="../../../frontend/src/app/useSessionDirectory.ts">会话索引</a> · <a href="../../../frontend/src/app/useTaskWorkspace.ts">标签清单</a></p>
+
+        <h3>好几个地方分别读取终端画面</h3>
+        <p><code>TerminalPane</code> 每 4 秒给所有命令行标签读取屏幕，用来判断是否等确认或需要恢复。桌面收起终端区时只把它缩为零宽，组件还在。终端确认框和对话里的确认框分别按 1.2 秒读取。隐藏的对话也保留了确认框。<code>LiveTail</code> 用来显示生成中的终端输出，有需要时再按 800 毫秒读取。 <a href="../../../frontend/src/components/terminal/TerminalPane.tsx">终端面板</a> · <a href="../../../frontend/src/components/shell/Workspace.tsx">终端区</a> · <a href="../../../frontend/src/components/prompt.tsx">确认框</a> · <a href="../../../frontend/src/components/chat/LiveTail.tsx">实时输出</a></p>
+        <p>项目详情每 6 秒查一遍它的会话，分别问 Claude 和 Codex 是否在跑，再请求终端画面。会话树和注解每 5 秒更新时，前端会重新生成项目会话清单，可能提前开始下一轮。展开的工作区还每 5 秒查一次末尾预览。 <a href="../../../frontend/src/components/projects/Projects.tsx">项目详情</a></p>
+
+        <h3>每个对话各自读取新消息</h3>
+        <p>前端把 Agent 存下来的对话记录叫作转录。对话打开时每隔约 1.5 秒读一次，切走后约 6 秒读一次。每个对话各自安排下一次请求。浏览器标签隐藏时，前端没有暂停或取消这些请求。遇到错误也没有延长间隔。 <a href="../../../frontend/src/components/chat/useTranscript.ts">对话请求</a></p>
+        <p>工作台和项目 Main 可以打开同一个会话的对话。两个地方会各自记录上次读到哪里。截图中相同的参数也可能来自一个对话连续两次没读到新消息。看 Network 的完整 URL、时间和 Initiator（发起请求的代码）才能区分。 <a href="../../../frontend/src/components/chat/ExecutorSessionChat.tsx">项目中的对话</a></p>
+
+        <h3>小响应也可能让服务端做不少事</h3>
+        <p>服务端要查 tmux（管理终端会话的程序）和系统进程，才知道某种 Agent 在不在跑。找到 Claude 或 Codex 时，还要找对应的记录文件。找到 OpenCode 时，还会读取屏幕并查 SQLite。读终端画面也会调用 tmux。读转录要检查访问权限，再定位或打开文件。 <a href="../../../backend/api/claude.go">Claude 和批量查询</a> · <a href="../../../backend/api/codex.go">Codex</a> · <a href="../../../backend/api/opencode-chat.go">OpenCode</a> · <a href="../../../backend/api/api.go">读屏请求</a></p>
+      </section>
+
+      <section aria-labelledby="plan">
+        <h2 id="plan">分三步改</h2>
+
+        <h3>一 · 整批查状态，只给当前会话查详情</h3>
+        <p>工作台、独立会话页和项目详情用 <code>/sessions/agents</code> 每 6 秒查询会话各用哪个 Agent。工作台和项目页面每 5 秒共用一次 <code>/sessions/overview</code>，查询会话是否在响应、是否等输入，以及终端末尾的内容。独立命令行会话页也用这份概览显示互审和内存提醒，并识别同名会话是否重建。</p>
+        <p>只有你正在看的会话需要查目录、对话 ID 或恢复信息时，工作台才请求对应 Agent 的详情。打开会话时，如果已知道它在用哪个 Agent，就立即查一次。启动、恢复或切换 Agent 后，等批量查询或会话变更事件确认新状态，再立即查详情。可见期间每 5 秒查一次，切走就停。</p>
+        <p>一个会话可以有多个终端窗格（pane），里面可能跑着不同的 Agent。批量查询会列出这些 Agent。工作台只为你正在看的会话查这些已识别的 Agent。验证普通命令行如何进入和退出 Agent，以及桌面和手机手动切换显示方式。</p>
+
+        <h3>二 · 让同一个会话共用一次终端画面请求</h3>
+        <p>其他标签用批量状态判断是否等输入。对你正在看的会话，确认框、实时输出和恢复入口共用一次画面请求。合并前，要用同一窗格验证一次请求能覆盖现有 <code>lines=40</code> 和 <code>lines=50</code> 的读取范围，然后按各自范围取用。一般每 1.2 秒请求一次。需要显示实时输出时，用 800 毫秒间隔，两种情况都只跑一个定时器。</p>
+        <p>收起终端区、切到文件或隐藏浏览器标签时，停止为离开视野的会话请求画面。如果同一会话还在项目里显示，它可以继续请求。最后一个显示该会话的地方关闭后，取消正在等的请求和下一次定时。沿用 <code>pollWhileVisible</code>，等上一条请求结束才安排下一条，超时会取消，失败后逐步拉长间隔。</p>
+        <p>请求失败时，可以保留上次画面，但不能用旧问题发按键。发送按键后要用这次操作之后读到的画面核对结果。Codex 恢复前也要重新读屏，继续执行原有的备份、中断和恢复校验。</p>
+
+        <h3>三 · 让同一个对话共用新消息请求</h3>
+        <p>两个地方都在看同一个对话时，只发一份新消息请求。合并前先确认它们连的是同一个节点（运行会话的机器）、同一个会话和同一种 Agent，也确实用同一份记录。受管会话额外检查执行代次（服务端用来区分这一次运行和上一次运行的编号）。草稿、滚动位置和项目 Main 的当前回合状态各自保留。</p>
+        <p>请求转录时，<code>offset</code> 记住上次读到了文件的哪个字节。它就像书签，让下次只读后面的新内容。对话活跃时约每 1.5 秒查一次，连续几轮确认空闲后约每 10 秒查一次。没人看就停。发消息、重新打开对话或断网恢复后，马上从书签接着读。</p>
+        <p>首屏仍取最近 50 条。往上翻用 <code>before</code> 读更早一页，Pi 仍按现有规则替换消息窗口。文件被替换、截短或会话换了一次运行时，重新确定从哪读，忽略随后返回的旧请求。权限或绑定变化时清掉旧数据，切换节点时取消旧节点请求。需要跨页面保留的消息放进现有的工作区缓存，并沿用它的容量上限。</p>
+        <p>每一步都可以单独测试、提交和回滚。会话创建、关闭等事件继续触发刷新。做完生产对照后，如果服务端仍有明显的重复工作，再考虑由服务端统一采样或主动推送消息，并验证断线后能补齐。</p>
+      </section>
+
+      <section aria-labelledby="budget">
+        <h2 id="budget">30 秒内各类请求应有多少条</h2>
+        <p>同一个浏览器里，等页面稳定后计时。下面只数列出的请求。手动翻历史、按键复核和刚打开或恢复会话时的请求另记。</p>
+        <dl class="endpoint-list">
+          <div><dt>8 个命令行会话，终端区收起</dt><dd>按现有测试，逐会话 Agent 请求从 <strong>144 条降到 0 条</strong>，读屏从 <strong>81 条降到 0 条</strong>。批量查询 <code>/sessions/agents</code> 约 5 条，<code>/sessions/overview</code> 约 6 条。如果页面还打开了同一个会话的详情，这部分按下一行计。</dd></div>
+          <div><dt>只看一个命令行会话</dt><dd>通常只查一种 Agent，详情最多 6 条。读屏最多 25 条，需要实时输出时最多 38 条。独立命令行会话页还有约 5 条批量 Agent 查询和约 6 条共享会话概览查询，用于互审和内存提醒。打开独立的 Roami 原生会话页时，终端运行状态改用原生会话列表。</dd></div>
+          <div><dt>在两个地方看同一个对话</dt><dd>两个对话都以 1.5 秒间隔请求时，现状约 40 条。改后活跃时最多 20 条，稳定空闲时最多 3 条，都切走后为 0 条。</dd></div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="verification">
+        <h2 id="verification">怎么做上线前对照</h2>
+        <ol>
+          <li>改前、改后用相同的生产构建配置、节点和会话。等首屏稳定后录 30 秒 Network。测 0、1、8、20 个命令行会话，并覆盖收起终端区、打开文件、项目详情、独立会话页、同一对话在两处打开、切到后台再回来。首屏和恢复过程各自单独计。</li>
+          <li>按完整请求路径、会话、参数和发起代码归类。记录失败、取消、重叠、没有新消息的请求比例和传输量。分享结果时删除会话路径和敏感参数。用 <code>scripts/dev/isolated-roami.sh</code> 启停本地测试实例。</li>
+          <li>在同一个测试窗口测服务端的请求耗时、tmux 查询和读屏次数、转录读取量、CPU 和内存，再单独测浏览器的主线程和内存。用真实会话测权限框出现到可点击、消息写入到可读的时间，比较两版较慢的一批操作（P95）。</li>
+          <li>复查 Claude、Codex、OpenCode、Pi、普通命令行和 Roami 原生会话。覆盖慢请求、乱序、暂时没有转录、旧版本节点、换节点、多个窗格、同名会话重建、会话原地重启、记录换文件和权限失败。桌面测 1280、1920、2560、3440 CSS px，手机用 Android 真机确认触摸和前后台切换。</li>
+        </ol>
+      </section>
+      <nav class="document-links" aria-label="设计分册">
+        <a href="product.html"><strong>场景与验收</strong><span>你会看到什么变化，以及怎样自己验收</span></a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

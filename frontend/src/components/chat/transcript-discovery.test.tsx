@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { WorkspaceStateProvider } from '../../view-state'
 import { hasNativeFinal, useTranscript } from './useTranscript'
 
 const state = vi.hoisted(() => ({ api: vi.fn() }))
@@ -129,4 +130,46 @@ it('only replaces live output once the current turn has a native final reply', (
   const final = { ...interim, final: true }
   expect(hasNativeFinal([old, final])).toBe(false)
   expect(hasNativeFinal([old, final], startedMs)).toBe(true)
+})
+
+it('backs off and resumes the same cursor for two visible views of one conversation', async () => {
+  vi.useFakeTimers()
+  const file = '/history/conversation.jsonl'
+  state.api.mockResolvedValueOnce({ data: { file, nextOffset: 120, messages: [message('one')] } })
+    .mockResolvedValue({ data: { file, nextOffset: 120, messages: [] } })
+  const hook = renderHook(({ active }) => ({
+    workbench: useTranscript('session', undefined, 'transcript', { active, source: file, identity: 'current' }),
+    project: useTranscript('session', undefined, 'transcript', { active, identity: 'current' }),
+  }), { initialProps: { active: true }, wrapper: WorkspaceStateProvider })
+  await act(async () => {})
+  expect(state.api).toHaveBeenCalledTimes(1)
+  expect(hook.result.current.workbench.msgs).toBe(hook.result.current.project.msgs)
+  await act(async () => { await vi.advanceTimersByTimeAsync(4500) })
+  expect(state.api).toHaveBeenCalledTimes(4)
+  await act(async () => { await vi.advanceTimersByTimeAsync(9500) })
+  expect(state.api).toHaveBeenCalledTimes(4)
+  hook.rerender({ active: false })
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+  expect(state.api).toHaveBeenCalledTimes(4)
+  hook.rerender({ active: true })
+  await act(async () => {})
+  expect(state.api).toHaveBeenCalledTimes(5)
+  const query = new URL('http://fixture' + state.api.mock.calls[4][1]).searchParams
+  expect(query.get('offset')).toBe('120')
+  expect(query.has('file')).toBe(false)
+  expect(hook.result.current.workbench.msgs.map(msg => msg.id)).toEqual(['one'])
+})
+
+it('does not show cached messages after the same session name is reused', async () => {
+  vi.useFakeTimers()
+  state.api.mockResolvedValueOnce({ data: { file: '/history/old.jsonl', nextOffset: 120, messages: [message('old')] } })
+    .mockImplementationOnce(() => new Promise(() => {}))
+  const view = renderHook(({ identity }) => useTranscript('session', undefined, 'transcript', { identity }), {
+    initialProps: { identity: 'original' }, wrapper: WorkspaceStateProvider,
+  })
+  await act(async () => {})
+  expect(view.result.current.msgs.map(msg => msg.id)).toEqual(['old'])
+  view.rerender({ identity: 'replacement' })
+  expect(view.result.current.msgs).toEqual([])
+  expect(state.api.mock.calls[1][1]).toContain('offset=0')
 })

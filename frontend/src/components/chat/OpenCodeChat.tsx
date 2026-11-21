@@ -9,10 +9,10 @@ import { deriveFromMessages } from './status-derive'
 import { useSessionLabel } from '../sessions/session-label'
 import { useI18n } from '../../i18n'
 
-export default memo(function OpenCodeChat({ name, file, onOpenFile, onOpenGit, active, onSend }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; onSend?: (text: string) => Promise<void> }) {
+export default memo(function OpenCodeChat({ name, sessionIdentity, file, onOpenFile, onOpenGit, active, onSend }: { name: string; sessionIdentity?: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; onSend?: (text: string) => Promise<void> }) {
   const { t } = useI18n()
   const label = useSessionLabel(name)
-  const { msgs, err, status: raw, hasEarlier, loadEarlier, resolvedFile, serverPending } = useTranscript(name, file, 'opencode-transcript', active === false ? 6000 : 1500)
+  const { msgs, err, status: raw, hasEarlier, loadEarlier, refresh, resolvedFile, serverPending } = useTranscript(name, undefined, 'opencode-transcript', { identity: sessionIdentity, active, source: file })
   const { results, view } = useMemo(() => pairToolResults(msgs), [msgs])
   const pending = serverPending === true
   const tasks = useMemo(() => buildTaskIndex(view, results), [view, results])
@@ -21,9 +21,9 @@ export default memo(function OpenCodeChat({ name, file, onOpenFile, onOpenGit, a
 
   return <ChatShell
     emptyHint={resolvedFile !== undefined && msgs.length === 0 ? t('chat.noTranscriptYet') : undefined}
-    name={name} accent={CODEX_ACCENT} error={err} onOpenFile={onOpenFile} tasks={tasks} status={status} onOpenGit={onOpenGit} lastErrorId={derived.lastErrorId}
+    name={name} sessionIdentity={sessionIdentity} accent={CODEX_ACCENT} error={err} onOpenFile={onOpenFile} tasks={tasks} status={status} onOpenGit={onOpenGit} lastErrorId={derived.lastErrorId}
     placeholder={t('chat.sendTo', { name: label })} agent="opencode"
-    messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}
+    messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier} onTranscriptRefresh={refresh}
     renderMessage={(m, i) => <ChatMessage key={m.id || i} m={m} results={results} side="opencode" />}
     pending={pending ? <Typing color={CODEX_ACCENT} /> : undefined}
     busy={pending} active={active} onSend={onSend}

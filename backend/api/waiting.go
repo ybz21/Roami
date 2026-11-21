@@ -16,6 +16,8 @@ var (
 	waitCtrl         = regexp.MustCompile("[\x00-\x08\x0b-\x1f\x7f]")
 	waitCursorPrefix = regexp.MustCompile(`^[❯➤▶►▸→›»☞◉●>]\s*`)
 	waitLead         = regexp.MustCompile(`^[\s│┃|╎┆┊╭╰├╞┝─━═]+`)
+	waitUnnumbered   = regexp.MustCompile(`^(\s*)[❯➤▶►▸›»](\s+)(\S.*)$`)
+	waitFrameLead    = regexp.MustCompile(`^\s*[│┃|╎┆┊╭╰├╞┝─━═]+`)
 	waitTail         = regexp.MustCompile(`[\s│┃|╎┆┊╮╯┤╡┥─━═]+$`)
 	waitOpt          = regexp.MustCompile(`^(?:[❯➤▶►▸→›»☞◉●>]\s*)?(\d+)[.)]\s+(\S.*)$`)
 	waitQuestion     = regexp.MustCompile(`(?i)(would you like|do you want|are you sure|should (we|i)|(proceed|allow|continue|overwrite|approve|trust).*[?？]|是否(继续|允许|确认|执行)|(继续|允许|确认|执行).*[?？])`)
@@ -122,7 +124,7 @@ func sessionWaiting(capture string) bool {
 			break
 		}
 	}
-	if sequential {
+	if sequential && waitNearScreenEnd(lines, g[len(g)-1].idx) {
 		var qlines []string
 		for i := g[0].idx - 1; i >= 0 && g[0].idx-i <= 6; i-- {
 			c := waitClean(lines[i])
@@ -168,6 +170,9 @@ func sessionWaiting(capture string) bool {
 			return true
 		}
 	}
+	if waitArrowMenu(lines) {
+		return true
+	}
 	// y/n 兜底
 	for i := len(lines) - 1; i >= 0 && len(lines)-i <= 12; i-- {
 		line := waitClean(lines[i])
@@ -178,6 +183,51 @@ func sessionWaiting(capture string) bool {
 			return true
 		}
 		break
+	}
+	return false
+}
+
+func waitNearScreenEnd(lines []string, lastOption int) bool {
+	count := 0
+	for _, line := range lines[lastOption+1:] {
+		if waitClean(line) != "" {
+			count++
+			if count > 12 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func waitArrowMenu(lines []string) bool {
+	rows := make([]string, len(lines))
+	for i, line := range lines {
+		rows[i] = waitTail.ReplaceAllString(waitFrameLead.ReplaceAllString(line, ""), "")
+	}
+	for i, row := range rows {
+		m := waitUnnumbered.FindStringSubmatch(row)
+		if m == nil || waitOpt.MatchString(waitClean(row)) {
+			continue
+		}
+		column := len(m[1]) + 1 + len(m[2])
+		sibling := func(row string) bool {
+			if len(row) <= column || row[column] == ' ' || strings.TrimSpace(row[:column]) != "" {
+				return false
+			}
+			label := strings.TrimSpace(row[column:])
+			return label != "" && len([]rune(label)) <= 80
+		}
+		top, bottom := i, i
+		for top > 0 && i-top < 6 && sibling(rows[top-1]) {
+			top--
+		}
+		for bottom+1 < len(rows) && bottom-i < 6 && sibling(rows[bottom+1]) {
+			bottom++
+		}
+		if top != bottom && waitNearScreenEnd(rows, bottom) && waitAction.MatchString(strings.Join(rows[max(0, top-12):min(len(rows), bottom+4)], " ")) {
+			return true
+		}
 	}
 	return false
 }

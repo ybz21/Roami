@@ -10,9 +10,14 @@ const names: Record<string, string> = { native: 'Roami', claude: 'Claude', codex
 export const agentName = (kind: string): string => names[kind] || agentDefinition(kind)?.displayName || kind
 export const hasRenderedChat = (kind: string): boolean => ['claude', 'codex', 'opencode', 'pi'].includes(kind)
 
-const useKinds = createSessionPoll<Record<string, AgentKind>>('/sessions/agents', 6000, {}, response =>
-  Object.fromEntries(Object.entries(response?.data || {}).filter(([, kind]) => isAgentKind(kind))) as Record<string, AgentKind>)
+type Inventory = { kinds: Record<string, AgentKind>; alternatives: Record<string, AgentKind[]> }
+const empty: Inventory = { kinds: {}, alternatives: {} }
+export const useAgentKindInventory = createSessionPoll<Inventory>('/sessions/agents', 6000, empty, response => ({
+  kinds: Object.fromEntries(Object.entries(response?.data || {}).filter(([, kind]) => isAgentKind(kind))) as Inventory['kinds'],
+  alternatives: Object.fromEntries(Object.entries(response?.alternatives || {}).flatMap(([name, kinds]) =>
+    Array.isArray(kinds) ? [[name, kinds.filter(isAgentKind)]] : [])),
+}))
 
 export function useAgentKinds(enabled = true): Record<string, AgentKind> {
-  return useKinds(enabled).value
+  return useAgentKindInventory(enabled).value.kinds
 }

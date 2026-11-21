@@ -26,16 +26,17 @@ type WorkspaceTerminalsProps = {
   pages: ReturnType<typeof usePageTabs>
   routing: AppRoute
   hasSider: boolean
+  sessionVisible: boolean
   agentKinds: ReturnType<typeof useAgentKinds>
   activeTaskLabel: string
   taskDir: string
   actions: TerminalActions
 }
-export default function WorkspaceTerminals({ workspace, runtime, inspector, pages, routing, hasSider, agentKinds, activeTaskLabel, taskDir, actions }: WorkspaceTerminalsProps) {
+export default function WorkspaceTerminals({ workspace, runtime, inspector, pages, routing, hasSider, sessionVisible, agentKinds, activeTaskLabel, taskDir, actions }: WorkspaceTerminalsProps) {
   const { t } = useI18n()
   const keys = useKeybindings()
   const { terms, active, taskView, space, activateSession, setOverlay, fileTabs, curFile, closeFileTab, pinFileTab, setFileMode, reveal, openFileTab, reorderTerm } = workspace
-  const { fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, setMobileWaiting } = runtime
+  const { fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView } = runtime
   const { pageTabs, closePageTab, closePageTabs, tabBarHost, selectPage } = pages
   const { openTerm, closeTerm, renameOpenTerm, newTerminalInTask } = actions
   const { toggleInspector, showInspector } = inspector
@@ -57,7 +58,7 @@ export default function WorkspaceTerminals({ workspace, runtime, inspector, page
       onRename={renameOpenTerm}
       onCollapse={hasSider ? undefined : () => { setOverlay(false); space.setDockOpen(false) }}
       onReorder={reorderTerm}
-      onNeedsInput={setMobileWaiting}
+      sessionVisible={sessionVisible}
       onOpenSession={(n) => openTerm(n)}
       onNew={taskView ? { terminal: () => { void newTerminalInTask('shell') }, agent: (kind) => { void newTerminalInTask(kind) }, taskLabel: activeTaskLabel } : undefined}
       onOpenFile={taskView || !hasSider ? (path, line) => openFileTab(path, line) : undefined}

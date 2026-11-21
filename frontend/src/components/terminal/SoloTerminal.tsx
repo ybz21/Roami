@@ -1,30 +1,21 @@
-import { usePageEffect } from '../../page-activity'
 // ── 独立单终端页：新浏览器标签全屏打开单个会话（hash 路由 #/term/name）──
 import { nativeSessionId } from '../sessions/session-record'
-import { useEffect, useRef, useState } from 'react'
-import { TermHandle, TermStatus } from './Terminal'
+import { useEffect } from 'react'
 import { api } from '../../api'
 import TerminalPane from './TerminalPane'
-import { type ClaudeInfo } from './claude-info'
 import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { sessionDisplay, setSessionLabels, useSessionLabel } from '../sessions/session-label'
 import { type PaletteActions } from '../shell/palette'
 import { GlobalSearch } from '../shell/palette'
-import { useAgentKinds } from '../../agent-kind'
+import { useAgentKindInventory } from '../../agent-kind'
 import { useLayout } from '../../layout'
+import { useTerminalRuntime } from '../../app/useTerminalRuntime'
 
 export default function SoloTerminal({ name }: { name: string }) {
-  const agentKinds = useAgentKinds()
+  const inventory = useAgentKindInventory(!nativeSessionId(name))
+  const agentKinds = inventory.value.kinds
   const { phone } = useLayout()
-  const [fontSize, setFontSize] = useState(13)
-  const [statusMap, setStatusMap] = useState<Record<string, TermStatus>>({})
-  const [claudeMap, setClaudeMap] = useState<Record<string, ClaudeInfo>>({})
-  const [claudeView, setClaudeView] = useState<Record<string, boolean>>({})
-  const [codexMap, setCodexMap] = useState<Record<string, ClaudeInfo>>({})
-  const [codexView, setCodexView] = useState<Record<string, boolean>>({})
-  const [openCodeMap, setOpenCodeMap] = useState<Record<string, ClaudeInfo>>({})
-  const [openCodeView, setOpenCodeView] = useState<Record<string, boolean>>({})
-  const termRefs = useRef<Record<string, TermHandle | null>>({})
+  const runtime = useTerminalRuntime(name, inventory, phone, { workspaceActivity: false, desktopClaude: false })
   const label = useSessionLabel(name)
 
   // 独立页没有会话列表轮询，自己拉一次拿展示名（标题要显示「名字（id）」）
@@ -35,34 +26,6 @@ export default function SoloTerminal({ name }: { name: string }) {
     }).catch(() => {})
   }, [name])
   useEffect(() => { document.title = `Roami · ${sessionDisplay(name) || name}` }, [name, label])
-  usePageEffect(() => {
-    if (nativeSessionId(name)) return
-    let stop = false
-    const check = async () => {
-      try {
-        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/claude`)
-        if (stop) return
-        setClaudeMap((m) => ({ ...m, [name]: r.data }))
-        if (phone && r.data?.running) setClaudeView((v) => (name in v ? v : { ...v, [name]: true }))
-      } catch {}
-      try {
-        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/codex`)
-        if (stop) return
-        setCodexMap((m) => ({ ...m, [name]: r.data }))
-        if (phone && r.data?.running) setCodexView((v) => (name in v ? v : { ...v, [name]: true }))
-      } catch {}
-      try {
-        const r = await api('GET', `/sessions/${encodeURIComponent(name)}/opencode`)
-        if (stop) return
-        setOpenCodeMap((m) => ({ ...m, [name]: r.data }))
-        if (phone && r.data?.running) setOpenCodeView((v) => (name in v ? v : { ...v, [name]: true }))
-      } catch {}
-    }
-    check()
-    const t = setInterval(check, 5000)
-    return () => { stop = true; clearInterval(t) }
-  }, [name, phone])
-
   // 独立页也要能搜（⌘K）。这页没有侧栏也没有顶栏，本地条目就只有「当前这个会话」；
   // 结果照样从后端来。打开方式换成同一个标签内换 hash——独立页本身就是同一个 SPA，
   // 所以「打开文件」的意图（intents）也照常能被文件页接住。
@@ -77,12 +40,8 @@ export default function SoloTerminal({ name }: { name: string }) {
       <GlobalSearch items={[]} actions={paletteActions} />
       <TerminalPane
         terms={[name]} active={name} setActive={() => {}} closeTerm={() => window.close()}
-        fontSize={fontSize} setFontSize={setFontSize}
-        statusMap={statusMap} setStatus={(n, s) => setStatusMap((m) => ({ ...m, [n]: s }))}
-        termRefs={termRefs} sendKey={(seq) => termRefs.current[name]?.send(seq)}
-        claudeMap={claudeMap} claudeView={claudeView} setClaudeView={setClaudeView}
-        codexMap={codexMap} codexView={codexView} setCodexView={setCodexView}
-        openCodeMap={openCodeMap} openCodeView={openCodeView} setOpenCodeView={setOpenCodeView}
+        {...runtime}
+        sendKey={(seq) => runtime.termRefs.current[name]?.send(seq)}
         agentKinds={agentKinds}
         onOpenSession={paletteActions.openSession}
         onRename={(_, newName) => { location.hash = '#/term/' + encodeURIComponent(newName) }}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>场景与验收 · 会话请求频率优化</title>
+  <link rel="stylesheet" href="../../../frontend/src/index.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <div class="document-width heading-row">
+      <a href="index.html" class="back" aria-label="返回方案总览"></a>
+      <h1>场景与验收</h1>
+    </div>
+  </header>
+  <main>
+    <article class="document-width">
+      <p class="lead">开着很多会话时，工作台只为你正在看的会话读取详情。其他标签仍会告诉你哪些会话在跑、哪些在等你。</p>
+
+      <section aria-labelledby="scenarios">
+        <h2 id="scenarios">改完你会看到什么</h2>
+
+        <h3>一 · 同时开多个会话</h3>
+        <dl class="step-comparison">
+          <div><dt>现在</dt><dd>工作台每 5 秒挨个问三遍，确认每个打开的会话在跑哪个 Agent。收起终端区也照问。</dd></div>
+          <div><dt>改后</dt><dd>标签和项目列表共用一份会话状态。工作台只查你正在看的会话实际在用的那个 Agent。切走就停。</dd></div>
+          <div><dt>要保留</dt><dd>标签和项目列表仍显示哪个 Agent 在用、哪些会话在跑或等你确认。手机仍记得你选的是对话还是终端。</dd></div>
+        </dl>
+
+        <h3>二 · 看终端画面、回答问题和恢复连接</h3>
+        <dl class="step-comparison">
+          <div><dt>现在</dt><dd>标签状态、权限确认和正在输出的对话会各自读取终端画面。看不到的标签也可能发请求。</dd></div>
+          <div><dt>改后</dt><dd>你看的那个会话只发一份请求来读取画面。收起终端区、切到文件或离开浏览器标签时，这些请求暂停。</dd></div>
+          <div><dt>要保留</dt><dd>权限确认框照常出现，选完后仍会核对问题是否已处理。Codex 的恢复入口还在，你仍可先备份草稿，再中断并继续会话。</dd></div>
+        </dl>
+
+        <h3>三 · 在两个地方看同一个对话</h3>
+        <dl class="step-comparison">
+          <div><dt>现在</dt><dd>如果工作台和项目都打开同一个对话，两边会各自问有没有新消息。切走后也还会继续查。</dd></div>
+          <div><dt>改后</dt><dd>同一个对话只发一份请求。没人看时暂停。你回来或发消息后，工作台马上去拿新消息。</dd></div>
+          <div><dt>要保留</dt><dd>草稿、滚动位置和已翻过的旧消息都还在。切换会话或断网重连后，消息仍出现在它所属的对话里。</dd></div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="acceptance">
+        <h2 id="acceptance">实现后，你可以这样验收</h2>
+        <ol>
+          <li>在桌面打开 8 个命令行会话。收起终端区，切到没有显示会话详情的页面，等页面稳定后清空浏览器的 Network。接下来的 30 秒里，<code>/claude</code>、<code>/codex</code>、<code>/opencode</code> 这三种逐会话请求应都是 0 条，工作台也不应为那些标签读取终端画面。</li>
+          <li>在工作台和项目里同时打开同一个 Claude 对话，让它持续输出。在 Network 里只看这个会话的 <code>/transcript</code> 请求。应只有一组请求，约每 1.5 秒发一次。等它空闲下来，请求应减少到约 10 秒一次。</li>
+          <li>留下一段没发送的草稿，往上翻几页，再切到文件或别的会话。切回时检查草稿和阅读位置。用手机把应用切到后台再回来，也做一遍。</li>
+          <li>用一个等待授权的会话确认权限框照常弹出。点选一次，确认选项生效，下一道题还等着你点。遇到 Codex 连接失败时，检查恢复入口和备份草稿的步骤。</li>
+        </ol>
+      </section>
+
+      <nav class="document-links" aria-label="设计分册">
+        <a href="tech.html"><strong>技术方案</strong><span>请求周期、保留现有行为的方法和完整测试清单</span></a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

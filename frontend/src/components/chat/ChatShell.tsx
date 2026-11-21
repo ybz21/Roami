@@ -19,6 +19,7 @@ import { sessionDraftKey } from './session-draft'
 import { reachEarlierTop } from './earlier-autoload'
 import { useAgentDraft } from '../agent/useAgentDraft'
 import { currentNodeId } from '../cluster/node-url'
+import { useWorkspaceStateStore } from '../../view-state'
 import { sessionDisplay } from '../sessions/session-label'
 import { ChatActionsProvider } from './actions'
 import type { TaskIndex } from './tasks'
@@ -30,8 +31,11 @@ import type { AgentStatus } from './status'
 // 排队中气泡的会话名 → 队列。模块级、不随组件卸载清空（见下方注释）。
 // 数量很小（几条文本），且已发出的会话消息很快就会被转录对账掉，不会无限增长。
 const outboxStore = new Map<string, { id: number; text: string }[]>()
+type ReadingPosition = { height: number; top: number; firstId: string }
+type ReadingState = { position: ReadingPosition; limit: number; atBottom: boolean; seen: number }
+const firstPosition: ReadingPosition = { height: 0, top: 0, firstId: '' }
 
-export function ChatShell({ name, accent, placeholder, messages, results, renderMessage, pending, busy, liveOutput = true, mainTurnId, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, agent, emptyHint, active, onSend, onCommand }: {
+export function ChatShell({ name, sessionIdentity, accent, placeholder, messages, results, renderMessage, pending, busy, liveOutput = true, mainTurnId, error, onOpenFile, tasks, status, onOpenGit, lastErrorId, hasEarlier, onLoadEarlier, onTranscriptRefresh, agent, emptyHint, active, onSend, onCommand }: {
   /** 这条 composer 发给谁：左端那枚亮着的 agent pill（22 设计 §3.3） */
   onSend?: (text: string) => Promise<void>
   onCommand?: (text: string) => Promise<void>
@@ -39,6 +43,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   /** 还没有对话文件（agent 刚起、一句没说）：显示这句而不是「加载中」 */
   emptyHint?: string
   name: string
+  sessionIdentity?: string
   accent: string
   placeholder: string
   messages: Msg[]
@@ -59,6 +64,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   hasEarlier?: boolean
   /** 把首屏窗口放大一档重取（往回翻） */
   onLoadEarlier?: () => void | Promise<void>
+  onTranscriptRefresh?: () => void
   /**
    * 是不是当前标签。所有跑着 agent 的会话对话都常驻挂着（切标签只翻 visibility），
    * 不在前台的那几份不渲染消息列表——否则点一下标签，N 份 × 200 条消息一起重建 DOM、
@@ -67,6 +73,11 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   active?: boolean
 }) {
   const live = active !== false
+  const store = useWorkspaceStateStore(), node = currentNodeId()
+  const page = onSend ? location.hash.split('?')[0] : 'terminal'
+  const readingScope = useMemo(() => store.node(node).child('page', page, 'conversation', name, sessionIdentity || '', agent || ''),
+    [store, node, page, name, sessionIdentity, agent])
+  const saved = useMemo(() => readingScope.get<ReadingState>('scroll'), [readingScope])
   const draftKey = sessionDraftKey(name)
   const [input, editInput] = useAgentDraft(draftKey)
   const inputRef = useRef(input); inputRef.current = input
@@ -80,15 +91,15 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   const [showJump, setShowJump] = useState(false)
   // 未读：上滚离底之后新来了几条。贴底时恒为 0（看得见就不叫未读）。
   const [unread, setUnread] = useState(0)
-  const seenCount = useRef(0)
-  const [limit, setLimit] = useState(200) // 只渲染最近 N 条，超长转录不卡
+  const seenCount = useRef(saved?.seen || 0)
+  const [limit, setLimit] = useState(saved?.limit || 200) // 只渲染最近 N 条，超长转录不卡
   const [dragOver, setDragOver] = useState(false)
   const [dropMode, setDropMode] = useState<'upload' | 'path' | 'session'>('upload')
   const [uploading, setUploading] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const atBottom = useRef(true)
+  const atBottom = useRef(saved?.atBottom ?? true)
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   // 手机窄屏：输入区换成「文本框独占一行 + 按钮行」竖排，避免挤成一坨
@@ -194,7 +205,11 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   // 所以顶部身份一变就按高度差回补 scrollTop，让眼皮底下那段纹丝不动。
   // 必须是 useLayoutEffect：它在 paint 之前跑完，补位是「本来就没动过」；
   // 放在 useEffect 里补，用户会先看见跳一下再跳回来。
-  const anchor = useRef({ height: 0, top: 0, firstId: '' })
+  const anchor = useRef(saved?.position || firstPosition)
+  const wasLive = useRef(false)
+  const saveReading = () => readingScope.set('scroll', {
+    position: anchor.current, limit, atBottom: atBottom.current, seen: seenCount.current,
+  }, 'cache')
   useLayoutEffect(() => {
     const box = boxRef.current
     const transcript = transcriptRef.current
@@ -233,7 +248,8 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
 
   const onScroll = () => {
     const el = boxRef.current
-    if (!el) return
+    // Removing hidden messages also fires a scroll event as the browser clamps scrollTop.
+    if (!el || !live || !wasLive.current) return
     // 锚点跟着手走：补位要用「此刻」的位置和高度。只靠上面那个布局效应记录的话，
     // 纯上滚（没有新消息、不触发重渲染）这段时间里锚点停在很久以前的底部位置，
     // 插进来的更早一页就会按错误的高度差补位，一下弹走。
@@ -243,6 +259,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId: visible[0]?.id || '' }
     setShowJump(!atBottom.current)
     if (atBottom.current) { seenCount.current = messages.length; setUnread(0) }
+    saveReading()
     reachEarlier(el)
   }
 
@@ -250,6 +267,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     atBottom.current = true; setShowJump(false)
     seenCount.current = messages.length; setUnread(0)
     if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight
+    saveReading()
   }
 
   /**
@@ -267,7 +285,8 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   const [outbox, setOutboxState] = useState<{ id: number; text: string }[]>(() => outboxStore.get(name) || [])
   useLayoutEffect(() => {
     const el = boxRef.current
-    if (!el || !live) return
+    if (!live) { wasLive.current = false; return }
+    if (!el || !visible.length) return
     const firstId = visible[0]?.id || ''
     if (atBottom.current) {
       el.scrollTop = el.scrollHeight
@@ -276,11 +295,15 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     } else {
       if (anchor.current.firstId && firstId !== anchor.current.firstId) {
         el.scrollTop = anchor.current.top + (el.scrollHeight - anchor.current.height)
+      } else if (!wasLive.current) {
+        el.scrollTop = anchor.current.top
       }
       setUnread(Math.max(0, messages.length - seenCount.current))
     }
+    wasLive.current = true
     anchor.current = { height: el.scrollHeight, top: el.scrollTop, firstId }
-  }, [messages, outbox.length, pending, visible, live])
+    saveReading()
+  }, [messages, outbox.length, pending, visible, live, readingScope])
   const setOutbox = (fn: (q: { id: number; text: string }[]) => { id: number; text: string }[]) => {
     setOutboxState((q) => {
       const next = fn(q)
@@ -325,6 +348,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     try {
       if (onSend) await onSend(text)
       else await api('POST', '/tasks/_/send', { sess: name, msg: text, activity: 'dialogue' })
+      onTranscriptRefresh?.()
       if (inputRef.current === original) {
         let unchanged = true
         try { unchanged = (localStorage.getItem(draftKey) || '') === original } catch { /* Keep sending without storage. */ }
@@ -386,7 +410,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
   // 又有滚动容器（能定位到某条消息），再往上传反而绕。
   // 发一条斜杠命令给 agent（/model /compact /review /goal /approvals）：
   // TUI 自己弹选择框，PromptPanel 在页面里接住。状态条和「+」面板共用这一份。
-  const sendCommand = (cmd: string) => { (onCommand ? onCommand(cmd) : api('POST', '/tasks/_/send', { sess: name, msg: cmd })).catch((error: Error) => setSendErr(error.message)) }
+  const sendCommand = (cmd: string) => { (onCommand ? onCommand(cmd) : api('POST', '/tasks/_/send', { sess: name, msg: cmd })).then(() => onTranscriptRefresh?.()).catch((error: Error) => setSendErr(error.message)) }
 
   const statusActions: StatusActions = useMemo(() => ({
     onOpenGit,
@@ -400,7 +424,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
     } : undefined,
     onCompact: () => sendCommand('/compact'),
     onPickModel: () => sendCommand('/model'),
-  }), [name, onOpenGit, lastErrorId, onCommand])
+  }), [name, onOpenGit, lastErrorId, onCommand, onTranscriptRefresh])
 
   // 「+」面板要用的两件事：Shift+Tab 换权限模式，以及上传（走隐藏的 file input）。
   // 换模型 / 压缩上下文与状态条同一份实现（statusActions），面板只是换一种问法。
@@ -467,7 +491,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
                 </div>
               </div>
             ))}
-            {live && (busy && liveOutput ? <LiveTail key={mainTurnId} name={name} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
+            {live && (busy && liveOutput ? <LiveTail key={mainTurnId} name={name} sessionIdentity={sessionIdentity} accent={accent} idle={pending} lastUser={lastUserText} /> : pending)}
             </div>
           </div>
           {/* 「回到底部」已并进下方状态条（带未读数）；状态条一个字段都没有时（刚进页面、
@@ -480,7 +504,7 @@ export function ChatShell({ name, accent, placeholder, messages, results, render
           )}
         </div>
         {/* 交互式选择框（权限确认/选项菜单）：检测到才显示，可点选 */}
-        <PromptPanel name={name} accent={accent} />
+        <PromptPanel name={name} sessionIdentity={sessionIdentity} accent={accent} enabled={live} />
         {errMsg && <div style={{ color: '#f85149', fontSize: 12, padding: '2px 12px' }}>{errMsg}</div>}
         <div className="conversation-composer-dock">
           <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={event => { const files = Array.from(event.target.files || []); event.target.value = ''; if (files.length) void doUpload(files) }} />
