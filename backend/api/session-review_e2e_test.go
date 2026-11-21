@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/backend/ttmux"
 	"github.com/ybz21/Roami/internal/gitcontext"
 	"github.com/ybz21/Roami/internal/id"
@@ -212,30 +215,92 @@ func TestSessionReviewIsolatedE2E(t *testing.T) {
 	}
 	drive := func(phase string) sessionreview.Pair {
 		t.Helper()
-		handler.driveSessionReviews(sessions, authors, nil, func(string) string { return "" }, probes, time.Now())
+		handler.driveSessionReviews(sessions, authors, nil, probes, time.Now())
 		got, err := store.Load(pair.Author.Session)
 		if err != nil || got.Phase != phase {
 			t.Fatalf("review phase: want %s got %+v %v", phase, got, err)
 		}
 		return got
 	}
-	for round := 1; round <= sessionreview.MaxRounds; round++ {
-		path := filepath.Join(pair.Directory, "changed.txt")
-		summary := fmt.Sprintf("workspace content %d", round)
-		if err := os.WriteFile(path, []byte(summary), 0600); err != nil {
-			t.Fatal(err)
+	status := func(p sessionreview.Pair, now time.Time, phase string) {
+		t.Helper()
+		version, verified := handler.reviewWorkspaces.get(p.Author.Session, now)
+		view := map[string]sessionreview.Status{}
+		p.Statuses(view, version, verified)
+		for _, endpoint := range []sessionreview.Endpoint{p.Author, p.Reviewer} {
+			if got := view[endpoint.Session].Phase; got != phase {
+				t.Fatalf("%s review status: %s != %s", endpoint.Session, got, phase)
+			}
 		}
-		queue(authorFile, pair.Reviewer.Session, "[review.request] "+summary)
+	}
+	notes := filepath.Join(pair.Directory, "notes.md")
+	if err := os.WriteFile(notes, []byte("Review analysis first\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	queue(authorFile, pair.Reviewer.Session, "[review.request] Review the analysis")
+	first := drive("reviewing")
+	queue(reviewerFile, pair.Author.Session, fmt.Sprintf("[review.approved] r1 rev=%s Analysis verified", first.Rounds[0].Version))
+	first = drive("approved")
+	status(first, time.Now(), "approved")
+	if err := os.Remove(notes); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Add(reviewProbeInterval)
+	handler.driveSessionReviews(sessions, authors, nil, probes, now)
+	status(first, now, "clean")
+	path := filepath.Join(pair.Directory, "changed.txt")
+	if err := os.WriteFile(path, []byte("workspace content 2"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("-C", pair.Directory, "add", "changed.txt")
+	git("-C", pair.Directory, "commit", "-m", "Code after notes review")
+	now = now.Add(reviewProbeInterval)
+	handler.driveSessionReviews(sessions, authors, nil, probes, now)
+	status(first, now, "stale")
+	for _, elapsed := range []time.Duration{reviewIdleWindow, reviewIdleWindow + time.Second} {
+		handler.driveSessionReviews(sessions, authors, nil, probes, now.Add(elapsed))
+	}
+	for round := 2; round <= 1+sessionreview.MaxRounds; round++ {
+		summary := fmt.Sprintf("workspace content %d", round)
+		if round > 2 {
+			if err := os.WriteFile(path, []byte(summary), 0600); err != nil {
+				t.Fatal(err)
+			}
+			queue(authorFile, pair.Reviewer.Session, "[review.request] "+summary)
+		}
 		request := drive("reviewing")
 		version := request.Rounds[round-1].Version
 		await(reviewerFile+".received", fmt.Sprintf("[review.request] r%d rev=%s", round, version))
 		await(store.SnapshotPath(pair.Author.Session, round), summary)
 		queue(reviewerFile, pair.Author.Session, fmt.Sprintf("[review.changes_requested] r%d rev=%s Finding %d", round, version, round))
 		want := "changes"
-		if round == sessionreview.MaxRounds {
+		if round == 1+sessionreview.MaxRounds {
 			want = "limit"
 		}
 		drive(want)
 		await(authorFile+".received", fmt.Sprintf("Finding %d", round))
 	}
+	engine := gin.New()
+	engine.GET("/sessions/:name/review/history", handler.SessionReviewHistory)
+	engine.POST("/sessions/:name/review/continue", handler.ContinueSessionReview)
+	history := httptest.NewRecorder()
+	engine.ServeHTTP(history, httptest.NewRequest(http.MethodGet, "/sessions/"+pair.Reviewer.Session+"/review/history", nil))
+	if history.Code != http.StatusOK || !strings.Contains(history.Body.String(), "Analysis verified") || !strings.Contains(history.Body.String(), "Finding 4") {
+		t.Fatalf("review history: %d %s", history.Code, history.Body)
+	}
+	for _, want := range []int{http.StatusNoContent, http.StatusConflict} {
+		body := strings.NewReader(`{"round":4}`)
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/sessions/"+pair.Author.Session+"/review/continue", body))
+		if response.Code != want {
+			t.Fatalf("continue review: %d %s", response.Code, response.Body)
+		}
+	}
+	if err := os.WriteFile(path, []byte("resumed version"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	queue(authorFile, pair.Reviewer.Session, "[review.request] Resumed review")
+	resumed := drive("reviewing")
+	queue(reviewerFile, pair.Author.Session, fmt.Sprintf("[review.approved] r5 rev=%s Resumed version verified", resumed.Rounds[4].Version))
+	status(drive("approved"), time.Now(), "approved")
 }

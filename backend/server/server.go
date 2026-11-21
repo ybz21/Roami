@@ -211,6 +211,8 @@ func New(cfg Config) *gin.Engine {
 		// ── Session API 增量 ──
 		g.GET("/sessions/annotations", h.SessionAnnotations)              // session→worktree 归属（cwd join）
 		g.GET("/sessions/:name/worktree-status", h.SessionWorktreeStatus) // W7 关闭前预检
+		g.GET("/sessions/:name/review/history", h.SessionReviewHistory)
+		g.POST("/sessions/:name/review/continue", h.ContinueSessionReview)
 		// ── 组合 WorktreeSession API（事务编排）──
 		g.POST("/worktree-sessions", h.WorktreeSessionCreate)                     // 建 worktree + 会话
 		g.POST("/sessions/:name/fork", h.SessionFork)                             // 派生子会话（继承父 cwd）

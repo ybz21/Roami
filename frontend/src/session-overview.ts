@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { useSessionLifecycle, lifecycleEnded } from './components/sessions/session-lifecycle'
 
 export type SessionReview = {
-  peer: string; role: 'author' | 'reviewer'; phase: 'waiting' | 'reviewing' | 'changes' | 'approved' | 'limit' | 'interrupted'; round?: number
+  peer: string; role: 'author' | 'reviewer'; phase: 'waiting' | 'reviewing' | 'changes' | 'approved' | 'stale' | 'checking' | 'clean' | 'limit' | 'interrupted'; round?: number; newVersion?: boolean
 }
 
 export type OverviewItem = {
