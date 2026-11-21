@@ -2,6 +2,7 @@ import ModelGatewayWorkspace from './ModelGatewayWorkspace'
 import ModelAggregationWorkspace from './ModelAggregationWorkspace'
 import ModelMonitoringWorkspace from './ModelMonitoringWorkspace'
 import GatewayRequestDetail from './GatewayRequestDetail'
+import GatewayRequestAudit from './GatewayRequestAudit'
 import { api } from '../../api'
 import SourcePricingSettings, { sourcePriceDraftChanged, type SourcePriceDraft } from './SourcePricingSettings'
 import BackButton from '../BackButton'
@@ -43,6 +44,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const tab = requested === 'prices' ? 'catalog' : requested === 'sources' ? 'catalog' : tabs.includes(requested) ? requested : legacy === 'prices' ? 'catalog' : legacy === 'proxy' ? 'usage' : 'catalog'
   const catalogDetail = tab === 'catalog' && !!detail
   const requestDetail = tab === 'audit' && detail === 'request' ? id : ''
+  const requestAudit = tab === 'audit' && detail === 'requests'
   const auditOrigin = section
   const billing = useGatewaySettings(tab === 'usage' || tab === 'audit' || tab === 'catalog')
   const [newSourceId, setNewSourceId] = useState(newID), [newModelId, setNewModelId] = useState(newID)
@@ -54,7 +56,13 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const [addingAccount,setAddingAccount]=useState(''),[accountError,setAccountError]=useState(''),[accountToAuthorize,setAccountToAuthorize]=useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
-  const openRequest = (id: string, from: 'monitor' | 'aggregate', pool?: string) => navigate('audit/request/' + encodeURIComponent(id) + '/' + from + (pool ? '/' + encodeURIComponent(pool) : ''))
+  const openRequest = (id: string, from: 'monitor' | 'aggregate' | 'requests', pool?: string) => navigate('audit/request/' + encodeURIComponent(id) + '/' + from + (pool ? '/' + encodeURIComponent(pool) : ''))
+  const openRequestAudit = () => navigate('audit/requests')
+  const backFromRequest = () => {
+    if (auditOrigin === 'monitor') navigate('monitor')
+    else if (auditOrigin === 'aggregate' && originPool) navigate('aggregate/' + encodeURIComponent(originPool))
+    else navigate(auditOrigin === 'requests' ? 'audit/requests' : 'audit')
+  }
   const back = () => { navigate(detail === 'pricing' ? priceReturn : detail === 'model' && returnSource ? 'catalog/source/' + returnSource : tab); setReturnSource('') }
   const error = controller.error && <Alert type="error" role="alert" message={t(controller.error)} action={<Button onClick={controller.retry}>{t('capabilities.models.reread')}</Button>} />
   const models = value?.models || [], sources = value?.sources || []
@@ -179,10 +187,11 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     {<div className="tt-model-hub-main" hidden={catalogDetail && layout.phone}>
       <Tabs tabPosition={layout.phone ? 'top' : 'left'} className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
       <div className="tt-model-catalog-detail" hidden={!fullDetail || layout.phone}><header className="tt-pagehead"><BackButton onClick={back}/><h2>{editorTitle}</h2></header>{fullDetail && !layout.phone && editor}</div>
-      <ModelUsageWorkspace active={tab === 'usage' || tab === 'audit' && !requestDetail} mode={tab === 'audit' ? 'audit' : 'overview'} controller={billing} sources={sources} onAudit={query => navigate('audit?'+query)} onOverview={()=>navigate('usage')} />
+      <ModelUsageWorkspace active={tab === 'usage' || tab === 'audit' && !requestDetail && !requestAudit} mode={tab === 'audit' ? 'audit' : 'overview'} controller={billing} sources={sources} onAudit={query => navigate('audit?'+query)} onOverview={()=>navigate('usage')} onRequestAudit={openRequestAudit} />
       <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onRequest={(id, pool) => openRequest(id, 'aggregate', pool)} requestedPool={tab === 'aggregate' ? detail : ''} onCloseRequested={() => navigate('aggregate')}/>
       <ModelMonitoringWorkspace active={tab==='monitor'} catalog={loaded} onRequest={id => openRequest(id, 'monitor')}/>
-      {requestDetail && <GatewayRequestDetail key={requestDetail} id={requestDetail} catalog={value} onBack={() => navigate(auditOrigin === 'monitor' ? 'monitor' : auditOrigin === 'aggregate' && originPool ? 'aggregate/' + encodeURIComponent(originPool) : 'audit')} onSource={source => navigate('catalog/source/' + source)} onPool={pool => navigate('aggregate/' + encodeURIComponent(pool))} onLimits={() => navigate('usage')} />}
+      <GatewayRequestAudit active={requestAudit} catalog={value} onBack={() => navigate('audit')} onRequest={id => openRequest(id, 'requests')} />
+      {requestDetail && <GatewayRequestDetail key={requestDetail} id={requestDetail} catalog={value} onBack={backFromRequest} onSource={source => navigate('catalog/source/' + source)} onPool={pool => navigate('aggregate/' + encodeURIComponent(pool))} onLimits={() => navigate('usage')} />}
       <ModelGatewayWorkspace active={tab==='gateway' && !detail} catalog={value} onChanged={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onPool={pool=>navigate('aggregate/'+encodeURIComponent(pool)+'/members')}/>
       {tab==='aggregate'||tab==='monitor'||tab==='gateway'?null:fullDetail ? null : tab === 'usage' || tab === 'audit' ? <GatewayReconciliation controller={billing} /> : <div className="tt-model-hub-scroll">
       {tab !== 'speech' && error}{accountError&&<Alert type="error" role="alert" message={t(accountError)} action={<Button onClick={()=>{setAccountError('');controller.retry()}}>{t('capabilities.models.reread')}</Button>}/>}

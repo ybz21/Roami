@@ -5971,6 +5971,7 @@ const enUS = {
   'gatewayTrace.caller': "Caller",
   'gatewayTrace.allCallers': "All callers",
   'gatewayTrace.recent': "Recent requests",
+  'gatewayTrace.audit': "Request log",
   'gatewayTrace.filterOutcome': "Filter by outcome",
   'gatewayTrace.recentLimit': "Showing the latest 50 requests. Narrow the filters to find others.",
   'gatewayTrace.unsupported': "This node does not have request-level monitoring yet. View attempts in Source comparison.",

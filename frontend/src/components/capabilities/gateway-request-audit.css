@@ -1,0 +1,48 @@
+.tt-request-audit[hidden] {
+  display: none;
+}
+.tt-request-audit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-3);
+}
+.tt-request-audit-filters > label {
+  flex: 0 1 calc(var(--sp-5) * 8);
+  min-width: 0;
+}
+.tt-request-audit-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tt-request-audit-list li {
+  border-block-end: 1px solid var(--border-subtle);
+}
+.tt-request-audit-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-1);
+  text-align: start;
+  white-space: normal;
+}
+.tt-request-audit-list button > span {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tt-request-audit-list small {
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+}
+.tt-request-audit-result {
+  text-align: end;
+}
+html:is([data-size="compact"], [data-size="medium"]) .tt-request-audit-filters > label {
+  flex: 1 1 calc(var(--sp-5) * 5);
+}

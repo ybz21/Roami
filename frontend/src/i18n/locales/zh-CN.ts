@@ -5980,6 +5980,7 @@ const zhCN = {
   'gatewayTrace.caller': "调用方",
   'gatewayTrace.allCallers': "全部调用方",
   'gatewayTrace.recent': "最近请求",
+  'gatewayTrace.audit': "请求记录",
   'gatewayTrace.filterOutcome': "按结果筛选",
   'gatewayTrace.recentLimit': "显示最近 50 条，缩小筛选范围可查看更多。",
   'gatewayTrace.unsupported': "此节点还没有请求级监控，可在模型源对比查看上游尝试。",

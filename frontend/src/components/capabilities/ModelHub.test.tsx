@@ -37,6 +37,31 @@ beforeEach(() => { installRadixTestEvents();
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const mount = (sub: string, navigate = vi.fn()) => render(<App><ModelHub sub={sub} onNav={navigate} /></App>, { wrapper })
 
+it('opens records and returns from a blocked gateway request through audit', async () => {
+  const requestId = '1d5c6684-0fdd-4a2f-b975-6dcc832f24f2'
+  const request = { requestId, at: Date.now(), routeId: 'coding', model: 'Coding', caller: 'claude', outcome: 'blocked', status: 503, durationMs: 10 }
+  const fallback = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path.includes('view=requests')) return { data: { recent: [request], routes: { coding: 'Coding' } } }
+    if (path.endsWith('/monitor/requests/' + requestId)) return { data: { request, attempts: [], complete: true } }
+    if (path.startsWith('/agent/model-gateway/usage')) return { data: {
+      day: '2026-10-31', from: '2026-10-25', to: '2026-10-31', days: 7, timezone: 'Asia/Shanghai',
+      today: [], groups: [], hourly: [], recent: [], options: { sources: [], agents: [], models: [] },
+    } }
+    return fallback(method, path, body, options)
+  })
+  const navigate = vi.fn(), view = mount('audit', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'gatewayTrace.audit' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/audit/requests')
+  view.rerender(<App><ModelHub sub="audit/requests" onNav={navigate} /></App>)
+  fireEvent.click(await screen.findByRole('button', { name: /Coding.*gatewayTrace.blocked/ }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/audit/request/' + requestId + '/requests')
+  view.rerender(<App><ModelHub sub={'audit/request/' + requestId + '/requests'} onNav={navigate} /></App>)
+  expect(await screen.findByText('gatewayTrace.blockedBeforeSend')).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('region', { name: 'gatewayTrace.detail' })).getByRole('button', { name: 'common.back' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/audit/requests')
+})
+
 it('retains old default and per-model prices and saves to the existing Go configuration', async () => {
   mount('prices')
   const input = await screen.findByLabelText('agent.proxy.price.input') as HTMLInputElement
