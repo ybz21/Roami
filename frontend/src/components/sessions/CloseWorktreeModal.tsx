@@ -1,6 +1,6 @@
 // ── 关闭 worktree 会话的收尾三选一（W7）：保留 / 合并回 base 并删除 / 丢弃并删除 ──
 import { useEffect, useState } from 'react'
-import { submitLifecycle, lifecycleRequestError } from './session-lifecycle'
+import { submitLifecycle, lifecycleAction, lifecycleRequestError } from './session-lifecycle'
 import { useI18n } from '../../i18n'
 import { Checkbox, Modal, Radio, Select, App as AntApp } from 'antd'
 import { closeSession, sessionActionError } from './session-actions'
@@ -21,22 +21,25 @@ export function CloseWorktreeModal({ info, onClose, onDone, checking = false, se
   const { message } = AntApp.useApp()
   const { t } = useI18n()
   const st = info?.st || {}
+  const pendingCreation = st.pendingCreation
+  const closeLabel = t(pendingCreation ? 'session.lifecycle.cancel' : 'session.close')
   const merged = !!st.mergedInto // 合入检测（10 §5）：已合入时丢弃=清理，默认直选
   const unfinished = (st.dirty || 0) + (st.untracked || 0) + (st.committedAhead || 0) > 0
   const owned = st.inWorktree && !st.external && !(st.others > 0)
-  const choices = !sessionConfirmation || (owned && unfinished)
-  const removeOption = sessionConfirmation && owned && !unfinished && !!st.base
+  const choices = !pendingCreation && (!sessionConfirmation || (owned && unfinished))
+  const removeOption = !pendingCreation && sessionConfirmation && owned && !unfinished && !!st.base
   useEffect(() => { if (info) { setMode(info.st?.mergedInto ? 'discard' : 'keep'); setStrategy('squash') } }, [info])
   useEffect(() => { setRemoveToo(true) }, [info?.name])
   const ok = async () => {
     if (!info || checking || busy) return
     setBusy(true)
     try {
-      if (sessionConfirmation && !choices && !removeOption) await closeSession(info.name)
+      if (pendingCreation) await lifecycleAction(pendingCreation, 'cancel')
+      else if (sessionConfirmation && !choices && !removeOption) await closeSession(info.name)
       else await submitLifecycle('close', {
         mode: choices ? mode : removeToo ? 'discard' : 'keep', path: st.path, snapshot: st.snapshot, sessionIdentity: st.sessionIdentity, ...(choices && mode === 'merge' ? { strategy } : {}),
       }, info.name)
-      message.success(t('session.lifecycle.closeAccepted'))
+      message.success(t(pendingCreation ? 'session.lifecycle.cancelling' : 'session.lifecycle.closeAccepted'))
       onClose(); onDone(info.name)
     } catch (e: any) {
       const ae = e.apiError || {}
@@ -46,12 +49,12 @@ export function CloseWorktreeModal({ info, onClose, onDone, checking = false, se
   return (
     <Modal open={!!info} centered={sessionConfirmation} transitionName={sessionConfirmation ? '' : undefined} onCancel={() => { if (!busy) onClose() }} onOk={ok} confirmLoading={busy} destroyOnHidden
       modalRender={sessionConfirmation ? node => <SessionClosePosition>{node}</SessionClosePosition> : undefined}
-      title={sessionConfirmation ? t('session.closeConfirm', { name: sessionLabel(info?.name) }) : t('worktree.close.title', { name: info?.name || '' })}
-      okText={t('session.close')}
+      title={sessionConfirmation || pendingCreation ? t('session.closeConfirm', { name: sessionLabel(info?.name) }) : t('worktree.close.title', { name: info?.name || '' })}
+      okText={closeLabel}
       cancelText={t('common.cancel')}
       cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} keyboard={!busy}
-      okButtonProps={{ 'aria-label': t('session.close'), loading: checking || busy, disabled: checking, danger: !choices || (mode === 'discard' && (!merged || (st.dirty || 0) + (st.untracked || 0) > 0)) }}>
-      {checking ? <div role="status" aria-live="polite" style={{ fontSize: 'var(--fs-lg)', color: 'var(--text-bright)' }}>{t('session.closeChecking')}</div> : choices ? <>
+      okButtonProps={{ 'aria-label': closeLabel, loading: checking || busy, disabled: checking, danger: !choices || (mode === 'discard' && (!merged || (st.dirty || 0) + (st.untracked || 0) > 0)) }}>
+      {checking ? <div role="status" aria-live="polite" style={{ fontSize: 'var(--fs-lg)', color: 'var(--text-bright)' }}>{t('session.closeChecking')}</div> : pendingCreation ? <p>{t('session.lifecycle.cancelFromClose')}</p> : choices ? <>
       <div style={{ color: 'var(--text-dim)', marginBottom: 'var(--sp-3)' }}>
         {/* 已合入（10 §5）：损失叙事换成绿色定心丸；未提交改动仍如实提示 */}
         {merged

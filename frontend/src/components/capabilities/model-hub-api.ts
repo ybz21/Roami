@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { RoutingStrategy } from './model-routing-api'
 import { api } from '../../api'
 
-export type ModelSource = { connector?: 'openrouter-free'; pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; id: string; name: string; baseUrl: string; protocol: string; authMode: string; hasKey?: boolean; apiKey?: string }
+export type ModelSource = { connector?: 'openrouter-free'; pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; id: string; name: string; baseUrl: string; protocol: string; authMode: string; skipTlsVerification?: boolean; hasKey?: boolean; apiKey?: string }
 export type ModelCandidate = { sourceId: string; model: string }
 export type CatalogModel = { id: string; aliases?: string[]; name: string; protocol: string; strategy: 'fixed' | 'failover' | RoutingStrategy; aggregate?: boolean; enabled?: boolean; freeOnly?: boolean; allowPlan?: boolean; requireTools?: boolean; minContext?: number; cooldownSeconds?: number; onLimit?: boolean; onExhausted?: boolean; weights?: Record<string, number>; candidates: ModelCandidate[] }
 export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string>; defaultModel?: string }

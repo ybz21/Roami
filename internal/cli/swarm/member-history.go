@@ -56,7 +56,11 @@ func inspectMember(ctx context.Context, client *runtimeClient, path string, opti
 	if err = responseData(raw, &value); err != nil {
 		return err
 	}
-	fmt.Fprintf(w, "%s  %s\nID: %s\n%s\n", line(value.Member.Name), stateLabel(value.Member.State), value.Member.ID, line(value.Member.Duty))
+	state := stateLabel(value.Member.State)
+	if value.Member.RetiredAtMS != 0 {
+		state = "已退出"
+	}
+	fmt.Fprintf(w, "%s  %s\nID: %s\n%s\n", line(value.Member.Name), state, value.Member.ID, line(value.Member.Duty))
 	if value.Member.Instance != nil {
 		fmt.Fprintf(w, "对话: %s\n", line(value.Member.Instance.ConversationID))
 	}

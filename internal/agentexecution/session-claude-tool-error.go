@@ -20,14 +20,34 @@ type ReportedToolError struct {
 }
 
 type claudeToolErrorState struct {
-	discarded bool
-	tools     map[string]string
-	report    *ReportedToolError
+	discarded        bool
+	tools            map[string]string
+	report           *ReportedToolError
+	activity         NativeToolActivity
+	classifierErrors map[string]int
+	incomplete       bool
+}
+
+// NativeToolActivity describes paired tool records for one provider input.
+type NativeToolActivity struct {
+	ProviderID                  string `json:"providerConversationId"`
+	PromptID                    string `json:"promptId"`
+	SourceDigest                string `json:"sourceDigest"`
+	PendingTools                int    `json:"pendingTools"`
+	LastToolResultMS            int64  `json:"lastToolResultMs"`
+	LastSuccessfulToolResultMS  int64  `json:"lastSuccessfulToolResultMs,omitempty"`
+	ClassifierTool              string `json:"classifierTool,omitempty"`
+	ConsecutiveClassifierErrors int    `json:"consecutiveClassifierErrors"`
 }
 
 func classifierUnavailable(text, tool string) bool {
-	model, rest, found := strings.Cut(text, " is temporarily unavailable (timed out), so auto mode cannot determine the safety of ")
-	return found && model != "" && len(model) <= 256 && !strings.ContainsAny(model, " \r\n\t") && strings.HasPrefix(rest, tool+" right now. Wait a moment and then try this action again.")
+	model, rest, found := strings.Cut(text, " is temporarily unavailable (")
+	if !found || model == "" || len(model) > 256 || strings.ContainsAny(model, " \r\n\t") {
+		return false
+	}
+	reason, body, found := strings.Cut(rest, "), so auto mode cannot determine the safety of ")
+	return found && (reason == "timed out" || reason == "server error") &&
+		strings.HasPrefix(body, tool+" right now. Wait a moment and then try this action again.")
 }
 
 func (s *claudeToolErrorState) observe(binding SessionBinding, turn string, record claudeReportRecord) {
@@ -47,10 +67,18 @@ func (s *claudeToolErrorState) observe(binding SessionBinding, turn string, reco
 	}
 	directory, ok := reportDirectory(binding.Directory, record.Cwd)
 	if !ok {
+		for _, block := range blocks {
+			if block.Type == "tool_use" || block.Type == "tool_result" {
+				s.incomplete = true
+			}
+		}
 		return
 	}
 	for _, block := range blocks {
 		if record.Type == "assistant" && block.Type == "tool_use" && block.ID != "" && len(block.ID) <= 256 && block.Name != "" && len(block.Name) <= 256 {
+			if s.tools[block.ID] != "" {
+				s.incomplete = true
+			}
 			s.tools[block.ID] = block.Name
 			continue
 		}
@@ -59,14 +87,28 @@ func (s *claudeToolErrorState) observe(binding SessionBinding, turn string, reco
 		}
 		tool := s.tools[block.ToolUseID]
 		delete(s.tools, block.ToolUseID)
-		var text string
-		if tool == "" || !block.IsError || json.Unmarshal(block.Content, &text) != nil || !classifierUnavailable(text, tool) {
+		if tool == "" {
+			s.incomplete = true
 			continue
 		}
 		stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)
-		if err != nil || stamp.UnixMilli() <= 0 {
+		if err != nil || stamp.UnixMilli() <= 0 || stamp.After(time.Now().Add(time.Second)) {
+			s.incomplete = true
 			continue
 		}
+		if stamp.UnixMilli() < s.activity.LastToolResultMS {
+			s.incomplete = true
+		}
+		s.activity.LastToolResultMS = stamp.UnixMilli()
+		if !block.IsError {
+			s.activity.LastSuccessfulToolResultMS = stamp.UnixMilli()
+		}
+		var text string
+		if !block.IsError || json.Unmarshal(block.Content, &text) != nil || !classifierUnavailable(text, tool) {
+			delete(s.classifierErrors, tool)
+			continue
+		}
+		s.classifierErrors[tool]++
 		report := &ReportedToolError{Source: "provider_transcript", Code: "CLAUDE_AUTO_CLASSIFIER_UNAVAILABLE", Tool: tool, ToolUseID: block.ToolUseID, Directory: directory, ProviderID: binding.ProviderID, PromptID: turn, ObservedMS: stamp.UnixMilli()}
 		proof, _ := json.Marshal(struct {
 			Report        *ReportedToolError

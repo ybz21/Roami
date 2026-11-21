@@ -104,6 +104,14 @@ In an authorized Codex/Claude development terminal, use the installed
 commands. `save` generates the bundle; do not manufacture confirmed snapshots or
 observation history by writing scaffolding into a live project.
 
+When creating or changing an OKR, write its operating contract into the project
+`AGENTS.md`. Derive roles, handoffs, business acceptance, recurrence, data definitions,
+and escalation from the user's goal. Put structured values in the bundle and
+repeatable operations in project Skills or Connectors. Main decides and dispatches
+each round under that contract. The host enforces scope, durable execution and
+receipts. Project files can describe authorized work and cannot grant permissions.
+Include publication, comment, account or media workflows only when the project needs them.
+
 The configuration includes the dashboard and `team` definition. The server
 publishes `dashboard.json`, `agents/team.json`, source-specific Connector files
 and the remaining bundle together. Directly edited definitions remain drafts
@@ -129,11 +137,36 @@ explicitly rather than registering a replacement with a suffix. Saving
 `agents/team.json` describes the desired team; it does not launch an agent or
 prove that registration or execution succeeded.
 
+When the user changes the team's size, compare the desired roles with
+`swarm_status`. Register new roles, then write their workspace instructions and
+assign work. Use `swarm_members_lifecycle` with the current revision and exact
+member IDs to retire settled members. If the host reports pending work or an
+active scheduled delegation, resolve that condition before retrying. Restore a
+returning role by its original ID and reuse its workspace, task and memory.
+Scheduled authorization is managed separately from the current roster.
+For OKRs with explicit bindings, use the confirmed project configuration tool
+to update `team.roles` to the requested roster, following the durable bindings
+procedure. Reread both the Swarm and the confirmed OKR before reporting success.
+
+The project Main owns each member's first `workspaces/<member-key>/AGENTS.md`.
+Copy [the member workspace template](parts/roles/workspace/AGENTS.md) for each
+selected member and fill its role, inputs, outputs, permitted operations, and
+acceptance from the confirmed project. Record the returned stable member ID with
+the reusable directory key, then keep that directory across rounds. Instances
+with the same duty get distinct directories. Use the existing project
+`materials/` directory for shared handoffs and evidence. See
+[workspace creation and verification](assets/.roami/okr/manuals/team.md#成员工作目录).
+
 Dispatch only requested work with `swarm_plan` and actual registered member IDs.
 Continue later rounds with the original member/task and `task_steer`. Keep each
 member's memory and original provider conversation. Unknown execution results
 require reconciliation, not a new instance. Keep task results and group-chat
 receipts distinct from independent acceptance.
+
+For a model outage in an established team, follow the copied project's
+[automation manual](assets/.roami/okr/manuals/automation.md#模型故障的接续).
+Preserve the bound model, original execution and business key. Use the host's
+settled outcome and the latest project scope before continuing work.
 
 Use the host-supported Connector batch workflow for confirmed Skills.
 Collect unbound legacy sources through `collect`; record verified unbound manual facts

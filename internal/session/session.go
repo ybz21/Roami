@@ -198,17 +198,6 @@ func must(s string, _ error) string {
 	return s
 }
 
-// maxNumeric returns whichever of two tmux epoch strings is the larger number,
-// tolerating empty/garbage (parses as 0). Keeps the string form for the JSON.
-func maxNumeric(a, b string) string {
-	na, _ := strconv.ParseInt(strings.TrimSpace(a), 10, 64)
-	nb, _ := strconv.ParseInt(strings.TrimSpace(b), 10, 64)
-	if nb > na {
-		return b
-	}
-	return a
-}
-
 func IsTerminal() bool {
 	info, err := os.Stdout.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0

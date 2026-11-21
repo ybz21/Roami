@@ -24,6 +24,8 @@ def member_for_plan(db, group, name, executor, duty, member_id=None):
     if member_id and (not member or member["id"] != member_id):
         raise DomainError("SWARM_MEMBER_NOT_FOUND", 404)
     if member:
+        if member["retired_ms"] is not None:
+            raise DomainError("SWARM_MEMBER_RETIRED", 409)
         if member["executor"] != executor:
             raise DomainError("SWARM_MEMBER_EXECUTOR_CONFLICT", 409)
         from roami_agent.storage.member_instances import ensure_native_instance
@@ -63,7 +65,7 @@ def member_list(db, sid, work):
     by_id = {item["id"]: item for item in work}
     members = rows(
         db,
-        "SELECT m.id,m.swarm_id,m.name,m.executor,m.model,m.execution_generation,m.created_ms,m.legacy,substr(m.duty,1,200) AS dutyPreview,b.work_id AS workId,(SELECT COUNT(*) FROM swarm_member_rounds r WHERE r.member_id=m.id) AS roundCount "
+        "SELECT m.id,m.swarm_id,m.name,m.executor,m.model,m.execution_generation,m.created_ms,m.legacy,m.retired_ms AS retiredAtMs,substr(m.duty,1,200) AS dutyPreview,b.work_id AS workId,(SELECT COUNT(*) FROM swarm_member_rounds r WHERE r.member_id=m.id) AS roundCount "
         "FROM swarm_members m LEFT JOIN swarm_member_work b ON b.member_id=m.id AND b.work_id=m.current_work_id WHERE m.swarm_id=? ORDER BY m.rowid",
         (sid,),
     )
@@ -82,6 +84,20 @@ def member_list(db, sid, work):
         if item:
             item["memberId"] = member["id"]
     return members
+
+
+def assert_member_active(db, task_id):
+    if row(
+        db,
+        "WITH RECURSIVE parents(id,parent_task_id) AS ("
+        "SELECT id,parent_task_id FROM tasks WHERE id=? UNION "
+        "SELECT t.id,t.parent_task_id FROM tasks t JOIN parents p ON t.id=p.parent_task_id) "
+        "SELECT 1 FROM parents p JOIN swarm_members m ON m.retired_ms IS NOT NULL WHERE "
+        "EXISTS (SELECT 1 FROM swarm_member_rounds r WHERE r.member_id=m.id AND r.task_id=p.id) "
+        "OR EXISTS (SELECT 1 FROM swarm_work_items w WHERE w.id=m.current_work_id AND w.task_id=p.id) LIMIT 1",
+        (task_id,),
+    ):
+        raise DomainError("SWARM_MEMBER_RETIRED", 409)
 
 
 def visible_source(db, owner, message_id):

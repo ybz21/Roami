@@ -12,13 +12,12 @@ import (
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
-func TestFreeModelRetryTimeOnlyForPrivateRequestsWithoutAttempts(t *testing.T) {
-	const retryHeader = "X-Roami-Model-Retry-At"
+func TestFreeModelRetryUsesHTTPHeaderOnlyBeforeUpstreamAttempts(t *testing.T) {
+	const retryHeader = "Retry-After"
 	var hits atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(retryHeader, "forged")
 		if hits.Add(1) == 1 {
-			w.Header().Set("Retry-After", "120")
+			w.Header().Set(retryHeader, "120")
 			http.Error(w, "rate limited", http.StatusTooManyRequests)
 			return
 		}
@@ -56,11 +55,11 @@ func TestFreeModelRetryTimeOnlyForPrivateRequestsWithoutAttempts(t *testing.T) {
 		t.Fatalf("attempted request acquired a retry receipt: status=%d hits=%d header=%q", first.Code, hits.Load(), first.Header().Get(retryHeader))
 	}
 	at := clock.Add(120 * time.Second)
-	if blocked := call(true, true); blocked.Code != 503 || hits.Load() != 1 || blocked.Header().Get(retryHeader) != fmt.Sprint(at.UnixMilli()) {
-		t.Fatalf("missing zero-attempt retry receipt: status=%d hits=%d header=%q body=%s", blocked.Code, hits.Load(), blocked.Header().Get(retryHeader), blocked.Body)
+	if blocked := call(true, true); blocked.Code != 503 || hits.Load() != 1 || blocked.Header().Get(retryHeader) != "120" {
+		t.Fatalf("missing retry delay on the private route: status=%d hits=%d header=%q body=%s", blocked.Code, hits.Load(), blocked.Header().Get(retryHeader), blocked.Body)
 	}
-	if public := call(true, false); public.Header().Get(retryHeader) != "" || hits.Load() != 1 {
-		t.Fatalf("public request received private retry metadata: %d %q", public.Code, public.Header().Get(retryHeader))
+	if public := call(true, false); public.Code != 503 || public.Header().Get(retryHeader) != "120" || hits.Load() != 1 {
+		t.Fatalf("missing retry delay on the public route: %d %q", public.Code, public.Header().Get(retryHeader))
 	}
 	clock = at
 	if recovered := call(true, true); recovered.Code != 200 || hits.Load() != 2 || recovered.Header().Get(retryHeader) != "" {
@@ -69,6 +68,9 @@ func TestFreeModelRetryTimeOnlyForPrivateRequestsWithoutAttempts(t *testing.T) {
 	h.restRoute(routingLeaf{ChannelID: "work/fixture/"}, h.Catalog.snapshot().Models[0], http.StatusUnauthorized, 0)
 	if unauthorized := call(true, true); unauthorized.Code != 503 || hits.Load() != 2 || unauthorized.Header().Get(retryHeader) != "" {
 		t.Fatalf("authentication cooldown received a free-capacity receipt: %d %q", unauthorized.Code, unauthorized.Header().Get(retryHeader))
+	}
+	if regular := call(false, false); regular.Header().Get(retryHeader) != "" {
+		t.Fatalf("regular route received a free-capacity hint: %d %q", regular.Code, regular.Header().Get(retryHeader))
 	}
 }
 

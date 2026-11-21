@@ -1,6 +1,7 @@
 """Native Main capabilities use the original turn, gateway and immutable provider."""
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,9 +9,13 @@ import httpx
 import pytest
 from test_project_main_execution import setup_main
 
+from roami_agent.context.native_prompt import INLINE_LIMIT, PAGE_BYTES, READ_CAPABILITY
+from roami_agent.context.swarm_coordination import CURRENT_BATCH_PREFIX
 from roami_agent.conversation.main_execution import main_binding
 from roami_agent.protocol.errors import DomainError
+from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_agent.providers.native_main import NativeMain
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
 
@@ -51,6 +56,121 @@ def request(context, args=None, key="one"):
     return {"executionContext": context, "requestId": key, "arguments": args or {}}
 
 
+async def signed_native_launch(runtime, main, turn, retry_suffix=""):
+    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
+    key = "project-main:" + turn["id"] + ":" + "a" * 24 + retry_suffix
+    await runtime.main_capabilities.brief(binding, {**turn, "native_launch_key": key})
+    signed = next(
+        context
+        for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
+        if (context := json.loads(path.read_text())).get("nativeLaunchKey") == key
+    )
+    return binding, key, signed
+
+
+async def test_large_coordination_uses_bound_read_only_context_without_changing_launch(native_main):
+    runtime, main, turn, original_context = native_main
+    binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
+    binding["binding"] = json.loads(binding.pop("binding_json"))
+    messages = [
+        {"role": "system", "content": "Current team rules"},
+        {"role": "user", "content": "历史证据🙂" * 30000},
+        {"role": "system", "content": CURRENT_BATCH_PREFIX + "Frozen original goal and evidence"},
+        {"role": "system", "content": "Current resume policy"},
+    ]
+    key = (
+        "project-main:"
+        + turn["id"]
+        + ":"
+        + hashlib.sha256(encoded(messages).encode()).hexdigest()[:24]
+    )
+    context = None
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime)),
+        base_url="http://testserver",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        route = "/v1/tool-directory/" + READ_CAPABILITY + "/call"
+
+        async def command(sub, *args, spec):
+            nonlocal context
+            assert (sub, *args) == ("launch", "--file", "-")
+            assert spec["key"] == key and spec["preparedFrom"] == binding["launch_key"]
+            assert spec["sessionId"] == binding["session_id"] and spec["persistent"]
+            assert len(spec["prompt"].encode()) < INLINE_LIMIT
+            assert READ_CAPABILITY in spec["prompt"] and "历史证据" not in spec["prompt"]
+            context = next(
+                signed
+                for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
+                if (signed := json.loads(path.read_text())).get("nativeLaunchKey") == key
+            )
+            index = await client.post(route, json=request(context, key="context-index"))
+            assert index.status_code == 200
+            assert index.json()["data"]["result"] == {
+                "messageCount": 4,
+                "systemIndices": [0, 2, 3],
+                "coordinationIndex": 2,
+            }
+            for number, message in enumerate(messages):
+                offset, parts = 0, []
+                while offset is not None:
+                    page = await client.post(
+                        route, json=request(context, {"index": number, "offset": offset})
+                    )
+                    assert page.status_code == 200
+                    part = page.json()["data"]["result"]
+                    assert part["offset"] == offset and 0 < len(part["text"].encode()) <= PAGE_BYTES
+                    parts.append(part["text"])
+                    offset = part["nextOffset"]
+                assert "".join(parts) == encoded(message)
+            with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED"):
+                await runtime.main_capabilities.call(READ_CAPABILITY, request(context), "bob")
+            with pytest.raises(DomainError, match="NATIVE_PROMPT_CONTEXT_UNAVAILABLE"):
+                await runtime.main_capabilities.call(
+                    READ_CAPABILITY, request(original_context), "alice"
+                )
+            invalid = await client.post(route, json=request(context, {"index": True}))
+            assert invalid.status_code == 400
+            for epoch in (2, 1):
+                await runtime.db.call(
+                    lambda db, epoch=epoch: db.execute(
+                        "UPDATE turns SET lease_epoch=? WHERE id=?", (epoch, turn["id"])
+                    ),
+                    write=True,
+                )
+                if epoch == 2:
+                    stale = await client.post(route, json=request(context))
+                    assert stale.status_code == 409
+            return {
+                "session": spec["sessionId"],
+                "sessionBinding": binding["binding"],
+                "result": {
+                    "state": "succeeded",
+                    "inputStopped": True,
+                    "outcomeKnown": True,
+                    "summary": "Native answer",
+                },
+            }
+
+        model = NativeMain(
+            binding,
+            {**turn, "trigger_kind": "continuation"},
+            command,
+            capabilities=runtime.main_capabilities,
+        )
+        assert [event.value async for event in model.stream(messages, [])] == ["Native answer"]
+        released = await client.post(route, json=request(context))
+        assert released.status_code == 409
+        assert not runtime.main_capabilities.prepared_prompts
+        calls = await runtime.db.call(
+            lambda db: row(
+                db, "SELECT count(*) count FROM tool_calls WHERE turn_id=?", (turn["id"],)
+            )
+        )
+        assert calls["count"] == 0
+
+
 async def group_for(runtime, main, turn):
     runtime.swarms.chat = None
     return await runtime.swarms.create(
@@ -85,6 +205,126 @@ async def test_native_main_uses_actual_registry_gateway_and_original_team(native
     )
     with pytest.raises(DomainError, match="CAPABILITY_REQUEST_CONFLICT"):
         await runtime.main_capabilities.call("swarm_memory_read", payload, "alice")
+
+
+@pytest.mark.parametrize("retry_suffix", ["", ":retry-1"])
+async def test_claude_input_uses_signed_registered_capability_launch(
+    native_main, monkeypatch, retry_suffix
+):
+    runtime, main, turn, original_context = native_main
+    binding, key, signed = await signed_native_launch(runtime, main, turn, retry_suffix)
+    assert "nativeLaunchKey" not in original_context
+    with pytest.raises(DomainError, match="ACTIVE_MAIN_CONTEXT_REQUIRED"):
+        await runtime.main_capabilities.call(
+            "swarm_status", request({**signed, "nativeLaunchKey": key[:-1] + "b"}), "alice"
+        )
+    cli_proof = {
+        "providerId": binding["provider_id"],
+        "promptId": "current-native-prompt",
+        "requestSha256": "a" * 64,
+        "capabilities": [],
+        "images": [{"mime": "image/png", "sha256": "b" * 64}],
+    }
+
+    async def observed(sub, *args):
+        assert (sub, *args[:-1]) == (
+            "capability-input",
+            "--key",
+            key,
+            "--capability",
+            "check_evidence",
+            "--request",
+        )
+        assert args[-1] in {"current", "wrong-provider"}
+        return cli_proof
+
+    monkeypatch.setattr(runtime.main_executions.executor, "command", observed)
+
+    async def input_proof(args, call_binding):
+        if args.get("wrongTool"):
+            call_binding = {
+                **call_binding,
+                "nativeCapabilityCall": {
+                    **call_binding["nativeCapabilityCall"],
+                    "name": "another_tool",
+                },
+            }
+        return await runtime.main_capabilities.capability_input(call_binding)
+
+    runtime.tools.add(
+        Tool(
+            "check_evidence",
+            "Check the input evidence",
+            object_schema({"wrongTool": {"type": "boolean"}}),
+            input_proof,
+            main=True,
+            effect="read",
+        )
+    )
+    actual = await runtime.main_capabilities.call(
+        "check_evidence", request(signed, key="current"), "alice"
+    )
+    assert actual["state"] == "succeeded" and actual["result"] == cli_proof
+    wrong_tool = await runtime.main_capabilities.call(
+        "check_evidence", request(signed, {"wrongTool": True}, "wrong-tool"), "alice"
+    )
+    assert wrong_tool["state"] == "failed"
+    assert wrong_tool["result"]["error"] == "NATIVE_CAPABILITY_INPUT_UNCONFIRMED"
+    cli_proof["providerId"] = "another-provider"
+    wrong_provider = await runtime.main_capabilities.call(
+        "check_evidence", request(signed, key="wrong-provider"), "alice"
+    )
+    assert wrong_provider["state"] == "failed"
+    assert wrong_provider["result"]["error"] == "NATIVE_CAPABILITY_INPUT_UNCONFIRMED"
+
+
+async def test_native_artifact_view_lives_only_for_the_admitted_turn(native_main, monkeypatch):
+    runtime, main, turn, original_context = native_main
+    _, _, signed = await signed_native_launch(runtime, main, turn)
+    expected = b"image bytes already verified by the artifact store"
+    artifact = await runtime.artifacts.put(
+        "alice", expected, name="visual.png", mime_type="image/png"
+    )
+
+    async def preview(args, binding):
+        return {"path": await runtime.main_capabilities.artifact_view(binding, artifact["id"])}
+
+    runtime.tools.add(
+        Tool(
+            "preview_artifact",
+            "Read the visual artifact",
+            object_schema({}),
+            preview,
+            main=True,
+            effect="read",
+        )
+    )
+    invalid = await runtime.main_capabilities.call(
+        "preview_artifact", request(original_context), "alice"
+    )
+    assert invalid["state"] == "failed"
+    value = await runtime.main_capabilities.call(
+        "preview_artifact", request(signed, key="image"), "alice"
+    )
+    image = Path(value["result"]["path"])
+    assert value["state"] == "succeeded"
+    assert image.suffix == ".png" and image.is_symlink() and image.read_bytes() == expected
+    assert image.parent.stat().st_mode & 0o777 == 0o700
+    original_blob = image.resolve()
+
+    async def finished(*args, **kwargs):
+        return "done"
+
+    monkeypatch.setattr(runtime, "_run_turn", finished)
+    assert await runtime.run_turn({**turn, "lease_epoch": turn["lease_epoch"] + 1}) == "done"
+    assert image.is_symlink()
+    assert await runtime.run_turn(turn) == "done"
+    assert not image.is_symlink() and original_blob.read_bytes() == expected
+    left = runtime.main_capabilities.artifact_views.root / "turn-orphan01"
+    left.mkdir(mode=0o700)
+    (left / "image.png").symlink_to(original_blob)
+    runtime.main_capabilities.artifact_views.recover()
+    assert not left.exists() and original_blob.read_bytes() == expected
 
 
 async def test_signed_native_main_can_register_and_plan_without_worker_impersonation(native_main):
@@ -559,3 +799,38 @@ async def test_native_failure_returns_registered_call_id_for_real_blocker_eviden
     with pytest.raises(DomainError, match="SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED"):
         await runtime.db.call(lambda db: failed_step(db, binding, result["requestId"]))
     assert await runtime.main_capabilities.call("native_unavailable", payload, "alice") == result
+
+
+async def test_native_main_updates_its_existing_roster_through_signed_capabilities(native_main):
+    runtime, main, turn, context = native_main
+    group = await group_for(runtime, main, turn)
+    scope = {"swarmId": group["id"]}
+    registration = request(
+        context,
+        {
+            **scope,
+            "expectedRevision": 1,
+            "members": [{"name": "review", "executor": "claude", "duty": "Review references"}],
+        },
+        key="new-review-role",
+    )
+    added = await runtime.main_capabilities.call("swarm_members_register", registration, "alice")
+    assert added["state"] == "succeeded"
+    ident = added["result"]["members"][0]["id"]
+    retirement = request(
+        context,
+        {**scope, "expectedRevision": 2, "action": "retire", "memberIds": [ident]},
+        key="remove-review-role",
+    )
+    retired = await runtime.main_capabilities.call("swarm_members_lifecycle", retirement, "alice")
+    assert retired["state"] == "succeeded" and retired["result"]["members"][0]["id"] == ident
+    assert (
+        await runtime.main_capabilities.call("swarm_members_lifecycle", retirement, "alice")
+        == retired
+    )
+    status = await runtime.main_capabilities.call(
+        "swarm_status", request(context, scope, key="roster"), "alice"
+    )
+    snapshot = status["result"]
+    assert snapshot["mainConversationId"] == main["id"] and not snapshot["members"]
+    assert snapshot["retiredMembers"][0]["id"] == ident

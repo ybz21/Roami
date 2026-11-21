@@ -171,3 +171,9 @@ export function isPending(view: Msg[]): boolean {
   if (last.role === 'assistant') return last.blocks[last.blocks.length - 1]?.kind === 'tool_use'
   return false
 }
+
+export function hasNativeFinal(view: Msg[], startedMs?: number): boolean {
+  const latest = view[view.length - 1]
+  return startedMs !== undefined && latest?.final === true && Date.parse(latest.ts || '') >= startedMs
+    && latest.blocks.some(block => block.kind === 'text' && !!block.text?.trim())
+}

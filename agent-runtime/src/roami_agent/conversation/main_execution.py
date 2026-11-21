@@ -1,6 +1,8 @@
 """Project Main provider bindings keep the existing conversation and team identity."""
 
 import json
+import logging
+import sqlite3
 from copy import copy
 
 from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
@@ -12,7 +14,10 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.providers.native_main import NativeMain
 from roami_agent.storage.database import event, row
 from roami_agent.storage.swarm_repository import receipt
+from roami_agent.storage.swarm_settled_route_recovery import recover_route_wait, recovery_candidates
 from roami_agent.storage.transcript_repository import owned
+
+log = logging.getLogger(__name__)
 
 
 class NeedMainPreparation(Exception):
@@ -152,7 +157,74 @@ class MainExecutions:
             return loop
         binding["binding"] = json.loads(binding.pop("binding_json"))
         selected = copy(loop)
+
+        async def observe_delivery(launch_key, state):
+            def write(db):
+                current = main_binding(db, turn["owner_id"], turn["conversation_id"])
+                if not current or current["generation"] != binding["generation"]:
+                    return
+                active = row(
+                    db,
+                    "SELECT 1 FROM turns t JOIN conversations c ON c.id=t.conversation_id "
+                    "AND c.active_branch_id=t.branch_id WHERE t.id=? AND c.id=? AND t.state='running' "
+                    "AND t.lease_epoch=? AND c.deleted_ms IS NULL",
+                    (turn["id"], turn["conversation_id"], turn["lease_epoch"]),
+                )
+                key = f"native-delivery:{launch_key}:{turn['lease_epoch']}:{state}"
+                if active and not row(db, "SELECT 1 FROM events WHERE event_key=?", (key,)):
+                    event(
+                        db,
+                        turn["conversation_id"],
+                        "turn.native_delivery",
+                        {"state": state, "leaseEpoch": turn["lease_epoch"]},
+                        turn_id=turn["id"],
+                        key=key,
+                    )
+
+            try:
+                await self.db.call(write, write=True)
+            except (DomainError, OSError, sqlite3.Error):
+                log.debug("Native delivery observation could not be recorded", exc_info=True)
+
         selected.model = NativeMain(
-            binding, turn, self.executor.command, capabilities=self.capabilities
+            binding,
+            turn,
+            self.executor.command,
+            capabilities=self.capabilities,
+            delivery=observe_delivery,
         )
         return selected
+
+    async def recover_settled_route_waits(self):
+        for turn in await self.db.call(recovery_candidates):
+            try:
+                await self._recover_settled_route_wait(turn)
+            except (DomainError, OSError, TimeoutError):
+                log.debug("Original Main route wait could not be recovered", exc_info=True)
+
+    async def _recover_settled_route_wait(self, turn):
+        owner, cid = turn["owner_id"], turn["conversation_id"]
+        binding = await self.db.call(lambda db: main_binding(db, owner, cid))
+        if not binding or binding["executor"] != "claude":
+            return
+        proof = await self.executor.command("prepared", "--key", binding["launch_key"])
+        if (
+            proof.get("ready") is not True
+            or proof.get("executor") != binding["executor"]
+            or proof.get("configuredModel") != binding["model"]
+            or proof.get("launchKey") != binding["launch_key"]
+            or not isinstance(proof.get("sessionBinding"), dict)
+            or not proof.get("routeRefusal")
+        ):
+            return
+        native = dict(binding)
+        native["binding"] = json.loads(native.pop("binding_json"))
+        model = NativeMain(native, turn, self.executor.command)
+        model.verify({"session": proof.get("sessionId"), "sessionBinding": proof["sessionBinding"]})
+        await self.db.call(
+            lambda db: (
+                main_binding(db, owner, cid) == binding
+                and recover_route_wait(db, turn["id"], model, proof)
+            ),
+            write=True,
+        )

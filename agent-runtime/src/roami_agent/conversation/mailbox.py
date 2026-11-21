@@ -15,10 +15,16 @@ class TurnMailbox:
 
     async def claim(self, job):
         def write(db):
+            current_job = row(db, "SELECT * FROM jobs WHERE id=? AND state='queued'", (job["id"],))
+            if not current_job:
+                return None
+            payload = json.loads(current_job["payload_json"])
+            if payload.get("nativeRouteRetry") and current_job["available_ms"] > now_ms():
+                return None
             turn = row(
                 db,
                 "SELECT t.*,c.owner_id FROM turns t JOIN conversations c ON c.id=t.conversation_id WHERE t.id=? AND t.state='queued'",
-                (job["aggregate_id"],),
+                (current_job["aggregate_id"],),
             )
             if not turn:
                 db.execute("UPDATE jobs SET state='done' WHERE id=?", (job["id"],))
@@ -30,7 +36,6 @@ class TurnMailbox:
                     "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 1000, job["id"])
                 )
                 return None
-            payload = json.loads(job["payload_json"])
             if turn["trigger_kind"] == "continuation" or payload.get("coordinationBatchId"):
                 batch = row(
                     db, "SELECT id FROM swarm_coordination_batches WHERE turn_id=?", (turn["id"],)
@@ -100,7 +105,8 @@ class TurnMailbox:
                 turn,
                 state="running",
                 lease_epoch=turn["lease_epoch"] + 1,
-                resumed=bool(json.loads(job["payload_json"]).get("deferred")),
+                resumed=bool(payload.get("deferred")),
+                native_route_retry=payload.get("nativeRouteRetry", 0),
             )
 
         return await self.db.call(write, write=True)

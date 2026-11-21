@@ -162,6 +162,28 @@ def from_project(workspace):
     return result
 
 
+def project_guidance_references(memory):
+    guidance = memory.get("projectGuidance")
+    if not guidance:
+        return memory
+    return {
+        **memory,
+        "projectGuidance": {
+            **{key: guidance[key] for key in ("source", "instructions", "workflowSource", "scope")},
+            "workflowSha256": digest(guidance["workflow"]),
+            "skills": [
+                {key: skill[key] for key in ("id", "path", "sha256")}
+                for skill in guidance["skills"]
+            ],
+            "loadPolicy": (
+                "Read the current project workflow and the relevant declared Skills before acting. "
+                "Paths are relative to .roami/okr/. Use the selected native project's files or "
+                "swarm_project_context. Recheck confirmed project guidance when a file differs."
+            ),
+        },
+    }
+
+
 async def read_memory(swarms, owner, sid):
     await swarms.db.call(lambda db: group(db, owner, sid))
     try:

@@ -15,7 +15,7 @@ from roami_agent.server.configuration import Settings
 
 
 @asynccontextmanager
-async def gateway_fixture(socket, seen, *, status=200, code=None, events=EVENTS, retry_at=None):
+async def gateway_fixture(socket, seen, *, status=200, code=None, events=EVENTS):
     async def handle(reader, writer):
         try:
             raw = await reader.readuntil(b"\r\n\r\n")
@@ -32,8 +32,6 @@ async def gateway_fixture(socket, seen, *, status=200, code=None, events=EVENTS,
             )
             if current_code:
                 response += f"X-Roami-Model-Error: {current_code}\r\n"
-            if retry_at is not None and current_status == 503:
-                response += f"X-Roami-Model-Retry-At: {retry_at}\r\n"
             writer.write(response.encode() + b"\r\n" + payload)
             await writer.drain()
         finally:

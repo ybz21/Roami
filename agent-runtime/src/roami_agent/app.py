@@ -199,6 +199,7 @@ class Runtime:
         self.stopping = False
         self.supervisor = None
         self.external_monitor = None
+        self.settled_route_recovery = None
         self.browser_monitor = None
         self.desktop_monitor = None
         self.control_monitor = None
@@ -279,7 +280,16 @@ class Runtime:
         )
         register_project_okr_tools(self.tools, database, self.settings)
         register_swarm_goal_tools(self.tools, database, self.wakeup, schedule=goal_schedule)
-        register_publication_tools(self.tools, database, self.artifacts, lambda: self.reply_review)
+        register_publication_tools(
+            self.tools,
+            database,
+            self.artifacts,
+            lambda: self.reply_review,
+            native_review_input=lambda binding: self.main_capabilities.capability_input(binding),
+            native_artifact_view=lambda binding, artifact: self.main_capabilities.artifact_view(
+                binding, artifact
+            ),
+        )
         register_research_tools(self.tools, self.tasks)
         register_foundations(self.tools, self.settings)
 
@@ -403,7 +413,18 @@ class Runtime:
         return configured_provider(settings, actual)
 
     async def run_turn(self, turn, *args, **kwargs):
+        try:
+            return await self._run_turn(turn, *args, **kwargs)
+        finally:
+            try:
+                self.main_capabilities.artifact_views.release(turn["id"], turn.get("lease_epoch"))
+            except OSError:
+                log.exception("Native artifact view cleanup failed")
+
+    async def _run_turn(self, turn, *args, **kwargs):
         loop = await self.main_executions.loop_for(self.loop, turn)
+        if loop is not self.loop and turn.get("trigger_kind") == "continuation":
+            turn = {**turn, "native_project_main": True}
         if self.improvement is None or not self.improvement.ledger.path.exists():
             return await loop.run(turn, *args, **kwargs)
 
@@ -435,6 +456,10 @@ class Runtime:
         self.mcp.start()
         await self.mcp.refresh()
         await self.professional_capabilities.recover()
+        try:
+            self.main_capabilities.artifact_views.recover()
+        except (DomainError, OSError):
+            log.exception("Native artifact view recovery failed")
         await self.model_settings.refresh_capacity()
         await self.conversations.recover()
         await self.memory_jobs.recover()
@@ -449,6 +474,9 @@ class Runtime:
         self.supervisor = asyncio.create_task(self.scheduler.run(), name="roami-agent-supervisor")
         if self.executor and getattr(self.executor, "can_reconcile", False):
             self.external_monitor = asyncio.create_task(self._monitor_external())
+            self.settled_route_recovery = asyncio.create_task(
+                self.main_executions.recover_settled_route_waits()
+            )
         self.browser_monitor = asyncio.create_task(self._monitor_browser())
         self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
         self.control_monitor = asyncio.create_task(self._monitor_controls())
@@ -595,6 +623,9 @@ class Runtime:
         if self.external_monitor:
             self.external_monitor.cancel()
             await asyncio.gather(self.external_monitor, return_exceptions=True)
+        if self.settled_route_recovery:
+            self.settled_route_recovery.cancel()
+            await asyncio.gather(self.settled_route_recovery, return_exceptions=True)
         if self.reminder_monitor:
             self.reminder_monitor.cancel()
             await asyncio.gather(self.reminder_monitor, return_exceptions=True)
@@ -628,6 +659,10 @@ class Runtime:
         await asyncio.gather(*running, return_exceptions=True)
         await self.native_sessions.flush()
         await self.main_capabilities.close()
+        try:
+            self.main_capabilities.artifact_views.close()
+        except OSError:
+            log.exception("Native artifact view cleanup failed")
         await self.professional_capabilities.close()
         await self.capability_markets.close()
         await self.mcp.close()

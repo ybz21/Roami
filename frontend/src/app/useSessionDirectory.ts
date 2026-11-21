@@ -26,7 +26,7 @@ export function useSessionDirectory() {
         for (const s of Array.isArray(list) ? list : []) {
           if (s?.name && isInfraSession(s.name)) continue
           if (s?.id && s?.name) { byId[s.id] = s.name; byName[s.name] = s.id }
-          if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: s.lastActivity || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined, parent: s.parent || undefined })
+          if (s?.name) names.push({ name: s.name, label: s.label || undefined, lastActivity: Number(s.last_activity) || undefined, agent: isAgentKind(s.agent) ? s.agent : undefined, parent: s.parent || undefined })
         }
         const ids = Object.keys(byId)
         setSessIds(current => current && ids.length === Object.keys(current.byId).length && ids.every(id => current.byId[id] === byId[id]) ? current : { byId, byName })
@@ -54,7 +54,7 @@ export function useSessionDirectory() {
     const pending = overview.value.filter(item => item.lifecycle && !cliSessions.some(session => session.name === item.name)).map(item => ({ ...item, agent: item.agent || undefined }))
     return [...pending, ...cliSessions.filter(session => !overview.closingNames?.has(session.name)).map(session => {
       const location = locations.get(session.name)
-      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch, lifecycle: location?.lifecycle }
+      return { ...session, cwd: location?.cwd, worktree: location?.worktree, branch: location?.branch, review: location?.review, lifecycle: location?.lifecycle }
     }), ...native.value.map(nativeSessionRecord)]
   }, [cliSessions, native.value, overview.value, overview.closingNames])
   useEffect(() => { setSessionLabels(Object.fromEntries(sessList.map(session => [session.name, session.label || session.name]))) }, [sessList])

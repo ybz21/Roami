@@ -7,15 +7,9 @@ import logging
 import httpx
 
 from roami_agent.conversation.activity_events import activity_event as event
-from roami_agent.dispatch.native_free_model_retry import defer_free_model
 from roami_agent.dispatch.web_evidence import retrieved_sources
 from roami_agent.executors.workspace import NativeWorkspaceRejected
-from roami_agent.protocol.errors import (
-    DomainError,
-    FreeModelAdmissionDeferred,
-    ToolPreflightError,
-    public_error_code,
-)
+from roami_agent.protocol.errors import DomainError, ToolPreflightError, public_error_code
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
@@ -303,11 +297,6 @@ class TaskDispatcher:
             )
 
     async def _finish_failure(self, task, run, turn, job, exc):
-        if isinstance(exc, FreeModelAdmissionDeferred) and await self.db.call(
-            lambda db: defer_free_model(db, task, run, turn, job["id"], exc.retry_at_ms),
-            write=True,
-        ):
-            return
         if isinstance(exc, ToolPreflightError) and exc.code == "SWARM_COORDINATION_PAUSED":
             await self.end_prepared_turn(turn, "interrupted", exc.code)
             if await self.defer_coordination(task, run, job):

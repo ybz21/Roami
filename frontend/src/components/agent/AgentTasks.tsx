@@ -203,9 +203,6 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
         </div>
         </header>
         <div className="agent-task-main">
-          {task.state === 'queued' && !!task.modelRetryAtMs && <p className="agent-task-note" role="status">{t('agent.task.waitingFreeModel', {
-            time: new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(task.modelRetryAtMs),
-          })}</p>}
           {(uncertain || stopUnconfirmed) && <>
             <p className="agent-task-note" role="status">{t(stopUnconfirmed ? 'agent.task.stopUnconfirmed' : 'agent.task.executionUnconfirmedHint')}</p>
             {(professional || task.latestAttempt?.executorKind === 'cli') && <div className="agent-task-actions"><Button disabled={!!busy || !detailSafe || !current || sessionClosing || sessionClosed} loading={busy === 'reconcile'} onClick={() => { void mutate('reconcile', '/agent/tasks/' + encodeURIComponent(id) + '/reconcile', { revision: task.revision, runId: current?.id }) }}>{t('agent.task.checkExecution')}</Button></div>}

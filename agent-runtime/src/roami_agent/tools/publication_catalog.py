@@ -10,8 +10,19 @@ from roami_agent.storage.publication_versions import create_item, freeze_version
 from roami_agent.tools.publication_media_catalog import register_publication_media_tools
 
 
-def register_publication_tools(registry, database, artifacts, reviewer, media=None):
-    register_publication_media_tools(registry, database, artifacts, media)
+def register_publication_tools(
+    registry,
+    database,
+    artifacts,
+    reviewer,
+    media=None,
+    *,
+    native_review_input=None,
+    native_artifact_view=None,
+):
+    register_publication_media_tools(
+        registry, database, artifacts, media, native_artifact_view=native_artifact_view
+    )
 
     async def prepare(args, binding):
         scope = {
@@ -72,9 +83,9 @@ def register_publication_tools(registry, database, artifacts, reviewer, media=No
         )
         if manifest["author"]["swarmId"] != args["swarmId"]:
             raise DomainError("PUBLICATION_PROJECT_SCOPE_CONFLICT", 403)
-        return await PublicationReview(database, artifacts, reviewer()).decide(
-            binding, args["versionId"], args["decision"], args["feedback"]
-        )
+        return await PublicationReview(
+            database, artifacts, reviewer(), native_review_input=native_review_input
+        ).decide(binding, args["versionId"], args["decision"], args["feedback"])
 
     async def release(args, binding):
         return await PublicationReleases(database, artifacts, reviewer()).prepare(

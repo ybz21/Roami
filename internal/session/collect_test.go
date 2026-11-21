@@ -8,6 +8,21 @@ import (
 	sessmeta "github.com/ybz21/Roami/internal/sessionstore"
 )
 
+func TestSessionListUsesMostRecentWindowOutput(t *testing.T) {
+	sessions := parseSessionLines("work\t2\t100\t1\t150 200 \t$2\t活动会话\tpressure\t300\n"+
+		"quiet\t1\t120\t0\t\t$3\n", nil)
+	if len(sessions) != 2 {
+		t.Fatalf("parsed sessions: %+v", sessions)
+	}
+	active, quiet := sessions[0], sessions[1]
+	if active.LastActivity != "200" || active.TmuxID != "$2" || active.Label != "活动会话" || active.pauseReason != "pressure" || active.resumeUntil != 300 {
+		t.Fatalf("parsed active session: %+v", active)
+	}
+	if quiet.LastActivity != "120" {
+		t.Fatalf("activity without window time = %q, want 120", quiet.LastActivity)
+	}
+}
+
 func TestFlatSessionListKeepsRecordedLineage(t *testing.T) {
 	store := sessmeta.New(t.TempDir())
 	// Reading the existing collection must not start another tmux scan.

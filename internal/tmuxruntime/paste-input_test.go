@@ -80,13 +80,16 @@ func TestEnvironmentInjectionRequiresExactSession(t *testing.T) {
 		if err := os.WriteFile(rt.EnvFile, []byte("FIXTURE_VALUE=sample\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
-		rt.InjectEnv(session)
+		if err := rt.InjectEnv(session); err != nil {
+			t.Fatal(err)
+		}
 		calls := pasteCalls(t, directory)
 		if len(calls) != 3 {
 			t.Fatalf("missing environment commands: %v", calls)
 		}
-		for _, call := range calls {
-			if len(call) < 3 || call[1] != "-t" || call[2] != "=worker" {
+		for i, target := range []string{"=worker", "=worker:", "=worker:"} {
+			call := calls[i]
+			if len(call) < 3 || call[1] != "-t" || call[2] != target {
 				t.Fatalf("environment injection can reach a prefix sibling: %v", call)
 			}
 		}

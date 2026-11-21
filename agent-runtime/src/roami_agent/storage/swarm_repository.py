@@ -239,7 +239,13 @@ def snapshot(db, owner, swarm_id):
         ):
             item["state"] = "blocked"
             item["dispatch_error"] = item["dispatch_error"] or "SWARM_DEPENDENCY_NOT_VERIFIED"
-    all_ids = {item["id"] for item in work}
+    from roami_agent.storage.swarm_members import member_list
+
+    members = member_list(db, swarm_id, work)
+    retired = [member for member in members if member["retiredAtMs"] is not None]
+    retired_work_ids = {member["workId"] for member in retired}
+    active_work = [item for item in work if item["id"] not in retired_work_ids]
+    all_ids = {item["id"] for item in active_work}
     graph = {item["id"]: [dep["upstreamId"] for dep in item["dependencies"]] for item in work}
 
     def covers(ident):
@@ -253,8 +259,8 @@ def snapshot(db, owner, swarm_id):
             pending.extend(graph.get(upstream, []))
         return all_ids - {ident} <= reached
 
-    integration_complete = any(item["integration"] and covers(item["id"]) for item in work)
-    states = [item["state"] for item in work]
+    integration_complete = any(item["integration"] and covers(item["id"]) for item in active_work)
+    states = [item["state"] for item in active_work]
     state = (
         "planning"
         if not states
@@ -314,12 +320,43 @@ def snapshot(db, owner, swarm_id):
     )[::-1]
     main_turn = row(
         db,
-        "SELECT state FROM turns WHERE id IN (SELECT turn_id FROM swarm_posts WHERE swarm_id=? AND turn_id IS NOT NULL UNION SELECT aggregate_id FROM jobs WHERE kind='turn.run' AND json_extract(payload_json,'$.completion.taskId') IN (SELECT task_id FROM swarm_work_items WHERE swarm_id=?)) ORDER BY created_ms DESC LIMIT 1",
-        (swarm_id, swarm_id),
+        "SELECT id,state FROM turns WHERE conversation_id=? "
+        "ORDER BY CASE state WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END,created_ms DESC,rowid DESC LIMIT 1",
+        (value["conversation_id"],),
     )
-    from roami_agent.storage.swarm_members import member_list
-
-    members = member_list(db, swarm_id, work)
+    if main_turn and main_turn["state"] == "running":
+        submission = row(
+            db,
+            "SELECT json_extract(e.payload_json,'$.state') AS state,e.created_ms AS observedAtMs "
+            "FROM events e JOIN turns t ON t.id=e.turn_id JOIN conversations c ON c.id=t.conversation_id "
+            "AND c.active_branch_id=t.branch_id JOIN project_okr_mains m ON m.conversation_id=c.id "
+            "AND m.owner_id=c.owner_id AND m.project_id=? WHERE e.turn_id=? "
+            "AND e.kind='turn.native_delivery' AND json_extract(e.payload_json,'$.leaseEpoch')=t.lease_epoch "
+            "ORDER BY e.id DESC LIMIT 1",
+            (value["scope_project_id"], main_turn["id"]),
+        )
+    else:
+        submission = None
+    model_wait = (
+        row(
+            db,
+            "SELECT j.available_ms AS retryAtMs FROM jobs j "
+            "JOIN swarm_coordination_batches b ON b.turn_id=j.aggregate_id "
+            "JOIN swarm_goal_delegations d ON d.id=b.delegation_id AND d.swarm_id=b.swarm_id "
+            "JOIN turns t ON t.id=b.turn_id "
+            "JOIN conversations c ON c.id=t.conversation_id AND c.active_branch_id=t.branch_id "
+            "WHERE j.kind='turn.run' AND j.aggregate_id=? AND j.state='queued' "
+            "AND b.swarm_id=? AND d.revoked_ms IS NULL AND c.deleted_ms IS NULL "
+            "AND json_extract(j.payload_json,'$.coordinationBatchId')=b.id "
+            "AND json_extract(j.payload_json,'$.nativeRouteRetry')>0",
+            (main_turn["id"], swarm_id),
+        )
+        if main_turn
+        and main_turn["state"] == "queued"
+        and not value["paused"]
+        and not value["archived"]
+        else None
+    )
     from roami_agent.storage.swarm_work_pause import pause_view
 
     return {
@@ -343,10 +380,15 @@ def snapshot(db, owner, swarm_id):
         "state": state,
         "sequence": sequence,
         "work": work,
-        "members": members,
+        "members": [member for member in members if member["retiredAtMs"] is None],
+        "retiredMembers": retired,
         "memberProtocol": value["member_protocol"],
         "memberYieldSupported": True,
         "posts": posts,
         "mainMessages": main_messages,
         "mainState": main_turn["state"] if main_turn else "idle",
+        "mainSubmission": submission
+        if submission and submission["state"] == "awaiting_native"
+        else None,
+        "mainModelWait": model_wait,
     }

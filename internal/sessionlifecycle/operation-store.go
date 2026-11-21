@@ -16,6 +16,17 @@ import (
 var ErrConflict = errors.New("LIFECYCLE_REVISION_CHANGED")
 var ErrRequestKey = errors.New("LIFECYCLE_REQUEST_KEY_REUSED")
 
+type OperationRevision struct {
+	OperationID string `json:"operationId"`
+	Revision    int64  `json:"revision"`
+}
+
+func (s *Store) PendingCreation(resource string) (OperationRevision, error) {
+	var value OperationRevision
+	err := s.DB.QueryRow(`SELECT id,revision FROM session_lifecycle_operations WHERE resource_id=? AND kind='create' AND state NOT IN ('succeeded','cancelled')`, resource).Scan(&value.OperationID, &value.Revision)
+	return value, err
+}
+
 type Database interface {
 	Tx(func(*sql.Tx) error) error
 	Query(string, ...any) (*sql.Rows, error)
@@ -40,6 +51,13 @@ type Intent struct {
 	Snapshot        string  `json:"snapshot,omitempty"`
 	SessionIdentity string  `json:"sessionIdentity,omitempty"`
 	Launch          *Launch `json:"launch,omitempty"`
+	Review          *Review `json:"review,omitempty"`
+}
+
+type Review struct {
+	Agent   string `json:"agent"`
+	Command string `json:"command"`
+	Trigger string `json:"trigger"`
 }
 
 // Prompt templates are filled as text before shell quoting; paths never become shell syntax.

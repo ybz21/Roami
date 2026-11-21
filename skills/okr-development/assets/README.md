@@ -12,6 +12,8 @@
 | 自定义 HTML、样式和数据读取 | .roami/okr/dashboard/ |
 | Connector Skill、脚本和来源绑定 | .roami/okr/connectors/ |
 | 项目 Main、分工与团队绑定 | .roami/okr/agents/ |
+| 成员规则与草稿 | [workspaces/](workspaces/README.md) |
+| 团队共享交付与证据 | [materials/](materials/README.md) |
 | 规划、采集、执行工作流 | .roami/okr/skills/ |
 | 团队记忆与重要事项 | .roami/okr/memory/ |
 | 事实记录与证据 | .roami/okr/data/、.roami/okr/evidence/ |

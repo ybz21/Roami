@@ -31,7 +31,18 @@ def current_version(db, binding, version_id):
     return value, manifest
 
 
-def save_review(db, binding, version_id, decision, feedback, proof):
+def version_text(manifest):
+    by_id = {item["id"]: item for item in manifest["artifacts"]}
+    ids = dict.fromkeys(
+        ident
+        for name, value in manifest["content"].items()
+        if name not in {"images", "video", "audio"}
+        for ident in (value if isinstance(value, list) else [value])
+    )
+    return [by_id[ident] for ident in ids]
+
+
+def save_review(db, binding, version_id, decision, feedback, proof, *, native_input=None):
     version, manifest = current_version(db, binding, version_id)
     if (
         decision not in {"approved", "rejected"}
@@ -39,13 +50,22 @@ def save_review(db, binding, version_id, decision, feedback, proof):
         or not 1 <= len(feedback.strip()) <= 8000
     ):
         raise DomainError("INVALID_PUBLICATION_REVIEW")
+    if decision == "approved" and native_input is not None:
+        from roami_agent.storage.publication_text_evidence import reviewed_text
+
+        if reviewed_text(
+            db, binding, version_text(manifest), native_input=native_input
+        ) != proof.get("text"):
+            raise DomainError("PUBLICATION_PROMPT_REVIEW_CHANGED", 409)
     if decision == "approved" and proof.get("images"):
         from roami_agent.storage.publication_image_evidence import reviewed_images
 
-        manifest = json.loads(version["manifest_json"])
         by_id = {item["id"]: item for item in manifest["artifacts"]}
         current_images = reviewed_images(
-            db, binding, [by_id[ident] for ident in manifest["content"]["images"]]
+            db,
+            binding,
+            [by_id[ident] for ident in manifest["content"]["images"]],
+            native_input=native_input,
         )
         if current_images != proof["images"]:
             raise DomainError("PUBLICATION_IMAGE_REVIEW_CHANGED", 409)
@@ -69,9 +89,12 @@ def save_review(db, binding, version_id, decision, feedback, proof):
         ]
         if (
             current_media != media_proof.get("snapshot")
-            or reviewed_media_images(db, binding, version_id, current_media)
+            or reviewed_media_images(
+                db, binding, version_id, current_media, native_input=native_input
+            )
             != media_proof.get("images")
-            or reviewed_text(db, binding, text) != media_proof.get("text")
+            or reviewed_text(db, binding, text, native_input=native_input)
+            != media_proof.get("text")
         ):
             raise DomainError("PUBLICATION_MEDIA_REVIEW_CHANGED", 409)
     payload = {**proof, "manifestSha256": version["manifest_sha256"]}

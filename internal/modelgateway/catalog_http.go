@@ -357,9 +357,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			if !ok {
 				if trace.Attempts == 0 {
 					trace.Blocks = choice.unavailableReasons()
-					if index == 0 && freeOnlyRequested && len(checks) > 0 && (kind == "roami_worker" || kind == "roami_research") {
-						if at := choice.nextAvailableAt(); !at.IsZero() {
-							w.Header().Set("X-Roami-Model-Retry-At", strconv.FormatInt(at.UnixMilli(), 10))
+					if index == 0 && model.FreeOnly {
+						wait := choice.nextAvailableAt().Sub(h.Ledger.now())
+						if wait > 0 {
+							seconds := (wait-time.Nanosecond)/time.Second + 1
+							w.Header().Set("Retry-After", strconv.FormatInt(int64(seconds), 10))
 						}
 					}
 				}
@@ -571,7 +573,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 					return pluginSource.ProviderID
 				}(), out, upstreamBody)
 			} else {
-				response, e = h.Client.Do(out)
+				response, e = h.sourceClient(source).Do(out)
 			}
 			if e != nil {
 				var op *net.OpError

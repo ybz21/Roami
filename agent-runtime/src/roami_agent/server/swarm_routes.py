@@ -66,6 +66,15 @@ class RegisterMembers(Payload):
     members: list[RoleSpec] = Field(min_length=1, max_length=100)
 
 
+class ChangeMembers(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    expectedRevision: int = Field(ge=1)
+    action: Literal["retire", "restore"]
+    memberIds: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        min_length=1, max_length=100
+    )
+
+
 class ExecutionMember(Payload):
     memberId: str = Field(min_length=1, max_length=200)
     executor: str = Field(pattern=EXECUTOR_PATTERN)
@@ -213,6 +222,10 @@ def mount_swarm_routes(app, runtime):
     @app.post("/v1/swarms/{sid}/members")
     async def register_members(sid: str, body: RegisterMembers, owner: Owner):
         return {"data": await runtime.swarms.register_members(owner, sid, body.model_dump())}
+
+    @app.post("/v1/swarms/{sid}/members/lifecycle")
+    async def change_members(sid: str, body: ChangeMembers, owner: Owner):
+        return {"data": await runtime.swarms.change_members(owner, sid, body.model_dump())}
 
     @app.post("/v1/swarms/{sid}/execution-migrations")
     async def migrate_execution(sid: str, body: MigrateExecution, owner: Owner):

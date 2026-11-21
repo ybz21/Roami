@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -30,6 +29,7 @@ type ModelSource struct {
 	BaseURL                  string `json:"baseUrl"`
 	Protocol                 string `json:"protocol"`
 	AuthMode                 string `json:"authMode"`
+	SkipTLSVerification      bool   `json:"skipTlsVerification,omitempty"`
 	APIKey                   string `json:"apiKey,omitempty"`
 	HasKey                   bool   `json:"hasKey,omitempty"`
 }
@@ -311,7 +311,7 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 	if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
 		return ModelSource{}, catalogError()
 	}
-	if !allowedModelSourceURL(u) {
+	if u.Scheme != "https" && u.Scheme != "http" || p.SkipTLSVerification && u.Scheme != "https" {
 		return ModelSource{}, catalogError()
 	}
 	if s.isGatewaySource(p.BaseURL) {
@@ -439,9 +439,4 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		}
 	}
 	return nil
-}
-
-func allowedModelSourceURL(u *url.URL) bool {
-	ip := net.ParseIP(u.Hostname())
-	return u.Scheme == "https" || u.Scheme == "http" && (u.Hostname() == "localhost" || ip != nil && (ip.IsLoopback() || ip.IsPrivate()))
 }

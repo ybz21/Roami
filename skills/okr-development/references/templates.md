@@ -5,6 +5,20 @@ Copy `assets/.` to a new empty project draft. The assets directory itself is the
 project root: AGENTS.md, README.md and .roami/okr/, including its own AGENTS.md. Combine only the
 needed `parts/` next; business examples are optional overlays, not the entrypoint.
 
+For each agreed team member, copy the role seed into its own draft directory and
+fill the placeholders from the confirmed role and registration receipt:
+
+```bash
+mkdir -p "$okr_draft_dir/workspaces/$okr_member_key"
+cp "$okr_skill_dir/parts/roles/workspace/AGENTS.md" "$okr_draft_dir/workspaces/$okr_member_key/"
+# Only when the member uses Claude Code
+cp "$okr_skill_dir/parts/roles/workspace/CLAUDE.md" "$okr_draft_dir/workspaces/$okr_member_key/"
+```
+
+Choose and keep a readable kebab-case member directory key. Prepare the role rules
+with Main before dispatch, then record the actual, stable member ID after registration.
+Review placeholders, shared handoff paths, and actual executor workspace binding
+before applying the draft. See [Team](../assets/.roami/okr/manuals/team.md#成员工作目录).
 
 `examples/<id>/config.json` is a current schema1 configuration seed;
 `template.json` explains decisions still required. The seeds do not include

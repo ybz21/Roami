@@ -8,10 +8,11 @@ import ClaudeChat from './ClaudeChat'
 import CodexChat from './CodexChat'
 import OpenCodeChat from './OpenCodeChat'
 import PiChat from './PiChat'
+import type { NativeMainTurn } from './types'
 import './executor-session-chat.css'
 
-export default function ExecutorSessionChat({ sessionId, executor, storageKey, onSend, onCommand, onSession }: {
-  sessionId: string; executor: string; storageKey?: string
+export default function ExecutorSessionChat({ sessionId, executor, storageKey, mainTurn, onSend, onCommand, onSession }: {
+  sessionId: string; executor: string; storageKey?: string; mainTurn?: NativeMainTurn | null
   onSend: (text: string) => Promise<void>; onCommand?: (text: string) => Promise<void>; onSession?: (id: string) => void
 }) {
   const { t } = useI18n()
@@ -31,7 +32,7 @@ export default function ExecutorSessionChat({ sessionId, executor, storageKey, o
       {terminalOpened && <div className="executor-session-terminal" style={{ visibility: chat ? 'hidden' : 'visible', pointerEvents: chat ? 'none' : 'auto' }} aria-hidden={chat}>
         <Term name={sessionId} fontSize={Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs-sm'))} active={!chat} restore={false} />
       </div>}
-      {chat && (executor === 'codex' ? <CodexChat name={sessionId} onSend={onSend} onCommand={onCommand} /> : executor === 'claude' ? <ClaudeChat name={sessionId} onSend={onSend} onCommand={onCommand} /> : executor === 'pi' ? <PiChat name={sessionId} onSend={onSend} /> : <OpenCodeChat name={sessionId} onSend={onSend} />)}
+      {chat && (executor === 'codex' ? <CodexChat name={sessionId} mainTurn={mainTurn} onSend={onSend} onCommand={onCommand} /> : executor === 'claude' ? <ClaudeChat name={sessionId} mainTurn={mainTurn} onSend={onSend} onCommand={onCommand} /> : executor === 'pi' ? <PiChat name={sessionId} onSend={onSend} /> : <OpenCodeChat name={sessionId} onSend={onSend} />)}
     </div>
   </div>
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -73,7 +74,7 @@ func TestDiscoverDraftReusesKeyOnlyAtSavedEndpoint(t *testing.T) {
 func TestDiscoverDraftRejectsInvalidAndStaleInputBeforeConnecting(t *testing.T) {
 	h := catalogHandler(t, "https://saved.example/v1", "openai-responses")
 	source := h.Catalog.view(context.Background()).Sources[0]
-	for _, endpoint := range []string{"http://external.example/v1", "https://user:pass@external.example/v1", "https://external.example/v1?key=secret", h.Catalog.baseURL, "file:///tmp/models"} {
+	for _, endpoint := range []string{"https://user:pass@external.example/v1", "https://external.example/v1?key=secret", h.Catalog.baseURL, "file:///tmp/models"} {
 		source.BaseURL = endpoint
 		if w := discoverRequest(h, source, h.Catalog.value.Revision); w.Code != 400 {
 			t.Fatalf("invalid endpoint accepted: %s", endpoint)
@@ -81,6 +82,104 @@ func TestDiscoverDraftRejectsInvalidAndStaleInputBeforeConnecting(t *testing.T) 
 	}
 	if w := discoverRequest(h, source, "stale"); w.Code != 409 {
 		t.Fatal("stale revision accepted")
+	}
+}
+
+func TestPublicHTTPModelSourceSupportsDiscoveryAndCalls(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(sourceTransportFixture))
+	defer upstream.Close()
+	h := catalogHandler(t, "http://203.0.113.22/v1", "openai-responses")
+	transport := h.Client.Transport.(*http.Transport)
+	transport.Proxy = nil
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if addr != "203.0.113.22:80" {
+			t.Errorf("unexpected address %q", addr)
+		}
+		return (&net.Dialer{}).DialContext(ctx, network, upstream.Listener.Addr().String())
+	}
+	defer transport.CloseIdleConnections()
+	view := h.Catalog.view(context.Background())
+	if w := discoverRequest(h, view.Sources[0], view.Revision); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"models":["fixture"]`) {
+		t.Fatalf("public HTTP discovery: %d %s", w.Code, w.Body)
+	}
+	if w := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`); w.Code != http.StatusOK {
+		t.Fatalf("public HTTP request: %d %s", w.Code, w.Body)
+	}
+	view.Sources[0].SkipTLSVerification = true
+	if w := discoverRequest(h, view.Sources[0], view.Revision); w.Code != http.StatusBadRequest {
+		t.Fatalf("accepted TLS option for HTTP: %d", w.Code)
+	}
+}
+
+func TestModelSourceCertificateVerificationIsPerSourceAndPersistent(t *testing.T) {
+	upstream := httptest.NewTLSServer(http.HandlerFunc(sourceTransportFixture))
+	defer upstream.Close()
+	h := catalogHandler(t, upstream.URL+"/v1", "openai-responses")
+	defer h.uncheckedTLS.CloseIdleConnections()
+	view := h.Catalog.view(context.Background())
+	source := view.Sources[0]
+	if w := discoverRequest(h, source, view.Revision); w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "MODEL_LIST_TLS_CERTIFICATE") {
+		t.Fatalf("untrusted certificate was not rejected: %d %s", w.Code, w.Body)
+	}
+	if w := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`); w.Code != http.StatusBadGateway {
+		t.Fatalf("call accepted an untrusted certificate: %d", w.Code)
+	}
+	source.SkipTLSVerification = true
+	if w := discoverRequest(h, source, view.Revision); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"models":["fixture"]`) {
+		t.Fatalf("opt-in discovery: %d %s", w.Code, w.Body)
+	}
+	view.Sources[0] = source
+	if err := h.Catalog.update(context.Background(), view); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := openCatalog(h.Ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.Catalog = reopened
+	view = h.Catalog.view(context.Background())
+	if !view.Sources[0].SkipTLSVerification || view.Sources[0].APIKey != "" {
+		t.Fatal("certificate policy or credential redaction lost on reload")
+	}
+	if w := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`); w.Code != http.StatusOK {
+		t.Fatalf("opt-in call: %d %s", w.Code, w.Body)
+	}
+	source = view.Sources[0]
+	source.SkipTLSVerification = false
+	if w := discoverRequest(h, source, view.Revision); w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "MODEL_LIST_TLS_CERTIFICATE") {
+		t.Fatalf("verified requests reused an unverified connection: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestModelDirectoryReportsRedirectWithoutFollowingIt(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("followed directory redirect")
+	}))
+	defer target.Close()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusPermanentRedirect)
+	}))
+	defer upstream.Close()
+	h := catalogHandler(t, upstream.URL+"/v1", "openai-responses")
+	view := h.Catalog.view(context.Background())
+	if w := discoverRequest(h, view.Sources[0], view.Revision); w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "MODEL_LIST_REDIRECT") {
+		t.Fatalf("directory redirect: %d %s", w.Code, w.Body)
+	}
+}
+
+func sourceTransportFixture(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Authorization") != "Bearer upstream-secret" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/v1/models":
+		_, _ = io.WriteString(w, `{"data":[{"id":"fixture"}]}`)
+	case r.Method == http.MethodPost && r.URL.Path == "/v1/responses":
+		_, _ = io.WriteString(w, `{"id":"response","usage":{"input_tokens":1,"output_tokens":1}}`)
+	default:
+		w.WriteHeader(http.StatusNotFound)
 	}
 }
 

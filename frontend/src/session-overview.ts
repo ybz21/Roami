@@ -4,7 +4,12 @@ import { createSessionPoll } from './session-poll'
 import { useMemo } from 'react'
 import { useSessionLifecycle, lifecycleEnded } from './components/sessions/session-lifecycle'
 
+export type SessionReview = {
+  peer: string; role: 'author' | 'reviewer'; phase: 'waiting' | 'reviewing' | 'changes' | 'approved' | 'limit' | 'interrupted'; round?: number
+}
+
 export type OverviewItem = {
+  review?: SessionReview
   name: string; label: string; lastActivity: number; dormant: boolean; parent?: string; cwd?: string
   projectKey?: string; project?: string; projectDir?: string; worktree?: string; branch?: string
   agent?: SessionAgent | ''; running: boolean; waiting: boolean; tail?: string

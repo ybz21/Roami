@@ -1,5 +1,6 @@
 """Require frozen text in the original Main's actual current model input."""
 
+from roami_agent.dispatch.publication_text_review import PublicationTextReview
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.publication_text_evidence import reviewed_text
 
@@ -8,7 +9,11 @@ class PublicationPromptReview:
     def __init__(self, database, artifacts, reviewer):
         self.db, self.artifacts, self.reviewer = database, artifacts, reviewer
 
-    async def inspect(self, binding, required):
+    async def inspect(self, binding, required, *, native_input=None):
+        if native_input is not None:
+            return await PublicationTextReview(self.db, self.artifacts).inspect(
+                binding, required, native_input=native_input
+            )
         if self.reviewer is None:
             raise DomainError("PUBLICATION_MODEL_CONTEXT_UNAVAILABLE", 409)
         context, _ = await self.reviewer.sources(binding)

@@ -1,10 +1,9 @@
 """Explicit executor generations preserve member identity and retired task evidence."""
 
-import json
-
+from roami_agent.dispatch.swarm_member_stop import require_stopped_member_task
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.executor_kind import is_executor
-from roami_agent.storage.database import row, rows
+from roami_agent.storage.database import row
 from roami_agent.storage.swarm_repository import changed, group, receipt
 
 
@@ -48,6 +47,8 @@ def migrate_members(db, owner, sid, spec, *, prepared=None):
             member = row(db, "SELECT * FROM swarm_members WHERE id=? AND swarm_id=?", (ident, sid))
             if not member:
                 raise DomainError("SWARM_MEMBER_NOT_FOUND", 404)
+            if member["retired_ms"] is not None:
+                raise DomainError("SWARM_MEMBER_RETIRED", 409)
             work = row(
                 db, "SELECT * FROM swarm_work_items WHERE id=?", (member["current_work_id"],)
             )
@@ -57,57 +58,7 @@ def migrate_members(db, owner, sid, spec, *, prepared=None):
                 else None
             )
             if task:
-                if (
-                    task["owner_id"] != owner
-                    or task["origin_conversation_id"] != value["conversation_id"]
-                ):
-                    raise DomainError("SWARM_MEMBER_BINDING_CONFLICT", 409)
-                if task["state"] not in {"succeeded", "failed", "cancelled", "interrupted"}:
-                    raise DomainError("SWARM_MEMBER_STOP_REQUIRED", 409)
-                if row(
-                    db,
-                    "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) SELECT 1 FROM jobs WHERE aggregate_id IN (SELECT id FROM tree) AND state IN ('queued','running') AND kind!='swarm.coordinate' LIMIT 1",
-                    (task["id"],),
-                ):
-                    raise DomainError("SWARM_MEMBER_STOP_REQUIRED", 409)
-                if row(
-                    db,
-                    "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) SELECT 1 FROM tasks WHERE id IN (SELECT id FROM tree) AND state NOT IN ('succeeded','failed','cancelled','interrupted') LIMIT 1",
-                    (task["id"],),
-                ):
-                    raise DomainError("SWARM_MEMBER_STOP_REQUIRED", 409)
-                generations = rows(
-                    db,
-                    "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) SELECT * FROM tasks WHERE id IN (SELECT id FROM tree)",
-                    (task["id"],),
-                )
-                attempts = []
-                for generation in generations:
-                    latest = row(
-                        db,
-                        "SELECT * FROM task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1",
-                        (generation["id"],),
-                    )
-                    if not latest and (
-                        generation["state"] != "cancelled" or generation["target_json"] is not None
-                    ):
-                        raise DomainError("SWARM_MEMBER_STOP_UNCONFIRMED", 409)
-                    if latest:
-                        attempts.append(latest)
-                for attempt in attempts:
-                    outcome = json.loads(attempt["result_json"] or "{}")
-                    if (
-                        attempt["state"] not in {"succeeded", "failed", "cancelled", "interrupted"}
-                        or outcome.get("inputStopped") is not True
-                        or outcome.get("outcomeKnown") is not True
-                    ):
-                        raise DomainError("SWARM_MEMBER_STOP_UNCONFIRMED", 409)
-                if row(
-                    db,
-                    "WITH RECURSIVE tree(id) AS (SELECT ? UNION ALL SELECT t.id FROM tasks t JOIN tree ON t.parent_task_id=tree.id) SELECT 1 FROM resources r JOIN task_attempts a ON a.id=r.owner_run_id WHERE a.task_id IN (SELECT id FROM tree) AND (r.state!='idle' OR r.lease_until_ms IS NOT NULL) LIMIT 1",
-                    (task["id"],),
-                ):
-                    raise DomainError("SWARM_MEMBER_STOP_REQUIRED", 409)
+                require_stopped_member_task(db, owner, value, task)
             old = {
                 "memberId": ident,
                 "executor": member["executor"],

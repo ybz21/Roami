@@ -59,7 +59,7 @@ def ensure_native_instance(db, member):
 def native_task_instance(db, owner, main_cid, ident, key):
     value = row(
         db,
-        "SELECT i.*,g.conversation_id AS main_cid,w.id AS work_id FROM swarm_member_instances i JOIN swarm_members m ON m.id=i.member_id JOIN swarm_groups g ON g.id=m.swarm_id LEFT JOIN swarm_work_items w ON w.id=m.current_work_id WHERE i.id=? AND i.owner_id=? AND m.executor='native'",
+        "SELECT i.*,g.conversation_id AS main_cid,w.id AS work_id FROM swarm_member_instances i JOIN swarm_members m ON m.id=i.member_id JOIN swarm_groups g ON g.id=m.swarm_id LEFT JOIN swarm_work_items w ON w.id=m.current_work_id WHERE i.id=? AND i.owner_id=? AND m.executor='native' AND m.retired_ms IS NULL",
         (ident, owner),
     )
     if (

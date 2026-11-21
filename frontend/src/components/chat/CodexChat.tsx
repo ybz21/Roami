@@ -4,20 +4,22 @@ import { memo, useMemo } from 'react'
 import { ChatShell } from './ChatShell'
 import { Typing } from './blocks'
 import { ChatMessage, CODEX_ACCENT } from './Message'
-import { useTranscript, isPending, pairToolResults } from './useTranscript'
+import { useTranscript, hasNativeFinal, isPending, pairToolResults } from './useTranscript'
 import { buildTaskIndex } from './tasks'
 import { toAgentStatus } from './status'
 import { deriveFromMessages } from './status-derive'
 import { useSessionLabel } from '../sessions/session-label'
 import { useI18n } from '../../i18n'
+import type { NativeMainTurn } from './types'
 
 // memo：父层（TerminalPane）任何 setState 都会重渲，N 个常驻对话不该跟着一起重算
-export default memo(function CodexChat({ name, file, onOpenFile, onOpenGit, active, onSend, onCommand }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; onSend?: (text: string) => Promise<void>; onCommand?: (text: string) => Promise<void> }) {
+export default memo(function CodexChat({ name, file, onOpenFile, onOpenGit, active, mainTurn, onSend, onCommand }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; mainTurn?: NativeMainTurn | null; onSend?: (text: string) => Promise<void>; onCommand?: (text: string) => Promise<void> }) {
   const { t } = useI18n()
   const label = useSessionLabel(name)
   const { msgs, err, status: raw, hasEarlier, loadEarlier, resolvedFile } = useTranscript(name, file, 'codex-transcript', active === false ? 6000 : 1500)
   const { results, view } = useMemo(() => pairToolResults(msgs), [msgs])
-  const pending = isPending(view)
+  const pending = mainTurn === undefined ? isPending(view) : mainTurn !== null
+  const liveOutput = !hasNativeFinal(view, mainTurn?.startedMs)
   // TaskUpdate 只给 {taskId,status}，标题在更早那次 TaskCreate 的结果里 —— 跨消息扫一遍才接得上
   const tasks = useMemo(() => buildTaskIndex(view, results), [view, results])
   // 失败数与时长后端给不了（它只增量扫新行），前端手里是完整消息流，数一遍就有
@@ -31,8 +33,8 @@ export default memo(function CodexChat({ name, file, onOpenFile, onOpenGit, acti
       placeholder={t('chat.sendTo', { name: label })} agent="codex"
       messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}
       renderMessage={(m, i) => <ChatMessage key={m.id || i} m={m} results={results} side="codex" />}
-      pending={pending ? <Typing color={CODEX_ACCENT} /> : undefined}
-      busy={pending} active={active} onSend={onSend} onCommand={onCommand}
+      pending={pending && liveOutput ? <Typing color={CODEX_ACCENT} /> : undefined}
+      busy={pending} liveOutput={liveOutput} mainTurnId={mainTurn?.id} active={active} onSend={onSend} onCommand={onCommand}
     />
   )
 })

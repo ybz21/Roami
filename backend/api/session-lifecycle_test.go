@@ -102,6 +102,15 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := response.Data
+	pending := call("GET", "/sessions/"+o.ResourceID+"/worktree-status", nil)
+	var pendingStatus struct {
+		Data struct {
+			Creation life.OperationRevision `json:"pendingCreation"`
+		}
+	}
+	if err := json.Unmarshal(pending.Body.Bytes(), &pendingStatus); err != nil || pendingStatus.Data.Creation.OperationID != o.ID || pendingStatus.Data.Creation.Revision != o.Revision {
+		t.Fatalf("close preflight must point to pending creation: %s", pending.Body.String())
+	}
 	if identity, err := rt.SessionIdentity(o.ResourceID); err != nil || identity != "" {
 		t.Fatal("acceptance executed resource work synchronously")
 	}

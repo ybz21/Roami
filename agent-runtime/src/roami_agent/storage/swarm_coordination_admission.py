@@ -1,7 +1,7 @@
 """Current batch identity and original user delegation, independent of trigger names."""
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from roami_agent.protocol.errors import DomainError
@@ -9,7 +9,7 @@ from roami_agent.storage.database import row
 from roami_agent.storage.swarm_delegations import current_delegation
 
 
-def batch_context(db, owner, turn_id, *, lease_epoch=None):
+def batch_context(db, owner, turn_id, *, lease_epoch=None, allow_paused=False):
     value = row(
         db,
         "SELECT b.*,t.conversation_id,t.branch_id,t.state,t.lease_epoch,c.owner_id FROM swarm_coordination_batches b "
@@ -31,19 +31,27 @@ def batch_context(db, owner, turn_id, *, lease_epoch=None):
         )
     ):
         raise DomainError("SWARM_COORDINATION_NOT_CURRENT", 409)
-    delegation = current_delegation(db, owner, value["swarm_id"], value["delegation_id"])
+    delegation = current_delegation(
+        db, owner, value["swarm_id"], value["delegation_id"], allow_paused=allow_paused
+    )
     if value["state"] == "queued":
         job = row(
             db,
-            "SELECT json_extract(payload_json,'$.dailySlot') AS slot FROM jobs "
+            "SELECT json_extract(payload_json,'$.dailySlot') AS slot,"
+            "json_extract(payload_json,'$.nativeRouteRetry') AS retry_generation FROM jobs "
             "WHERE kind='turn.run' AND aggregate_id=?",
             (turn_id,),
         )
         if job and job["slot"]:
             try:
                 slot = json.loads(job["slot"])
-                current_date = datetime.now(ZoneInfo(slot["timezone"])).date().isoformat()
-                valid = slot["delegationId"] == delegation["id"] and slot["date"] == current_date
+                current_date = datetime.now(ZoneInfo(slot["timezone"])).date()
+                slot_date = date.fromisoformat(slot["date"])
+                retry = job["retry_generation"]
+                started_retry = value["lease_epoch"] > 0 and type(retry) is int and retry > 0
+                valid = slot["delegationId"] == delegation["id"] and (
+                    slot_date == current_date or started_retry and slot_date < current_date
+                )
             except (ValueError, TypeError, KeyError, ZoneInfoNotFoundError):
                 valid = False
             if not valid:
@@ -51,7 +59,7 @@ def batch_context(db, owner, turn_id, *, lease_epoch=None):
     return {**value, "delegation": delegation}
 
 
-def for_turn(db, turn):
+def for_turn(db, turn, *, allow_paused=False):
     batch = row(db, "SELECT id FROM swarm_coordination_batches WHERE turn_id=?", (turn["id"],))
     job = row(
         db,
@@ -63,4 +71,6 @@ def for_turn(db, turn):
         return None
     if type(turn.get("lease_epoch")) is not int:
         raise DomainError("SWARM_COORDINATION_NOT_CURRENT", 409)
-    return batch_context(db, turn["owner_id"], turn["id"], lease_epoch=turn["lease_epoch"])
+    return batch_context(
+        db, turn["owner_id"], turn["id"], lease_epoch=turn["lease_epoch"], allow_paused=allow_paused
+    )

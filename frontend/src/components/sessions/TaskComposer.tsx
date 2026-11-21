@@ -18,11 +18,12 @@ import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
 import { taskNameFromPrompt } from './NewSessionModal'
 import { VoiceInput } from '../chat/VoiceInput'
-import { AgentLogo, CheckIcon, ChevronDown, CircleIcon, PaperclipIcon, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronDown, PaperclipIcon, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { submitLifecycle, lifecycleLaunchIntent, lifecycleRequestError } from './session-lifecycle'
+import { useReviewDraft, useSessionReviewControls } from './SessionReviewOptions'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
 export type TaskComposerHandle = { focus: () => void; insert: (text: string) => void; appendInstruction: (text: string) => void }
@@ -56,7 +57,8 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   const [base, setBase] = useState('')
   const [branches, setBranches] = useState<LocalBranch[]>([])
   const [remoteBranches, setRemoteBranches] = useState<{ remote: string; name: string }[]>([])
-  const [autoReview, setAutoReview] = useState(false)
+  const review = useReviewDraft(agent, agents, isGit)
+  const reviewControls = useSessionReviewControls(review)
   const [creating, setCreating] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -166,11 +168,12 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         baseReq = { base: rest.slice(sep + 1), remote: rest.slice(0, sep) }
       }
       const op = await submitLifecycle('create', {
+        review: review.intent(prefs),
         name: finalName, task: prompt, dir: sessionDir, worktree: !!(wantWt || adopt),
         ...(adopt ? { branch: adopt, existing: true } : baseReq),
-        launch: lifecycleLaunchIntent(agent, prefs, prompt, wantWt ? 'new' : adopt ? 'adopt' : isGit ? 'repo' : 'plain', autoReview, t),
+        launch: lifecycleLaunchIntent(agent, prefs, prompt, wantWt ? 'new' : adopt ? 'adopt' : isGit ? 'repo' : 'plain', false, t),
       })
-      setPrompt(''); message.success(t('session.lifecycle.accepted')); openTerm(op.resourceId); onCreated?.(op.resourceId)
+      setPrompt(''); review.reset(); message.success(t('session.lifecycle.accepted')); openTerm(op.resourceId); onCreated?.(op.resourceId)
     } catch (e: any) { message.error(lifecycleRequestError(e, t)) }
     finally { setCreating(false) }
   }
@@ -223,14 +226,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
             title={t('session.agentNone')} aria-label={t('session.agentNone')} aria-pressed={agent === 'none'}
             onClick={() => setAgent('none')}><TerminalIcon size={16} /></button>
         </span>
-        {agent !== 'none' && (
-          <span className="tt-cgrp">
-            <button type="button" className={`tt-pill${autoReview ? ' on' : ''}`} title={t('session.autoReviewTip')}
-              aria-pressed={autoReview} onClick={() => setAutoReview((v) => !v)}>
-              {autoReview ? <CheckIcon size={11} /> : <CircleIcon size={11} />}{t('session.autoReview')}
-            </button>
-          </span>
-        )}
+        {reviewControls.toggle}
         <span className="tt-cend">
           <VoiceInput inline accent="var(--accent)" onResult={(text) => setPrompt((v) => (v ? v + ' ' : '') + text)} />
           <button type="button" className="tt-pill ico" title={t('project.attachImage', { shortcut: primaryShortcutLabel() + 'V' })} aria-label={t('project.attachImage', { shortcut: primaryShortcutLabel() + 'V' })}
@@ -240,6 +236,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
           <Button type="primary" size="small" className="prj-go" loading={creating} disabled={setup.blocked} onClick={goCreate}>{t('project.go')}</Button>
         </span>
       </div>
+      {reviewControls.row}
     </div>
   )
 })

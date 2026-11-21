@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
 type sessionEventState struct {
@@ -175,11 +177,13 @@ func claudeLastTurn(file string) lastTurnInfo {
 // SessionEventLoop 后台探测循环
 func (a *API) SessionEventLoop() {
 	ev := newSessionEvents()
+	rt := runtime.New()
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	var openCodeAt time.Time
 	var openCodeActive map[string]bool
 	openCodeDirs := map[string]string{}
+	reviewProbes := map[string]idleReviewProbe{}
 	// 转录文件按 (会话, pid) 缓存：pickTranscript 要扫目录，不必每 5s 扫一遍
 	type fileKey struct {
 		name string
@@ -196,6 +200,7 @@ func (a *API) SessionEventLoop() {
 			continue
 		}
 		sessions := map[string]string{}
+		reviewAuthors, paused := map[string]bool{}, map[string]bool{}
 		for _, s := range list {
 			if s.State == "dormant" || strings.HasPrefix(s.Name, "_ttmux-") {
 				continue
@@ -205,6 +210,11 @@ func (a *API) SessionEventLoop() {
 				label = s.Name
 			}
 			sessions[s.Name] = label
+			reviewAuthors[s.Name] = true
+			if s.Parent != "" {
+				reviewAuthors[s.Parent] = true
+			}
+			paused[s.Name] = s.Mem != nil && s.Mem.Paused
 		}
 		procs := runningAgentProcs()
 		if time.Since(openCodeAt) >= 10*time.Second {
@@ -221,7 +231,7 @@ func (a *API) SessionEventLoop() {
 			if c, ok := caps[n]; ok {
 				return c
 			}
-			c := sessionCapture(n, 60)
+			c := captureTerminalSession(rt, n, 60)
 			caps[n] = c
 			return c
 		}
@@ -264,6 +274,7 @@ func (a *API) SessionEventLoop() {
 			a.Live.set(name, snap)
 		}
 		a.Live.prune(sessions)
+		a.driveSessionReviews(sessions, reviewAuthors, paused, capture, reviewProbes, now)
 		for k := range files { // 进程换了就丢缓存
 			if p, ok := procs[k.name]; !ok || p.Pid != k.pid {
 				delete(files, k)

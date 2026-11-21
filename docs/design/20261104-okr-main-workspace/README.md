@@ -24,6 +24,8 @@
 
 [Claude 原实例中断后的可信接续](claude-interruption-recovery.md)。
 
+[原生 Main 的直接消息结束对账](claude-direct-completion.md)，支持缺失工具完成钩子的原 Claude 输入回到团队协作。
+
 [复盘写入契约与失败恢复](review-input-contract.md)（#843）：准确字段、原请求身份和已保存结果对账。
 
 [等待已核验的原日程](scheduled-goal-wait.md)（#841）：先设计真实排期等待，避免用零碎任务代替接续。
@@ -51,6 +53,10 @@
 [晚到执行结果的冻结与实际模型观察](result-observation.md)（#744、#761）。
 
 [协调回合的实际工具目录](coordination-tool-catalog.md)：按宿主批次投影模型入口、命令和帮助，不扩大执行权限。
+
+[原生工具诊断的宿主记录](native-tool-diagnostics.md)（#982）保留真实来源与时间，历史诊断和当前阻塞分别判断。
+
+[持续运行的 OKR：机制、产品与模型](autonomous-operation.md)统一记录闭环、真实断点、分层职责和宣传项目应用；#987 先修 Main 的有界协作概览及真实运行状态，监督与完整自主运营分别验收。
 
 ## 产品设计
 

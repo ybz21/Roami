@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,7 +65,7 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 		case "assistant":
 			usage := r.Message.Usage
 			compaction := claudeCompactionRefusal(r)
-			if result != nil || r.ParentUUID != root || r.UUID == "" || r.SessionID != binding.ProviderID || (!compaction && (r.APIStatus != 402 || !r.NoToolCall)) || !r.APIError || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
+			if result != nil || r.ParentUUID != root || r.UUID == "" || r.SessionID != binding.ProviderID || (!compaction && !r.NoToolCall) || !r.APIError || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
 				return nil, "", nil
 			}
 			var blocks []struct {
@@ -76,19 +77,10 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 			}
 			code := "CLAUDE_COMPACTION_FAILED"
 			if !compaction {
-				body, ok := strings.CutPrefix(blocks[0].Text, "API Error: 402 ")
-				if !ok {
+				code = claudeGatewayAdmissionCode(r.APIStatus, r.Failure, blocks[0].Text)
+				if code == "" {
 					return nil, "", nil
 				}
-				var rejection struct {
-					Error struct {
-						Code string `json:"code"`
-					} `json:"error"`
-				}
-				if json.Unmarshal([]byte(body), &rejection) != nil || rejection.Error.Code != "MODEL_PROXY_DAILY_LIMIT" {
-					return nil, "", nil
-				}
-				code = rejection.Error.Code
 			}
 			stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
 			if problem != nil || stamp.Before(promptTime) || stamp.After(time.Now().Add(time.Second)) {
@@ -110,6 +102,34 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 		return nil, "", nil
 	}
 	return result, hex.EncodeToString(digest.Sum(nil)), map[string]int64{}
+}
+
+func claudeGatewayAdmissionCode(status int, failure, text string) string {
+	if status != 402 && (status != 503 || failure != "server_error") {
+		return ""
+	}
+	body, ok := strings.CutPrefix(text, "API Error: "+strconv.Itoa(status)+" ")
+	if !ok {
+		return ""
+	}
+	var refusal struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	decoder := json.NewDecoder(strings.NewReader(body))
+	if decoder.Decode(&refusal) != nil {
+		return ""
+	}
+	suffix := strings.TrimSpace(body[decoder.InputOffset():])
+	if status == 402 && refusal.Error.Code == "MODEL_PROXY_DAILY_LIMIT" && suffix == "" {
+		return refusal.Error.Code
+	}
+	if status == 503 && refusal.Error.Code == "MODEL_ROUTE_NO_AVAILABLE_MEMBER" &&
+		(suffix == "" || strings.HasPrefix(suffix, ". This is a server-side issue, usually temporary")) {
+		return refusal.Error.Code
+	}
+	return ""
 }
 
 func (s Service) reconcileClaudeAdmissionRejection(ctx context.Context, key, dir, path string, spec Spec, receipt Receipt, state *sessionLifecycle) (Status, bool, error) {

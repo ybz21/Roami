@@ -114,6 +114,7 @@ it('saves a connection before any models are enabled', async () => {
 it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
+  expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(screen.getByLabelText('hub.name'))
   expect(screen.getByRole('combobox', { name: 'capabilities.models.protocol' }).closest('details')).toBeNull()
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
@@ -130,17 +131,55 @@ it('saves a LAN HTTP source and manual models without fetching the directory', a
   expect((writes[0][2] as ModelCatalog).models[0]).toEqual(catalog.models[0])
 })
 
-it('explains why public HTTP discovery is disabled and enables it after changing to HTTPS', async () => {
+it('allows discovery and manual save for public HTTP sources and limits certificate settings to HTTPS', async () => {
   mount('catalog/source/new')
-  const address = await screen.findByLabelText('agent.models.baseUrl')
-  const fetchDirectory = screen.getByRole('button', { name: 'hub.directory.fetch' }) as HTMLButtonElement
-  fireEvent.change(address, { target: { value: 'http://api.example.com/v1' } })
-  const warning = screen.getByText('hub.directory.publicHTTP')
-  expect(address.getAttribute('aria-describedby')).toBe(warning.id)
-  expect(fetchDirectory.disabled).toBe(true)
-  fireEvent.change(address, { target: { value: 'https://api.example.com/v1' } })
-  expect(screen.queryByText('hub.directory.publicHTTP')).toBeNull()
-  expect(fetchDirectory.disabled).toBe(false)
+  const endpoint = await screen.findByLabelText('agent.models.baseUrl')
+  const fetchModels = screen.getByRole<HTMLButtonElement>('button', { name: 'hub.directory.fetch' })
+  fireEvent.change(endpoint, { target: { value: 'ftp://203.0.113.22/v1' } })
+  expect(screen.getByRole('alert').textContent).toBe('hub.directory.invalidBaseUrl')
+  expect(fetchModels.disabled).toBe(true)
+  fireEvent.change(endpoint, { target: { value: 'http://203.0.113.22/v1' } })
+  expect(endpoint.getAttribute('aria-describedby')).toBe(screen.getByText('hub.directory.plainHttp').id)
+  expect(endpoint.getAttribute('aria-invalid')).toBeNull()
+  expect(fetchModels.disabled).toBe(false)
+  expect(screen.queryByRole('checkbox', { name: 'hub.directory.skipTlsVerification' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
+  fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'vendor/model@256k' } })
+  const save = screen.getByRole<HTMLButtonElement>('button', { name: 'hub.directory.saveModels' })
+  expect(save.disabled).toBe(false)
+  fireEvent.click(save)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'http://203.0.113.22/v1' })]),
+  })))
+})
+
+it('sends the selected HTTPS certificate policy on discovery and save, and resets it on endpoint changes', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (!path.endsWith('/discover')) return original(method, path, body, options)
+    if (body.source.skipTlsVerification) return { data: { models: ['listed-model'] } }
+    throw Object.assign(new Error('certificate'), { apiError: { code: 'MODEL_LIST_TLS_CERTIFICATE' } })
+  })
+  mount('catalog/source/new')
+  const endpoint = await screen.findByLabelText('agent.models.baseUrl')
+  fireEvent.change(endpoint, { target: { value: 'https://first.example/v1' } })
+  fireEvent.click(screen.getByText('hub.connectionOptions'))
+  const skip = screen.getByRole('checkbox', { name: 'hub.directory.skipTlsVerification' })
+  expect(skip.getAttribute('aria-checked')).toBe('false')
+  fireEvent.click(skip)
+  fireEvent.change(endpoint, { target: { value: 'https://second.example/v1' } })
+  expect(skip.getAttribute('aria-checked')).toBe('false')
+
+  const fetchModels = screen.getByRole('button', { name: 'hub.directory.fetch' })
+  fireEvent.click(fetchModels)
+  await screen.findByText('hub.directory.certificate')
+  fireEvent.click(skip)
+  fireEvent.click(fetchModels)
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'listed-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.saveModels' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'https://second.example/v1', skipTlsVerification: true })]),
+  })))
 })
 
 it('opens a dedicated OpenRouter connector and only adds models selected from its directory', async () => {
@@ -359,8 +398,9 @@ it('updates an existing source without fetching models and retains its stored ke
   fireEvent.click(await screen.findByRole('button', { name: 'hub.openSource' }))
   page.rerender(<App><ModelHub sub="catalog/source/upstream" onNav={navigate} /></App>)
   fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.changeConnection' }))
-  fireEvent.click(document.querySelector('.tt-model-source-options summary')!)
-  fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'Renamed source' } })
+  const name = await screen.findByLabelText('hub.name')
+  expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(name)
+  fireEvent.change(name, { target: { value: 'Renamed source' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   const dialog = await screen.findByRole('alertdialog')
   fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
@@ -368,6 +408,56 @@ it('updates an existing source without fetching models and retains its stored ke
     sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '' })], models: catalog.models,
   })))
   expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})
+
+it('opens connection editing after fetching an existing source and keeps model changes out of the connection save', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['priced-model', 'new-model'] } }
+    : original(method, path, body, options))
+  mount('catalog/source/upstream')
+  fireEvent.click(await screen.findByRole('button', { name: 'modelInteraction.manageModels' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'new-model' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'priced-model' }))
+
+  const edit = () => fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
+  const changeAddress = () => fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://updated.example/v1' } })
+  edit()
+  changeAddress()
+  fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
+  expect(screen.getByRole('checkbox', { name: 'new-model' }).getAttribute('aria-checked')).toBe('true')
+  expect(screen.getByRole('checkbox', { name: 'priced-model' }).getAttribute('aria-checked')).toBe('false')
+
+  edit()
+  expect((screen.getByLabelText('agent.models.baseUrl') as HTMLInputElement).value).toBe(catalog.sources[0].baseUrl)
+  changeAddress()
+  fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'fixture-replacement' } })
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  fireEvent.click(within(await screen.findByRole('alertdialog', { name: 'hub.sourceApply' })).getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: [expect.objectContaining({ id: 'upstream', baseUrl: 'https://updated.example/v1', apiKey: 'fixture-replacement' })],
+    models: catalog.models,
+  })))
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/discover'))).toHaveLength(1)
+})
+
+it('lets new sources change their address and save without carrying over the old directory selection', async () => {
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover')
+    ? { data: { models: ['old-directory-model'] } }
+    : original(method, path, body, options))
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://first.example/v1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'old-directory-model' }))
+  fireEvent.click(screen.getByRole('button', { name: 'hub.directory.changeConnection' }))
+  fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://second.example/v1' } })
+  expect(screen.queryByRole('checkbox', { name: 'old-directory-model' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ baseUrl: 'https://second.example/v1' })]),
+    models: catalog.models,
+  })))
 })
 
 
@@ -571,7 +661,7 @@ it('shows saved source models read-only until management is requested and cancel
  expect(screen.queryByRole('button',{name:'agent.models.save'})).toBeNull()
  fireEvent.click(screen.getByRole('button',{name:'modelInteraction.manageModels'}))
  fireEvent.click(await screen.findByRole('checkbox',{name:'available-model'}))
- expect((screen.getByRole('button',{name:'hub.directory.changeConnection'}) as HTMLButtonElement).disabled).toBe(true)
+ expect((screen.getByRole('button',{name:'hub.directory.changeConnection'}) as HTMLButtonElement).disabled).toBe(false)
  fireEvent.click(screen.getByRole('button',{name:'common.cancel'}))
  expect(screen.queryByRole('checkbox')).toBeNull()
  expect(vi.mocked(api).mock.calls.filter(([method])=>method==='PUT')).toHaveLength(0)

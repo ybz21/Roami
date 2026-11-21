@@ -12,7 +12,7 @@ class PublicationMediaReview:
     def __init__(self, database, artifacts, reviewer):
         self.db, self.artifacts, self.reviewer = database, artifacts, reviewer
 
-    async def inspect(self, binding, version_id, required):
+    async def inspect(self, binding, version_id, required, *, native_input=None):
         snapshots = await self.db.call(lambda db: media_snapshot(db, binding, version_id, required))
         text = []
         for snapshot in snapshots:
@@ -48,13 +48,15 @@ class PublicationMediaReview:
                     raise DomainError("PUBLICATION_MEDIA_TRANSCRIPTION_UNVERIFIED", 409)
                 text.append(snapshot["transcript"])
         text_proof = await PublicationPromptReview(self.db, self.artifacts, self.reviewer).inspect(
-            binding, text
+            binding, text, native_input=native_input
         )
 
         def recheck(db):
             if media_snapshot(db, binding, version_id, required) != snapshots:
                 raise DomainError("PUBLICATION_MEDIA_REVIEW_CHANGED", 409)
-            return reviewed_media_images(db, binding, version_id, snapshots)
+            return reviewed_media_images(
+                db, binding, version_id, snapshots, native_input=native_input
+            )
 
         images = await self.db.call(recheck)
         return {"snapshot": snapshots, "text": text_proof, "images": images}

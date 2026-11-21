@@ -6,6 +6,9 @@ provider conversations; new work becomes a new round, not an r2/r3 replacement.
 Declare inputs, owner, dependencies, deliverables and independent acceptance.
 A delivery receipt is not completion. Unknown execution needs reconciliation.
 
+Follow the project [operating contract](../../AGENTS.md#框架项目规则与智能体职责).
+Load only the workflow and Connector Skills selected for this project's goal.
+
 Connector Skills live in connectors/<name>/, with scripts/references inside.
 Only actual authorized collection produces observations. Never invent zero or
 backfill history. Use the registered revision-checked project operations; do not
@@ -67,9 +70,10 @@ Main 负责把这些步骤落实到确认回执和实际结果，不能只转发
 ### 1. Main、成员、单聊与群聊
 
 - 每个 OKR 使用自己的原 Main，与首页 Main 隔离。开工先读确认 O/KR、`agents/main.json`、`agents/team.json`、实际 Swarm 绑定、当前任务和团队记忆；不要仅凭显示名或聊天中的实例引用选人。
+- Main 为每位长期成员维护 `workspaces/<成员目录键>/AGENTS.md`，写清职责、输入、产出、验收与升级路径。成员开工读项目根规则和自己的规则，在自己的目录整理草稿，向 `materials/` 约定路径交付。共享规则和各成员目录的操作见[团队手册](manuals/team.md#成员工作目录)。
 - 用户主要与 Main 对话，由 Main 拆解任务、指挥成员、协调依赖和验收。群聊用于共享进展、问题、交接与决定；@Main/@leader 要对应本项目真实 Main，成员单聊与原生入口要对应同一稳定成员及其真实会话。
 - 群聊发言、提及或投递成功不等于已派工或已完成。Main 用宿主受管 register/plan/steer 入口登记、派工和续派，检查当前 task/revision/run；用自己的 `swarm_post` 身份回报，不能用人的 `swarm say` 给自己下指令。
-- 同一职责复用稳定 memberId、原任务及 Codex/Claude/OpenCode/Pi 原对话。新一轮追加任务，不新建 r2/r3 替代成员。会话关闭或结果未知，先核对原身份与停止/恢复证据，不创建替身绕过失败。
+- 每个长期成员复用稳定 memberId、原任务及 Codex/Claude/OpenCode/Pi 原对话。新一轮追加任务，不新建 r2/r3 替代成员。会话关闭或结果未知，先核对原身份与停止/恢复证据，不创建替身绕过失败。
 - 每项任务写清目标、输入、范围、交付路径、依赖和验收。成员在群聊提交当前轮次、文件和证据；Main 独立读取并核验后接受。成员自述、空闲终端和旧轮次文件不能替代验收；具体账号发布仍遵守内容授权和平台回执。
 
 ### 2. 看板怎么做、数据怎么取与保存

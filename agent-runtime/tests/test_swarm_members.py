@@ -322,6 +322,17 @@ async def test_http_and_discovered_cli_read_owned_member_rounds(team):
         assert (
             await client.get(f"/v1/swarms/{group['id']}/members/{member_id}?limit=0")
         ).status_code == 422
+        retired = await client.post(
+            f"/v1/swarms/{group['id']}/members/lifecycle",
+            json={
+                "commandKey": "retire-via-http",
+                "expectedRevision": 2,
+                "action": "retire",
+                "memberIds": [member_id],
+            },
+        )
+        assert retired.status_code == 200 and retired.json()["data"]["revision"] == 3
+        assert (await client.get(f"/v1/swarms/{group['id']}/members")).json()["data"] == []
     call = {
         "function": {
             "name": "bash",
@@ -693,3 +704,175 @@ async def test_revision_between_create_and_binding_keeps_history(team, monkeypat
     await runtime.swarms.advance({"id": "advance", "aggregate_id": group["id"]})
     detail = await runtime.swarms.member("alice", group["id"], member["id"])
     assert [entry["revision"] for entry in detail["rounds"]["items"]] == [2, 1]
+
+
+async def test_retirement_preserves_task_rounds_and_restores_original_conversation(team, store):
+    runtime, group = team
+    member, work = await assigned(runtime, group)
+    sid, ident, task_id = group["id"], member["id"], work["task_id"]
+    retire = {
+        "action": "retire",
+        "memberIds": [ident],
+        "expectedRevision": 3,
+        "commandKey": "retire-research",
+    }
+    before = await runtime.swarms.member("alice", sid, ident)
+    with pytest.raises(DomainError, match="SWARM_MEMBER_STOP_REQUIRED"):
+        await runtime.swarms.change_members("alice", sid, retire)
+
+    attempt = await finish_round(runtime, work, 1)
+    await store.call(
+        lambda db: db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (task_id,)),
+        write=True,
+    )
+    artifact = await runtime.artifacts.put(
+        "alice",
+        b"verified reference",
+        task_id=task_id,
+        mime_type="text/plain",
+        metadata={"runId": attempt["id"]},
+    )
+    receipt = await runtime.swarms.change_members("alice", sid, retire)
+    assert receipt["revision"] == 4 and receipt["members"][0]["retiredAtMs"]
+    assert await runtime.swarms.change_members("alice", sid, retire) == receipt
+    snapshot = await runtime.swarms.snapshot("alice", sid)
+    assert snapshot["members"] == []
+    assert [member["id"] for member in snapshot["retiredMembers"]] == [ident]
+    assert snapshot["work"][0]["task_id"] == task_id
+    after = await runtime.swarms.member("alice", sid, ident)
+    assert after["member"]["instance"] == before["member"]["instance"]
+    assert after["member"]["memoryPath"] == before["member"]["memoryPath"]
+    assert after["rounds"]["items"][0]["artifacts"][0]["id"] == artifact["id"]
+    with pytest.raises(DomainError, match="SWARM_MEMBER_RETIRED"):
+        await runtime.tasks.revisions.request(
+            "alice", task_id, "Read a new reference", 1, "blocked"
+        )
+    with pytest.raises(DomainError, match="SWARM_MEMBER_RETIRED"):
+        await runtime.swarms.send(
+            "alice", sid, {"text": "@research continue", "taskRevision": 1, "commandKey": "no-send"}
+        )
+    with pytest.raises(DomainError, match="SWARM_MEMBER_RETIRED"):
+        await register(runtime, group, key="use-original-id", revision=4)
+    restore = {
+        **retire,
+        "action": "restore",
+        "expectedRevision": 4,
+        "commandKey": "restore-research",
+    }
+    result = await runtime.swarms.change_members("alice", sid, restore)
+    assert result["members"] == [{"id": ident, "name": "research", "retiredAtMs": None}]
+    operation = await runtime.tasks.revisions.request(
+        "alice", task_id, "Read a new reference", 1, "continue-member"
+    )
+    await runtime.tasks.revisions.advance()
+    applied = await runtime.tasks.revisions.get("alice", task_id, operation["operationId"])
+    assert applied["state"] == "applied" and applied["revision"] == 2
+    resumed = (await runtime.swarms.member("alice", sid, ident))["member"]
+    assert resumed["instance"] == after["member"]["instance"] and resumed["roundCount"] == 2
+
+
+async def test_retirement_is_atomic_and_rejects_unknown_execution(team, store):
+    runtime, group = team
+    member, work = await assigned(runtime, group)
+    other = (
+        await runtime.swarms.register_members(
+            "alice",
+            group["id"],
+            {
+                "expectedRevision": 3,
+                "commandKey": "another-role",
+                "members": [{"name": "editor", "executor": "codex", "duty": "Edit references"}],
+            },
+        )
+    )["members"][0]
+
+    def unknown(db):
+        db.execute("UPDATE tasks SET state='failed' WHERE id=?", (work["task_id"],))
+        db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (work["task_id"],))
+        db.execute(
+            "UPDATE task_attempts SET state='unknown',result_json=? WHERE task_id=?",
+            ('{"outcomeKnown":false,"inputStopped":false}', work["task_id"]),
+        )
+
+    await store.call(unknown, write=True)
+    spec = {
+        "action": "retire",
+        "memberIds": [other["id"], member["id"]],
+        "expectedRevision": 4,
+        "commandKey": "atomic-retire",
+    }
+    with pytest.raises(DomainError, match="SWARM_MEMBER_STOP_UNCONFIRMED"):
+        await runtime.swarms.change_members("alice", group["id"], spec)
+    snapshot = await runtime.swarms.snapshot("alice", group["id"])
+    assert snapshot["retiredMembers"] == [] and snapshot["revision"] == 4
+    assert len(snapshot["members"]) == 2
+    for owner, change, error in [
+        ("alice", {"expectedRevision": 3}, "SWARM_PLAN_CHANGED"),
+        ("alice", {"memberIds": [other["id"], "foreign"]}, "SWARM_MEMBER_NOT_FOUND"),
+        ("bob", {"memberIds": [other["id"]]}, "SWARM_NOT_FOUND"),
+    ]:
+        with pytest.raises(DomainError, match=error):
+            await runtime.swarms.change_members(owner, group["id"], {**spec, **change})
+    assert (await runtime.swarms.snapshot("alice", group["id"]))["retiredMembers"] == []
+
+
+async def test_retired_failed_work_does_not_block_new_integration(team, store):
+    runtime, group = team
+    member, work = await assigned(runtime, group)
+    sid = group["id"]
+
+    def stopped_failure(db):
+        db.execute("UPDATE tasks SET state='failed' WHERE id=?", (work["task_id"],))
+        db.execute("UPDATE jobs SET state='done' WHERE aggregate_id=?", (work["task_id"],))
+        db.execute(
+            "UPDATE task_attempts SET state='failed',result_json=? WHERE task_id=?",
+            ('{"state":"failed","outcomeKnown":true,"inputStopped":true}', work["task_id"]),
+        )
+
+    await store.call(stopped_failure, write=True)
+    before = await runtime.swarms.snapshot("alice", sid)
+    assert before["state"] == "blocked"
+    await runtime.swarms.change_members(
+        "alice",
+        sid,
+        {
+            "action": "retire",
+            "memberIds": [member["id"]],
+            "expectedRevision": 3,
+            "commandKey": "retire-failed-research",
+        },
+    )
+    after = await runtime.swarms.snapshot("alice", sid)
+    assert after["state"] == "planning" and after["work"][0]["state"] == "failed"
+    registered = await runtime.swarms.register_members(
+        "alice",
+        sid,
+        {
+            "expectedRevision": 4,
+            "commandKey": "register-integration",
+            "members": [{"name": "integration", "executor": "native", "duty": "Integrate"}],
+        },
+    )
+    await runtime.swarms.plan(
+        "alice",
+        sid,
+        {
+            "expectedRevision": 5,
+            "commandKey": "new-integration",
+            "items": [
+                {
+                    "memberId": registered["members"][0]["id"],
+                    "member": "integration",
+                    "executor": "native",
+                    "title": "Integrate",
+                    "goal": "Verify remaining work",
+                    "acceptance": "Check result",
+                    "integration": True,
+                }
+            ],
+        },
+    )
+    await runtime.swarms.advance({"id": "new-advance", "aggregate_id": sid})
+    active = await runtime.swarms.snapshot("alice", sid)
+    assert active["state"] == "running"
+    assert active["work"][1]["dependencies"] == [] and active["work"][1]["task_id"]

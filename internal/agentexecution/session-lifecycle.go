@@ -449,6 +449,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 		if err = s.preparedContinuation(spec, state); err != nil {
 			return Status{}, err
 		}
+		if _, err = reconcileDirectClaudeCompletion(ctx, binding, &state, path); err != nil {
+			return Status{}, err
+		}
 		if !sessionProcessesStopped(state.Binding) {
 			return Status{}, fmt.Errorf("SESSION_NOT_IDLE")
 		}
@@ -571,12 +574,19 @@ func (s Service) sessionExecutionStatus(key string, status Status) (Status, erro
 		return recovered, problem
 	}
 	if state.LaunchKey == key && state.Executor == "claude" && state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.resourceID() == binding.resourceID() {
-		status.Progress, status.ReportedToolError = claudeReportedState(state.Binding, state.TurnID, state.PromptHash, dir)
+		status.Progress, status.ReportedToolError, status.NativeToolActivity = claudeReport(state.Binding, state.TurnID, state.PromptHash, dir)
 	}
 	if state.LaunchKey != key || (state.State != "busy" && !(state.Structured && state.State == "submitting")) {
 		status.State, status.ObservationErrorCode = "unknown", state.UnknownReason
 		if status.ObservationErrorCode == "" {
-			status.ObservationErrorCode = "SESSION_LIFECYCLE_UNKNOWN"
+			if state.Executor == "claude" && state.State == "submitting" && !state.Structured && !state.InitialLaunch &&
+				state.Binding.ProviderID != "" &&
+				state.Binding.ProviderID == status.Binding.ProviderID && state.Binding.PID == binding.PID &&
+				state.Binding.resourceID() == binding.resourceID() && state.Binding.Directory == binding.Directory {
+				status.ObservationErrorCode = "SESSION_SUBMISSION_UNCONFIRMED"
+			} else {
+				status.ObservationErrorCode = "SESSION_LIFECYCLE_UNKNOWN"
+			}
 		}
 		if state.LaunchKey != key {
 			status.ObservationErrorCode = "SESSION_LAUNCH_MISMATCH"

@@ -69,6 +69,25 @@ async def test_missing_model_image_evidence_cannot_be_replaced_by_file_metadata(
         await runtime.db.call(lambda db: reviewed_images(db, binding, required))
 
 
+async def test_native_read_must_match_frozen_image_bytes_in_current_request(main_read):
+    runtime, _, binding, required, _ = await frozen_fixture(main_read, record_images=False)
+    with pytest.raises(DomainError, match="PUBLICATION_IMAGE_NOT_REVIEWED"):
+        await runtime.db.call(
+            lambda db: reviewed_images(db, binding, required, native_input={"images": []})
+        )
+    native_input = {"images": [{"mime": "image/png", "sha256": required[0]["sha256"]}]}
+    accepted = await runtime.db.call(
+        lambda db: reviewed_images(db, binding, required, native_input=native_input)
+    )
+    assert accepted == [
+        {
+            "artifactId": required[0]["id"],
+            "sha256": required[0]["sha256"],
+            "source": "claude_model_input",
+        }
+    ]
+
+
 @pytest.mark.parametrize(
     "fault",
     [

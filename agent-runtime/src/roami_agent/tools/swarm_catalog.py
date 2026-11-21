@@ -51,6 +51,14 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
             {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
         )
 
+    async def change_members(args, binding):
+        await main(binding, args["swarmId"])
+        return await swarms.change_members(
+            binding["owner"],
+            args["swarmId"],
+            {**args, "commandKey": binding["turnId"] + ":" + binding["toolCallId"]},
+        )
+
     async def member(args, binding):
         await status(args, binding)
         value = await swarms.member(
@@ -324,6 +332,27 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
             "write",
         ),
         (
+            "swarm_members_lifecycle",
+            "Apply a requested roster reduction or restoration in this Main's existing team. Read swarm_status first for the current revision and exact stable member IDs. Retire only after assigned work is settled and no active scheduled delegation still selects the role. Keep the original role history, memory and provider identity. Restore the same ID for a returning role. Restoration does not dispatch work.",
+            object_schema(
+                {
+                    "swarmId": string,
+                    "expectedRevision": {"type": "integer", "minimum": 1},
+                    "action": {"type": "string", "enum": ["retire", "restore"]},
+                    "memberIds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "items": {"type": "string", "minLength": 1, "maxLength": 200},
+                    },
+                },
+                ["swarmId", "expectedRevision", "action", "memberIds"],
+            ),
+            change_members,
+            True,
+            "write",
+        ),
+        (
             "swarm_member",
             "Read a persistent member and its paginated execution rounds. Round requests, attempts and acceptance stay distinct; delivery is not completion. Main reads its team, workers only their own member history. Use task_steer with the existing task ID for subsequent rounds.",
             object_schema(
@@ -482,7 +511,7 @@ def register_swarm_tools(registry, swarms, *, confirm=None, artifacts=None):
         ),
         (
             "swarm_status",
-            "Read your swarm group chat, work items, dependencies and authoritative task state; reports are not verification. Main may inspect only its bound conversation; workers only their own group.",
+            "Read your swarm group chat, work items, dependencies and authoritative task state; reports are not verification. Large histories include a bounded overview of current member/task/revision/run identities; use task_status for results, swarm_inbox_read for pending messages and swarm_member for history rather than paging the whole snapshot. Main may inspect only its bound conversation; workers only their own group.",
             object_schema({"swarmId": string}, ["swarmId"]),
             status,
             True,

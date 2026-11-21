@@ -164,3 +164,22 @@ func StopProcess(panes []int, pid int, start string, force bool) error {
 	}
 	return signalProcess(pid, start, force, scopes)
 }
+
+// ProcessDescendsFrom verifies a caller against its terminal pane process.
+func ProcessDescendsFrom(pid, ancestor int) bool {
+	for pid > 1 && ancestor > 1 {
+		if pid == ancestor {
+			return true
+		}
+		stat, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+		if err != nil {
+			return false
+		}
+		parent, _, _, err := processStat(string(stat))
+		if err != nil || parent == pid {
+			return false
+		}
+		pid = parent
+	}
+	return false
+}

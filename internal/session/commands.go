@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ybz21/Roami/internal/gitcontext"
 	"github.com/ybz21/Roami/internal/revive"
+	"github.com/ybz21/Roami/internal/sessionreview"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/terminalui"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
@@ -374,6 +376,18 @@ func Send(rt runtime.Runtime, exclude map[string]bool, args []string, w io.Write
 	} else {
 		target = rt.Resolve(args[0])
 		cmdStr = strings.Join(args[1:], " ")
+	}
+	ctx := rt.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if handled, err := sessionreview.Open(rt).QueueCLI(ctx, rt, target, cmdStr); handled {
+		if err != nil {
+			ui.Err(w, "%s", err)
+			return err
+		}
+		ui.Ok(w, "互审消息已排队发送到 %s", ui.Bold(Display(rt, target)))
+		return nil
 	}
 	if !rt.HasSession(target) {
 		ui.Err(w, "会话 %s 不存在", ui.Bold(target))

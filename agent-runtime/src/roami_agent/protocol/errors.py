@@ -23,12 +23,12 @@ class ModelAdmissionRejected(DomainError):
     """The trusted model transport rejected admission before sending a request."""
 
 
-class FreeModelAdmissionDeferred(ModelAdmissionRejected):
-    """The private gateway rejected a free request before contacting an upstream."""
+class NativeRouteUnavailable(DomainError):
+    """A bound native input settled before producing assistant output or tools."""
 
-    def __init__(self, retry_at_ms):
-        self.retry_at_ms = retry_at_ms
-        super().__init__("MODEL_ROUTE_NO_AVAILABLE_MEMBER", 503)
+    def __init__(self, code, stop_evidence):
+        super().__init__(code, 503)
+        self.stop_evidence = stop_evidence
 
 
 class ToolPreflightError(DomainError):

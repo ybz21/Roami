@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/sessionreview"
 )
 
 // liveSnap 探测循环每轮写一份：会话此刻在干什么
@@ -71,23 +72,24 @@ func (l *liveTable) prune(alive map[string]string) {
 }
 
 type overviewItem struct {
-	Name         string   `json:"name"`
-	Label        string   `json:"label"`
-	Parent       string   `json:"parent,omitempty"`
-	Cwd          string   `json:"cwd,omitempty"`
-	LastActivity int64    `json:"lastActivity"`
-	Dormant      bool     `json:"dormant"`
-	ProjectKey   string   `json:"projectKey,omitempty"`
-	Project      string   `json:"project,omitempty"`
-	ProjectDir   string   `json:"projectDir,omitempty"`
-	Worktree     string   `json:"worktree,omitempty"`
-	Branch       string   `json:"branch,omitempty"`
-	Agent        string   `json:"agent,omitempty"`
-	Running      bool     `json:"running"`
-	Waiting      bool     `json:"waiting"`
-	Tail         string   `json:"tail,omitempty"`
-	YesNo        bool     `json:"yesNo,omitempty"`
-	Mem          *sessMem `json:"mem,omitempty"`
+	Name         string                `json:"name"`
+	Label        string                `json:"label"`
+	Parent       string                `json:"parent,omitempty"`
+	Cwd          string                `json:"cwd,omitempty"`
+	LastActivity int64                 `json:"lastActivity"`
+	Dormant      bool                  `json:"dormant"`
+	ProjectKey   string                `json:"projectKey,omitempty"`
+	Project      string                `json:"project,omitempty"`
+	ProjectDir   string                `json:"projectDir,omitempty"`
+	Worktree     string                `json:"worktree,omitempty"`
+	Branch       string                `json:"branch,omitempty"`
+	Agent        string                `json:"agent,omitempty"`
+	Running      bool                  `json:"running"`
+	Waiting      bool                  `json:"waiting"`
+	Tail         string                `json:"tail,omitempty"`
+	YesNo        bool                  `json:"yesNo,omitempty"`
+	Mem          *sessMem              `json:"mem,omitempty"`
+	Review       *sessionreview.Status `json:"review,omitempty"`
 }
 
 func (a *API) SessionsOverview(c *gin.Context) {
@@ -110,6 +112,14 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		}
 		byDir[filepath.Clean(e.Dir)] = struct{ key, name, dir string }{key, name, e.Dir}
 	}
+	authors, reviews := make(map[string]bool, len(list)), map[string]sessionreview.Status{}
+	for _, s := range list {
+		authors[s.Name] = true
+		if s.Parent != "" {
+			authors[s.Parent] = true
+		}
+	}
+	sessionreview.Open(lifecycleRuntime(ctx)).ForAuthors(authors, func(pair sessionreview.Pair) { pair.Statuses(reviews) })
 	items := make([]overviewItem, 0, len(list))
 	for _, s := range list {
 		if strings.HasPrefix(s.Name, "_ttmux-") {
@@ -117,6 +127,9 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		}
 		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: rawInt(s.LastActivity), Dormant: s.State == "dormant"}
 		it.Mem = s.Mem
+		if review, ok := reviews[s.Name]; ok {
+			it.Review = &review
+		}
 		if it.Label == "" {
 			it.Label = s.Name
 		}

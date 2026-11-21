@@ -144,6 +144,28 @@ async def test_registered_media_read_delivers_real_sample_pixels_to_main(coordin
     assert inspected["publicationAuthorized"] is False
 
 
+async def test_native_media_path_uses_only_the_current_verified_sheet(coordination):
+    runtime, _, inspected, _, binding = await media_inputs(coordination)
+    native_binding = {**binding, "nativeCapabilityCall": {"name": "swarm_publication_media"}}
+    media = PublicationMedia(runtime.db, runtime.artifacts, None)
+    selected = inspected["images"][0]
+
+    async def scoped_view(actual, artifact):
+        assert actual is native_binding and artifact == selected["id"]
+        return "/private/confirmed.png"
+
+    plain = await media.image(
+        binding, inspected["versionId"], selected["id"], native_artifact_view=scoped_view
+    )
+    assert "nativeReadPath" not in plain
+    result = await media.image(
+        native_binding, inspected["versionId"], selected["id"], native_artifact_view=scoped_view
+    )
+    assert result["nativeReadPath"] == "/private/confirmed.png"
+    assert result["mediaImage"] == plain["mediaImage"]
+    assert result["publicationAuthorized"] is False
+
+
 @pytest.mark.parametrize(
     "fault", ["forged_call", "old_lease", "unknown_version", "forgotten_source"]
 )

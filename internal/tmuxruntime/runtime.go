@@ -251,11 +251,11 @@ func (r Runtime) InjectEnv(sess string) error {
 		if err := r.Tmux("set-environment", "-t", target, key, val); err != nil {
 			return err
 		}
-		if err := r.Tmux("send-keys", "-t", target, "export "+line, "C-m"); err != nil {
+		if err := r.Tmux("send-keys", "-t", target+":", "export "+line, "C-m"); err != nil {
 			return err
 		}
 	}
-	return r.Tmux("send-keys", "-t", target, "clear", "C-m")
+	return r.Tmux("send-keys", "-t", target+":", "clear", "C-m")
 }
 
 var promptSequence atomic.Uint64
@@ -314,6 +314,23 @@ func (r Runtime) SendPromptSubmit(target, message string) error {
 		return err
 	}
 	defer unlock()
+	return r.sendPromptSubmit(target, message)
+}
+
+// SendReviewPrompt pins delivery to the bound pane while holding the session input lease.
+func (r Runtime) SendReviewPrompt(session, pane, message string, ready func() bool) error {
+	unlock, err := r.InputLease("=" + session + ":")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if !ready() {
+		return fmt.Errorf("bound review pane is unavailable")
+	}
+	return r.sendPromptSubmit(pane, message)
+}
+
+func (r Runtime) sendPromptSubmit(target, message string) error {
 	if err := r.PasteInput(target, message); err != nil {
 		return err
 	}

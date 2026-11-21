@@ -62,11 +62,7 @@ func PrepareCodex(ctx context.Context, options SessionOptions) ([]string, error)
 	}
 	probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	help := exec.CommandContext(probeContext, options.Binary, "--help")
-	help.Stdout = &boundedOutput{limit: 256_000}
-	help.Stderr = io.Discard
-	help.WaitDelay = time.Second
-	if help.Run() != nil || !bytes.Contains(help.Stdout.(*boundedOutput).data, []byte("--no-daemon")) {
+	if !CodexSupportsLocalLaunch(probeContext, options.Binary) {
 		return nil, fmt.Errorf("CODEX_LOCAL_LIFECYCLE_UNAVAILABLE")
 	}
 	config, err := readCodexConfiguration(probeContext, options.Binary, options.Directory)
@@ -102,6 +98,15 @@ func PrepareCodex(ctx context.Context, options SessionOptions) ([]string, error)
 	}
 	value, _ := json.Marshal(notify)
 	return append(args, "-c", "notify="+string(value)), nil
+}
+
+func CodexSupportsLocalLaunch(ctx context.Context, binary string) bool {
+	output := &boundedOutput{limit: 256_000}
+	help := exec.CommandContext(ctx, binary, "--help")
+	help.Stdout = output
+	help.Stderr = io.Discard
+	help.WaitDelay = time.Second
+	return help.Run() == nil && bytes.Contains(output.data, []byte("--no-daemon"))
 }
 
 type boundedOutput struct {
