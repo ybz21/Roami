@@ -47,8 +47,9 @@ type API struct {
 	Speech            *SpeechStore      // 语音识别(ASR)配置 + 转录
 	Prefs             *PreferencesStore // 用户偏好（主题/语言/Agent 命令等）
 	Workspace         *WorkspaceStore
-	Push              *PushStore        // Web Push：VAPID 密钥 + 设备订阅（api/push.go）
-	Inbox             *InboxStore       // 收件箱：会话事件 + 已读（api/inbox.go）
+	Push              *PushStore  // Web Push：VAPID 密钥 + 设备订阅（api/push.go）
+	Inbox             *InboxStore // 收件箱：会话事件 + 已读（api/inbox.go）
+	reviewWorkspaces  reviewWorkspaceTable
 	Live              liveTable         // 探测循环攒的活状态：agent / 等你 / 最近一句（api/sessions-overview.go）
 	Events            EventHub          // 会话事件长连接（api/events-ws.go），Android App 的通知来源
 	Races             *race.Store       // 竞赛（W5/W6）业务数据模型
