@@ -44,11 +44,16 @@ func sessionCapture(name string, lines int) string {
 
 func captureTerminalSession(rt runtime.Runtime, name string, lines int) string {
 	// `=name:`：pane 类命令对裸 `=name` 报 can't find pane（tmux 3.4），带冒号才按「该会话当前窗口」解析
-	out, err := rt.TmuxOutput("capture-pane", "-t", "="+name+":", "-p", "-J", "-S", "-"+strconv.Itoa(lines))
-	if err != nil {
-		return ""
-	}
+	out, _ := captureTerminalTarget(rt, "="+name+":", lines)
 	return out
+}
+
+func captureTerminalTarget(rt runtime.Runtime, target string, lines int) (string, bool) {
+	out, err := rt.TmuxOutput("capture-pane", "-t", target, "-p", "-J", "-S", "-"+strconv.Itoa(lines))
+	if err != nil {
+		return "", false
+	}
+	return out, true
 }
 
 // chromeLine Agent 自己的外壳行：状态栏、标签栏、输入框边框、提示符那行（空的，或用户刚敲的话）、

@@ -346,7 +346,7 @@ func (a *API) ProjectsList(c *gin.Context) {
 			if an.Primary.Linked {
 				branch = an.Primary.Branch
 			}
-			addSession(&p, &top, s.Name, s.Label, rawInt(s.Attached) > 0, rawInt(s.LastActivity), branch, an.Primary.Linked, an.Dormant)
+			addSession(&p, &top, s.Name, s.Label, rawInt(s.Attached) > 0, a.Live.sessionActivity(s), branch, an.Primary.Linked, an.Dormant)
 		}
 		if p.Sessions > 0 {
 			a.Projects.NoteSessions(key)
@@ -390,7 +390,7 @@ func (a *API) ProjectsList(c *gin.Context) {
 			}
 			if best >= 0 {
 				ng := nonGit[best]
-				addSession(ng.p, &tops[best], s.Name, s.Label, rawInt(s.Attached) > 0, rawInt(s.LastActivity), "", false, ann[s.Name] != nil && ann[s.Name].Dormant)
+				addSession(ng.p, &tops[best], s.Name, s.Label, rawInt(s.Attached) > 0, a.Live.sessionActivity(s), "", false, ann[s.Name] != nil && ann[s.Name].Dormant)
 			}
 		}
 		for i, ng := range nonGit {
@@ -400,10 +400,10 @@ func (a *API) ProjectsList(c *gin.Context) {
 
 	for _, s := range sessions {
 		if !claimed[s.Name] {
-			ls := projectSession{Name: s.Name, Label: s.Label, Attached: rawInt(s.Attached) > 0, Agent: agentRunning[s.Name], LastActivity: rawInt(s.LastActivity), Mem: noteworthyMem(s.Mem)}
+			ls := projectSession{Name: s.Name, Label: s.Label, Attached: rawInt(s.Attached) > 0, Agent: agentRunning[s.Name], LastActivity: a.Live.sessionActivity(s), Mem: noteworthyMem(s.Mem)}
 			if s.dormant() {
 				// 休眠会话不跑进程，绿点/待输入一律不适用，也不该去 capture-pane。
-				ls = projectSession{Name: s.Name, Label: s.Label, LastActivity: rawInt(s.LastActivity), State: "dormant"}
+				ls = projectSession{Name: s.Name, Label: s.Label, LastActivity: a.Live.sessionActivity(s), State: "dormant"}
 			}
 			if ls.Agent != "" {
 				screen := sessionCapture(s.Name, 50)
