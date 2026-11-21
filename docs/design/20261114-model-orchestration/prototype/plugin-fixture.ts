@@ -10,15 +10,23 @@ const packageName = /^@magpie-community\/[a-z0-9][a-z0-9._-]{0,119}$/
 const providerId = /^[a-zA-Z0-9._-]{1,120}$/
 
 type RegistryItem = { package: string; name: string; providers: string[]; release?: string }
-type Provider = { id: string; name: string; region: string[]; models: string[] }
+type Provider = { id: string; name: string; region: string[]; models: string[]; usage?: boolean; checkin?: boolean; calls?: boolean; renews?: boolean }
 type Plugin = { id: string; package: string; path?: string; name: string; available: string; providers: Provider[] }
 const demoProviders: Record<string, { id: string; path: string; providers: Provider[] }> = {
   '@magpie-community/opencode-workbuddy-auth': {
     id: 'workbuddy', path: 'packages/workbuddy',
     providers: [
-      { id: 'workbuddy', name: 'WorkBuddy', region: ['国内版', 'China'], models: ['hy4-flash', 'deepseek-flash', 'hy4-free'] },
-      { id: 'workbuddy-ai', name: 'WorkBuddy AI', region: ['国际版', 'International'], models: ['hy4-flash', 'vision-lite'] },
+      { id: 'workbuddy', name: 'WorkBuddy', region: ['国内版', 'China'], models: ['hy4-flash', 'deepseek-flash', 'hy4-free'], usage: true, checkin: true },
+      { id: 'workbuddy-ai', name: 'WorkBuddy AI', region: ['国际版', 'International'], models: ['hy4-flash', 'vision-lite'], usage: true },
     ],
+  },
+  '@magpie-community/opencode-raccoon-auth': {
+    id: 'raccoon', path: 'packages/raccoon',
+    providers: [{ id: 'raccoon', name: '商汤小浣熊', region: [], models: ['raccoon-demo'], usage: true, checkin: true, renews: true }],
+  },
+  '@magpie-community/opencode-cursor-auth': {
+    id: 'cursor', path: 'packages/cursor',
+    providers: [{ id: 'cursor', name: 'Cursor', region: [], models: ['cursor-demo'], usage: true, calls: true }],
   },
   '@magpie-community/opencode-atomcode-auth': {
     id: 'atomcode', path: 'packages/atomcode',
@@ -29,6 +37,8 @@ const demoProviders: Record<string, { id: string; path: string; providers: Provi
 type PluginRelease = { active: string; staged: string; previous: string; checkedAt: number | null; downloaded: string[] }
 const releases = new Map<string, PluginRelease>([
   ['workbuddy', { active: '0.2.26', staged: '', previous: '', checkedAt: null, downloaded: ['0.2.26'] }],
+  ['raccoon', { active: '0.1.14', staged: '', previous: '', checkedAt: null, downloaded: ['0.1.14'] }],
+  ['cursor', { active: '0.2.48', staged: '', previous: '', checkedAt: null, downloaded: ['0.2.48'] }],
 ])
 const releaseByPackage = new Map(snapshot.map(row => [row.package, row.release]))
 function catalogFromRows(rows: RegistryItem[]): Plugin[] {
@@ -101,6 +111,8 @@ export function loadMagpieReleases(): Promise<void> {
 type PluginAccount = { sourceId: string; authId: string; pluginId: string; providerId: string; authorized: boolean; claimed: boolean }
 export const pluginAccounts: PluginAccount[] = [
   { sourceId: 'workbuddy', authId: 'workbuddy-demo', pluginId: 'workbuddy', providerId: 'workbuddy', authorized: true, claimed: false },
+  { sourceId: 'raccoon', authId: 'raccoon-demo', pluginId: 'raccoon', providerId: 'raccoon', authorized: true, claimed: false },
+  { sourceId: 'cursor', authId: 'cursor-demo', pluginId: 'cursor', providerId: 'cursor', authorized: true, claimed: false },
 ]
 
 export function pluginRelease(id: string) {

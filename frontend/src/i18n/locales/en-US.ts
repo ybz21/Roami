@@ -1,5 +1,13 @@
 const enUS = {
   'hub.plugin.accountCapabilities': "Plugin account capabilities",
+  'hub.plugin.noAccountCapabilities': "Model access only",
+  'hub.plugin.renewsCredentials': "Supports credential renewal",
+  'hub.plugin.callHistory': "Provider call history",
+  'hub.plugin.callsLastDay': "Last 24 hours · Up to 20 calls",
+  'hub.plugin.noRecentCalls': "No calls in the last 24 hours.",
+  'hub.plugin.callsUnavailable': "Provider call history is temporarily unavailable.",
+  'hub.plugin.callModelUnknown': "Unknown model",
+  'hub.plugin.callTokens': "{input} input · {output} output tokens",
   'hub.plugin.accountQuota': "Account allowance",
   'hub.plugin.quotaUnavailable': "Account allowance is temporarily unavailable.",
   'hub.plugin.quotaReset': "Resets at {time}",

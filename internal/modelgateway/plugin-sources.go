@@ -167,7 +167,7 @@ func (h *Handler) pluginsManagement(w http.ResponseWriter, r *http.Request) bool
 			return true
 		}
 		writeJSON(w, 200, map[string]any{"data": map[string]any{"provider": publicProvider(provider), "options": source.Options, "desktopUnavailable": modelplugins.DesktopUnavailable(source.ProviderID), "desktopAppMissing": modelplugins.DesktopAppMissing(source.ProviderID)}})
-	case len(parts) == 2 && (parts[1] == "usage" || parts[1] == "check-in"):
+	case len(parts) == 2 && (parts[1] == "usage" || parts[1] == "check-in" || parts[1] == "calls"):
 		h.pluginAccountCapability(w, r, source, parts[1])
 	case len(parts) == 2 && parts[1] == "options" && r.Method == "POST":
 		var input struct {

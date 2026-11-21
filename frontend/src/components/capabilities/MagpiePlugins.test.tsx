@@ -75,13 +75,34 @@ it('omits check-in when the signed-in provider only declares allowance', async (
   expect(screen.queryByRole('button', { name: 'hub.plugin.checkInNow' })).toBeNull()
 })
 
+it('lists detected capabilities before sign-in and loads vendor calls only when expanded', async () => {
+  const capabilities = { ...provider, id: 'history-provider', usage: false, checkin: false, calls: true, renews: true }
+  vi.mocked(api).mockImplementation(async (_method, path) => ({ data: path.endsWith('/info')
+    ? { provider: { ...capabilities, signedIn: path.includes('/signed/') }, options: {} }
+    : [{ t: Date.UTC(2026, 10, 21), model: 'Vendor model', in: 20, out: 4, cost: 0 }] }))
+  const page = render(<App><MagpieSourceSettings sourceId="unsigned" onChanged={() => {}} /></App>)
+  expect(await screen.findByText('hub.plugin.callHistory · hub.plugin.renewsCredentials')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/calls'))).toBe(false)
+  page.rerender(<App><MagpieSourceSettings key="signed" sourceId="signed" onChanged={() => {}} /></App>)
+  const summary = await screen.findByText('hub.plugin.callHistory')
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/calls'))).toBe(false)
+  const details = summary.closest('details')!
+  details.open = true
+  fireEvent(details, new Event('toggle'))
+  expect(await screen.findByText('Vendor model')).toBeTruthy()
+  expect(screen.getByText('$0.00')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'hub.plugin.checkInNow' })).toBeNull()
+})
+
 it('discovers every plugin in an imported collection and adds from the matching package', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ data: { packages: [{ id: 'first', name: 'First plugin' }, { id: 'second', name: 'Second plugin' }], skipped: ['repo/broken/package.json'] } }) })))
-  vi.mocked(api).mockImplementation(async (_method, path, body) => ({ data: path.endsWith('/packages') ? [] : path.endsWith('/inspect') ? [{ ...provider, name: body.packageId === 'first' ? 'First cloud' : 'Second cloud' }] : {} }))
+  vi.mocked(api).mockImplementation(async (_method, path, body) => ({ data: path.endsWith('/packages') ? [] : path.endsWith('/inspect') ? [{ ...provider, ...(body.packageId === 'first' ? { name: 'First cloud', usage: true, checkin: true } : { name: 'Second cloud', calls: true }) }] : {} }))
   const imported = vi.fn(), page = render(<App><MagpiePluginImport revision="r1" onImported={imported} /></App>)
   fireEvent.change(page.container.querySelector('input[accept]')!, { target: { files: [new File(['zip'], 'repository.zip')] } })
   await screen.findByText('First cloud')
   await screen.findByText('Second cloud')
+  expect(screen.getByText('hub.plugin.accountQuota · hub.plugin.checkIn')).toBeTruthy()
+  expect(screen.getByText('hub.plugin.callHistory')).toBeTruthy()
   expect(screen.getByText('repo/broken/package.json')).toBeTruthy()
   const buttons = screen.getAllByRole('button', { name: 'hub.plugin.addSource' })
   fireEvent.click(buttons[1])

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { Button, Spin } from './model-controls'
+import MagpieCallHistory from './MagpieCallHistory'
+import type { PluginProvider } from './magpie-provider'
 import './magpie-account-capabilities.css'
 
 type QuotaWindow = { name: string; display?: string; balance: number | null; limit: number; unit: string; used: number | null; resetsAt?: string }
@@ -9,9 +11,11 @@ type Quota = { plan?: string; balance?: string; windows?: QuotaWindow[] }
 const outcomes = ['claimed', 'done', 'ineligible', 'inactive', 'captcha', 'failed'] as const
 type CheckIn = { outcome: typeof outcomes[number]; credit: number; streak: number; until?: string }
 
-export default function MagpieAccountCapabilities({ path, usage, checkin, disabled = false }: {
-  path: string; usage: boolean; checkin: boolean; disabled?: boolean
+export default function MagpieAccountCapabilities({ path, provider, disabled = false }: {
+  path: string; provider: PluginProvider; disabled?: boolean
 }) {
+  const { usage, checkin, calls } = provider
+  const [historyOpen, setHistoryOpen] = useState(false)
   const { t, locale } = useI18n()
   const [quota, setQuota] = useState<Quota | null>(null), [error, setError] = useState(''), [loading, setLoading] = useState(usage)
   const [result, setResult] = useState<CheckIn | null>(null), [checkInError, setCheckInError] = useState(''), [checking, setChecking] = useState(false)
@@ -70,10 +74,14 @@ export default function MagpieAccountCapabilities({ path, usage, checkin, disabl
     {checkin && <div>
       <div className="tt-magpie-capability-head"><h4>{t('hub.plugin.checkIn')}</h4><Button loading={checking} disabled={disabled || complete} onClick={() => void checkIn()}>{t(complete ? 'hub.plugin.checkIn.done' : 'hub.plugin.checkInNow')}</Button></div>
       {(result || checkInError) && <p role="status">
-        {checkInError ? t(checkInError) : t('hub.plugin.checkIn.' + result!.outcome, { credit: number.format(result!.credit) })}
+        {checkInError ? t(checkInError) : result?.outcome !== 'done' && t('hub.plugin.checkIn.' + result!.outcome, { credit: number.format(result!.credit) })}
         {result && result.streak > 0 && <small>{t('hub.plugin.checkInStreak', { count: number.format(result.streak) })}</small>}
         {next && <small>{t('hub.plugin.checkInNext', { time: next })}</small>}
       </p>}
     </div>}
+    {calls && <div><details onToggle={event => setHistoryOpen(event.currentTarget.open)}>
+      <summary>{t('hub.plugin.callHistory')}</summary>
+      {historyOpen && <MagpieCallHistory path={path} />}
+    </details></div>}
   </section>
 }

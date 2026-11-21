@@ -9,6 +9,8 @@ const protocol = 'openai-completions'
 const origins: ModelSource[] = [
   { id: 'demo-api', name: 'Demo API', baseUrl: 'https://models.example.invalid/v1', protocol, authMode: 'bearer', hasKey: true },
   { id: 'workbuddy', name: 'WorkBuddy · Demo', baseUrl: 'https://magpie.invalid/workbuddy', protocol, authMode: 'plugin', pluginSourceId: 'workbuddy-demo' },
+  { id: 'raccoon', name: '商汤小浣熊 · Demo', baseUrl: 'https://magpie.invalid/raccoon', protocol, authMode: 'plugin', pluginSourceId: 'raccoon-demo' },
+  { id: 'cursor', name: 'Cursor · Demo', baseUrl: 'https://magpie.invalid/cursor', protocol, authMode: 'plugin', pluginSourceId: 'cursor-demo' },
   { id: 'openrouter', name: 'OpenRouter · Free', baseUrl: 'https://openrouter.ai/api/v1', protocol, authMode: 'bearer', connector: 'openrouter-free', hasKey: true },
 ]
 const discovery: Record<string, string[]> = {
@@ -47,7 +49,7 @@ const demoProvider = (pluginId: string, id: string, signedIn: boolean) => {
   const provider = pluginProvider(pluginId, id)
   return {
     id, name: provider?.name || id, signedIn,
-    usage: id === 'workbuddy' || id === 'workbuddy-ai', checkin: id === 'workbuddy',
+    usage: !!provider?.usage, checkin: !!provider?.checkin, calls: !!provider?.calls, renews: !!provider?.renews,
     methods: [{ type: 'api', label: 'Demo sign-in', keyless: true, labels: { 'zh-CN': '演示授权', en: 'Demo sign-in' } }],
     options: [],
     models: provider?.models.map(id => ({ id, name: id })) || [],
@@ -211,14 +213,19 @@ export function installFixture() {
       const [, , id, action] = path.split('/')
       const account = pluginAccounts.find(row => row.authId === id)
       if (!account) return missing()
-      if (action === 'info') return data({ provider: demoProvider(account.pluginId, account.providerId, account.authorized), options: authOptions[id] || {} })
-      if (action === 'usage' && method === 'GET' && account.authorized && ['workbuddy', 'workbuddy-ai'].includes(account.providerId)) {
-        return data({ windows: [{ name: '周期积分', display: '120 / 500' }, { name: '额外积分', balance: account.claimed ? 60 : 40, unit: '积分' }] })
+      const provider = demoProvider(account.pluginId, account.providerId, account.authorized)
+      if (action === 'info') return data({ provider, options: authOptions[id] || {} })
+      if (action === 'usage' && method === 'GET' && account.authorized && provider.usage) {
+        const windows = [{ name: '周期额度', display: '120 / 500' }]
+        return data({ windows: provider.checkin ? [...windows, { name: '额外积分', balance: account.claimed ? 60 : 40, unit: '积分' }] : windows })
       }
-      if (action === 'check-in' && method === 'POST' && account.authorized && account.providerId === 'workbuddy') {
+      if (action === 'check-in' && method === 'POST' && account.authorized && provider.checkin) {
         const outcome = account.claimed ? 'done' : 'claimed'
         account.claimed = true
         return data({ outcome, credit: outcome === 'claimed' ? 20 : 0, streak: 1 })
+      }
+      if (action === 'calls' && method === 'GET' && account.authorized && provider.calls) {
+        return data([{ t: now - 30000, model: provider.models[0]?.name ?? '', in: 1200, out: 220, cost: null }])
       }
       if (action === 'auth') {
         if (body.action === 'apiKey') account.authorized = true

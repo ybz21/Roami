@@ -1,5 +1,13 @@
 const zhCN = {
   'hub.plugin.accountCapabilities': "插件账号能力",
+  'hub.plugin.noAccountCapabilities': "仅接入模型",
+  'hub.plugin.renewsCredentials': "支持凭据续期",
+  'hub.plugin.callHistory': "服务商调用记录",
+  'hub.plugin.callsLastDay': "最近 24 小时 · 最多 20 条",
+  'hub.plugin.noRecentCalls': "最近 24 小时没有调用。",
+  'hub.plugin.callsUnavailable': "暂时读不到服务商调用记录。",
+  'hub.plugin.callModelUnknown': "未知模型",
+  'hub.plugin.callTokens': "输入 {input} · 输出 {output} Token",
   'hub.plugin.accountQuota': "账号额度",
   'hub.plugin.quotaUnavailable': "暂时读不到账号额度。",
   'hub.plugin.quotaReset': "{time} 重置",

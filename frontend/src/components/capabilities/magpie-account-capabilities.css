@@ -7,4 +7,6 @@
 .tt-magpie-account-capabilities :is(dt,dd,p) { overflow-wrap:anywhere; }
 .tt-magpie-account-capabilities dd { margin:0; font-variant-numeric:tabular-nums; }
 .tt-magpie-account-capabilities small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-magpie-account-capabilities summary { cursor:pointer; padding-block:var(--sp-2); }
+html[data-pointer="coarse"] .tt-magpie-account-capabilities summary { min-height:var(--tap); }
 html[data-pointer="coarse"] .tt-magpie-capability-head button { min-height:var(--tap); }

@@ -58,6 +58,8 @@ type Provider struct {
 	Accounts       []Account       `json:"accounts"`
 	Usage          bool            `json:"usage"`
 	CheckIn        *bool           `json:"checkin,omitempty"`
+	Calls          *bool           `json:"calls,omitempty"`
+	Renews         bool            `json:"renews"`
 	ID             string          `json:"id"`
 	Name           string          `json:"name"`
 	NPM            string          `json:"npm"`

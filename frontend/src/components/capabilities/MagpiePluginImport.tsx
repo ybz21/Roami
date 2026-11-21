@@ -6,8 +6,8 @@ import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import MagpieCommunityCatalog, { communityPath, type MagpiePackage as Package } from './MagpieCommunityCatalog'
 import { catalogFailure } from './model-hub-api'
+import { pluginCapabilityLabels, type PluginProvider } from './magpie-provider'
 
-export type PluginProvider = { id: string; name: string; signedIn: boolean; fellBack?: boolean; usage?: boolean; checkin?: boolean; methods: { type: string; label: string; keyless?: boolean; labels?: Record<string, string> }[]; options: { key: string; label: string; description: string; default: boolean; labels?: Record<string, string> }[]; models: { id: string; name: string }[] }
 type InspectedPackage = { pkg: Package; providers?: PluginProvider[]; error?: string }
 export const pluginFailure = (cause: any) => {
   const code = cause?.apiError?.code || cause?.message
@@ -93,7 +93,10 @@ export default function MagpiePluginImport({ revision, onImported, onRetry }: { 
     {inspected.map(row => <section className="tt-model-plugin-package" key={row.pkg.id} aria-label={row.pkg.name}>
       {inspected.length > 1 && <h3>{row.pkg.name}</h3>}
       {row.error && <Alert type="error" role="alert" message={t(row.error)} action={<Button disabled={busy || scanning} onClick={() => { setSelected(row.pkg.id); setVersion(previous => previous + 1) }}>{t('capabilities.models.reread')}</Button>} />}
-      {row.providers?.map(provider => <article className="tt-model-hub-row" key={provider.id}><div><strong>{provider.name}</strong><small>{provider.id}</small></div><Button type="primary" disabled={busy} onClick={() => void add(row.pkg.id, provider)}>{t('hub.plugin.addSource')}</Button></article>)}
+      {row.providers?.map(provider => <article className="tt-model-hub-row" key={provider.id}>
+        <div><strong>{provider.name}</strong><small>{pluginCapabilityLabels(provider).map(label => t(label)).join(' · ') || t('hub.plugin.noAccountCapabilities')}</small></div>
+        <Button type="primary" disabled={busy} onClick={() => void add(row.pkg.id, provider)}>{t('hub.plugin.addSource')}</Button>
+      </article>)}
       {row.providers?.length === 0 && <p>{t('hub.plugin.noProviders')}</p>}
     </section>)}
     <details className="tt-magpie-upload"><summary>{t('hub.plugin.manualImport')}</summary>
