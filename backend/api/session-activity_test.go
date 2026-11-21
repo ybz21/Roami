@@ -57,6 +57,20 @@ func TestSessionActivitySkipsQuietBackgroundAndKeepsKnownValueOnFailedCapture(t 
 	}
 }
 
+func TestSessionActivityIgnoresAgentChromeAndKeepsShellOutput(t *testing.T) {
+	before := "The response is ready.\n✻ Working for 1s\n⠋ Working"
+	after := "The response is ready.\n✻ Working for 2s\n⠙ Working"
+	if paneActivityHash(before, true) != paneActivityHash(after, true) {
+		t.Fatal("changing Agent chrome changed the activity fingerprint")
+	}
+	if paneActivityHash(before, false) == paneActivityHash(after, false) {
+		t.Fatal("shell output resembling Agent chrome was ignored")
+	}
+	if paneActivityHash(before, true) == paneActivityHash("A new response.\n✻ Working for 2s", true) {
+		t.Fatal("new response did not change the activity fingerprint")
+	}
+}
+
 func TestSessionActivityProjectionPreservesTreeFields(t *testing.T) {
 	var live liveTable
 	live.set("child", liveSnap{Activity: sessionActivity{identity: "$2:100", at: 125}})
@@ -126,7 +140,18 @@ func TestSessionActivityIsolatedE2E(t *testing.T) {
 
 	const name = "activity-check"
 	const terminal = "stty -echo; printf 'ready'; while IFS= read -r line; do printf '\\r\\033[2K%s' \"$line\"; done"
-	tmux("new-session", "-d", "-s", name, "-n", "foreground", terminal)
+	agent := filepath.Join(t.TempDir(), "codex")
+	agentScript := `#!/bin/sh
+stty -echo
+printf 'ready\n✻ Working for 1s'
+while IFS= read -r line; do
+  printf '\r\033[2K%s' "$line"
+done
+`
+	if err := os.WriteFile(agent, []byte(agentScript), 0700); err != nil {
+		t.Fatal(err)
+	}
+	tmux("new-session", "-d", "-s", name, "-n", "foreground", agent)
 	tmux("new-window", "-d", "-t", "="+name+":", "-n", "background", terminal)
 
 	sessionRow := func() sessListItem {
@@ -246,7 +271,7 @@ func TestSessionActivityIsolatedE2E(t *testing.T) {
 	}
 	t.Logf("Initial                        tmux=%d  observed=%d", before, first.Activity.at)
 
-	send("foreground", "ready")
+	send("background", "ready")
 	redraw := waitForSample(time.Now())
 	rawRedraw := rawInt(sessionRow().LastActivity)
 	if rawRedraw <= before || redraw.Activity.at != before {
@@ -254,10 +279,18 @@ func TestSessionActivityIsolatedE2E(t *testing.T) {
 	}
 	t.Logf("Redrew the same text           tmux=%d  observed=%d", rawRedraw, redraw.Activity.at)
 
+	send("foreground", "✻ Working for 2s")
+	updatedChrome := waitForSample(time.Now())
+	rawChrome := rawInt(sessionRow().LastActivity)
+	if rawChrome <= rawRedraw || updatedChrome.Agent != "codex" || updatedChrome.Activity.at != before {
+		t.Fatalf("Agent timer: raw = %d, observed = %d, agent = %q, started at %d", rawChrome, updatedChrome.Activity.at, updatedChrome.Agent, before)
+	}
+	t.Logf("Agent chrome timer incremented tmux=%d  observed=%d", rawChrome, updatedChrome.Activity.at)
+
 	tmux("select-window", "-t", "="+name+":background")
 	switched := waitForSample(time.Now())
 	rawSwitch := rawInt(sessionRow().LastActivity)
-	if rawSwitch <= rawRedraw || switched.Activity.at != before {
+	if rawSwitch <= rawChrome || switched.Activity.at != before {
 		t.Fatalf("window switch: raw = %d, confirmed = %d, started at %d", rawSwitch, switched.Activity.at, before)
 	}
 	checkHTTP(before)

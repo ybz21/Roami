@@ -250,10 +250,10 @@ func runningAgentProcs() map[string]agentProc {
 }
 
 func scanAgentPanes(includeAlternatives bool) (map[string]agentProc, map[string][]string) {
-	return agentProcsByPane(scanSessionPanes(runtime.New()), includeAlternatives)
+	return agentProcsByPane(scanSessionPanes(runtime.New()), includeAlternatives, nil)
 }
 
-func agentProcsByPane(panes []sessionPane, includeAlternatives bool) (map[string]agentProc, map[string][]string) {
+func agentProcsByPane(panes []sessionPane, includeAlternatives bool, agentPanes map[string]bool) (map[string]agentProc, map[string][]string) {
 	if panes == nil {
 		return nil, nil
 	}
@@ -263,7 +263,7 @@ func agentProcsByPane(panes []sessionPane, includeAlternatives bool) (map[string
 	for _, pane := range panes {
 		name := pane.session
 		primary := running[name]
-		if pane.pid <= 0 || (primary.Kind != "" && !includeAlternatives) {
+		if pane.pid <= 0 || (primary.Kind != "" && !includeAlternatives && agentPanes == nil) {
 			continue
 		}
 		kind, found := registeredAgentInTree(pane.pid, children, func(pid int) []string {
@@ -275,9 +275,12 @@ func agentProcsByPane(panes []sessionPane, includeAlternatives bool) (map[string
 		if found == 0 {
 			continue
 		}
+		if agentPanes != nil {
+			agentPanes[pane.id] = true
+		}
 		if primary.Kind == "" {
 			running[name] = agentProc{Kind: kind, Dir: pane.dir, Pid: found}
-		} else if primary.Kind != kind && !slices.Contains(alternatives[name], kind) {
+		} else if includeAlternatives && primary.Kind != kind && !slices.Contains(alternatives[name], kind) {
 			alternatives[name] = append(alternatives[name], kind)
 		}
 	}

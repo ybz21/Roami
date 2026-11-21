@@ -13,7 +13,7 @@ type sessionPane struct {
 	session, identity, id, dir string
 	pid                        int
 	activity                   int64
-	active                     bool
+	active, agent              bool
 }
 
 func scanSessionPanes(rt runtime.Runtime) []sessionPane {
@@ -74,7 +74,7 @@ func (s sessionActivity) observe(row sessListItem, panes []sessionPane, now int6
 			continue
 		}
 		// tmux advances window_activity on focus and on any PTY bytes, even an identical redraw.
-		hash := sha256.Sum256([]byte(strings.Join(strings.Fields(text), " ")))
+		hash := paneActivityHash(text, pane.agent)
 		next[pane.id] = paneActivity{screen: hash, observedAt: now}
 		if !seen || hash != old.screen {
 			s.at = max(s.at, pane.activity)
@@ -82,6 +82,22 @@ func (s sessionActivity) observe(row sessListItem, panes []sessionPane, now int6
 	}
 	s.panes = next
 	return s
+}
+
+func paneActivityHash(text string, agent bool) [sha256.Size]byte {
+	if agent {
+		lines := strings.Split(text, "\n")
+		content := lines[:0]
+		for _, line := range lines {
+			clean := waitClean(line)
+			if chromeLine.MatchString(clean) || openCodeProgress.MatchString(clean) {
+				continue
+			}
+			content = append(content, line)
+		}
+		text = strings.Join(content, "\n")
+	}
+	return sha256.Sum256([]byte(strings.Join(strings.Fields(text), " ")))
 }
 
 func (s sessListItem) identity() string {
@@ -123,14 +139,15 @@ func (l *liveTable) projectSessionActivity(body []byte) []byte {
 			return raw
 		}
 		at, observed := l.observedActivity(row.sessListItem)
-		if !observed && len(row.Children) == 0 {
+		changed := observed && at != rawInt(row.LastActivity)
+		if !changed && len(row.Children) == 0 {
 			return raw
 		}
 		var fields map[string]json.RawMessage
 		if err := json.Unmarshal(raw, &fields); err != nil {
 			return raw
 		}
-		if observed && at != rawInt(row.LastActivity) {
+		if changed {
 			value := strconv.FormatInt(at, 10)
 			if len(row.LastActivity) > 0 && row.LastActivity[0] == '"' {
 				value = strconv.Quote(value)
