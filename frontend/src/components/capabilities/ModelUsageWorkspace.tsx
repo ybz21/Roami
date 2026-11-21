@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Input, Pagination, Segmented, Select, Spin } from 'antd'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Alert, Button, Input, Pagination, Select, Spin } from 'antd'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { ChevronRight, SearchIcon } from '../../icons'
@@ -16,8 +16,9 @@ import ModelUsageQuota from './ModelUsageQuota'
 import './model-usage-workspace.css'
 
 type Call = UsageWorkspaceData['recent'][number]
-export default function ModelUsageWorkspace({ mode, controller: c, sources, onAudit, onOverview, active = true }: { mode: 'overview' | 'audit'; active?: boolean; controller: GatewaySettingsController; sources: ModelSource[]; onAudit: (query: string) => void; onOverview?: () => void }) {
+export default function ModelUsageWorkspace({ mode, controller: c, sources, onAudit, onOverview, onRequestAudit, active = true }: { mode: 'overview' | 'audit'; active?: boolean; controller: GatewaySettingsController; sources: ModelSource[]; onAudit: (query: string) => void; onOverview?: () => void; onRequestAudit?: () => void }) {
   const { t, locale } = useI18n(), { phone } = useLayout()
+  const rangeName = useId()
   const gatewayAgentNames = useGatewayAgentNames(active)
   const [overviewFilters, setOverviewFilters] = useState(initialUsageFilters), [auditFilters,setAuditFilters]=useState(initialUsageFilters), [search, setSearch] = useState(() => initialUsageFilters().search)
   const filters = mode==='audit'?auditFilters:overviewFilters, setFilters = mode==='audit'?setAuditFilters:setOverviewFilters
@@ -34,6 +35,12 @@ export default function ModelUsageWorkspace({ mode, controller: c, sources, onAu
   const close = () => { setSelected(null); setTimeout(() => lastButton.current?.focus({ preventScroll: true }), 0) }
   useEffect(() => { const key = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key) }, [])
   const update = (patch: Partial<UsageFilters>) => { if(mode==='overview')setPoint(''); setFilters(previous => ({ ...previous,...(patch.days!==undefined||patch.start!==undefined||patch.end!==undefined?{day:'',hour:''}:{}), ...patch, page: 1 })); setSelected(null) }
+  const selectRange = (days: number) => {
+    setGrain(days === 1 ? 'hour' : 'day')
+    update(days === -1
+      ? { days, start: filters.start || data?.from || '', end: filters.end || data?.to || '' }
+      : { days, start: '', end: '' })
+  }
   const clear = () => { setSearch(''); update({ sourceId: '', agentKind: '', model: '', source: '', state: '', search: '', day:'', hour:'' }) }
   const count = (value: number) => new Intl.NumberFormat(locale).format(value)
   const short = (value: number) => new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 2 }).format(value)
@@ -65,7 +72,13 @@ export default function ModelUsageWorkspace({ mode, controller: c, sources, onAu
   const select = (name: string, value: string, options: { value: string; label: string }[], onChange: (value: string) => void) => <label className="model-usage-field"><span>{name}</span><Select virtual={false} aria-label={name} value={value} options={options} onChange={onChange} /></label>
   const withCurrent = (options: string[], value: string) => [...new Set([...options, ...(value ? [value] : [])])]
   const filtersView = <>
-    <div className="model-usage-toolbar"><Segmented aria-label={t('agent.usage.range')} value={filters.days} options={[1, 7, 30, -1].map(value => ({ value, label: value === -1 ? t('modelUsage.custom') : value === 1 ? t('modelUsage.today') : t('agent.usage.range.' + value) }))} onChange={days => {setGrain(days===1?'hour':'day');update(days === -1 ? { days, start: filters.start || data?.from || '', end: filters.end || data?.to || '', day:'',hour:'' } : { days, start: '', end: '', day:'',hour:'' })}} />
+    <div className="model-usage-toolbar">
+      <div className="model-usage-range" role="radiogroup" aria-label={t('agent.usage.range')}>
+        {[1, 7, 30, -1].map(days => <label key={days} className="model-usage-range-option">
+          <input type="radio" name={rangeName} value={days} checked={filters.days === days} onChange={() => selectRange(days)} />
+          {t(days === -1 ? 'modelUsage.custom' : days === 1 ? 'modelUsage.today' : 'agent.usage.range.' + days)}
+        </label>)}
+      </div>
       {data && <span className="model-usage-period">{day(data.from)} – {day(data.to)} · {data.timezone}</span>}
       {phone && <Button aria-expanded={filtersOpen} icon={<SearchIcon />} onClick={() => setFiltersOpen(!filtersOpen)}>{t('modelUsage.filters')}{activeFilters ? ` (${count(activeFilters)})` : ''}</Button>}
     </div>
@@ -111,9 +124,10 @@ export default function ModelUsageWorkspace({ mode, controller: c, sources, onAu
     {groups.length ? <><div className="model-usage-table-wrap"><table className="model-usage-group-table"><thead><tr><th>{t('modelUsage.by.' + group)}</th>{sortHeader('totalTokens', label('totalTokens'))}{sortHeader('requests', label('requests'))}{sortHeader('inputTokens', label('inputTokens'))}{sortHeader('outputTokens', label('outputTokens'))}{sortHeader('cacheReadTokens', label('cacheReadTokens'))}<th>{t('agent.usage.cost')}</th><th>{t('modelUsage.share')}</th></tr></thead><tbody>{groups.map(row=><tr key={row.key}><td>{groupName(row.key)}</td><td>{tokens(row)}</td><td>{count(row.requests)}</td><td>{count(row.inputTokens)}</td><td>{count(row.outputTokens)}</td><td>{count(row.cacheReadTokens)}</td><td>{fees(row)}</td><td>{new Intl.NumberFormat(locale,{style:'percent',maximumFractionDigits:1}).format(metricValue(totals)?metricValue(row)/metricValue(totals):0)}</td></tr>)}</tbody></table></div><div className="model-usage-group-cards">{groups.map(row=><div key={row.key}><strong>{groupName(row.key)}</strong><span>{tokens(row)} · {count(row.requests)} {t('agent.proxy.requests')}</span>{fees(row)}</div>)}</div></>:<p className="agent-settings-hint">{t('agent.usage.empty')}</p>}
   </section>
 
+  const requestAuditAction = mode === 'audit' && onRequestAudit && <Button onClick={onRequestAudit}>{t('gatewayTrace.audit')}</Button>
   return <div className="model-usage-workspace" hidden={!active}><div className="model-usage-main"><div ref={scroll} className="model-usage-scroll" aria-busy={state.loading}>
-    {!phone && <div className="tt-pagehead">{mode==='audit'&&onOverview&&<BackButton onClick={onOverview}/>}<div className="ttl"><h2>{t(mode === 'overview' ? 'hub.tab.usage' : 'hub.tab.audit')}</h2></div></div>}
-    {phone&&mode==='audit'&&onOverview&&<div className="model-usage-audit-back"><BackButton onClick={onOverview}/><span>{t('hub.tab.usage')}</span></div>}
+    {!phone && <div className="tt-pagehead">{mode==='audit'&&onOverview&&<BackButton onClick={onOverview}/>}<div className="ttl"><h2>{t(mode === 'overview' ? 'hub.tab.usage' : 'hub.tab.audit')}</h2></div>{requestAuditAction && <div className="acts">{requestAuditAction}</div>}</div>}
+    {phone && mode === 'audit' && <div className="model-usage-audit-back">{onOverview && <><BackButton onClick={onOverview}/><span>{t('hub.tab.usage')}</span></>}{requestAuditAction}</div>}
     {c.error && <Alert type="error" message={c.error} action={<Button onClick={c.retry}>{t('agent.retry')}</Button>} />}
     {filtersView}{data && data.archived > 0 && data.accountingTimezone && data.accountingTimezone !== data.timezone && <p className="agent-settings-hint">{t('modelUsage.archivedTimezone', { timezone: data.accountingTimezone })}</p>}{invalidDates && <Alert type="error" message={t('modelUsage.invalidDates')} />}{state.failed && <Alert role="alert" type="error" message={t('agent.proxy.loadFailed')} action={<Button onClick={state.retry}>{t('agent.retry')}</Button>} />}
     {mode === 'audit' && <div className="model-usage-audit-controls"><p className="agent-settings-hint">{t('agent.gateway.retention', { days: count((data?.detailRetentionHours || 48) / 24) })}</p><div className="model-usage-search"><Input aria-label={t('modelUsage.search')} placeholder={t('modelUsage.search')} prefix={<SearchIcon />} value={search} onChange={event => setSearch(event.target.value)} />{select(t('modelUsage.state'), filters.state, [{ value: '', label: t('modelUsage.allStates') }, ...['known', 'unknown', 'pending', 'failed'].map(value => ({ value, label: t('agent.proxy.state.' + value) }))], value => update({ state: value }))}</div></div>}

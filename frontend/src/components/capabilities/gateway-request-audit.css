@@ -1,0 +1,16 @@
+.tt-request-audit[hidden] {
+  display: none;
+}
+.tt-request-audit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-block-end: var(--sp-3);
+}
+.tt-request-audit-filters > label {
+  flex: 0 1 calc(var(--sp-5) * 8);
+  min-width: 0;
+}
+html:is([data-size="compact"], [data-size="medium"]) .tt-request-audit-filters > label {
+  flex: 1 1 calc(var(--sp-5) * 5);
+}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聚合监控与请求链路 · 产品设计</title>
+<link rel="stylesheet" href="../20261114-model-orchestration/assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">设计首页</a><h1>聚合监控与请求链路</h1></header>
+<main class="doc">
+  <section>
+    <h2>页面与操作</h2>
+    <ul>
+      <li>打开聚合的「监控」，查看请求数、成功和失败、切换请求数、切换后恢复和失败，以及成功请求总耗时 P95。</li>
+      <li>从「查看切换记录」带当前时间范围进入「请求链路」。可切换到全部请求或只看恢复、切换后失败。</li>
+      <li>点入一条请求，核对请求方、整体耗时、最终结果和实际尝试顺序。每次尝试展示模型源、命中的模型、子聚合、失败原因、HTTP 状态及观测到的耗时。</li>
+      <li>从详情返回时恢复筛选和列表位置。手机详情使用一层返回栏与一个滚动区域。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>交互原型</h2>
+    <p>以下为示例数据。点「查看切换记录」进入请求列表，再展开单条请求。</p>
+    <div class="toolbar"><strong>免费编码池</strong><a class="btn" href="#monitor">监控</a><a class="btn" href="#requests">请求链路</a></div>
+    <section id="monitor">
+      <h3>最近 6 小时</h3>
+      <dl class="facts">
+        <div><dt>请求</dt><dd>38</dd></div><div><dt>最终失败</dt><dd>4</dd></div>
+        <div><dt>发生切换</dt><dd>9</dd></div><div><dt>切换后恢复</dt><dd>7</dd></div>
+        <div><dt>切换后失败</dt><dd>2</dd></div>
+      </dl>
+      <p><a class="btn" href="#requests">查看切换记录</a></p>
+    </section>
+    <section id="requests">
+      <h3>请求链路</h3>
+      <details>
+        <summary>19:16 · Codex · 2 次尝试 · 切换后恢复</summary>
+        <ol class="flow">
+          <li><strong>OpenRouter · ernie-flash</strong><span>首选池 · 上游限流 · HTTP 429 · 310 毫秒</span></li>
+          <li><strong>WorkBuddy · hy4-flash</strong><span>备用池 · 成功 · HTTP 200 · 1.73 秒</span></li>
+        </ol>
+      </details>
+      <details>
+        <summary>19:11 · Claude · 2 次尝试 · 候选用尽</summary>
+        <ol class="flow">
+          <li><strong>OpenRouter · ernie-flash</strong><span>上游限流 · HTTP 429</span></li>
+          <li><strong>WorkBuddy · hy4-flash</strong><span>上游超时 · HTTP 504</span></li>
+        </ol>
+      </details>
+    </section>
+  </section>
+  <p><a href="tech.html">技术设计</a></p>
+</main>
+</body>
+</html>

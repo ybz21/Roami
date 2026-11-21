@@ -37,6 +37,31 @@ beforeEach(() => { installRadixTestEvents();
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const mount = (sub: string, navigate = vi.fn()) => render(<App><ModelHub sub={sub} onNav={navigate} /></App>, { wrapper })
 
+it('opens records and returns from a blocked gateway request through audit', async () => {
+  const requestId = '1d5c6684-0fdd-4a2f-b975-6dcc832f24f2'
+  const request = { requestId, at: Date.now(), routeId: 'coding', model: 'Coding', caller: 'claude', outcome: 'blocked', status: 503, durationMs: 10 }
+  const fallback = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path.includes('view=requests')) return { data: { recent: [request], routes: { coding: 'Coding' } } }
+    if (path.endsWith('/monitor/requests/' + requestId)) return { data: { request, attempts: [], complete: true } }
+    if (path.startsWith('/agent/model-gateway/usage')) return { data: {
+      day: '2026-10-31', from: '2026-10-25', to: '2026-10-31', days: 7, timezone: 'Asia/Shanghai',
+      today: [], groups: [], hourly: [], recent: [], options: { sources: [], agents: [], models: [] },
+    } }
+    return fallback(method, path, body, options)
+  })
+  const navigate = vi.fn(), view = mount('audit', navigate)
+  fireEvent.click(await screen.findByRole('button', { name: 'gatewayTrace.audit' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/audit/requests')
+  view.rerender(<App><ModelHub sub="audit/requests" onNav={navigate} /></App>)
+  fireEvent.click(await screen.findByRole('button', { name: /Coding.*gatewayTrace.blocked/ }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/audit/request/' + requestId + '/requests')
+  view.rerender(<App><ModelHub sub={'audit/request/' + requestId + '/requests'} onNav={navigate} /></App>)
+  expect(await screen.findByText('gatewayTrace.blockedBeforeSend')).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('region', { name: 'gatewayTrace.detail' })).getByRole('button', { name: 'common.back' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/audit/requests')
+})
+
 it('retains old default and per-model prices and saves to the existing Go configuration', async () => {
   mount('prices')
   const input = await screen.findByLabelText('agent.proxy.price.input') as HTMLInputElement
@@ -524,7 +549,7 @@ it('routes each named choice in the New menu to its own creation flow', async ()
   }
 })
 
-it('keeps the card read-only and opens editing, pricing, routing and deletion inside its detail', async () => {
+it('keeps the source card read-only and falls back to connection for single-credential routing links', async () => {
   const navigate = vi.fn(), page = mount('', navigate)
   const card = await screen.findByRole('region', { name: 'Saved source' })
   expect(within(card).getAllByRole('button')).toHaveLength(1)
@@ -541,8 +566,38 @@ it('keeps the card read-only and opens editing, pricing, routing and deletion in
   expect(screen.getByRole('button', { name: 'hub.deleteSource' })).toBeTruthy()
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'pricing.section.prices' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream/prices')
-  fireEvent.mouseDown(screen.getByRole('tab', { name: 'pricing.section.routing' }))
+  expect(screen.queryByRole('tab', { name: 'pricing.section.routing' })).toBeNull()
+  page.rerender(<App><ModelHub sub="catalog/source/upstream/routing" onNav={navigate} /></App>)
+  expect(screen.getByRole('tab', { name: 'pricing.section.connection', selected: true })).toBeTruthy()
+  expect(screen.getByLabelText('hub.name')).toBeTruthy()
+  expect(vi.mocked(api).mock.calls.some(([, path]) => path === '/agent/model-gateway/settings/sources/upstream')).toBe(false)
+})
+
+it('keeps the account routing tab and stored strategy for a multi-credential source', async () => {
+  const source = { ...catalog.sources[0], pluginSourceId: 'upstream', accountRoutingAvailable: true }
+  const path = '/agent/model-gateway/settings/sources/' + source.id
+  const policy = { default: { mode: 'inherit', price: settings.pricing.default }, accountStrategy: 'rotate' }
+  const original = vi.mocked(api).getMockImplementation()!
+  vi.mocked(api).mockImplementation(async (method, url, body, options) => {
+    if (url === '/agent/model-gateway/catalog') return { data: { ...catalog, sources: [source] } }
+    if (url.endsWith('/plugins/sources/upstream/info')) return { data: { provider: { id: 'workbuddy', name: 'WorkBuddy', signedIn: true, methods: [], options: [] }, options: {}, desktopUnavailable: false } }
+    if (url.startsWith(path)) return { data: method === 'PUT' ? body : policy, currency: 'CNY', effective: [] }
+    return original(method, url, body, options)
+  })
+  const navigate = vi.fn(), page = mount('catalog/source/upstream', navigate)
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: 'pricing.section.routing' }))
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog/source/upstream/routing')
+  page.rerender(<App><ModelHub sub="catalog/source/upstream/routing" onNav={navigate} /></App>)
+  const strategy = await screen.findByRole('combobox', { name: 'pricing.accountStrategy' })
+  expect(strategy.textContent).toContain('pool.strategy.rotate')
+  expect(screen.getByRole('tab', { name: 'pricing.section.routing', selected: true })).toBeTruthy()
+  expect(screen.getByText('pricing.routingHint')).toBeTruthy()
+  const save = screen.getByRole('button', { name: 'pricing.saveRouting' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  fireEvent.keyDown(strategy, { key: 'ArrowDown' })
+  fireEvent.keyDown(await screen.findByRole('option', { name: 'pool.strategy.order' }), { key: 'Enter' })
+  fireEvent.click(save)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', path + '?scope=account', { ...policy, accountStrategy: 'order' }))
 })
 
 it('deletes a source from its connection settings and returns to the catalog', async () => {
@@ -587,7 +642,7 @@ it('creates an independent plugin account inside connection settings',async()=>{
  const second={...first,id:'plugin-two',pluginSourceId:'plugin-two',name:'WorkBuddy 2'}
  vi.mocked(api).mockImplementation(async(method,path,body,options)=>{
   if(path==='/agent/model-gateway/catalog')return {data:{...catalog,sources:[first],models:[]}}
-  if(path.endsWith('/plugin-one/info'))return {data:{provider:{id:'plugin-one',name:'WorkBuddy',signedIn:true,methods:[],options:[]},options:{},desktopUnavailable:false}}
+  if(path.endsWith('/plugin-one/info') || path.endsWith('/plugin-two/info'))return {data:{provider:{id:'workbuddy',name:'WorkBuddy',signedIn:true,methods:[],options:[]},options:{},desktopUnavailable:false}}
   if(path==='/agent/model-gateway/plugins/sources')return {data:{sourceId:second.id,catalog:{...catalog,revision:'new-r',sources:[first,second],models:[]}}}
   return original(method,path,body,options)
  })
@@ -599,6 +654,11 @@ it('creates an independent plugin account inside connection settings',async()=>{
  page.rerender(<App><ModelHub sub="catalog" onNav={navigate}/></App>)
  expect(await screen.findByRole('region',{name:'WorkBuddy 2'})).toBeTruthy()
  expect(screen.getByRole('region',{name:'WorkBuddy'})).toBeTruthy()
+ for (const source of [first, second]) {
+  page.rerender(<App><ModelHub sub={'catalog/source/' + source.id + '/routing'} onNav={navigate}/></App>)
+  expect(screen.getByRole('tab', { name: 'pricing.section.connection', selected: true })).toBeTruthy()
+  expect(screen.queryByRole('tab', { name: 'pricing.section.routing' })).toBeNull()
+ }
 })
 
 it('uses only source-owned models in its saved list and pricing, preserving aggregates when a model is removed', async () => {

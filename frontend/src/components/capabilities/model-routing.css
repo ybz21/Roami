@@ -68,6 +68,7 @@ html[data-pointer="coarse"] .tt-member-quick-actions { opacity:1; pointer-events
 .tt-member-order>p:empty { margin:0; }
 .tt-pool-draft-label { color:var(--warn); font-size:var(--fs-meta); }
 .tt-aggregate-detail,.tt-aggregate-editor { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; }
+.tt-aggregate-editor[hidden] { display:none; }
 .tt-aggregate-tabs { flex-shrink:0; padding-inline:var(--pad-page); }
 .tt-aggregate-editor-content>section[hidden] { display:none; }
 .tt-aggregate-editor-content>section { min-width:0; }

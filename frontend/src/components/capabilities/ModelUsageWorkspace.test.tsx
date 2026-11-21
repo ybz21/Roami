@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
 import { gatewayDraft } from '../settings/local-model-gateway'
@@ -76,10 +76,39 @@ it('retains the chosen interval and group on returning from audit',async()=>{
  fireEvent.click(screen.getByRole('button',{name:'modelUsage.openAudit'}))
  await screen.findByRole('button',{name:'modelUsage.inspectCall call-1'})
  expect([...container.querySelectorAll<HTMLInputElement>('input[type=date]')].map(input=>input.value)).toEqual(['2026-11-12','2026-11-12'])
- expect(screen.getByText('modelUsage.custom').closest('.ant-segmented-item')?.classList.contains('ant-segmented-item-selected')).toBe(true)
+ expect(screen.getByRole('radio',{name:'modelUsage.custom',checked:true})).toBeTruthy()
  fireEvent.click(screen.getByRole('button',{name:'Overview test'}))
  await screen.findByTestId('chart-data')
  expect(screen.getByRole('combobox',{name:'modelUsage.interval'}).closest('.ant-select')?.textContent).toContain('10:00')
+})
+
+it('reads the range from the URL and changes the usage query through the radio group', async () => {
+ const previous = location.href
+ history.replaceState(null, '', '#/capabilities/models/usage?days=7&day=2026-11-10&hour=10')
+ try {
+  render(<Harness />)
+  await screen.findByTestId('chart-data')
+  const range = within(screen.getByRole('radiogroup', { name: 'agent.usage.range' }))
+  expect(range.getByRole('radio', { name: 'agent.usage.range.7', checked: true })).toBeTruthy()
+  const custom = range.getByRole('radio', { name: 'modelUsage.custom' })
+  fireEvent.click(custom.closest('label')!)
+  expect(range.getByRole('radio', { name: 'modelUsage.custom', checked: true })).toBe(custom)
+  expect((screen.getByLabelText('modelUsage.start') as HTMLInputElement).value).toBe('2026-11-06')
+  expect((screen.getByLabelText('modelUsage.end') as HTMLInputElement).value).toBe('2026-11-12')
+  await waitFor(() => {
+   const path = vi.mocked(api).mock.lastCall![1]
+   const params = new URL(path, location.origin).searchParams
+   expect(params.get('start')).toBe('2026-11-06')
+   expect(params.get('end')).toBe('2026-11-12')
+   expect(params.has('day')).toBe(false)
+  })
+  fireEvent.click(range.getByRole('radio', { name: 'agent.usage.range.30' }))
+  expect(range.getByRole('radio', { name: 'agent.usage.range.30', checked: true })).toBeTruthy()
+  expect(screen.queryByLabelText('modelUsage.start')).toBeNull()
+  expect(location.hash).toBe('#/capabilities/models/usage?days=7&day=2026-11-10&hour=10')
+ } finally {
+  history.replaceState(null, '', previous)
+ }
 })
 
 
