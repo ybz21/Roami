@@ -23,7 +23,7 @@ func pluginTestHandler(t *testing.T) *Handler {
 	originalPath := os.Getenv("PATH")
 	h := catalogHandler(t, "https://existing.example/v1", "openai-completions")
 	t.Setenv("PATH", os.Getenv("PATH")+string(os.PathListSeparator)+originalPath)
-	manager, err := modelplugins.NewManager(filepath.Join(t.TempDir(), "plugins"))
+	manager, err := modelplugins.NewManager(filepath.Join(t.TempDir(), "plugins"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func TestPluginTenIndependentAccounts(t *testing.T) {
 	}
 	root := h.Plugins.Root
 	h.Plugins.Close()
-	manager, err := modelplugins.NewManager(root)
+	manager, err := modelplugins.NewManager(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
