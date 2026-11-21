@@ -28,7 +28,7 @@
 :where(html[data-pointer="fine"]) .ui-button-ghost:hover { background:var(--list-hover); color:var(--text-bright); }
 :where(html[data-pointer="fine"]) .ui-button-primary:hover { filter:brightness(1.08); }
 :where(html[data-pointer="fine"]) .ui-button-danger:hover { background:var(--danger-border); }
-.ui-button:focus-visible,.ui-select-trigger:focus-visible,.ui-checkbox:focus-visible,.ui-tabs-trigger:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
+.ui-button:focus-visible,.ui-select-trigger:focus-visible,.ui-checkbox:focus-visible { outline:2px solid var(--accent); outline-offset:var(--sp-1); }
 .ui-button:disabled { cursor:default; }
 .ui-input-wrap { box-sizing:border-box; display:flex; align-items:center; gap:var(--sp-2); width:100%; min-width:0; min-height:var(--ctl-h); border:1px solid var(--border); border-radius:var(--r-xs); background:var(--bg-container); padding-inline:var(--sp-3); color:var(--text-dim); }
 .ui-input-wrap:focus-within { border-color:var(--accent); outline:1px solid var(--accent-border); }
@@ -53,9 +53,17 @@
 .ui-checkbox { position:relative; width:var(--sp-4); height:var(--sp-4); flex-shrink:0; background:var(--bg-container); border:1px solid var(--border); color:var(--on-accent); cursor:inherit; }
 .ui-checkbox[data-state="checked"],.ui-checkbox[data-state="indeterminate"] { background:var(--accent-solid); border-color:var(--accent-solid); }
 .ui-tabs-list { border-bottom:1px solid var(--border-subtle); padding-block:var(--sp-2); overflow-x:auto; scrollbar-width:none; }
-.ui-tabs-trigger { position:relative; flex-shrink:0; min-height:var(--ctl-h); padding:var(--sp-2) var(--sp-3); border:0; background:transparent; color:var(--text-dim); font-family:inherit; cursor:pointer; }
-.ui-tabs-trigger[data-state="active"] { background:var(--sel-bg); color:var(--text-bright); }
-:where(html[data-pointer="fine"]) .ui-tabs-trigger:hover { color:var(--text-bright); background:var(--list-hover); }
+.model-usage-range { display:flex; flex-wrap:wrap; gap:var(--sp-1); min-width:0; }
+:is(.ui-tabs-trigger,.model-usage-range-option) {
+  position:relative; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  min-height:var(--ctl-h); padding:var(--sp-1) var(--sp-3); border:1px solid transparent;
+  border-radius:var(--r-xs); background:transparent; color:var(--text-dim); font:inherit;
+  font-size:var(--fs-sm); font-weight:500; white-space:nowrap; cursor:pointer;
+}
+.model-usage-range-option > input { position:absolute; inline-size:1px; block-size:1px; opacity:0; }
+:where(html[data-pointer="fine"]) :is(.ui-tabs-trigger,.model-usage-range-option):hover { color:var(--text-bright); background:var(--list-hover); }
+.ui-tabs-trigger[data-state="active"],.model-usage-range-option:has(> input:checked) { background:var(--sel-bg); border-color:var(--accent); color:var(--accent); }
+.ui-tabs-trigger:focus-visible,.model-usage-range-option:has(> input:focus-visible) { outline:2px solid var(--accent); outline-offset:-2px; }
 .ui-badge { min-height:var(--sp-5); padding:0 var(--sp-2); line-height:1.2; border:1px solid var(--border-subtle); background:var(--sel-bg); color:var(--text-dim); white-space:nowrap; }
 .ui-menu-content { min-width:calc(var(--sp-5) * 7); border-radius:var(--r-sm); }
 .ui-menu-item { display:flex; align-items:center; gap:var(--sp-2); border-radius:var(--r-xs); }
@@ -69,7 +77,13 @@
 .ui-dialog-content h2 { font-size:var(--fs-lg); margin:0 0 var(--sp-3); }
 .ui-dialog-content p { font-size:var(--fs-sm); color:var(--text-dim); }
 .ui-dialog-content footer { display:flex; justify-content:flex-end; gap:var(--sp-3); margin-top:var(--sp-5); }
-html[data-pointer="coarse"] :is(.ui-select-trigger,.ui-select-item,.ui-menu-item,.ui-input,.ui-tabs-trigger,.ui-check-label) { min-height:var(--tap); }
+html[data-pointer="coarse"] :is(.ui-select-trigger,.ui-select-item,.ui-menu-item,.ui-input,.ui-check-label) { min-height:var(--tap); }
+html[data-pointer="coarse"] .model-usage-range { padding-block:var(--sp-1); row-gap:var(--sp-2); }
+html[data-pointer="coarse"] :is(.ui-tabs-trigger,.model-usage-range-option) { min-height:calc(var(--tap) - var(--sp-1)); }
+html[data-pointer="coarse"] :is(.ui-tabs-trigger,.model-usage-range-option)::after {
+  content:''; position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%);
+  inline-size:max(var(--tap),calc(100% + var(--sp-2))); block-size:var(--tap);
+}
 html[data-pointer="coarse"] .ui-button { position:relative; min-height:var(--ctl-h); }
 html[data-pointer="coarse"] .ui-button::after,html[data-pointer="coarse"] .ui-checkbox::after { content:''; position:absolute; inset:calc(var(--sp-1) * -1); min-height:var(--tap); min-width:var(--tap); left:50%; top:50%; transform:translate(-50%,-50%); }
 html[data-pointer="coarse"] .ui-select-content { max-width:calc(100vw - var(--sp-4)); }

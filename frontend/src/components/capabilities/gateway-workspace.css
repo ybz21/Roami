@@ -20,6 +20,7 @@
 .tt-gateway-connection>button{align-self:flex-start;flex-direction:row-reverse}
 .tt-gateway-sample .tt-gateway-section-head>.tt-gateway-example-tabs{margin-left:auto}
 .tt-gateway-sample .ui-tabs-list{padding:0;border:0}
+html[data-pointer="coarse"] .tt-gateway-sample .ui-tabs-list{padding-block:var(--sp-1)}
 .tt-gateway-sample-model{display:flex;flex-direction:row;align-items:center;gap:var(--sp-3)}
 .tt-gateway-sample-model>span{flex-shrink:0;font-size:var(--fs-sm)}
 .tt-gateway-sample-model>button{flex:1;min-width:0}
