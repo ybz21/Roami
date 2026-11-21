@@ -13,41 +13,40 @@
   </header>
   <main>
     <article class="document-width">
-      <p class="lead">工作台对每个已打开的 CLI 会话重复探测 Agent 并抓屏。桌面终端坞收起时组件仍然挂载，隐藏的对话也会持续读取转录和提示。优先复用现有批量状态，并让每个可见会话共享一份实时读取。</p>
-
-      <section aria-labelledby="baseline">
-        <h2 id="baseline">30 秒受控复现</h2>
-        <dl class="metrics">
-          <div><dt>逐会话 Agent 探测</dt><dd class="metric-value">144 次</dd><dd class="metric-note">8 个会话 × 3 种 Agent × 6 轮</dd></div>
-          <div><dt>收起终端坞的抓屏</dt><dd class="metric-value">81 次</dd><dd class="metric-note">标签状态 56 次，终端提示 25 次</dd></div>
-          <div><dt>共享的 Agent 种类查询</dt><dd class="metric-value">5 次</dd><dd class="metric-note">两个订阅者共用一轮</dd></div>
-        </dl>
-        <p class="note">各项来自独立计时场景，使用当前组件和固定 API 响应，排除挂载首轮。数字对应前端发起的调用，生产网络及 CPU、内存数据需另测。</p>
-      </section>
+      <div class="lead">
+        <p>桌面上，每过 5 秒，工作台就给每个打开的命令行会话发三条请求，分别查 Claude、Codex、OpenCode 在不在跑。</p>
+        <p>开了 8 个会话，一轮就是 24 条请求，收起终端区也照问。截图里成批的 <code>codex</code> 和 <code>opencode</code> 多半就来自这里。</p>
+        <p>你正在看的对话还会每隔约 1.5 秒问有没有新消息。同一个对话如果在两个地方打开，两边会各问一次。</p>
+      </div>
 
       <section aria-labelledby="evidence">
-        <h2 id="evidence">截图里的请求从哪里来</h2>
+        <h2 id="evidence">Network 里其余几项是什么</h2>
         <dl class="endpoint-list">
-          <div><dt><code>codex</code> / <code>opencode</code></dt><dd>每轮对所有打开的 CLI 标签依次请求 <code>claude</code>、<code>codex</code> 和 <code>opencode</code>，所以 Network 会出现成批的同名条目。后端即使返回未运行，也已经查过 tmux 与进程树。</dd></div>
-          <div><dt><code>capture?lines=50</code></dt><dd>标签每 4 秒逐个抓屏，终端和对话中的交互提示每 1.2 秒再读一份。项目详情也在针对所属会话抓屏。</dd></div>
-          <div><dt><code>transcript?offset=…</code></dt><dd>渲染对话以字节游标增量读取。可见时约 1.5 秒一轮，后台对话约 6 秒一轮。同一会话有两个视图订阅时，可以发出相同游标的两次请求。</dd></div>
-          <div><dt><code>agents</code></dt><dd><code>/sessions/agents</code> 是已共享的批量种类查询，正常间隔 6 秒。单条记录与现有设计一致。</dd></div>
+          <div><dt><code>capture?lines=50</code></dt><dd>工作台每 4 秒看一遍各会话的终端画面，判断哪个标签在等你。权限确认框还会每 1.2 秒自己看一遍。项目详情也会为自己的会话发这类请求。</dd></div>
+          <div><dt><code>transcript</code></dt><dd>对话用这条请求读取新消息。切到别的标签后，原来的对话还会每隔约 6 秒查一次。</dd></div>
+          <div><dt><code>agents</code></dt><dd>如果完整路径是 <code>/sessions/agents</code>，这是工作台每 6 秒发一次的请求，一次查出所有会话各用哪个 Agent。</dd></div>
         </dl>
-        <p class="note">截图仅显示请求名称和部分查询参数，且开启了 Keep log。还需完整 URL、Initiator 和固定时间窗口来确认各条记录的会话归属与实际频率。用户原图保留在本机。</p>
+        <p class="note">截图开了 Keep log，列表里可能有之前留下来的请求。要看当前频率，可以清空 Network 后重新计时。</p>
+      </section>
+
+      <section aria-labelledby="baseline">
+        <h2 id="baseline">开 8 个会话，30 秒会发多少次</h2>
+        <dl class="metrics">
+          <div><dt>挨个问是哪种 Agent</dt><dd class="metric-value">144 次</dd><dd class="metric-note">每轮 24 次，30 秒发 6 轮</dd></div>
+          <div><dt>收起终端区后读取画面</dt><dd class="metric-value">81 次</dd><dd class="metric-note">标签 56 次，当前会话的确认提示 25 次</dd></div>
+          <div><dt>一次查所有会话的 Agent</dt><dd class="metric-value">5 次</dd><dd class="metric-note">两个地方要查，工作台只发一份</dd></div>
+        </dl>
+        <p class="note">这三项分开计时，跳过页面打开时的第一轮请求。测试用固定响应核对请求次数。正式环境的速度和资源用量留待实施后实测。</p>
       </section>
 
       <section aria-labelledby="delivery">
-        <h2 id="delivery">先去掉随标签数量增长的请求</h2>
-        <ol>
-          <li>用现有批量接口供工作台和项目详情显示 Agent 种类、运行和等待状态。只为可见会话读取所需的 Agent 详情。</li>
-          <li>让当前会话的交互提示、恢复检测和实时尾行共用抓屏。收起终端坞、切换到文件或隐藏浏览器时暂停相应消费者。</li>
-          <li>合并同一对话的增量读取。恢复时沿用字节游标，空闲会话降频，发送或重新打开时立即追上。</li>
-        </ol>
+        <h2 id="delivery">准备怎么改</h2>
+        <p>先让标签和项目列表共用一次状态查询。打开会话后，权限确认和恢复功能共用一份终端画面。同一个对话也只发一份新消息请求。收起终端区或切走后，工作台就停止读这些详情。</p>
       </section>
 
       <nav class="document-links" aria-label="设计分册">
-        <a href="product.html"><strong>场景与验收</strong><span>桌面和手机应看到的状态与响应目标</span></a>
-        <a href="tech.html"><strong>技术方案</strong><span>调用链、共享边界、请求预算与分阶段上线</span></a>
+        <a href="product.html"><strong>场景与验收</strong><span>改完你会看到什么，以及怎样自己验收</span></a>
+        <a href="tech.html"><strong>技术方案</strong><span>请求从哪里发出，以及每一步怎么改</span></a>
       </nav>
     </article>
   </main>

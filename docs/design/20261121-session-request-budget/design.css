@@ -59,6 +59,15 @@ code { color: var(--text-bright); overflow-wrap: anywhere; }
 .endpoint-list div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); gap: var(--sp-3); padding-block: var(--sp-2); }
 .endpoint-list div + div { border-top: 1px solid var(--border-subtle); }
 .endpoint-list dt { font-weight: 600; }
+.step-comparison {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block-start: 1px solid var(--border-subtle);
+}
+.step-comparison > div { padding: var(--sp-3) var(--sp-4); }
+.step-comparison > div:first-child { padding-inline-start: 0; }
+.step-comparison > div + div { border-inline-start: 1px solid var(--border-subtle); }
+.step-comparison dt { font-weight: 600; margin-block-end: var(--sp-1); }
 .document-links { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-top: var(--sp-5); }
 .document-links a {
   flex: 1 1 auto;
@@ -73,8 +82,8 @@ code { color: var(--text-bright); overflow-wrap: anywhere; }
 .document-links span { color: var(--text-dim); }
 
 @media (max-width: 599px) {
-  .metrics, .endpoint-list div { grid-template-columns: minmax(0, 1fr); }
-  .metrics div { padding-inline: 0; }
-  .metrics div + div { border-inline-start: 0; border-top: 1px solid var(--border-subtle); }
+  .metrics, .endpoint-list div, .step-comparison { grid-template-columns: minmax(0, 1fr); }
+  .metrics div, .step-comparison > div { padding-inline: 0; }
+  .metrics div + div, .step-comparison > div + div { border-inline-start: 0; border-top: 1px solid var(--border-subtle); }
   .endpoint-list div { gap: var(--sp-1); }
 }
