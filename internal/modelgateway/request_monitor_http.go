@@ -45,6 +45,13 @@ type requestBucket struct {
 
 var requestFailureReasons = []string{"blocked", "exhausted", "interrupted", "upstreamLimited", "upstreamUnauthorized", "upstreamTimeout", "connectFailed", "dailyLimit", "quota", "failed"}
 
+func requestOutcomeKey(row MonitorRecord) string {
+	if row.Outcome == "cancelled" || row.Outcome == "unknown" {
+		return "uncertain"
+	}
+	return row.Outcome
+}
+
 func requestFailureReason(row MonitorRecord) string {
 	switch row.Outcome {
 	case "success", "recovered", "unknown", "cancelled":
@@ -102,7 +109,8 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 	const monitor = "/v1/model-gateway/monitor"
 	id, detail := strings.CutPrefix(r.URL.Path, monitor+"/requests/")
 	query := r.URL.Query()
-	if !detail && !(r.URL.Path == monitor && query.Get("view") == "requests") {
+	view := query.Get("view")
+	if !detail && !(r.URL.Path == monitor && (view == "requests" || view == "request-summary")) {
 		return false
 	}
 	if r.Method != "GET" {
@@ -190,6 +198,13 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 		points[index].From = start + int64(index)*span
 		points[index].To = points[index].From + span
 	}
+	if view == "request-summary" {
+		data := summarizeRequests(rows, points, requestSummaryFilter{
+			from: sampleFrom, to: sampleTo, route: route, caller: caller, outcome: outcome, reason: reason,
+		})
+		writeJSON(w, 200, map[string]any{"data": data})
+		return true
+	}
 	var totals requestTotals
 	routes, callers, outcomes := map[string]string{}, map[string]bool{}, map[string]int{}
 	failureReasons := map[string]int{}
@@ -211,10 +226,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 			points[(row.At-start-1)/span].Totals.add(row)
 		}
 		if row.At > sampleFrom && row.At <= sampleTo {
-			key := row.Outcome
-			if key == "cancelled" || key == "unknown" {
-				key = "uncertain"
-			}
+			key := requestOutcomeKey(row)
 			outcomes[key]++
 			failure := requestFailureReason(row)
 			if failure != "" {

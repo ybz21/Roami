@@ -58,7 +58,7 @@ func newRequestObservation(w http.ResponseWriter, catalog ModelCatalog, model Ca
 	}
 }
 
-func (o *requestObservation) attempt(record MonitorRecord, candidate ModelCandidate, delivered, notSent bool) {
+func (o *requestObservation) attempt(record MonitorRecord, candidate ModelCandidate, usage *Usage, delivered, notSent bool) {
 	if o.Attempts > 0 {
 		switch {
 		case o.previous.SourceID != candidate.SourceID:
@@ -71,6 +71,12 @@ func (o *requestObservation) attempt(record MonitorRecord, candidate ModelCandid
 	o.previous = candidate
 	o.SourceID, o.UpstreamModel = candidate.SourceID, candidate.Model
 	o.succeeded = delivered && record.Success
+	if o.succeeded {
+		o.FirstToken = record.FirstToken
+		if usage != nil {
+			o.TokenUsage = &monitorTokenUsage{Input: usage.Input, Output: usage.Output}
+		}
+	}
 	o.unknownSend = !notSent && record.Error == "MODEL_TRANSPORT_FAILED"
 	o.Error = record.Error
 }

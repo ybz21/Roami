@@ -2,18 +2,24 @@
 import { installRadixTestEvents } from '../ui/radix-test-events'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from 'antd'
+import { useState, type ComponentProps } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
-import ModelAggregationWorkspace from './ModelAggregationWorkspace'
+import AggregationWorkspace from './ModelAggregationWorkspace'
 import ModelMonitoringWorkspace from './ModelMonitoringWorkspace'
 import type { ModelCatalog } from './model-hub-api'
 vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }) }))
 const catalog: ModelCatalog = { revision: 'r1', sources: [{ id: 'a', name: 'Source A', baseUrl: 'https://a.example', protocol: 'openai-completions', authMode: 'bearer' }, { id: 'b', name: 'Source B', baseUrl: 'https://b.example', protocol: 'openai-completions', authMode: 'bearer' }], models: [{ id: 'model-a', name: 'A', strategy: 'fixed', protocol: 'openai-completions', candidates: [{ sourceId: 'a', model: 'native-a' }] }, { id: 'model-b', name: 'B', strategy: 'fixed', protocol: 'openai-completions', candidates: [{ sourceId: 'b', model: 'native-b' }] }], drafts: [], baseUrl: '', uses: {} }
-const requestNav = { onRequest: vi.fn(), onCloseRequested: vi.fn() }
+const requestNav = { onRequest: vi.fn() }
+function ModelAggregationWorkspace(props: Omit<ComponentProps<typeof AggregationWorkspace>, 'onOpenRequested' | 'onCloseRequested'>) {
+  const [route, setRoute] = useState<{ pool: string; section?: string } | null>(null)
+  return <AggregationWorkspace {...props} requestedPool={route?.pool} requestedSection={route?.section}
+    onOpenRequested={(pool, section) => setRoute({ pool, section })} onCloseRequested={() => setRoute(null)} />
+}
 const totals = { requests: 2, failed: 0, success: 1, firstTokenP95: 123, outputP50: 45, quality: null, graded: 0 }
-beforeEach(() => { installRadixTestEvents(); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })); vi.mocked(api).mockImplementation(async (method, path) => method === 'POST' ? { data: { sourceId: 'a', model: 'native-a', quality: 'pass' } } : path.includes('view=requests') ? { data: { totals: { requests: 0 }, points: [], outcomes: {}, recent: [], routes: {}, callers: {} } } : path.includes('/monitor?') ? { data: { now: Date.now(), hours: 24, totals, sources: [{ sourceId: 'a', totals }], models: { a: { 'native-a': true } }, points: [], events: [], storage: { records: 2, maxRecords: 10000, bytes: 40960000, maxBytes: 67108864, expired: 0, evicted: 0, dropped: 0, retentionHours: 24 } } } : { data: { available: 0, channels: [] } }) })
+beforeEach(() => { installRadixTestEvents(); window.matchMedia = vi.fn().mockImplementation(() => ({ matches: false, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() })); vi.mocked(api).mockImplementation(async (method, path) => method === 'POST' ? { data: { sourceId: 'a', model: 'native-a', quality: 'pass' } } : path.includes('view=request-summary') ? { data: { totals: { requests: 0 }, points: [], outcomes: {}, range: { from: 0, to: 1 }, byModel: [], routes: {}, callers: {} } } : path.includes('/monitor?') ? { data: { now: Date.now(), hours: 24, totals, sources: [{ sourceId: 'a', totals }], models: { a: { 'native-a': true } }, points: [], events: [], storage: { records: 2, maxRecords: 10000, bytes: 40960000, maxBytes: 67108864, expired: 0, evicted: 0, dropped: 0, retentionHours: 24 } } } : { data: { available: 0, channels: [] } }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const pick = async (_label: string, option: string) => { fireEvent.click(screen.getByRole('button', { name: option })) }
 it('requires source before model and saves a smart pool with cross-source candidates', async () => {
@@ -36,8 +42,8 @@ it('requires source before model and saves a smart pool with cross-source candid
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'free-main', aggregate: true, strategy: 'smart', candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'b', model: 'native-b' }] })]) })))
 })
 it('does not send probes until requested and keeps unknown quality out of the pass rate', async () => {
-  const mounted = render(<App><ModelMonitoringWorkspace onRequest={requestNav.onRequest} active={false} catalog={catalog} /></App>); expect(api).not.toHaveBeenCalled()
-  mounted.rerender(<App><ModelMonitoringWorkspace onRequest={requestNav.onRequest} active catalog={catalog} /></App>)
+  const mounted = render(<App><ModelMonitoringWorkspace active={false} catalog={catalog} /></App>); expect(api).not.toHaveBeenCalled()
+  mounted.rerender(<App><ModelMonitoringWorkspace active catalog={catalog} /></App>)
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'monitor.sources' }))
   await screen.findByText('monitor.storage')
   expect(screen.getAllByText('monitor.pending').length).toBeGreaterThan(0)

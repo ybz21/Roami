@@ -1,0 +1,7 @@
+.tt-pool-monitor .tt-request-toolbar { margin-block-start:0; }
+.tt-pool-monitor-charts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.tt-pool-monitor .is-same-source { --request-color:var(--accent-solid); }
+.tt-pool-monitor .is-cross-source { --request-color:var(--warn); }
+.tt-pool-monitor-bars { margin:0; padding:0; list-style:none; }
+.tt-pool-monitor-bars > li { min-width:0; display:grid; gap:var(--sp-1); text-align:center; }
+.tt-pool-monitor-bars time { color:var(--text-dim); font-size:var(--fs-meta); }

@@ -520,7 +520,7 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			delivered := false
 			defer func() {
 				record := h.observeAttempt(r, leaf, call, status, code, usage, observation, trace.RequestID, trace.Attempts+1)
-				trace.attempt(record, candidate, delivered, notSent)
+				trace.attempt(record, candidate, usage, delivered, notSent)
 			}()
 
 			defer func() {

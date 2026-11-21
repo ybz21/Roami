@@ -26,6 +26,7 @@ export default function GatewayRequestAudit({ active, catalog, onBack, onRequest
   const state = useGatewayRequests(active && pageActive, hours, route, '', outcome, null)
   const title = t('gatewayTrace.audit')
   const routeNames = new Map([...Object.entries(state.data?.routes || {}), ...catalog.models.map(model => [model.id, model.name] as const)])
+  if (route && !routeNames.has(route)) routeNames.set(route, route)
   const time = new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   useEffect(() => {
@@ -45,11 +46,11 @@ export default function GatewayRequestAudit({ active, catalog, onBack, onRequest
     {state.unsupported && <p className="agent-settings-hint">{t('gatewayTrace.unsupported')}</p>}
     {state.pending ? <Spin /> : state.data && (
       state.data.recent.length ? <>
-        <ul className="tt-request-audit-list">
+        <ul className="tt-request-list">
           {state.data.recent.map(row => <li key={row.requestId}>
             <button type="button" className="tt-act" onClick={event => { openedRow.current = event.currentTarget; onRequest(row.requestId) }}>
-              <span><strong>{routeNames.get(row.routeId) || row.model}</strong><small>{row.caller === 'external' ? t('hub.gateway.externalClient') : row.caller} · {time.format(row.at)}</small></span>
-              <span className="tt-request-audit-result"><strong className={'tt-request-outcome is-' + row.outcome}>{t('gatewayTrace.' + row.outcome)}</strong>{row.status > 0 && <small>HTTP {row.status}</small>}</span>
+              <span className="tt-request-row-model"><strong>{routeNames.get(row.routeId) || row.model}</strong><small>{row.caller === 'external' ? t('hub.gateway.externalClient') : row.caller} · {time.format(row.at)}</small></span>
+              <span className="tt-request-row-result"><strong className={'tt-request-outcome is-' + row.outcome}>{t('gatewayTrace.' + row.outcome)}</strong>{row.status > 0 && <small>HTTP {row.status}</small>}</span>
               <ChevronRight />
             </button>
           </li>)}

@@ -19,7 +19,9 @@
 .tt-request-totals > div { min-width:0; }
 .tt-request-totals dt,.tt-request-legend { color:var(--text-dim); font-size:var(--fs-meta); }
 .tt-request-totals dd { margin:0; font-size:var(--fs-lg); font-weight:650; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.tt-request-monitor .tt-request-totals { grid-template-columns:repeat(5,minmax(0,1fr)); }
 .tt-request-monitor .tt-request-totals dd { font-size:var(--fs-title); }
+.tt-request-open-audit { margin-inline-start:auto; }
 .tt-request-totals dd.is-failed,.tt-request-outcome:is(.is-failed,.is-blocked,.is-exhausted,.is-interrupted) { color:var(--danger); }
 .tt-request-totals dd.is-recovered,.tt-request-outcome.is-recovered,.tt-request-path .tt-request-outcome.is-success { color:var(--ok); }
 .tt-request-charts {
@@ -68,7 +70,32 @@
 .tt-request-outcomes button strong { font-variant-numeric:tabular-nums; }
 .tt-request-outcome-track { grid-column:1/-1; display:block; height:var(--sp-1); background:var(--border-subtle); border-radius:var(--r-pill); overflow:hidden; }
 .tt-request-outcome-track i { display:block; height:100%; background:var(--request-color); border-radius:inherit; }
-.tt-request-recent { padding-block:var(--sp-4); }
+.tt-request-monitor .tt-request-outcomes li + li { border-block-start:1px solid var(--border-subtle); }
+.tt-request-monitor .tt-request-outcomes button:not([aria-pressed=true]) { border-color:transparent; }
+.tt-request-panels {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  border-block-end:1px solid var(--border-subtle);
+}
+.tt-request-panel { min-width:0; padding-block:var(--sp-4); }
+.tt-request-panel:first-child { padding-inline-end:var(--sp-5); }
+.tt-request-panel + .tt-request-panel { border-inline-start:1px solid var(--border-subtle); padding-inline-start:var(--sp-5); }
+.tt-request-panel h3 { margin:0 0 var(--sp-2); font-size:var(--fs-body); }
+.tt-request-panel .ui-button { margin-block-start:var(--sp-2); }
+.tt-request-metric-table { width:100%; border-collapse:collapse; font-size:var(--fs-sm); font-variant-numeric:tabular-nums; }
+.tt-request-metric-table :is(th,td) { padding:var(--sp-2); text-align:end; }
+.tt-request-metric-table th { font-weight:500; }
+.tt-request-metric-table th:first-child { text-align:start; padding-inline-start:0; overflow-wrap:anywhere; }
+.tt-request-metric-table :is(th,td):last-child { padding-inline-end:0; }
+.tt-request-metric-table thead { color:var(--text-dim); }
+.tt-request-metric-table tbody tr { border-block-start:1px solid var(--border-subtle); }
+.tt-request-metric-table small,.tt-request-throughput small { display:block; color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-request-metric-table .is-failed { color:var(--danger); }
+.tt-request-throughput {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-3);
+  padding-block:var(--sp-2); margin:0; border-block-end:1px solid var(--border-subtle);
+}
+.tt-request-throughput dt { color:var(--text-dim); font-size:var(--fs-meta); }
+.tt-request-throughput dd { margin:0; font-size:var(--fs-lg); font-variant-numeric:tabular-nums; }
 .tt-request-list { margin-block-start:var(--sp-2); }
 .tt-request-list li { border-bottom:1px solid var(--border-subtle); }
 .tt-request-list button {
@@ -122,6 +149,17 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-request-breakdown {
 }
 html[data-size="compact"] .tt-request-bars button { padding-inline:0; }
 html[data-size="compact"] .tt-request-toolbar > label { flex:1 1 calc(var(--sp-5) * 5); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-request-panels { grid-template-columns:minmax(0,1fr); }
+html:is([data-size="compact"],[data-size="medium"]) .tt-request-panel:first-child { padding-inline-end:0; }
+html:is([data-size="compact"],[data-size="medium"]) .tt-request-panel + .tt-request-panel {
+  border-inline-start:0; border-block-start:1px solid var(--border-subtle); padding-inline-start:0;
+}
+html[data-size="compact"] .tt-request-monitor .tt-request-totals { grid-template-columns:repeat(2,minmax(0,1fr)); }
+html[data-size="compact"] .tt-request-metric-table :is(th,td) { padding-inline:var(--sp-1); }
+html[data-pointer="coarse"] .tt-request-filter-chips button { position:relative; }
+html[data-pointer="coarse"] .tt-request-filter-chips button::after {
+  content:''; position:absolute; inset:50% calc(var(--sp-1) * -1) auto; min-height:var(--tap); transform:translateY(-50%);
+}
 html[data-pointer="coarse"] .tt-request-bars button::after {
   content:''; position:absolute; inset:0 calc(var(--sp-1) * -1);
 }
