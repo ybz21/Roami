@@ -1,12 +1,14 @@
-import { usePageEffect } from '../page-activity'
 // 交互式选择框检测与响应 —— 供 ClaudeChat / CodexChat 专业渲染模式复用。
 //
 // 背景：Claude/Codex 的权限确认、选项菜单是终端 TUI 实时状态，不在 JSONL transcript 里，
 // 所以对话面板渲染不出、也无从响应。这里从实时屏幕(capture，纯文本含 ❯/框线)解析出
 // 选择框，渲染成可点按钮；点击经 POST /sessions/:name/keys 注入原始按键完成选择。
-import { useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Modal, Space } from 'antd'
 import { api } from '../api'
+import { usePageActive } from '../page-activity'
+import { currentNodeId, useCurrentNodeId } from './cluster/node-url'
+import { readSessionScreen, useSessionScreen } from './terminal/session-screen'
 import { useI18n } from '../i18n'
 import { ArrowDown, ArrowUp, ChevronRight, DotIcon } from '../icons'
 
@@ -52,7 +54,7 @@ export function detectPrompt(capture: string): Prompt | null {
   }
   // 必须是从 1 起的连续编号、至少两项 —— 否则当普通编号列表，不误判
   const sequential = g.length >= 2 && g.every((o, k) => o.num === k + 1)
-  if (sequential) {
+  if (sequential && nearScreenEnd(lines, g[g.length - 1].idx)) {
     const qlines: string[] = []
     for (let i = g[0].idx - 1; i >= 0 && g[0].idx - i <= 6; i--) {
       const c = clean(lines[i])
@@ -84,6 +86,10 @@ export function detectPrompt(capture: string): Prompt | null {
   }
   return null
 }
+
+// A menu pushed into scrollback by subsequent output is no longer actionable.
+const nearScreenEnd = (lines: string[], lastOption: number) =>
+  lines.slice(lastOption + 1).filter(line => clean(line) !== '').length <= 12
 
 // 无编号选择框：Claude 起手的「信任这个文件夹吗」就长这样——
 //     ❯ No, exit
@@ -117,7 +123,7 @@ function detectUnnumbered(lines: string[]): Prompt | null {
     const top = group[0].idx
     const bottom = group[group.length - 1].idx
     const around = rows.slice(Math.max(0, top - 12), Math.min(rows.length, bottom + 4)).map((r) => r.trim()).join(' ')
-    if (!ACTION_HINT.test(around)) continue
+    if (!nearScreenEnd(rows, bottom) || !ACTION_HINT.test(around)) continue
     // 真正在问的那句离选项挺远：信任框里隔着一整段权限清单，窄屏上还会折成四五行。
     // 所以按空行切成段、由近及远找带问号的那段（整段拼起来再判，问号常落在折行处），
     // 找不到就退回最近的那段。
@@ -145,16 +151,6 @@ function detectUnnumbered(lines: string[]): Prompt | null {
     }
   }
   return null
-}
-
-// 后台标签的待确认状态需要连续采样后才切换。终端 TUI 在重绘中途可能短暂形成
-// “编号列表 + 游标”的残帧；单次采样不能让标签立刻增删“待确认”并造成视觉闪动。
-export interface PromptSignal { candidate: boolean; streak: number; stable: boolean }
-export function advancePromptSignal(previous: PromptSignal | undefined, candidate: boolean, confirmations = 2): PromptSignal {
-  const sameCandidate = previous?.candidate === candidate
-  const streak = sameCandidate ? (previous?.streak || 0) + 1 : 1
-  const stable = streak >= confirmations ? candidate : (previous?.stable || false)
-  return { candidate, streak, stable }
 }
 
 function PromptActions({ p, accent, busy, choose, press }: {
@@ -197,87 +193,83 @@ function PromptActions({ p, accent, busy, choose, press }: {
   )
 }
 
-function usePromptControl(name: string) {
-  const [p, setP] = useState<Prompt | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  usePageEffect(() => {
-    if (!name) { setP(null); return }
-    let stop = false
-    const poll = async () => { const r = await fetchPrompt(name); if (!stop) setP(r) }
-    poll()
-    const t = setInterval(poll, 1200)
-    return () => { stop = true; clearInterval(t) }
-  }, [name])
-
-  const press = async (keys: string[]) => {
-    setBusy(true)
-    try {
-      await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys })
-      setTimeout(async () => { setP(await fetchPrompt(name)) }, 350)
-    } catch (err) {
-      console.error('failed to send prompt keys', err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // 无编号选择框只能用方向键：先把游标挪到目标上，**确认它真的挪到了**再回车。
-  // 不核对就回车的代价是替用户答错——信任框的第一项正是「No, exit」，按错一格会话就没了。
-  const chooseByArrows = async (before: Prompt, target: Choice) => {
-    const from = before.choices.find((c) => c.selected)?.num ?? 1
-    const step = target.num - from
-    if (step !== 0) {
-      const keys = Array.from({ length: Math.abs(step) }, () => (step > 0 ? 'Down' : 'Up'))
-      await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys })
-      await new Promise((r) => setTimeout(r, 350))
-    }
-    const moved = await fetchPrompt(name)
-    // 同名选项也要认得出，所以位置和文本都对上才算挪到了
-    const landed = moved?.numbered === false && moved.choices.length === before.choices.length &&
-      moved.choices.find((c) => c.selected)?.num === target.num && moved.choices[target.num - 1]?.label === target.label
-    if (!landed) { setP(moved); return }
-    await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys: ['Enter'] })
-    setTimeout(async () => { setP(await fetchPrompt(name)) }, 350)
-  }
-
-  // 点选项只发数字，350ms 后再看屏幕：同一个问题还在（数字只是挪了高亮）才补 Enter。
-  // 以前一律发「数字 + Enter」：Claude Code 的 AskUserQuestion 按数字就直接进下一题，
-  // 那个 Enter 落到下一题上，把它的第一个选项当成你的答案交了；多问一题就多错一题。
-  const choose = async (target: Choice) => {
-    const before = p
-    setBusy(true)
-    try {
-      if (before?.numbered === false) { await chooseByArrows(before, target); return }
-      await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys: [String(target.num)] })
-      await new Promise((r) => setTimeout(r, 350))
-      const after = await fetchPrompt(name)
-      if (after && before && after.kind === 'select' && before.kind === 'select' && after.question === before.question) {
-        await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys: ['Enter'] })
-        setTimeout(async () => { setP(await fetchPrompt(name)) }, 350)
-      } else {
-        setP(after)
-      }
-    } catch (err) {
-      console.error('failed to send prompt keys', err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return { p, busy, press, choose }
+function promptIdentity(prompt: Prompt | null) {
+  return prompt ? JSON.stringify([prompt.kind, prompt.question, prompt.numbered, prompt.choices.map(choice => [choice.num, choice.label])]) : ''
 }
 
-async function fetchPrompt(name: string): Promise<Prompt | null> {
-  try {
-    const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=50`)
-    return detectPrompt(r.data || '')
-  } catch { return null }
+const answering = new Set<string>()
+
+function usePromptControl(name: string, enabled = true) {
+  const active = usePageActive()
+  const node = useCurrentNodeId()
+  const key = JSON.stringify([node, name])
+  const context = useMemo(() => ({ key, enabled: enabled && active }), [key, enabled, active])
+  const scope = useRef<typeof context | null>(null)
+  useLayoutEffect(() => {
+    scope.current = context
+    return () => { scope.current = null }
+  }, [context])
+  const { raw, fresh } = useSessionScreen(enabled ? name : null)
+  const p = useMemo(() => detectPrompt(raw), [raw])
+  const [busy, setBusy] = useState(false)
+
+  const valid = () => scope.current === context && context.enabled && currentNodeId() === node && !document.hidden
+  const read = async () => valid() ? detectPrompt(await readSessionScreen(name, node) || '') : null
+  const keys = async (values: string[]) => {
+    if (!valid()) return
+    await api('POST', `/sessions/${encodeURIComponent(name)}/keys`, { keys: values })
+  }
+  const afterKeys = async () => {
+    await new Promise(resolve => setTimeout(resolve, 350))
+    return read()
+  }
+
+  const answer = async (send: (before: Prompt) => Promise<void>) => {
+    if (!p || !fresh || !valid() || answering.has(key)) return
+    answering.add(key)
+    setBusy(true)
+    try {
+      const before = await read()
+      if (before && promptIdentity(before) === promptIdentity(p)) await send(before)
+    } catch (error) {
+      console.error('failed to send prompt keys', error)
+    } finally {
+      answering.delete(key)
+      setBusy(false)
+    }
+  }
+
+  const press = (values: string[]) => answer(async () => {
+    await keys(values)
+    await afterKeys()
+  })
+  const choose = (target: Choice) => answer(async before => {
+    if (before.numbered === false) {
+      const from = before.choices.find(choice => choice.selected)?.num ?? 1
+      const step = target.num - from
+      if (step !== 0) {
+        await keys(Array.from({ length: Math.abs(step) }, () => step > 0 ? 'Down' : 'Up'))
+        const moved = await afterKeys()
+        if (promptIdentity(moved) !== promptIdentity(before) || !moved?.choices.some(choice => choice.num === target.num && choice.selected)) return
+      } else if (!before.choices.some(choice => choice.num === target.num && choice.selected)) {
+        return
+      }
+    } else {
+      await keys([String(target.num)])
+      const remaining = await afterKeys()
+      // Some agents accept the number immediately and move to the next question.
+      if (promptIdentity(remaining) !== promptIdentity(before)) return
+    }
+    await keys(['Enter'])
+    await afterKeys()
+  })
+
+  return { p: enabled && active ? p : null, busy: busy || !fresh, press, choose }
 }
 
 // 选择框面板：检测到 TUI 提示时显示在输入框上方，点击即注入按键完成选择
-export function PromptPanel({ name, accent }: { name: string; accent: string }) {
-  const { p, busy, press, choose } = usePromptControl(name)
+export function PromptPanel({ name, accent, enabled = true }: { name: string; accent: string; enabled?: boolean }) {
+  const { p, busy, press, choose } = usePromptControl(name, enabled)
   const { t } = useI18n()
 
   if (!p) return null
@@ -291,7 +283,7 @@ export function PromptPanel({ name, accent }: { name: string; accent: string }) 
 }
 
 export function PromptDialog({ name, accent, enabled = true }: { name: string; accent: string; enabled?: boolean }) {
-  const { p, busy, press, choose } = usePromptControl(enabled ? name : '')
+  const { p, busy, press, choose } = usePromptControl(name, enabled)
   const { t } = useI18n()
   const [dismissedKey, setDismissedKey] = useState<string | null>(null)
   const promptKey = p ? `${p.kind}:${p.question}:${p.choices.map((c) => `${c.num}:${c.label}`).join('|')}` : ''

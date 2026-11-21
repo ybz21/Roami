@@ -1,5 +1,5 @@
 /** One request at a time; hidden pages resume with a fresh snapshot. */
-export function pollWhileVisible(load: (signal: AbortSignal) => Promise<unknown>, interval: number, shouldPoll: () => boolean = () => true) {
+export function pollWhileVisible(load: (signal: AbortSignal) => Promise<unknown>, interval: number | (() => number), shouldPoll: () => boolean = () => true) {
   let stopped = false, failures = 0
   let timer: ReturnType<typeof setTimeout> | undefined
   let deadline: ReturnType<typeof setTimeout> | undefined
@@ -29,7 +29,10 @@ export function pollWhileVisible(load: (signal: AbortSignal) => Promise<unknown>
       if (pending === controller) {
         pending = undefined
         deadline = undefined
-        if (!stopped && !document.hidden && (failures > 0 || shouldPoll())) timer = setTimeout(tick, Math.min(interval * 2 ** failures, 60_000))
+        if (!stopped && !document.hidden && (failures > 0 || shouldPoll())) {
+          const delay = typeof interval === 'function' ? interval() : interval
+          timer = setTimeout(tick, Math.min(delay * 2 ** failures, 60_000))
+        }
       }
     }
   }

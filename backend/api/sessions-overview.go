@@ -72,6 +72,7 @@ func (l *liveTable) prune(alive map[string]string) {
 }
 
 type overviewItem struct {
+	Identity     string                `json:"identity,omitempty"`
 	Name         string                `json:"name"`
 	Label        string                `json:"label"`
 	Parent       string                `json:"parent,omitempty"`
@@ -126,6 +127,9 @@ func (a *API) SessionsOverview(c *gin.Context) {
 			continue
 		}
 		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: rawInt(s.LastActivity), Dormant: s.State == "dormant"}
+		if s.TmuxID != "" && s.Created != "" {
+			it.Identity = s.TmuxID + ":" + s.Created
+		}
 		it.Mem = s.Mem
 		if review, ok := reviews[s.Name]; ok {
 			it.Review = &review

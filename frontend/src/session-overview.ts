@@ -9,6 +9,7 @@ export type SessionReview = {
 }
 
 export type OverviewItem = {
+  identity?: string
   review?: SessionReview
   name: string; label: string; lastActivity: number; dormant: boolean; parent?: string; cwd?: string
   projectKey?: string; project?: string; projectDir?: string; worktree?: string; branch?: string

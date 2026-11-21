@@ -13,10 +13,10 @@ import { useI18n } from '../../i18n'
 import type { NativeMainTurn } from './types'
 
 // memo：父层（TerminalPane）任何 setState 都会重渲，N 个常驻对话不该跟着一起重算
-export default memo(function ClaudeChat({ name, file, onOpenFile, onOpenGit, active, mainTurn, onSend, onCommand }: { name: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; mainTurn?: NativeMainTurn | null; onSend?: (text: string) => Promise<void>; onCommand?: (text: string) => Promise<void> }) {
+export default memo(function ClaudeChat({ name, sessionIdentity, file, onOpenFile, onOpenGit, active, mainTurn, onSend, onCommand }: { name: string; sessionIdentity?: string; file?: string; onOpenFile?: (path: string, line?: number) => void; onOpenGit?: () => void; active?: boolean; mainTurn?: NativeMainTurn | null; onSend?: (text: string) => Promise<void>; onCommand?: (text: string) => Promise<void> }) {
   const { t } = useI18n()
   const label = useSessionLabel(name)
-  const { msgs, err, status: raw, hasEarlier, loadEarlier, resolvedFile } = useTranscript(name, file, 'transcript', active === false ? 6000 : 1500)
+  const { msgs, err, status: raw, hasEarlier, loadEarlier, refresh, resolvedFile } = useTranscript(name, undefined, 'transcript', { identity: sessionIdentity, active, source: file, busy: mainTurn ? true : undefined })
   const { results, view } = useMemo(() => pairToolResults(msgs), [msgs])
   const pending = mainTurn === undefined ? isPending(view) : mainTurn !== null
   const liveOutput = !hasNativeFinal(view, mainTurn?.startedMs)
@@ -29,9 +29,9 @@ export default memo(function ClaudeChat({ name, file, onOpenFile, onOpenGit, act
   return (
     <ChatShell
       emptyHint={resolvedFile !== undefined && msgs.length === 0 ? t('chat.noTranscriptYet') : undefined}
-      name={name} accent="var(--accent)" error={err} onOpenFile={onOpenFile} tasks={tasks} status={status} onOpenGit={onOpenGit} lastErrorId={derived.lastErrorId}
+      name={name} sessionIdentity={sessionIdentity} accent="var(--accent)" error={err} onOpenFile={onOpenFile} tasks={tasks} status={status} onOpenGit={onOpenGit} lastErrorId={derived.lastErrorId}
       placeholder={t('chat.sendTo', { name: label })} agent="claude"
-      messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier}
+      messages={view} results={results} hasEarlier={hasEarlier} onLoadEarlier={loadEarlier} onTranscriptRefresh={refresh}
       renderMessage={(m, i) => <ChatMessage key={m.id || i} m={m} results={results} side="claude" />}
       pending={pending && liveOutput ? <Typing color="var(--accent)" /> : undefined}
       busy={pending} liveOutput={liveOutput} mainTurnId={mainTurn?.id} active={active} onSend={onSend} onCommand={onCommand}

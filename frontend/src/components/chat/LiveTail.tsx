@@ -1,5 +1,3 @@
-import { usePageEffect } from '../../page-activity'
-import { pollWhileVisible } from '../../visible-poll'
 // 实时回显（会话还在生成时，从终端 capture 里扒出来的那截）。
 //
 // 从前是把 TUI 尾巴原样倒出来的一坨 pre：`└` 框线、`✔ □` 字符图标、会话名、
@@ -7,7 +5,7 @@ import { pollWhileVisible } from '../../visible-poll'
 // 现在收成一张卡，和运行组同一套语言：一条左脊 + 一个头 + 一段带终端底的身子，
 // 行按类型画（命令 / 待办 / 正文），字符图标一律换成 SVG（图标硬规则）。
 import { useMemo, useState, type ReactNode } from 'react'
-import { api } from '../../api'
+import { useSessionScreen } from '../terminal/session-screen'
 import { detectPrompt } from '../prompt'
 import { useI18n } from '../../i18n'
 import { CheckIcon, ChevronRight, CircleIcon } from '../../icons'
@@ -65,16 +63,9 @@ export function LiveTail({ name, accent, idle, lastUser }: {
   lastUser?: string
 }) {
   const { t } = useI18n()
-  const [raw, setRaw] = useState('')
+  const { raw } = useSessionScreen(name, 800)
   const [open, setOpen] = useState(true)
-  usePageEffect(() => pollWhileVisible(async signal => {
-    const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=40`, undefined, { signal })
-    const data = r.data || ''
-    // 交互选择只由 PromptPanel 渲染。
-    if (!signal.aborted) setRaw(detectPrompt(data) ? '' : data)
-  }, 800).stop, [name])
-
-  const lines = useMemo(() => parseTail(raw, { session: name, lastUser }), [raw, name, lastUser])
+  const lines = useMemo(() => detectPrompt(raw) ? [] : parseTail(raw, { session: name, lastUser }), [raw, name, lastUser])
   if (!lines.length) return <>{idle}</>
 
   const copy = lines.map((l) => (l.kind === 'cmd' ? `$ ${l.text}` : l.text)).join('\n')

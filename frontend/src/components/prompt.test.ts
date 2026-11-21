@@ -1,7 +1,7 @@
 // detectPrompt 的回归用例。重点是**窄屏**：手机 attach 后 tmux 窗格常只剩 40 多列，
 // Claude 的选项会折成五六行，早期按「行距 ≤3」分组会把每个选项拆成孤岛 → 手机上根本不弹提问框。
 import { describe, it, expect } from 'vitest'
-import { advancePromptSignal, detectPrompt } from './prompt'
+import { detectPrompt } from './prompt'
 
 // 宽屏：选项彼此紧挨
 const WIDE = `
@@ -189,17 +189,12 @@ describe('detectPrompt', () => {
     expect(detectPrompt(NUMBERED_COMPOSER)).toBeNull()
   })
 
-  it('空屏返回 null', () => {
-    expect(detectPrompt('')).toBeNull()
+  it('不会把后续终端输出推入历史的选择框当成当前提示', () => {
+    const later = Array.from({ length: 30 }, (_, index) => 'command output ' + index).join('\n')
+    expect(detectPrompt(WIDE + later)).toBeNull()
   })
 
-  it('待确认状态需要连续两次相同采样才切换', () => {
-    const firstPositive = advancePromptSignal(undefined, true)
-    expect(firstPositive.stable).toBe(false)
-    const confirmedPositive = advancePromptSignal(firstPositive, true)
-    expect(confirmedPositive.stable).toBe(true)
-    const firstNegative = advancePromptSignal(confirmedPositive, false)
-    expect(firstNegative.stable).toBe(true)
-    expect(advancePromptSignal(firstNegative, false).stable).toBe(false)
+  it('空屏返回 null', () => {
+    expect(detectPrompt('')).toBeNull()
   })
 })

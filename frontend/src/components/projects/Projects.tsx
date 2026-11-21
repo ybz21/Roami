@@ -41,7 +41,6 @@ import { usePreferences } from '../../preferences'
 import { MobileSheet, SheetRow } from '../shell/MobileSheet'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useLayout } from '../../layout'
-import { detectPrompt } from '../prompt'
 import { relTime } from '../../time-format'
 import { NewSessionModal } from '../sessions/NewSessionModal'
 import { TaskComposer, type TaskComposerHandle } from '../sessions/TaskComposer'
@@ -49,7 +48,7 @@ import { CloseWorktreeModal } from '../sessions/CloseWorktreeModal'
 import { DirPicker, recentDirs, pushRecentDir } from '../sessions/DirPicker'
 import { projNeeds, runningCount, waitingCount } from './project-list/project-model'
 import type { Proj, ProjSession } from './project-list/project-model'
-import type { OverviewItem } from '../../session-overview'
+import { useSessionOverview, type OverviewItem } from '../../session-overview'
 import { mergeProjectActivity } from './project-list/project-activity'
 import { NeedsQueue, WorkbenchHead, buildNeedCards, NEEDS_CSS } from './project-list/needs-queue'
 import { ActivityRail, useRecentActivity, RAIL_CSS } from './project-list/activity-rail'
@@ -813,13 +812,6 @@ function FinishModal({ w, base, onClose, onDone, onRevive }: {
   )
 }
 
-// 终端捕获 → 尾行预览：去 ANSI/OSC，取最后一行非空输出
-function tailLine(raw: string): string {
-  const clean = String(raw || '').replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
-  const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean)
-  return (lines[lines.length - 1] || '').slice(0, 90)
-}
-
 // ── P2 项目主页：头部 + composer(hero) + 任务流/Worktree/编队/活动 ──
 function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, activeTerm }: {
   activeTerm?: string | null
@@ -836,11 +828,10 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [sessions, setSessions] = useState<any[]>([])
   const [ann, setAnn] = useState<Record<string, any>>({})
   const agentKinds = useAgentKinds()
+  const overview = useSessionOverview()
+  const sessionActivity = useMemo(() => new Map(overview.value.map(item => [item.name, item])), [overview.value])
   const agents = useRegisteredAgents()
   const cliKinds = ['shell', ...agents.map(agent => agent.kind)]
-  const [cc, setCc] = useState<Record<string, boolean>>({})
-  const [cx, setCx] = useState<Record<string, boolean>>({})
-  const [needsInput, setNeedsInput] = useState<Record<string, boolean>>({})
   const [races, setRaces] = useState<any[]>([])
   const swarmScope = nodeApi('/agent/swarms')
   const [swarms, setSwarms] = useState<SwarmSnapshot[]>([])
@@ -855,7 +846,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [activity, setActivity] = useState<any[]>([])
   const [finishing, setFinishing] = useState<any>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [peeks, setPeeks] = useState<Record<string, string>>({})
   const [creating, setCreating] = useState(false)
   const [wtOpen, setWtOpen] = useState(false)
   const [gitOpen, setGitOpen] = useState(false)
@@ -971,31 +961,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       if (!signal.aborted) setSwarms(matching)
     }, 10000).stop
   }, [isGit, dir, proj?.key, swarmScope])
-  // Agent 运行标注 + 待输入检测（仅本项目会话，量小）
-  usePageEffect(() => {
-    let stop = false
-    const check = () => cliMine.forEach(async (s: any) => {
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/claude`); if (!stop) setCc((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/codex`); if (!stop) setCx((m) => ({ ...m, [s.name]: !!r.data?.running })) } catch {}
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(s.name)}/capture?lines=50`); if (!stop) setNeedsInput((m) => ({ ...m, [s.name]: !!detectPrompt(r.data || '') })) } catch {}
-    })
-    if (cliMine.length) check()
-    const i = setInterval(() => { if (cliMine.length) check() }, 6000)
-    return () => { stop = true; clearInterval(i) }
-  }, [cliMine])
-  // 展开的 worktree 的命令行尾行预览（懒加载，5s）
-  usePageEffect(() => {
-    const names = wts.filter((w: any) => expanded[w.path]).flatMap((w: any) => (w.sessions || []).map((x: any) => x.session))
-    if (!names.length) return
-    let stop = false
-    const peek = () => names.forEach(async (n: string) => {
-      try { const r = await api('GET', `/sessions/${encodeURIComponent(n)}/capture?lines=8`); if (!stop) setPeeks((m) => ({ ...m, [n]: tailLine(r.data) })) } catch {}
-    })
-    peek()
-    const i = setInterval(peek, 5000)
-    return () => { stop = true; clearInterval(i) }
-  }, [wts, expanded])
-
   const swarmMap = useMemo(() => {
     const members: Record<string, { swarm: string }> = {}
     for (const group of swarms) for (const work of group.work) {
@@ -1192,8 +1157,10 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     const changes = (w?.dirty || 0) + (w?.untracked || 0)
     const gs = wtStage(w)
     const merged = gs === 'merged'
-    const running = s.running ?? (!!agentKinds[s.name] || cc[s.name] || cx[s.name])
-    const waiting = s.waiting ?? needsInput[s.name]
+    const live = sessionActivity.get(s.name)
+    const agent = s.agent || agentKinds[s.name] || live?.agent || ''
+    const running = s.running ?? live?.running ?? !!agent
+    const waiting = s.waiting ?? live?.waiting
     // 休眠：机器重启带走了 tmux 那一半，点开即恢复。它没有进程，
     // 所以生命周期导轨/未提交改动那些运行时判断对它都不适用。
     const dormant = s.state === 'dormant' 
@@ -1211,7 +1178,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       const drag = {
         id: s.name, label: s.label || sessionLabel(s.name),
         project: proj.name, dir: hit.worktree || proj.dir,
-        agent: s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
+        agent,
       }
       const v = canDrop(drag, { id: activeTerm })
       if (!v.ok) { message.warning(t('pair.cannotSelf')); return }
@@ -1232,7 +1199,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           e.dataTransfer.setData(SESSION_MIME, JSON.stringify({
             id: s.name, label: s.label || sessionLabel(s.name),
             project: proj.name, dir: hit.worktree || proj.dir,
-            agent: s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : cx[s.name] ? 'codex' : ''),
+            agent,
             node: currentNodeId() || '',
           }))
           e.dataTransfer.effectAllowed = 'copy'
@@ -1249,7 +1216,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
             )}
             <SessionLocation branch={hit.branch} worktree={hit.worktree} cwd={a.home || s.cwd || s.dir} />
             {hit.external && hit.linked && <Tag style={{ margin: 0 }}><WindowsIcon size={11} /></Tag>}
-            {(s.agent || agentKinds[s.name] || cc[s.name] || cx[s.name]) && <span className="tt-agentmark" title={agentName(s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex'))}><AgentLogo kind={s.agent || agentKinds[s.name] || (cc[s.name] ? 'claude' : 'codex')} size={13} /></span>}
+            {agent && <span className="tt-agentmark" title={agentName(agent)}><AgentLogo kind={agent} size={13} /></span>}
             {waiting && <Tag color="warning" style={{ margin: 0 }}>{t('session.waiting')}</Tag>}
             <MemBar mem={s.mem} />
             {a.ambiguous && (
@@ -1599,10 +1566,10 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                       <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {(w.sessions || []).map((ref: any) => (
                           <div key={ref.session} className="prj-subrow" onClick={() => openTerm(ref.session)}>
-                            {dot(false, agentKinds[ref.session] || cc[ref.session] || cx[ref.session] ? 'var(--ok)' : undefined)}
+                            {dot(sessionActivity.get(ref.session)?.running ?? !!agentKinds[ref.session], sessionActivity.get(ref.session)?.waiting ? 'var(--warn)' : undefined)}
                             <span style={{ fontWeight: 600, fontSize: 13 }} title={ref.session}>{sessionLabel(ref.session)}</span>
                             {(nativeSessionId(ref.session) || agentKinds[ref.session]) && <span className="tt-agentmark" title={agentName(nativeSessionId(ref.session) ? 'native' : agentKinds[ref.session])}><AgentLogo kind={nativeSessionId(ref.session) ? 'native' : agentKinds[ref.session]} size={12} /></span>}
-                            <span className="prj-peek">{peeks[ref.session] || '…'}</span>
+                            <span className="prj-peek">{sessionActivity.get(ref.session)?.tail || '…'}</span>
                             <a style={{ fontSize: 'var(--fs-meta)' }} onClick={(e) => { e.stopPropagation(); openTerm(ref.session) }}>{t('project.enter')}</a>
                           </div>
                         ))}

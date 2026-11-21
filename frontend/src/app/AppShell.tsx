@@ -1,6 +1,6 @@
 import { Layout } from 'antd'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAgentKinds } from '../agent-kind'
+import { useEffect, useRef, useState } from 'react'
+import { useAgentKindInventory } from '../agent-kind'
 import '../components/agent/agent-chat.css'
 import { openAgentPage } from '../components/agent/agent-page-route'
 import AgentNotifications from '../components/agent/AgentNotifications'
@@ -59,7 +59,8 @@ export default function AppShell(props: AppShellProps) {
 }
 function AppShellContent({ routing, logout }: AppShellProps) {
   const { setRoute, tab, go, selectAgent, inboxSub } = routing
-  const agentKinds = useAgentKinds()
+  const inventory = useAgentKindInventory()
+  const agentKinds = inventory.value.kinds
   const [agentInboxOpen, setAgentInboxOpen] = useState(false)
   const notifications = () => { agentInbox.refresh(); if (isMobile) openAgentPage('notifications'); else setAgentInboxOpen(true) }
   const { mode } = useThemeMode()
@@ -76,9 +77,9 @@ function AppShellContent({ routing, logout }: AppShellProps) {
   const activeProject = useSessionProject(active)
   const directory = useProjectDirectory(hasSider, activeProject?.worktree || activeProject?.dir || '')
   const { treeSrc, unfinished, swarmCount, git } = directory
-  const runtimeTerms = useMemo(() => isMobile ? (overlay && active ? [active] : []) : terms, [terms, active, isMobile, overlay])
-  const runtime = useTerminalRuntime(runtimeTerms, isMobile)
-  const { claudeMap, codexMap, mobileWaiting } = runtime
+  const sessionVisible = (isMobile ? overlay : space.mode !== 'page') && !curFile
+  const runtime = useTerminalRuntime(sessionVisible ? active : null, inventory, isMobile)
+  const { activityMap } = runtime
   const inspector = useTabInspector(workspace, data.sessIds)
   const { panel, pickPanel, toggleInspector, searchNonce } = inspector
   const pageTabsState = usePageTabs(routing.route, terms, go, curNodeId)
@@ -109,7 +110,7 @@ function AppShellContent({ routing, logout }: AppShellProps) {
   const { tree, openTerm, closeTerm, renameOpenTerm, onTreeProject, newTerminalInTask, newTerminalAt, activeTaskLabel } = projectActions
   const keys = useWorkspaceShortcuts({ hasSider, workspace, inspector, tree, activeProject, newTerminalInTask, closeTerm, setNewTaskDir: projectActions.setNewTaskDir })
   const termPane = <WorkspaceTerminals workspace={workspace} runtime={runtime} inspector={inspector} pages={pageTabsState}
-    routing={routing} hasSider={hasSider} agentKinds={agentKinds} activeTaskLabel={activeTaskLabel}
+    routing={routing} hasSider={hasSider} sessionVisible={sessionVisible} agentKinds={agentKinds} activeTaskLabel={activeTaskLabel}
     taskDir={activeTask && !isLooseTask(activeTask) ? activeTask : (activeProject?.dir || '')}
     actions={{ openTerm, closeTerm, renameOpenTerm, newTerminalInTask }} />
   openTermRef.current = (n) => openTerm(n)
@@ -172,9 +173,9 @@ function AppShellContent({ routing, logout }: AppShellProps) {
     hubAlarm: hubHealth.level === 'ok' ? undefined : hubReasonText(hubHealth, t),
     clustered: clusterNodes.length > 0,
     sessions: terms.length,
-    waiting: Object.values(mobileWaiting).filter(Boolean).length,
+    waiting: terms.filter(name => activityMap[name]?.waiting).length,
     unfinished,
-    agents: terms.filter((n) => agentKinds[n] || claudeMap[n]?.running || codexMap[n]?.running).length,
+    agents: terms.filter(name => agentKinds[name]).length,
     version: roamVersion,
     git,
     projectKey: activeProject?.key || '',

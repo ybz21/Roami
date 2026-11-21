@@ -40,11 +40,12 @@ import { KEYS, PFX, tmuxMenu } from './tmux-keys'
 import { codexReconnectFailed, codexResumeCommand } from './codex-recovery'
 import { useI18n } from '../../i18n'
 import { SESSION_MIME, buildIntro, canDrop, readDrag } from '../shell/session-drop'
-import { currentNodeId } from '../cluster/node-url'
+import { currentNodeId, useCurrentNodeId } from '../cluster/node-url'
 import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { useLayout } from '../../layout'
 import { savePreferences, saveWorkspace, usePreferences } from '../../preferences'
-import { PromptDialog, PromptSignal, advancePromptSignal, detectPrompt } from '../prompt'
+import { PromptDialog } from '../prompt'
+import { useSessionScreen } from './session-screen'
 import { SessionTitle, TabName, sessionDisplay, sessionLabel, useSessionLabel } from '../sessions/session-label'
 import { sessionProject, useSessionProject } from '../sessions/session-project'
 import AdaptivePanel from '../shell/AdaptivePanel'
@@ -68,7 +69,7 @@ export default function TerminalPane(props: {
   tabBarHost?: HTMLElement | null
   fontSize: number; setFontSize: (n: number) => void
   statusMap: Record<string, TermStatus>; setStatus: (n: string, s: TermStatus) => void
-  activityMap?: Record<string, { running: boolean; waiting: boolean }>
+  activityMap?: Record<string, { running: boolean; waiting: boolean; identity?: string }>
   termRefs: React.MutableRefObject<Record<string, TermHandle | null>>
   sendKey: (seq: string) => void; onCollapse?: () => void
   claudeMap: Record<string, ClaudeInfo>; claudeView: Record<string, boolean>; setClaudeView: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
@@ -78,8 +79,7 @@ export default function TerminalPane(props: {
   onRename: (oldName: string, newName: string) => void
   /** 标签拖拽排序；不传就不可拖（独立单终端页没有多标签） */
   onReorder?: (name: string, to: number) => void
-  /** 把「哪些会话在等输入」递给外层（手机会话坞要用），避免第二份抓屏轮询 */
-  onNeedsInput?: (map: Record<string, boolean>) => void
+  sessionVisible?: boolean
   /** 终端 Focus：传了才渲染工具条右侧那枚按钮（手机没有这个概念） */
   focus?: { on: boolean; toggle: () => void; hint: string }
   fileDock?: 'right' | 'left'   // 文件面板停靠：'right'=右侧浮动抽屉（默认），'left'=左侧 VSCode 栏（新标签全屏页）
@@ -110,7 +110,8 @@ export default function TerminalPane(props: {
   reveal?: { path: string; line: number; nonce: number }
 }) {
   const registeredAgents = useRegisteredAgents()
-  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, onNeedsInput, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, sessionTask, onReturnToSession, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const node = useCurrentNodeId()
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, sessionVisible = true, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, sessionTask, onReturnToSession, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
   const activeLabel = useSessionLabel(active)
   const opaqueLabel = !!activeProject && (activeLabel === active || /^\d{4}-\d{4}-\d{4}-\d{4}(?:-[a-z0-9]+)?$/i.test(activeLabel))
@@ -179,9 +180,6 @@ export default function TerminalPane(props: {
     ] }
   }
   const st = active ? statusMap[active] : undefined
-  const [termNeedsInput, setTermNeedsInput] = useState<Record<string, boolean>>({})
-  const [reconnectFailures, setReconnectFailures] = useState<Record<string, boolean>>({})
-  const promptSignals = useRef<Record<string, PromptSignal>>({})
   // 危险操作目标可视化 / 就地确认：关闭 pane 前先定位目标（几何+cwd+前台进程），
   // confirm 走结构化后端接口，不再盲发 Ctrl-b x 字节（那样只会撞上 tmux 底部原生 y/n 提示）。
   const [paneCloseTarget, setPaneCloseTarget] = useState<PaneCloseTarget | null>(null)
@@ -212,9 +210,9 @@ export default function TerminalPane(props: {
       setPaneCloseBusy(false)
     }
   }
-  const activeNeedsInput = !!(active && termNeedsInput[active])
+  const activeNeedsInput = !!(active && activityMap?.[active]?.waiting)
   const dotOf = (name: string) => {
-    if (activityMap?.[name]?.waiting || termNeedsInput[name]) return 'var(--warn)'
+    if (activityMap?.[name]?.waiting) return 'var(--warn)'
     if (activityMap?.[name]?.running) return 'var(--ok)'
     if (nativeSessionId(name) || statusMap[name] === 'connected' || agentKinds[name] || claudeMap[name]?.running || codexMap[name]?.running) return 'var(--text-dimmer)'
     return statusMap[name] === 'connecting' ? 'var(--warn)' : 'var(--danger)'
@@ -222,6 +220,9 @@ export default function TerminalPane(props: {
   const dot = active ? dotOf(active) : 'var(--danger)'
   // 当前标签是否在 Claude/Codex 对话视图：此时聊天 UI 自带输入框。
   const { coarse: isTouch, phone: isPhone } = useLayout()
+  const visibleSession = sessionVisible && !curFile && active && !preparingSession(active) ? active : null
+  const recoveryScreenSnapshot = useSessionScreen(isPhone ? visibleSession : null)
+  const reconnectFailure = !!visibleSession && codexReconnectFailed(recoveryScreenSnapshot.raw)
   const showClaudeChat = (name: string) => (claudeView[name] === true || (isPhone && claudeView[name] !== false)) &&
     (claudeMap[name]?.running || (isPhone && !claudeMap[name] && agentKinds[name] === 'claude'))
   const showCodexChat = (name: string) => (codexView[name] === true || (isPhone && codexView[name] !== false)) &&
@@ -546,61 +547,17 @@ export default function TerminalPane(props: {
   const [pasteSession, setPasteSession] = useState('')
   const [pasteText, setPasteText] = useState('')
   const [renameSession, setRenameSession] = useState<string | null>(null)
-  useEffect(() => {
-    if (!active) { setCwd(''); return }
-    // 优先用 claude/codex 已知工作目录，否则查会话 pane 当前路径
-    const known = claudeMap[active]?.dir || codexMap[active]?.dir
-    if (known) { setCwd(known); return }
-    let stop = false
-    api('GET', nativeSessionId(active) ? `/agent/native-sessions/${encodeURIComponent(nativeSessionId(active)!)}` : `/sessions/${encodeURIComponent(active)}/cwd`).then((r) => { if (!stop) setCwd(r.data?.directory || r.data?.dir || '') }).catch(() => {})
-    return () => { stop = true }
-  }, [active, claudeMap, codexMap])
-
+  const knownDirectory = visibleSession ? claudeMap[visibleSession]?.dir || codexMap[visibleSession]?.dir || openCodeMap[visibleSession]?.dir : undefined
   usePageEffect(() => {
-    if (!terms.length) {
-      promptSignals.current = {}
-      setTermNeedsInput((previous) => Object.keys(previous).length ? {} : previous)
-      setReconnectFailures((previous) => Object.keys(previous).length ? {} : previous)
-      return
-    }
-    let stop = false
-    const checkPrompts = async () => {
-      const entries = await Promise.all(terms.filter(name => !nativeSessionId(name)).map(async (name) => {
-        try {
-          const r = await api('GET', `/sessions/${encodeURIComponent(name)}/capture?lines=50`)
-          return [name, !!detectPrompt(r.data || ''), codexReconnectFailed(r.data || '')] as const
-        } catch {
-          return [name, false, false] as const
-        }
-      }))
-      if (stop) return
-      const nextSignals: Record<string, PromptSignal> = {}
-      const nextState: Record<string, boolean> = {}
-      const failures: Record<string, boolean> = {}
-      entries.forEach(([name, candidate, failed]) => {
-        const signal = advancePromptSignal(promptSignals.current[name], candidate)
-        nextSignals[name] = signal
-        nextState[name] = signal.stable
-        failures[name] = failed
-      })
-      promptSignals.current = nextSignals
-      // 未发生语义变化时复用旧对象，避免后台抓屏每 4 秒让整个终端区无意义重渲染。
-      setTermNeedsInput((previous) => {
-        const keys = Object.keys(nextState)
-        const unchanged = keys.length === Object.keys(previous).length && keys.every((name) => previous[name] === nextState[name])
-        return unchanged ? previous : nextState
-      })
-      setReconnectFailures((previous) => {
-        const keys = Object.keys(failures)
-        return keys.length === Object.keys(previous).length && keys.every((name) => previous[name] === failures[name]) ? previous : failures
-      })
-    }
-    checkPrompts()
-    const t = setInterval(checkPrompts, 4000)
-    return () => { stop = true; clearInterval(t) }
-  }, [terms])
-
-  useEffect(() => { onNeedsInput?.(termNeedsInput) }, [termNeedsInput, onNeedsInput])
+    if (!visibleSession) return
+    if (knownDirectory) { setCwd(knownDirectory); return }
+    setCwd('')
+    const controller = new AbortController()
+    const nativeId = nativeSessionId(visibleSession)
+    api('GET', nativeId ? `/agent/native-sessions/${encodeURIComponent(nativeId)}` : `/sessions/${encodeURIComponent(visibleSession)}/cwd`, undefined, { signal: controller.signal })
+      .then(r => { if (!controller.signal.aborted) setCwd(r.data?.directory || r.data?.dir || '') }).catch(() => {})
+    return () => controller.abort()
+  }, [visibleSession, knownDirectory, node])
 
   useEffect(() => {
     syncKeyFade()
@@ -819,7 +776,7 @@ export default function TerminalPane(props: {
         ))}
         {tabs.map((termName, i) => {
           const on = !activePage && termName === active && (!curFile || resourcesOf(termName).some(file => file.path === curFile))
-          const waiting = termNeedsInput[termName]
+          const waiting = activityMap?.[termName]?.waiting
           const proj = sessionProject(termName)
           // 分支进 Tooltip，不占标签宽度（14 §6.3.2）
           const tip = [proj && proj.name, sessionDisplay(termName), proj?.branch]
@@ -1036,7 +993,7 @@ export default function TerminalPane(props: {
         <SheetRow icon={TI.rename} title={t('session.rename')} onClick={() => { setMoreSheet(false); active && setRenameSession(active) }} />
         <SheetRow icon={TI.newTab} title={t('terminal.newTab')}
           onClick={() => { setMoreSheet(false); active && window.open(`/#/term/${encodeURIComponent(active)}`, '_blank') }} />
-        {active && (agentKinds[active] === 'codex' || codexMap[active]?.running || reconnectFailures[active]) &&
+        {active && (agentKinds[active] === 'codex' || codexMap[active]?.running || reconnectFailure) &&
           <SheetRow icon={TI.reconnect} title={t('terminal.recoveryTitle')}
             desc={t('terminal.recoveryEntry')} onClick={() => { void openRecovery() }} />}
         {/* 「中断」得在这儿常驻：带 ^C 的快捷键条只在打字时才升起来，而 agent 跑飞了要停它的
@@ -1216,21 +1173,21 @@ export default function TerminalPane(props: {
             {!preparingSession(termName) && <SessionLifecycleDraftNotice name={termName} />}
             {!preparingSession(termName) && showClaudeChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
-                <ClaudeChat name={termName} file={claudeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+                <ClaudeChat key={JSON.stringify([node, activityMap?.[termName]?.identity])} name={termName} sessionIdentity={activityMap?.[termName]?.identity} file={claudeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === visibleSession} />
               </div>
             )}
             {!preparingSession(termName) && showCodexChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
-                <CodexChat name={termName} file={codexMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+                <CodexChat key={JSON.stringify([node, activityMap?.[termName]?.identity])} name={termName} sessionIdentity={activityMap?.[termName]?.identity} file={codexMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === visibleSession} />
               </div>
             )}
             {!preparingSession(termName) && showOpenCodeChat(termName) && (
               <div style={{ position: 'absolute', inset: 0 }}>
-                <OpenCodeChat name={termName} file={openCodeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+                <OpenCodeChat key={JSON.stringify([node, activityMap?.[termName]?.identity])} name={termName} sessionIdentity={activityMap?.[termName]?.identity} file={openCodeMap[termName]?.file} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === visibleSession} />
               </div>
             )}
             {showPiChat(termName) && <div style={{ position: 'absolute', inset: 0 }}>
-              <PiChat name={termName} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === active && !curFile} />
+              <PiChat key={JSON.stringify([node, activityMap?.[termName]?.identity])} name={termName} sessionIdentity={activityMap?.[termName]?.identity} onOpenFile={openFileFromChat} onOpenGit={openGitFromChat} active={termName === visibleSession} />
             </div>}
             {/* 悬浮话筒只留给手机：桌面的在工具条上（重命名旁边） */}
             {!nativeSessionId(termName) && showVoice && isPhone && !claudeView[termName] && !codexView[termName] && !openCodeView[termName] && !showPiChat(termName) && (
@@ -1307,7 +1264,7 @@ export default function TerminalPane(props: {
     // 软键盘悬浮覆盖时(见 main.tsx/index.html)，
     // 把整块内容抬到键盘之上，让终端和快捷键栏不被遮住。桌面无虚拟键盘 → 0，无影响。
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: 'max(var(--kb), env(keyboard-inset-height, 0px))', transition: 'padding-bottom .15s ease-out' }}>
-      {active && <PromptDialog name={active} accent="var(--accent)" enabled={!inChat && !promptOff} />}
+      {active && <PromptDialog name={active} accent="var(--accent)" enabled={active === visibleSession && !inChat && !promptOff} />}
       <Modal
         open={pasteOpen}
         title={t('terminal.pasteTitle')}
@@ -1369,7 +1326,7 @@ export default function TerminalPane(props: {
                   onBack={isPhone ? undefined : onReturnToSession} onClose={() => closeFile(curFile)} />
               : !phoneChrome && sessionToolbar}
             {active && !curFile && <><SessionReviewStatus name={active} open={onOpenSession} /><SessionMemoryBanner name={active} /></>}
-            {isPhone && active && reconnectFailures[active] && !curFile &&
+            {isPhone && active && reconnectFailure && !curFile &&
               <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
                 <span>{t('terminal.recoveryAlert')}</span><strong>{t('terminal.recoveryAction')}</strong>
               </button>}

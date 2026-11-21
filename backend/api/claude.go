@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -234,21 +235,36 @@ func runningAgentSessions() map[string]string {
 
 // SessionAgents GET /sessions/agents —— 全部正在运行的交互式代理及其种类。
 func (a *API) SessionAgents(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"data": runningAgentSessions()})
+	procs, alternatives := scanAgentPanes(true)
+	kinds := make(map[string]string, len(procs))
+	for name, proc := range procs {
+		kinds[name] = proc.Kind
+	}
+	c.JSON(http.StatusOK, gin.H{"data": kinds, "alternatives": alternatives})
 }
 
-// runningAgentProcs 一次扫描：会话 → 正在跑的 agent 进程（种类、cwd、pid）。
-// 会话 ↔ 对话 id 的对账（agent-transcript-link.go）要 cwd 和 pid，绿点判活跃只要种类。
+// runningAgentProcs keeps the first Agent for consumers that need one process per session.
 func runningAgentProcs() map[string]agentProc {
+	running, _ := scanAgentPanes(false)
+	return running
+}
+
+func scanAgentPanes(includeAlternatives bool) (map[string]agentProc, map[string][]string) {
 	out, err := runtime.New().TmuxOutput("list-panes", "-a", "-F", "#{session_name}\t#{pane_pid}\t#{pane_current_path}")
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	children := procChildren()
 	running := map[string]agentProc{}
+	alternatives := map[string][]string{}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		parts := strings.SplitN(line, "\t", 3)
-		if len(parts) != 3 || running[parts[0]].Kind != "" {
+		if len(parts) != 3 {
+			continue
+		}
+		name := parts[0]
+		primary := running[name]
+		if primary.Kind != "" && !includeAlternatives {
 			continue
 		}
 		pid, err := strconv.Atoi(parts[1])
@@ -261,11 +277,16 @@ func runningAgentProcs() map[string]agentProc {
 			}
 			return processArgv(pid)
 		})
-		if found != 0 {
-			running[parts[0]] = agentProc{Kind: kind, Dir: parts[2], Pid: found}
+		if found == 0 {
+			continue
+		}
+		if primary.Kind == "" {
+			running[name] = agentProc{Kind: kind, Dir: parts[2], Pid: found}
+		} else if primary.Kind != kind && !slices.Contains(alternatives[name], kind) {
+			alternatives[name] = append(alternatives[name], kind)
 		}
 	}
-	return running
+	return running, alternatives
 }
 
 // newestJSONL 返回目录中最近修改的 .jsonl。
