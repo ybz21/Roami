@@ -192,7 +192,7 @@ function AppShellContent({ routing, logout }: AppShellProps) {
       <SessionMemoryAlerts onOpen={openTerm} visibleSession={(isMobile ? overlay : space.mode !== 'page') && !curFile ? active || undefined : undefined} />
 
       {isMobile && <MobileTopBar tab={tab} route={routing.route} go={go} unread={agentInbox.unread} notifications={notifications}
-        openSession={openTerm} newTask={projectActions.newSession}
+        openSession={openTerm} newTask={projectActions.newTask}
         search={() => setMobileSearchNonce(n => n + 1)} actionsHost={setMobileActionsHost} />}
       {/* clip prevents focus inside the hidden dock from scrolling the shell. */}
       <Layout style={{ flex: 1, minHeight: 0, overflow: 'clip', background: 'var(--bg-base)' }}>

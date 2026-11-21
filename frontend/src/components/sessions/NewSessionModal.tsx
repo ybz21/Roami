@@ -2,13 +2,11 @@
 // parent 非空 = 派生模式：同一张表单（目录默认父 cwd 可改、三选一、命名约定 prompt 全同款），
 // 仅提交路由不同（fork / fork-worktree，meta 记父子关系）。两处不再各维护一份表单。
 import ModelSelectionFields, { type ModelChoice } from '../capabilities/ModelSelectionFields'
-import { refreshSessionLists } from './native-session-list'
 import { useLayout } from '../../layout'
 import MobileSubPage from '../MobileSubPage'
 import './new-session-modal.css'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../api'
-import { nodeApi } from '../cluster/node-url'
 import { nativeSessionId } from './session-record'
 import { DirPicker, pushRecentDir, recentDirs } from './DirPicker'
 import { useI18n } from '../../i18n'
@@ -21,7 +19,8 @@ import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
 import { relTime } from '../../time-format'
-import { submitLifecycle, lifecycleLaunchIntent, lifecycleRequestError } from './session-lifecycle'
+import { submitLifecycle, lifecycleLaunchIntent } from './session-lifecycle'
+import { sessionCreateError, useNativeSessionCreate } from './native-session-create'
 import { useReviewDraft, useSessionReviewControls } from './SessionReviewOptions'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
@@ -59,7 +58,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const { phone } = useLayout()
   const agents = useRegisteredAgents(open)
   const [modelChoice, setModelChoice] = useState<ModelChoice>({ model: 'auto', freeOnly: false })
-  const nativeRequest = useRef<{ signature: string; key: string } | null>(null)
+  const nativeSession = useNativeSessionCreate()
   const [prompt, setPrompt] = useState('')
   const [name, setName] = useState('')
   const [nameTouched, setNameTouched] = useState(false)
@@ -92,7 +91,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   useEffect(() => {
     if (!open) return
     setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); review.reset()
-    setModelChoice({ model: 'auto', freeOnly: false }); nativeRequest.current = null
+    setModelChoice({ model: 'auto', freeOnly: false }); nativeSession.reset()
     setBase(''); setBranches([]); setRemoteBranches([]); setDefBranch(''); setExistingWts([]); setMainPath(''); setExisting('')
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
     if (parent) {
@@ -155,13 +154,10 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     try {
       setCreating(true)
       if (agent === 'native') {
-        const body = { title: finalName.slice(0, 80), task: prompt, ...(dir.trim() ? { directory: dir.trim() } : {}), ...(modelChoice.model !== 'auto' || modelChoice.freeOnly ? { model: modelChoice.model } : {}), freeOnly: modelChoice.freeOnly }
-        const destination = nodeApi('/agent/native-sessions')
-        const signature = JSON.stringify([destination, body])
-        if (nativeRequest.current?.signature !== signature) nativeRequest.current = { signature, key: crypto.randomUUID() }
-        const { data } = await api('POST', '/agent/native-sessions', { ...body, requestKey: nativeRequest.current.key })
-        if (nodeApi('/agent/native-sessions') !== destination) { message.info(t('modelSelection.createdOnOriginalNode')); onClose(); return }
-        refreshSessionLists(); onClose(); onDone(data.session)
+        const { session, onCurrentNode } = await nativeSession.create(finalName, prompt, dir.trim(), modelChoice)
+        onClose()
+        if (onCurrentNode) onDone(session)
+        else message.info(t('modelSelection.createdOnOriginalNode'))
         return
       }
       const sessionDir = (wtMode === 'existing' ? pickedWtPath(existing) : '') || dir.trim()
@@ -181,7 +177,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       pushRecentDir(dir); message.success(t('session.lifecycle.accepted')); onClose(); onDone(op.resourceId)
 
     }
-    catch (e: any) { const code = e?.apiError?.code || e?.message; message.error(code === 'MODEL_NOT_CONFIGURED' ? t('modelSelection.notConfigured') : code === 'MODEL_ROUTE_DISABLED' ? t('modelSelection.disabled') : code === 'MODEL_ROLE_REQUIRES_BINDING' ? t('agent.models.bindRoles') : lifecycleRequestError(e, t)) }
+    catch (e) { message.error(sessionCreateError(e, t)) }
     finally { setCreating(false) }
   }
   const form = <Space direction="vertical" style={{ width: '100%' }}>

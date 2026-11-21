@@ -12,7 +12,6 @@
   padding-block-start: var(--sp-2);
 }
 .tt-composer > .tt-cbar:has(+ .tt-review-row), .tt-composer > .tt-review-row { padding-inline: var(--sp-3); }
-html[data-size="compact"] .tt-newtask-modal .tt-composer > .tt-review-row { padding-inline: 0; }
 .tt-review-agents strong { color: var(--text-dim); font-size: var(--fs-sm); }
 html[data-pointer="coarse"] .tt-review-agents { gap: var(--sp-1); }
 html[data-pointer="coarse"] .tt-review-agents .tt-pill { flex-shrink: 0; }
