@@ -56,7 +56,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const [addingAccount,setAddingAccount]=useState(''),[accountError,setAccountError]=useState(''),[accountToAuthorize,setAccountToAuthorize]=useState('')
   const draftNotice = useSettingsDraft('onboarding-model-hub', { sourceDrafts, modelDrafts }, { sourceDrafts: {}, modelDrafts: {} }, draft => { setSourceDrafts(draft.sourceDrafts); setModelDrafts(draft.modelDrafts) }, embedded)
   const navigate = (path: string) => onNav('capabilities/models/' + path)
-  const openPool = (pool: string, section?: string) => navigate('aggregate/' + encodeURIComponent(pool) + (section ? '/' + section : ''))
+  const openPool = (pool: string, section?: string, requestId?: string) => navigate('aggregate/' + encodeURIComponent(pool) + (section ? '/' + section : '') + (requestId ? '/' + encodeURIComponent(requestId) : ''))
   const openRequest = (id: string, from: 'aggregate' | 'requests', pool?: string) => navigate('audit/request/' + encodeURIComponent(id) + '/' + from + (pool ? '/' + encodeURIComponent(pool) : ''))
   const openRequestAudit = () => navigate('audit/requests')
   const backFromRequest = () => {
@@ -191,7 +191,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <Tabs tabPosition={layout.phone ? 'top' : 'left'} className="tt-model-hub-tabs" activeKey={tab} onChange={key => navigate(key)} items={tabs.map(key => ({ key, label: t('hub.tab.' + key + (layout.phone ? '.compact' : '')) }))} />
       <div className="tt-model-catalog-detail" hidden={!fullDetail || layout.phone}><header className="tt-pagehead"><BackButton onClick={back}/><h2>{editorTitle}</h2></header>{fullDetail && !layout.phone && editor}</div>
       <ModelUsageWorkspace active={tab === 'usage' || tab === 'audit' && !requestDetail && !requestAudit} mode={tab === 'audit' ? 'audit' : 'overview'} controller={billing} sources={sources} onAudit={query => navigate('audit?'+query)} onOverview={()=>navigate('usage')} onRequestAudit={openRequestAudit} />
-      <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onRequest={(id, pool) => openRequest(id, 'aggregate', pool)} requestedPool={tab === 'aggregate' ? detail : ''} requestedSection={id} onOpenRequested={openPool} onCloseRequested={() => navigate('aggregate')}/>
+      <ModelAggregationWorkspace active={tab==='aggregate'} catalog={loaded} busy={controller.busy} error={controller.error} save={controller.save} retry={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onRequest={(id, pool) => openRequest(id, 'aggregate', pool)} onRequestLimits={() => navigate('usage')} requestedPool={tab === 'aggregate' ? detail : ''} requestedSection={id} requestedRequest={section} onOpenRequested={openPool} onCloseRequested={() => navigate('aggregate')}/>
       <ModelMonitoringWorkspace active={tab==='monitor'} catalog={loaded} onAudit={openRequestAudit}/>
       <GatewayRequestAudit active={requestAudit} catalog={value} onBack={() => navigate('audit')} onRequest={id => openRequest(id, 'requests')} />
       {requestDetail && <GatewayRequestDetail key={requestDetail} id={requestDetail} catalog={value} onBack={backFromRequest} onSource={source => navigate('catalog/source/' + source)} onPool={pool => navigate('aggregate/' + encodeURIComponent(pool))} onLimits={() => navigate('usage')} />}

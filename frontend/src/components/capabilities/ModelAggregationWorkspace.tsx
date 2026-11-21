@@ -14,10 +14,11 @@ import './model-routing.css'
 const identity = (candidate: ModelCandidate) => candidate.sourceId + '/' + candidate.model
 const draftKey = (pool: string | null) => pool === null ? '@new' : 'pool:' + pool
 const emptyPool = (): CatalogModel => ({ id: globalThis.crypto?.randomUUID?.() || 'pool-' + Date.now().toString(36), name: '', aggregate: true, enabled: true, protocol: 'openai-completions', strategy: 'smart', candidates: [], cooldownSeconds: 60, onLimit: true, onExhausted: true, minContext: 0, weights: {} })
-export default function ModelAggregationWorkspace({ active, catalog, busy, error, save, retry, onSource, onRequest, requestedPool, requestedSection, onOpenRequested, onCloseRequested }: {
+export default function ModelAggregationWorkspace({ active, catalog, busy, error, save, retry, onSource, onRequest, onRequestLimits, requestedPool, requestedSection, requestedRequest, onOpenRequested, onCloseRequested }: {
   active: boolean; catalog: ModelCatalog | null; busy: boolean; error: string; save: (value: ModelCatalog) => Promise<boolean>; retry: () => void
-  onSource: (source: string) => void; onRequest: (id: string, pool: string) => void; requestedPool?: string; requestedSection?: string
-  onOpenRequested: (pool: string, section?: AggregationSection) => void; onCloseRequested: () => void
+  onSource: (source: string) => void; onRequest: (id: string, pool: string) => void; onRequestLimits: () => void
+  requestedPool?: string; requestedSection?: string; requestedRequest?: string
+  onOpenRequested: (pool: string, section?: AggregationSection, requestId?: string) => void; onCloseRequested: () => void
 }) {
   const { t } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
   const [drafts, setDrafts] = useState<Record<string, CatalogModel>>({}), [creating, setCreating] = useState(false), [query,setQuery]=useState('')
@@ -26,7 +27,9 @@ export default function ModelAggregationWorkspace({ active, catalog, busy, error
   const original = savedPool?.id ?? null
   const key = draftKey(original), draft = drafts[key] ?? savedPool
   const newPoolOpen = !requestedPool && creating
-  const section = requestedSection === 'members' || requestedSection === 'monitor' ? requestedSection : 'routing'
+  const section = requestedSection === 'members' || requestedSection === 'monitor' || requestedSection === 'requests' ? requestedSection : 'routing'
+  const requestId = section === 'requests' ? requestedRequest : undefined
+  const openSection = (section: AggregationSection, id?: string) => { if (original) onOpenRequested(original, section, id) }
   const create = () => {
     setDrafts(previous => previous['@new'] ? previous : { ...previous, '@new': emptyPool() })
     setCreating(true)
@@ -47,10 +50,10 @@ export default function ModelAggregationWorkspace({ active, catalog, busy, error
     return <AggregationPoolCard key={model.id} model={model} disabled={busy} unsaved={!!savedDraft && JSON.stringify(savedDraft) !== JSON.stringify(model)} onOpen={() => onOpenRequested(model.id)} />
   }
   const remove = async () => { if (!catalog || !original || busy) return false; const saved = await save({ ...catalog, models: catalog.models.filter(row => row.id !== original) }); if (saved) cancel(); return saved }
-  const editor = draft && catalog && <AggregationEditor key={key} model={draft} original={original} catalog={catalog} active={active} busy={busy} valid={valid} error={error} retry={retry} section={original ? section : undefined} onSection={section => { if (original) onOpenRequested(original, section) }} onChange={patch} onSave={() => void submit()} onCancel={cancel} onDelete={remove} onSource={onSource} onRequest={id => { if (original) onRequest(id, original) }} />
+  const editor = draft && catalog && <AggregationEditor key={key} model={draft} original={original} catalog={catalog} active={active} busy={busy} valid={valid} error={error} retry={retry} section={original ? section : undefined} requestId={requestId} onSection={openSection} onChange={patch} onSave={() => void submit()} onCancel={cancel} onDelete={remove} onSource={onSource} onRequest={id => { if (original) onRequest(id, original) }} onTrace={id => openSection('requests', id)} onRequestLimits={onRequestLimits} />
   const title = savedPool?.name || t('pool.create')
   if ((savedPool || newPoolOpen) && draft) return <section className="tt-routing-workspace tt-model-catalog-detail tt-aggregate-detail" hidden={!active} aria-label={t('hub.tab.aggregate')}>
-    {phone ? active && <MobileSubPage title={title} search={false} onBack={closeEditor} manageHistory={newPoolOpen}>{editor}</MobileSubPage> : <><header className="tt-pagehead"><BackButton onClick={closeEditor} /><h2>{title}</h2></header>{editor}</>}
+    {phone ? active && <MobileSubPage title={title} search={false} onBack={requestId ? () => openSection('requests') : closeEditor} manageHistory={newPoolOpen}>{editor}</MobileSubPage> : <><header className="tt-pagehead"><BackButton onClick={closeEditor} /><h2>{title}</h2></header>{editor}</>}
   </section>
   return <section className="tt-routing-workspace" hidden={!active} aria-label={t('hub.tab.aggregate')}>
     <div className="tt-routing-main">

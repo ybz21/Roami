@@ -7,8 +7,9 @@ import (
 )
 
 type requestSummaryFilter struct {
-	from, to                       int64
-	route, caller, outcome, reason string
+	from, to                          int64
+	routeIDs                          []string
+	caller, outcome, reason, switched string
 }
 
 type requestSummaryRange struct {
@@ -108,7 +109,7 @@ func summarizeRequests(rows []MonitorRecord, points []requestBucket, filter requ
 			result.Routes[row.RouteID] = row.Model
 		}
 		result.Callers[row.Caller] = true
-		if row.At <= start || row.At > end || filter.route != "" && row.RouteID != filter.route ||
+		if row.At <= start || row.At > end || len(filter.routeIDs) != 0 && !slices.Contains(filter.routeIDs, row.RouteID) ||
 			filter.caller != "" && row.Caller != filter.caller {
 			continue
 		}
@@ -121,7 +122,7 @@ func summarizeRequests(rows []MonitorRecord, points []requestBucket, filter requ
 				result.FailureReasons[reason]++
 			}
 		}
-		if filter.outcome != "" && outcome != filter.outcome || filter.reason != "" && reason != filter.reason {
+		if filter.outcome != "" && outcome != filter.outcome || filter.reason != "" && reason != filter.reason || !matchesRequestSwitch(row, filter.switched, reason) {
 			continue
 		}
 		points[(row.At-start-1)/span].Totals.add(row)

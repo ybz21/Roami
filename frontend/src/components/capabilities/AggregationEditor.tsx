@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Input, InputNumber, Select, TabBar, Popconfirm } from './model-controls'
 import { useI18n } from '../../i18n'
 import { ChevronRight } from '../../icons'
+import { usePageActive } from '../../page-activity'
+import { useViewState } from '../../view-state'
 import type { CatalogModel, ModelCatalog } from './model-hub-api'
 import { routingStrategies, type RoutingStrategy } from './model-routing-api'
 import { MAX_AGGREGATE_MEMBERS } from './routing-preview'
@@ -9,18 +11,26 @@ import AggregationMemberPicker from './AggregationMemberPicker'
 import RoutingStrategyPreview from './RoutingStrategyPreview'
 import AggregationRuntime from './AggregationRuntime'
 import AggregationMonitor from './AggregationMonitor'
+import AggregationRequestList, { type AggregationRequestFilter } from './AggregationRequestList'
+import GatewayRequestDetail from './GatewayRequestDetail'
 import { useModelMemberFacts } from './model-member-facts'
 
-export type AggregationSection = 'members' | 'routing' | 'monitor'
+export type AggregationSection = 'members' | 'routing' | 'monitor' | 'requests'
 
-export default function AggregationEditor({ model, original, catalog, active, busy, valid, error, section, onSection, onChange, onSave, onCancel, onDelete, onSource, onRequest, retry }: {
+export default function AggregationEditor({ model, original, catalog, active, busy, valid, error, section, requestId, onSection, onChange, onSave, onCancel, onDelete, onSource, onRequest, onTrace, onRequestLimits, retry }: {
   model: CatalogModel; original: string | null; catalog: ModelCatalog; active: boolean; busy: boolean; valid: boolean; error: string
-  section?: AggregationSection; onSection: (section: AggregationSection) => void
+  section?: AggregationSection; requestId?: string; onSection: (section: AggregationSection) => void
   onChange: (patch: Partial<CatalogModel>) => void; onSave: () => void; onCancel: () => void; onDelete: () => Promise<boolean>; onSource: (source: string) => void; onRequest: (id: string) => void; retry: () => void
+  onTrace: (id: string) => void; onRequestLimits: () => void
 }) {
   const { t, locale } = useI18n(), [creationTab, setCreationTab] = useState<AggregationSection>('members'), scroll = useRef<HTMLDivElement>(null)
   const tab = section ?? creationTab
   const setTab = section === undefined ? setCreationTab : onSection
+  const editing = tab === 'members' || tab === 'routing'
+  const pageActive = usePageActive()
+  const [trace, setTrace] = useViewState<{ hours: number; filter: AggregationRequestFilter }>('aggregation-trace:' + (original || ''), { hours: 6, filter: 'all' }, { policy: 'cache' })
+  const setHours = (hours: number) => setTrace(previous => ({ ...previous, hours }))
+  const setFilter = (filter: AggregationRequestFilter) => setTrace(previous => ({ ...previous, filter }))
   const more = useRef<HTMLDetailsElement>(null)
   const fieldId = useId(), [attempted, setAttempted] = useState(false), [touched, setTouched] = useState<Record<string, boolean>>({})
   const nameError = !model.name.trim() ? t('orchestration.nameRequired') : ''
@@ -28,11 +38,11 @@ export default function AggregationEditor({ model, original, catalog, active, bu
   const saved = catalog.models.find(row => row.id === original)
   const { facts, status } = useModelMemberFacts(model, saved, catalog, active && tab === 'routing')
   useEffect(() => { if (scroll.current) scroll.current.scrollTop = 0 }, [tab])
-  useEffect(() => { if (attempted && !valid && tab !== 'monitor') scroll.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus() }, [attempted, tab])
-  const tabs: AggregationSection[] = saved ? ['members', 'routing', 'monitor'] : ['members', 'routing']
+  useEffect(() => { if (attempted && !valid && editing) scroll.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus() }, [attempted, tab])
+  const tabs: AggregationSection[] = saved ? ['members', 'routing', 'monitor', 'requests'] : ['members', 'routing']
   return <div className="tt-aggregate-editor">
     <TabBar className="tt-aggregate-tabs" activeKey={tab} onChange={key => setTab(key as AggregationSection)} items={tabs.map(key => ({ key, label: t('pool.section.' + key) }))} />
-    <form className="tt-aggregate-editor" hidden={tab === 'monitor'} onSubmit={event => { event.preventDefault(); if (valid) onSave(); else { setAttempted(true); if (idError && more.current) more.current.open = true; const next = nameError || idError || !model.candidates.length ? 'members' : 'routing'; if (next !== tab) setTab(next) } }}>
+    <form className="tt-aggregate-editor" hidden={!editing} onSubmit={event => { event.preventDefault(); if (valid) onSave(); else { setAttempted(true); if (idError && more.current) more.current.open = true; const next = nameError || idError || !model.candidates.length ? 'members' : 'routing'; if (next !== tab) setTab(next) } }}>
     <div className={"tt-routing-editor tt-aggregate-editor-content" + (tab === 'members' ? ' is-members' : '')} ref={scroll}>
       {error && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
       <section hidden={tab !== 'members'} aria-label={t('pool.section.members')}>
@@ -64,6 +74,13 @@ export default function AggregationEditor({ model, original, catalog, active, bu
     </div>
     <footer className="tt-model-source-footer tt-aggregate-footer"><span role="status">{t('pool.memberSummary', { count: new Intl.NumberFormat(locale).format(model.candidates.length), max: MAX_AGGREGATE_MEMBERS })}{attempted && !valid && !nameError && !idError && !!model.candidates.length && <small role="alert">{t('pool.invalid')}</small>}</span><div><Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={busy} loading={busy}>{t('agent.models.save')}</Button></div></footer>
     </form>
-    {saved && <AggregationMonitor poolId={saved.id} visible={tab === 'monitor'} active={active} />}
+    {saved && <>
+      <AggregationMonitor poolId={saved.id} visible={tab === 'monitor'} active={active} hours={trace.hours} onHours={setHours}
+        onOpenSwitches={() => { setFilter('switched'); setTab('requests') }} />
+      <AggregationRequestList poolId={saved.id} catalog={catalog} visible={tab === 'requests' && !requestId} active={active}
+        hours={trace.hours} filter={trace.filter} onHours={setHours} onFilter={setFilter} onRequest={onTrace} />
+      {active && pageActive && tab === 'requests' && requestId && <GatewayRequestDetail key={requestId} id={requestId} catalog={catalog} routeId={saved.id}
+        onBack={() => onSection('requests')} onSource={onSource} onLimits={onRequestLimits} />}
+    </>}
   </div>
 }

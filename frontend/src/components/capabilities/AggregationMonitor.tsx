@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useI18n } from '../../i18n'
 import { usePageActive } from '../../page-activity'
 import { Alert, Button, Select, Spin } from './model-controls'
@@ -43,13 +42,18 @@ function AggregationTrend({ title, points, series, totals }: {
   </>
 }
 
-export default function AggregationMonitor({ poolId, visible, active }: { poolId: string; visible: boolean; active: boolean }) {
+export default function AggregationMonitor({ poolId, visible, active, hours, onHours, onOpenSwitches }: {
+  poolId: string; visible: boolean; active: boolean; hours: number; onHours: (hours: number) => void; onOpenSwitches: () => void
+}) {
   const { t, locale } = useI18n()
   const pageActive = usePageActive()
-  const [hours, setHours] = useState(6)
   const state = useGatewayRequestSummary(active && visible && pageActive, hours, poolId, '', '', null)
   const data = state.pending ? undefined : state.data
   const number = new Intl.NumberFormat(locale)
+  const duration = new Intl.NumberFormat(locale, { style: 'unit', unit: 'millisecond' })
+  const switched = data ? data.totals.sameSource + data.totals.crossSource : 0
+  const switchedFailed = data?.totals.switchedFailed
+  const switchedUncertain = data && switchedFailed != null ? switched - data.totals.recovered - switchedFailed : 0
   const outcomes: Series[] = [
     { key: 'success', label: t('gatewayTrace.success'), count: successfulRequests },
     { key: 'failed', label: t('gatewayTrace.failed'), count: totals => totals.failed },
@@ -62,7 +66,7 @@ export default function AggregationMonitor({ poolId, visible, active }: { poolId
 
   return <section className="tt-routing-editor tt-pool-monitor" hidden={!visible} aria-label={t('pool.section.monitor')} aria-busy={state.pending}>
     <div className="tt-request-toolbar">
-      <label className="agent-settings-field">{t('monitor.range')}<Select<number> aria-label={t('monitor.range')} value={hours} options={[1, 6, 24].map(value => ({ value, label: t('monitor.hours', { hours: value }) }))} onChange={setHours} /></label>
+      <label className="agent-settings-field">{t('monitor.range')}<Select<number> aria-label={t('monitor.range')} value={hours} options={[1, 6, 24].map(value => ({ value, label: t('monitor.hours', { hours: value }) }))} onChange={onHours} /></label>
     </div>
     {state.failed && <Alert type="error" role="alert" message={t('monitor.failed')} action={<Button onClick={state.retry}>{t('agent.retry')}</Button>} />}
     {state.unsupported && <p className="agent-settings-hint">{t('gatewayTrace.unsupported')}</p>}
@@ -71,7 +75,20 @@ export default function AggregationMonitor({ poolId, visible, active }: { poolId
         <div><dt>{t('gatewayTrace.requests')}</dt><dd>{number.format(data.totals.requests)}</dd></div>
         <div><dt>{t('gatewayTrace.success')}</dt><dd>{number.format(successfulRequests(data.totals))}</dd></div>
         <div><dt>{t('gatewayTrace.failed')}</dt><dd className={data.totals.failed ? 'is-failed' : undefined}>{number.format(data.totals.failed)}</dd></div>
+        {data.duration && <div><dt>{t('pool.trace.p95')}</dt><dd>{duration.format(data.duration.p95)}</dd></div>}
       </dl>
+      <section className="tt-pool-monitor-failover">
+        <div className="tt-request-section-head">
+          <h3>{t('pool.trace.failover')}</h3>
+          {!!switched && <Button onClick={onOpenSwitches}>{t('pool.trace.viewSwitches')}</Button>}
+        </div>
+        <dl className="tt-request-totals">
+          <div><dt>{t('pool.trace.switched')}</dt><dd>{number.format(switched)}</dd></div>
+          <div><dt>{t('gatewayTrace.recovered')}</dt><dd className={data.totals.recovered ? 'is-recovered' : undefined}>{number.format(data.totals.recovered)}</dd></div>
+          {switchedFailed != null && <div><dt>{t('pool.trace.switchFailed')}</dt><dd className={switchedFailed ? 'is-failed' : undefined}>{number.format(switchedFailed)}</dd></div>}
+          {switchedUncertain > 0 && <div><dt>{t('pool.trace.switchUncertain')}</dt><dd>{number.format(switchedUncertain)}</dd></div>}
+        </dl>
+      </section>
       <div className="tt-request-charts tt-pool-monitor-charts">
         <section className="tt-request-trend"><AggregationTrend title={t('pool.monitor.requestTrend')} points={data.points} series={outcomes} /></section>
         <section className="tt-request-breakdown"><AggregationTrend title={t('pool.monitor.switchTrend')} points={data.points} series={switches} totals={data.totals} /></section>

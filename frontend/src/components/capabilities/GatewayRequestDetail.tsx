@@ -30,8 +30,8 @@ function attemptReason(attempt: RequestAttempt, outcome: RequestOutcome) {
   return attempt.status >= 200 && attempt.status < 300 && outcome === 'interrupted' ? 'interrupted' : 'failed'
 }
 
-export default function GatewayRequestDetail({ id, catalog, onBack, onSource, onPool, onLimits }: {
-  id: string; catalog: ModelCatalog; onBack: () => void; onSource: (id: string) => void; onPool: (id: string) => void; onLimits: () => void
+export default function GatewayRequestDetail({ id, catalog, routeId, onBack, onSource, onPool, onLimits }: {
+  id: string; catalog: ModelCatalog; routeId?: string; onBack: () => void; onSource: (id: string) => void; onPool?: (id: string) => void; onLimits: () => void
 }) {
   const { t, locale } = useI18n(), { phone } = useLayout(), { message } = App.useApp()
   const [result, setResult] = useState<{ data?: RequestDetail; failure?: 'missing' | 'requestFailed' }>()
@@ -39,13 +39,13 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
   const resultHeading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     const controller = new AbortController()
-    loadRequestDetail(id, controller.signal).then(({ data }) => {
+    loadRequestDetail(id, controller.signal, routeId).then(({ data }) => {
       if (!controller.signal.aborted) setResult({ data })
     }).catch(error => {
       if (!controller.signal.aborted) setResult({ failure: error.status === 404 ? 'missing' : 'requestFailed' })
     })
     return () => controller.abort()
-  }, [id, retry])
+  }, [id, retry, routeId])
   const data = result?.data
   const row = data?.request
   useEffect(() => {
@@ -53,6 +53,7 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
   }, [row])
   const when = row && new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' }).format(row.at)
   const sources = new Map(catalog.sources.map(source => [source.id, source.name]))
+  const groups = new Map(catalog.models.filter(model => model.aggregate).flatMap(model => [model.id, ...(model.aliases || [])].map(id => [id, model.name] as const)))
   const pool = catalog.models.find(model => model.aggregate && row && (model.id === row.routeId || model.aliases?.includes(row.routeId)))
   const knownSource = row && sources.get(row.sourceId)
   const finished = row?.outcome === 'success' || row?.outcome === 'recovered'
@@ -60,6 +61,7 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
   const attempts = data?.attempts.slice().sort((left, right) => left.attempt - right.attempt) || []
   const title = t('gatewayTrace.detail')
   const count = new Intl.NumberFormat(locale)
+  const duration = new Intl.NumberFormat(locale, { style: 'unit', unit: 'millisecond', maximumFractionDigits: 1 })
   const attemptTime = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 })
   const attemptFee = (billing: RequestAttempt['billing']) => {
     if (!billing) return null
@@ -85,7 +87,7 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
           <dt>{t(finished ? 'gatewayTrace.actualHit' : 'gatewayTrace.lastAttempt')}</dt>
           <dd>{row.upstreamModel && <span translate="no">{row.upstreamModel}</span>}{row.sourceId && <small>{knownSource || t('gatewayTrace.sourceRemoved')}</small>}</dd>
         </div>
-        {switchType && <div><dt>{t('gatewayTrace.latestSwitch')}</dt><dd>{t('gatewayTrace.' + switchType)}</dd></div>}
+        {switchType && <div><dt>{t(routeId ? 'pool.trace.switchScope' : 'gatewayTrace.latestSwitch')}</dt><dd>{t('gatewayTrace.' + switchType)}</dd></div>}
       </dl>}
       {row.outcome === 'blocked' && <section className="tt-request-blocks"><h3>{t('gatewayTrace.whyBlocked')}</h3>
         {Object.keys(row.blocks || {}).length > 0
@@ -100,18 +102,21 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
           <div>
             <strong translate="no">{attempt.model}</strong>
             <span>{sources.get(attempt.sourceId) || t('gatewayTrace.sourceRemoved')}</span>
+            {!!attempt.groupPath?.length && <span>{t('pool.trace.via', { groups: attempt.groupPath.map(id => groups.get(id) || id).join(' / ') })}</span>}
             {attempt.billing && <span>{t('agent.usage.cost')} · {attemptFee(attempt.billing)}</span>}
           </div>
           <div className="tt-request-path-result">
             <strong className={'tt-request-outcome ' + (attempt.success ? 'is-success' : 'is-failed')}>{t('gatewayTrace.' + attemptReason(attempt, row.outcome))}</strong>
             {attempt.status > 0 && <small>HTTP {attempt.status}</small>}
+            {attempt.durationMs != null && <small>{duration.format(attempt.durationMs)}</small>}
+            {attempt.firstTokenMs != null && <small>{t('pool.trace.firstToken', { duration: duration.format(attempt.firstTokenMs) })}</small>}
             {attempt.at > 0 && <time dateTime={new Date(attempt.at).toISOString()}>{attemptTime.format(attempt.at)}</time>}
           </div>
         </li>)}</ol>
       </section>}
       {data && !data.complete && <p className="agent-settings-hint">{t('gatewayTrace.partial')}</p>}
       <div className="tt-request-actions">
-        {pool && <Button onClick={() => onPool(pool.id)}>{t('gatewayWorkspace.viewPool')}</Button>}
+        {pool && onPool && <Button onClick={() => onPool(pool.id)}>{t('gatewayWorkspace.viewPool')}</Button>}
         {knownSource && <Button onClick={() => onSource(row.sourceId)}>{t('gatewayWorkspace.viewSource')}</Button>}
         {row.error === 'MODEL_PROXY_DAILY_LIMIT' && <Button onClick={onLimits}>{t('gatewayTrace.viewLimits')}</Button>}
       </div>
@@ -129,6 +134,7 @@ export default function GatewayRequestDetail({ id, catalog, onBack, onSource, on
       </details>
     </>}
   </div>
+  if (phone && routeId) return <section className="tt-request-detail" aria-label={title}>{body}</section>
   return phone ? <MobileSubPage title={title} onBack={onBack} manageHistory={false} search={false}>{body}</MobileSubPage>
     : <section className="tt-request-detail" aria-label={title}><header className="tt-pagehead"><BackButton onClick={onBack} /><h2>{title}</h2></header>{body}</section>
 }

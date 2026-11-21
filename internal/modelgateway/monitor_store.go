@@ -51,6 +51,7 @@ type MonitorRecord struct {
 	Attempt         int            `json:"attempt,omitempty"`
 	Switch          string         `json:"switch,omitempty"`
 	Blocks          map[string]int `json:"blocks,omitempty"`
+	GroupPath       []string       `json:"groupPath,omitempty"`
 
 	TokenUsage *monitorTokenUsage `json:"tokenUsage,omitempty"`
 }

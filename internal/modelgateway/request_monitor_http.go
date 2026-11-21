@@ -10,12 +10,13 @@ import (
 )
 
 type requestTotals struct {
-	Requests    int `json:"requests"`
-	Failed      int `json:"failed"`
-	Recovered   int `json:"recovered"`
-	Uncertain   int `json:"uncertain"`
-	SameSource  int `json:"sameSource"`
-	CrossSource int `json:"crossSource"`
+	Requests       int `json:"requests"`
+	Failed         int `json:"failed"`
+	Recovered      int `json:"recovered"`
+	Uncertain      int `json:"uncertain"`
+	SameSource     int `json:"sameSource"`
+	CrossSource    int `json:"crossSource"`
+	SwitchedFailed int `json:"switchedFailed"`
 }
 
 func (t *requestTotals) add(row MonitorRecord) {
@@ -28,6 +29,9 @@ func (t *requestTotals) add(row MonitorRecord) {
 	case "success":
 	default:
 		t.Failed++
+		if row.Switch != "" {
+			t.SwitchedFailed++
+		}
 	}
 	switch row.Switch {
 	case "source":
@@ -35,6 +39,22 @@ func (t *requestTotals) add(row MonitorRecord) {
 	case "model":
 		t.SameSource++
 	}
+}
+
+func (h *Handler) requestRouteIDs(route string) []string {
+	if route == "" {
+		return nil
+	}
+	if h.Catalog != nil {
+		h.Catalog.mu.Lock()
+		defer h.Catalog.mu.Unlock()
+		for _, model := range h.Catalog.value.Models {
+			if model.Aggregate && model.ID == route {
+				return append([]string{route}, model.Aliases...)
+			}
+		}
+	}
+	return []string{route}
 }
 
 type requestBucket struct {
@@ -121,6 +141,12 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 		reject(w, 503, "MODEL_MONITOR_UNAVAILABLE")
 		return true
 	}
+	route := query.Get("routeId")
+	if route != "" && !catalogID.MatchString(route) {
+		reject(w, 400, "INVALID_MONITOR_QUERY")
+		return true
+	}
+	routeIDs := h.requestRouteIDs(route)
 	if detail {
 		parsed, err := uuid.Parse(id)
 		if err != nil || parsed.String() != id {
@@ -147,7 +173,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 				terminal = &copy
 			}
 		}
-		if terminal == nil {
+		if terminal == nil || len(routeIDs) != 0 && !containsField(routeIDs, terminal.RouteID) {
 			reject(w, 404, "MODEL_REQUEST_NOT_FOUND")
 			return true
 		}
@@ -164,8 +190,8 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 		}
 		hours, _ = strconv.Atoi(value)
 	}
-	route, caller, outcome, reason := query.Get("routeId"), query.Get("caller"), query.Get("outcome"), query.Get("reason")
-	if route != "" && !catalogID.MatchString(route) || len(caller) > 120 ||
+	caller, outcome, reason, switched := query.Get("caller"), query.Get("outcome"), query.Get("reason"), query.Get("switch")
+	if len(caller) > 120 || switched != "" && !containsField([]string{"any", "failed"}, switched) ||
 		outcome != "" && !containsField([]string{"success", "recovered", "blocked", "exhausted", "interrupted", "failed", "uncertain"}, outcome) ||
 		reason != "" && !containsField(requestFailureReasons, reason) {
 		reject(w, 400, "INVALID_MONITOR_QUERY")
@@ -200,7 +226,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 	}
 	if view == "request-summary" {
 		data := summarizeRequests(rows, points, requestSummaryFilter{
-			from: sampleFrom, to: sampleTo, route: route, caller: caller, outcome: outcome, reason: reason,
+			from: sampleFrom, to: sampleTo, routeIDs: routeIDs, caller: caller, outcome: outcome, reason: reason, switched: switched,
 		})
 		writeJSON(w, 200, map[string]any{"data": data})
 		return true
@@ -218,7 +244,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 			routes[row.RouteID] = row.Model
 		}
 		callers[row.Caller] = true
-		if (route != "" && route != row.RouteID) || (caller != "" && caller != row.Caller) {
+		if (len(routeIDs) != 0 && !containsField(routeIDs, row.RouteID)) || (caller != "" && caller != row.Caller) {
 			continue
 		}
 		if row.At > start && row.At <= end {
@@ -232,7 +258,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 			if failure != "" {
 				failureReasons[failure]++
 			}
-			if len(recent) < 50 && (outcome == "" || key == outcome) && (reason == "" || failure == reason) {
+			if len(recent) < 50 && (outcome == "" || key == outcome) && (reason == "" || failure == reason) && matchesRequestSwitch(row, switched, failure) {
 				recent = append(recent, row)
 			}
 		}
@@ -242,4 +268,8 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 		"failureReasons": failureReasons, "recent": recent, "storage": storage,
 	}})
 	return true
+}
+
+func matchesRequestSwitch(row MonitorRecord, switched, failure string) bool {
+	return switched == "" || row.Switch != "" && (switched == "any" || failure != "")
 }

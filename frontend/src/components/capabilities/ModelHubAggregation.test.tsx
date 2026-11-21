@@ -23,10 +23,10 @@ const catalog: ModelCatalog = {
   revision: 'r1', sources: [{ id: 'source', name: 'Source', baseUrl: '', protocol: 'openai-completions', authMode: 'bearer' }],
   models: [pool, { ...pool, id: 'pool-b', name: 'Pool Beta' }], drafts: [], baseUrl: '', uses: {},
 }
-const totals = { requests: 5, failed: 1, recovered: 2, uncertain: 1, sameSource: 1, crossSource: 2 }
+const totals = { requests: 5, failed: 1, recovered: 2, uncertain: 1, sameSource: 1, crossSource: 2, switchedFailed: 1 }
 const empty = { requests: 0, failed: 0, recovered: 0, uncertain: 0, sameSource: 0, crossSource: 0 }
 const now = Date.UTC(2026, 10, 21, 12)
-const trace = { requestId: 'audit-id', at: now, routeId: pool.id, model: pool.name, caller: 'external', outcome: 'recovered', sourceId: 'source', upstreamModel: 'native', status: 200, durationMs: 100, attempts: 2 }
+const trace = { requestId: 'audit-id', at: now, routeId: pool.id, model: pool.name, caller: 'external', outcome: 'recovered', sourceId: 'source', upstreamModel: 'native', status: 200, durationMs: 100, attempts: 2, switch: 'source' }
 let store: WorkspaceStateStore
 const page = (sub: string, navigate: (path: string) => void) =>
   <WorkspaceStateProvider store={store}><App><ModelHub sub={sub} onNav={navigate} /></App></WorkspaceStateProvider>
@@ -41,7 +41,14 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (_method, path) => {
     if (path === '/agent/model-gateway/catalog') return { data: catalog }
     if (path === '/agent/model-gateway/settings') return { data: { currency: 'CNY', timezone: 'Asia/Shanghai', dailyLimit: 0, pricing: { default: {}, models: {} } } }
-    if (path.includes('/monitor/requests/')) return { data: { request: trace, attempts: [], complete: false } }
+    if (path.includes('/monitor/requests/')) return { data: { request: trace, attempts: [
+      { attempt: 1, at: now - 100, sourceId: 'source', model: 'original', status: 429, success: false, durationMs: 80 },
+      { attempt: 2, at: now, sourceId: 'source', model: 'native', status: 200, success: true, durationMs: 20, firstTokenMs: 10, groupPath: ['pool-b'] },
+    ], complete: true } }
+    if (path.includes('view=requests')) {
+      const query = new URL(path, 'https://example.test').searchParams
+      return { data: { recent: query.get('routeId') === pool.id && query.get('switch') !== 'failed' ? [trace] : [] } }
+    }
     if (path.includes('view=request-summary')) {
       const query = new URL(path, 'https://example.test').searchParams
       const sample = query.get('routeId') === pool.id ? totals : empty
@@ -131,4 +138,36 @@ it('opens another pool in the phone detail, shows its empty state and preserves 
   await screen.findByRole('heading', { name: 'gatewayTrace.recovered' })
   fireEvent.click(document.querySelector('.tt-mobile-subpage-head .tt-back')!)
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/aggregate/pool-a')
+})
+
+it('hands off the monitoring range to the scoped switch list and returns from a nested trace on phone', async () => {
+  vi.mocked(useLayout).mockReturnValue({ phone: true, keyboard: 0 } as ReturnType<typeof useLayout>)
+  const navigate = vi.fn()
+  const view = render(page('aggregate/pool-a/monitor', navigate))
+  fireEvent.keyDown(await screen.findByRole('combobox', { name: 'monitor.range' }), { key: 'Enter' })
+  fireEvent.click((await screen.findAllByRole('option', { name: 'monitor.hours' }))[2])
+  await waitFor(() => expect(monitorCalls().slice(-1)[0]?.[1]).toContain('hours=24&routeId=pool-a'))
+  fireEvent.click(await screen.findByRole('button', { name: 'pool.trace.viewSwitches' }))
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/aggregate/pool-a/requests')
+  view.rerender(page('aggregate/pool-a/requests', navigate))
+  const row = await screen.findByRole('button', { name: /native/ })
+  expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/monitor?view=requests&hours=24&routeId=pool-a&switch=any', undefined, expect.anything())
+  fireEvent.click(row)
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/aggregate/pool-a/requests/audit-id')
+  view.rerender(page('aggregate/pool-a/requests/audit-id', navigate))
+  await screen.findByRole('heading', { name: 'gatewayTrace.recovered' })
+  expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/monitor/requests/audit-id?routeId=pool-a', undefined, expect.anything())
+  expect(screen.getByText('pool.trace.via')).toBeTruthy()
+  expect(screen.getByText('pool.trace.firstToken')).toBeTruthy()
+  expect(screen.getByText('gatewayTrace.upstreamLimited')).toBeTruthy()
+  expect(document.querySelectorAll('.tt-mobile-subpage-head')).toHaveLength(1)
+  fireEvent.click(document.querySelector('.tt-mobile-subpage-head .tt-back')!)
+  expect(navigate).toHaveBeenLastCalledWith('capabilities/models/aggregate/pool-a/requests')
+  view.rerender(page('aggregate/pool-a/requests', navigate))
+  expect(document.activeElement).toBe(row)
+  expect(screen.getByRole('combobox', { name: 'modelUsage.state' }).textContent).toBe('pool.trace.switched')
+  fireEvent.keyDown(screen.getByRole('combobox', { name: 'modelUsage.state' }), { key: 'Enter' })
+  fireEvent.click(await screen.findByRole('option', { name: 'pool.trace.switchFailed' }))
+  await screen.findByText('hub.directory.noMatches')
+  expect(api).toHaveBeenCalledWith('GET', '/agent/model-gateway/monitor?view=requests&hours=24&routeId=pool-a&switch=failed', undefined, expect.anything())
 })

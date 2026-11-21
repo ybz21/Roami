@@ -1,11 +1,13 @@
 package modelgateway
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -53,8 +55,8 @@ func TestAggregationMonitorScopesRequestTrendsBySavedRouteID(t *testing.T) {
 		route, hours string
 		want         requestTotals
 	}{
-		{pool.ID, "1", requestTotals{Requests: 3, Failed: 1, Recovered: 1, SameSource: 1, CrossSource: 1}},
-		{pool.ID, "6", requestTotals{Requests: 4, Failed: 1, Recovered: 1, SameSource: 1, CrossSource: 1}},
+		{pool.ID, "1", requestTotals{Requests: 3, Failed: 1, Recovered: 1, SameSource: 1, CrossSource: 1, SwitchedFailed: 1}},
+		{pool.ID, "6", requestTotals{Requests: 4, Failed: 1, Recovered: 1, SameSource: 1, CrossSource: 1, SwitchedFailed: 1}},
 		{others[0].ID, "24", requestTotals{Requests: 1}},
 		{"pool-empty", "24", requestTotals{}},
 	} {
@@ -79,7 +81,7 @@ func TestAggregationMonitorScopesRequestTrendsBySavedRouteID(t *testing.T) {
 				t.Fatalf("got %d trend buckets", len(points))
 			}
 			if tc.route == pool.ID && tc.hours == "1" {
-				if got := points[4].Totals; got != (requestTotals{Requests: 1, Failed: 1, CrossSource: 1}) {
+				if got := points[4].Totals; got != (requestTotals{Requests: 1, Failed: 1, CrossSource: 1, SwitchedFailed: 1}) {
 					t.Errorf("earlier bucket = %+v", got)
 				}
 				if got := points[5].Totals; got != (requestTotals{Requests: 2, Recovered: 1, SameSource: 1}) {
@@ -87,5 +89,92 @@ func TestAggregationMonitorScopesRequestTrendsBySavedRouteID(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAggregationTraceTracksNestedFailoverThroughPoolRename(t *testing.T) {
+	h := aggregateFixture(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "rate limited", http.StatusTooManyRequests)
+	}, responseFixture)
+	catalog := h.Catalog.snapshot()
+	root := &catalog.Models[0]
+	backup := root.Candidates[1]
+	root.Strategy = "order"
+	root.Candidates[1] = ModelCandidate{SourceID: groupSource, Model: "overflow"}
+	catalog.Models = append(catalog.Models,
+		CatalogModel{ID: "overflow", Name: "Overflow", Aggregate: true, Protocol: root.Protocol, Strategy: "order", Candidates: []ModelCandidate{{SourceID: groupSource, Model: "backup-pool"}}},
+		CatalogModel{ID: "backup-pool", Name: "Backup pool", Aggregate: true, Protocol: root.Protocol, Strategy: "order", Candidates: []ModelCandidate{backup}},
+	)
+	if err := h.Catalog.update(context.Background(), catalog); err != nil {
+		t.Fatal(err)
+	}
+	response := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`)
+	id := response.Header().Get(requestHeader)
+	if response.Code != http.StatusOK || id == "" {
+		t.Fatalf("inference = %d %s", response.Code, response.Body)
+	}
+	catalog = h.Catalog.snapshot()
+	catalog.Models[0].ID = "coding-renamed"
+	catalog.Models[0].Aliases = []string{"coding-main"}
+	if err := h.Catalog.update(context.Background(), catalog); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []MonitorRecord{
+		{RouteID: "coding-renamed", Outcome: "success"},
+		{RouteID: "overflow", Outcome: "failed", Switch: "source"},
+		{RouteID: "coding-main", Outcome: "failed", Switch: "model"},
+		{RouteID: "coding-renamed", Outcome: "cancelled", Switch: "source"},
+	} {
+		row.RequestID, row.At, row.Quality = uuid.NewString(), h.Ledger.now().UnixMilli(), "unchecked"
+		if err := h.Monitor.Append(row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	getMonitor := func(suffix string, dst any) int {
+		t.Helper()
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/model-gateway/monitor"+suffix, nil))
+		if dst != nil {
+			if err := json.Unmarshal(w.Body.Bytes(), dst); err != nil || w.Code != http.StatusOK {
+				t.Fatalf("monitor %s = %d %s (%v)", suffix, w.Code, w.Body, err)
+			}
+		}
+		return w.Code
+	}
+	summary := readRequestSummary(t, h, url.Values{"routeId": {"coding-renamed"}})
+	if summary.Totals != (requestTotals{Requests: 4, Failed: 1, Recovered: 1, Uncertain: 1, SameSource: 1, CrossSource: 2, SwitchedFailed: 1}) {
+		t.Fatalf("summary = %+v", summary.Totals)
+	}
+	for filter, want := range map[string]int{"any": 3, "failed": 1} {
+		var list struct {
+			Data struct{ Recent []MonitorRecord }
+		}
+		getMonitor("?view=requests&routeId=coding-renamed&switch="+filter, &list)
+		if len(list.Data.Recent) != want {
+			t.Fatalf("switch=%s: %+v", filter, list.Data.Recent)
+		}
+		if filter == "failed" && list.Data.Recent[0].Outcome != "failed" {
+			t.Fatalf("failure filter: %+v", list.Data.Recent)
+		}
+	}
+	var detail struct {
+		Data struct {
+			Request  MonitorRecord
+			Attempts []MonitorRecord
+			Complete bool
+		}
+	}
+	getMonitor("/requests/"+id+"?routeId=coding-renamed", &detail)
+	if detail.Data.Request.Outcome != "recovered" || !detail.Data.Complete || len(detail.Data.Attempts) != 2 {
+		t.Fatalf("request = %+v", detail.Data)
+	}
+	slices.SortFunc(detail.Data.Attempts, func(a, b MonitorRecord) int { return a.Attempt - b.Attempt })
+	first, second := detail.Data.Attempts[0], detail.Data.Attempts[1]
+	if first.Status != http.StatusTooManyRequests || len(first.GroupPath) != 0 ||
+		!second.Success || !slices.Equal(second.GroupPath, []string{"overflow", "backup-pool"}) {
+		t.Fatalf("attempts = %+v", detail.Data.Attempts)
+	}
+	if status := getMonitor("/requests/"+id+"?routeId=overflow", nil); status != http.StatusNotFound {
+		t.Fatalf("request within wrong root pool = %d", status)
 	}
 }

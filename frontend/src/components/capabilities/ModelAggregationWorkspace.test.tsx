@@ -12,7 +12,7 @@ vi.mock('../../api', () => ({ api: vi.fn() }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'en-US' }) }))
 vi.mock('../../layout', () => ({ useLayout: () => ({ phone: false, keyboard: 0 }) }))
 const catalog: ModelCatalog = { revision: 'r1', sources: [{ id: 'a', name: 'Source A', baseUrl: 'https://a.example', protocol: 'openai-completions', authMode: 'bearer' }, { id: 'b', name: 'Source B', baseUrl: 'https://b.example', protocol: 'openai-completions', authMode: 'bearer' }], models: [{ id: 'model-a', name: 'A', strategy: 'fixed', protocol: 'openai-completions', candidates: [{ sourceId: 'a', model: 'native-a' }] }, { id: 'model-b', name: 'B', strategy: 'fixed', protocol: 'openai-completions', candidates: [{ sourceId: 'b', model: 'native-b' }] }], drafts: [], baseUrl: '', uses: {} }
-const requestNav = { onRequest: vi.fn() }
+const requestNav = { onRequest: vi.fn(), onRequestLimits: vi.fn() }
 function ModelAggregationWorkspace(props: Omit<ComponentProps<typeof AggregationWorkspace>, 'onOpenRequested' | 'onCloseRequested'>) {
   const [route, setRoute] = useState<{ pool: string; section?: string } | null>(null)
   return <AggregationWorkspace {...props} requestedPool={route?.pool} requestedSection={route?.section}

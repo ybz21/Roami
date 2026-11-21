@@ -296,6 +296,11 @@ func (h *Handler) observeAttempt(r *http.Request, leaf routingLeaf, call Call, s
 		attempt = 0
 	}
 	record := MonitorRecord{At: h.Ledger.now().UnixMilli(), SourceID: call.SourceID, Model: call.Model, RouteID: call.RouteID, Account: routingAccountKey(leaf.Account), Success: successful, Status: status, Error: monitorError(code), Duration: finished.Sub(o.started).Milliseconds(), FirstToken: first, TokensPerSecond: speed, Quality: quality, QualityRule: rule, RequestID: requestID, Attempt: attempt, CallID: call.ID}
+	if requestID != "" {
+		for i := len(leaf.Ancestors) - 1; i >= 0; i-- {
+			record.GroupPath = append(record.GroupPath, strings.TrimPrefix(leaf.Ancestors[i], "group/"))
+		}
+	}
 	if probe, ok := r.Context().Value(qualityProbeContext{}).(*qualityProbe); ok {
 		copy := record
 		probe.Record = &copy
