@@ -16,6 +16,7 @@ export type SwarmMember = {
 export type SwarmSnapshot = {
   id: string; name: string; goal: string; mainConversationId: string; revision: number; sequence: number
   workPause?: { state: 'stopping' | 'paused' | 'blocked'; errorCode?: string } | null
+  mainModelWait?: { retryAtMs: number } | null
   mainState?: string; paused: boolean; archived: boolean; state: SwarmState; target: { projectId?: string; directory?: string }
   teamMemory?: { available: boolean; content?: string; sha256?: string; source: string; updatedMs?: number | null; author?: string | null; errorCode?: string }
   memberProtocol?: number; members?: SwarmMember[]
@@ -32,7 +33,7 @@ export function swarmColumn(state: string) {
 }
 export function swarmStateToken(state: string) {
   if (['running', 'succeeded', 'done'].includes(state)) return '--ok'
-  if (['waiting_user', 'blocked', 'verifying', 'review'].includes(state)) return '--warn'
+  if (['waiting_user', 'waiting_model', 'blocked', 'verifying', 'review'].includes(state)) return '--warn'
   if (state === 'failed') return '--danger'
   if (['preparing', 'queued', 'planning'].includes(state)) return '--accent'
   return '--text-dim'

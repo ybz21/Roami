@@ -35,7 +35,7 @@ function State({ state }: { state: string }) {
   return <span className="swarm-state" style={{ color: `var(${swarmStateToken(state)})` }}>{t(`swarm.managed.state.${state}`)}</span>
 }
 export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, projectId, onManage, renderMain, mainRequest, onRecipientChange, roles }: { id: string; onBack: () => void; openTerm: (id: string) => void; embedded?: boolean; projectId?: string; onManage?: () => void; renderMain?: (id: string) => ReactNode; mainRequest?: string; onRecipientChange?: (recipient: string) => void; roles?: SwarmRoleBinding[] }) {
-  const { data, error, missing, refresh } = useSwarmSnapshot(id), { t } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
+  const { data, error, missing, refresh } = useSwarmSnapshot(id), { t, locale } = useI18n(), { phone } = useLayout(), { message, modal } = App.useApp()
   const panelKey = 'roami.swarm.panel.v2:' + nodeApi('/agent/swarms/' + id)
   const [recipient, setRecipient] = useSwarmConversationSelection(panelKey + ':conversation', mainRequest)
   const [selected, setSelected] = useState(recipient), [tab, setTab] = useState(() => localStorage.getItem(panelKey) === 'board' ? 'board' : 'chat'), [detail, setDetail] = useState<string | null>(null), [busy, setBusy] = useState(false)
@@ -70,7 +70,8 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
   const node = useCurrentNodeId()
   const mainThread = useAgentThread(sceneActive ? data?.mainConversationId || '' : '', '', node)
   const liveMain = mainThread.view?.turns.find(turn => ['queued', 'running'].includes(turn.state))
-  const mainState = data?.paused && data.workPause?.state !== 'stopping' ? 'idle' : liveMain?.state === 'queued' ? 'preparing' : liveMain?.state === 'running' ? 'running' : mainThread.view ? mainThread.view.turns[0]?.state === 'failed' ? 'failed' : 'idle' : 'unknown'
+  const retryAt = !data?.paused && !data?.archived ? data?.mainModelWait?.retryAtMs : undefined
+  const mainState = data?.paused && data.workPause?.state !== 'stopping' ? 'idle' : retryAt ? 'waiting_model' : liveMain?.state === 'queued' ? 'preparing' : liveMain?.state === 'running' ? 'running' : mainThread.view ? mainThread.view.turns[0]?.state === 'failed' ? 'failed' : 'idle' : 'unknown'
   const nodes = useMemo(() => data ? [{ id: 'main', name: t('swarm.conversation.main'), executor: 'roami', main: true, state: mainState }, ...currentMembers.map(member => ({ id: member.id, name: member.name, executor: member.executor, state: member.state }))] : [], [currentMembers, mainState, Boolean(data), t])
   const control = async (action: string) => {
     if (!data || busy) return
@@ -135,6 +136,7 @@ export default function ManagedSwarm({ id, onBack, openTerm, embedded = false, p
             {(phone || !workspaceVisible) && <button type="button" className="tt-act" aria-label={t('swarm.workspace.open')} aria-expanded={studioOpen} onClick={() => showWorkspace(!studioOpen)}><PanelRightIcon />{t('swarm.workspace.open')}</button>}{embedded && !workspaceVisible && controls}
             {currentMember && !phone && <div className="swarm-detail-actions"><State state={currentMember.state} />{currentMember.registered && <button type="button" className="tt-act" onClick={() => inspectMember(currentMember.id)}>{t('swarm.member.details')}</button>}</div>}
           </header>
+          {retryAt && (recipient === 'main' || recipient === 'group') && <div className="swarm-work-status" role="status">{t('swarm.chat.mainModelWait', { time: new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(retryAt) })}</div>}
           {memberView && !phone ? memberView : recipient === 'main' ? data.mainConversationId ? renderMain ? renderMain(data.mainConversationId) : <SwarmMainChat key={nodeApi('/agent/conversations/' + data.mainConversationId)} conversationId={data.mainConversationId} projectId={data.target?.projectId} onSent={refresh} /> : <p role="alert" className="swarm-note">{t('swarm.relations.mainUnavailable')}</p> : currentMember?.registered && (currentMember.registered.instance || currentMember.executor !== 'native') ? <SwarmMemberChat key={nodeApi('/agent/swarms/' + data.id) + ':' + currentMember.id} data={data} member={currentMember} onMain={() => openChat('main')} onSession={openTerm} onChanged={refresh} /> : <SwarmChat members={members} key={nodeApi('/agent/swarms/' + data.id) + ':' + recipient} data={data} recipient={recipient} selected={selected} onSelect={openChat} onWork={openWork} onSession={openTerm} onSent={refresh} />}
         </section>
         {!phone && workspaceVisible && <SwarmWorkspaceDivider key={panelKey} width={workspaceSize.width || 0} min={workspaceSize.min} max={workspaceSize.max} onResize={workspaceSize.resize} />}
