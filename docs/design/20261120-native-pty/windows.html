@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三平台原生终端 · Windows 整包移植</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">调研与选型</a>
+      <a href="product.html">产品设计</a>
+      <a href="tech.html">技术设计</a>
+      <a href="capabilities.html">迁移清单</a>
+      <a href="windows.html" aria-current="page">Windows</a>
+      <a href="tech.html#acceptance">验证记录</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>Windows 整包移植</h1>
+      <p class="lead">Windows 11 24H2 或更新的受支持版本先验 x64。ConPTY 探针与 Unix 原生宿主试点并行，Windows 节点独立过发布验收。</p>
+
+      <section aria-labelledby="pty">
+        <h2 id="pty">同一批探针比较三种 ConPTY 封装</h2>
+        <ul>
+          <li><strong>crosspty v1.2.0 优先。</strong> 能悬挂启动、分配 Job 后再恢复。现有 Job 句柄封装在库内，默认组清理与 Roami 的证据、内存约束需要对齐。<code>Wait() == -1</code> 必须保留不确定性，客户端断开不会调用库的 <code>Close()</code>。检查非默认 Job 限制、只关闭 I/O、崩溃后进程组退出、输出排空和失败清理能否通过包装或小改实现。</li>
+          <li><strong>go-pty v0.2.3 作对照。</strong> 记录 Go 1.25 与传递依赖的升级影响，核对主线程与 Job 控制、进程等待证据和关闭排空。当前版本的 Windows 启动路径在库内关闭主线程句柄，使用悬挂启动时要验证放行机制。</li>
+          <li><strong>直接调用 ConPTY 作对照和回退。</strong> 若库需要绕过其进程模型才能满足宿主管理契约，使用现有 <code>x/sys/windows</code> 写薄适配器，复用 Microsoft 原生 API。启动时 <code>EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED</code>，将进程放进 Job，再 <code>ResumeThread</code>。</li>
+        </ul>
+        <p>为三种候选录制相同的交互与进程场景。验证嵌套 Job、<code>JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE</code> 或等价的退出回收证据，确认只有目标 Job 受影响。PTY 输出排空和进程退出分别观察。同步管道使用独立读写循环，由收尾路径关闭 ConPTY；24H2 的 <code>ClosePseudoConsole</code> 可立即返回，仍以管道 EOF 或保留的截断证据及进程结果判定终态。</p>
+        <p>24H2 起有公开的 <code>ReleasePseudoConsole</code> 让控制台随最后一个客户端断开退出。crosspty 对之前的系统版本存在访问旧 HPCON 内部布局的兼容分支。首发基线要求公开 API 路径，旧版本兼容独立评估。Windows 真机结果决定封装选型。</p>
+        <p class="source"><a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/process_windows.go">crosspty 创建与退出</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/conpty_windows.go">crosspty 的 ConPTY 路径</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/cmd_windows.go">go-pty Windows 进程启动</a> · <a href="https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session">ConPTY 建连</a> · <a href="https://learn.microsoft.com/en-us/windows/console/closepseudoconsole">ConPTY 关闭</a> · <a href="https://learn.microsoft.com/en-us/windows/console/releasepseudoconsole">ReleasePseudoConsole</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects">Job Objects</a></p>
+      </section>
+
+      <section aria-labelledby="port">
+        <h2 id="port">整包阻塞与适配边界</h2>
+        <div class="table" role="region" aria-label="Windows 整包适配清单" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">模块</th><th scope="col">Windows 方案与验证</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">存储、工作区围栏、Agent 注册、浏览器标签</th><td>用 Windows 专用锁实现替换 <code>Flock</code>。验证 <code>LockFileEx</code> 的共享/独占范围、非阻塞错误、进程退出释放和其他打开者语义。不同进程统一锁同一字节区间，覆盖路径大小写、工作区别名和拒绝时的围栏状态。</td></tr>
+              <tr><th scope="row">磁盘容量和内存守护</th><td><code>Statfs</code> 对应 <code>GetDiskFreeSpaceExW</code> 所需容量字段，验证目标卷和用户配额。Job Object 验证有效的进程树和内存策略。Unix 压缩交换区、信号暂停/恢复暂按能力关闭。</td></tr>
+              <tr><th scope="row">宿主监控和手机模拟器</th><td>隔离 <code>Setsid</code>、<code>Setpgid</code> 和 <code>Kill</code> 调用。只启用 Windows 实际支持的功能，查验禁用路径不会阻塞核心节点启动。</td></tr>
+              <tr><th scope="row">用户身份与 IPC</th><td>试点用登录用户的计划任务运行独立宿主，保持其 home、profile、环境、凭据访问及节点绑定。命名管道显式 DACL，校验用户或登录 SID，启用 <code>PIPE_REJECT_REMOTE_CLIENTS</code>，锁屏与登录切换均测试。系统服务的 Session 0 行为单独验证。</td></tr>
+              <tr><th scope="row">安装、签名、升级</th><td>试点用有校验和的 ZIP，正式包评估签名的 MSI 和 SmartScreen 表现。安装注册用户级宿主，卸载与升级遵循排空策略。验证安装路径含空格、用户目录非 ASCII、最小权限、升级失败回滚。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="source"><a href="acceptance.md#windows-整包编译回执">Windows 整包编译回执</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex">LockFileEx</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getdiskfreespaceexw">GetDiskFreeSpaceExW</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/taskschd/principal-logontype">计划任务登录类型</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/services/interactive-services">Windows 服务交互边界</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights">命名管道权限</a></p>
+      </section>
+
+      <section aria-labelledby="shell">
+        <h2 id="shell">PowerShell 与 Agent 入口</h2>
+        <p>依据宿主绑定用户的显式设置与受信任安装位置探测 <code>pwsh.exe</code> 和 <code>powershell.exe</code>。首发优先 PowerShell 7。5.1 作为独立选择，完成其输入、编辑和退出验收后才启用。用户指定的 shell 缺失时保留选项，并返回可处理的安装或切换提示。</p>
+        <p>原生 <code>.exe</code> 用绝对路径和按目标约定编码的 UTF-16 命令行启动。npm 安装可能给出 <code>codex.cmd</code> 或 <code>claude.cmd</code>，不能把批处理的路径当原生 PE 传给 <code>CreateProcessW</code>。先验证注册的原生可执行文件或可识别的 Node 入口。确需使用批处理包装器时，单独识别 PATHEXT 和受信任入口，经适配过引号语义的 <code>cmd.exe</code> 启动。验证 cwd、空参数、尾部反斜杠、引号、非 ASCII 与用户 PATH。受管任务的提示沿原有输入和绑定协议交付。</p>
+        <p class="source"><a href="https://learn.microsoft.com/en-us/windows/console/pseudoconsoles">Windows Pseudoconsole</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw">CreateProcessW 与批处理</a> · <a href="https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows">PowerShell 7 安装和并存</a> · <a href="https://learn.microsoft.com/en-us/powershell/module/psreadline">PSReadLine</a></p>
+      </section>
+
+      <section aria-labelledby="go-no-go">
+        <h2 id="go-no-go">开放原生 Windows 节点的条件</h2>
+        <ol>
+          <li><strong>PTY。</strong> 在真实 Windows x64 上对比三种封装。测试启动失败、阻塞输出、Ctrl+C、关闭排空、Job 清理、句柄回收与两个并发会话隔离。重复同样测试后再声明 arm64。</li>
+          <li><strong>交互。</strong> PowerShell 7 与所声明的 5.1 选项，使用真实 PSReadLine、中文、多行粘贴、窗口调整。Codex 与 Claude Code 分别验原生和适用的 npm 启动方式，验证全屏交互、分离后存活和关闭时进程归属。</li>
+          <li><strong>整包。</strong> 在干净 Windows 上通过构建、安装、权限校验、系统用户工作区和 CLI/Web 重连。重启 Web 服务和升级宿主版本时接回旧窗格，回滚后原归属仍可连接；失败证据不导致清除工作区围栏。</li>
+        </ol>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

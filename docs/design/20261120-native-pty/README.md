@@ -1,10 +1,12 @@
 # 三平台原生终端调研与设计
 
-推荐一套原生 Go 会话宿主和一个 Roami 自有的终端接口。macOS 和 Linux 在接口底层复用 `creack/pty`，Windows 实现同一接口，通过 `golang.org/x/sys/windows` 调用系统 ConPTY，默认启动 PowerShell 7。会话、日志、屏幕捕获和重连逻辑由三平台共用。
+Roami 自己管理会话，底层复用系统 PTY。先抽离 tmux 会话接口，以独立的 Go 宿主试点 Unix 单窗格，Windows 并行验证 `crosspty`、`go-pty` 和直接调用 ConPTY。
 
-- [调研与选型（HTML）](index.html) 给出选型对比、支持范围和迁移顺序。
-- [产品设计（HTML）](product.html) 给出用户故事与可展开的场景原型。
-- [技术设计（HTML）](tech.html) 给出代码落点、进程生命周期、屏幕恢复和回滚规则。
-- [验证记录（Markdown）](acceptance.md) 列出本次实际检查与后续验证范围。
+- [调研与选型（HTML）](index.html) 比较 PTY 库和 multiplexer，给出首轮决策。
+- [产品设计（HTML）](product.html) 说明终端接管、重连和旧会话体验。
+- [会话宿主与 Unix 试点（HTML）](tech.html) 包含宿主托管、升级排空、传输协议和实施门槛。
+- [tmux 迁移清单（HTML）](capabilities.html) 映射能力、宿主契约及试点缺失时的行为。
+- [Windows 整包移植（HTML）](windows.html) 记录 Go 候选约束、系统调用差异、PowerShell 和 Agent 启动验收。
+- [验证记录（Markdown）](acceptance.md) 保留已跑探针、整包构建回执和评审对应项。
 
-基线为 Roami `6108a657`，日期为 2026-11-20。本文为设计提案。
+代码基线为 Roami `6108a657`。2026-11-21 修订参考 [PR #1023 的设计评审](https://github.com/ybz21/Roami/pull/1023#issuecomment-7062408930)。

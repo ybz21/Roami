@@ -12,7 +12,9 @@
       <a href="index.html">调研与选型</a>
       <a href="product.html">产品设计</a>
       <a href="tech.html" aria-current="page">技术设计</a>
-      <a href="acceptance.md">验证记录</a>
+      <a href="capabilities.html">迁移清单</a>
+      <a href="windows.html">Windows</a>
+      <a href="tech.html#acceptance">验证记录</a>
     </nav>
   </header>
   <main>
@@ -45,16 +47,30 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
           │
           ├─ tmux 兼容适配器 → tmux server
           │
-          └─ 本机 IPC → Go 会话宿主（独立于 Web 服务）
+          └─ 本机 IPC → roami-sessiond（独立 Go 宿主）
                           ├─ 窗口与窗格、VT 状态、日志、退出观测
                           └─ PTY 适配器 → 每窗格一个 shell / Agent</pre>
         <ul>
-          <li><strong>平台接口。</strong> <code>Start(spec)</code> 接收可执行文件、argv、cwd、env 和初始尺寸，返回可读写的终端、<code>Resize</code>、<code>Wait</code>、<code>Close</code> 与具名的进程终止操作。<code>Wait</code> 只由宿主执行一次，之后共享退出结果。输入、读出、关闭及进程回收之间定义所有权，关闭和失败收尾可重试。</li>
+          <li><strong>平台接口。</strong> <code>Start(spec)</code> 接收可执行文件、argv、cwd、env 和初始尺寸，返回可读写的终端、<code>Resize</code>、<code>Wait</code> 和具名的停止与释放操作。启动请求的 context 只约束创建，在创建确认后由宿主持有进程。分离连接只取消订阅，优雅停止、强制停止和资源释放各走明确的操作。<code>Wait</code> 只由宿主执行一次，之后共享退出结果。输入、读出、关闭及进程回收之间定义所有权，关闭和失败收尾可重试。</li>
           <li><strong>会话接口。</strong> 覆盖创建、观测、附着、定向输入、捕获、进程停止和布局操作。附着订阅和服务端启动请求分别定生命周期。允许观测返回「确认存在」「确认退出」「状态待确认」，并附对应证据。</li>
-          <li><strong>本机 IPC。</strong> 宿主先复用同一 Roami 二进制的独立实例，Web 和 CLI 通过用户级 Unix socket 或 Windows 本地命名管道连接。socket 使用用户专属目录和同用户校验，命名管道使用显式 DACL 和本地连接限制。绑定实例根和发行协议版本，每个实例根只允许一位宿主拥有者。</li>
+          <li><strong>本机 IPC。</strong> Web 和 CLI 通过用户级 Unix socket 或 Windows 本地命名管道连接。socket 使用用户专属运行目录和同 UID 校验，命名管道使用显式 DACL 和本地连接限制。握手绑定实例根、宿主 ID 与可协商协议版本。</li>
           <li><strong>授权和并发。</strong> 每次输入先核对会话归属、窗格代次、当前控制权及生命周期围栏；受管任务走已有修订和提示绑定。自动粘贴、提交和交互输入共用单窗格有序写队列，粘贴与 Enter 作为同一操作中的两个有序动作。写入回执只证明写入已发生，任务结果仍由执行器证据和宿主观察确认。阻塞后状态不明确时禁止自动重投。</li>
         </ul>
         <p class="source"><a href="../../../internal/tmuxruntime/runtime.go">现有提交、捕获与日志代码</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights">Microsoft 命名管道权限</a></p>
+      </section>
+
+      <section aria-labelledby="supervision">
+        <h2 id="supervision">宿主托管与不停会话升级</h2>
+        <p>建议把 <code>roami-sessiond</code> 打包成独立版本的最小 Go 二进制，与 Roami 共享终端接口和协议代码。Web 服务与宿主各自托管，<code>start.sh</code> 的 Web 重启路径不持有宿主，也不停止宿主进程组。Linux 使用独立的 systemd user unit，macOS 用独立的用户 LaunchAgent。Windows 首轮验证按用户登录运行的计划任务。验证登录、锁屏、退出登录和开机行为后再决定长期托管范围。</p>
+        <p>每个节点和实例根只有一个接收新建的宿主；同一实例允许多个按宿主 ID 寻址的排空宿主。每个宿主有独立 IPC 端点和服务注册。宿主登记保存 <code>host_instance_id</code>、启动代次与系统进程身份、二进制版本、协议版本范围、端点和状态；每个会话写入后端、宿主 ID、窗格 ID、运行代次和进程身份。标签、工作区、任务及恢复来源沿用台账。</p>
+        <ol>
+          <li><strong>准备。</strong> 安装新版本到版本化路径，独立启动并通过身份、权限、上线健康检查和协议握手。宿主日志按版本与实例归档。Web/CLI 需能同时与新旧宿主的协议版本通信，失败时保持既有路由。</li>
+          <li><strong>切换。</strong> 旧宿主先停止接收新建、让已受理创建完成或落下可查回执，再用持久化的当前宿主指针和代次将新建指向新版。创建请求携带该代次，迟到请求由旧宿主拒绝。已有会话按登记宿主继续附着和输入。切换中断时以持久化代次重新确认准入宿主，确认前暂缓新建。</li>
+          <li><strong>排空。</strong> 旧宿主持有已有 PTY/ConPTY，等会话自然退出后再撤服务注册并清理旧二进制。升级验收必须证明旧会话的宿主和窗格进程身份不变、新会话归新版。回滚只改新建指针，仍兼容已经创建的两代会话。</li>
+          <li><strong>故障。</strong> 有权限的本地 CLI 可在 Web 不可用时继续普通会话，受管任务仍依赖已有围栏和宿主证据。IPC 权限错误、超时或协议不兼容都保留待确认，不自动开替代会话。宿主异常退出由系统重拉新运行代次，旧进程按可验证身份对账；机器重启后只启动当前配置的准入版本。确认原窗格已退出才允许从台账重开。</li>
+        </ol>
+        <p>Unix socket 放在短路径的用户私有运行目录，绑定实例根的摘要及宿主 ID。Linux 用 <code>SO_PEERCRED</code>，macOS 用 <code>getpeereid</code> 核对 peer UID，并检查端点所有权。Windows 管道要求用户或登录 SID 的访问控制和远程连接限制，详见<a href="windows.html">Windows 整包移植</a>。</p>
+        <p class="source"><a href="../../../install.sh">现有 systemd 与 LaunchAgent 托管</a> · <a href="../../../start.sh">Web 服务启动与重启</a></p>
       </section>
 
       <section aria-labelledby="platform-detail">
@@ -62,15 +78,9 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
         <p>将接口和启动参数放在同一 Go 包，由构建标签选中 Unix 或 Windows 的实现。上层使用统一的列行尺寸、退出结果和字节流接口。Unix 的 <code>*os.File</code>、Windows 的管道和句柄留在各自适配器里。两种后端在现有 Go 依赖上即可实现，可随 Roami 按目标平台编译，无需为 PTY 层引入 CGO 或额外运行时。</p>
         <p>同一组契约测试覆盖启动、双向输入输出、初始尺寸、在线调整、退出与重复关闭。能力存在平台差异时由适配器明确报告，例如信号、暂停和进程组观测，上层根据能力提供操作。</p>
         <h3>macOS / Linux</h3>
-        <p>以 <code>StartWithSize</code> 建控制终端和初始尺寸，子进程使用登录 shell 或指定可执行文件。由 master 读写，以 <code>Setsize</code> 更新尺寸并由系统通知前台进程组。按进程身份回收目标进程。交互 shell 可能将作业放入不同进程组，不能只按 shell 的组判断已清理。Linux 可沿用现有 cgroup 能力，macOS 先验证会话内进程归属和未能确认的退出行为。验证 <code>TERM</code> 对应的终端能力和两边的 UTF-8 locale，避免向应用宣称尚未支持的控制序列。</p>
+        <p>以 <code>StartWithSize</code> 建控制终端和初始尺寸，子进程使用登录 shell 或指定可执行文件。由 master 读写，以 <code>Setsize</code> 更新尺寸并由系统通知前台进程组。宿主记录 PID、系统启动标识、进程启动时间以及 session ID / PGID。交互 shell 会把作业放入不同进程组，回收前验证运行身份并以 Linux cgroup 或经验证的 macOS 会话进程归属核对退出。启动参数显式携带获准的每会话环境，登录 shell 初始化 PATH、nvm 与用户配置；<code>SSH_AUTH_SOCK</code> 等会话变量按启动来源传入。验证 <code>TERM</code> 与真实 VT 能力、平台可用的 UTF-8 locale。</p>
         <h3>Windows / PowerShell</h3>
-        <ol>
-          <li>解析并验证 <code>pwsh.exe</code> 的绝对路径、cwd 和环境。通过 <code>CreateProcessW</code> 的明确可执行路径、按目标程序约定编码的 UTF-16 命令行和 Unicode 环境块启动。测试空参数、引号、尾部反斜杠、非 ASCII 路径及大小写不敏感的环境覆盖。Agent 等原生程序使用 argv 直接启动。shell 输入另外按 PowerShell 语义处理。</li>
-          <li>用两条同步管道与 <code>CreatePseudoConsole</code> 建立 ConPTY，<code>STARTUPINFOEX</code> 带 <code>PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE</code>。进程悬挂创建，先加入 Job Object 再恢复主线程。具体核对宿主所在 Job 的嵌套限制、拒绝路径和部分初始化失败后的句柄清理；与 Job 无法关联时按配置的能力要求拒绝或报告降级。</li>
-          <li>独立读写循环处理 UTF-8/VT，PTY 流写入受尺寸转换、队列和并发约束。对 Ctrl+C、PSReadLine、多行粘贴和 TUI 的修饰键分别录制探针结果。交互键、进程退出及强制结束 Job 分开处理。</li>
-          <li>关闭先停止接收新输入，同时保持输出排空或在放弃尾部输出时显式关闭读端。等待进程退出与输出结束分别记录，按期限用 Job Object 完成确定的进程回收。即便系统关闭调用立即返回，也需观察进程和输出终态。</li>
-        </ol>
-        <p class="source"><a href="https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session">ConPTY 建连与管道管理</a> · <a href="https://learn.microsoft.com/en-us/windows/console/closepseudoconsole">ConPTY 关闭语义</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects">Windows Job Objects</a> · <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_parsing">PowerShell 参数解析</a> · <a href="https://learn.microsoft.com/en-us/powershell/module/psreadline">PSReadLine</a></p>
+        <p>Windows 适配器通过系统 ConPTY 启动 PowerShell 和 Agent。先评估 crosspty、go-pty 与直接调用 ConPTY 对进程身份、关闭排空及 Job Object 的支持。启动、引号、管道、签名与整包移植的验收条件见<a href="windows.html">Windows 整包移植</a>。</p>
       </section>
 
       <section aria-labelledby="screen">
@@ -84,16 +94,43 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
         <p class="source"><a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">XTerm 控制序列</a> · <a href="https://github.com/charmbracelet/x/blob/43427fdbad12fde220b737fc36303291a5ce4602/vt/emulator.go">Go VT 候选源码</a> · <a href="https://github.com/xtermjs/xterm.js">xterm.js、headless 和 Serialize</a></p>
       </section>
 
+      <section aria-labelledby="protocol">
+        <h2 id="protocol">连接与回放协议</h2>
+        <div class="table" role="region" aria-label="协议消息与状态" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">消息</th><th scope="col">最小字段</th><th scope="col">处理</th></tr></thead>
+            <tbody>
+              <tr><th scope="row"><code>hello / attach</code></th><td>协议范围、实例、宿主、会话、窗格、运行代次，可选最后已应用序号。</td><td>协商版本和能力，核对身份，判断续放或快照；不兼容时保留观测为待确认。</td></tr>
+              <tr><th scope="row"><code>snapshot</code></th><td>窗格代次、屏幕尺寸、截止序号、VT 屏幕与模式状态。</td><td>建立同一序号边界的快照和订阅，客户端应用后从其后接收连续事件。</td></tr>
+              <tr><th scope="row"><code>output / resized / exited</code></th><td>一条窗格事件流的连续序号。终端字节用二进制帧，改尺寸及退出用控制帧。</td><td>按顺序应用，区分进程退出和输出读完。出现序号缺口或缓冲溢出，暂停旧订阅并重取快照。</td></tr>
+              <tr><th scope="row"><code>claim / input / resize</code></th><td>请求 ID、窗格代次、控制权代次、目标窗格。resize 含列行，input 另有输入载荷。</td><td>宿主授权、排序、校验并发世代。相同尺寸去重；丢弃过小、超界或迟到尺寸。可查询写入回执，超时的不确定输入不重放。</td></tr>
+              <tr><th scope="row"><code>resync / detach</code></th><td>窗格代次与最近应用的序号。</td><td>释放订阅或恢复输出，不触发进程终止。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Web 以一条附着流对应一个窗格。首版 WebSocket 控制帧用 JSON，输出二进制帧用 8 字节大端序号加 VT 数据，输入控制帧携带请求 ID 和 UTF-8 文本或字节数组。本机 IPC 用 4 字节大端帧长、消息种类和载荷，使用每窗格独立附着流。输出记录和每客户端发送队列分别设上限。上线前根据录制和 30 会话基线确定默认值；达到上限时慢客户端重同步，日志则轮转并暴露可查询范围。</p>
+      </section>
+
       <section aria-labelledby="migration">
         <h2 id="migration">迁移、故障与回滚</h2>
         <ol>
-          <li><strong>平台探针。</strong> 先做纯 Go PTY 启动与回收。Windows 整包编译已复现 Unix 文件锁、磁盘查询和进程控制等阻塞。优先为存储、会话生命周期等核心模块补平台实现，对宿主监控和手机模拟器等可选功能按能力启用，再验证安装、工作区路径和 Agent 启动。</li>
-          <li><strong>宿主与普通会话试点。</strong> 完成单窗格、屏幕捕获、断线回连和 Web 重启恢复。先在隔离实例开启原生后端，复用会话台账和连接入口。旧记录识别为 tmux。新建记录写入不可变的后端与运行身份，部署版本支持双读。Web 服务与宿主独立托管，服务更新保持协议兼容。</li>
+          <li><strong>先抽业务接口。</strong> 以现有 tmux 为第一个 SessionBackend。按<a href="capabilities.html">迁移清单</a>迁移 API、CLI 和 Agent 调用点，先跑旧行为回归。TerminalBackend 只供原生宿主调用，处理 PTY、进程和操作系统能力。Windows 整包单独立项，候选 PTY 探针可并行。</li>
+          <li><strong>宿主与普通会话试点。</strong> Linux 和 macOS 从单窗格开始，完成屏幕捕获、断线回连和 Web 重启恢复。先在隔离实例开启原生后端，复用会话台账和连接入口。旧记录识别为 tmux。新建记录写入不可变的后端与运行身份，部署版本支持双读，首个用户可用版本由独立宿主持有 PTY，并通过双版本排空演练。</li>
           <li><strong>迁移剩余功能。</strong> 补齐窗口、分屏和 CLI 操作，接入 Agent 输入和执行生命周期。启动前先持久化操作 ID、目标和工作区租约，再向宿主发起同一操作可查的创建。一旦创建结果中断，按操作 ID 查询当前宿主和已写入的观测证据，禁止重新开一个窗格来碰运气。</li>
           <li><strong>确认退出再恢复。</strong> Web 重启时按宿主实例与窗格代次接续。宿主不可达时保留工作区围栏。进程等待结果、带身份的系统观测或宿主重启证据明确后，才对历史做相应状态变更。宿主或整机重启后，可按台账重开并用支持的 Agent 对话 ID 恢复；新会话有新运行身份和恢复来源。原进程内存和未持久化输出随宿主故障丢失。</li>
           <li><strong>切换与回滚。</strong> 一次只改变新建默认项；运行中的会话继续按已登记后端连接。保留支持两种后端的版本和恢复路径，避免回退到无法读取原生会话的版本。旧后端只有在活跃会话自然排空、历史和复原路径验收后，才评估停止安装和维护。</li>
         </ol>
-        <p>上线前对比旧链路与原生链路的首屏、重连耗时、输入延迟、忙窗格资源占用与高输出下的断连行为。以相同机器、尺寸、输出负载和会话数记录，详见<a href="acceptance.md">验证记录</a>。</p>
+
+      </section>
+      <section aria-labelledby="acceptance">
+        <h2 id="acceptance">验证记录与试点门槛</h2>
+        <ul>
+          <li><strong>已验证。</strong> Linux 的系统 PTY、双向 I/O、改尺寸和退出码。两种候选在 Linux 跑通基本交互，退出后 EOF 行为有差异。macOS 与 Windows 完成探针交叉编译，Windows 整包基线复现文件锁、磁盘和进程控制编译阻塞。</li>
+          <li><strong>VT 试点门槛。</strong> 用同批录制对比 Go VT 与 xterm headless/Serialize。最少覆盖正常/备用屏、宽字符、换行、滚动记录、鼠标、括号粘贴、DA/DSR/OSC 唯一响应、快照后接续与纯文本捕获。比较 1、10、30 会话 CPU、RSS 与延迟，选择可承担常驻开销的实现。</li>
+          <li><strong>宿主试点门槛。</strong> 两个隔离实例分别运行，停止一个后另一个会话、端点及进程仍存活。Web 重启、宿主滚动升级、协议错配、宿主崩溃和围栏对账都要有证据。将隔离脚本扩展为只核验并清理对应实例的已登记宿主。进入实现时将 tmux 目标、提交等仓库规则明确作用于兼容适配器。</li>
+          <li><strong>发布门槛。</strong> 先过 Unix 原生试点，再按能力灰度。Windows 分别核对 ConPTY、整包、安装和 Agent 交互，发布范围见<a href="windows.html#go-no-go">Windows 整包验收</a>。</li>
+        </ul>
+        <p class="source"><a href="acceptance.md">详细验证记录（Markdown）</a> · <a href="https://github.com/ybz21/Roami/pull/1023#issuecomment-7062408930">PR #1023 设计评审</a></p>
       </section>
     </article>
   </main>
