@@ -25,6 +25,7 @@ type ModelSource struct {
 	PluginRevision           string `json:"pluginRevision,omitempty"`
 	PluginDesktop            bool   `json:"pluginDesktop,omitempty"`
 	PluginDesktopUnavailable bool   `json:"pluginDesktopUnavailable,omitempty"`
+	AccountRoutingAvailable  bool   `json:"accountRoutingAvailable,omitempty"`
 	Name                     string `json:"name"`
 	BaseURL                  string `json:"baseUrl"`
 	Protocol                 string `json:"protocol"`
@@ -276,6 +277,8 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 				v.Sources[i].PluginDesktopUnavailable = modelplugins.DesktopUnavailable(source.ProviderID)
 				if provider, err := s.plugins.CachedProvider(source); err == nil {
 					v.Sources[i].HasKey = provider.SignedIn
+					accounts := len(provider.Accounts)
+					v.Sources[i].AccountRoutingAvailable = accounts > 1 && accounts <= maxSourceRouteAccounts && pluginRouteSignedIn(provider)
 				}
 			}
 		}
@@ -331,6 +334,7 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 		return ModelSource{}, catalogError()
 	}
 	p.HasKey = false
+	p.AccountRoutingAvailable = false
 	return p, nil
 }
 

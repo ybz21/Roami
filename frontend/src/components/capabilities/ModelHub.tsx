@@ -138,9 +138,11 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     }
     return saved
   }} />
+  const sourceTabs = sourceBase.accountRoutingAvailable ? ['connection', 'prices', 'routing'] : ['connection', 'prices']
+  const sourceSection = sourceTabs.includes(section) ? section : 'connection'
   const sourceEditor = id === 'new' ? connectionEditor : <div className="tt-source-workspace">
-    <TabBar activeKey={section || 'connection'} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={['connection','prices','routing'].map(key => ({key,label:t('pricing.section.'+key)}))}/>
-    {(section === 'prices' || section === 'routing') ? <SourcePricingSettings key={sourceBase.id} sourceId={sourceBase.id} view={section} models={configuredSourceModelIds(models, sourceBase.id)} draft={sourcePrices[sourceBase.id]} onChange={draft=>setSourcePrices(previous=>({...previous,[sourceBase.id]:draft}))} onSaved={billing.setSourcePolicy} onGlobal={()=>{setPriceReturn('catalog/source/'+id+'/prices');navigate('catalog/pricing')}} onAddModels={()=>{setSourceDrafts(previous=>({...previous,[id]:{...(previous[id]||initialSourceDraft(sourceBase,true)),fetchRequested:true}}));navigate('catalog/source/'+id+'/connection')}}/> : connectionEditor}
+    <TabBar activeKey={sourceSection} onChange={key => navigate('catalog/source/' + id + '/' + key)} items={sourceTabs.map(key => ({ key, label: t('pricing.section.' + key) }))}/>
+    {(sourceSection === 'prices' || sourceSection === 'routing') ? <SourcePricingSettings key={sourceBase.id} sourceId={sourceBase.id} view={sourceSection} models={configuredSourceModelIds(models, sourceBase.id)} draft={sourcePrices[sourceBase.id]} onChange={draft=>setSourcePrices(previous=>({...previous,[sourceBase.id]:draft}))} onSaved={billing.setSourcePolicy} onGlobal={()=>{setPriceReturn('catalog/source/'+id+'/prices');navigate('catalog/pricing')}} onAddModels={()=>{setSourceDrafts(previous=>({...previous,[id]:{...(previous[id]||initialSourceDraft(sourceBase,true)),fetchRequested:true}}));navigate('catalog/source/'+id+'/connection')}}/> : connectionEditor}
   </div>
   const modelEditor = <form className="agent-settings-form" onSubmit={event => { event.preventDefault(); submitModel() }}>
     <label className="agent-settings-field">{t('hub.displayName')}<Input aria-label={t('hub.displayName')} value={model.name} maxLength={100} onChange={event => updateModel({ name: event.target.value })} /></label>

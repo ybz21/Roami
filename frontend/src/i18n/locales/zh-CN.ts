@@ -6111,7 +6111,7 @@ const zhCN = {
   'pricing.editModel': "编辑定价 {model}",
   'pricing.editTitle': "模型定价",
   'pricing.exitOverrides': "对外名称覆盖价",
-  'pricing.routingHint': "决定使用哪个账号或 Key，不改变模型单价。",
+  'pricing.routingHint': "仅在聚合使用「按权重」策略时，为此模型源内的候选账号或 API Key 排序。",
   'pricing.saveRouting': "保存调度",
   'pricing.origin.model': "单独定价",
   'pricing.origin.source': "继承源默认",

@@ -11,6 +11,12 @@ import (
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
+const maxSourceRouteAccounts = 64
+
+func pluginRouteSignedIn(provider modelplugins.Provider) bool {
+	return provider.SignedIn && !modelplugins.DesktopUnavailable(provider.ID) && !modelplugins.DesktopAppMissing(provider.ID)
+}
+
 type sourceRouteFacts struct {
 	source    ModelSource
 	plugin    modelplugins.Provider
@@ -110,7 +116,7 @@ func (h *Handler) routingFacts(ctx context.Context, catalog ModelCatalog, model 
 		}(value)
 	}
 	for id, value := range facts {
-		if !value.plugin.Usage || len(value.plugin.Accounts) > 64 {
+		if !value.plugin.Usage || len(value.plugin.Accounts) > maxSourceRouteAccounts {
 			continue
 		}
 		for _, account := range value.plugin.Accounts {
@@ -255,7 +261,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 			var pluginModel *modelplugins.Model
 			accounts := []modelplugins.Account{{Key: "", Type: "api"}}
 			if fact.source.PluginSourceID != "" {
-				if !fact.plugin.SignedIn || modelplugins.DesktopUnavailable(fact.plugin.ID) || modelplugins.DesktopAppMissing(fact.plugin.ID) {
+				if !pluginRouteSignedIn(fact.plugin) {
 					continue
 				}
 				for _, value := range fact.plugin.Models {
@@ -272,7 +278,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				if len(accounts) == 0 {
 					accounts = []modelplugins.Account{{Key: fact.plugin.ID}}
 				}
-				if len(accounts) > 64 {
+				if len(accounts) > maxSourceRouteAccounts {
 					return nil, errors.New("MODEL_ROUTE_TOO_LARGE")
 				}
 			}

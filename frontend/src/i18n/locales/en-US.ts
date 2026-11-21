@@ -6102,7 +6102,7 @@ const enUS = {
   'pricing.editModel': "Edit pricing {model}",
   'pricing.editTitle': "Model pricing",
   'pricing.exitOverrides': "Public-name overrides",
-  'pricing.routingHint': "Selects the account or Key without changing model rates.",
+  'pricing.routingHint': "Only the Weighted aggregation strategy uses this setting to rank eligible accounts or API keys within this source.",
   'pricing.saveRouting': "Save routing",
   'pricing.origin.model': "Individual price",
   'pricing.origin.source': "From source default",

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,6 +96,78 @@ func TestPluginFolderAndZIPImportEndpoints(t *testing.T) {
 		t.Fatal("public gateway exposed plugin management")
 	}
 }
+
+func TestCatalogAccountRoutingAvailabilityUsesEachSourcesCachedCredentials(t *testing.T) {
+	h := pluginTestHandler(t)
+	upload := pluginUpload(t, h, map[string]string{"package.json": `{"name":"test-plugin","main":"index.mjs"}`, "index.mjs": "export const Plugin=async()=>({})"}, false)
+	var imported struct {
+		Data modelplugins.Package `json:"data"`
+	}
+	if upload.Code != 200 || json.Unmarshal(upload.Body.Bytes(), &imported) != nil {
+		t.Fatal(upload.Body)
+	}
+	writeFixture := func(path string, data any) {
+		t.Helper()
+		raw, err := json.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	accountOne := modelplugins.Account{Key: "private-account-one", Type: "api"}
+	accountTwo := modelplugins.Account{Key: "private-account-two", Type: "api"}
+	fixtures := []struct {
+		name     string
+		provider *modelplugins.Provider
+	}{
+		{"WorkBuddy-ybz", &modelplugins.Provider{ID: "workbuddy", SignedIn: true, Accounts: []modelplugins.Account{accountOne}}},
+		{"WorkBuddy-hmh", &modelplugins.Provider{ID: "workbuddy", SignedIn: true, Accounts: []modelplugins.Account{accountTwo}}},
+		{"Multi-account", &modelplugins.Provider{ID: "workbuddy", SignedIn: true, Accounts: []modelplugins.Account{accountOne, accountTwo}}},
+		{"Legacy sign-in", &modelplugins.Provider{ID: "workbuddy", SignedIn: true}},
+		{"Signed out", &modelplugins.Provider{ID: "workbuddy", Accounts: []modelplugins.Account{accountOne, accountTwo}}},
+		{"Cache missing", nil},
+	}
+	next := h.Catalog.snapshot()
+	for i, fixture := range fixtures {
+		id := fmt.Sprintf("%032x", i+1)
+		dir := filepath.Join(h.Plugins.Root, "sources", id)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		writeFixture(filepath.Join(dir, "source.json"), modelplugins.Source{ID: id, PackageID: imported.Data.ID, ProviderID: "workbuddy"})
+		if fixture.provider != nil {
+			writeFixture(filepath.Join(dir, "provider.json"), map[string]any{"provider": fixture.provider, "optionsHash": fmt.Sprintf("%x", sha256.Sum256([]byte("null")))})
+		}
+		next.Sources = append(next.Sources, ModelSource{ID: id, PluginSourceID: id, Name: fixture.name})
+	}
+	if err := h.Catalog.update(context.Background(), next); err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/v1/model-gateway/catalog", nil))
+	var response struct {
+		Data ModelCatalog `json:"data"`
+	}
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &response) != nil || len(response.Data.Sources) != len(next.Sources) || strings.Contains(w.Body.String(), "private-account-") {
+		t.Fatalf("unexpected catalog response: %d %s", w.Code, w.Body)
+	}
+	for _, source := range response.Data.Sources {
+		if source.AccountRoutingAvailable != (source.Name == "Multi-account") {
+			t.Errorf("account routing availability for %q: %t", source.Name, source.AccountRoutingAvailable)
+		}
+	}
+	if err := h.Catalog.update(context.Background(), response.Data); err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range h.Catalog.snapshot().Sources {
+		if source.AccountRoutingAvailable {
+			t.Errorf("persisted derived availability for %q", source.Name)
+		}
+	}
+}
+
 func TestPluginSourceUsesNativeProtocolAndPrivateCredential(t *testing.T) {
 	if os.Getenv("ROAMI_MAGPIE_BUN") == "" {
 		t.Skip("set ROAMI_MAGPIE_BUN for the sandbox integration")
