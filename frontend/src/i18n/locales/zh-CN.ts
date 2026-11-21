@@ -3994,6 +3994,7 @@ const zhCN = {
   'project.back': '返回项目列表',
   'project.wtManage': 'Worktree 管理',
   'project.composerPlaceholder': '描述任务，回车开干 —— agent 会在独立 worktree 里干活，开工后自己给分支起语义化名字…',
+  'project.taskPrompt': '描述任务',
   'project.where.new': '新建 worktree',
   'project.where.repo': '主仓库',
   'project.where.existing': '已有 ({count})',

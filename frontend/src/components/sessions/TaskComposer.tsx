@@ -16,13 +16,15 @@ import { useRegisteredAgents } from '../../agent-registry'
 import { agentName, type AgentKind } from '../../agent-kind'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
+import ModelSelectionFields, { type ModelChoice } from '../capabilities/ModelSelectionFields'
 import { taskNameFromPrompt } from './NewSessionModal'
 import { VoiceInput } from '../chat/VoiceInput'
 import { AgentLogo, ChevronDown, PaperclipIcon, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import type { LocalBranch } from '../git/local-branches'
 import { ExistingWorkPicker, pickBranch, pickWt, pickedBranch, pickedWtPath } from './ExistingWorkPicker'
-import { submitLifecycle, lifecycleLaunchIntent, lifecycleRequestError } from './session-lifecycle'
+import { submitLifecycle, lifecycleLaunchIntent } from './session-lifecycle'
+import { sessionCreateError, useNativeSessionCreate } from './native-session-create'
 import { useReviewDraft, useSessionReviewControls } from './SessionReviewOptions'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
 
@@ -35,10 +37,11 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   /** 建完（会话已开）：项目主页刷新列表，弹窗关掉自己 */
   onCreated?: (name: string) => void
   autoFocus?: boolean
+  allowNative?: boolean
   draftKey?: string
   initialAgent?: AgentKind
   initialPrompt?: string
-}>(function TaskComposer({ dir, isGit: gitHint, openTerm, onCreated, autoFocus, draftKey, initialAgent = 'claude', initialPrompt = '' }, ref) {
+}>(function TaskComposer({ dir, isGit: gitHint, openTerm, onCreated, autoFocus, allowNative, draftKey, initialAgent = 'claude', initialPrompt = '' }, ref) {
   const agents = useRegisteredAgents()
   const { t } = useI18n()
   const { phone, keyboard } = useLayout()
@@ -49,7 +52,10 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   const [prompt, setPrompt] = useState(initialPrompt)
   const draftNotice = useSettingsDraft(draftKey || 'task:' + dir, prompt, '', setPrompt, !!draftKey)
   const [wtMode, setWtMode] = useState<'new' | 'existing'>('new')
-  const [agent, setAgent] = useState<AgentKind | 'none'>(initialAgent)
+  const [agent, setAgent] = useState<AgentKind | 'none' | 'native'>(initialAgent)
+  const native = agent === 'native'
+  const nativeSession = useNativeSessionCreate()
+  const [modelChoice, setModelChoice] = useState<ModelChoice>({ model: 'auto', freeOnly: false })
   const [wtsAll, setWtsAll] = useState<any[]>([])
   // 「已有」选中值：'wt:<路径>'（进这个工作区）/ 'br:<分支>'（为这条分支开一个工作区）
   const [existing, setExisting] = useState('')
@@ -84,6 +90,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
     appendInstruction: (text) => setPrompt(cur => cur ? cur + '\n' + text : text),
   }))
   useEffect(() => { if (autoFocus) setTimeout(() => promptRef.current?.focus?.(), 0) }, [autoFocus])
+  useEffect(() => { setWtMode('new') }, [dir])
 
   usePageEffect(() => {
     setWtsAll([]); setBranches([]); setRemoteBranches([]); setDefBranch(''); setBase(''); setExisting('')
@@ -148,9 +155,9 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
   })()
 
   const goCreate = async () => {
-    if (!dir || creating || setup.blocked) return
+    if (!dir || creating || (!native && setup.blocked)) return
     if (!prompt.trim()) { message.error(t('session.promptOrNameRequired')); return }
-    if (isGit && wtMode === 'existing' && !existing) { message.error(t('project.where.pickFirst')); return }
+    if (!native && isGit && wtMode === 'existing' && !existing) { message.error(t('project.where.pickFirst')); return }
     // 名字一律从需求派生：这就是任务名（23 设计 §3.3 #6），agent 不再改它
     let finalName = taskNameFromPrompt(prompt)
     if (!finalName) {
@@ -159,6 +166,14 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
     }
     try {
       setCreating(true)
+      if (native) {
+        const { session, onCurrentNode } = await nativeSession.create(finalName, prompt, dir, modelChoice)
+        setPrompt('')
+        if (onCurrentNode) openTerm(session)
+        else message.info(t('modelSelection.createdOnOriginalNode'))
+        onCreated?.(session)
+        return
+      }
       const wantWt = isGit && wtMode === 'new'
       const adopt = isGit && wtMode === 'existing' ? pickedBranch(existing) : ''
       const sessionDir = (isGit && wtMode === 'existing' ? pickedWtPath(existing) : '') || dir
@@ -174,22 +189,22 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
         launch: lifecycleLaunchIntent(agent, prefs, prompt, wantWt ? 'new' : adopt ? 'adopt' : isGit ? 'repo' : 'plain', false, t),
       })
       setPrompt(''); review.reset(); message.success(t('session.lifecycle.accepted')); openTerm(op.resourceId); onCreated?.(op.resourceId)
-    } catch (e: any) { message.error(lifecycleRequestError(e, t)) }
+    } catch (e) { message.error(sessionCreateError(e, t)) }
     finally { setCreating(false) }
   }
 
   return (
     <div className="tt-composer prj-in" ref={composerRef} style={{ animationDelay: '60ms' }}>
-      {draftNotice}<RepositorySetup setup={setup} />
-      <Input.TextArea ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-        placeholder={isGit ? t('project.composerPlaceholder') : t('project.composerPlain')} autoSize={{ minRows: 2, maxRows: 6 }} variant="borderless"
+      {draftNotice}{!native && <RepositorySetup setup={setup} />}
+      <Input.TextArea ref={promptRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} aria-label={t('project.taskPrompt')}
+        placeholder={t(phone || native ? 'project.taskPrompt' : isGit ? 'project.composerPlaceholder' : 'project.composerPlain')} autoSize={{ minRows: 2, maxRows: 6 }} variant="borderless"
         onPaste={onPaste}
         onKeyDown={(e) => { if (!phone && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void goCreate() } }} />
       <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
         onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; e.target.value = ''; if (fs.length) void uploadImages(fs) }} />
       {/* 控制条按「在哪干活 / 谁来干 / 动作」三组排，组内 6px、组间 16px，不画分隔线 */}
       <div className="tt-cbar">
-        {isGit && (
+        {isGit && !native && (
           <span className="tt-cgrp where">
             <button type="button" className={`tt-pill${wtMode === 'new' ? ' on' : ''}`} aria-pressed={wtMode === 'new'} onClick={() => setWtMode('new')}><BranchIcon size={11} />{t('project.where.new')}</button>
             <button type="button" className={`tt-pill${wtMode === 'existing' ? ' on' : ''}`} aria-pressed={wtMode === 'existing'}
@@ -217,6 +232,8 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
           </span>
         )}
         <span className="tt-cgrp agents" role="group" aria-label={t('set.groupAgent')}>
+          {allowNative && <button type="button" className={`tt-pill ico${native ? ' on' : ''}`}
+            title={agentName('native')} aria-label={agentName('native')} aria-pressed={native} onClick={() => setAgent('native')}><AgentLogo kind="native" size={16} /></button>}
           {agents.map(({ kind }) => (
             <button key={kind} type="button" className={`tt-pill ico${agent === kind ? ' on' : ''}`}
               title={agentName(kind)} aria-label={agentName(kind)} aria-pressed={agent === kind}
@@ -233,10 +250,11 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
             disabled={uploading} onClick={() => fileRef.current?.click()}>
             <PaperclipIcon size={13} />
           </button>
-          <Button type="primary" size="small" className="prj-go" loading={creating} disabled={setup.blocked} onClick={goCreate}>{t('project.go')}</Button>
+          <Button type="primary" size="small" className="prj-go" loading={creating} disabled={!native && setup.blocked} onClick={goCreate}>{t('project.go')}</Button>
         </span>
       </div>
       {reviewControls.row}
+      {native && <div className="tt-task-model-fields"><ModelSelectionFields value={modelChoice} onChange={setModelChoice} disabled={creating} /></div>}
     </div>
   )
 })

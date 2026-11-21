@@ -1,0 +1,83 @@
+.tt-project-task-label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  color: var(--text-bright);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.tt-project-task-select {
+  width: 100%;
+  margin-bottom: var(--sp-3);
+}
+
+.tt-project-task-path {
+  margin-inline-start: var(--sp-2);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+}
+
+.tt-project-task-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4) var(--pad-page);
+}
+
+.tt-project-task-page .tt-composer {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tt-project-task-page .tt-composer textarea {
+  min-height: calc(var(--tap) * 2);
+  padding: var(--sp-3) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-sm);
+  background: var(--bg-container) !important;
+}
+
+.tt-project-task-page .tt-composer textarea:focus { border-color: var(--accent) !important; }
+.tt-project-task-page .tt-composer textarea::placeholder { color: var(--text-dim); }
+
+.tt-project-task-page .tt-composer > .tt-cbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0 0;
+}
+
+.tt-project-task-page .tt-cgrp.where {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+
+.tt-project-task-page .tt-cgrp.where > :nth-child(n+3) { grid-column: 1 / -1; }
+.tt-project-task-page .tt-cgrp.where .tt-pill { justify-content: center; width: 100%; }
+.tt-project-task-page .tt-cgrp.agents { flex-wrap: wrap; gap: var(--sp-1); }
+
+.tt-project-task-page .tt-cend {
+  display: flex;
+  gap: var(--sp-2);
+  width: 100%;
+  margin-inline-start: 0;
+}
+
+.tt-project-task-page .prj-go { flex: 1; min-width: 0; }
+.tt-project-task-page .tt-composer > .tt-review-row { padding-inline: 0; }
+.tt-composer > .tt-task-model-fields { padding: var(--sp-3); }
+.tt-project-task-page .tt-task-model-fields { padding-inline: 0; }
+
+html[data-pointer="coarse"] :is(.tt-project-task-page, .tt-project-task-options) :is(.ant-select, .ant-select-item, .tt-pill, .prj-go) {
+  min-height: var(--tap);
+}
+
+html[data-pointer="coarse"] .tt-project-task-page :is(.tt-cgrp.agents, .tt-cend) .tt-pill {
+  min-width: var(--tap);
+}
