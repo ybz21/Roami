@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest'
 import { buildSettings } from './registry'
 vi.mock('../agent/AgentImprovement', () => ({ default: () => null }))
 
-const deps = { t: (key: string) => key, theme: 'dark', setTheme: vi.fn(), locale: 'zh-CN', setLocale: vi.fn(), prefs: {}, setPrefs: vi.fn(), setWorkspace: vi.fn(), nodeLabel: '', isHub: false, onBrowserRestart: vi.fn(), onEnvPush: vi.fn() }
+const deps = { t: (key: string) => key, theme: 'dark', setTheme: vi.fn(), locale: 'zh-CN', setLocale: vi.fn(), prefs: {}, setPrefs: vi.fn(), setWorkspace: vi.fn(), nodeLabel: '', isHub: false, onEnvPush: vi.fn() }
 it.each([undefined, false, true])('registers the experimental workflow only for an explicitly confirmed development node (%s)', developmentRsi => {
   const model = buildSettings({ ...deps, developmentRsi, nodeId: 'dev-node' })
   expect(!!model.pages['experiments.rsi']).toBe(developmentRsi === true)
@@ -21,10 +21,10 @@ it('keeps device and account settings while removing migrated agent pages from n
   expect(model.groups).toEqual([
     { title: 'set.groupPreferences', pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
     { title: 'set.groupNotifications', pages: ['agent.messages'] },
-    { title: 'set.groupDevices', pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
+    { title: 'set.groupDevices', pages: ['node.p2p', 'cluster'] },
     { title: 'set.groupSystem', pages: ['node.env', 'sec', 'about'] },
   ])
-  expect(new Set(model.order).size).toBe(12)
+  expect(new Set(model.order).size).toBe(10)
   expect(model.pages['agent.runtime']).toBeUndefined()
   expect(model.pages['agent.memory']).toBeUndefined()
   for (const id of model.order) expect(model.pages[id].parent).toBe(model.groups.find(group => group.pages.includes(id))!.title)

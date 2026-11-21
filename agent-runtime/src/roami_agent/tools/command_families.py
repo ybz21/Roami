@@ -10,54 +10,6 @@ COMMANDS = json.loads((Path(__file__).resolve().parents[1] / "commands.json").re
 INTERNAL = {"artifact_read", "capability_overview"}
 
 
-def chrome_operation(argv):
-    if not argv:
-        raise DomainError("INVALID_CLI_ARGUMENTS")
-    verb, rest = argv[0], list(argv[1:])
-    flags = {}
-    positionals = []
-    while rest:
-        value = rest.pop(0)
-        if value.startswith("--"):
-            if (
-                value not in {"--resource", "--observation", "--target"}
-                or value in flags
-                or not rest
-            ):
-                raise DomainError("INVALID_CLI_ARGUMENTS")
-            flags[value] = rest.pop(0)
-        else:
-            positionals.append(value)
-    if verb == "new" and len(positionals) <= 1 and not flags:
-        return "browser_open", {"url": positionals[0]} if positionals else {}
-    if verb == "observe" and not positionals and set(flags) == {"--target"}:
-        return "browser_open", {"targetId": flags["--target"]}
-    if verb in {"observe", "screenshot"} and not positionals and set(flags) == {"--resource"}:
-        return "browser_observe", {"resourceId": flags["--resource"]}
-    if verb in {"observe", "screenshot"} and not positionals and not flags:
-        return "browser_observe", {}
-    if set(flags) not in (set(), {"--observation"}, {"--resource"}):
-        raise DomainError("INVALID_CLI_ARGUMENTS")
-    args = {"kind": verb}
-    if "--observation" in flags:
-        args["observationId"] = flags["--observation"]
-    if "--resource" in flags:
-        args["resourceId"] = flags["--resource"]
-    if verb == "goto" and len(positionals) == 1:
-        args["url"] = positionals[0]
-    elif verb == "click" and len(positionals) == 1:
-        args["selector"] = positionals[0]
-    elif verb in {"fill", "type"} and len(positionals) == 2:
-        args.update(selector=positionals[0], text=positionals[1])
-    elif verb == "upload" and len(positionals) == 2:
-        args.update(selector=positionals[0], path=positionals[1])
-    elif verb == "press" and len(positionals) == 1:
-        args["key"] = positionals[0]
-    else:
-        raise DomainError("INVALID_CLI_ARGUMENTS")
-    return "browser_act", args
-
-
 def option_name(field):
     return "--" + re.sub(r"[A-Z]", lambda match: "-" + match[0].lower(), field)
 
@@ -121,8 +73,8 @@ def public_operation(argv, schemas):
     for name, path in COMMANDS.items():
         if argv[: len(path)] == path:
             return name, command_arguments(argv[len(path) :], schemas.get(name, {}))
-    if argv[:1] == ["chrome"]:
-        return chrome_operation(argv[1:])
+    if argv[:1] in (["chrome"], ["adb"]):
+        raise DomainError("TOOL_UNAVAILABLE")
     return None
 
 

@@ -21,8 +21,6 @@ INPUTS = {
     "task_steer": ("taskId text", "taskId text"),
     "memory_search": ("query scope projectId dayKey", "query"),
     "reminder_create": ("text kind afterSeconds whenMs dailyAt", "text"),
-    "browser_observe": ("resourceId", ""),
-    "browser_act": ("kind selector text key url path sha256 resourceId", "kind"),
     "computer_observe": ("resourceId focusOnly", ""),
     "computer_act": ("kind x y button amount key text", "kind"),
 }
@@ -41,8 +39,6 @@ DESCRIPTIONS = {
     "task_steer": "Continue an existing task with new instructions. Its executor and workspace are preserved.",
     "memory_search": "Search relevant saved memories. Scope and date filters are optional.",
     "reminder_create": "Create a requested reminder. Choose afterSeconds, whenMs or dailyAt; the saved timezone is used. kind=daily_brief requests a daily generated summary.",
-    "browser_observe": "Observe the current browser tab. Select resourceId only when more than one tab is owned.",
-    "browser_act": "Act on the last browser observation seen in this conversation. Choose click, fill, type, press, goto or upload and its target/value. Upload needs selector and an absolute path in the prepared workspace; observe afterward to verify server results.",
     "computer_observe": "Observe the current desktop. Optionally crop to its focused window.",
     "computer_act": "Act on the current screenshot: click or scroll at x/y, send a key, or type text.",
 }
@@ -74,8 +70,6 @@ def register_model_inputs(registry):
                 "maximum": 2000,
                 "description": "Maximum lines to read.",
             }
-        if name == "browser_act":
-            public["resourceId"] = {"type": "string", "minLength": 1, "maxLength": 128}
         schema = object_schema(public, required.split())
         if "allOf" in tool.schema:
             schema["allOf"] = deepcopy(tool.schema["allOf"])

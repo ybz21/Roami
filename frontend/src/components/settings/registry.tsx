@@ -3,8 +3,6 @@ import type { ReactNode } from 'react'
 import { PushSettings } from './push-settings'
 import { HotkeyRecorder } from './hotkey-recorder'
 import { KEY_ACTIONS, DEFAULT_KEYBINDINGS, keybindingConflicts, resolveKeybindings, type KeyAction } from '../shell/keybindings'
-import { BrowserSettings } from './browser-settings'
-import { PhoneSettings } from './phone-settings'
 import { P2PSettings } from './p2p-settings'
 import { EnvVarsSettings } from './env-vars'
 import { MemoryGuardSettings } from './memory-settings'
@@ -91,8 +89,6 @@ export function buildSettings(deps: {
   nodeId?: string | null
   experimentRunId?: string
   onExperimentRun?: (id: string) => void
-  onBrowserReady?: (run: (() => Promise<void>) | null) => void
-  onBrowserRestart: () => void
   onEnvPush: () => void
   onInstall?: () => void
   fullscreen?: { active: boolean; toggle: () => void }
@@ -205,21 +201,6 @@ export function buildSettings(deps: {
       ],
     },
     {
-      id: 'node.browser', name: t('set.pageBrowser'), scope: 'node',
-      note: t('settings.browserHelp'),
-      items: [{
-        id: 'browser', label: t('settings.browser'), bare: true, control: { kind: 'custom', node: <BrowserSettings onRestartReady={deps.onBrowserReady} /> },
-        keywords: 'chrome headless window scale profile 无头 窗口 缩放 镜像',
-      }],
-    },
-    {
-      id: 'node.phone', name: t('settings.phoneTitle'), scope: 'node',
-      items: [{
-        id: 'phone', label: t('settings.phoneTitle'), bare: true, control: { kind: 'custom', node: <PhoneSettings /> },
-        keywords: 'android ios adb avd emulator 模拟器 真机 镜像',
-      }],
-    },
-    {
       id: 'node.p2p', name: t('set.pageTransfer'), scope: 'mine',
       items: [{
         id: 'p2p', label: t('settings.p2p'), bare: true, control: { kind: 'custom', node: <P2PSettings /> },
@@ -271,8 +252,6 @@ export function buildSettings(deps: {
   ]
 
   // 浏览器页的「保存并重启」是页级动作：它管的是整页的参数，不是某一行
-  const browserPage = pages.find((p) => p.id === 'node.browser')
-  if (browserPage) browserPage.action = { label: t('settings.browserRelaunch'), hint: t('set.restartHint'), run: deps.onBrowserRestart }
 
   const byId: Record<string, SettingsPageDef> = {}
   pages.forEach((p) => { byId[p.id] = p })
@@ -281,7 +260,7 @@ export function buildSettings(deps: {
     { title: t('set.groupPreferences'), pages: ['ui.look', 'ui.layout', 'ui.keys', 'agent.new'] },
     ...(deps.developmentRsi ? [{ title: t('set.groupAgent'), pages: ['experiments.rsi'] }] : []),
     { title: t('set.groupNotifications'), pages: ['agent.messages'] },
-    { title: t('set.groupDevices'), pages: ['node.browser', 'node.phone', 'node.p2p', 'cluster'] },
+    { title: t('set.groupDevices'), pages: ['node.p2p', 'cluster'] },
     { title: t('set.groupSystem'), pages: ['node.env', 'sec', 'about'] },
   ]
   for (const group of groups) for (const id of group.pages) byId[id].parent = group.title

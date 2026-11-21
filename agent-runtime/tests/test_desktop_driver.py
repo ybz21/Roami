@@ -304,7 +304,7 @@ class DelayedDesktop:
         self.writes = 0
 
     def observe(self, *, focus_only=False):
-        from test_browser_driver import PNG
+        from vision_fixture import PNG
 
         return {
             "driverId": self.driver_id,

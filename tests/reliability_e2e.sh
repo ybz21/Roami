@@ -4,7 +4,7 @@
 #   bash tests/reliability_e2e.sh            全跑
 #   bash tests/reliability_e2e.sh guard      只跑内存护栏
 #   bash tests/reliability_e2e.sh revive     只跑懒恢复
-#   bash tests/reliability_e2e.sh ui         只跑浏览器那几条（需要 chrome CLI + 服务在跑）
+#   bash tests/reliability_e2e.sh ui         只跑界面用例（外部 playwright-cli 测试会话）
 #
 # 为什么要有它：这两块的坑几乎全在「跨进程 / 跨内核 / 跨浏览器」的接缝上——
 # systemctl 会静默成功、cgroup 目录随会话消失、tree 接口和平铺接口是两份实现、
@@ -344,12 +344,13 @@ print(sum(1 for x in json.load(sys.stdin) if x['name']=='$k' and x.get('state')=
   tmux kill-session -t "=$new" 2>/dev/null
 }
 
-# ── UI（需要 chrome CLI + 服务在跑）────────────────────────────────────
+browser_cli() { playwright-cli -s="${ROAMI_E2E_BROWSER_SESSION:-roami-e2e}" --raw "$@"; }
+
 run_ui() {
-  sect "UI（chrome）"
-  command -v roami >/dev/null || { skip "整组" "没有 chrome CLI"; return; }
+  sect "UI（外部 Playwright 测试会话）"
+  command -v playwright-cli >/dev/null || { skip "整组" "需要外部 playwright-cli"; return; }
   curl -sk -o /dev/null "https://127.0.0.1:${PORT:-13579}/" 2>/dev/null || { skip "整组" "服务没在跑"; return; }
-  roami chrome eval "1" >/dev/null 2>&1 || { skip "整组" "Chrome 没起（roami chrome goto 一次即可）"; return; }
+  browser_cli eval "1" >/dev/null 2>&1 || { skip "整组" "请先打开指定的 Playwright 测试会话"; return; }
 
   # 自己造一个休眠会话再看——不能指望跑测试时环境里正好有一个，
   # 那样这条最该守的用例会长期停在 skip 上，等于没有。
@@ -358,26 +359,26 @@ run_ui() {
 
   # 掉登录就自己登回去：服务重启会清 session，而这组用例常跟在一次部署后面跑，
   # 不自愈的话它就变成「每次都要人先去点一下登录」，那种测试没人会跑。
-  roami chrome goto "https://127.0.0.1:${PORT:-13579}/" >/dev/null 2>&1; sleep 3
-  if roami chrome eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
+  browser_cli goto "https://127.0.0.1:${PORT:-13579}/" >/dev/null 2>&1; sleep 3
+  if browser_cli eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
     local pw; pw=$(grep -m1 '^TTMUX_WEB_PASSWORD=' .env 2>/dev/null | cut -d= -f2-)
     if [ -n "$pw" ]; then
-      roami chrome fill "input[type=password]" "$pw" >/dev/null 2>&1
-      roami chrome click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1
+      browser_cli fill "input[type=password]" "$pw" >/dev/null 2>&1
+      browser_cli click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1
       sleep 4
     else
       skip "整组" "在登录页且 .env 里读不到口令"; return
     fi
   fi
 
-  roami chrome eval "location.hash='#/sessions'; 1" >/dev/null 2>&1; sleep 4
+  browser_cli eval "location.hash='#/sessions'" >/dev/null 2>&1; sleep 4
   local r
-  r=$(roami chrome eval "
+  r=$(browser_cli eval "() => {
 const rows=[...document.querySelectorAll('.tt-srow')];
 const dor=rows.filter(r=>/休眠|Dormant/.test(r.querySelector('.tags')?.innerText||''));
 const hollow=rows.filter(r=>{const i=r.querySelector('i');return i&&getComputedStyle(i).backgroundColor==='rgba(0, 0, 0, 0)'});
-JSON.stringify({rows:rows.length,dormantTag:dor.length,hollow:hollow.length,membar:document.querySelectorAll('.tt-membar').length})
-" 2>/dev/null | tail -1)
+return {rows:rows.length,dormantTag:dor.length,hollow:hollow.length,membar:document.querySelectorAll('.tt-membar').length}
+}" 2>/dev/null)
   local rows dtag hollow membar
   rows=$(echo "$r"   | python3 -c 'import json,sys;print(json.loads(sys.stdin.read().strip().strip(chr(39))).get("rows",0))' 2>/dev/null)
   dtag=$(echo "$r"   | python3 -c 'import json,sys;print(json.loads(sys.stdin.read().strip().strip(chr(39))).get("dormantTag",0))' 2>/dev/null)
@@ -409,20 +410,20 @@ JSON.stringify({rows:rows.length,dormantTag:dor.length,hollow:hollow.length,memb
   if [ -z "$hub" ]; then
     skip "U3 主机监控颜色令牌化" "没给 HUB_URL（形如 https://<中心>:13570）"
   else
-    roami chrome goto "$hub" >/dev/null 2>&1; sleep 3
-    if roami chrome eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
+    browser_cli goto "$hub" >/dev/null 2>&1; sleep 3
+    if browser_cli eval "!!document.querySelector('input[type=password]')" 2>/dev/null | grep -q true; then
       [ -n "${HUB_PASSWORD:-}" ] && {
-        roami chrome fill "input[type=password]" "$HUB_PASSWORD" >/dev/null 2>&1
-        roami chrome click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1; sleep 4
+        browser_cli fill "input[type=password]" "$HUB_PASSWORD" >/dev/null 2>&1
+        browser_cli click "button[type=submit], button:has-text('登 录')" >/dev/null 2>&1; sleep 4
       }
     fi
-    roami chrome eval "location.hash='#/hub'; 1" >/dev/null 2>&1; sleep 4
-    roami chrome eval "const f=[...document.querySelectorAll('.tt-hub-fold')].find(x=>/这台机器|This machine/.test(x.innerText)); const b=f&&f.querySelector('button'); b&&b.click(); 1" >/dev/null 2>&1; sleep 4
+    browser_cli eval "location.hash='#/hub'" >/dev/null 2>&1; sleep 4
+    browser_cli eval "() => { const f=[...document.querySelectorAll('.tt-hub-fold')].find(x=>/这台机器|This machine/.test(x.innerText)); f?.querySelector('button')?.click() }" >/dev/null 2>&1; sleep 4
     local hr
-    hr=$(roami chrome eval "
+    hr=$(browser_cli eval "() => {
 const bars=[...document.querySelectorAll('.ant-progress-line .ant-progress-bg')].map(b=>b.style.background||b.style.backgroundColor);
-JSON.stringify({swap:/Swap /.test(document.body.innerText),bars:bars.length,hard:bars.filter(b=>/#f5222d|#faad14/.test(b)).length})
-" 2>/dev/null | tail -1)
+return {swap:/Swap /.test(document.body.innerText),bars:bars.length,hard:bars.filter(b=>/#f5222d|#faad14/.test(b)).length}
+}" 2>/dev/null)
     local hard swapshown
     hard=$(echo "$hr" | python3 -c 'import json,sys;print(json.loads(sys.stdin.read().strip().strip(chr(39))).get("hard",-1))' 2>/dev/null)
     swapshown=$(echo "$hr" | python3 -c 'import json,sys;print(json.loads(sys.stdin.read().strip().strip(chr(39))).get("swap",False))' 2>/dev/null)

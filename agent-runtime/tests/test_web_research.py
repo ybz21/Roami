@@ -1,11 +1,10 @@
 """Live questions route through native Browser Use, not a coding project or legacy session."""
 
 import json
-from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock
 
 import pytest
-from native_prompt_messages import dialogue_messages
-from test_browser_driver import BrowserFixture
+from mcp import types
 from test_runtime import until
 
 from roami_agent.app import Runtime
@@ -20,118 +19,6 @@ class MemoryModel:
 
     async def stream(self, messages, tools):
         yield ModelEvent("text", '{"memories":[]}')
-
-
-async def test_main_web_research_uses_browser_without_configured_code_workspace(store, tmp_path):
-    class Main:
-        model = "main-research-fixture"
-
-        async def stream(self, messages, tools):
-            if messages[-1]["content"] == "Check the latest stock quote":
-                yield ModelEvent(
-                    "tool",
-                    {
-                        "id": "research",
-                        "function": {
-                            "name": "delegate",
-                            "arguments": '{"requestComplete":false,"goal":"Check the latest stock quote with sources and time","executor":"native","target":{"kind":"new_session","resourceOnly":true}}',
-                        },
-                    },
-                )
-            else:
-                yield ModelEvent("text", "Research updates will appear here.")
-
-    class Worker:
-        model = "browser-research-fixture"
-        step = 0
-
-        async def stream(self, messages, tools):
-            messages = dialogue_messages(messages)
-            self.step += 1
-            if self.step == 1:
-                seed = messages[-1]["content"]
-                assert "Original user request" in seed
-                assert "Check the latest stock quote\n\nDelegated goal" in seed
-                assert "Check the latest stock quote with sources and time" in seed
-                name, args = "tool_list", {"query": "browser_use"}
-            elif self.step == 2:
-                name, args = "read", {"path": "skill://browser_use"}
-            elif self.step == 3:
-                name, args = "browser_act", {}
-            elif self.step == 4:
-                name, args = "browser_open", {"url": "https://example.org/quote"}
-            else:
-                yield ModelEvent(
-                    "text",
-                    "Observed the quote source https://example.org/quote. This is fixture data, not a real price.",
-                )
-                return
-            yield ModelEvent(
-                "tool",
-                {
-                    "id": f"read-{self.step}",
-                    "function": {
-                        "name": name if name in {"read", "tool_list"} else "bash",
-                        "arguments": json.dumps(
-                            args
-                            if name in {"read", "tool_list"}
-                            else {
-                                "argv": [
-                                    "roami",
-                                    "agent",
-                                    "capability",
-                                    "call",
-                                    name,
-                                    "--input",
-                                    json.dumps(args),
-                                ]
-                            }
-                        ),
-                    },
-                },
-            )
-
-    fixture = BrowserFixture()
-    runtime = Runtime(
-        store,
-        Main(),
-        worker_model=Worker(),
-        memory_model=MemoryModel(),
-        settings=Settings(browser={"enabled": True}, coding_directory=tmp_path),
-    )
-    runtime.browser.runner = fixture
-
-    async def receipt(operation):
-        return fixture.receipts[operation]
-
-    @asynccontextmanager
-    async def forbidden_workspace(*args, **kwargs):
-        pytest.fail("A web lookup must not prepare a code workspace")
-        yield
-
-    runtime.browser.receipt_reader = receipt
-    runtime.dispatch.native_executor.workspace_factory = forbidden_workspace
-    await runtime.start()
-    try:
-        conversation = await runtime.conversations.create("alice")
-        await runtime.chat.submit(
-            "alice", conversation["id"], "quote", "Check the latest stock quote"
-        )
-        await until(store, lambda db: row(db, "SELECT * FROM tasks WHERE state='succeeded'"))
-        task = await store.call(lambda db: row(db, "SELECT * FROM tasks WHERE state='succeeded'"))
-        assert json.loads(task["intent_json"])["target"] == {
-            "kind": "new_session",
-            "resourceOnly": True,
-        }
-        assert json.loads(task["intent_json"])["executor"] == "native"
-        assert fixture.url == "https://example.org/quote"
-        assert "new" in fixture.writes and "goto" in fixture.writes
-        view = await runtime.conversations.messages("alice", conversation["id"])
-        assert any(activity["name"] == "browser_open" for activity in view["activities"])
-        records = await runtime.tasks.activities("alice", task["id"])
-        assert any(activity.get("name") == "browser_open" for activity in records)
-    finally:
-        await runtime.close()
 
 
 @pytest.mark.parametrize(
@@ -160,35 +47,27 @@ async def test_disabled_browser_is_discovered_and_never_blindly_enqueued(store):
     assert await store.call(lambda db: db.execute("SELECT count(*) FROM tasks").fetchone()[0]) == 0
 
 
-async def test_research_catalog_and_invocation_share_background_capabilities(store):
-    runtime = Runtime(store, MemoryModel(), settings=Settings(browser={"enabled": True}))
+async def test_lookup_uses_enabled_provider_tools_with_legacy_browser_config(store, tmp_path):
+    config = tmp_path / "agent.toml"
+    config.write_text(
+        '[tools.browser]\nenabled=true\nendpoint="http://127.0.0.1:9222"\n'
+        '[tools.mcp.external]\ncommand="fixture"\n'
+    )
+    settings = Settings.load(config)
+    runtime = Runtime(store, MemoryModel(), settings=settings)
     try:
-        assert runtime.tools.catalog("research") == runtime.tools.catalog("worker")
-        assert runtime.tools.directory.list(
-            "browser", "cli", 10, "research"
-        ) == runtime.tools.directory.list("browser", "cli", 10, "worker")
-        commands = runtime.tools.directory.list("browser", "cli", 10, "research")["items"]
-        browser = next(item for item in commands if item["name"] == "roami chrome")
-        forms = [item["argv"][2] for item in browser["commands"]]
-        assert "goto" in forms and "click" in forms and "fill" in forms
-        skill = await runtime.tools.invoke(
-            {"function": {"name": "read", "arguments": json.dumps({"path": "skill://roami"})}},
-            "research",
-            {},
-        )
-        assert skill["text"]
-        tool, _ = runtime.tools.validate(
-            {
-                "function": {
-                    "name": "browser_act",
-                    "arguments": json.dumps(
-                        {"kind": "click", "observationId": "scene", "selector": "#next"}
-                    ),
-                }
-            },
-            "research",
-        )
-        assert tool.name == "browser_act"
+        assert "browser_open" not in runtime.tools.registry
+        connection = runtime.mcp.connections["external"]
+        session = AsyncMock()
+        overview = runtime.tools.registry["capability_overview"].handler
+        for remote, expected in [("search_contacts", False), ("browser_navigate", True)]:
+            session.list_tools.return_value = types.ListToolsResult(
+                tools=[types.Tool(name=remote, inputSchema={"type": "object"})]
+            )
+            await runtime.mcp._catalog(connection, session)
+            assert (await overview({}, {}))["webResearchAvailable"] is expected
+        runtime.tools.disabled_tools.update(connection.names)
+        assert (await overview({}, {}))["webResearchAvailable"] is False
     finally:
         await runtime.close()
 

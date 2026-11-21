@@ -23,15 +23,3 @@ func TestNamedOperationsUseAdmittedLegacyTransport(t *testing.T) {
 		t.Fatal("ordinary session send was intercepted")
 	}
 }
-
-func TestManagedChromeDoesNotFallThroughOnInvalidScopedCommands(t *testing.T) {
-	for _, args := range [][]string{{"eval", "document.cookie", "--observation", "scene"}, {"fill", "#name", "--observation", "scene"}, {"observe", "--resource", "resource", "--observation", "scene"}} {
-		handled, code := managedChrome(args)
-		if !handled || code != 2 {
-			t.Fatalf("scoped command fell through: %v", args)
-		}
-	}
-	if handled, _ := managedChrome([]string{"screenshot", "/tmp/example.png", "--target", "tab"}); handled {
-		t.Fatal("ordinary Chrome command was intercepted")
-	}
-}

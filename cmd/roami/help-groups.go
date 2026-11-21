@@ -20,7 +20,6 @@ var helpGroups = map[string]string{
 	"agent notification-preferences": "管理通知偏好", "agent control": "管理任务资源输入",
 	"agent execution": "查看与管理执行器任务", "agent gateway": "管理模型网关配置与用量",
 	"agent mcp": "管理独立 MCP 服务", "speech": "使用节点语音服务",
-	"chrome": "操作浏览器标签页与页面", "chrome record": "录制浏览器画面",
 	"plugin": "管理插件",
 }
 
@@ -43,12 +42,12 @@ func groupHelpPage(name string) clihelp.Page {
 		}
 	}
 	if name == "" {
-		rows = append(rows, clihelp.Entry{Name: "session", Description: "管理会话、终端与环境"}, clihelp.Entry{Name: "swarm", Description: "蜂群协作、群聊与看板"}, clihelp.Entry{Name: "adb", Description: "Android 设备操作（透传系统 ADB）"}, clihelp.Entry{Name: "server", Description: "启动 Web 服务"}, clihelp.Entry{Name: "help", Description: "查看命令帮助"})
+		rows = append(rows, clihelp.Entry{Name: "session", Description: "管理会话、终端与环境"}, clihelp.Entry{Name: "swarm", Description: "蜂群协作、群聊与看板"}, clihelp.Entry{Name: "server", Description: "启动 Web 服务"}, clihelp.Entry{Name: "help", Description: "查看命令帮助"})
 		p.Command += " " + displayVersion()
 		p.Sections = append(p.Sections, clihelp.Section{Title: "全局路径选项（放在命令之前）", Entries: []clihelp.Entry{{Name: "--home PATH", Description: "实例目录"}, {Name: "--data-dir PATH", Description: "数据目录"}, {Name: "--database-dir PATH", Description: "数据库目录"}, {Name: "--backup-dir PATH", Description: "备份目录"}, {Name: "--config PATH", Description: "配置文件"}}})
 		p.Examples = []clihelp.Entry{{Name: "roami project ls"}, {Name: "roami session ls --tree"}, {Name: "roami session fork -h"}}
 	} else {
-		for _, example := range []string{"project ls", "auth login", "db status", "agent status", "agent capability list", "agent reminder ls", "agent notification-preferences get", "agent control ls", "agent trace", "speech transcribe", "chrome tabs", "plugin ls"} {
+		for _, example := range []string{"project ls", "auth login", "db status", "agent status", "agent capability list", "agent reminder ls", "agent notification-preferences get", "agent control ls", "agent trace", "speech transcribe", "plugin ls"} {
 			if strings.HasPrefix(example, prefix) && commandGuides[example].example != "" {
 				p.Examples = []clihelp.Entry{{Name: commandGuides[example].example}}
 				break
@@ -99,15 +98,11 @@ func showCLIHelp(args []string) (bool, int) {
 		requested = true
 	}
 	name := strings.Join(path, " ")
-	if name == "chrome shot" {
-		name = "chrome screenshot"
-		path = []string{"chrome", "screenshot"}
-	}
 	if name == "plugin list" {
 		name = "plugin ls"
 		path = []string{"plugin", "ls"}
 	}
-	if name == "session" || strings.HasPrefix(name, "session ") || name == "swarm" || strings.HasPrefix(name, "swarm ") || name == "adb" || strings.HasPrefix(name, "adb ") {
+	if name == "session" || strings.HasPrefix(name, "session ") || name == "swarm" || strings.HasPrefix(name, "swarm ") {
 		return false, 0
 	}
 	if _, ok := helpGroups[name]; ok && (requested || len(args) > 0 && name != "") {

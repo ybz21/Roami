@@ -21,21 +21,9 @@
 - 进展 `roami swarm status SWARM_ID --json`
 - 群聊 `roami swarm chat SWARM_ID --follow`
 
-## 浏览器：`roami chrome`
+## 浏览器与手机：MCP
 
-操作 Roami 浏览器中的标签页和网页。
-
-- 标签 `roami chrome tabs`；打开 `roami chrome goto URL --target TAB_ID`
-- 截图 `roami chrome screenshot /tmp/page.png --target TAB_ID`
-
-## Android：`roami adb`
-
-控制已连接的 Android 设备，读取屏幕和文件。
-
-- 设备 `roami adb devices -l`；点按 `roami adb -s SERIAL shell input tap X Y`
-- 截图 `roami adb -s SERIAL exec-out screencap -p > /tmp/phone.png`
-
-透传原生 ADB；设备端命令按自身帮助查询。
+在节点的「能力 → MCP」分别添加浏览器或手机服务，连接后启用需要的工具。用 `roami agent capability list --query KEYWORD` 查找服务实际提供的工具，调用前用 `roami agent capability show NAME` 核对输入与权限。
 
 ## 项目：`roami project`
 

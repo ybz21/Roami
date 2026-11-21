@@ -261,7 +261,6 @@ function TaskInspector({ projects = [],  id, hideBack, onBack, select, onSession
               return <div className="agent-task-resource" key={resource.id}><b>{title}</b><span className="agent-muted" role="status">{t('agent.task.' + status)}</span><div className="agent-task-actions">
                 {resource.canPause && <Button disabled={!safe || resource.state === 'pausing'} onClick={() => { void mutate('pause', '/agent/resources/' + encodeURIComponent(resource.id) + '/pause') }}>{t('agent.task.takeControl')}</Button>}
                 {resource.canResume && <Button disabled={!safe} onClick={() => { void mutate('resume', '/agent/resources/' + encodeURIComponent(resource.id) + '/resume') }}>{t('agent.task.returnControl')}</Button>}
-                {safe && resource.takeoverReady && resource.browserId && resource.targetId && <a className="tt-act agent-task-browser-link" href={'#/browser/task/' + encodeURIComponent(resource.browserId) + '/' + encodeURIComponent(resource.targetId)}>{t('agent.task.openBrowser')}</a>}
               </div></div>
             })}
             {controls?.actions.some((action) => action.state === 'unknown' && action.outcomeKnown !== true) && <p className="agent-task-note">{t('agent.task.reconcile')}</p>}

@@ -30,10 +30,10 @@ describe('legacy inbox links', () => {
 })
 
 
-it('keeps the exact task browser target when node parameters change', () => {
-  at('#/browser/task/browser-instance/exact-tab')
+it.each(['browser/task/browser-instance/exact-tab', 'phone', 'settings/node/browser', 'settings/node/phone'])('redirects %s to MCP on the selected node', route => {
+  at('#/' + route)
   setHashParams({ node: 'node-a' })
-  expect(normalizeRoute(location.hash.replace(/^#\/?/, ''))).toBe('browser/task/browser-instance/exact-tab')
+  expect(normalizeRoute(location.hash.replace(/^#\/?/, ''))).toBe('capabilities/mcp')
   expect(getHashParams().get('node')).toBe('node-a')
 })
 

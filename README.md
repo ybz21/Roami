@@ -49,8 +49,8 @@ your own Linux or macOS machines.
 - **Extend what the assistant can do.** Create or import Skills, configure MCP
   servers and CLIs, install plugins, and discover capabilities through the
   market. Review imported configuration before saving it.
-- **Use the actual development tools.** Work with files and Git, operate the
-  development machine's Chrome, and mirror a connected Android device. Add a
+- **Use the actual development tools.** Work with files and Git, connect browser and
+  phone tools through the MCP servers you choose. Add a
   hub when you need one console for several machines.
 
 ## Get started
@@ -74,8 +74,7 @@ assistant. Optional features have their own requirements:
 |---|---|
 | Persistent terminals and agent sessions | `tmux` |
 | Professional coding agents | The relevant CLI, its login, and provider access |
-| Browser mirror and automation | Chrome and Node |
-| Android device mirror | ADB and a connected, authorized Android device |
+| Browser or phone control | A configured MCP server for the device |
 
 For an installation without service registration:
 
@@ -155,15 +154,11 @@ does not automatically configure every CLI.
 ### Tools: files, browser, and a real phone
 
 The file workspace supports browsing, previews, editing, and Git inspection.
-The browser workspace mirrors Chrome on the development machine, including its
-existing tabs and login state. The phone workspace mirrors an Android device
-connected to that machine over ADB.
+Add browser and phone providers independently on the node under **Capabilities → MCP**. Add a stdio command and its arguments, or an SSE / Streamable HTTP URL. Connect the server and enable the tools you want. The provider supplies its browser, device connection and supported actions. The Android app is a remote client for the console.
+
+For example, use `npx` as the stdio command with arguments `-y @playwright/mcp --isolated` for a browser or `-y @mobilenext/mobile-mcp` for a phone. Each provider runs on the machine hosting it and needs access to its browser or devices.
 
 ![Current file workspace](docs/screenshots/current/workspace.en.webp)
-
-The **Android app below is a remote client**. The **phone mirror** is a separate
-feature for operating and debugging a device attached to your development
-machine.
 
 ## Android app
 
@@ -226,7 +221,7 @@ nodes or disconnects.
 
 ## CLI and development
 
-`roami` is the command entry point for the console, sessions, browser automation,
+`roami` is the command entry point for the console, sessions, capabilities,
 and installed plugins:
 
 ```bash
@@ -234,8 +229,7 @@ roami help
 roami session ls --json
 roami project ls --json
 roami agent status
-roami chrome help
-roami adb devices -l
+roami agent capability list --query browser
 ```
 
 For a source checkout, install the Go and Node versions required by

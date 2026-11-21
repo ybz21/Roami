@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | project | 项目与完整会话归属 | `roami project help` |
 | session | tmux 会话 / 窗格 / 蜂群 | `roami session help` |
-| chrome | 浏览器、截图、录屏 | `roami chrome help` |
+| MCP | 浏览器、手机 | `roami agent capability list --query MCP` |
 | agent | Main、任务、提醒、回报、资源 | `roami agent help`，子命令 help |
 | auth | 当前节点 Web 登录 | `roami auth help` |
 | plugin | 节点插件、命令、审计 | `roami plugin help` |

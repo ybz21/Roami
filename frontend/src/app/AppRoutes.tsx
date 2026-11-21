@@ -22,8 +22,6 @@ const MobileSessions = lazyRetry(() => import('../components/mobile/MobileSessio
 const MobileHome = lazyRetry(() => import('../components/mobile/MobileHome'))
 const InstallPage = lazyRetry(() => import('../components/install/InstallPage'))
 const MobileTools = lazyRetry(() => import('../components/mobile/MobileTools'))
-const BrowserView = lazyRetry(() => import('../components/mirror/BrowserView'))
-const PhoneView = lazyRetry(() => import('../components/mirror/PhoneView'))
 const ProjectOkr = lazyRetry(() => import('../components/projects/okr/ProjectOkr'))
 const OkrProjects = lazyRetry(() => import('../components/projects/okr/OkrProjects'))
 const Swarm = lazyRetry(() => import('../components/swarm/Swarm'))
@@ -116,8 +114,6 @@ function AppRouteContent({ foreground, routing, isMobile, hasDock, active, proje
     />, { lifetime: 'retain' }),
     install: definePage(isMobile ? <MobileSubPage title={t('install.pageTitle')} onBack={() => go('settings')} manageHistory={false} keepBottomNav><InstallPage /></MobileSubPage> : <InstallPage />, { lifetime: 'retain' }),
     tools: definePage(<MobileTools onNav={(k) => go(k)} />, { lifetime: 'retain' }),
-    browser: definePage(<BrowserView key={route} initialTarget={route.startsWith('browser/task/') ? route.split('/')[3] || '' : ''} browserInstance={route.startsWith('browser/task/') ? route.split('/')[2] || '' : ''} />, { scroll: 'content', resource: route }),
-    phone: definePage(<PhoneView />, { scroll: 'content' }),
   }
   const lazyFallback = <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><Spin /></div>
   const definition = pages[tab as keyof typeof pages] || pages.projects

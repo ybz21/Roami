@@ -38,8 +38,7 @@ Agent、仓库与进程始终在你自己的 Linux 或 macOS 开发机上运行�
   关闭客户端或客户端断网，不会关闭服务器上的会话。
 - **扩展助手的能力。** 创建或导入 Skill、配置 MCP 和 CLI、安装插件，
   也能从市场发现能力，预览并修改配置后再确认导入。
-- **直接使用真实开发工具。** 浏览文件、查看 Git、操控开发机上的 Chrome、
-  镜像已连接的 Android 设备；机器多了，再用中心把它们接到同一个控制台。
+- **直接使用真实开发工具。** 浏览文件、查看 Git、通过自选 MCP 服务操作浏览器或手机；机器多了，再用中心把它们接到同一个控制台。
 
 ## 快速开始
 
@@ -59,8 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/ybz21/Roami/main/install.sh | bash
 |---|---|
 | 持久终端与 Agent 会话 | `tmux` |
 | 专业编程 Agent | 对应 CLI、登录状态与模型服务访问权限 |
-| 浏览器镜像与自动化 | Chrome 与 Node |
-| Android 设备镜像 | ADB 与已连接、已授权的 Android 设备 |
+| 浏览器或手机控制 | 已配置的设备 MCP 服务 |
 
 如果不需要注册常驻服务：
 
@@ -126,13 +124,11 @@ Roami 托管的能力供内置助手调用。专业 CLI 还有各自的 Skill �
 
 ### 工具：文件、浏览器与真手机
 
-文件工作区支持目录浏览、预览、编辑与 Git 检查。浏览器工作区镜像开发机上的 Chrome，
-复用已有标签和登录状态；手机工作区通过 ADB 镜像连接在开发机上的 Android 设备。
+文件工作区支持目录浏览、预览、编辑与 Git 检查。在节点的**能力 → MCP** 中可分别添加浏览器和手机服务。选择 stdio 并填写启动命令和参数，或填写 SSE / Streamable HTTP 地址。连接后勾选需要的工具；具体可用的页面操作、截图或设备控制由服务提供。Android App 仍用于从手机访问控制台。
+
+例如，stdio 命令填 `npx`，浏览器服务的参数填 `-y @playwright/mcp --isolated`，手机服务的参数填 `-y @mobilenext/mobile-mcp`。浏览器和设备由服务所在机器提供。
 
 ![当前文件工作区](docs/screenshots/current/workspace.zh.webp)
-
-下文的 **Android App 是远程客户端**；这里的**手机镜像**是另一项功能，用于操控与调试
-接在开发机上的设备。
 
 ## Android App
 
@@ -186,15 +182,14 @@ cluster:
 
 ## CLI 与开发
 
-`roami` 是控制台、会话、浏览器自动化和已安装插件的统一命令入口：
+`roami` 是控制台、会话、能力管理和已安装插件的统一命令入口：
 
 ```bash
 roami help
 roami session ls --json
 roami project ls --json
 roami agent status
-roami chrome help
-roami adb devices -l
+roami agent capability list --query browser
 ```
 
 从源码开发时，先准备 [go.mod](go.mod) 与[前端配置](frontend/package.json)要求的 Go、Node，

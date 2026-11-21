@@ -5,8 +5,6 @@ export const NAV = [
   { key: 'projects', labelKey: 'nav.projects' },
   { key: 'okr', labelKey: 'okr.title' },
   { key: 'files', labelKey: 'nav.files' },
-  { key: 'browser', labelKey: 'nav.browser' },
-  { key: 'phone', labelKey: 'nav.phone' },
   { key: 'capabilities', labelKey: 'nav.capabilities' },
   { key: 'settings', labelKey: 'nav.env' },
   { key: 'sessions', labelKey: 'nav.sessions' }, // 兼容旧会话页路由；手机归入项目，桌面不列
@@ -14,8 +12,8 @@ export const NAV = [
 ]
 
 export const NAV_WORKSPACE = ['home', 'projects', 'okr', 'files']
-export const NAV_TOOLS = ['browser', 'phone', 'capabilities']
-export const DESKTOP_PAGE_KEYS = new Set(['onboarding', 'home', 'activity', 'projects', 'okr', 'files', 'browser', 'phone', 'capabilities', 'settings', 'sessions', 'swarm', 'hub'])
+export const NAV_TOOLS = ['capabilities']
+export const DESKTOP_PAGE_KEYS = new Set(['onboarding', 'home', 'activity', 'projects', 'okr', 'files', ...NAV_TOOLS, 'settings', 'sessions', 'swarm', 'hub'])
 export const PAGE_TABS_KEY = 'roam.pageTabs'
 export function loadPageTabs(): string[] {
   try {

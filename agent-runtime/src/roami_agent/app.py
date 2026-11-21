@@ -38,8 +38,8 @@ from roami_agent.dispatch.swarm_goal_schedule import GoalSchedule
 from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.dispatch.tasks import Tasks
-from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
+from roami_agent.executors.legacy_browser_receipts import LegacyBrowserReceipts
 from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
 from roami_agent.executors.project_goal_schedule import ProjectGoalSchedule
@@ -74,7 +74,6 @@ from roami_agent.storage.task_deliverables import TaskDeliverables
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
 from roami_agent.tools.artifacts import register_artifact_tools
-from roami_agent.tools.browser import register_browser_tools
 from roami_agent.tools.cli_commands import CLICommands
 from roami_agent.tools.computer import register_computer_tools
 from roami_agent.tools.files import register_file_tools
@@ -262,9 +261,7 @@ class Runtime:
             if mcp_socket
             else None,
         )
-        self.browser = BrowserDriver(database, self.settings, self.resources, self.artifacts)
-        if self.browser.config.get("enabled"):
-            register_browser_tools(self.tools, self.browser)
+        self.legacy_browser_receipts = LegacyBrowserReceipts(database, self.resources)
         self.desktop = DesktopDriver(database, self.settings, self.resources, self.artifacts)
         if self.desktop.config["enabled"]:
             register_computer_tools(self.tools, self.desktop)
@@ -290,7 +287,7 @@ class Runtime:
                 binding, artifact
             ),
         )
-        register_research_tools(self.tools, self.tasks)
+        register_research_tools(self.tools, self.tasks, self.mcp)
         register_foundations(self.tools, self.settings)
 
         def main_context():
@@ -328,9 +325,7 @@ class Runtime:
                 lambda *args, **kwargs: self.run_turn(*args, **kwargs),
                 database,
                 self.settings,
-                resources=self.resources
-                if self.browser.config.get("enabled") or self.desktop.config["enabled"]
-                else None,
+                resources=self.resources if self.desktop.config["enabled"] else None,
                 artifacts=self.artifacts,
                 project_workspace=targets.project_workspace,
             ),
@@ -477,7 +472,8 @@ class Runtime:
             self.settled_route_recovery = asyncio.create_task(
                 self.main_executions.recover_settled_route_waits()
             )
-        self.browser_monitor = asyncio.create_task(self._monitor_browser())
+        if await self.legacy_browser_receipts.pending():
+            self.browser_monitor = asyncio.create_task(self._monitor_browser())
         self.desktop_monitor = asyncio.create_task(self._monitor_desktop())
         self.control_monitor = asyncio.create_task(self._monitor_controls())
         self.reminder_monitor = asyncio.create_task(self._monitor_reminders())
@@ -564,7 +560,9 @@ class Runtime:
     async def _monitor_browser(self):
         while not self.stopping:
             try:
-                await self.browser.reconcile()
+                await self.legacy_browser_receipts.reconcile()
+                if not await self.legacy_browser_receipts.pending():
+                    return
             except (DomainError, OSError, TimeoutError):
                 log.exception("Browser operation observation failed")
             await asyncio.sleep(1)

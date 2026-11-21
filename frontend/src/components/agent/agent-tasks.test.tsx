@@ -108,8 +108,8 @@ it('waits for server-confirmed handoff and invalidates old readiness immediately
   expect(screen.queryByRole('link', { name: 'agent.task.openBrowser' })).toBeNull()
   ready = true
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.checkControl' }))
-  const link = await screen.findByRole('link', { name: 'agent.task.openBrowser' })
-  expect(link.getAttribute('href')).toBe('#/browser/task/browser-instance/exact-tab')
+  await screen.findByText('agent.task.controlReady')
+  expect(screen.queryByRole('link', { name: 'agent.task.openBrowser' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'agent.task.returnControl' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('POST', '/agent/resources/resource/resume', {}))
   await waitFor(() => expect(screen.queryByText('agent.task.controlReady')).toBeNull())

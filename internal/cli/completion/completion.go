@@ -15,7 +15,7 @@ import (
 // Script completes only the public Roami command vocabulary.
 const Script = `_roami_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}" prev="${COMP_WORDS[COMP_CWORD-1]}"
-    local words="session swarm chrome adb speech project model agent db server auth plugin help version completion"
+    local words="session swarm speech project model agent db server auth plugin help version completion"
     case "${COMP_WORDS[1]}" in
         session)
             words="ls new attach detach kill rename processes process-stop pause resume reclaim compact memory-status memory-setup-script send keys capture fork children parent swarm env info nw lw kw sp split kp db help"
@@ -32,8 +32,6 @@ const Script = `_roami_complete() {
                 env) words="set rm clear push" ;;
             esac ;;
         swarm) words="new ls status show members member board work collect chat feed say post plan dependencies control pause resume stop archive daily help" ;;
-        chrome) words="tabs goto click fill text eval screenshot record setup help" ;;
-        adb) words="devices shell exec-out push pull install uninstall logcat forward reverse connect disconnect pair version help" ;;
         speech) words="transcribe help"
             if (( COMP_CWORD > 2 )); then words="--file --file-root --expected-file-sha256 --server --json --help"; fi ;;
         model) words="list"

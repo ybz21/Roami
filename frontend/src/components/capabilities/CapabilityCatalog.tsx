@@ -35,7 +35,7 @@ export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | '
   const managed = kind === 'tools' ? {} : catalog?.managed?.[kind] || {}
   const rows: Entry[] = kind === 'skills' ? (catalog?.skills || []).map(skill => ({ ...skill, description: ['roami', 'browser_use'].includes(skill.name) ? t('agent.capabilities.skillDescription.' + skill.name) : skill.description || t('agent.capabilities.skillFallback'), managed: managed[skill.name] }))
     : kind === 'mcp' ? (catalog?.mcp || []).map(server => ({ ...server, source: server.transport, displayName: server.displayName || managed[server.name]?.displayName, description: server.description || managed[server.name]?.description || '', managed: managed[server.name] }))
-    : (kind === 'tools' ? catalog?.tools || [] : (catalog?.cli || []).flatMap(group => group.commands).filter(tool => !tool.name.startsWith('mcp_'))).map(tool => ({ ...tool, description: kind === 'tools' && ['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user', 'computer_open', 'computer_observe', 'computer_act'].includes(tool.name) ? t('agent.capabilities.toolDescription.' + tool.name) : ['roami', 'roami chrome'].includes(tool.name) ? t('agent.capabilities.cliDescription.' + tool.name) : tool.description, source: tool.source || 'builtin', managed: managed[tool.name.replace(/^cli_/, '')] }))
+    : (kind === 'tools' ? catalog?.tools || [] : (catalog?.cli || []).flatMap(group => group.commands).filter(tool => !tool.name.startsWith('mcp_'))).map(tool => ({ ...tool, description: kind === 'tools' && ['read', 'bash', 'edit', 'write', 'tool_list', 'delegate', 'ask_user', 'computer_open', 'computer_observe', 'computer_act'].includes(tool.name) ? t('agent.capabilities.toolDescription.' + tool.name) : tool.name === 'roami' ? t('agent.capabilities.cliDescription.' + tool.name) : tool.description, source: tool.source || 'builtin', managed: managed[tool.name.replace(/^cli_/, '')] }))
   const filtered = rows.filter(row => `${row.displayName || row.name} ${row.name} ${row.description}`.toLowerCase().includes(query.trim().toLowerCase()))
   const selected = rows.find(row => row.name === selectedName)
   const change = async (row: Entry, enabled: boolean) => {
@@ -100,7 +100,7 @@ export function CapabilityCatalog({ kind }: { kind: 'skills' | 'cli' | 'mcp' | '
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setVersion(value => value + 1)}>{t('agent.retry')}</Button>} />}
     {!catalog && !error && <Spin />}
-    {catalog && !filtered.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('agent.capabilities.empty')} />}
+    {catalog && !filtered.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t(kind === 'mcp' && !rows.length ? 'capabilities.emptyMcp' : 'agent.capabilities.empty')} />}
     <div className="tt-capability-list">{filtered.map(row => <article className="tt-capability-row" key={row.name}>
       <div className="tt-capability-cardhead"><span className="tt-capability-icon">{kind === 'skills' ? <FileTextIcon size={24} /> : kind === 'cli' ? <TerminalIcon size={24} /> : kind === 'mcp' ? <PlugIcon size={24} /> : <GearIcon size={24} />}</span>
         <span className="tt-capability-source">{source(row)}</span>

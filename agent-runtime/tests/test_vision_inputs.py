@@ -4,22 +4,21 @@ import json
 
 import httpx
 import pytest
-from native_prompt_messages import dialogue_messages
-from test_browser_driver import PNG, BrowserFixture, BrowserModel
 from test_resource_leases import controller
+from test_runtime import ConversationModel
+from vision_fixture import PNG
 
 from roami_agent.app import Runtime
 from roami_agent.context.vision_inputs import VisionInputs
 from roami_agent.protocol.errors import DomainError
 from roami_agent.providers.chat_completions import ChatCompletions
-from roami_agent.server.configuration import Settings
 from roami_agent.storage.context_admission import assert_context_admitted
-from roami_agent.storage.database import row, rows
+from roami_agent.storage.database import row
 
 
 @pytest.fixture
 async def observation(store):
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
     try:
         task, run = await controller(store)
         artifact = await runtime.artifacts.put(
@@ -108,69 +107,6 @@ async def test_revoked_image_manifest_prevents_further_model_and_tool_admission(
     await runtime.artifacts.delete("alice", artifact["id"])
     with pytest.raises(DomainError, match="CONTEXT_SOURCE_FORGOTTEN"):
         await runtime.db.call(lambda db: assert_context_admitted(db, turn))
-
-
-async def test_native_browser_loop_passes_current_png_to_worker_and_keeps_storage_reference_only(
-    store,
-):
-    from test_runtime import until
-
-    class VisualBrowser(BrowserModel):
-        def __init__(self):
-            super().__init__()
-            self.images = 0
-
-        async def stream(self, messages, tools):
-            messages = dialogue_messages(messages)
-            if isinstance(messages[-1].get("content"), list):
-                assert "bash" in {tool["function"]["name"] for tool in tools}
-                assert messages[-1]["content"][1]["image_url"]["url"].startswith(
-                    "data:image/png;base64,"
-                )
-                self.images += 1
-                messages = messages[:-1]
-            async for event in super().stream(messages, tools):
-                yield event
-
-    fixture, model = BrowserFixture(), VisualBrowser()
-
-    async def verify(task, result):
-        return fixture.saved and fixture.name == "Roami"
-
-    runtime = Runtime(
-        store,
-        model,
-        worker_model=model,
-        settings=Settings(browser={"enabled": True}, model_capabilities={"images": True}),
-        verifier=verify,
-    )
-    runtime.browser.runner = fixture
-    await runtime.start()
-    try:
-        conversation = await runtime.conversations.create("alice")
-        task = await runtime.tasks.create(
-            "alice",
-            conversation["id"],
-            "Use the observed form",
-            key="visual-form",
-            record_intent=True,
-        )
-        runtime.wakeup.set()
-        await until(
-            store,
-            lambda db: row(
-                db, "SELECT id FROM tasks WHERE id=? AND state='succeeded'", (task["id"],)
-            ),
-        )
-        assert model.images == 3 and fixture.writes == ["new", "goto", "fill", "click"]
-        manifests = await store.call(lambda db: rows(db, "SELECT parts_json FROM prompt_manifests"))
-        assert sum(bool(json.loads(item["parts_json"])["imageEvidence"]) for item in manifests) == 3
-        assert all("data:image" not in item["parts_json"] for item in manifests)
-        assert not await store.call(
-            lambda db: row(db, "SELECT id FROM messages WHERE content_json LIKE '%data:image%'")
-        )
-    finally:
-        await runtime.close()
 
 
 async def test_provider_rejects_images_before_network_without_explicit_capability():

@@ -2,8 +2,8 @@
 
 import httpx
 import pytest
-from test_browser_driver import BrowserModel
 from test_resource_leases import begin, setup
+from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
@@ -12,7 +12,7 @@ from roami_agent.server.http import create_app
 
 async def test_pause_releases_only_confirmed_controls_and_resume_requires_a_fresh_lease(store):
     leases, lease, observed, task, run = await setup(store)
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
     try:
         action = await begin(leases, lease, observed, task, run)
         pending = await runtime.controls.pause("alice", lease["id"])
@@ -41,7 +41,7 @@ async def test_pause_releases_only_confirmed_controls_and_resume_requires_a_fres
 
 async def test_http_controls_are_owner_scoped_and_exclude_typed_input_from_action_details(store):
     leases, lease, observed, task, run = await setup(store)
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
     try:
         action = await begin(leases, lease, observed, task, run)
         await leases.finish(
@@ -83,7 +83,7 @@ async def test_http_controls_are_owner_scoped_and_exclude_typed_input_from_actio
 async def test_control_listing_includes_claims_before_observation(store):
     _, lease, _, task, _ = await setup(store)
     await store.call(lambda db: db.execute("DELETE FROM resource_observations"), write=True)
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
     try:
         items = (await runtime.controls.task("alice", task))["resources"]
         assert (
@@ -125,7 +125,7 @@ async def test_fork_cannot_bypass_parent_takeover_but_an_independent_goal_is_not
     await leases.pause("alice", lease["id"])
     with pytest.raises(DomainError, match="RESOURCE_INPUT_PAUSED"):
         await leases.claim("alice", child["id"], child_run, "browser", "replacement-tab")
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
     try:
         assert child_resource["id"] in {
             item["id"] for item in (await runtime.controls.task("alice", parent))["resources"]
@@ -154,14 +154,10 @@ async def test_disabled_drivers_still_reconcile_durable_stop_receipts_without_st
             write=True,
         )
     action = await begin(leases, lease, observed, task, run)
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
 
-    async def no_cli(*args, **kwargs):
-        pytest.fail("Receipt reconciliation started the browser SDK")
-
-    runtime.browser.runner = no_cli
     runtime.desktop.factory = lambda: pytest.fail("Receipt reconciliation connected a desktop")
-    root = runtime.browser.receipts if kind == "browser" else runtime.desktop.root
+    root = runtime.legacy_browser_receipts.receipts if kind == "browser" else runtime.desktop.root
     root.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     root.mkdir(mode=0o700)
     descriptor = os.open(
@@ -218,7 +214,7 @@ async def test_handoff_waits_for_sibling_input_but_not_unrelated_goal(store):
         "alice", other["id"], independent, run, other["lease_epoch"], "c" * 64, {}
     )
     await begin(leases, other, other_seen, independent, run, "unrelated-action")
-    runtime = Runtime(store, BrowserModel())
+    runtime = Runtime(store, ConversationModel())
     try:
         pending = await runtime.controls.pause("alice", lease["id"])
         assert pending["actionPending"] and not pending["takeoverReady"]

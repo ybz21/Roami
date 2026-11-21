@@ -51,9 +51,9 @@ bash tests/reliability_e2e.sh ui         # 只跑浏览器那几条
 | **V6** | 恢复后再看列表 | 它不再是 dormant | `restored_from` 被占用后就该排除，否则会重复恢复 |
 | **V7** | 显式 `ttmux kill --yes` | `died_reason='killed'` 且**不进**休眠列表 | 你亲手杀掉的会话自己回来，比消失更让人恼火 |
 
-## UI（chrome CLI）
+## UI（外部 Playwright CLI）
 
-跑之前需要 Chrome 起着（`roami chrome goto <url>` 一次即可）。用例会自己登录、自己造休眠会话。
+在测试机用单独安装的 `playwright-cli` 运行 `playwright-cli -s=roami-e2e open`，并让测试浏览器信任测试节点的证书。可用 `ROAMI_E2E_BROWSER_SESSION` 指定其他测试会话。用例会自己登录、自己造休眠会话。完成后用 `playwright-cli -s=roami-e2e close` 关闭测试浏览器。
 
 | # | 用例 | 断言 | 守的是什么 |
 |---|---|---|---|

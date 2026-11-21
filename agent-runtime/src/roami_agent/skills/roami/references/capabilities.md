@@ -8,7 +8,7 @@ Main 直接提供基础工具；普通原生 Worker 与 research 共享 read/bas
 roami agent capability list --query "发消息" --kind cli
 roami agent capability list --query "浏览器" --kind all
 roami agent capability show roami
-roami agent capability show "roami chrome"
+roami agent capability list --query browser
 ```
 
 模型用 tool_list 按 MCP / Skill / CLI / tool 分类发现能力，按返回的 nextOffset 分页。CLI 只列命令族；用 roami help 查看当前角色可执行的真实命令和输入 schema，再经 bash 执行。普通标量参数使用 `--kebab-case` flags（例如 `reminder cancel --id ID`）；无参命令直接执行（例如 `reminder ls`），无需补空 JSON。复杂对象/数组可选用 `--input JSON`。两种形式共用能力 schema 与运行中的 Agent 工具上下文，由宿主绑定身份；不从历史日志复制内部 ID，也不让用户填写。专业终端的普通 flags 用法以本机帮助为准。发现不代表授权，执行仍重新校验。

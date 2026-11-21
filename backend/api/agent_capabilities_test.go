@@ -19,7 +19,7 @@ func TestAgentCapabilitiesCreatesEditableGuide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(initial, "roami agent capability") || !strings.Contains(initial, "roami chrome") || !strings.Contains(initial, "roami --help") {
+	if !strings.Contains(initial, "roami agent capability") || !strings.Contains(initial, "能力 → MCP") || !strings.Contains(initial, "roami --help") {
 		t.Fatalf("default guide missing capabilities: %q", initial)
 	}
 	info, err := os.Stat(path)

@@ -5,7 +5,7 @@ description: Use Roami projects, sessions, background tasks, executors, reminder
 
 # Roami
 
-Use the `roami` CLI family. Discover unfamiliar commands with `tool_list(kind="cli",query="roami")` or run `roami help` in native bash. The returned command list carries each input schema and effect. Internal operation names are not separate CLI products. Browser work belongs to `skill://browser_use` and `roami chrome`.
+Use the `roami` CLI family. Discover unfamiliar commands with `tool_list(kind="cli",query="roami")` or run `roami help` in native bash. The returned command list carries each input schema and effect. Internal operation names are not separate CLI products. Browser work belongs to `skill://browser_use` and the configured MCP tools.
 
 Read only the relevant reference through `read`:
 

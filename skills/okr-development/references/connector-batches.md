@@ -126,7 +126,7 @@ a new batch only after proving the old one was not published.
 New publications expand a later collection's coverage. Collect that new set in a
 fresh real batch; the earlier set remains valid at its earlier capture time.
 
-Reopen the real dashboard with roami chrome and verify current-source values,
+Reopen the real dashboard with the configured browser MCP and verify current-source values,
 unknowns and same-day append order. A data receipt does not prove task acceptance,
 public posting, or a daily schedule. Schedule/nextDue and platform receipts remain
 separate. Never create a replacement Main or data member to bypass a failure.

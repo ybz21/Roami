@@ -18,7 +18,7 @@ func TestIndexedSubcommandHelpDoesNotInitializeResources(t *testing.T) {
 	}
 	for _, command := range []string{
 		"session ls", "session capture", "session fork", "session rename", "session resolve", "session send",
-		"chrome tabs", "chrome goto", "chrome screenshot", "chrome click", "chrome fill", "chrome eval", "chrome record", "chrome record start", "chrome record stop", "swarm status",
+		"swarm status",
 		"project ls", "project show", "agent capability list", "agent capability show",
 	} {
 		t.Run(command, func(t *testing.T) {

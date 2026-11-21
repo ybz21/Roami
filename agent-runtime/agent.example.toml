@@ -92,13 +92,7 @@ skill_roots = []
 # [tools.mcp.remote.header_env]
 # X-Service-Token = "MCP_SERVICE_TOKEN"
 
-# Browser Use reuses the unified Chrome CLI and the existing browser login state.
-# [tools.browser]
-# enabled = true
-# existing_tabs = false # default: new task-owned background tabs only
-# max_tabs = 20 # legacy fallback, 0..1000 (0 = unlimited); Browser settings govern current drivers
-# idle_timeout_seconds = 600 # idle retention before recycling, 30..86400
-# endpoint = "http://127.0.0.1:9222" # omit to follow Roami's configured Chrome
+# Configure browser and phone providers independently in Capabilities → MCP.
 
 # Requires images = true on the effective Worker route.
 # [tools.computer]

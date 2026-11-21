@@ -239,7 +239,7 @@ async def test_discovery_handles_retired_names_weather_and_kind_misses_without_o
     assert not any(item["name"] == "capability_overview" for item in found["items"])
     for query in ("browser", "browser_open", "网页"):
         result = directory.list(query, "cli", 5, "research")
-        assert result["items"][0]["name"] == "roami chrome"
+        assert all(item["name"] != "roami chrome" for item in result["items"])
     assert all(
         item["name"] != "capability_overview" for item in directory.list(kind="cli")["items"]
     )

@@ -93,17 +93,10 @@ export default function SettingsPage({ sub, onNav, onLogout, onInstall, fullscre
     return () => cancelAnimationFrame(frame)
   }, [compact, mobileSearchOpen, searchNonce])
 
-  const browserRestart = useRef<(() => Promise<void>) | null>(null)
-  const registerBrowserRestart = useRef((run: (() => Promise<void>) | null) => { browserRestart.current = run }).current
   const runId = sub?.startsWith('experiments/rsi/') ? sub.slice('experiments/rsi/'.length) : ''
   const model = useMemo(() => buildSettings({
     t, theme: mode, setTheme: setMode, locale, setLocale, prefs, setPrefs,
     setWorkspace: saveWorkspace, onLogout, onInstall, fullscreen,
-    onBrowserReady: registerBrowserRestart,
-    onBrowserRestart: async () => {
-      if (!browserRestart.current) throw new Error(t('settings.readFailed'))
-      await browserRestart.current()
-    },
     onEnvPush: pushEnv,
     developmentRsi: channel.value?.developmentRsi === true, nodeId, experimentRunId: runId,
     onExperimentRun: id => { const route = 'settings/experiments/rsi' + (id ? '/' + encodeURIComponent(id) : ''); if (onNav) onNav(route); else location.hash = '#/' + route },

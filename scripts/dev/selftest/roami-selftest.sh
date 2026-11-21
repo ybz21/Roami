@@ -82,7 +82,6 @@ check_json "GET /api/sessions"      "/api/sessions"       ""         " 个会话
 check_json "GET /api/projects"      "/api/projects"       "projects" " 个项目"
 check_json "GET /api/plugins"       "/api/plugins"        ""         " 个插件"
 check_json "GET /api/preferences"   "/api/preferences"
-check_json "GET /api/browser/config" "/api/browser/config"
 
 section "插件（顺带守住「日志混进 JSON」那条回归）"
 run_plugin() {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/ybz21/Roami/backend/browser/automation"
 	"github.com/ybz21/Roami/internal/cli"
 	"github.com/ybz21/Roami/internal/cli/completion"
 	clihelp "github.com/ybz21/Roami/internal/cli/help"
@@ -10,7 +9,6 @@ import (
 	"github.com/ybz21/Roami/internal/plugin"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -171,8 +169,9 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 		fmt.Fprintln(os.Stderr, "ttmux entry retired; use roami session <command>")
 		return true, 2
 	}
-	if base == "chrome" {
-		return true, runChrome(args)
+	if base == "chrome" || len(args) > 0 && (args[0] == "chrome" || args[0] == "adb") {
+		fmt.Fprintln(os.Stderr, "浏览器和手机控制已迁至 能力 → MCP")
+		return true, 2
 	}
 	if len(args) == 0 {
 		return false, 0
@@ -195,10 +194,6 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 				return true, runSession(append([]string{"help"}, rest[1:]...))
 			case "swarm":
 				return true, runSwarm(append([]string{"help"}, rest[1:]...))
-			case "chrome":
-				return true, runChrome([]string{"help"})
-			case "adb":
-				return true, runADB([]string{"help"})
 			case "speech":
 				return true, runSpeech([]string{"help"})
 			case "agent":
@@ -232,10 +227,6 @@ func runCLI(args []string, _ string) (handled bool, code int) {
 		return true, runDatabase(rest)
 	case "plugin", "__autoconfirm", "_plugin-host":
 		return true, runSession(args)
-	case "chrome":
-		return true, runChrome(rest)
-	case "adb":
-		return true, runADB(rest)
 	case "speech":
 		return true, runSpeech(rest)
 	case "completion":
@@ -283,47 +274,7 @@ func legacySessionCommand(word string) bool {
 	return false
 }
 
-func runChrome(args []string) int {
-	if handled, code := showCLIHelp(append([]string{"chrome"}, args...)); handled {
-		return code
-	}
-	if len(args) == 2 && args[1] == "--help" {
-		args = []string{"--help"}
-	}
-	if len(args) == 3 && args[0] == "record" && args[2] == "--help" && (args[1] == "start" || args[1] == "stop") {
-		args = []string{"--help"}
-	}
-	if handled, code := managedChrome(args); handled {
-		return code
-	}
-	if err := automation.Run(args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		if e, ok := err.(*exec.ExitError); ok {
-			return e.ExitCode()
-		}
-		return 1
-	}
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Println("\n  Managed task forms (require the active Agent tool context):\n    roami chrome observe|screenshot --resource ID\n    roami chrome goto URL --observation ID\n    roami chrome click SELECTOR --observation ID\n    roami chrome fill|type SELECTOR TEXT --observation ID\n    roami chrome press KEY --observation ID\n    roami chrome upload SELECTOR ABSOLUTE_PATH --observation ID")
-	}
-	return 0
-}
-
 const completionScript = completion.Script
-
-func forward(bin string, args []string) int {
-	cmd := exec.Command(bin, args...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		var ee *exec.ExitError
-		if ok := asExitError(err, &ee); ok {
-			return ee.ExitCode()
-		}
-		fmt.Fprintf(os.Stderr, "调用 %s 失败: %v\n", bin, err)
-		return 1
-	}
-	return 0
-}
 
 func printHelp(_ []pluginInfo) { _ = groupHelpPage("").Render(os.Stdout) }
 

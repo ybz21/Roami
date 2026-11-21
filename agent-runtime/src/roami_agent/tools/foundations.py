@@ -322,45 +322,6 @@ class ToolDirectory:
                     "enabled": True,
                 }
             )
-        if "browser_open" in available:
-            browser_commands = [
-                ["new", "URL"],
-                ["observe"],
-                ["screenshot"],
-                ["goto", "URL"],
-            ]
-            browser_commands.extend(
-                [
-                    ["observe", "--target", "TARGET_ID"],
-                    ["click", "SELECTOR"],
-                    ["fill", "SELECTOR", "TEXT"],
-                    ["type", "SELECTOR", "TEXT"],
-                    ["press", "KEY"],
-                ]
-            )
-            entries.append(
-                {
-                    "id": "cli:roami chrome",
-                    "kind": "cli",
-                    "name": "roami chrome",
-                    "skill": "browser_use",
-                    "description": "Browser navigation, observation, web research, screenshots and page interactions through Roami Chrome.",
-                    "argv": ["roami", "chrome", "help"],
-                    "commands": [{"argv": ["roami", "chrome", *args]} for args in browser_commands],
-                    "searchTerms": [
-                        "browser_open",
-                        "browser_observe",
-                        "browser_act",
-                        "chrome",
-                        "recording",
-                        "tabs",
-                    ],
-                    "effect": "mixed",
-                    "source": "builtin",
-                    "mutable": False,
-                    "enabled": True,
-                }
-            )
         return entries
 
     def groups(self):
@@ -383,14 +344,14 @@ class ToolDirectory:
         return [{"name": "commands", "commands": entries}]
 
     def help_command(self, argv, role):
-        family = "roami chrome" if argv[1:2] == ["chrome"] else "roami"
+        family = "roami"
         entries = [entry for entry in self.command_entries(role) if entry["name"] == family]
         if not entries:
             raise DomainError("TOOL_UNAVAILABLE")
 
         entry = deepcopy(entries[0])
         prefix = argv[1:-1]
-        if family == "roami" and prefix:
+        if prefix:
             entry["commands"] = [
                 item for item in entry["commands"] if item["argv"][1 : len(prefix) + 1] == prefix
             ]

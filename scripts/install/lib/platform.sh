@@ -1,6 +1,6 @@
 # scripts/install/lib/platform.sh — 平台/架构检测 + 包管理辅助。source 时自动跑检测。
 # 暴露变量：OS(mac|wsl|linux|other) IS_WSL PKG(apt|dnf|pacman|brew) SUDO ARCH_H PLAT_H
-# 暴露函数：can_autoinstall pkg_cmd pkg_do node_major go_ver_ok
+# 暴露函数：can_autoinstall pkg_cmd pkg_do go_ver_ok
 # shellcheck shell=bash
 
 detect_platform() {
@@ -46,7 +46,7 @@ can_autoinstall() {
 }
 
 # 某工具在当前平台的安装命令(仅用于提示)
-pkg_cmd() {  # <tmux|node|go|chromium>
+pkg_cmd() {  # <tmux|node|go>
     case "$1:$PKG" in
         tmux:brew)       echo "brew install tmux" ;;
         tmux:apt)        echo "sudo apt install -y tmux" ;;
@@ -60,39 +60,29 @@ pkg_cmd() {  # <tmux|node|go|chromium>
         go:apt)          echo "sudo apt install -y golang" ;;
         go:dnf)          echo "sudo dnf install -y golang" ;;
         go:pacman)       echo "sudo pacman -S go" ;;
-        chromium:brew)   echo "brew install --cask google-chrome" ;;
-        chromium:apt)    echo "sudo apt install -y chromium-browser" ;;
-        chromium:dnf)    echo "sudo dnf install -y chromium" ;;
-        chromium:pacman) echo "sudo pacman -S chromium" ;;
         *)               echo "请手动安装 $1" ;;
     esac
 }
 
 # best-effort 装包；失败返回非零
-pkg_do() {  # <tmux|node|go|chromium>
+pkg_do() {  # <tmux|node|go>
     local p=""
     case "$PKG" in
         apt)
-            case "$1" in tmux) p=tmux ;; node) p="nodejs npm" ;; go) p=golang ;; chromium) p="chromium-browser" ;; esac
+            case "$1" in tmux) p=tmux ;; node) p="nodejs npm" ;; go) p=golang ;; esac
             $SUDO apt-get update -qq && $SUDO apt-get install -y $p ;;
         dnf)
-            case "$1" in tmux) p=tmux ;; node) p="nodejs npm" ;; go) p=golang ;; chromium) p=chromium ;; esac
+            case "$1" in tmux) p=tmux ;; node) p="nodejs npm" ;; go) p=golang ;; esac
             $SUDO dnf install -y $p ;;
         pacman)
-            case "$1" in tmux) p=tmux ;; node) p="nodejs npm" ;; go) p=go ;; chromium) p=chromium ;; esac
+            case "$1" in tmux) p=tmux ;; node) p="nodejs npm" ;; go) p=go ;; esac
             $SUDO pacman -S --noconfirm $p ;;
         brew)
-            case "$1" in chromium) brew install --cask google-chrome ;; *) brew install "$1" ;; esac ;;
+            brew install "$1" ;;
         *) return 1 ;;
     esac
 }
 
-# node 主版本（playwright-core 需 ≥ 18），无 node 返回 0
-node_major() {
-    command -v node &>/dev/null || { echo 0; return; }
-    local m; m="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
-    [[ "$m" =~ ^[0-9]+$ ]] && echo "$m" || echo 0
-}
 # go 是否 ≥ 1.22（项目要求）
 go_ver_ok() {
     command -v go &>/dev/null || return 1

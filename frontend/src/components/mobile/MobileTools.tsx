@@ -1,6 +1,7 @@
 import { useI18n } from '../../i18n'
 import { SheetRow } from '../shell/MobileSheet'
 import { ICONS } from '../nav-icons'
+import { NAV_TOOLS } from '../../app/navigation'
 
 export default function MobileTools({ onNav }: { onNav: (key: string) => void }) {
   const { t } = useI18n()
@@ -8,7 +9,7 @@ export default function MobileTools({ onNav }: { onNav: (key: string) => void })
     <div className="tt-mme">
       <p className="tt-mobile-section-lead">{t('mobile.tools.lead')}</p>
       <div className="tt-mme-group">
-        {(['files', 'browser', 'phone', 'capabilities'] as const).map((key) => (
+        {['files', ...NAV_TOOLS].map((key) => (
           <SheetRow key={key} icon={ICONS[key]} title={t('nav.' + key)} desc={t('mobile.tools.' + key)} onClick={() => onNav(key)} />
         ))}
       </div>

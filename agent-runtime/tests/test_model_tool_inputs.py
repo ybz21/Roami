@@ -185,7 +185,6 @@ async def test_main_keeps_small_catalog_and_discovers_compact_task_commands(stor
 async def test_main_has_no_browser_or_desktop_tools_even_through_cli(store):
     from types import SimpleNamespace
 
-    from roami_agent.tools.browser import register_browser_tools
     from roami_agent.tools.computer import register_computer_tools
 
     async def forbidden(*args, **kwargs):
@@ -193,7 +192,6 @@ async def test_main_has_no_browser_or_desktop_tools_even_through_cli(store):
 
     runtime = Runtime(store, ConversationModel())
     driver = SimpleNamespace(open=forbidden, observe=forbidden, act=forbidden)
-    register_browser_tools(runtime.tools, driver)
     register_computer_tools(runtime.tools, driver)
     register_model_inputs(runtime.tools)
     try:
@@ -216,62 +214,6 @@ async def test_main_has_no_browser_or_desktop_tools_even_through_cli(store):
             await runtime.tools.invoke(
                 call("bash", {"command": "roami chrome new https://example.com"}), "main", {}
             )
-    finally:
-        await runtime.close()
-
-
-async def test_browser_commands_bind_returned_observation_without_id_parameters(store, monkeypatch):
-    import shlex
-
-    from test_browser_driver import BrowserFixture, BrowserModel, native_browser
-    from test_runtime import until
-
-    from roami_agent.protocol.models import ModelEvent
-
-    original = BrowserModel.stream
-
-    async def compact(self, messages, tools):
-        async for part in original(self, messages, tools):
-            if part.kind == "tool":
-                value = part.value
-                args = json.loads(value["function"]["arguments"])
-                if value["function"]["name"] == "browser_open":
-                    command = ["roami", "chrome", "new", args["url"]]
-                else:
-                    command = ["roami", "chrome", args["kind"], args["selector"]]
-                    if "text" in args:
-                        command.append(args["text"])
-                yield ModelEvent(
-                    "tool",
-                    {
-                        **value,
-                        "function": {
-                            "name": "bash",
-                            "arguments": json.dumps({"command": shlex.join(command)}),
-                        },
-                    },
-                )
-            else:
-                yield part
-
-    monkeypatch.setattr(BrowserModel, "stream", compact)
-    fixture = BrowserFixture()
-    runtime, _, task = await native_browser(store, fixture)
-    try:
-        await until(
-            store,
-            lambda db: (
-                row(db, "SELECT state FROM tasks WHERE id=?", (task["id"],))["state"] == "succeeded"
-            ),
-        )
-        assert fixture.saved and fixture.name == "Roami"
-        counts = await store.call(
-            lambda db: row(
-                db,
-                "SELECT COUNT(*) n,SUM(state='failed') failed FROM tool_calls WHERE tool_name IN ('browser_open','browser_act')",
-            )
-        )
-        assert counts == {"n": 3, "failed": 0}
     finally:
         await runtime.close()
 

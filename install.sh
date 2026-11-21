@@ -15,13 +15,12 @@
 #   ROAMI_BUNDLE_FILE=FILE 离线安装本地完整包（需同目录 .sha256）
 #   ROAMI_INSTALL_ROOT=DIR 版本目录（默认 ~/.local/share/roami）
 #   ROAMI_SYSTEM=1         注册系统级 systemd 服务（/etc/systemd/system，需 root/sudo）
-#   ROAMI_NO_KVM=1         跳过 /dev/kvm 授权（则本机 Android 模拟器起不来）
 #   ROAMI_NO_ZRAM=1        跳过 Linux 压缩交换区配置（默认自动尝试启用）
 #   ROAMI_ZRAM_SIZE=16G    指定压缩交换区逻辑容量（默认物理内存的一半）
 #   ROAMI_ZRAM_MEMORY_LIMIT=4G 压缩区实际内存上限（默认物理内存的 1/8）
 #   ROAMI_FROM_SOURCE=1    在仓库 clone 内从源码构建（需 go+node），而非下载 release
 #
-# 开发/源码构建请用 start.sh --dev（会从源码构建 CLI/chrome/skills + 前后端）。
+# 开发/源码构建请用 start.sh --dev（会从源码构建 CLI/skills + 前后端）。
 #
 set -euo pipefail
 
@@ -270,83 +269,6 @@ ensure_tmux() {
   command -v tmux >/dev/null && info "tmux 已安装" || die "tmux 未安装；安装完成后重试本命令"
 }
 
-# ── Chromium（「浏览器」镜像页需要一台 Chrome/Chromium 才能投屏）─────
-# roami 后端按 google-chrome → chromium → chromium-browser 的顺序在 PATH 里探测，
-# 都没有就会「拉起 Chrome 失败」。ROAMI_NO_CHROME=1 可跳过（则浏览器镜像页不可用）。
-ensure_chrome() {
-  [ "${ROAMI_NO_CHROME:-0}" = 1 ] && { step "ROAMI_NO_CHROME=1：跳过 Chromium（浏览器镜像页将不可用）"; return 0; }
-  if command -v google-chrome >/dev/null || command -v chromium >/dev/null || command -v chromium-browser >/dev/null; then
-    info "Chrome/Chromium 已就绪（浏览器镜像可用）"; return 0
-  fi
-  local sudo=""; [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null && sudo=sudo
-  step "未检测到 Chrome/Chromium，尝试安装 Chromium（较大；ROAMI_NO_CHROME=1 可跳过）..."
-  if   command -v apt-get >/dev/null; then
-    $sudo apt-get install -y -qq chromium 2>/dev/null \
-      || $sudo apt-get install -y -qq chromium-browser 2>/dev/null \
-      || { command -v snap >/dev/null && $sudo snap install chromium; }
-  elif command -v dnf    >/dev/null; then $sudo dnf install -y chromium
-  elif command -v pacman >/dev/null; then $sudo pacman -Sy --noconfirm chromium
-  elif command -v zypper >/dev/null; then $sudo zypper -n install chromium
-  elif command -v apk    >/dev/null; then $sudo apk add chromium
-  elif command -v snap   >/dev/null; then $sudo snap install chromium
-  elif command -v brew   >/dev/null; then brew install --cask chromium 2>/dev/null || brew install chromium
-  fi
-  if command -v google-chrome >/dev/null || command -v chromium >/dev/null || command -v chromium-browser >/dev/null; then
-    info "Chromium 已安装（浏览器镜像可用）"
-  else
-    warn "未能自动安装 Chromium：浏览器镜像页不可用。装好后 roami 会自动探测，或设 CHROME_BIN 指向可执行文件；重启：systemctl --user restart roami"
-  fi
-}
-
-# ── adb（「手机」镜像页需要 adb 才能连 Android 设备）─────────────────
-# ROAMI_NO_ADB=1 可跳过（则手机镜像页不可用）。
-ensure_adb() {
-  [ "${ROAMI_NO_ADB:-0}" = 1 ] && { step "ROAMI_NO_ADB=1：跳过 adb（手机镜像页将不可用）"; return 0; }
-  command -v adb >/dev/null && { info "adb 已就绪（手机镜像可用）"; return 0; }
-  local sudo=""; [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null && sudo=sudo
-  step "未检测到 adb，尝试安装（手机镜像页用）..."
-  if   command -v apt-get >/dev/null; then $sudo apt-get install -y -qq adb 2>/dev/null || $sudo apt-get install -y -qq android-tools-adb 2>/dev/null
-  elif command -v dnf     >/dev/null; then $sudo dnf install -y android-tools
-  elif command -v yum     >/dev/null; then $sudo yum install -y android-tools
-  elif command -v pacman  >/dev/null; then $sudo pacman -Sy --noconfirm android-tools
-  elif command -v zypper  >/dev/null; then $sudo zypper -n install android-tools
-  elif command -v apk     >/dev/null; then $sudo apk add android-tools
-  elif command -v brew    >/dev/null; then brew install --cask android-platform-tools 2>/dev/null || brew install android-platform-tools
-  fi
-  command -v adb >/dev/null && info "adb 已安装（手机镜像可用）" \
-    || warn "未能自动安装 adb：手机镜像页不可用，装好后重启：systemctl --user restart roami"
-}
-
-# ── KVM（本机 Android 模拟器要靠它跑起来）──────────────────────────
-#
-# 唯一实现在 scripts/install/kvm-access.sh —— 这里按「本地仓库 → 远端同源 → 只打印命令」
-# 三级取用，**不留第二份副本**：抄两份必然走散，改一条规则要改两处，最后两个入口
-# 按不同版本的规则给同一台机器授权。远端和 install.sh 自己是同一个 raw 源，不多一层信任。
-ensure_kvm() {
-  [ "$OS" = linux ] || return 0                     # macOS 用 HVF，不碰 /dev/kvm
-  [ -e /dev/kvm ] || return 0                       # 云主机大多没有，别为用不上的功能弹口令框
-  local here lib=""
-  here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
-  if [ -n "$here" ] && [ -f "$here/scripts/install/kvm-access.sh" ]; then
-    lib="$here/scripts/install/kvm-access.sh"
-  else
-    lib="$(mktemp)" || lib=""
-    # 限时：网络不通时安装器不能卡在这儿 —— 拿不到就退回打印命令，几秒内给出结论。
-    if [ -n "$lib" ] && ! curl -fsSL --connect-timeout 5 --max-time 20 \
-         "https://raw.githubusercontent.com/${REPO}/main/scripts/install/kvm-access.sh" -o "$lib" 2>/dev/null; then
-      rm -f "$lib"; lib=""
-    fi
-  fi
-  if [ -z "$lib" ]; then
-    warn "取不到 KVM 授权脚本。若要用本机模拟器，在终端里跑一次： sudo gpasswd -a \$USER kvm && sudo setfacl -m u:\$USER:rw /dev/kvm"
-    return 0
-  fi
-  # shellcheck source=scripts/install/kvm-access.sh
-  source "$lib"
-  kvm_ensure step
-  [ "$lib" = "$here/scripts/install/kvm-access.sh" ] || rm -f "$lib"
-}
-
 memory_compression_supported() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
@@ -402,9 +324,9 @@ ensure_memory_compression() {
 # 旧名 roam 留一条软链：改名之前写好的脚本、别人的 crontab、自己的手指记忆都还在。
 # 已经存在同名**真文件**（旧版二进制）时也换成软链——留着两个二进制只会让人不知道跑的是哪个。
 link_legacy_name() {
-  local dest="$1" legacy
+  local dest="$1"
   run_as_service_user bash -c 'source "$1"; retire_roami_session_entries "$2"' _ "$INSTALL_SLOT/install/retire-session-entries.sh" "$BIN_DIR"
-  for legacy in roam chrome; do run_as_service_user ln -sfn "$dest" "$BIN_DIR/$legacy"; done
+  run_as_service_user ln -sfn "$dest" "$BIN_DIR/roam"
   run_as_service_user bash -c 'mkdir -p "$HOME/.local/share/bash-completion/completions"; "$1" completion > "$HOME/.local/share/bash-completion/completions/roami"' _ "$dest"
   run_as_service_user "$dest" session completion
 }
@@ -539,9 +461,6 @@ trap cleanup_installation EXIT
 detect_asset
 install_binary
 ensure_tmux
-ensure_chrome || warn "Chrome 安装失败，可稍后安装"
-ensure_adb || warn "ADB 安装失败，可稍后安装"
-ensure_kvm || warn "KVM 授权未完成"
 ensure_memory_compression
 activate_installation
 

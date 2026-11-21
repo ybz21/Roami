@@ -1,105 +1,95 @@
-"""A user can continue stopped navigation; unknown writes and missing proof stay blocked."""
+"""A stopped navigation from a previous installation still requires durable proof to retry."""
 
 import json
 
 import pytest
-from native_prompt_messages import dialogue_messages
-from test_browser_driver import BrowserFixture
-from test_runtime import ConversationModel, until
+from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.serialization import encoded
-from roami_agent.server.configuration import Settings
-from roami_agent.storage.database import row, rows
-
-
-class NavigationModel:
-    model = "unknown-navigation"
-
-    def __init__(self, mode):
-        self.mode, self.calls = mode, 0
-
-    async def stream(self, messages, tools):
-        messages = dialogue_messages(messages)
-        self.calls += 1
-        if self.mode == "act" and self.calls > 1:
-            name, arguments = (
-                "browser_act",
-                {
-                    "observationId": json.loads(messages[-1]["content"])["observation"]["id"],
-                    "kind": "goto",
-                    "url": "https://fixture.example/pricing",
-                },
-            )
-        else:
-            name, arguments = (
-                "browser_open",
-                ({"url": "https://fixture.example/pricing"} if self.mode == "open" else {}),
-            )
-        yield ModelEvent(
-            "tool",
-            {
-                "id": "lookup-" + str(self.calls),
-                "function": {
-                    "name": name,
-                    "arguments": encoded(arguments),
-                },
-            },
-        )
+from roami_agent.storage.database import event, row, rows
+from roami_agent.storage.transcript_repository import message
 
 
 async def interrupted_navigation(store, mode="act"):
-    fixture = BrowserFixture()
-
-    async def runner(argv, **options):
-        result = await fixture(argv, **options)
-        verb, flags, _ = fixture.arguments(argv)
-        if verb == "goto":
-            receipt = fixture.receipts[flags["--operation-id"]]
-            receipt.update(state="unknown", inputStopped=True, outcomeKnown=False)
-            result["stdout"] = encoded(receipt)
-        return result
-
-    runtime = Runtime(
-        store,
-        ConversationModel(),
-        worker_model=NavigationModel(mode),
-        settings=Settings(browser={"enabled": True}),
-    )
-    runtime.browser.runner = runner
-    # Preserve the legacy gateway's failure after a stopped unknown navigation receipt.
-    for name in ("browser_open", "browser_act"):
-        tool = runtime.tools.registry[name]
-
-        async def legacy_handler(args, binding, handler=tool.handler):
-            value = await handler(args, binding)
-            if value.get("action", {}).get("state") == "unknown":
-                raise DomainError("TOOL_OUTCOME_UNKNOWN")
-            return value
-
-        tool.handler = legacy_handler
-    await runtime.start()
+    runtime = Runtime(store, ConversationModel())
     conversation = await runtime.conversations.create("alice")
     task = await runtime.tasks.create(
         "alice",
         conversation["id"],
         "Check pricing",
-        target={"kind": "new_session", "resourceOnly": True},
         key="lookup",
         record_intent=True,
+        target={"kind": "new_session", "resourceOnly": True},
     )
-    runtime.wakeup.set()
-    await until(
-        store,
-        lambda db: row(
-            db, "SELECT id FROM tasks WHERE id=? AND state='interrupted'", (task["id"],)
-        ),
-    )
-    # Keep the fixture's next revision queued while checking durable admission.
-    runtime.scheduler.stopping = True
-    await runtime.supervisor
+    url = "https://fixture.example/pricing"
+
+    def history(db):
+        run = row(db, "SELECT * FROM task_attempts WHERE task_id=?", (task["id"],))
+        branch = row(db, "SELECT * FROM branches WHERE id=?", (run["native_branch_id"],))
+        child = branch["conversation_id"]
+        db.execute(
+            "INSERT INTO turns(id,conversation_id,branch_id,trigger_kind,state,created_ms) "
+            "VALUES('old-turn',?,?,'continuation','interrupted',1)",
+            (child, branch["id"]),
+        )
+        event(
+            db, child, "task.started", {"runId": run["id"]}, turn_id="old-turn", task_id=task["id"]
+        )
+        call = {"id": "lookup", "function": {"name": "browser_" + mode}}
+        args = (
+            {"url": url}
+            if mode == "open"
+            else {"kind": "goto", "url": url, "observationId": "page"}
+        )
+        call["function"]["arguments"] = encoded(args)
+        assistant = message(
+            db, child, branch["id"], "assistant", {"tool_calls": [call]}, turn_id="old-turn"
+        )
+        db.execute(
+            "INSERT INTO tool_calls(id,turn_id,assistant_message_id,tool_name,arguments_json,effect,state,idempotency_key,created_ms,updated_ms) "
+            "VALUES('unknown-call','old-turn',?,?,?,'write','unknown','lookup',1,1)",
+            (assistant, call["function"]["name"], encoded(args)),
+        )
+        db.execute(
+            "INSERT INTO resources(id,node_id,kind,resource_key) VALUES('tab','local','browser','old-tab')"
+        )
+        for observation, verb, state in [
+            ("blank", "new", "succeeded"),
+            ("page", "goto", "unknown"),
+        ]:
+            db.execute(
+                "INSERT INTO resource_observations VALUES(?, 'tab', ?, ?, 1, 1, 'snapshot', '{}', 1)",
+                (observation, task["id"], run["id"]),
+            )
+            db.execute(
+                "INSERT INTO resource_actions(id,resource_id,task_id,run_id,lease_epoch,observation_id,idempotency_key,payload_sha256,action_json,state,result_json,created_ms,updated_ms) "
+                "VALUES(?,'tab',?,?,1,?,?,?,?,?,?,1,1)",
+                (
+                    verb,
+                    task["id"],
+                    run["id"],
+                    observation,
+                    "old-turn:lookup:" + verb,
+                    "a" * 64,
+                    encoded({"verb": verb, "args": [url]}),
+                    state,
+                    encoded({"inputStopped": True}),
+                ),
+            )
+        db.execute("UPDATE tasks SET state='interrupted' WHERE id=?", (task["id"],))
+        db.execute(
+            "UPDATE task_attempts SET state='unknown',result_json=? WHERE id=?",
+            (
+                encoded(
+                    {"summary": "TOOL_OUTCOME_UNKNOWN", "inputStopped": True, "outcomeKnown": False}
+                ),
+                run["id"],
+            ),
+        )
+
+    await store.call(history, write=True)
     return runtime, task
 
 

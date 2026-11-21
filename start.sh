@@ -2,7 +2,7 @@
 # start.sh — 启动 ttmux-web（后台守护，关终端/Ctrl-C 不影响）
 #
 #   bash start.sh            直接启动已构建的产物（不重新编译，最快）
-#   bash start.sh --dev      开发模式：从源码构建 CLI/chrome/skills + 增量编译前端+后端再启动
+#   bash start.sh --dev      开发模式：从源码构建 CLI/skills + 增量编译前端+后端再启动
 #                            （原 install.sh 的源码构建编排已并入本脚本；install.sh 现只做「下载二进制 + systemd 常驻」）
 #   bash start.sh stop       停止
 #   bash start.sh status     查看状态
@@ -103,14 +103,13 @@ esac
 #    这里不再生成/写回口令，避免用环境变量覆盖掉「首次设置」流程。
 BIN=backend/ttmux-web
 
-# ── dev：从源码刷新 ttmux CLI + chrome + skills ─────────────────────
+# ── dev：从源码刷新 ttmux CLI + skills ─────────────────────
 # 原 install.sh 的源码构建编排已并入这里（后端/前端由本脚本下面自行增量编译）。
 if [ "$DEV" = 1 ] && [ -d scripts/install ]; then
-  echo "==> [dev] 从源码刷新 ttmux CLI + chrome + skills..."
+  echo "==> [dev] 从源码刷新 ttmux CLI + skills..."
   SRC="$(pwd)"
   export SCRIPT_DIR="$SRC"
   export GO_SRC="$SRC"
-  export CHROME_BUILD="$SRC/scripts/build/build-chrome.sh"
   export INSTALL_DIR="$HOME/.local/bin"
   export SKILL_DIR="$HOME/.claude/skills"
   export REPO="ybz21/Roam" BRANCH="${TTMUX_INSTALL_BRANCH:-main}"
@@ -120,9 +119,7 @@ if [ "$DEV" = 1 ] && [ -d scripts/install ]; then
   source scripts/install/lib/platform.sh
   source scripts/install/lib/github.sh
   source scripts/install/install-roami.sh
-  source scripts/install/install-chrome.sh
   module_roami
-  module_chrome
 fi
 
 # ── 前端依赖：仅目录存在不代表依赖完整 ───────────────────────────
@@ -193,32 +190,6 @@ if [ "$DEV" = 1 ]; then
   "$BIN" agent setup --runtime-dir "$(pwd)/agent-runtime"
   export ROAMI_AGENT_RUNTIME="$(pwd)/agent-runtime"
 fi
-
-# ── KVM：--dev 才动手拿权限，平时只提醒 ──────────────────────────
-#
-# 为什么分开：systemd 的 ExecStart 就是 `start.sh fg`，普通启动也常在后台跑，
-# 那里弹 sudo 口令框会把启动挂死（kvm_ensure 里的 can_elevate 也会挡住，
-# 但「启动服务」这件事本来就不该顺手要 root）。--dev 是源码档的安装+构建模式，
-# 装依赖、编 CLI、拉 chrome 都在那儿，拿 KVM 权限是同一类事。
-#
-# 只对「装了 Android SDK 却开不了 /dev/kvm」的机器说：没装 SDK 的机器不关心模拟器。
-kvm_step() {
-  [ "$OS" = Linux ] || return 0
-  [ -e /dev/kvm ] || return 0
-  [ -r /dev/kvm ] && [ -w /dev/kvm ] && return 0
-  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}"
-  [ -d "$sdk" ] || return 0
-  if [ "$DEV" = 1 ] && [ -f scripts/install/kvm-access.sh ]; then
-    # shellcheck source=scripts/install/kvm-access.sh
-    source scripts/install/kvm-access.sh
-    kvm_ensure 'echo "==>"'
-    return 0
-  fi
-  echo "==> 提示：无权访问 /dev/kvm，本机 Android 模拟器起不来。跑一次即可（只需一次）："
-  echo "    sudo gpasswd -a \$USER kvm && sudo setfacl -m u:\$USER:rw /dev/kvm"
-  echo "    或 bash start.sh --dev 让它替你办（需要在终端里跑）"
-}
-kvm_step
 
 # ── 启动 ─────────────────────────────────────────────────────────
 echo "==> 启动 Roami  $SCHEME://$BIND"

@@ -210,7 +210,7 @@ skills.md; links alone do not replace the root working agreement. Preserve real
 identities, evidence and existing customizations.
 
 For an existing team's daily execution, browser validation, recovery, memory and
-scheduling, read [the daily loop](references/daily-loop.md). Use `roami chrome`
+scheduling, read [the daily loop](references/daily-loop.md). Use the configured browser MCP
 for the actual Main/group/member and dashboard interactions. Preserve the original
 Main and member identities; distinguish human `swarm say` from Main `swarm_post`.
 Never probe live write endpoints with placeholder content. Extract only verified

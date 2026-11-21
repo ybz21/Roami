@@ -103,7 +103,7 @@ def register_skills(registry, settings):
         registry.add(
             Tool(
                 "skill_read",
-                "Read a workflow skill when needed. roami covers Roami operations; browser_use covers roami chrome and public research. Available: "
+                "Read a workflow skill when needed. roami covers Roami operations; browser_use covers browser MCP tools and public research. Available: "
                 + ", ".join(skills),
                 object_schema(
                     {
