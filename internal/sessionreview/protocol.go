@@ -14,7 +14,7 @@ import (
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
-var verdictHeader = regexp.MustCompile(`^r([1-3]) rev=([0-9a-f]{64})[[:space:]]+`)
+var verdictHeader = regexp.MustCompile(`^r([1-9][0-9]*) rev=([0-9a-f]{64})[[:space:]]+`)
 var paneID = regexp.MustCompile(`^%[0-9]+$`)
 
 func (s *Store) QueueCLI(ctx context.Context, rt runtime.Runtime, target, text string) (bool, error) {
@@ -62,7 +62,7 @@ func (s *Store) QueueCLI(ctx context.Context, rt runtime.Runtime, target, text s
 			if source != p.Author.Session || (len(p.Rounds) == 0 && p.Trigger == "idle") {
 				return false, errors.New("this review request is not expected from the source session")
 			}
-			return s.queueRequest(ctx, p, body)
+			return s.queueRequest(ctx, p, body, "")
 		case "[review.changes_requested", "[review.approved":
 			if source != p.Reviewer.Session {
 				return false, errors.New("only the bound reviewer can submit a verdict")
@@ -75,29 +75,36 @@ func (s *Store) QueueCLI(ctx context.Context, rt runtime.Runtime, target, text s
 	return true, err
 }
 
-func (s *Store) QueueIdle(ctx context.Context, author string) error {
+func (s *Store) QueueIdle(ctx context.Context, author, version string) error {
 	return s.Change(ctx, author, func(p *Pair) (bool, error) {
-		if p.Trigger != "idle" || p.Phase != "waiting" || p.Pending != nil {
+		if !p.AutoQueue() {
 			return false, nil
 		}
-		return s.queueRequest(ctx, p, "The author is idle. Review this workspace snapshot against the original task.")
+		summary := "The author is idle. Review the changes in this workspace snapshot. Use the original task as background."
+		if len(p.Rounds) > 0 && p.Rounds[len(p.Rounds)-1].Verdict == "changes_requested" {
+			summary += "\n\nPrevious findings:\n" + p.Rounds[len(p.Rounds)-1].Result
+		}
+		return s.queueRequest(ctx, p, summary, version)
 	})
 }
 
-func (s *Store) queueRequest(ctx context.Context, p *Pair, body string) (bool, error) {
-	if p.Phase != "waiting" && p.Phase != "changes" || len(p.Rounds) >= MaxRounds {
+func (s *Store) queueRequest(ctx context.Context, p *Pair, body, expected string) (bool, error) {
+	if !p.canQueue() {
 		return false, errors.New("this review is not accepting a new revision")
 	}
+	batchStart := p.BatchStart
+	if p.Phase == "approved" {
+		batchStart = len(p.Rounds)
+	}
+	if len(p.Rounds)-batchStart >= MaxRounds {
+		return false, errors.New("this review has reached its round limit")
+	}
 	round := len(p.Rounds) + 1
-	version, err := s.snapshot(ctx, *p, round)
+	version, err := s.snapshot(ctx, *p, round, expected)
 	if err != nil {
 		return false, err
 	}
-	for _, existing := range p.Rounds {
-		if existing.Version == version {
-			return false, errors.New("this workspace version was already reviewed")
-		}
-	}
+	p.BatchStart = batchStart
 	p.Pending = &Message{Kind: "request", Round: round, Version: version, Text: body}
 	return true, nil
 }
@@ -125,7 +132,7 @@ func (p Pair) Recipient() Endpoint {
 	return p.Author
 }
 
-func (s *Store) Deliver(ctx context.Context, author string, ready func(Endpoint) bool, send func(Endpoint, string) error) error {
+func (s *Store) Deliver(ctx context.Context, author string, ready func(Endpoint) bool, send func(Endpoint, string) error, observed func(string, error)) error {
 	return s.Change(ctx, author, func(p *Pair) (bool, error) {
 		m := p.Pending
 		if !p.Active() || m == nil {
@@ -139,15 +146,32 @@ func (s *Store) Deliver(ctx context.Context, author string, ready func(Endpoint)
 		if !ready(recipient) {
 			return false, nil
 		}
+		current, err := WorkspaceVersion(ctx, *p)
+		observed(current, err)
+		if m.Kind == "request" {
+			if err != nil {
+				return false, err
+			}
+			if current != m.Version {
+				p.Pending = nil
+				return true, nil
+			}
+		}
 		m.Started = true
 		if err := s.save(*p); err != nil {
 			return false, err
 		}
 		body := fmt.Sprintf("[review.%s] r%d rev=%s\n\n%s", m.Kind, m.Round, m.Version, m.Text)
 		if m.Kind == "request" {
-			body += "\n\nBaseline: " + p.Base + "\nRead-only patch: " + s.SnapshotPath(author, m.Round)
-		} else if m.Kind == "changes_requested" && m.Round == MaxRounds {
-			body += "\n\nReview has reached its round limit. Record any remaining findings and stop the review loop."
+			body += "\n\nBaseline: " + p.Base + "\nRead-only patch: " + s.SnapshotPath(author, m.Round) +
+				"\nReview only the changes in this snapshot. Tie verification evidence to this version. After sending the verdict, wait for another request from the same pair. Approval only covers this version."
+		} else {
+			if err != nil || current != m.Version {
+				body += "\n\nThis verdict covers the requested snapshot. The current workspace has not been verified against it."
+			}
+			if m.Kind == "changes_requested" && m.Round-p.BatchStart == MaxRounds {
+				body += "\n\nThis batch has reached its round limit. Preserve the findings and wait for the user to continue review."
+			}
 		}
 		if err := send(recipient, body); err != nil {
 			p.Phase, p.Interrupted = "interrupted", "delivery_unconfirmed"
@@ -162,7 +186,7 @@ func (s *Store) Deliver(ctx context.Context, author string, ready func(Endpoint)
 			p.Phase = "changes"
 			if m.Kind == "approved" {
 				p.Phase = "approved"
-			} else if m.Round == MaxRounds {
+			} else if m.Round-p.BatchStart == MaxRounds {
 				p.Phase = "limit"
 			}
 		}

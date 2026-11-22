@@ -14,7 +14,7 @@ import (
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
-func TestIdleReviewPinsChangesAndStopsOnApproval(t *testing.T) {
+func TestIdleReviewPinsChangesAndResumesAfterApproval(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	for _, args := range [][]string{{"init", "-b", "main"}, {"commit", "--allow-empty", "-m", "baseline"}} {
@@ -35,26 +35,44 @@ func TestIdleReviewPinsChangesAndStopsOnApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	author := p.Author.Session
-	if err := s.QueueIdle(ctx, author); !errors.Is(err, ErrNoChanges) {
+	if err := s.QueueIdle(ctx, author, ""); !errors.Is(err, ErrNoChanges) {
 		t.Fatalf("empty diff: %v", err)
 	}
 	file := filepath.Join(dir, "new file")
 	if err := os.WriteFile(file, []byte("review content"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.QueueIdle(ctx, author); err != nil {
+	if err := s.QueueIdle(ctx, author, ""); err != nil {
 		t.Fatal(err)
 	}
-	var text string
+	var text, observedVersion string
+	var verified bool
+	observe := func(version string, err error) { observedVersion, verified = version, err == nil }
 	send := func(to Endpoint, body string) error {
 		text = body
 		return nil
 	}
-	if err := s.Deliver(ctx, author, func(Endpoint) bool { return false }, send); err != nil || text != "" {
+	if err := s.Deliver(ctx, author, func(Endpoint) bool { return false }, send, observe); err != nil || text != "" {
 		t.Fatalf("busy peer received input: %q %v", text, err)
 	}
 	idle := func(Endpoint) bool { return true }
-	if err := s.Deliver(ctx, author, idle, send); err != nil {
+	if err := os.WriteFile(file, []byte("superseded before delivery"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Deliver(ctx, author, idle, send, observe); err != nil || text != "" {
+		t.Fatalf("obsolete request received input: %q %v", text, err)
+	}
+	p, _ = s.Load(author)
+	if len(p.Rounds) != 0 || p.Pending != nil || p.Phase != "waiting" {
+		t.Fatalf("obsolete request consumed a round: %+v", p)
+	}
+	if err := os.WriteFile(file, []byte("review content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.QueueIdle(ctx, author, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Deliver(ctx, author, idle, send, observe); err != nil {
 		t.Fatal(err)
 	}
 	p, _ = s.Load(author)
@@ -79,12 +97,27 @@ func TestIdleReviewPinsChangesAndStopsOnApproval(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Deliver(ctx, author, idle, send); err != nil {
+	if err := s.Deliver(ctx, author, idle, send, observe); err != nil {
 		t.Fatal(err)
 	}
 	p, _ = s.Load(author)
 	if p.Phase != "approved" || p.Pending != nil || p.Rounds[0].Result != "Verified patch" {
 		t.Fatalf("approval was not recorded: %+v", p)
+	}
+	statuses := map[string]Status{}
+	p.Statuses(statuses, observedVersion, verified)
+	if statuses[author].Phase != "stale" || !strings.Contains(text, "has not been verified") {
+		t.Fatalf("old approval was projected as current: %+v %q", statuses[author], text)
+	}
+	if err := s.QueueIdle(ctx, author, observedVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Deliver(ctx, author, idle, send, observe); err != nil {
+		t.Fatal(err)
+	}
+	p, _ = s.Load(author)
+	if p.BatchStart != 1 || len(p.Rounds) != 2 || p.Rounds[1].Version != observedVersion {
+		t.Fatalf("second batch did not use the new version: %+v", p)
 	}
 }
 
@@ -104,7 +137,7 @@ func TestUnknownReviewDeliveryIsNotReplayed(t *testing.T) {
 	if err := s.Deliver(ctx, p.Author.Session, func(Endpoint) bool { return true }, func(Endpoint, string) error {
 		t.Error("unknown terminal submission was replayed")
 		return nil
-	}); err != nil {
+	}, func(string, error) { t.Error("unknown delivery was rechecked") }); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.Load(p.Author.Session)

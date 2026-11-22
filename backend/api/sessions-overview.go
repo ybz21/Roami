@@ -121,7 +121,11 @@ func (a *API) SessionsOverview(c *gin.Context) {
 			authors[s.Parent] = true
 		}
 	}
-	sessionreview.Open(lifecycleRuntime(ctx)).ForAuthors(authors, func(pair sessionreview.Pair) { pair.Statuses(reviews) })
+	now := time.Now()
+	sessionreview.Open(lifecycleRuntime(ctx)).ForAuthors(authors, func(pair sessionreview.Pair) {
+		version, verified := a.reviewWorkspaces.get(pair.Author.Session, now)
+		pair.Statuses(reviews, version, verified)
+	})
 	items := make([]overviewItem, 0, len(list))
 	for _, s := range list {
 		if strings.HasPrefix(s.Name, "_ttmux-") {

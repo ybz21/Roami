@@ -20,13 +20,16 @@
         <a href="#creation">会话创建</a>
         <a href="#prompts">双方 Prompt</a>
         <a href="#delivery">消息投递</a>
+        <a href="#version">版本核验</a>
+        <a href="#scheduler">复审调度</a>
         <a href="#rounds">多轮审查</a>
+        <a href="#upgrade">兼容与验收</a>
         <a href="#modules">代码落点</a>
       </nav>
 
       <section id="creation">
         <h2>会话创建</h2>
-        <p>作者与审查者各有一个独立的普通 Agent 终端会话，绑定同一个任务工作区。宿主启动两个会话，给审查者绑定只读快照来源，并在开工前记录父子关系。每次互审最多审 3 轮。</p>
+        <p>作者与审查者各有一个独立的普通 Agent 终端会话，绑定同一个任务工作区。宿主启动两个会话，给审查者绑定只读快照来源，并在开工前记录父子关系。持续复审复用这组配对。</p>
         <ol>
           <li>宿主用现有创建意图受理任务。互审配置仅带 Agent 类型和交审方式。用户省略互审时沿用原有创建流程。</li>
           <li>准备 worktree 和作者会话，以同一创建操作预留 <code>review</code> 的稳定 ID，保存父子关系、同一个工作区归属和审查者角色。按当前节点注册表核对审查 Agent 和它的启动参数，检查安装与登录状态。未就绪时保留选择并提示恢复。</li>
@@ -41,24 +44,24 @@
         <p>作者的原任务、开工说明和能力指南保持原有顺序。互审约定追加在末尾。宿主用实际值替换下方占位符。作者在原会话内写代码、验证并响应审查。审查者核对本轮版本和证据。</p>
         <h3>发给作者</h3>
         <pre>你是任务作者，工作区为 {{WORKTREE}}。
-审查会话 ID 为 {{REVIEW_SESSION_ID}}，最多审 3 轮。
+审查会话 ID 为 {{REVIEW_SESSION_ID}}，每批最多审 3 轮。
 
 主动交审：有可审版本时，向 review 发送验证摘要，由宿主绑定轮次和版本。
-空闲交审：首轮等待宿主提交，有意见时在原会话内继续修复。
+空闲交审：首轮等待宿主提交。
 
 收到意见后，逐项修复或说明，再运行相关验证。
-仍可复审时，发送新版本和新的验证摘要。通过或达到上限时结束。
+后续变更在空闲且稳定后由宿主交审。也可以主动提交新版本及验证摘要。
+通过意见只覆盖请求中的版本。继续改动时，等待或主动发起下一轮。
 只向下发的对端稳定 ID 发送消息。</pre>
         <h3>发给审查者</h3>
         <pre>你是审查者。作者会话 ID 为 {{AUTHOR_SESSION_ID}}。
-任务范围为 {{TASK_SCOPE}}，最多审 3 轮。
+首轮任务为 {{TASK_SCOPE}}，每批最多审 3 轮。
 
 输出独立一行 ROAMI_REVIEW_READY，再等待交审。
-收到请求后读取本轮基准和只读补丁，核对版本及证据。
+收到请求后以本轮范围及只读补丁为准，并注明验证证据对应的版本。
 发回结论、文件位置、问题、依据和建议，或说明通过的验证依据。
 使用 roami session send 发回完整意见，包含请求中的轮次和完整版本摘要。
-有修复时等待作者提交下一版本，并在同一 review 会话里继续。
-只审阅本轮快照。通过或达到上限时结束。</pre>
+发出意见后回到等待。收到下一轮请求时重新读取本轮快照。</pre>
       </section>
 
       <section id="delivery">
@@ -69,12 +72,32 @@ roami session send "$AUTHOR_SESSION_ID" '[review.changes_requested] r1 rev=ROUND
 roami session send "$REVIEW_SESSION_ID" '[review.request] 已修复并验证，请复审'
 roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=ROUND_2_FULL_SHA256 已核对改动与验证证据'</pre>
         <ul>
-          <li>首轮「主动交审」由作者发起。「空闲交审」复用会话观察循环，宿主在作者屏幕稳定且空闲至少 30 秒、存在变更时发起。后续轮次由作者提交新版本。</li>
-          <li>Git 开工基准、已跟踪及未跟踪的变更形成只读补丁。宿主计算补丁的 SHA-256 摘要，并把文件路径、完整摘要和轮次随请求送达。审查端读取已登记的补丁。</li>
+          <li>每次请求携带轮次、完整版本摘要、基准、只读补丁及审查范围。作者主动交审可附上本轮任务范围和验证摘要。自动交审以本轮快照里的变更为范围，并带上前一轮结论。首轮任务用于提供背景。</li>
+          <li>补丁生成后不可覆盖。审查者只对本轮快照出具结论。在共享工作区里运行的测试，只有核对输入版本一致后才能作为本轮通过依据。无法核对时，结论写明未验证项。</li>
           <li>接收端须仍是配对的 Agent 且能接收输入。路由以稳定 ID 及运行身份核验，遇到退出、变成 shell、忙碌或身份变化时停在可恢复的状态。</li>
           <li>CLI 成功表示互审消息已排队。宿主通过发送进程的终端归属核验配对身份，记录类型、轮次、版本及投递回执。结果未知时停止投递并显示中断，避免回放重复意见。</li>
           <li>此链路覆盖普通交互会话。受管任务继续使用当前修订对应的 <code>task_steer</code>，Swarm 成员继续通过 <code>roami swarm say</code> 续接。</li>
         </ul>
+      </section>
+
+      <section id="version">
+        <h2>版本核验</h2>
+        <ol>
+          <li>沿用配对记录中的开工 Git 提交作为基准。把已提交、已跟踪和未忽略的未跟踪变更生成规范补丁。复用同一个补丁生成器计算 SHA-256；日常探测只算摘要，正式交审才保存只读补丁。独立工作区的变更以进入作者工作区时为准。</li>
+          <li>保存最新核验的工作区摘要、待审摘要和每轮的实际裁决。宿主只有在当前摘要与通过轮次完全一致，且当前没有待处理的请求时，才向会话概览发布「当前版本已通过」。上一轮的通过只留在历史。</li>
+          <li>探测到修改时先撤下通过标记。工作区无变更则显示「暂无可审变更」；摘要核验失败或超过核验期限时显示「待核验」。恢复原已审内容且没有待处理请求时，可以复用对应的通过记录。</li>
+          <li>发布请求前核对工作区仍是待审摘要。生成补丁期间检测到变化就丢弃候选，重新等待稳定。裁决必须匹配正在审的轮次和摘要；接收后再次核对工作区，避免旧裁决覆盖新版本的「待复审」。终端仍接收上一轮意见，消息同时标明该意见是否对应当前版本。</li>
+        </ol>
+      </section>
+
+      <section id="scheduler">
+        <h2>复审调度</h2>
+        <ol>
+          <li>首轮遵从用户选的交审方式。首轮交审后，只要工作区有未审版本且本批有预算，宿主在作者空闲、变更稳定至少 30 秒后创建下一轮。作者可主动提前交审，仍需核对摘要、轮次和预算。</li>
+          <li>配对内同一时间仅有一个在途请求。审查中产生的新改动只更新待审候选，上一轮结束后重新核对并提交最新稳定版本。自动和主动交审在同一配对锁内去重，同一工作区摘要不会因为多次触发而重复计轮。</li>
+          <li>复用宿主会话观察器和会话概览。作者活动变化、工作区根目录与 Git HEAD 或索引变化触发提前核验，对仍存活的互审配对每 15 秒做一次兜底核验。每个观察周期按最近检查时间轮转，最多处理 4 个配对，失败退避。超过 35 秒没有核验结果则撤下通过标记。普通会话和前端页面不增加轮询。</li>
+          <li>宿主继续核对两端会话和终端身份。关停、身份变化或投递结果未知时暂停自动复审，保留回执，按原有恢复规则核对后续接。</li>
+        </ol>
       </section>
 
       <section id="rounds">
@@ -82,12 +105,22 @@ roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=ROUND_2_FULL_S
         <dl>
           <div><dt>等待交审</dt><dd>双端已就绪。收到有效的新版本后进入第 1 轮。</dd></div>
           <div><dt>审查中</dt><dd>显示当前轮次，审查者对该版本发回修改意见或通过结论。</dd></div>
-          <div><dt>待修复</dt><dd>作者收到完整意见，在原会话修复、验证并提交新版本，review 进入下一轮。</dd></div>
-          <div><dt>通过</dt><dd>当前版本已通过，停止自动交审，保留完整历史。</dd></div>
-          <div><dt>达到轮次上限</dt><dd>第 3 轮仍有待改项时结束，最后意见留在双方会话。已记录的轮次保留用于追溯。</dd></div>
+          <div><dt>待修复</dt><dd>作者收到意见。出现新版本后按同一批的下一轮继续。</dd></div>
+          <div><dt>待复审</dt><dd>工作区有更新且当前版本未通过。上一批通过后新开一批；旧轮次仍在审查中时，先等它结束。</dd></div>
+          <div><dt>当前版本已通过</dt><dd>该版本所在的一批结束，宿主继续核验工作区。</dd></div>
+          <div><dt>达到轮次上限</dt><dd>同一批 3 轮未通过，暂停自动交审。用户点「继续互审」重新开启一批，有新版本时继续，保留全部意见。</dd></div>
           <div><dt>已中断</dt><dd>会话关闭、身份变化或投递需要核对时停在当前轮次，保留回执供核对。取消创建时只回收当前操作创建且已核对的资源。</dd></div>
         </dl>
-        <p class="scope">同一版本重复提交不计新轮次。审查通过只对应本轮版本及验证依据，外部 PR 评审与合并沿用原流程。</p>
+        <p>宿主记录当前批次的起点，以实际送达的轮次数计算剩余预算。CLI 的 <code>rN</code> 在整组会话内递增，允许超过 <code>r3</code>。配对锁内校验序号和完整摘要。重复摘要、空变更、核验失败以及投递前被替代的候选均不计轮。</p>
+      </section>
+
+      <section id="upgrade">
+        <h2>兼容与验收</h2>
+        <ul>
+          <li>旧记录的裁决和只读补丁保留为历史。升级后，仍存活的配对先核对终端身份、工作区和当前摘要；只有当前摘要吻合才恢复通过。两端可用且工作区已变更时，沿用原子会话安排复审。旧启动指令中的停止约定由新版交审请求更新。</li>
+          <li>先实现当前版本核验和撤下旧标记，再启用自动复审，并联调列表和终端状态。用两个新隔离实例分别验证整条复审路径和关闭互审的普通任务。上线前核对空闲期间的探测次数、队列积压与核验延迟。</li>
+          <li>以<a href="./acceptance.md#持续复审验收用例">持续复审验收用例</a>为准。至少一条真实 Agent 路径要在首轮通过后继续改代码，并由原审查者通过新的快照。</li>
+        </ul>
       </section>
 
       <section id="modules">
@@ -95,10 +128,11 @@ roami session send "$AUTHOR_SESSION_ID" '[review.approved] r2 rev=ROUND_2_FULL_S
         <dl>
           <div><dt>创建表单</dt><dd>作者和审查者都从同一个 <a href="../../../frontend/src/agent-registry.ts">Agent 注册表</a> 获取当前节点的 Agent，复用图标和 i18n。<a href="../../../frontend/src/components/sessions/TaskComposer.tsx">TaskComposer</a> 与 <a href="../../../frontend/src/components/sessions/NewSessionModal.tsx">NewSessionModal</a> 共享互审配置和创建意图。</dd></div>
           <div><dt>宿主生命周期</dt><dd>在 <a href="../../../backend/api/session-lifecycle-review.go">创建生命周期的互审阶段</a> 准备 review 会话与回执，给双方绑定对端稳定 ID。旧 <code>autoReview</code> 布尔值兼容原有路径。</dd></div>
-          <div><dt>状态与投递</dt><dd>宿主记录作者 ID、review ID、交审方式、上限、当前轮次、版本快照、消息状态和核对结果。<a href="../../../internal/sessionreview/protocol.go">互审协议</a> 校验并排队，<a href="../../../backend/api/session-review-observer.go">会话观察循环</a> 复用既有输入投递，并向工作台提供状态。</dd></div>
-          <div><dt>会话树与终端</dt><dd><a href="../../../frontend/src/components/shell/task-tree.ts">项目树</a> 使用实际父子绑定与角色，兼容旧陪跑会话。会话终端的互审状态栏可直接打开对端。</dd></div>
+          <div><dt>快照与记录</dt><dd><a href="../../../internal/sessionreview/snapshot.go">快照生成</a> 负责补丁和摘要，<a href="../../../internal/sessionreview/store.go">互审存储</a> 持久化版本、批次与回执。</dd></div>
+          <div><dt>状态与投递</dt><dd><a href="../../../internal/sessionreview/protocol.go">互审协议</a> 校验版本、预算和身份。<a href="../../../backend/api/session-review-observer.go">会话观察循环</a> 调度稳定版本并复用既有终端投递。</dd></div>
+          <div><dt>会话树与终端</dt><dd>桌面项目树、手机项目列表和<a href="../../../frontend/src/components/sessions/SessionReviewStatus.tsx">终端状态栏</a>共用宿主输出的当前状态，保留现有对端入口。</dd></div>
         </dl>
-        <p class="scope">验证记录见 <a href="./acceptance.md">原型验收</a>。运行验收覆盖工作区、会话关系、CLI 和 Web 两端。</p>
+        <p class="scope">验证记录见<a href="./acceptance.md">验收记录</a>。</p>
       </section>
     </article>
   </main>

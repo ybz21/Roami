@@ -305,7 +305,7 @@ func (a *API) SessionEventLoop() {
 			a.Live.set(name, snap)
 		}
 		a.Live.prune(sessions)
-		a.driveSessionReviews(sessions, reviewAuthors, paused, capture, reviewProbes, now)
+		a.driveSessionReviews(sessions, reviewAuthors, paused, reviewProbes, now)
 		for k := range files { // 进程换了就丢缓存
 			if p, ok := procs[k.name]; !ok || p.Pid != k.pid {
 				delete(files, k)

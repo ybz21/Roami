@@ -12,13 +12,14 @@
       <a class="doc-back" href="./index.html" aria-label="返回总览"></a>
       <h1>互审产品设计</h1>
     </div>
-    <a href="./prototype.html?lang=zh">打开原型</a>
+    <a href="./prototype.html?lang=zh">初版原型</a>
   </header>
   <main class="scroll doc-scroll">
     <article class="doc-content">
       <nav class="contents" aria-label="文档目录">
         <a href="#create">创建任务</a>
         <a href="#review">会话与复审</a>
+        <a href="#continuous">持续复审</a>
         <a href="#stories">用户故事</a>
         <a href="#prototype">交互原型</a>
       </nav>
@@ -27,9 +28,10 @@
         <p>沿用现有「开任务」弹窗。「互审」位于上排工具条，默认收起。点击后下方展开以「审查者」为标题的一行，显示 Agent Logo 和交审方式。再次收起时保留已选设置。</p>
         <dl>
           <div><dt>审查 Agent</dt><dd>与作者共用全部已注册 Agent 选项。推荐由另一种已就绪 Agent 审查，也可以选同一种 Agent 的独立会话。点 Logo 改选后保留该选择。</dd></div>
-          <div><dt>主动交审</dt><dd>作者在有可审版本时发送首轮请求，适合明确知道何时收敛的任务。</dd></div>
-          <div><dt>空闲交审</dt><dd>作者空闲且有新变更时自动开始首轮，之后由作者提交修复版本。</dd></div>
+          <div><dt>主动交审</dt><dd>由作者决定首次交审时机。</dd></div>
+          <div><dt>空闲交审</dt><dd>作者空闲且有稳定的工作区变更时，Roami 发起首次交审。</dd></div>
         </dl>
+        <p class="scope">两种方式只决定首次交审时机。后续的新版本都可自动复审，也可由作者主动提前交审。</p>
       </section>
       <section id="review">
         <h2>会话与复审</h2>
@@ -37,10 +39,22 @@
         <ol>
           <li>作者提交可审版本，审查者在自己的终端里核对任务范围和改动。</li>
           <li>审查者发出结论。作者在原会话直接收到完整意见，可继续修复和验证。</li>
-          <li>作者提交新版本，原 <code>review</code> 会话继续下一轮。每轮可通过或发回修改。</li>
-          <li>通过即停。最多 3 轮，无需在开工时设置。达到上限时保留末轮意见和历史。</li>
+          <li>作者产出修复版本后，原 <code>review</code> 会话继续下一轮。同一个版本只审一次。</li>
+          <li>每批默认最多 3 轮。通过后这一批结束，下一次变更开新一批。3 轮都未通过时保留意见，在作者或审查会话里提供「继续互审」，由用户决定是否重新开启一批。</li>
         </ol>
         <p class="scope">开工指令由宿主下发。发送命令可以从实际执行记录展开查看。</p>
+      </section>
+      <section id="continuous">
+        <h2>持续复审</h2>
+        <p>「模型中心改进」的第 1 轮只审了 <code>account-routing-review.md</code>。之后作者工作区合入了 3 个代码提交，列表仍显示「互审通过」。改进后，通过只表示当前工作区与已审快照一致。</p>
+        <dl>
+          <div><dt>当前版本已通过</dt><dd>审查者通过本轮快照，Roami 核对当前变更与该快照一致。轮次、版本摘要和意见留在审查历史里。</dd></div>
+          <div><dt>待复审</dt><dd>已审工作区出现新变更时，列表和终端切换到「待复审」。作者忙时合并连续改动，等空闲且内容稳定后交给原 <code>review</code> 会话。</dd></div>
+          <div><dt>审查中</dt><dd>审查者检查提交时的快照。审查期间继续改动时，详情提示有新版本待审。旧快照即使通过，列表也要等新版本通过后才显示「当前版本已通过」。</dd></div>
+          <div><dt>暂无可审变更</dt><dd>清理临时文件或撤回改动后，若相对开工基准没有变更，记录里仍能查看之前的通过意见。工作区出现新变更后再交审。</dd></div>
+        </dl>
+        <p>按这个现场走一遍：分析文档通过后归档，列表显示「暂无可审变更」。代码提交合入作者工作区后，状态变为「待复审」。作者空闲后，原审查者收到代码版本的下一轮请求。</p>
+        <p class="scope">列表只显示短状态，详情才展示历史和验证依据。独立子任务的改动进入作者工作区后，纳入该会话的互审范围。项目任务完成、PR 评审和合并各有自己的状态。</p>
       </section>
       <section id="stories">
         <h2>用户故事</h2>
@@ -48,13 +62,14 @@
           <li>创建任务时，我用两个 Logo 区分作者和审查者，选好何时交审即可开工。</li>
           <li>开工后，我从作者下方打开 <code>review</code>，看到所选 Agent 正在等待或审查。</li>
           <li>审查者发回意见后，我在作者会话查看涉及的文件、问题和依据，能在两边来回核对同一轮版本。</li>
+          <li>首轮通过后我继续写代码，能看到「待复审」，并在原审查会话里看到下一轮。打开历史时，我能核对每次通过覆盖了哪些改动。</li>
           <li>准备失败时，我能用原配置重试，或收起互审后继续任务。</li>
         </ul>
       </section>
       <section id="prototype">
         <h2>交互原型</h2>
-        <p>点上排「互审」，选择审查 Agent，再点「开干」。进入 <code>review</code> 后可演示交审、发回意见、提交修复和通过，再切回作者查看收到的意见。</p>
-        <p><a href="./prototype.html?lang=zh">打开交互原型</a> · <a href="./tech.html">技术实现</a></p>
+        <p>初版原型演示开工、审查者回传意见及多轮修复。新版的通过后重审流程见<a href="#continuous">状态示例</a>。</p>
+        <p><a href="./prototype.html?lang=zh">打开初版原型</a> · <a href="./tech.html">技术实现</a></p>
         <p class="scope">Claude Code、Codex、OpenCode、Pi 均可作为作者或审查者演示。语音、附件和纯终端控件用于还原现有工具条。</p>
       </section>
     </article>

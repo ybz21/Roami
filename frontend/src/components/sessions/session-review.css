@@ -19,6 +19,7 @@ html[data-pointer="coarse"] .tt-review-agents .tt-pill { flex-shrink: 0; }
 .tt-session-review {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
   padding: var(--sp-1) var(--sp-3);
   border-bottom: 1px solid var(--border-subtle);
@@ -29,3 +30,11 @@ html[data-pointer="coarse"] .tt-review-agents .tt-pill { flex-shrink: 0; }
 .tt-review-round { margin-inline-start: var(--sp-2); }
 .tt-review-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
 html[data-pointer="coarse"] .tt-review-toggle { min-height: var(--tap); }
+
+.tt-review-history { overflow: auto; }
+.ant-modal .tt-review-history { max-block-size: 55dvh; }
+.tt-review-history:not(.ant-modal *) { padding: var(--sp-4) var(--pad-page); }
+.tt-review-history section + section { border-top: 1px solid var(--border-subtle); margin-top: var(--sp-3); padding-top: var(--sp-3); }
+.tt-review-history code { display: block; color: var(--text-dim); overflow-wrap: anywhere; }
+.tt-review-history p { margin-block: var(--sp-2) 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+html[data-pointer="coarse"] .tt-session-review > button { min-block-size: var(--tap); }

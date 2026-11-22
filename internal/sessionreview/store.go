@@ -15,6 +15,8 @@ import (
 
 const MaxRounds = 3
 
+var ErrReviewNotAtLimit = errors.New("the review round limit is no longer current")
+
 type Endpoint struct {
 	Session  string `json:"session"`
 	Identity string `json:"identity"`
@@ -29,6 +31,7 @@ type Pair struct {
 	Base        string   `json:"base"`
 	Trigger     string   `json:"trigger"`
 	Phase       string   `json:"phase"`
+	BatchStart  int      `json:"batchStart,omitempty"`
 	Rounds      []Round  `json:"rounds,omitempty"`
 	Pending     *Message `json:"pending,omitempty"`
 	Interrupted string   `json:"interrupted,omitempty"`
@@ -50,10 +53,11 @@ type Message struct {
 }
 
 type Status struct {
-	Peer  string `json:"peer"`
-	Role  string `json:"role"`
-	Phase string `json:"phase"`
-	Round int    `json:"round,omitempty"`
+	Peer       string `json:"peer"`
+	Role       string `json:"role"`
+	Phase      string `json:"phase"`
+	Round      int    `json:"round,omitempty"`
+	NewVersion bool   `json:"newVersion,omitempty"`
 }
 
 type Store struct {
@@ -168,13 +172,80 @@ func (s *Store) Change(ctx context.Context, author string, act func(*Pair) (bool
 }
 
 func (p Pair) Active() bool {
-	return p.Phase == "waiting" || p.Phase == "reviewing" || p.Phase == "changes"
+	return p.Phase != "interrupted"
 }
 
-func (p Pair) Statuses(view map[string]Status) {
-	round := len(p.Rounds)
-	view[p.Author.Session] = Status{Peer: p.Reviewer.Session, Role: "author", Phase: p.Phase, Round: round}
-	view[p.Reviewer.Session] = Status{Peer: p.Author.Session, Role: "reviewer", Phase: p.Phase, Round: round}
+func (p Pair) canQueue() bool {
+	return p.Phase == "waiting" || p.Phase == "changes" || p.Phase == "approved"
+}
+
+func (p Pair) AutoQueue() bool {
+	return p.canQueue() && p.Pending == nil && (p.Trigger == "idle" || len(p.Rounds) > 0)
+}
+
+func (p Pair) Reviewed(version string) bool {
+	for _, round := range p.Rounds {
+		if round.Version == version {
+			return true
+		}
+	}
+	return false
+}
+
+func (p Pair) Statuses(view map[string]Status, version string, verified bool) {
+	status := Status{Phase: p.Phase, Round: len(p.Rounds)}
+	switch {
+	case p.Phase == "reviewing":
+		status.NewVersion = verified && version != "" && len(p.Rounds) > 0 && version != p.Rounds[len(p.Rounds)-1].Version
+	case p.Phase == "approved" || p.Phase == "changes":
+		status.Phase = p.workspacePhase(version, verified)
+		if status.Phase == "approved" {
+			for i, round := range p.Rounds {
+				if round.Version == version {
+					status.Round = i + 1
+					break
+				}
+			}
+		}
+	}
+	status.Peer, status.Role = p.Reviewer.Session, "author"
+	view[p.Author.Session] = status
+	status.Peer, status.Role = p.Author.Session, "reviewer"
+	view[p.Reviewer.Session] = status
+}
+
+func (p Pair) workspacePhase(version string, verified bool) string {
+	if p.Pending != nil {
+		return "stale"
+	}
+	if !verified {
+		return "checking"
+	}
+	if version == "" {
+		return "clean"
+	}
+	for _, round := range p.Rounds {
+		if round.Version == version {
+			if round.Verdict == "approved" {
+				return "approved"
+			}
+			return "changes"
+		}
+	}
+	return "stale"
+}
+
+func (s *Store) Continue(ctx context.Context, author string, round int, verify func(Pair) error) error {
+	return s.Change(ctx, author, func(p *Pair) (bool, error) {
+		if p.Phase != "limit" || len(p.Rounds) != round || p.Pending != nil {
+			return false, ErrReviewNotAtLimit
+		}
+		if err := verify(*p); err != nil {
+			return false, err
+		}
+		p.BatchStart, p.Phase = len(p.Rounds), "changes"
+		return true, nil
+	})
 }
 
 func (s *Store) Interrupt(ctx context.Context, author, reason string) error {
