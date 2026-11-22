@@ -89,16 +89,17 @@ type worker struct {
 	gate          chan struct{}
 }
 type Manager struct {
-	AuthChanged func(string) error
-	Root        string
-	bun         string
-	mu          sync.Mutex
-	workers     map[string]*worker
-	closed      bool
-	jobs        map[string]*authJob
+	AuthChanged   func(string) error
+	Root          string
+	bun           string
+	communityHTTP *http.Client
+	mu            sync.Mutex
+	workers       map[string]*worker
+	closed        bool
+	jobs          map[string]*authJob
 }
 
-func NewManager(root string) (*Manager, error) {
+func NewManager(root string, readEnv func() []string) (*Manager, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func NewManager(root string) (*Manager, error) {
 	if err := MaterializeRuntime(filepath.Join(root, "runtime")); err != nil {
 		return nil, err
 	}
-	return &Manager{Root: root, bun: bun, workers: map[string]*worker{}, jobs: map[string]*authJob{}}, nil
+	return &Manager{Root: root, bun: bun, communityHTTP: newCommunityClient(readEnv), workers: map[string]*worker{}, jobs: map[string]*authJob{}}, nil
 }
 func (m *Manager) PackagesRoot() string { return filepath.Join(m.Root, "packages") }
 func (m *Manager) ReadPackage(id string) (Package, error) {
@@ -517,6 +518,7 @@ func (m *Manager) Close() {
 	for _, w := range workers {
 		w.close()
 	}
+	m.communityHTTP.CloseIdleConnections()
 }
 
 type serialBody struct {

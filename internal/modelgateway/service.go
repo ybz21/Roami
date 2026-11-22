@@ -13,6 +13,7 @@ import (
 
 	"github.com/ybz21/Roami/internal/modelplugins"
 	metadb "github.com/ybz21/Roami/internal/storage"
+	runtime "github.com/ybz21/Roami/internal/tmuxruntime"
 	"golang.org/x/sys/unix"
 )
 
@@ -100,7 +101,8 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 		listener.Close()
 		return nil, err
 	}
-	plugins, err := modelplugins.NewManager(filepath.Join(paths.Data, "model-plugins"))
+	rt := runtime.Runtime{EnvFile: filepath.Join(paths.Data, "env")}
+	plugins, err := modelplugins.NewManager(filepath.Join(paths.Data, "model-plugins"), rt.EnvPairs)
 	if err != nil {
 		public.Close()
 		listener.Close()

@@ -21,6 +21,11 @@ const monitorSlots = 10000
 const monitorSlotBytes = 4096
 const monitorDiskBudget = 64 << 20
 
+type monitorTokenUsage struct {
+	Input  int64 `json:"input"`
+	Output int64 `json:"output"`
+}
+
 type MonitorRecord struct {
 	Sequence        uint64         `json:"sequence"`
 	At              int64          `json:"at"`
@@ -46,6 +51,9 @@ type MonitorRecord struct {
 	Attempt         int            `json:"attempt,omitempty"`
 	Switch          string         `json:"switch,omitempty"`
 	Blocks          map[string]int `json:"blocks,omitempty"`
+	GroupPath       []string       `json:"groupPath,omitempty"`
+
+	TokenUsage *monitorTokenUsage `json:"tokenUsage,omitempty"`
 }
 type MonitorStore struct {
 	mu                        sync.Mutex
@@ -112,6 +120,9 @@ func openMonitorStore(path string, capacity int, now func() time.Time) (*Monitor
 	return store, nil
 }
 func validMonitorRecord(record MonitorRecord) bool {
+	if usage := record.TokenUsage; usage != nil && (usage.Input < 0 || usage.Input > 100_000_000 || usage.Output < 0 || usage.Output > 100_000_000) {
+		return false
+	}
 	return record.Sequence > 0 && len(record.RequestID) <= 36 && len(record.CallID) <= 36 && len(record.Caller) <= 120 && len(record.Revision) <= 160 && len(record.UpstreamModel) <= 200 && record.At > 0 && len(record.SourceID) <= 160 && len(record.Model) <= 200 && len(record.RouteID) <= 160 && len(record.Account) <= 200 && len(record.Error) <= 100 && record.Duration >= 0 && containsField([]string{"pass", "fail", "unchecked"}, record.Quality) && (record.FirstToken == nil || !math.IsNaN(*record.FirstToken) && !math.IsInf(*record.FirstToken, 0) && *record.FirstToken >= 0) && (record.TokensPerSecond == nil || !math.IsNaN(*record.TokensPerSecond) && !math.IsInf(*record.TokensPerSecond, 0) && *record.TokensPerSecond >= 0)
 }
 func (s *MonitorStore) pruneLocked(now time.Time) error {

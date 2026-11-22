@@ -3,6 +3,7 @@ package modelplugins
 import (
 	"archive/tar"
 	"bytes"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/sha512"
@@ -11,14 +12,18 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/http/httpproxy"
 )
 
 const communityRepo = "magpie-community/plugins"
 const communityRaw = "https://raw.githubusercontent.com/" + communityRepo + "/"
+const communityIndexTimeout = 20 * time.Second
 
 var (
 	ErrCommunityUnavailable = errors.New("MODEL_PLUGIN_COMMUNITY_UNAVAILABLE")
@@ -66,14 +71,34 @@ func communityURLs(channel, branch, file string) []string {
 	return append(mirrors, official)
 }
 
-var communityHTTP = &http.Client{
-	Timeout: 8 * time.Second,
-	CheckRedirect: func(next *http.Request, via []*http.Request) error {
-		if len(via) >= 3 || next.URL.Scheme != "https" || next.URL.Host != via[0].URL.Host {
-			return http.ErrUseLastResponse
+func newCommunityClient(readEnv func() []string) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if readEnv != nil {
+		transport.Proxy = func(request *http.Request) (*url.URL, error) {
+			config := httpproxy.FromEnvironment()
+			saved := make(map[string]string)
+			for _, line := range readEnv() {
+				key, value, ok := strings.Cut(line, "=")
+				if ok {
+					saved[strings.TrimSpace(key)] = strings.TrimSpace(value)
+				}
+			}
+			config.HTTPProxy = cmp.Or(config.HTTPProxy, saved["HTTP_PROXY"], saved["http_proxy"])
+			config.HTTPSProxy = cmp.Or(config.HTTPSProxy, saved["HTTPS_PROXY"], saved["https_proxy"])
+			config.NoProxy = cmp.Or(config.NoProxy, saved["NO_PROXY"], saved["no_proxy"])
+			return config.ProxyFunc()(request.URL)
 		}
-		return nil
-	},
+	}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   communityIndexTimeout,
+		CheckRedirect: func(next *http.Request, via []*http.Request) error {
+			if len(via) >= 3 || next.URL.Scheme != "https" || next.URL.Host != via[0].URL.Host {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
 }
 
 func readCommunity(ctx context.Context, client *http.Client, channel, branch, file string, limit int64, accept func([]byte) error) error {
@@ -83,8 +108,8 @@ func readCommunity(ctx context.Context, client *http.Client, channel, branch, fi
 			return ctx.Err()
 		}
 		timeout := 8 * time.Second
-		if strings.HasSuffix(file, ".json") {
-			timeout = 4 * time.Second
+		if branch == "dist" && file == "index.json" {
+			timeout = communityIndexTimeout
 		}
 		attempt, cancel := context.WithTimeout(ctx, timeout)
 		req, requestErr := http.NewRequestWithContext(attempt, http.MethodGet, endpoint, nil)
@@ -133,6 +158,7 @@ func communityProviders(ctx context.Context, client *http.Client, channel string
 	seen := map[string]bool{}
 	for _, plugin := range registry.Plugins {
 		if len(plugin.Providers) > 0 && communityName.MatchString(plugin.Package) && !seen[plugin.Package] {
+			plugin.Version = ""
 			plugins = append(plugins, plugin)
 			seen[plugin.Package] = true
 		}
@@ -153,21 +179,26 @@ func communityReleases(ctx context.Context, client *http.Client, channel string)
 }
 
 func (m *Manager) CommunityPlugins(ctx context.Context, channel string) ([]CommunityPlugin, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	var index communityIndex
 	var indexErr error
 	var pending sync.WaitGroup
 	pending.Add(1)
 	go func() {
 		defer pending.Done()
-		index, indexErr = communityReleases(ctx, communityHTTP, channel)
+		index, indexErr = communityReleases(ctx, m.communityHTTP, channel)
 	}()
-	plugins, err := communityProviders(ctx, communityHTTP, channel)
-	pending.Wait()
+	plugins, err := communityProviders(ctx, m.communityHTTP, channel)
 	if err != nil {
 		return nil, err
 	}
+	pending.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if indexErr != nil {
-		return nil, indexErr
+		return plugins, nil
 	}
 	for i := range plugins {
 		published := index.Packages[plugins[i].Package]
@@ -179,7 +210,7 @@ func (m *Manager) CommunityPlugins(ctx context.Context, channel string) ([]Commu
 }
 
 func (m *Manager) ImportCommunity(ctx context.Context, channel, name, version string) (Package, error) {
-	return importCommunity(ctx, communityHTTP, m.PackagesRoot(), channel, name, version)
+	return importCommunity(ctx, m.communityHTTP, m.PackagesRoot(), channel, name, version)
 }
 
 func importCommunity(ctx context.Context, client *http.Client, root, channel, name, version string) (Package, error) {

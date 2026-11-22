@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聚合监控与请求链路 · 技术设计</title>
+<link rel="stylesheet" href="../20261114-model-orchestration/assets/design.css">
+</head>
+<body>
+<header class="page-head"><a class="crumb" href="index.html">设计首页</a><h1>聚合监控与请求链路</h1></header>
+<main class="doc">
+  <section>
+    <h2>统计与时间范围</h2>
+    <p>按发起请求的逻辑聚合 ID 查询。聚合改名沿用已保存的别名查询历史。每笔有终态的请求计一次，切换次数按发生切换的请求计数，切换后取消或结果未知时独立保留。</p>
+    <p>复用网关的六个时间桶及监控环。请求列表沿用最近 50 条和已有保留范围，支持时间范围及切换结果筛选。列表查询在可见时轮询。</p>
+  </section>
+  <section>
+    <h2>观测与导航</h2>
+    <p>详情按请求 ID 读取终态及上游尝试，再按尝试序号展示。实际选路时记下该次尝试经过的子聚合。历史记录缺少子聚合字段时只展示已经记录的上游，已过期的部分显示缺失提示。</p>
+    <p>聚合路线使用 <code>aggregate/{id}/requests</code>，详情使用 <code>aggregate/{id}/requests/{requestId}</code>。后端详情可携带聚合 ID，防止从当前聚合误开另一条链路。全局审计沿用现有入口。</p>
+  </section>
+  <section>
+    <h2>验证记录</h2>
+    <p>用测试网关发送真实 HTTP 请求，验证上游限流、经过两层备用聚合后恢复、改名后查看历史，以及其他聚合无法打开该请求。</p>
+    <p>使用固定样本验证桌面 1280、1920、2560、3440 CSS 像素与 Redmi Note 8 的 392 CSS 像素界面。实机操作覆盖切换记录、链路详情、返回时恢复筛选和列表滚动。</p>
+  </section>
+  <p><a href="product.html">产品设计与交互原型</a></p>
+</main>
+</body>
+</html>
