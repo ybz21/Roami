@@ -56,6 +56,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
   const urlHintId = useId()
+  const sourceKeyHintId = useId()
   const sourceKeyErrorId = useId()
   const [confirming, setConfirming] = useState(false), [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
@@ -183,7 +184,8 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         </label>}
         {draft.editing && <label className="agent-settings-field">
           {t('hub.sourceKey.label')}
-          <Input aria-label={t('hub.sourceKey.label')} required disabled={loading || busy} value={sourceKey} maxLength={160} autoCapitalize="none" spellCheck={false} aria-describedby={sourceKeyError ? sourceKeyErrorId : undefined} status={sourceKeyError ? 'error' : undefined} onChange={event => updateSource({ sourceKey: event.target.value })} />
+          <Input aria-label={t('hub.sourceKey.label')} required disabled={loading || busy} value={sourceKey} maxLength={160} autoCapitalize="none" spellCheck={false} aria-describedby={sourceKeyError ? sourceKeyHintId + ' ' + sourceKeyErrorId : sourceKeyHintId} status={sourceKeyError ? 'error' : undefined} onChange={event => updateSource({ sourceKey: event.target.value })} />
+          <span className="agent-settings-hint" id={sourceKeyHintId}>{t('hub.sourceKey.hint')}</span>
           {sourceKeyError && <span className="tt-model-source-warning" id={sourceKeyErrorId} role="alert">{t(sourceKeyError)}</span>}
         </label>}
         {draft.editing && !source.pluginSourceId && <>
