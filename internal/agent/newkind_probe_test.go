@@ -4,46 +4,46 @@ import "strings"
 import "testing"
 
 // 假的一型，只实现接口、不碰任何既有代码 —— 验证「新增一型」的成本。
-type gemini struct{}
+type testHarness struct{}
 
-func (gemini) Kind() string             { return "gemini" }
-func (gemini) DisplayName() string      { return "Gemini CLI" }
-func (gemini) Bin() string              { return "gemini" }
-func (gemini) PinsConversationID() bool { return true }
-func (gemini) InteractiveArgs(o StartOpts) []string {
+func (testHarness) Kind() string             { return "test-harness" }
+func (testHarness) DisplayName() string      { return "Test Harness" }
+func (testHarness) Bin() string              { return "test-harness" }
+func (testHarness) PinsConversationID() bool { return true }
+func (testHarness) InteractiveArgs(o StartOpts) []string {
 	if o.ConvID != "" {
 		return []string{"--chat", o.ConvID}
 	}
 	return nil
 }
-func (gemini) OneShotArgs(o StartOpts) []string { return []string{"--stdin"} }
-func (g gemini) ResumeCommand(c string) string {
+func (testHarness) OneShotArgs(o StartOpts) []string { return []string{"--stdin"} }
+func (g testHarness) ResumeCommand(c string) string {
 	if c == "" {
 		return ""
 	}
 	return g.Bin() + " --chat " + c
 }
-func (gemini) DetectConversationID(string) string { return "" }
-func (gemini) ConversationDir(string) string      { return "" }
+func (testHarness) DetectConversationID(string) string { return "" }
+func (testHarness) ConversationDir(string) string      { return "" }
 
 func TestNewKindNeedsNoChangesElsewhere(t *testing.T) {
-	Register(gemini{})
-	defer func() { mu.Lock(); delete(registry, "gemini"); mu.Unlock() }()
+	Register(testHarness{})
+	defer func() { mu.Lock(); delete(registry, "test-harness"); mu.Unlock() }()
 
-	if a := Get("gemini"); a == nil {
+	if a := Get("test-harness"); a == nil {
 		t.Fatal("注册完却取不到")
 	}
-	if d := Describe(Get("gemini")); d.Kind != "gemini" || d.DisplayName != "Gemini CLI" || d.Command != "gemini" || !d.Interactive || d.Models || d.CanInstall {
+	if d := Describe(Get("test-harness")); d.Kind != "test-harness" || d.DisplayName != "Test Harness" || d.Command != "test-harness" || !d.Interactive || d.Models || d.CanInstall {
 		t.Fatalf("new registration missing metadata: %+v", d)
 	}
 	// 恢复这条路自动认得它
-	if got := ResumeCommandFor("gemini", "C1"); got != "gemini --chat C1" {
+	if got := ResumeCommandFor("test-harness", "C1"); got != "test-harness --chat C1" {
 		t.Errorf("恢复命令 = %q", got)
 	}
 	// 列表/校验这条路也认得
 	found := false
 	for _, k := range Kinds() {
-		if k == "gemini" {
+		if k == "test-harness" {
 			found = true
 		}
 	}
@@ -51,7 +51,7 @@ func TestNewKindNeedsNoChangesElsewhere(t *testing.T) {
 		t.Error("Kinds() 里没有它，swarm 的 --kind 校验会拒绝它")
 	}
 	// 启动参数
-	if got := strings.Join(Get("gemini").InteractiveArgs(StartOpts{ConvID: "X"}), " "); got != "--chat X" {
+	if got := strings.Join(Get("test-harness").InteractiveArgs(StartOpts{ConvID: "X"}), " "); got != "--chat X" {
 		t.Errorf("交互参数 = %q", got)
 	}
 }

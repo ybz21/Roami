@@ -63,6 +63,7 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
   const current = rows.find(row => row.kind === initialKind)?.kind || null
   const modelsOpen = initialSection === 'models' && rows.some(row => row.kind === current && row.models !== false)
   const selected = rows.find(row => row.kind === current)
+  const loginHint = current === 'gemini' ? 'capabilities.agents.geminiLoginHint' : selected?.interactive === false ? 'capabilities.agents.headlessHint' : 'capabilities.agents.loginHint'
   const close = () => onSelect('')
   const check = async (kind: AgentKind) => {
     if (busy) return
@@ -133,7 +134,7 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
       {selected?.models !== false && <Button disabled={!!busy} onClick={() => onSelect(current + '/models')}>{t('capabilities.models.manage')}</Button>}
     </div>
     {selected?.installed && selected.canUpgrade === false && <p>{t('capabilities.agents.manualUpgrade')}</p>}
-    <p>{t(selected?.interactive === false ? 'capabilities.agents.headlessHint' : 'capabilities.agents.loginHint', { command: selected?.setupCommand || selected?.command || current })}</p><p>{t('onboarding.verifyHint')}</p>
+    <p>{t(loginHint, { command: selected?.setupCommand || selected?.command || current })}</p><p>{t('onboarding.verifyHint')}</p>
     {selected && <AgentCommandForm key={current} kind={current} defaultCommand={selected.command} />}
     {selected?.installed && <AgentBalance agent={selected} detail />}
   </div>

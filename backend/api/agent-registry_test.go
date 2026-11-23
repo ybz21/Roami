@@ -29,7 +29,7 @@ func TestAgentRegistryIncludesUninstalledHarnessesWithoutProbes(t *testing.T) {
 			t.Fatal("removed Harness still advertised")
 		}
 	}
-	for _, kind := range []string{"claude", "codex", "opencode", "pi"} {
+	for _, kind := range []string{"claude", "codex", "gemini", "opencode", "pi"} {
 		if !found[kind] {
 			t.Fatalf("uninstalled agent %s omitted", kind)
 		}

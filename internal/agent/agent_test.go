@@ -103,10 +103,10 @@ func TestResumeRefusesEmptyID(t *testing.T) {
 
 // 认不出的类型不猜。台账里可能存着旧版本写的、或手工改进去的 kind。
 func TestUnknownKindIsNil(t *testing.T) {
-	if Get("gemini") != nil {
+	if Get("future-harness") != nil {
 		t.Error("没注册的类型不该返回实现")
 	}
-	if got := ResumeCommandFor("gemini", "abc"); got != "" {
+	if got := ResumeCommandFor("future-harness", "abc"); got != "" {
 		t.Errorf("认不出类型时该返回空串，得到 %q", got)
 	}
 	if got := ResumeCommandFor("claude", ""); got != "" {
