@@ -20,7 +20,7 @@
 #   ROAMI_ZRAM_SIZE=16G    指定压缩交换区逻辑容量（默认物理内存的一半）
 #   ROAMI_ZRAM_MEMORY_LIMIT=4G 压缩区实际内存上限（默认物理内存的 1/8）
 #   ROAMI_FROM_SOURCE=1    在仓库 clone 内从源码构建（需 go+node），而非下载 release
-#   ROAMI_INSTALL_GEMINI=1 同时安装并验证 Gemini CLI（需 Node.js 20+ 和 npm）
+#   ROAMI_INSTALL_ANTIGRAVITY=1 同时安装并验证 Antigravity CLI
 #
 # 开发/源码构建请用 start.sh --dev（会从源码构建 CLI/chrome/skills + 前后端）。
 #
@@ -43,7 +43,7 @@ INSTALL_ACTIVATED=0
 INSTALL_QUIESCED=0
 INSTALL_LOCKED=0
 INSTALL_PREVIOUS=""
-INSTALL_GEMINI_PATH=""
+INSTALL_ANTIGRAVITY_PATH=""
 
 # ── 输出助手 ─────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -154,8 +154,8 @@ service_path_environment() {
       keys+=("${prefix}_${suffix}")
     done
   done
-  if [ -n "$INSTALL_GEMINI_PATH" ]; then
-    local PATH="$INSTALL_GEMINI_PATH"
+  if [ -n "$INSTALL_ANTIGRAVITY_PATH" ]; then
+    local PATH="$INSTALL_ANTIGRAVITY_PATH"
     keys+=(PATH)
   fi
   for key in "${keys[@]}"; do
@@ -221,15 +221,15 @@ install_binary() {
   info "完整包准备完成"
 }
 
-install_gemini() {
-  [ "${ROAMI_INSTALL_GEMINI:-0}" = 1 ] || return 0
-  local script="$INSTALL_SLOT/install/install-gemini-cli.sh"
-  local prefix="$INSTALL_RUN_HOME/.local"
-  [ -f "$script" ] || die "当前运行包缺少 Gemini CLI 安装脚本，请使用较新的完整包"
-  step "准备 Gemini CLI..."
-  INSTALL_GEMINI_PATH="$prefix/bin:$PATH"
-  run_as_service_user env "PATH=$INSTALL_GEMINI_PATH" bash "$script" "$prefix" \
-    || die "Gemini CLI 准备失败，Roami 服务版本未切换"
+install_antigravity() {
+  [ "${ROAMI_INSTALL_ANTIGRAVITY:-0}" = 1 ] || return 0
+  local script="$INSTALL_SLOT/install/install-antigravity-cli.sh"
+  local bin_dir="$INSTALL_RUN_HOME/.local/bin"
+  [ -f "$script" ] || die "当前运行包缺少 Antigravity CLI 安装脚本，请使用较新的完整包"
+  step "准备 Antigravity CLI..."
+  INSTALL_ANTIGRAVITY_PATH="$bin_dir:$PATH"
+  run_as_service_user env "PATH=$INSTALL_ANTIGRAVITY_PATH" bash "$script" "$bin_dir" \
+    || die "Antigravity CLI 准备失败，Roami 服务版本未切换"
 }
 
 restart_existing_service() {
@@ -558,7 +558,7 @@ echo ""
 trap cleanup_installation EXIT
 detect_asset
 install_binary
-install_gemini
+install_antigravity
 ensure_tmux
 ensure_chrome || warn "Chrome 安装失败，可稍后安装"
 ensure_adb || warn "ADB 安装失败，可稍后安装"

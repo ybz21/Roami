@@ -9,7 +9,7 @@
 import type { ReactNode } from 'react'
 import type { AgentKind } from './agent-kind'
 // 品牌资产：OpenCode packages/console/app/src/asset/brand，Pi https://pi.dev/logo-auto.svg。
-import geminiLogo from './assets/agents/gemini.svg'
+import antigravityLogo from './assets/agents/antigravity.svg'
 import opencodeDark from './assets/agents/opencode-dark.svg'
 import opencodeLight from './assets/agents/opencode-light.svg'
 import piLogo from './assets/agents/pi.svg'
@@ -227,7 +227,7 @@ const CODEX_MARK = 'M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.04
 /** 会话跑的是哪个 agent：官方品牌标使用原色 */
 export const AgentLogo = ({ kind, size = 13 }: { kind: AgentKind | 'native'; size?: number }) => {
   if (kind === 'native') return <RoamiLogo size={size} />
-  if (kind === 'gemini') return <img src={geminiLogo} width={size} height={size} alt="" aria-hidden />
+  if (kind === 'antigravity') return <img src={antigravityLogo} width={size} height={size} alt="" aria-hidden />
   if (kind === 'pi') return <img src={piLogo} width={size} height={size} alt="" aria-hidden />
   if (kind === 'opencode') return <span className="tt-opencode-logo" style={{ width: size, height: size }} aria-hidden>
     <img className="dark" src={opencodeDark} width={size} height={size} alt="" />

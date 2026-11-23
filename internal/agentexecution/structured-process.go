@@ -2,6 +2,7 @@ package agentexecution
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,11 +18,12 @@ import (
 )
 
 func structuredArgs(spec Spec, provider string) []string {
-	if spec.Executor == "gemini" {
-		args := agent.Get("gemini").OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission})
-		args = append(args, "--output-format", "stream-json")
+	if spec.Executor == "antigravity" {
+		args := agent.AntigravityOptions(agent.StartOpts{Model: spec.Model, Permission: spec.Permission})
+		args = append(args, "--settings", agent.AntigravityAPIKeySettings, "--input-format", "stream-json",
+			"--output-format", "stream-json", "--disable-slash-commands")
 		if provider != "" {
-			args = append(args, "--resume", provider)
+			args = append(args, "--conversation", provider)
 		}
 		return args
 	}
@@ -46,7 +48,12 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 		spec.Prompt = sessionPrompt(dir, spec)
 	}
 	result := Result{State: "failed", ExitCode: -1, Summary: "EXECUTOR_START_FAILED"}
-	if spec.Executor == "gemini" && provider != "" && !agent.ValidGeminiSessionID(provider) {
+	if spec.Executor == "antigravity" && !agent.AntigravityManagedConfigured() {
+		result.Summary = "EXECUTOR_AUTH_REQUIRED"
+		result.FinishedMS = time.Now().UnixMilli()
+		return result, provider
+	}
+	if spec.Executor == "antigravity" && provider != "" && !agent.ValidAntigravityConversationID(provider) {
 		result.Summary = "INVALID_EXECUTOR_EVENT_STREAM"
 		result.FinishedMS = time.Now().UnixMilli()
 		return result, ""
@@ -67,8 +74,12 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 	cmd := exec.CommandContext(runCtx, bin, structuredArgs(spec, provider)...)
 	cmd.Dir = receipt.Workspace.Directory
 	cmd.Env = gitcontext.ForDirectory(os.Environ())
-	if spec.Executor == "opencode" || spec.Executor == "gemini" {
+	if spec.Executor == "opencode" {
 		cmd.Stdin = strings.NewReader(spec.Prompt)
+	}
+	if spec.Executor == "antigravity" {
+		prompt, _ := json.Marshal(spec.Prompt)
+		cmd.Stdin = strings.NewReader(`{"event":"user","message":{"content":` + string(prompt) + "}}\n")
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {

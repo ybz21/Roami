@@ -25,11 +25,14 @@ func TestAgentRegistryIncludesUninstalledHarnessesWithoutProbes(t *testing.T) {
 	found := map[string]bool{}
 	for _, row := range body.Agents {
 		found[row.Kind] = true
-		if row.Kind == "deepseek" {
+		if row.Kind == "deepseek" || row.Kind == "gemini" {
 			t.Fatal("removed Harness still advertised")
 		}
+		if row.Kind == "antigravity" && (row.Command != "agy" || row.DisplayName != "Antigravity CLI" || !row.Interactive || !row.CanInstall) {
+			t.Fatalf("invalid Antigravity descriptor: %+v", row)
+		}
 	}
-	for _, kind := range []string{"claude", "codex", "gemini", "opencode", "pi"} {
+	for _, kind := range []string{"claude", "codex", "antigravity", "opencode", "pi"} {
 		if !found[kind] {
 			t.Fatalf("uninstalled agent %s omitted", kind)
 		}

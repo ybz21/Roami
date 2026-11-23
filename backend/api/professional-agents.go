@@ -31,14 +31,15 @@ func (a *API) annotateProfessionalPresets(ctx context.Context, rows []agentinven
 }
 
 func (a *API) InstallProfessionalAgent(c *gin.Context) {
-	args, err := agentinventory.ProfessionalInstallArgs(c.Param("kind"))
-	if err != nil {
+	kind := c.Param("kind")
+	registered := agent.Get(kind)
+	if registered == nil || !agent.Describe(registered).CanInstall {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "INVALID_AGENT_KIND"}})
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
-	if err := agentinventory.InstallProfessionalAgent(ctx, args); err != nil {
+	if err := agentinventory.InstallProfessionalAgent(ctx, registered.Kind()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "AGENT_INSTALL_FAILED"}})
 		return
 	}
