@@ -27,7 +27,7 @@
 | 隔离清理 | Linux 探针经 `scripts/dev/isolated-roami.sh` 启动，测试实例经同入口 `--stop` 清理。Zellij 只停止并删除试验会话。 |
 | Windows 整包基线 | 在本次评审中重跑交叉构建，仍出现下列七个包的编译阻塞。 |
 
-库的优先顺序用于安排下一轮 Windows 真机验证。采用哪一种还需通过 [Windows 整包验收](windows.html#go-no-go)。[go-pty Unix 句柄管理](https://github.com/aymanbagabas/go-pty/blob/v0.2.3/pty_unix.go)
+Windows 开发首选 crosspty。真机未通过 Job 清理、退出取证或关闭排空且小范围适配无法补齐时，回退到直接调用 ConPTY。开放发布前通过 [Windows 整包验收](windows.html#go-no-go)。[go-pty Unix 句柄管理](https://github.com/aymanbagabas/go-pty/blob/v0.2.3/pty_unix.go)
 
 ## Windows 整包编译回执
 

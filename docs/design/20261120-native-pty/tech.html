@@ -88,7 +88,7 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
         <h3>macOS / Linux</h3>
         <p>以 <code>StartWithSize</code> 建控制终端和初始尺寸，子进程使用登录 shell 或指定可执行文件。由 master 读写，以 <code>Setsize</code> 更新尺寸并由系统通知前台进程组。宿主记录 PID、系统启动标识、进程启动时间以及 session ID / PGID。交互 shell 会把作业放入不同进程组，回收前验证运行身份并以 Linux cgroup 或经验证的 macOS 会话进程归属核对退出。启动参数显式携带获准的每会话环境，登录 shell 初始化 PATH、nvm 与用户配置；<code>SSH_AUTH_SOCK</code> 等会话变量按启动来源传入。验证 <code>TERM</code> 与真实 VT 能力、平台可用的 UTF-8 locale。</p>
         <h3>Windows / PowerShell</h3>
-        <p>Windows 适配器通过系统 ConPTY 启动 PowerShell 和 Agent。采用 <code>crosspty v1.2.0</code> 需新增模块，最低 Go 版本为 1.24.0，与当前工程一致。采用 <code>go-pty v0.2.3</code> 需新增模块并评估将工程及 CI 升级至 Go 1.25.0 或以上，以及传递依赖变化。直接调用 ConPTY 的探针使用仓库现有 <code>x/sys v0.41.0</code>。启动、关闭排空、Job Object 及整包验收见<a href="windows.html">Windows 整包移植</a>。</p>
+        <p>Windows 首选 crosspty 作为 ConPTY 适配，驱动 PowerShell 和 Agent。采用 <code>crosspty v1.2.0</code> 需新增模块，最低 Go 版本为 1.24.0，与当前工程一致。采用 <code>go-pty v0.2.3</code> 需新增模块并评估将工程及 CI 升级至 Go 1.25.0 或以上，以及传递依赖变化。crosspty 无法通过 Windows 门槛时，回退到仓库现有 <code>x/sys v0.41.0</code> 直接调用 ConPTY。启动、关闭排空、Job Object 及整包验收见<a href="windows.html">Windows 整包移植</a>。</p>
         <p class="source"><a href="../../../go.mod">Roami Go 依赖</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/go.mod">crosspty 依赖</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a></p>
       </section>
 
@@ -97,10 +97,10 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
         <ol>
           <li><strong>一个流。</strong> 宿主始终读取 PTY，并把输出按窗格代次和单调序号排入有界缓冲。记录尺寸变化事件和输出位置，server-side VT 状态按相同顺序更新。Web 保持 xterm.js，CLI 在本机终端 raw mode 中渲染。双方都要支持二进制输入输出和独立控制帧。</li>
           <li><strong>一次衔接。</strong> 新连接在同一序号边界取得屏幕快照和订阅，然后收到严格晚于该边界的输出。短断线可从同代次最后已确认序号补发，输出落后超出缓冲时重取快照。快照尺寸与宿主一致；慢客户端只影响自身，丢失顺序时重同步。客户端按同一顺序应用输出与尺寸变化。</li>
-          <li><strong>终端语义。</strong> 快照需保留正常/备用屏、滚动记录、光标、样式与键盘/鼠标模式。由屏幕状态提供 <code>capture</code> 普通文本，用输出日志做审计或诊断。验证换屏、中文宽字符、跨块 UTF-8、Ctrl/Cmd 组合键、括号粘贴和交互滚动。对终端查询指定唯一响应方，避免多客户端向应用复制响应。首次实现先比较 Go <code>charmbracelet/x/vt</code> 的模式覆盖和 <code>@xterm/headless</code> + Serialize 的快照表现，后者用作对照。用同一批流录制做一致性验收后，再定 Go VT 库版本和最小自研边界。</li>
+          <li><strong>终端语义。</strong> 快照需保留正常/备用屏、滚动记录、光标、样式与键盘/鼠标模式。由屏幕状态提供 <code>capture</code> 普通文本，用输出日志做审计或诊断。验证换屏、中文宽字符、跨块 UTF-8、Ctrl/Cmd 组合键、括号粘贴和交互滚动。对终端查询指定唯一响应方，避免多客户端向应用复制响应。服务端原型首选 Go <code>charmbracelet/x/vt v0.1.0</code>，该模块要求 Go 1.24.2。用 <code>@xterm/headless</code> + Serialize 作为回放基准；同批录制通过行为和资源验收后再把 Go 模块并入。</li>
           <li><strong>输入权。</strong> 用宿主端控制权代次排除迟到的输入、滚轮和尺寸事件。普通屏向上翻查历史；备用屏根据当前模式发送滚轮，或按应用验收结果转为明确的翻页按键。尺寸以有效且显式接管的客户端为准，合并连续变化。</li>
         </ol>
-        <p class="source"><a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">XTerm 控制序列</a> · <a href="https://github.com/charmbracelet/x/blob/43427fdbad12fde220b737fc36303291a5ce4602/vt/emulator.go">Go VT 候选源码</a> · <a href="https://github.com/xtermjs/xterm.js">xterm.js、headless 和 Serialize</a></p>
+        <p class="source"><a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">XTerm 控制序列</a> · <a href="https://github.com/charmbracelet/x/blob/43427fdbad12fde220b737fc36303291a5ce4602/vt/emulator.go">Go VT 原型源码</a> · <a href="https://github.com/charmbracelet/x/blob/43427fdbad12fde220b737fc36303291a5ce4602/vt/go.mod">Go VT 版本要求</a> · <a href="https://github.com/xtermjs/xterm.js">xterm.js、headless 和 Serialize</a></p>
       </section>
 
       <section aria-labelledby="protocol">
@@ -123,7 +123,7 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
       <section aria-labelledby="migration">
         <h2 id="migration">迁移、故障与回滚</h2>
         <ol>
-          <li><strong>先抽业务接口。</strong> 以现有 tmux 为第一个 SessionBackend。按<a href="capabilities.html">迁移清单</a>迁移 API、CLI 和 Agent 调用点，先跑旧行为回归。TerminalBackend 只供原生宿主调用，处理 PTY、进程和操作系统能力。Windows 整包单独立项，候选 PTY 探针可并行。</li>
+          <li><strong>先抽业务接口。</strong> 以现有 tmux 为第一个 SessionBackend。按<a href="capabilities.html">迁移清单</a>迁移 API、CLI 和 Agent 调用点，先跑旧行为回归。TerminalBackend 只供原生宿主调用，处理 PTY、进程和操作系统能力。Windows 整包单独立项，先用 crosspty 跑 PowerShell 7 真机探针。</li>
           <li><strong>宿主与普通会话试点。</strong> Linux 和 macOS 从单窗格开始，完成屏幕捕获、断线回连和 Web 重启恢复。先在隔离实例开启原生后端，复用会话台账和连接入口。旧记录识别为 tmux。新建记录写入不可变的后端与运行身份，部署版本支持双读，首个用户可用版本由独立宿主持有 PTY，并通过双版本排空演练。</li>
           <li><strong>迁移剩余功能。</strong> 补齐窗口、分屏和 CLI 操作，接入 Agent 输入和执行生命周期。启动前先持久化操作 ID、目标和工作区租约，再按<a href="#admission">并发创建与幂等契约</a>发起创建。结果中断时按操作记录和原归属宿主核对退出或创建证据。</li>
           <li><strong>确认退出再恢复。</strong> Web 重启时按宿主实例与窗格代次接续。宿主不可达时保留工作区围栏。进程等待结果、带身份的系统观测或宿主重启证据明确后，才对历史做相应状态变更。宿主或整机重启后，可按台账重开并用支持的 Agent 对话 ID 恢复；新会话有新运行身份和恢复来源。原进程内存和未持久化输出随宿主故障丢失。</li>

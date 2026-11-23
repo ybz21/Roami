@@ -1,8 +1,10 @@
 # 三平台原生终端调研与设计
 
-Roami 自己管理会话，底层复用系统 PTY。先抽离 tmux 会话接口，以独立的 Go 宿主试点 Unix 单窗格，Windows 并行验证 `crosspty`、`go-pty` 和直接调用 ConPTY。
+采用 **Roami 自有 Go 宿主 `roami-sessiond` + macOS/Linux 的 `creack/pty v1.1.24` + Windows 首选 `crosspty v1.2.0`（ConPTY + PowerShell 7）**。浏览器继续用 xterm.js。服务端屏幕状态先用 `charmbracelet/x/vt v0.1.0` 验证，合入前评估 Go 1.24.2 与回放结果。
 
-- [调研与选型（HTML）](index.html) 比较 PTY 库和 multiplexer，给出首轮决策。
+开工先将 tmux 接入 `SessionBackend`，再做 Linux 单窗格宿主，随后验 macOS。Windows 并行用 crosspty 做 PowerShell 真机探针。若 Job 清理、退出取证或关闭排空无法通过，回退到 `x/sys/windows` 直接调用 ConPTY。
+
+- [调研与选型（HTML）](index.html#recommended-stack) 给出采用的技术栈、回退条件和开工顺序。
 - [产品设计（HTML）](product.html) 说明终端接管、重连和旧会话体验。
 - [会话宿主与 Unix 试点（HTML）](tech.html) 包含宿主托管、升级排空、传输协议和实施门槛。
 - [tmux 迁移清单（HTML）](capabilities.html) 映射能力、宿主契约及试点缺失时的行为。
