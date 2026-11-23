@@ -6,7 +6,7 @@
 
 - [调研与选型（HTML）](index.html#recommended-stack) 给出方案优劣、采用的技术栈和回退条件。
 - [产品设计（HTML）](product.html) 说明终端接管、重连和旧会话体验。
-- [代码分层图（HTML）](tech.html#layers) 标明两层接口、tmux 和原生分支、以及平台实现的落点。宿主托管和协议细节同页可查。
+- [架构图（HTML）](tech.html#layers) 画出两层接口和平台分支。另有[矢量原图（SVG）](terminal-architecture.svg)。
 - [tmux 迁移清单（HTML）](capabilities.html) 映射能力、宿主契约及试点缺失时的行为。
 - [Windows 整包移植（HTML）](windows.html) 记录 Go 候选约束、系统调用差异、PowerShell 和 Agent 启动验收。
 - [验证记录（Markdown）](acceptance.md) 保留已跑探针、整包构建回执和评审对应项。

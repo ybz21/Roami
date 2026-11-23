@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 478" role="img" aria-labelledby="title description">
+  <title id="title">Roami 终端架构</title>
+  <desc id="description">Web、CLI 和 Agent 通过会话服务调用 SessionBackend。会话走 tmux 适配器，或通过本机 IPC 连接独立的 roami-sessiond。原生宿主通过 TerminalBackend 调用 macOS 和 Linux 的 creack/pty 或 Windows 的 crosspty。</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg-base: light-dark(#f6f8fa, #0d1117);
+      --bg-container: light-dark(#fff, #161b22);
+      --border: light-dark(#d0d7de, #30363d);
+      --text-bright: light-dark(#1f2328, #e6edf3);
+      --text-dim: light-dark(#57606a, #8b949e);
+      --accent: light-dark(#0969da, #58a6ff);
+    }
+    text { fill: var(--text-bright); font: 600 16px system-ui, sans-serif; }
+    .detail, .label { fill: var(--text-dim); font-size: 15px; font-weight: 400; }
+    .code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .node { fill: var(--bg-container); stroke: var(--border); }
+    .interface { stroke: var(--accent); stroke-width: 1.5; }
+    .region { fill: var(--bg-base); stroke: var(--text-dim); stroke-dasharray: 5 5; }
+    .path { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
+    .legacy { stroke: var(--text-dim); stroke-dasharray: 4 4; }
+    .accent { fill: var(--accent); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+      <path class="accent" d="M0 0 8 4 0 8z"/>
+    </marker>
+    <marker id="legacy-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+      <path fill="var(--text-dim)" d="M0 0 8 4 0 8z"/>
+    </marker>
+  </defs>
+
+  <rect class="region" x="304" y="176" width="592" height="286" rx="10"/>
+
+  <g id="connections">
+    <path class="path" d="M220 64H293" marker-end="url(#arrow)"/>
+    <path class="path" d="M533 64H605" marker-end="url(#arrow)"/>
+    <path class="path" d="M750 98V116"/>
+    <path class="path legacy" d="M750 116H136V189" marker-end="url(#legacy-arrow)"/>
+    <path class="path" d="M750 116V149H600V220" marker-end="url(#arrow)"/>
+    <path class="path" d="M600 272V301" marker-end="url(#arrow)"/>
+    <path class="path" d="M600 354V375H454V394" marker-end="url(#arrow)"/>
+    <path class="path" d="M600 375H746V394" marker-end="url(#arrow)"/>
+    <circle class="accent" cx="750" cy="116" r="3"/>
+  </g>
+
+  <g id="web-cli-agent">
+    <rect class="node" x="24" y="30" width="196" height="68" rx="6"/>
+    <text x="40" y="58">Web / CLI / Agent</text>
+    <text class="detail" x="40" y="81">打开或操作终端</text>
+  </g>
+  <g id="session-service">
+    <rect class="node" x="293" y="30" width="240" height="68" rx="6"/>
+    <text x="309" y="58">Roami 会话服务</text>
+    <text class="detail" x="309" y="81">会话 ID、权限、工作区</text>
+  </g>
+  <g id="session-backend">
+    <rect class="node interface" x="605" y="30" width="291" height="68" rx="6"/>
+    <text class="code" x="621" y="58">SessionBackend</text>
+    <text class="detail" x="621" y="81">统一会话接口</text>
+  </g>
+
+  <text class="label" x="152" y="148">兼容后端</text>
+  <g id="tmux-backend">
+    <rect class="node" x="24" y="189" width="224" height="68" rx="6"/>
+    <text x="40" y="217">tmux 适配器</text>
+    <text class="detail" x="40" y="240">连接现有 tmux server</text>
+  </g>
+
+  <text class="label accent" x="616" y="170">本机 IPC</text>
+  <text class="label" x="324" y="203">独立 Go 进程</text>
+  <g id="session-host">
+    <rect class="node" x="448" y="220" width="304" height="52" rx="6"/>
+    <text class="code" x="464" y="242">roami-sessiond</text>
+    <text class="detail" x="464" y="262">持有窗格、保存画面、支持重连</text>
+  </g>
+  <g id="terminal-backend">
+    <rect class="node interface" x="448" y="301" width="304" height="53" rx="6"/>
+    <text class="code" x="464" y="323">TerminalBackend</text>
+    <text class="detail" x="464" y="343">统一 PTY 接口</text>
+  </g>
+  <g id="unix">
+    <rect class="node" x="328" y="394" width="252" height="52" rx="6"/>
+    <text x="344" y="416">macOS / Linux</text>
+    <text class="detail" x="344" y="436">creack/pty · Unix PTY</text>
+  </g>
+  <g id="windows">
+    <rect class="node" x="620" y="394" width="252" height="52" rx="6"/>
+    <text x="636" y="416">Windows</text>
+    <text class="detail" x="636" y="436">crosspty · ConPTY</text>
+  </g>
+</svg>
