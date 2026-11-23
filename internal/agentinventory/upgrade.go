@@ -28,6 +28,9 @@ func ProfessionalUpgradePlan(kind string) (UpgradePlan, error) {
 	if kind == "opencode" {
 		return UpgradePlan{Method: "native", Program: path, Args: []string{"upgrade"}}, nil
 	}
+	if kind == "antigravity" {
+		return UpgradePlan{Method: "native", Program: path, Args: []string{"update"}}, nil
+	}
 	installation, ok := agent.InstallPackage(kind)
 	if !ok {
 		return UpgradePlan{}, fmt.Errorf("AGENT_UPGRADE_UNSUPPORTED")

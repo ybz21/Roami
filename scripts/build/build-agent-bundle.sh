@@ -40,7 +40,7 @@ fi
 uv run --no-project --python "$PYTHON_EXE" --with pip==25.3 python -m pip wheel --require-hashes --no-cache-dir "${formats[@]}" --wheel-dir "$WORK/package/runtime/wheels" -r "$WORK/package/runtime/requirements.lock.txt"
 mkdir -p "$WORK/package/install"
 cp scripts/install/retire-session-entries.sh "$WORK/package/install/"
-cp scripts/deploy/install-gemini-cli.sh "$WORK/package/install/"
+cp internal/agentinventory/install-antigravity-cli.sh "$WORK/package/install/"
 cp agent-runtime/pyproject.toml "$WORK/package/runtime/pyproject.toml"
 uv run --no-project --python "$PYTHON_EXE" python scripts/build/agent-bundle-manifest.py "$WORK/package" "$PYTHON_EXE" "$VERSION" "$TARGET" "$(git rev-parse HEAD)"
 tar -czf "$ROOT/backend/dist/$ASSET.tar.gz" -C "$WORK/package" bin runtime install licenses manifest.json

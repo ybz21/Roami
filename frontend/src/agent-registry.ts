@@ -9,6 +9,7 @@ export type AgentDefinition = {
   promptFlag?: string
   setupCommand?: string
   interactive: boolean
+  managed?: boolean
   models: boolean
   canInstall: boolean
 }

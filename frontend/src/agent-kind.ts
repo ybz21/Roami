@@ -6,7 +6,7 @@ export type AgentKind = string
 export const isAgentKind = (value: unknown): value is AgentKind =>
   typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/.test(value) && !['native', 'roami', 'none', 'shell', 'terminal', 'auto', 'unknown', 'cli', 'roami-cli'].includes(value)
 
-const names: Record<string, string> = { native: 'Roami', claude: 'Claude', codex: 'Codex', opencode: 'OpenCode', pi: 'Pi' }
+const names: Record<string, string> = { native: 'Roami', claude: 'Claude', codex: 'Codex', gemini: 'CLI', opencode: 'OpenCode', pi: 'Pi' }
 export const agentName = (kind: string): string => names[kind] || agentDefinition(kind)?.displayName || kind
 export const hasRenderedChat = (kind: string): boolean => ['claude', 'codex', 'opencode', 'pi'].includes(kind)
 

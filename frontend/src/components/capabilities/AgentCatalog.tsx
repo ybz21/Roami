@@ -63,7 +63,7 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
   const current = rows.find(row => row.kind === initialKind)?.kind || null
   const modelsOpen = initialSection === 'models' && rows.some(row => row.kind === current && row.models !== false)
   const selected = rows.find(row => row.kind === current)
-  const loginHint = current === 'gemini' ? 'capabilities.agents.geminiLoginHint' : selected?.interactive === false ? 'capabilities.agents.headlessHint' : 'capabilities.agents.loginHint'
+  const loginHint = current === 'antigravity' ? 'capabilities.agents.antigravityLoginHint' : selected?.interactive === false ? 'capabilities.agents.headlessHint' : 'capabilities.agents.loginHint'
   const close = () => onSelect('')
   const check = async (kind: AgentKind) => {
     if (busy) return
@@ -129,12 +129,13 @@ function ProfessionalAgentCatalog({ initialKind, initialSection, onSelect, onLau
       {onLaunch && selected?.interactive !== false && <Button type="primary" disabled={!selected?.installed || !!busy || !preferencesLoaded()} loading={launching} onClick={() => { void launch() }}>{t('capabilities.agents.openTerminal')}</Button>}
       <Button loading={busy === 'check:' + current} disabled={!!busy} onClick={() => { void check(current) }}>{t('capabilities.agents.check')}</Button>
       {installAction(current, selected)}
-      <Button loading={busy === 'verify:' + current} disabled={!selected?.installed || !!busy} onClick={() => { void verify(current) }}>{t('onboarding.verify')}</Button>
+      <Button loading={busy === 'verify:' + current} disabled={!selected?.installed || selected?.managed === false || !!busy} onClick={() => { void verify(current) }}>{t('onboarding.verify')}</Button>
       {selected?.verified && <span role="status">{t('onboarding.verified')}</span>}
       {selected?.models !== false && <Button disabled={!!busy} onClick={() => onSelect(current + '/models')}>{t('capabilities.models.manage')}</Button>}
     </div>
     {selected?.installed && selected.canUpgrade === false && <p>{t('capabilities.agents.manualUpgrade')}</p>}
-    <p>{t(loginHint, { command: selected?.setupCommand || selected?.command || current })}</p><p>{t('onboarding.verifyHint')}</p>
+    <p>{t(loginHint, { command: selected?.setupCommand || selected?.command || current })}</p>
+    <p>{t(selected?.managed === false ? 'capabilities.agents.antigravityManagedHint' : 'onboarding.verifyHint')}</p>
     {selected && <AgentCommandForm key={current} kind={current} defaultCommand={selected.command} />}
     {selected?.installed && <AgentBalance agent={selected} detail />}
   </div>

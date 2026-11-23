@@ -2,14 +2,20 @@ package agentinventory
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agent"
 )
+
+//go:embed install-antigravity-cli.sh
+var antigravityInstaller string
 
 type ProfessionalAgent struct {
 	agent.Descriptor
@@ -122,14 +128,29 @@ func ProfessionalInstallArgs(kind string) ([]string, error) {
 	return append(args, pkg.Spec()), nil
 }
 
-func InstallProfessionalAgent(ctx context.Context, args []string) error {
+func InstallProfessionalAgent(ctx context.Context, kind string) error {
 	select {
 	case professionalMaintenance <- struct{}{}:
 		defer func() { <-professionalMaintenance }()
 	default:
 		return fmt.Errorf("AGENT_MAINTENANCE_BUSY")
 	}
-	if err := exec.CommandContext(ctx, "npm", args...).Run(); err != nil {
+	var command *exec.Cmd
+	if kind == "antigravity" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		command = exec.CommandContext(ctx, "bash", "-c", antigravityInstaller,
+			"install-antigravity-cli.sh", filepath.Join(home, ".local", "bin"))
+	} else {
+		args, err := ProfessionalInstallArgs(kind)
+		if err != nil {
+			return err
+		}
+		command = exec.CommandContext(ctx, "npm", args...)
+	}
+	if err := command.Run(); err != nil {
 		return err
 	}
 	professionalVersions.Lock()

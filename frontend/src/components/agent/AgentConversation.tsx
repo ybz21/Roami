@@ -75,7 +75,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
   const setWorkspaceTask = (value: string) => { editWorkspaceTask(value); try { if (value) localStorage.setItem(workspaceSelectionKey, value); else localStorage.removeItem(workspaceSelectionKey) } catch { /* Keep selection in memory. */ } }
   const openWorkspaceTask = (id: string) => { setWorkspaceTask(id); workspace.change({ open: true, tab: 'tasks' }) }
   const [sending, setSending] = useState(false)
-  const agents = useRegisteredAgents()
+  const agents = useRegisteredAgents().filter(agent => agent.managed !== false)
   const [target, setTarget] = useState('direct'), [executor, setExecutor] = useState<AgentKind>('codex')
   const [taskModel, setTaskModel] = useState<ModelChoice>(defaultModelChoice)
   const [taskModelOpen, setTaskModelOpen] = useState(false)

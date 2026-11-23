@@ -32,8 +32,9 @@ func DiscoverExecutors() ExecutorCatalog {
 	result := ExecutorCatalog{Version: 1, ObservedMS: time.Now().UnixMilli(), Candidates: []ExecutorCandidate{}}
 	for _, kind := range agent.Kinds() {
 		_, err := agent.ResolveBinary(kind)
+		descriptor := agent.Describe(agent.Get(kind))
 		result.Candidates = append(result.Candidates, ExecutorCandidate{
-			Interactive: agent.Describe(agent.Get(kind)).Interactive, DisplayName: agent.Get(kind).DisplayName(), Kind: kind, Installed: err == nil, Tracked: true,
+			Interactive: descriptor.Interactive, DisplayName: descriptor.DisplayName, Kind: kind, Installed: err == nil, Tracked: descriptor.Managed,
 			Authentication: "unknown", Usage: "unknown",
 		})
 	}
