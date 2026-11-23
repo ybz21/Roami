@@ -7,6 +7,7 @@
 - [Gemini CLI 官方仓库](https://github.com/google-gemini/gemini-cli)
 - [Gemini CLI 登录](https://geminicli.com/docs/get-started/authentication/)
 - [Gemini CLI 信任目录](https://geminicli.com/docs/cli/trusted-folders/)
+- [Gemini CLI 官方品牌素材](https://geminicli.com/brand-kit/)提供能力目录、执行器选择和会话标记共用的彩色 SVG 图标。
 
 ## 执行契约
 
