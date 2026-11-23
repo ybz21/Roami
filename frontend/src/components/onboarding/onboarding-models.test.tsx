@@ -33,6 +33,7 @@ const save = async () => {
 it('adds a connection and its models before any agent configuration or call verification', async () => {
   const page = show()
   fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'First connection' } })
+  fireEvent.change(screen.getByLabelText('hub.sourceKey.label'), { target: { value: 'test-source' } })
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://models.example/v1' } })
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
@@ -47,6 +48,7 @@ it('adds a connection and its models before any agent configuration or call veri
 it('restores connection and model drafts together without storing the credential in browser storage', async () => {
   const first = show()
   fireEvent.change(await screen.findByLabelText('hub.name'), { target: { value: 'Draft connection' } })
+  fireEvent.change(screen.getByLabelText('hub.sourceKey.label'), { target: { value: 'test-source' } })
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'https://models.example/v1' } })
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'draft-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))

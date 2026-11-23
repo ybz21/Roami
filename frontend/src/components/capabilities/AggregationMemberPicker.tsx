@@ -18,7 +18,7 @@ export default function AggregationMemberPicker({ model, original, catalog, acti
   const [sourceId, setSource] = useState(model.candidates[0]?.sourceId || sources[0]?.id || '')
   const [query, setQuery] = useState(''), [page, setPage] = useState(1)
   const [freeOnly, setFreeOnly] = useState(false)
-  const freeDirectory = useAgentData<GatewayModelCatalog>(freeOnly ? '/agent/model-gateway/models?free=true&revision=' + encodeURIComponent(catalog.revision) : null, 30000, 0, 'GET', active)
+  const freeDirectory = useAgentData<GatewayModelCatalog>(freeOnly ? '/agent/model-gateway/models?free=true&includeHidden=true&revision=' + encodeURIComponent(catalog.revision) : null, 30000, 0, 'GET', active)
   const free = useMemo(() => new Set((freeDirectory.value?.models || [])
     .filter(row => row.configured && row.enabled)
     .flatMap(row => row.kind === 'aggregate' ? ['@group/' + row.id] : (row.candidates || []).slice(0, 1).map(candidateIdentity))), [freeDirectory.value])

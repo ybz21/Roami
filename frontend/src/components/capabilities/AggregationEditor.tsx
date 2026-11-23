@@ -4,7 +4,7 @@ import { useI18n } from '../../i18n'
 import { ChevronRight } from '../../icons'
 import { usePageActive } from '../../page-activity'
 import { useViewState } from '../../view-state'
-import type { CatalogModel, ModelCatalog } from './model-hub-api'
+import { gatewayAliasError, gatewayModelNameTaken, type CatalogModel, type ModelCatalog } from './model-hub-api'
 import { routingStrategies, type RoutingStrategy } from './model-routing-api'
 import { MAX_AGGREGATE_MEMBERS } from './routing-preview'
 import AggregationMemberPicker from './AggregationMemberPicker'
@@ -34,7 +34,8 @@ export default function AggregationEditor({ model, original, catalog, active, bu
   const more = useRef<HTMLDetailsElement>(null)
   const fieldId = useId(), [attempted, setAttempted] = useState(false), [touched, setTouched] = useState<Record<string, boolean>>({})
   const nameError = !model.name.trim() ? t('orchestration.nameRequired') : ''
-  const idError = model.id === 'roami-default' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) ? t('orchestration.idInvalid') : catalog.models.some(row => row.id !== original && (row.id === model.id || row.aliases?.includes(model.id))) ? t('orchestration.idTaken') : ''
+  const idError = model.id === 'roami-default' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) ? t('orchestration.idInvalid') : gatewayModelNameTaken(model.id, original, catalog.models) ? t('orchestration.idTaken') : ''
+  const aliasError = gatewayAliasError(model, original, catalog.models)
   const saved = catalog.models.find(row => row.id === original)
   const { facts, status } = useModelMemberFacts(model, saved, catalog, active && tab === 'routing')
   useEffect(() => { if (scroll.current) scroll.current.scrollTop = 0 }, [tab])
@@ -42,15 +43,24 @@ export default function AggregationEditor({ model, original, catalog, active, bu
   const tabs: AggregationSection[] = saved ? ['members', 'routing', 'monitor', 'requests'] : ['members', 'routing']
   return <div className="tt-aggregate-editor">
     <TabBar className="tt-aggregate-tabs" activeKey={tab} onChange={key => setTab(key as AggregationSection)} items={tabs.map(key => ({ key, label: t('pool.section.' + key) }))} />
-    <form className="tt-aggregate-editor" hidden={!editing} onSubmit={event => { event.preventDefault(); if (valid) onSave(); else { setAttempted(true); if (idError && more.current) more.current.open = true; const next = nameError || idError || !model.candidates.length ? 'members' : 'routing'; if (next !== tab) setTab(next) } }}>
+    <form className="tt-aggregate-editor" hidden={!editing} onSubmit={event => { event.preventDefault(); if (valid) onSave(); else { setAttempted(true); if (idError && more.current) more.current.open = true; const next = nameError || idError || aliasError || !model.candidates.length ? 'members' : 'routing'; if (next !== tab) setTab(next) } }}>
     <div className={"tt-routing-editor tt-aggregate-editor-content" + (tab === 'members' ? ' is-members' : '')} ref={scroll}>
       {error && <Alert role="alert" type="error" message={t(error)} action={<Button onClick={retry}>{t('agent.retry')}</Button>} />}
       <section hidden={tab !== 'members'} aria-label={t('pool.section.members')}>
         <div className="tt-aggregate-basics">
           <label className="agent-settings-field tt-aggregate-identity">{t('pool.name')}<Input id={fieldId + '-name'} aria-describedby={fieldId + '-name-error'} aria-invalid={!!nameError && (attempted || touched.name)} aria-label={t('pool.name')} onBlur={() => setTouched(value => ({ ...value, name: true }))} value={model.name} disabled={busy} maxLength={100} onChange={event => onChange({ name: event.target.value })} />{nameError && (attempted || touched.name) && <small className="tt-model-field-error" id={fieldId + '-name-error'} role="alert">{nameError}</small>}</label>
+          <label className="agent-settings-field tt-aggregate-identity">
+            {t('hub.gatewayAlias')}
+            <Input aria-label={t('hub.gatewayAlias')} status={aliasError ? 'error' : undefined} aria-describedby={aliasError ? fieldId + '-alias-error' : undefined} value={model.gatewayAlias || ''} disabled={busy} maxLength={160} autoCapitalize="none" spellCheck={false} onChange={event => onChange({ gatewayAlias: event.target.value })} />
+            {aliasError && <small className="tt-model-field-error" id={fieldId + '-alias-error'} role="alert">{t(aliasError)}</small>}
+          </label>
         </div>
         {attempted && !model.candidates.length && <p className="tt-model-field-error" role="alert">{t('orchestration.membersRequired')}</p>}
         <AggregationMemberPicker model={model} original={original} catalog={catalog} active={active && tab === 'members'} disabled={busy} onChange={onChange} onSource={onSource} />
+        <div className="tt-aggregate-gateway-visibility">
+          <Checkbox disabled={busy} checked={model.hideMembers} onChange={event => onChange({ hideMembers: event.target.checked })}>{t('pool.hideMembers')}</Checkbox>
+          {model.hideMembers && <p className="agent-settings-hint">{t('pool.hideMembersHint')}</p>}
+        </div>
         <details className="tt-aggregate-more" ref={more}>
           <summary><ChevronRight />{t('orchestration.moreSettings')}{model.enabled === false && <small>{t('pool.disabled')}</small>}</summary>
           <div className="tt-aggregate-settings"><label className="agent-settings-field">{t('pool.modelId')}<Input id={fieldId + '-id'} aria-describedby={fieldId + '-id-error'} aria-invalid={!!idError && (attempted || touched.id)} aria-label={t('pool.modelId')} onBlur={() => setTouched(value => ({ ...value, id: true }))} value={model.id} disabled={busy} maxLength={160} onChange={event => onChange({ id: event.target.value })} />{idError && (attempted || touched.id) && <small className="tt-model-field-error" id={fieldId + '-id-error'} role="alert">{idError}</small>}</label>
@@ -72,7 +82,7 @@ export default function AggregationEditor({ model, original, catalog, active, bu
         </details>
       </section>
     </div>
-    <footer className="tt-model-source-footer tt-aggregate-footer"><span role="status">{t('pool.memberSummary', { count: new Intl.NumberFormat(locale).format(model.candidates.length), max: MAX_AGGREGATE_MEMBERS })}{attempted && !valid && !nameError && !idError && !!model.candidates.length && <small role="alert">{t('pool.invalid')}</small>}</span><div><Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={busy} loading={busy}>{t('agent.models.save')}</Button></div></footer>
+    <footer className="tt-model-source-footer tt-aggregate-footer"><span role="status">{t('pool.memberSummary', { count: new Intl.NumberFormat(locale).format(model.candidates.length), max: MAX_AGGREGATE_MEMBERS })}{attempted && !valid && !nameError && !idError && !aliasError && !!model.candidates.length && <small role="alert">{t('pool.invalid')}</small>}</span><div><Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={busy} loading={busy}>{t('agent.models.save')}</Button></div></footer>
     </form>
     {saved && <>
       <AggregationMonitor poolId={saved.id} visible={tab === 'monitor'} active={active} hours={trace.hours} onHours={setHours}

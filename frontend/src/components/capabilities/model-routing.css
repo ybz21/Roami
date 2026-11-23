@@ -105,6 +105,8 @@ html:is([data-size="compact"],[data-size="medium"]) .tt-aggregate-tabs .ui-tabs-
 
 .tt-aggregate-basics{display:flex;align-items:flex-end;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5)}
 .tt-aggregate-basics>.tt-aggregate-identity{flex:1 1 calc(var(--sp-5) * 12);max-width:calc(var(--sp-5) * 20)}
+.tt-aggregate-gateway-visibility{flex-shrink:0;display:grid;gap:var(--sp-1)}
+.tt-aggregate-gateway-visibility > p{margin:0}
 .tt-aggregate-more{margin-top:var(--sp-5);border-top:1px solid var(--border-subtle);padding-top:var(--sp-2)}
 .tt-aggregate-settings{max-width:var(--content-form);padding-block:var(--sp-3)}
 .tt-aggregate-more>summary>small,.tt-strategy-test>summary>small{color:var(--text-dim);font-size:var(--fs-meta)}

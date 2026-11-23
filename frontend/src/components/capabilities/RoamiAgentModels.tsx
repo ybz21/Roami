@@ -19,7 +19,7 @@ export default function RoamiAgentModels({ onBack, onMemory, inline = false, onS
   useEffect(() => { const abort = new AbortController(); void api('GET', '/agent/model-gateway/models', undefined, { signal: abort.signal }).then(({ data }) => { if (!abort.signal.aborted) setDirectory(data.models || []) }).catch(() => {}); return () => abort.abort() }, [catalog.value?.revision])
   const live = useRef(true)
   useEffect(() => { live.current = true; return () => { live.current = false } }, [])
-  const options = (catalog.value?.models || []).map(model => ({ value: model.id, label: model.name, disabled: model.enabled === false }))
+  const options = (catalog.value?.models || []).map(model => ({ value: model.id, label: model.name, disabled: model.enabled === false || !!model.gatewayHidden }))
   const chosen = (role: string, draft: string) => draft || (options.some(model => model.value === catalog.value?.roamiModels?.[role]) ? catalog.value?.roamiModels?.[role] : options.find(model => !model.disabled)?.value)
   const usable = (value?: string) => !!value && options.some(option => option.value === value && !option.disabled)
   const draftNotice = useSettingsDraft('onboarding-role-binding', { main: chosen('main', main) || '', worker: chosen('worker', worker) || '' }, { main: catalog.value?.roamiModels?.main || '', worker: catalog.value?.roamiModels?.worker || '' }, draft => { setMain(draft.main); setWorker(draft.worker) }, inline && !!catalog.value)

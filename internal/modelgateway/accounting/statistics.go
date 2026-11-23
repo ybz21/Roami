@@ -1,0 +1,239 @@
+package accounting
+
+import (
+	"database/sql"
+	"fmt"
+	"slices"
+	"time"
+
+	agentregistry "github.com/ybz21/Roami/internal/agent"
+)
+
+// Historical evaluations already carry an RSI session ID, even when their role is main/worker.
+const usageSourceSQL = `CASE WHEN substr(role,1,4)='rsi_' OR substr(session_id,1,4)='rsi-' THEN 'rsi' ELSE 'other' END`
+
+type UsageGroup struct {
+	SourceID     string `json:"sourceId"`
+	AgentKind    string `json:"agentKind"`
+	Source       string `json:"source"`
+	Day          string `json:"day"`
+	Role         string `json:"role"`
+	Model        string `json:"model"`
+	Currency     string `json:"currency"`
+	Requests     int64  `json:"requests"`
+	Input        int64  `json:"inputTokens"`
+	Output       int64  `json:"outputTokens"`
+	Cached       int64  `json:"cacheReadTokens"`
+	Pending      int64  `json:"pending"`
+	Unknown      int64  `json:"unknown"`
+	UsageUnknown int64  `json:"usageUnknown"`
+	Failed       int64  `json:"failed"`
+	Cost         string `json:"cost"`
+}
+
+type CallRecord struct {
+	Price           *ModelPricing `json:"price,omitempty"`
+	Finished        *int64        `json:"finishedMs,omitempty"`
+	UpstreamStatus  int           `json:"upstreamHttpStatus"`
+	UpstreamRequest string        `json:"upstreamRequestId,omitempty"`
+	PriceStatus     string        `json:"priceStatus"`
+	AgentKind       string        `json:"agentKind"`
+	KeyID           string        `json:"keyId"`
+	SourceID        string        `json:"sourceId"`
+	RouteID         string        `json:"routeId"`
+	Source          string        `json:"source"`
+	ID              string        `json:"id"`
+	Day             string        `json:"day"`
+	Role            string        `json:"role"`
+	Model           string        `json:"model"`
+	Currency        string        `json:"currency"`
+	State           string        `json:"state"`
+	Started         int64         `json:"startedMs"`
+	Input           *int64        `json:"inputTokens"`
+	Output          *int64        `json:"outputTokens"`
+	Cached          *int64        `json:"cacheReadTokens"`
+	Cost            *string       `json:"cost"`
+	Status          int           `json:"httpStatus"`
+	Error           string        `json:"errorCode"`
+	Reconciliation  string        `json:"reconciliation"`
+	Session         string        `json:"sessionId"`
+	Request         string        `json:"requestId"`
+}
+
+type Statistics struct {
+	DetailRetentionHours int           `json:"detailRetentionHours"`
+	DailyAggregated      bool          `json:"dailyAggregated"`
+	RecentState          string        `json:"recentState,omitempty"`
+	AgentKind            string        `json:"agentKind"`
+	Source               string        `json:"source"`
+	Day                  string        `json:"day"`
+	Timezone             string        `json:"timezone"`
+	From                 string        `json:"from"`
+	To                   string        `json:"to"`
+	Days                 int           `json:"days"`
+	Hourly               []HourlyUsage `json:"hourly"`
+	Today                []UsageGroup  `json:"today"`
+	Groups               []UsageGroup  `json:"groups"`
+	Recent               []CallRecord  `json:"recent"`
+}
+
+type HourlyUsage struct {
+	UsageGroup
+	Hour int `json:"hour"`
+}
+
+func (l *Ledger) Statistics(days int) (Statistics, error) {
+	return l.StatisticsFor(days, "")
+}
+
+func (l *Ledger) StatisticsFor(days int, selected string) (Statistics, error) {
+	return l.StatisticsForSource(days, selected, "")
+}
+
+func (l *Ledger) StatisticsForSource(days int, selected, source string, agents ...string) (Statistics, error) {
+	agent := ""
+	if len(agents) > 0 {
+		agent = agents[0]
+	}
+	return l.StatisticsForCalls(days, selected, source, agent, "")
+}
+
+func (l *Ledger) StatisticsForCalls(days int, selected, source, agent, recentState string) (Statistics, error) {
+	result := Statistics{Today: []UsageGroup{}, Groups: []UsageGroup{}, Recent: []CallRecord{}, Hourly: []HourlyUsage{}, Days: days, Source: source, AgentKind: agent, RecentState: recentState, DetailRetentionHours: int(callRetention / time.Hour)}
+	if recentState != "" && recentState != "unknown" {
+		return result, fmt.Errorf("INVALID_MODEL_USAGE_STATE")
+	}
+	if agent != "" && agent != "external" && agent != "roami" && !slices.Contains(agentregistry.Kinds(), agent) {
+		return result, fmt.Errorf("INVALID_AGENT_KIND")
+	}
+	if source != "" && source != "rsi" && source != "other" {
+		return result, fmt.Errorf("INVALID_MODEL_USAGE_SOURCE")
+	}
+	if days < 0 || days > 90 {
+		return result, fmt.Errorf("INVALID_MODEL_USAGE_DAY")
+	}
+	err := l.db.Tx(func(tx *sql.Tx) error {
+		c, err := configuration(tx)
+		if err != nil {
+			return err
+		}
+		zone, err := time.LoadLocation(c.Timezone)
+		if err != nil {
+			return err
+		}
+		today := l.now().In(zone)
+		result.Day, result.Timezone, result.From = today.Format("2006-01-02"), c.Timezone, today.AddDate(0, 0, 1-days).Format("2006-01-02")
+		result.To = result.Day
+		if selected != "" {
+			parsed, parseErr := time.Parse("2006-01-02", selected)
+			if parseErr != nil || parsed.Format("2006-01-02") != selected || selected > result.Day {
+				return fmt.Errorf("INVALID_MODEL_USAGE_DAY")
+			}
+			result.From, result.To, result.Days = selected, selected, 1
+		} else if days == 0 {
+			if err := tx.QueryRow(`SELECT COALESCE(MIN(day),?) FROM (SELECT day FROM gateway_calls UNION ALL SELECT day FROM gateway_daily_usage)`, result.Day).Scan(&result.From); err != nil {
+				return err
+			}
+		}
+		rows, err := tx.Query(`SELECT day,role,model,currency,agent_kind,source,sum(requests),sum(input_tokens),sum(output_tokens),sum(cache_read_tokens),sum(pending),sum(unknown),sum(usage_unknown),sum(failed),sum(cost_nano) FROM `+usageTotalsSQL+` WHERE ((day>=? AND day<=?) OR day=?) AND (?='' OR agent_kind=?) GROUP BY day,role,model,currency,agent_kind,source ORDER BY day DESC,role,model,currency,source`, result.From, result.To, result.Day, agent, agent)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var group UsageGroup
+			var nano int64
+			if err = rows.Scan(&group.Day, &group.Role, &group.Model, &group.Currency, &group.AgentKind, &group.Source, &group.Requests, &group.Input, &group.Output, &group.Cached, &group.Pending, &group.Unknown, &group.UsageUnknown, &group.Failed, &nano); err != nil {
+				rows.Close()
+				return err
+			}
+			group.Cost = money(nano)
+			if group.Day >= result.From && group.Day <= result.To && (source == "" || group.Source == source) {
+				result.Groups = append(result.Groups, group)
+			}
+			if group.Day == result.Day {
+				result.Today = append(result.Today, group)
+			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+		if result.Days == 1 {
+			if err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM gateway_daily_usage WHERE day=? AND (?='' OR source=?) AND (?='' OR agent_kind=?))`, result.From, source, source, agent, agent).Scan(&result.DailyAggregated); err != nil {
+				return err
+			}
+		}
+		if result.Days == 1 && !result.DailyAggregated {
+			rows, err = tx.Query(`SELECT started_ms,role,model,currency,agent_kind,`+usageSourceSQL+`,state,input_tokens,output_tokens,cache_read_tokens,cost_nano FROM gateway_calls WHERE day=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?)`, result.From, source, source, agent, agent)
+			if err != nil {
+				return err
+			}
+			type key struct {
+				hour                                 int
+				role, model, currency, source, agent string
+			}
+			groups := map[key]*HourlyUsage{}
+			costs := map[key]int64{}
+			for rows.Next() {
+				var started int64
+				var role, model, currency, rowSource, rowAgent, state string
+				var input, output, cached, nano sql.NullInt64
+				if err = rows.Scan(&started, &role, &model, &currency, &rowAgent, &rowSource, &state, &input, &output, &cached, &nano); err != nil {
+					rows.Close()
+					return err
+				}
+				k := key{time.UnixMilli(started).In(zone).Hour(), role, model, currency, rowSource, rowAgent}
+				if groups[k] == nil {
+					groups[k] = &HourlyUsage{UsageGroup: UsageGroup{Day: result.From, Role: role, Model: model, Currency: currency, Source: rowSource, AgentKind: rowAgent}, Hour: k.hour}
+				}
+				g := groups[k]
+				g.Requests++
+				g.Input += input.Int64
+				g.Output += output.Int64
+				g.Cached += cached.Int64
+				costs[k] += nano.Int64
+				if state == "pending" {
+					g.Pending++
+				}
+				if state == "unknown" {
+					g.Unknown++
+				}
+				if state == "failed" {
+					g.Failed++
+				}
+				if state != "pending" && !input.Valid {
+					g.UsageUnknown++
+				}
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return err
+			}
+			for k, g := range groups {
+				g.Cost = money(costs[k])
+				result.Hourly = append(result.Hourly, *g)
+			}
+		}
+		rows, err = tx.Query(`SELECT id,day,role,model,currency,state,started_ms,input_tokens,output_tokens,cache_read_tokens,cost_nano,http_status,error_code,reconciliation,session_id,request_id,agent_kind,key_id,source_id,route_id,price_status,upstream_http_status,upstream_request_id,`+usageSourceSQL+` FROM gateway_calls WHERE day>=? AND day<=? AND (?='' OR `+usageSourceSQL+`=?) AND (?='' OR agent_kind=?) AND (?='' OR state=?) ORDER BY started_ms DESC,id DESC LIMIT 20`, result.From, result.To, source, source, agent, agent, recentState, recentState)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var record CallRecord
+			var nano *int64
+			if err = rows.Scan(&record.ID, &record.Day, &record.Role, &record.Model, &record.Currency, &record.State, &record.Started, &record.Input, &record.Output, &record.Cached, &nano, &record.Status, &record.Error, &record.Reconciliation, &record.Session, &record.Request, &record.AgentKind, &record.KeyID, &record.SourceID, &record.RouteID, &record.PriceStatus, &record.UpstreamStatus, &record.UpstreamRequest, &record.Source); err != nil {
+				return err
+			}
+			if nano != nil {
+				text := money(*nano)
+				record.Cost = &text
+			}
+			result.Recent = append(result.Recent, record)
+		}
+		return rows.Err()
+	})
+	return result, err
+}

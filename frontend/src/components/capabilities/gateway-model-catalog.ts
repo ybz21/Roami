@@ -24,8 +24,8 @@ export const prioritizeGatewayModels = <T extends { kind?: string }>(rows: T[]) 
 export const freeGatewayModel = (row: ModelDirectoryEntry) => row.freeOnly || row.pricing === 'confirmed-free'
 export function configuredGatewayModels(catalog?: ModelCatalog, directory?: GatewayModelCatalog): ModelDirectoryEntry[] {
   const metadata = directory?.revision === catalog?.revision ? directory?.models || [] : []
-  return prioritizeGatewayModels((catalog?.models || []).map(model => {
+  return prioritizeGatewayModels((catalog?.models || []).filter(model => !model.gatewayHidden).map(model => {
     const detail = metadata.find(row => row.configured && row.id === model.id)
-    return { ...detail, id: model.id, name: model.name, kind: model.aggregate ? 'aggregate' : 'single', protocol: model.protocol, configured: true, enabled: model.enabled !== false, freeOnly: model.freeOnly === true, pricing: model.freeOnly ? 'free-only' : detail?.pricing || 'unknown', capabilities: detail?.capabilities || {}, candidates: model.candidates || [] }
+    return { ...detail, id: model.id, name: model.name, gatewayAlias: model.gatewayAlias, kind: model.aggregate ? 'aggregate' : 'single', protocol: model.protocol, configured: true, enabled: model.enabled !== false, freeOnly: model.freeOnly === true, pricing: model.freeOnly ? 'free-only' : detail?.pricing || 'unknown', capabilities: detail?.capabilities || {}, candidates: model.candidates || [] }
   }))
 }

@@ -37,6 +37,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/model-gateway/monitor/check"}, {"GET", "/agent/model-gateway/monitor"}, {"GET", "/agent/model-gateway/monitor/requests/:request"}, {"GET", "/agent/model-gateway/settings/sources/:source"}, {"PUT", "/agent/model-gateway/settings/sources/:source"},
 		{"GET", "/agent/model-gateway/settings"}, {"PUT", "/agent/model-gateway/settings"},
 		{"GET", "/agent/model-gateway/models"}, {"GET", "/agent/model-gateway/catalog/routing"}, {"GET", "/agent/model-gateway/catalog"}, {"PUT", "/agent/model-gateway/catalog"}, {"POST", "/agent/model-gateway/catalog/apply"},
+		{"GET", "/agent/model-gateway/network"}, {"PUT", "/agent/model-gateway/network"},
 		{"POST", "/agent/model-gateway/catalog/discover"}, {"POST", "/agent/model-gateway/catalog/roles"}, {"POST", "/agent/model-gateway/catalog/source-models"},
 		{"GET", "/agent/model-gateway/catalog/local-sources"}, {"POST", "/agent/model-gateway/catalog/local-sources"},
 		{"GET", "/agent/model-gateway/usage"}, {"PUT", "/agent/model-gateway/calls/:call"},

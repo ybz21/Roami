@@ -37,6 +37,31 @@ beforeEach(() => { installRadixTestEvents();
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const mount = (sub: string, navigate = vi.fn()) => render(<App><ModelHub sub={sub} onNav={navigate} /></App>, { wrapper })
 
+it('enables a LAN address, switches the sample to Anthropic and opens model configuration', async () => {
+  const fallback = vi.mocked(api).getMockImplementation()!
+  const networkPath = '/agent/model-gateway/network'
+  let enabled = false
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path !== networkPath) return fallback(method, path, body, options)
+    if (method === 'PUT') enabled = body.enabled
+    return { data: { enabled, urls: enabled ? ['http://192.168.1.4:19000'] : [] } }
+  })
+  const navigate = vi.fn()
+  mount('gateway', navigate)
+  const lan = await screen.findByRole('switch', { name: 'gatewayWorkspace.allowLAN' })
+  await waitFor(() => expect(lan.hasAttribute('disabled')).toBe(false))
+  expect(screen.getByText('http://127.0.0.1:19000/v1')).toBeTruthy()
+  fireEvent.click(lan)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', networkPath, { enabled: true }))
+  await screen.findByText('http://192.168.1.4:19000/v1')
+  fireEvent.keyDown(screen.getByRole('combobox', { name: 'gatewayWorkspace.protocol' }), { key: 'ArrowDown' })
+  fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+  expect(screen.getByText('http://192.168.1.4:19000')).toBeTruthy()
+  expect(screen.getByRole('region', { name: 'gatewayWorkspace.sample' }).querySelector('pre')?.textContent).toContain('/v1/messages')
+  fireEvent.click(screen.getByRole('button', { name: 'gatewayWorkspace.configureModel' }))
+  expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog/model/coding')
+})
+
 it('opens records and returns from a blocked gateway request through audit', async () => {
   const requestId = '1d5c6684-0fdd-4a2f-b975-6dcc832f24f2'
   const request = { requestId, at: Date.now(), routeId: 'coding', model: 'Coding', caller: 'claude', outcome: 'blocked', status: 503, durationMs: 10 }
@@ -125,8 +150,38 @@ it('shows connections and their models together and accepts old source-page link
   expect(screen.queryByText('hub.consumers')).toBeNull()
 })
 
+it('requires a unique source key made of letters, numbers and hyphens', async () => {
+  mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://models.example/v1' } })
+  const sourceKey = screen.getByLabelText<HTMLInputElement>('hub.sourceKey.label')
+  const hint = screen.getByText('hub.sourceKey.hint')
+  const save = screen.getByRole<HTMLButtonElement>('button', { name: 'agent.models.save' })
+  expect(sourceKey.required).toBe(true)
+  expect(sourceKey.value).toBe('')
+  expect(save.disabled).toBe(true)
+  expect(screen.getByText('hub.sourceKey.required')).toBeTruthy()
+  expect(sourceKey.getAttribute('aria-describedby')?.split(' ')).toContain(hint.id)
+  for (const value of ['blade.ai', 'blade_ai', '刀', ' bladeai', 'blade/ai']) {
+    fireEvent.change(sourceKey, { target: { value } })
+    expect(screen.getByText('hub.sourceKey.invalid')).toBeTruthy()
+    expect(save.disabled).toBe(true)
+  }
+  fireEvent.change(sourceKey, { target: { value: 'upstream' } })
+  expect(screen.getByText('hub.sourceKey.inUse')).toBeTruthy()
+  expect(save.disabled).toBe(true)
+  fireEvent.change(sourceKey, { target: { value: 'Blade-01' } })
+  expect(sourceKey.getAttribute('aria-describedby')).toBe(hint.id)
+  expect(screen.getByText('hub.sourceKey.hint')).toBe(hint)
+  expect(save.disabled).toBe(false)
+  fireEvent.click(save)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
+    sources: expect.arrayContaining([expect.objectContaining({ sourceKey: 'Blade-01' })]),
+  })))
+})
+
 it('saves a connection before any models are enabled', async () => {
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://separate-source.example.test/v1' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
@@ -138,6 +193,7 @@ it('saves a connection before any models are enabled', async () => {
 
 it('saves a LAN HTTP source and manual models without fetching the directory', async () => {
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(screen.getByLabelText('hub.name'))
   expect(screen.getByRole('combobox', { name: 'capabilities.models.protocol' }).closest('details')).toBeNull()
@@ -158,6 +214,7 @@ it('saves a LAN HTTP source and manual models without fetching the directory', a
 
 it('allows discovery and manual save for public HTTP sources and limits certificate settings to HTTPS', async () => {
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   const endpoint = await screen.findByLabelText('agent.models.baseUrl')
   const fetchModels = screen.getByRole<HTMLButtonElement>('button', { name: 'hub.directory.fetch' })
   fireEvent.change(endpoint, { target: { value: 'ftp://203.0.113.22/v1' } })
@@ -186,6 +243,7 @@ it('sends the selected HTTPS certificate policy on discovery and save, and reset
     throw Object.assign(new Error('certificate'), { apiError: { code: 'MODEL_LIST_TLS_CERTIFICATE' } })
   })
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   const endpoint = await screen.findByLabelText('agent.models.baseUrl')
   fireEvent.change(endpoint, { target: { value: 'https://first.example/v1' } })
   fireEvent.click(screen.getByText('hub.connectionOptions'))
@@ -213,6 +271,7 @@ it('opens a dedicated OpenRouter connector and only adds models selected from it
     ? { data: { models: ['vendor/chat:free', 'openrouter/free'], details: [{ id: 'vendor/chat:free', name: 'Sample free model' }] } }
     : original(method, path, body, options))
   mount('catalog/source/new/openrouter')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'openrouter' } })
   const endpoint = await screen.findByLabelText('agent.models.baseUrl') as HTMLInputElement
   expect(endpoint.value).toBe('https://openrouter.ai/api/v1')
   expect(endpoint.readOnly).toBe(true)
@@ -237,6 +296,7 @@ it('fetches an unsaved source, selects all matches and keeps selection across se
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? { data: { models: ['alpha', 'beta', 'gamma'] } } : original(method, path, body, options))
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'draft-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
@@ -296,6 +356,7 @@ it('preserves inputs after authentication errors and allows manual recovery', as
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => { if (path.endsWith('/discover')) throw { apiError: { code: 'MODEL_LIST_UNAUTHORIZED' } }; return original(method, path, body, options) })
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
   fireEvent.change(screen.getByLabelText('modelIdentity.providerKey'), { target: { value: 'draft-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
@@ -311,6 +372,7 @@ it('discards discovery responses after editing the endpoint', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path.endsWith('/discover') ? new Promise(resolve => { finish = resolve }) : original(method, path, body, options))
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://old.example/v1' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
   fireEvent.change(screen.getByLabelText('agent.models.baseUrl'), { target: { value: 'http://192.168.120.56:3425/v1' } })
@@ -341,6 +403,7 @@ it('keeps selected models after save fails and retries without a new discovery r
 
 it('retains each source draft when navigating back and reopening', async () => {
   const navigate = vi.fn(), page = mount('catalog/source/new', navigate)
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'draft-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://draft.example/v1' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.manual' }))
   fireEvent.change(screen.getByLabelText('hub.directory.manual'), { target: { value: 'draft-model' } })
@@ -426,13 +489,49 @@ it('updates an existing source without fetching models and retains its stored ke
   const name = await screen.findByLabelText('hub.name')
   expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(name)
   fireEvent.change(name, { target: { value: 'Renamed source' } })
+  fireEvent.change(screen.getByLabelText('hub.sourceKey.label'), { target: { value: 'bladeai' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   const dialog = await screen.findByRole('alertdialog')
   fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
-    sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '' })], models: catalog.models,
+    sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '', sourceKey: 'bladeai' })], models: catalog.models,
   })))
+  expect(await screen.findByText('bladeai/priced-model')).toBeTruthy()
   expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})
+
+it('saves source headers with a masked existing value and removes saved headers explicitly', async () => {
+  const fallback = vi.mocked(api).getMockImplementation()!
+  let names = ['X-User-Id']
+  const path = '/agent/model-gateway/catalog'
+  vi.mocked(api).mockImplementation(async (method, url, body, options) => {
+    if (url !== path) return fallback(method, url, body, options)
+    if (method === 'PUT') names = Object.keys(body.sources[0].headers)
+    return { data: { ...catalog, sources: [{ ...catalog.sources[0], headerNames: names }] } }
+  })
+  mount('catalog/source/upstream')
+  const edit = async () => fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.changeConnection' }))
+  const save = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'agent.models.save' }))
+  }
+  await edit()
+  expect(screen.getByPlaceholderText('hub.headers.kept')).toHaveProperty('value', '')
+  fireEvent.click(screen.getByRole('button', { name: 'hub.headers.add' }))
+  fireEvent.change(screen.getAllByLabelText('hub.headers.name')[1], { target: { value: 'x-user-id' } })
+  expect(screen.getByText('hub.headers.invalidName')).toBeTruthy()
+  fireEvent.change(screen.getAllByLabelText('hub.headers.name')[1], { target: { value: 'X-Title' } })
+  fireEvent.change(screen.getAllByLabelText('hub.headers.value')[1], { target: { value: 'Test app' } })
+  await save()
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', path, expect.objectContaining({
+    sources: [expect.objectContaining({ headers: { 'X-User-Id': '', 'X-Title': 'Test app' } })],
+  })))
+  await edit()
+  for (const remove of screen.getAllByRole('button', { name: 'hub.headers.remove' })) fireEvent.click(remove)
+  await save()
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', path, expect.objectContaining({
+    sources: [expect.objectContaining({ headers: {} })],
+  })))
 })
 
 it('opens connection editing after fetching an existing source and keeps model changes out of the connection save', async () => {
@@ -472,6 +571,7 @@ it('lets new sources change their address and save without carrying over the old
     ? { data: { models: ['old-directory-model'] } }
     : original(method, path, body, options))
   mount('catalog/source/new')
+  fireEvent.change(await screen.findByLabelText('hub.sourceKey.label'), { target: { value: 'new-source' } })
   fireEvent.change(await screen.findByLabelText('agent.models.baseUrl'), { target: { value: 'https://first.example/v1' } })
   fireEvent.click(screen.getByRole('button', { name: 'hub.directory.fetch' }))
   fireEvent.click(await screen.findByRole('checkbox', { name: 'old-directory-model' }))

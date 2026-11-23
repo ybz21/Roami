@@ -18,13 +18,15 @@ it('defaults to configured routes with aggregates first and shows per-route user
  vi.mocked(api).mockResolvedValue({ data: { revision:'r1', models: [row('paid-upstream'), row('team-model', {configured:true,name:'Team alias'})] } })
  const writeText = vi.fn().mockResolvedValue(undefined), onSource=vi.fn()
  Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{writeText} })
- render(<App><GatewayModelDirectory catalog={catalog} onSource={onSource} /></App>)
+ render(<App><GatewayModelDirectory catalog={{ ...catalog, sources: [{ ...catalog.sources[0], sourceKey: 'bladeai' }] }} onSource={onSource} /></App>)
  await waitFor(() => expect(api).toHaveBeenCalled())
  expect(document.querySelector('.tt-directory-model-name strong')?.textContent).toBe('Team pool')
  expect(screen.queryByText('paid-upstream')).toBeNull()
+ expect(screen.getByText('bladeai/vendor/model')).toBeTruthy()
+ fireEvent.change(screen.getByLabelText('directory.search'), { target: { value: 'bladeai/vendor/model' } })
  fireEvent.click(screen.getByRole('button', {name:/Team alias/}))
  const inspector=await screen.findByLabelText('gatewayWorkspace.modelDetails', {selector:'aside'})
- expect(inspector.textContent).toContain('vendor/model')
+ expect(inspector.textContent).toContain('bladeai/vendor/model')
  expect(inspector.textContent).toContain('roami, codex')
  expect(inspector.textContent).not.toContain('claude')
  fireEvent.click(within(inspector).getByRole('button', {name:'gatewayWorkspace.copyModel'}))
@@ -45,6 +47,19 @@ it('keeps paid upstream models out of the default directory and never infers fre
  expect(vi.mocked(api).mock.calls[0][1]).toContain('/agent/model-gateway/models?all=true&refresh=true')
  expect(vi.mocked(api).mock.calls.some(([method])=>method!=='GET')).toBe(false)
  expect(screen.queryByRole('button', { name: 'directory.testModel' })).toBeNull()
+})
+
+it('keeps hidden members out of the directory and copies the configured pool alias', async () => {
+ vi.mocked(api).mockResolvedValue({ data: { revision:'r1', models: [row('hidden-upstream', { gatewayHidden:true })] } })
+ const writeText = vi.fn().mockResolvedValue(undefined)
+ Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{writeText} })
+ const models = [{ ...catalog.models[0], gatewayHidden:true }, { ...catalog.models[1], gatewayAlias:'team-gateway' }]
+ render(<App><GatewayModelDirectory catalog={{ ...catalog, models }} onSource={vi.fn()} /></App>)
+ expect(screen.queryByText('Team alias')).toBeNull()
+ fireEvent.change(screen.getByLabelText('directory.search'), { target: { value: 'team-gateway' } })
+ expect(screen.getByText('team-gateway')).toBeTruthy()
+ fireEvent.click(screen.getByRole('button', { name: 'gatewayWorkspace.copyModel' }))
+ await waitFor(() => expect(writeText).toHaveBeenCalledWith('team-gateway'))
 })
 
 it('tests the selected gateway route even when discovery fails and shows the final 503 and upstream 502', async () => {

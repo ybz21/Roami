@@ -9,7 +9,7 @@ import { useLayout } from '../../layout'
 import { PlusIcon, SearchIcon } from '../../icons'
 import BackButton from '../BackButton'
 import MobileSubPage from '../MobileSubPage'
-import type { CatalogModel, ModelCatalog, ModelCandidate } from './model-hub-api'
+import { gatewayAliasError, gatewayModelNameTaken, type CatalogModel, type ModelCatalog, type ModelCandidate } from './model-hub-api'
 import './model-routing.css'
 const identity = (candidate: ModelCandidate) => candidate.sourceId + '/' + candidate.model
 const draftKey = (pool: string | null) => pool === null ? '@new' : 'pool:' + pool
@@ -43,8 +43,8 @@ export default function ModelAggregationWorkspace({ active, catalog, busy, error
     if (draft) setDrafts(previous => ({ ...previous, [key]: { ...(previous[key] ?? draft), ...value } }))
   }
   const sources = catalog?.sources || []
-  const valid = !!draft && !!draft.name.trim() && draft.id !== 'roami-default' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(draft.id) && draft.candidates.length > 0 && draft.candidates.length <= MAX_AGGREGATE_MEMBERS && (draft.aliases?.length || 0) + (original && draft.id !== original && !draft.aliases?.includes(draft.id) ? 1 : 0) <= 32 && draft.candidates.every(candidate => candidate.model && (candidate.sourceId === '@group' || sources.some(source => source.id === candidate.sourceId)) && Number.isInteger(draft.weights?.[identity(candidate)] ?? 1) && (draft.weights?.[identity(candidate)] ?? 1) >= 1 && (draft.weights?.[identity(candidate)] ?? 1) <= 1000) && !catalog?.models.some(model => (model.id === draft.id || model.aliases?.includes(draft.id)) && model.id !== original)
-  const submit = async () => { if (!catalog || !draft || !valid || busy) return; const next = { ...draft, name: draft.name.trim(), aliases: [...new Set([...(draft.aliases || []), ...(original && original !== draft.id ? [original] : [])])].filter(id => id !== draft.id) }; if (await save({ ...catalog, models: original ? catalog.models.map(model => model.id === original ? next : model) : [...catalog.models, next] })) { cancel(); message.success(t('pool.saved')) } }
+  const valid = !!draft && !!draft.name.trim() && draft.id !== 'roami-default' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(draft.id) && draft.candidates.length > 0 && draft.candidates.length <= MAX_AGGREGATE_MEMBERS && (draft.aliases?.length || 0) + (original && draft.id !== original && !draft.aliases?.includes(draft.id) ? 1 : 0) <= 32 && draft.candidates.every(candidate => candidate.model && (candidate.sourceId === '@group' || sources.some(source => source.id === candidate.sourceId)) && Number.isInteger(draft.weights?.[identity(candidate)] ?? 1) && (draft.weights?.[identity(candidate)] ?? 1) >= 1 && (draft.weights?.[identity(candidate)] ?? 1) <= 1000) && !gatewayModelNameTaken(draft.id, original, catalog?.models || []) && !gatewayAliasError(draft, original, catalog?.models || [])
+  const submit = async () => { if (!catalog || !draft || !valid || busy) return; const next = { ...draft, name: draft.name.trim(), gatewayAlias: draft.gatewayAlias?.trim() || undefined, aliases: [...new Set([...(draft.aliases || []), ...(original && original !== draft.id ? [original] : [])])].filter(id => id !== draft.id) }; if (await save({ ...catalog, models: original ? catalog.models.map(model => model.id === original ? next : model) : [...catalog.models, next] })) { cancel(); message.success(t('pool.saved')) } }
   const card = (model: CatalogModel) => {
     const savedDraft = drafts[draftKey(model.id)]
     return <AggregationPoolCard key={model.id} model={model} disabled={busy} unsaved={!!savedDraft && JSON.stringify(savedDraft) !== JSON.stringify(model)} onOpen={() => onOpenRequested(model.id)} />
