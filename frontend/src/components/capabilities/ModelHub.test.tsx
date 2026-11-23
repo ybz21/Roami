@@ -37,6 +37,31 @@ beforeEach(() => { installRadixTestEvents();
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const mount = (sub: string, navigate = vi.fn()) => render(<App><ModelHub sub={sub} onNav={navigate} /></App>, { wrapper })
 
+it('enables a LAN address, switches the sample to Anthropic and opens model configuration', async () => {
+  const fallback = vi.mocked(api).getMockImplementation()!
+  const networkPath = '/agent/model-gateway/network'
+  let enabled = false
+  vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path !== networkPath) return fallback(method, path, body, options)
+    if (method === 'PUT') enabled = body.enabled
+    return { data: { enabled, urls: enabled ? ['http://192.168.1.4:19000'] : [] } }
+  })
+  const navigate = vi.fn()
+  mount('gateway', navigate)
+  const lan = await screen.findByRole('switch', { name: 'gatewayWorkspace.allowLAN' })
+  await waitFor(() => expect(lan.hasAttribute('disabled')).toBe(false))
+  expect(screen.getByText('http://127.0.0.1:19000/v1')).toBeTruthy()
+  fireEvent.click(lan)
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', networkPath, { enabled: true }))
+  await screen.findByText('http://192.168.1.4:19000/v1')
+  fireEvent.keyDown(screen.getByRole('combobox', { name: 'gatewayWorkspace.protocol' }), { key: 'ArrowDown' })
+  fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+  expect(screen.getByText('http://192.168.1.4:19000')).toBeTruthy()
+  expect(screen.getByRole('region', { name: 'gatewayWorkspace.sample' }).querySelector('pre')?.textContent).toContain('/v1/messages')
+  fireEvent.click(screen.getByRole('button', { name: 'gatewayWorkspace.configureModel' }))
+  expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog/model/coding')
+})
+
 it('opens records and returns from a blocked gateway request through audit', async () => {
   const requestId = '1d5c6684-0fdd-4a2f-b975-6dcc832f24f2'
   const request = { requestId, at: Date.now(), routeId: 'coding', model: 'Coding', caller: 'claude', outcome: 'blocked', status: 503, durationMs: 10 }

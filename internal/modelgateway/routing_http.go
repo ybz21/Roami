@@ -20,7 +20,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 	h.Catalog.mu.Unlock()
 	var model *CatalogModel
 	for _, value := range catalog.Models {
-		if value.ID == id || containsField(value.Aliases, id) {
+		if value.matchesGatewayName(id) {
 			copy := value
 			model = &copy
 			break
@@ -38,7 +38,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 	var observation *requestObservationSummary
 	if h.Monitor != nil {
 		if rows, _, readErr := h.Monitor.Snapshot(); readErr == nil {
-			value := routeObservation(rows, append([]string{model.ID}, model.Aliases...), h.Monitor.now().Add(-time.Hour).UnixMilli())
+			value := routeObservation(rows, append([]string{model.ID}, model.additionalGatewayNames()...), h.Monitor.now().Add(-time.Hour).UnixMilli())
 			observation = &value
 		}
 	}

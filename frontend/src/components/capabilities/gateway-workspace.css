@@ -18,6 +18,9 @@
 .tt-gateway-copy-field code{flex:1;min-width:0;overflow-wrap:anywhere;font-size:var(--fs-sm)}
 .tt-gateway-copy-field>button{flex-shrink:0}
 .tt-gateway-connection>button{align-self:flex-start;flex-direction:row-reverse}
+.tt-gateway-lan-toggle{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:var(--tap)}
+html[data-pointer="coarse"] .tt-gateway-lan-toggle .ant-switch{min-width:var(--tap)}
+html[data-pointer="coarse"] .tt-gateway-lan-toggle .ant-switch::before{content:'';position:absolute;inset:50% 0 auto;min-height:var(--tap);transform:translateY(-50%)}
 .tt-gateway-sample .tt-gateway-section-head>.tt-gateway-example-tabs{margin-left:auto}
 .tt-gateway-sample .ui-tabs-list{padding:0;border:0}
 html[data-pointer="coarse"] .tt-gateway-sample .ui-tabs-list{padding-block:var(--sp-1)}

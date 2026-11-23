@@ -20,7 +20,11 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		sources[source.ID] = source
 	}
 	fingerprints := map[string]string{}
+	hidden := hiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
+		if model.hiddenAtGateway(hidden) {
+			continue
+		}
 		routes := []route{}
 		for _, candidate := range model.Candidates {
 			source := sources[candidate.SourceID]
@@ -34,7 +38,11 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 			return err
 		}
 		digest := sha256.Sum256(raw)
-		fingerprints[model.ID] = hex.EncodeToString(digest[:])
+		fingerprint := hex.EncodeToString(digest[:])
+		fingerprints[model.ID] = fingerprint
+		for _, alias := range model.additionalGatewayNames() {
+			fingerprints[alias] = fingerprint
+		}
 	}
 	directory := filepath.Join(root, "agents")
 	if err := os.MkdirAll(directory, 0700); err != nil {

@@ -43,6 +43,8 @@ type ModelCandidate struct {
 }
 type CatalogModel struct {
 	Aggregate       bool             `json:"aggregate,omitempty"`
+	HideMembers     bool             `json:"hideMembers,omitempty"`
+	GatewayHidden   bool             `json:"gatewayHidden,omitempty"`
 	Enabled         *bool            `json:"enabled,omitempty"`
 	FreeOnly        bool             `json:"freeOnly,omitempty"`
 	AllowPlan       bool             `json:"allowPlan,omitempty"`
@@ -54,6 +56,7 @@ type CatalogModel struct {
 	Weights         map[string]int   `json:"weights,omitempty"`
 	ID              string           `json:"id"`
 	Aliases         []string         `json:"aliases,omitempty"`
+	GatewayAlias    string           `json:"gatewayAlias,omitempty"`
 	Name            string           `json:"name"`
 	Protocol        string           `json:"protocol"`
 	Strategy        string           `json:"strategy"`
@@ -67,6 +70,7 @@ type ModelCatalog struct {
 	BaseURL         string                   `json:"baseUrl,omitempty"`
 	Uses            map[string][]string      `json:"uses"`
 	Port            int                      `json:"-"`
+	LANEnabled      bool                     `json:"-"`
 	Token           string                   `json:"-"`
 	AccessKey       gatewayAccessKey         `json:"-"`
 	AccessKeys      []gatewayAccessKey       `json:"-"`
@@ -79,6 +83,7 @@ type ModelCatalog struct {
 type catalogDisk struct {
 	Catalog     ModelCatalog             `json:"catalog"`
 	Port        int                      `json:"port"`
+	LANEnabled  bool                     `json:"lanEnabled,omitempty"`
 	Token       string                   `json:"token"`
 	AccessKey   gatewayAccessKey         `json:"accessKey,omitempty"`
 	AccessKeys  []gatewayAccessKey       `json:"accessKeys,omitempty"`
@@ -119,6 +124,7 @@ func openCatalog(l *Ledger) (*CatalogStore, error) {
 		}
 		s.value = d.Catalog
 		s.value.Port = d.Port
+		s.value.LANEnabled = d.LANEnabled
 		s.value.Token = d.Token
 		s.value.AccessKey = d.AccessKey
 		s.value.AccessKeys = d.AccessKeys
@@ -158,7 +164,7 @@ func (s *CatalogStore) persist(value ModelCatalog) error {
 	if err := writeCatalogVerificationRevision(s.ledger.paths.Data, ModelCatalog{}); err != nil {
 		return err
 	}
-	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys, AccessKey: value.AccessKey, AccessKeys: value.AccessKeys})
+	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, LANEnabled: value.LANEnabled, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys, AccessKey: value.AccessKey, AccessKeys: value.AccessKeys})
 	if err != nil {
 		return err
 	}
@@ -192,6 +198,7 @@ func (s *CatalogStore) snapshot() ModelCatalog {
 	v.AccessKey = s.value.AccessKey
 	v.AccessKeys = append([]gatewayAccessKey(nil), s.value.AccessKeys...)
 	v.Port = s.value.Port
+	v.LANEnabled = s.value.LANEnabled
 	v.RolesBackup = s.value.RolesBackup
 	v.AgentKeys = map[string]agentKeyState{}
 	for kind, key := range s.value.AgentKeys {
@@ -254,8 +261,10 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	v := s.snapshot()
 	v.BaseURL = s.baseURL
 	v.Uses = s.uses(ctx)
-	for _, model := range v.Models {
-		for _, alias := range model.Aliases {
+	hidden := hiddenGatewayMembers(v.Models)
+	for i, model := range v.Models {
+		v.Models[i].GatewayHidden = model.hiddenAtGateway(hidden)
+		for _, alias := range model.additionalGatewayNames() {
 			for _, use := range v.Uses[alias] {
 				if !containsField(v.Uses[model.ID], use) {
 					v.Uses[model.ID] = append(v.Uses[model.ID], use)
@@ -398,7 +407,11 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	assignSourceKeys(v.Sources)
 	validate := func(rows []CatalogModel) error {
 		seen := map[string]bool{}
-		for _, m := range rows {
+		for i, m := range rows {
+			rows[i].GatewayHidden = false
+			if m.HideMembers && !m.Aggregate {
+				return catalogError()
+			}
 			limit := 8
 			if m.Aggregate {
 				limit = maxAggregateMembers
@@ -448,13 +461,14 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	}
 	uses, known := s.references(ctx)
 	for _, old := range s.value.Models {
-		for _, id := range append([]string{old.ID}, old.Aliases...) {
+		for _, id := range append([]string{old.ID}, old.additionalGatewayNames()...) {
 			if findCatalogModel(v.Models, id) == nil && (!known || len(uses[id]) > 0) {
 				return errors.New("MODEL_CATALOG_IN_USE")
 			}
 		}
 	}
 	v.Port = s.value.Port
+	v.LANEnabled = s.value.LANEnabled
 	v.Token = s.value.Token
 	v.AccessKey = s.value.AccessKey
 	v.AccessKeys = append([]gatewayAccessKey(nil), s.value.AccessKeys...)

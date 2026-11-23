@@ -50,7 +50,7 @@ func (h *Handler) requestRouteIDs(route string) []string {
 		defer h.Catalog.mu.Unlock()
 		for _, model := range h.Catalog.value.Models {
 			if model.Aggregate && model.ID == route {
-				return append([]string{route}, model.Aliases...)
+				return append([]string{route}, model.additionalGatewayNames()...)
 			}
 		}
 	}

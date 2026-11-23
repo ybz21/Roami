@@ -92,7 +92,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			model = s.defaultModel(s.value)
 		}
 		for _, m := range s.value.Models {
-			if m.ID == input.Model || containsField(m.Aliases, input.Model) {
+			if m.matchesGatewayName(input.Model) {
 				copy := m
 				model = &copy
 			}
@@ -132,7 +132,7 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 				created = true
 			}
 		}
-		if model == nil || input.SourceID != "" && !(model.Aggregate && input.SourceID == groupSource || !model.Aggregate && model.Candidates[0].SourceID == input.SourceID) {
+		if model == nil || model.hiddenAtGateway(hiddenGatewayMembers(s.value.Models)) || input.SourceID != "" && !(model.Aggregate && input.SourceID == groupSource || !model.Aggregate && model.Candidates[0].SourceID == input.SourceID) {
 			err = catalogError()
 			break
 		}
@@ -231,6 +231,10 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 		key = r.Header.Get("X-Api-Key")
 	}
 	kind, keyID := s.authenticate(key)
+	lan, _ := r.Context().Value(gatewayLANRequest{}).(bool)
+	if lan && (!s.value.LANEnabled || kind != "external") {
+		kind = ""
+	}
 	snapshot := s.snapshot()
 	s.mu.Unlock()
 	if kind == "" {
@@ -246,11 +250,12 @@ func (h *Handler) publicModels(w http.ResponseWriter, r *http.Request) {
 		if kind != "claude" && catalogProtocol(kind, "openai-completions") && s.defaultModel(snapshot) != nil {
 			data = append(data, map[string]any{"id": gatewayDefaultModel, "type": "model", "object": "model", "display_name": "Roami Default", "owned_by": "roami"})
 		}
+		hidden := hiddenGatewayMembers(snapshot.Models)
 		for _, m := range snapshot.Models {
-			if m.Aggregate && !m.enabled() {
+			if (m.Aggregate && !m.enabled()) || m.hiddenAtGateway(hidden) {
 				continue
 			}
-			id := m.ID
+			id := m.publicGatewayName()
 			if kind == "claude" {
 				id = claudeModelPrefix + id
 			}
@@ -294,19 +299,18 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	if resolvedID == gatewayDefaultModel && catalogProtocol(kind, protocol) {
 		model = h.Catalog.defaultModel(catalog)
 	}
-	for _, m := range catalog.Models {
-		if m.ID == resolvedID || containsField(m.Aliases, resolvedID) {
-			copy := m
-			model = &copy
-		}
+	if configured := findCatalogModel(catalog.Models, resolvedID); configured != nil {
+		copy := *configured
+		model = &copy
 	}
-	if model == nil {
+	probe, _ := r.Context().Value(qualityProbeContext{}).(*qualityProbe)
+	if model == nil || probe == nil && model.hiddenAtGateway(hiddenGatewayMembers(catalog.Models)) {
 		reject(w, 400, "MODEL_NOT_CONFIGURED")
 		return
 	}
 	observed := &observedRequestWriter{ResponseWriter: w}
 	trace := newRequestObservation(observed, catalog, *model, kind)
-	if probe, ok := r.Context().Value(qualityProbeContext{}).(*qualityProbe); ok {
+	if probe != nil {
 		probe.Trace = trace
 	}
 	w = observed

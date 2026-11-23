@@ -161,5 +161,8 @@ func (s *CatalogStore) isGatewaySource(raw string) bool {
 	if err != nil {
 		return false
 	}
-	return u.Port() == gateway.Port() && containsField([]string{gateway.Hostname(), "localhost", "127.0.0.1", "::1"}, u.Hostname())
+	if u.Port() != gateway.Port() {
+		return false
+	}
+	return containsField([]string{gateway.Hostname(), "localhost", "127.0.0.1", "::1"}, u.Hostname()) || containsField(gatewayLANAddresses(), u.Hostname())
 }

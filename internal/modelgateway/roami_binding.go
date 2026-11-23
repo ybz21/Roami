@@ -88,14 +88,10 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		if input.Role != "" {
 			names = []string{input.Model}
 		}
+		hidden := hiddenGatewayMembers(s.value.Models)
 		for _, name := range names {
-			valid := false
-			for _, model := range s.value.Models {
-				if model.ID == name || containsField(model.Aliases, name) {
-					valid = true
-				}
-			}
-			if !valid {
+			model := findCatalogModel(s.value.Models, name)
+			if model == nil || model.hiddenAtGateway(hidden) {
 				s.mu.Unlock()
 				reject(w, 400, "INVALID_MODEL_PROTOCOL")
 				return

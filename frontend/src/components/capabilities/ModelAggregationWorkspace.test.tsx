@@ -31,6 +31,9 @@ it('requires source before model and saves a smart pool with cross-source candid
   expect(screen.queryByRole('textbox', { name: 'hub.directory.search' })).toBeNull()
   expect(screen.queryByRole('checkbox', { name: 'pool.selectAll' })).toBeNull()
   fireEvent.change(screen.getByLabelText('pool.name'), { target: { value: 'Free pool' } })
+  fireEvent.change(screen.getByLabelText('hub.gatewayAlias'), { target: { value: 'team-free' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'pool.hideMembers' }))
+  expect(screen.getByText('pool.hideMembersHint')).toBeTruthy()
   fireEvent.click(document.querySelector('.tt-aggregate-more summary')!)
   fireEvent.change(screen.getByLabelText('pool.modelId'), { target: { value: 'free-main' } })
   await pick('pool.source', 'Source A'); fireEvent.click(screen.getByRole('checkbox', { name: 'native-a' }))
@@ -39,7 +42,7 @@ it('requires source before model and saves a smart pool with cross-source candid
   mounted.rerender(<App><ModelAggregationWorkspace {...requestNav} {...props} active={false} /></App>); mounted.rerender(<App><ModelAggregationWorkspace {...requestNav} {...props} /></App>)
   expect((screen.getByLabelText('pool.name') as HTMLInputElement).value).toBe('Free pool')
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
-  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'free-main', aggregate: true, strategy: 'smart', candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'b', model: 'native-b' }] })]) })))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: expect.arrayContaining([expect.objectContaining({ id: 'free-main', gatewayAlias: 'team-free', hideMembers: true, aggregate: true, strategy: 'smart', candidates: [{ sourceId: 'a', model: 'native-a' }, { sourceId: 'b', model: 'native-b' }] })]) })))
 })
 it('does not send probes until requested and keeps unknown quality out of the pass rate', async () => {
   const mounted = render(<App><ModelMonitoringWorkspace active={false} catalog={catalog} /></App>); expect(api).not.toHaveBeenCalled()

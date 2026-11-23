@@ -12,11 +12,12 @@ func (s *CatalogStore) modelOptions(catalog ModelCatalog) []agentproviders.Model
 	if s.defaultModel(catalog) != nil {
 		models = append(models, agentproviders.ModelOption{ID: gatewayDefaultModel, Name: "Roami Default"})
 	}
+	hidden := hiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
-		if model.Aggregate && !model.enabled() {
+		if (model.Aggregate && !model.enabled()) || model.hiddenAtGateway(hidden) {
 			continue
 		}
-		models = append(models, agentproviders.ModelOption{ID: model.ID, Name: model.Name})
+		models = append(models, agentproviders.ModelOption{ID: model.publicGatewayName(), Name: model.Name})
 	}
 	return models
 }
@@ -41,12 +42,13 @@ func (s *CatalogStore) defaultModel(catalog ModelCatalog) *CatalogModel {
 	if err != nil {
 		return nil
 	}
+	hidden := hiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
-		if model.Aggregate && !model.enabled() {
+		if (model.Aggregate && !model.enabled()) || model.hiddenAtGateway(hidden) {
 			continue
 		}
 		if strings.TrimRight(route.endpoint, "/") == s.baseURL+"/v1" {
-			if model.ID == route.model || containsField(model.Aliases, route.model) {
+			if model.matchesGatewayName(route.model) {
 				return &model
 			}
 			continue

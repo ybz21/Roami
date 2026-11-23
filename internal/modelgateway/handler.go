@@ -24,6 +24,7 @@ type Handler struct {
 	Monitor        *MonitorStore
 	Plugins        *modelplugins.Manager
 	Catalog        *CatalogStore
+	lan            *gatewayLAN // Protected by Catalog.mu.
 	Ledger         *Ledger
 	Client         *http.Client
 	uncheckedTLS   *http.Client
@@ -101,7 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
-	if h.modelDirectoryManagement(w, r) || h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
+	if h.gatewayNetworkManagement(w, r) || h.modelDirectoryManagement(w, r) || h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {

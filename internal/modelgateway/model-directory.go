@@ -21,6 +21,8 @@ type CapabilityFact struct {
 type ModelDirectoryRow struct {
 	ID               string                    `json:"id"`
 	Name             string                    `json:"name"`
+	GatewayAlias     string                    `json:"gatewayAlias,omitempty"`
+	GatewayHidden    bool                      `json:"gatewayHidden,omitempty"`
 	Kind             string                    `json:"kind"`
 	Protocol         string                    `json:"protocol"`
 	Configured       bool                      `json:"configured"`
@@ -218,12 +220,14 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 	}
 	configured := map[ModelCandidate]bool{}
 	rows := []ModelDirectoryRow{}
+	hidden := hiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
 		kind := "single"
 		if model.Aggregate {
 			kind = "aggregate"
 		}
 		entry := ModelDirectoryRow{ID: model.ID, Name: model.Name, Kind: kind, Protocol: model.Protocol, Configured: true, Enabled: model.enabled(), FreeOnly: model.FreeOnly, Pricing: "unknown", Capabilities: unknownCapabilities(), Candidates: model.Candidates}
+		entry.GatewayAlias, entry.GatewayHidden = model.GatewayAlias, model.hiddenAtGateway(hidden)
 		if model.FreeOnly {
 			entry.Pricing = "free-only"
 		} else if model.Aggregate && freeRoutePrice(model.ID) && allMembersFree(model, 0) {
@@ -258,6 +262,7 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 				continue
 			}
 			entry := ModelDirectoryRow{ID: candidate.Model, Name: detail.Name, Kind: "single", Pricing: "unknown", Capabilities: advertisedCapabilities(detail), Candidates: []ModelCandidate{candidate}, ContextWindow: detail.Context, MaxOutputTokens: detail.Output, InputModalities: detail.InputModalities, OutputModalities: detail.OutputModalities, InputPrice: detail.InputPrice, OutputPrice: detail.OutputPrice}
+			entry.GatewayHidden = hidden[candidate]
 			for _, source := range catalog.Sources {
 				if source.ID == candidate.SourceID {
 					entry.Protocol = source.Protocol
@@ -333,7 +338,11 @@ func (h *Handler) modelDirectoryManagement(w http.ResponseWriter, r *http.Reques
 	}
 	rows := s.directoryRows(r.Context(), catalog, r.URL.Query().Get("all") == "true")
 	filtered := []ModelDirectoryRow{}
+	includeHidden := r.URL.Query().Get("includeHidden") == "true"
 	for _, row := range rows {
+		if row.GatewayHidden && !includeHidden {
+			continue
+		}
 		if r.URL.Query().Get("free") == "true" && !row.FreeOnly && row.Pricing != "confirmed-free" {
 			continue
 		}

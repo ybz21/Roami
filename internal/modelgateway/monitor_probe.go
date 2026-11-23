@@ -76,7 +76,7 @@ func (h *Handler) runQualityProbe(w http.ResponseWriter, r *http.Request) {
 	found := false
 	for _, model := range catalog.Models {
 		if routeCheck {
-			if model.ID == input.RouteID {
+			if model.matchesGatewayName(input.RouteID) {
 				alias, found = model, true
 				break
 			}

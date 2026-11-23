@@ -23,7 +23,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const throughGateway = !!profile && !!catalog.value?.baseUrl && endpoint(profile.baseUrl) === endpoint(catalog.value.baseUrl)
   const currentID = kind === 'claude' ? view.current.model?.replace(/^roami-claude\//, '').replace(/\[1m\]$/, '') : view.current.model
   const usesDefault = throughGateway && currentID === gatewayDefault
-  const currentModel = (throughGateway ? models.find(model => model.id === (usesDefault ? catalog.value?.defaultModel : currentID) || !!currentID && model.aliases?.includes(currentID)) : undefined) || models.find(model => {
+  const currentModel = (throughGateway ? models.find(model => model.id === (usesDefault ? catalog.value?.defaultModel : currentID) || !!currentID && (model.gatewayAlias === currentID || model.aliases?.includes(currentID))) : undefined) || models.find(model => {
     if (model.aggregate) return false
     const source = sources.find(source => source.id === model.candidates[0].sourceId)
     return profile && source && source.protocol === profile.protocol && endpoint(source.baseUrl) === endpoint(profile.baseUrl) && model.candidates[0].model === view.current.model
@@ -47,7 +47,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
     })
     return () => abort.abort()
   }, [kind, selectedMode, selectedSource, defaultSelected, catalog.value?.revision, installed, directoryVersion])
-  const options = models.filter(model => selectedSource === '@group' ? model.aggregate : !model.aggregate && model.candidates[0].sourceId === selectedSource).map(model => ({ value: model.id, label: model.name, title: model.aggregate ? model.name : model.candidates[0].model, upstreamModel: model.aggregate ? model.id : model.candidates[0].model, configured: true, disabled: model.enabled === false }))
+  const options = models.filter(model => selectedSource === '@group' ? model.aggregate : !model.aggregate && model.candidates[0].sourceId === selectedSource).map(model => ({ value: model.id, label: model.name, title: model.aggregate ? model.name : model.candidates[0].model, upstreamModel: model.aggregate ? model.id : model.candidates[0].model, configured: true, disabled: model.enabled === false || !!model.gatewayHidden }))
   const pendingModel = model.startsWith(discoveredPrefix) ? decodeURIComponent(model.slice(discoveredPrefix.length)) : ''
   const query = search.trim()
   if (!defaultSelected && selectedSource !== '@group') for (const id of new Set([...remote.models, ...(pendingModel ? [pendingModel] : []), ...(query && query.length <= 200 ? [query] : [])])) {
@@ -57,7 +57,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const selected = selectedOption?.value
   const currentLabel = usesDefault ? t('hub.gatewayDefault') : currentModel?.name || view.current.model || t('agent.models.notConfigured')
   const gatewayApplied = throughGateway && !!profile?.applied && !view.changed
-  const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.filter(model => !model.aggregate || model.enabled !== false).map(model => ({ id: model.id, name: model.name }))]
+  const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.filter(model => !model.gatewayHidden && (!model.aggregate || model.enabled !== false)).map(model => ({ id: model.gatewayAlias || model.id, name: model.name }))]
   const catalogCurrent = kind !== 'pi' && kind !== 'opencode' || !!profile?.models && JSON.stringify(profile.models) === JSON.stringify(expectedModels)
   const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || catalogCurrent && throughGateway && !!profile?.applied && (defaultSelected ? usesDefault : !usesDefault && !!selected && selected === currentModel?.id))
   const valid = installed && (selectedMode === 'official' || (defaultSelected ? !!catalog.value?.defaultModel : !!selectedSource && !!selected && !selectedOption?.disabled && !!catalog.value))

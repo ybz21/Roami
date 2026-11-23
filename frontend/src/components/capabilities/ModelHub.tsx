@@ -23,7 +23,7 @@ import MagpiePluginImport, {pluginFailure} from './MagpiePluginImport'
 import MagpieSourceSettings from './MagpieSourceSettings'
 import ModelSourceEditor, { initialSourceDraft, type SourceDraft } from './ModelSourceEditor'
 import { GatewaySettingsForm, GatewayReconciliation, useGatewaySettings } from '../settings/gateway-settings'
-import { openRouterConnection, sourceModelName, useModelCatalog, type ModelSource, type CatalogModel } from './model-hub-api'
+import { gatewayAliasError, gatewayModelNameTaken, openRouterConnection, sourceModelName, useModelCatalog, type ModelSource, type CatalogModel } from './model-hub-api'
 import '../settings/agent-settings.css'
 import './model-hub.css'
 
@@ -86,10 +86,11 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const modelBase: CatalogModel = models.find(model => model.id === id) || value.drafts.find(model => model.id === id) || { id: newModelId, name: '', protocol: sources[0]?.protocol || 'openai-completions', strategy: 'fixed', candidates: [{ sourceId: sources[0]?.id || '', model: '' }] }
   const model = modelDrafts[id] || modelBase
   const updateModel = (patch: Partial<CatalogModel>) => setModelDrafts(previous => ({ ...previous, [id]: { ...model, ...patch } }))
-  const modelIdError = !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) || model.id === 'roami-default' ? 'orchestration.idInvalid' : models.some(row => (row.id === model.id || row.aliases?.includes(model.id)) && row.id !== id) ? 'orchestration.idTaken' : ''
-  const validModel = (model.aliases?.length || 0) + (id !== 'new' && id !== model.id && !model.aliases?.includes(model.id) ? 1 : 0) <= 32 && model.id !== 'roami-default' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) && model.candidates.length > 0 && (model.strategy !== 'failover' || model.candidates.length > 1) && model.candidates.every(candidate => candidate.model.trim() && sources.some(source => source.id === candidate.sourceId)) && !models.some(row => (row.id === model.id || row.aliases?.includes(model.id)) && row.id !== id)
+  const modelIdError = !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) || model.id === 'roami-default' ? 'orchestration.idInvalid' : gatewayModelNameTaken(model.id, id, models) ? 'orchestration.idTaken' : ''
+  const aliasError = gatewayAliasError(model, id !== 'new' ? id : null, models)
+  const validModel = (model.aliases?.length || 0) + (id !== 'new' && id !== model.id && !model.aliases?.includes(model.id) ? 1 : 0) <= 32 && model.id !== 'roami-default' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(model.id) && model.candidates.length > 0 && (model.strategy !== 'failover' || model.candidates.length > 1) && model.candidates.every(candidate => candidate.model.trim() && sources.some(source => source.id === candidate.sourceId)) && !gatewayModelNameTaken(model.id, id, models) && !aliasError
   const saveModel = async () => {
-    const next = { ...model, aliases: [...new Set([...(model.aliases || []), ...(models.some(row=>row.id===id) && id !== model.id ? [id] : [])])].filter(alias => alias !== model.id), name: model.name.trim() || model.candidates[0].model.trim(), candidates: model.strategy === 'fixed' ? model.candidates.slice(0, 1) : model.candidates }
+    const next = { ...model, gatewayAlias: model.gatewayAlias?.trim() || undefined, aliases: [...new Set([...(model.aliases || []), ...(models.some(row=>row.id===id) && id !== model.id ? [id] : [])])].filter(alias => alias !== model.id), name: model.name.trim() || model.candidates[0].model.trim(), candidates: model.strategy === 'fixed' ? model.candidates.slice(0, 1) : model.candidates }
     if (await controller.save({ ...value, models: id === 'new' || !models.some(row=>row.id===id) ? [...models, next] : models.map(row => row.id === id ? next : row), drafts: value.drafts.filter(row => row.id !== id && row.id !== next.id) })) {
       setModelDrafts(previous => { const n = { ...previous }; delete n[id]; return n }); if (id === 'new') setNewModelId(newID()); message.success(t('hub.modelSaved')); back()
     }
@@ -154,6 +155,11 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     <p className="agent-settings-hint">{t('modelIdentity.nameHint')}</p>
     {candidateFields(0)}
     {!sources.length && <Button icon={<PlusIcon />} onClick={() => navigate('catalog/source/new')}>{t('hub.addSource')}</Button>}
+    <label className="agent-settings-field">
+      {t('hub.gatewayAlias')}
+      <Input aria-label={t('hub.gatewayAlias')} status={aliasError ? 'error' : undefined} value={model.gatewayAlias || ''} maxLength={160} autoCapitalize="none" spellCheck={false} onChange={event => updateModel({ gatewayAlias: event.target.value })} />
+      {aliasError && <small className="agent-settings-error" role="alert">{t(aliasError)}</small>}
+    </label>
     <details><summary>{t('orchestration.moreSettings')}</summary>
       <label className="agent-settings-field">{t('pool.modelId')}<Input aria-label={t('pool.modelId')} aria-invalid={!!modelIdError} value={model.id} maxLength={160} onChange={event => updateModel({ id: event.target.value })} />{modelIdError && <small className="agent-settings-error" role="alert">{t(modelIdError)}</small>}</label><p className="agent-settings-hint">{t('modelInteraction.nativeIdHint')}</p>
       <label className="agent-settings-field">{t('hub.strategy')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.strategy')} value={model.strategy} options={['fixed', 'failover'].map(value => ({ value, label: t('hub.strategy.' + value) }))} onChange={(strategy: CatalogModel['strategy']) => updateModel({ strategy, candidates: model.candidates.slice(0, 1) })} /></label>
@@ -199,7 +205,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <ModelMonitoringWorkspace active={tab==='monitor'} catalog={loaded} onAudit={openRequestAudit}/>
       <GatewayRequestAudit active={requestAudit} catalog={value} onBack={() => navigate('audit')} onRequest={id => openRequest(id, 'requests')} />
       {requestDetail && <GatewayRequestDetail key={requestDetail} id={requestDetail} catalog={value} onBack={backFromRequest} onSource={source => navigate('catalog/source/' + source)} onPool={pool => navigate('aggregate/' + encodeURIComponent(pool))} onLimits={() => navigate('usage')} />}
-      <ModelGatewayWorkspace active={tab==='gateway' && !detail} catalog={value} onChanged={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onPool={pool=>navigate('aggregate/'+encodeURIComponent(pool)+'/members')}/>
+      <ModelGatewayWorkspace active={tab==='gateway' && !detail} catalog={value} onChanged={controller.retry} onSource={source=>navigate('catalog/source/'+source)} onPool={pool=>navigate('aggregate/'+encodeURIComponent(pool)+'/members')} onConfigure={route => navigate(models.find(model => model.id === route)?.aggregate ? 'aggregate/' + encodeURIComponent(route) + '/members' : 'catalog/model/' + route)}/>
       {tab==='aggregate'||tab==='monitor'||tab==='gateway'?null:fullDetail ? null : tab === 'usage' || tab === 'audit' ? <GatewayReconciliation controller={billing} /> : <div className="tt-model-hub-scroll">
       {tab !== 'speech' && error}{accountError&&<Alert type="error" role="alert" message={t(accountError)} action={<Button onClick={()=>{setAccountError('');controller.retry()}}>{t('capabilities.models.reread')}</Button>}/>}
       {tab === 'speech' ? <section className="tt-model-hub-speech" aria-label={t('hub.speechTitle')}><header className="tt-pagehead"><h2>{t('hub.tab.speech')}</h2></header><SpeechSettings /></section>

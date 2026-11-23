@@ -112,6 +112,12 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 	handler.Plugins = plugins
 	catalog.plugins = plugins
 	handler.Catalog = catalog
+	if catalog.value.LANEnabled {
+		handler.lan, err = handler.openGatewayLAN(catalog.value.Port)
+		if err != nil {
+			log.Printf("model gateway LAN listener: %v", err)
+		}
+	}
 	publicServer := &http.Server{Handler: http.HandlerFunc(handler.publicModels), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	publicDone := make(chan struct{})
 	go func() { defer close(publicDone); _ = publicServer.Serve(public) }()
@@ -153,6 +159,11 @@ func Start(paths metadb.Paths, socket string) (func(), error) {
 			handler.mu.Unlock()
 			_ = server.Close()
 			_ = publicServer.Close()
+			catalog.mu.Lock()
+			if handler.lan != nil {
+				handler.lan.close()
+			}
+			catalog.mu.Unlock()
 			<-publicDone
 			<-done
 			// Close cancels requests; wait for their deferred ledger writes before unlocking.

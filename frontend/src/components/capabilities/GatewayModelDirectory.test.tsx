@@ -49,6 +49,19 @@ it('keeps paid upstream models out of the default directory and never infers fre
  expect(screen.queryByRole('button', { name: 'directory.testModel' })).toBeNull()
 })
 
+it('keeps hidden members out of the directory and copies the configured pool alias', async () => {
+ vi.mocked(api).mockResolvedValue({ data: { revision:'r1', models: [row('hidden-upstream', { gatewayHidden:true })] } })
+ const writeText = vi.fn().mockResolvedValue(undefined)
+ Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{writeText} })
+ const models = [{ ...catalog.models[0], gatewayHidden:true }, { ...catalog.models[1], gatewayAlias:'team-gateway' }]
+ render(<App><GatewayModelDirectory catalog={{ ...catalog, models }} onSource={vi.fn()} /></App>)
+ expect(screen.queryByText('Team alias')).toBeNull()
+ fireEvent.change(screen.getByLabelText('directory.search'), { target: { value: 'team-gateway' } })
+ expect(screen.getByText('team-gateway')).toBeTruthy()
+ fireEvent.click(screen.getByRole('button', { name: 'gatewayWorkspace.copyModel' }))
+ await waitFor(() => expect(writeText).toHaveBeenCalledWith('team-gateway'))
+})
+
 it('tests the selected gateway route even when discovery fails and shows the final 503 and upstream 502', async () => {
  let complete: (payload: unknown) => void = () => {}
  vi.mocked(api).mockImplementation(async method => {
