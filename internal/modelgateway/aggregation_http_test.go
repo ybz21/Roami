@@ -158,6 +158,41 @@ func TestAggregateRetriesRejectedSourceHonorsCooldownAndKeepsAttempts(t *testing
 		t.Fatal("attempts were not independently accounted")
 	}
 }
+
+func TestAggregateRequestRejectionDoesNotRetryOrCoolDown(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var primary, backup atomic.Int64
+			h := aggregateFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if primary.Add(1) == 1 {
+					http.Error(w, "invalid request", status)
+					return
+				}
+				responseFixture(w, r)
+			}, func(w http.ResponseWriter, r *http.Request) {
+				backup.Add(1)
+				responseFixture(w, r)
+			})
+			catalog := h.Catalog.snapshot()
+			catalog.Models[0].Strategy = "order"
+			if err := h.Catalog.update(context.Background(), catalog); err != nil {
+				t.Fatal(err)
+			}
+			bad := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"rejected"}`)
+			if bad.Code != status || primary.Load() != 1 || backup.Load() != 0 {
+				t.Fatalf("rejected request = %d, primary = %d, backup = %d", bad.Code, primary.Load(), backup.Load())
+			}
+			good := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"valid"}`)
+			if good.Code != http.StatusOK || primary.Load() != 2 || backup.Load() != 0 {
+				t.Fatalf("next request = %d, primary = %d, backup = %d", good.Code, primary.Load(), backup.Load())
+			}
+			rows, _, err := h.Monitor.Snapshot()
+			if err != nil || len(rows) != 4 || rows[1].Outcome != "failed" || rows[1].Status != status || rows[1].Attempts != 1 || rows[1].Switch != "" || rows[3].Outcome != "success" {
+				t.Fatalf("request observation = %+v (%v)", rows, err)
+			}
+		})
+	}
+}
 func TestAggregateNeverReplaysAfterStreamStartsAndRejectsPaidZeroPrice(t *testing.T) {
 	var backup atomic.Int64
 	h := aggregateFixture(t, func(w http.ResponseWriter, r *http.Request) {
