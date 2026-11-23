@@ -15,23 +15,27 @@ func codexStateRollout(cwd string, started time.Time) string {
 	if cwd == "" || started.IsZero() {
 		return ""
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	paths, _ := filepath.Glob(filepath.Join(home, ".codex", "state_*.sqlite"))
-	sort.Slice(paths, func(i, j int) bool {
-		return codexStateVersion(paths[i]) > codexStateVersion(paths[j])
-	})
-	if len(paths) == 0 {
-		return ""
-	}
-	db, err := sql.Open("sqlite", "file:"+paths[0]+"?mode=ro")
-	if err != nil {
+	db := openCodexState()
+	if db == nil {
 		return ""
 	}
 	defer db.Close()
 	return pickCodexStateRollout(db, cwd, started, codexSessionsRoot())
+}
+
+func openCodexState() *sql.DB {
+	paths, _ := filepath.Glob(filepath.Join(filepath.Dir(codexSessionsRoot()), "state_*.sqlite"))
+	sort.Slice(paths, func(i, j int) bool {
+		return codexStateVersion(paths[i]) > codexStateVersion(paths[j])
+	})
+	if len(paths) == 0 {
+		return nil
+	}
+	db, err := sql.Open("sqlite", "file:"+paths[0]+"?mode=ro")
+	if err != nil {
+		return nil
+	}
+	return db
 }
 
 func codexStateVersion(path string) int {

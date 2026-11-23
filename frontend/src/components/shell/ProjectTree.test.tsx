@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '../../i18n'
 import { ProjectTree } from './ProjectTree'
 import type { TreeTask } from './task-tree'
@@ -60,4 +60,20 @@ it('keeps unrelated sessions in one directory at the same level without a direct
   expect(roots.children.length).toBe(2)
   expect(screen.queryByText('不应出现的目录标题')).toBeNull()
   expect(document.querySelector('.tt-tree-children')).toBeNull()
+})
+
+it('ages session labels when the session directory is unchanged', () => {
+  vi.useFakeTimers()
+  try {
+    vi.setSystemTime(new Date('2026-11-23T02:00:00Z'))
+    const at = Date.now() / 1000 - 10
+    render(<I18nProvider><ProjectTree tree={{ projects: [], loose: [{ name: 'idle', label: 'Idle session', at }] }} activeTask={null} activeSession={null} onProject={vi.fn()} onSession={vi.fn()} /></I18nProvider>)
+    const label = screen.getByText('Idle session').closest('button')!.querySelector('.tm')!
+    expect(label.textContent).toMatch(/刚刚|Just now/i)
+    act(() => { vi.advanceTimersByTime(70_000) })
+    expect(label.textContent).toBe('1m')
+  } finally {
+    cleanup()
+    vi.useRealTimers()
+  }
 })

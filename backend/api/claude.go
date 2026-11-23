@@ -253,7 +253,7 @@ func scanAgentPanes(includeAlternatives bool) (map[string]agentProc, map[string]
 	return agentProcsByPane(scanSessionPanes(runtime.New()), includeAlternatives, nil)
 }
 
-func agentProcsByPane(panes []sessionPane, includeAlternatives bool, agentPanes map[string]bool) (map[string]agentProc, map[string][]string) {
+func agentProcsByPane(panes []sessionPane, includeAlternatives bool, agentPanes map[string]agentProc) (map[string]agentProc, map[string][]string) {
 	if panes == nil {
 		return nil, nil
 	}
@@ -275,11 +275,12 @@ func agentProcsByPane(panes []sessionPane, includeAlternatives bool, agentPanes 
 		if found == 0 {
 			continue
 		}
+		proc := agentProc{Kind: kind, Dir: pane.dir, Pid: found}
 		if agentPanes != nil {
-			agentPanes[pane.id] = true
+			agentPanes[pane.id] = proc
 		}
 		if primary.Kind == "" {
-			running[name] = agentProc{Kind: kind, Dir: pane.dir, Pid: found}
+			running[name] = proc
 		} else if includeAlternatives && primary.Kind != kind && !slices.Contains(alternatives[name], kind) {
 			alternatives[name] = append(alternatives[name], kind)
 		}

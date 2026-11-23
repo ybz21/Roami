@@ -28,20 +28,20 @@ func TestSessionActivitySkipsQuietBackgroundAndKeepsKnownValueOnFailedCapture(t 
 		return screen, ok
 	}
 	activity := (sessionActivity{}).observe(row, panes, 120, capture)
-	if activity.at != 115 {
-		t.Fatalf("initial activity = %d, want 115", activity.at)
+	if activity.at != 100 {
+		t.Fatalf("initial activity = %d, want 100", activity.at)
 	}
 	captured = nil
 	panes[0].activity = 120
 	screens["%1"] = "\nready      \n\n"
 	activity = activity.observe(row, panes, 130, capture)
-	if activity.at != 115 || strings.Join(captured, ",") != "%1" {
+	if activity.at != 100 || strings.Join(captured, ",") != "%1" {
 		t.Fatalf("same-second redraw: activity = %d, captured %v", activity.at, captured)
 	}
 	panes[0].activity = 140
 	delete(screens, "%1")
 	activity = activity.observe(row, panes, 141, capture)
-	if activity.at != 115 {
+	if activity.at != 100 {
 		t.Fatalf("failed capture changed activity to %d", activity.at)
 	}
 	screens["%1"] = "new response"
@@ -52,7 +52,7 @@ func TestSessionActivitySkipsQuietBackgroundAndKeepsKnownValueOnFailedCapture(t 
 	row.Created = "200"
 	panes = []sessionPane{{id: "%1", activity: 210}}
 	activity = activity.observe(row, panes, 220, capture)
-	if activity.identity != "$1:200" || activity.at != 210 {
+	if activity.identity != "$1:200" || activity.at != 200 {
 		t.Fatalf("recreated session reused prior observation: %+v", activity)
 	}
 }
@@ -68,6 +68,44 @@ func TestSessionActivityIgnoresAgentChromeAndKeepsShellOutput(t *testing.T) {
 	}
 	if paneActivityHash(before, true) == paneActivityHash("A new response.\n✻ Working for 2s", true) {
 		t.Fatal("new response did not change the activity fingerprint")
+	}
+}
+
+func TestSessionActivityUsesTranscriptAcrossAgentRedraw(t *testing.T) {
+	row := sessListItem{Name: "task", TmuxID: "$1", Created: "100"}
+	pane := sessionPane{id: "%1", agent: agentProc{Kind: "codex"}, confirmedAt: 95, activity: 190, height: 24}
+	capture := func(string) (string, bool) {
+		t.Fatal("Agent activity attempted to use a screen capture")
+		return "", false
+	}
+	prior := (sessionActivity{}).observe(row, []sessionPane{pane}, 200, capture)
+	pane.activity, pane.height = 200, 32
+	redraw := prior.observe(row, []sessionPane{pane}, 201, capture)
+	if prior.at != 95 || redraw.at != 95 {
+		t.Fatalf("redraw advanced transcript activity: initial=%d, redraw=%d", prior.at, redraw.at)
+	}
+	pane.confirmedAt = 205
+	if observed := redraw.observe(row, []sessionPane{pane}, 210, capture); observed.at != 205 {
+		t.Fatalf("new transcript output activity = %d, want 205", observed.at)
+	}
+}
+
+func TestSessionActivityKeepsShellTimeOnGeometryChange(t *testing.T) {
+	row := sessListItem{Name: "shell", TmuxID: "$1", Created: "100"}
+	pane := sessionPane{id: "%1", activity: 115, width: 100, height: 24}
+	capture := func(string) (string, bool) { return "recent output", true }
+	activity := (sessionActivity{}).observe(row, []sessionPane{pane}, 120, capture)
+	pane.activity, pane.height = 125, 32
+	capture = func(string) (string, bool) { return "old scrollback\\nrecent output", true }
+	activity = activity.observe(row, []sessionPane{pane}, 130, capture)
+	if activity.at != 100 {
+		t.Fatalf("resize advanced shell activity to %d", activity.at)
+	}
+	pane.activity = 140
+	capture = func(string) (string, bool) { return "old scrollback\\nrecent output\\nnew output", true }
+	activity = activity.observe(row, []sessionPane{pane}, 145, capture)
+	if activity.at != 140 {
+		t.Fatalf("new shell output activity = %d, want 140", activity.at)
 	}
 }
 
@@ -89,7 +127,7 @@ func TestSessionActivityProjectionPreservesTreeFields(t *testing.T) {
 	children := rows[0].Children
 	if len(children) != 3 || string(children[0]["last_activity"]) != `"125"` ||
 		string(children[0]["mem"]) != `{"paused":true}` ||
-		string(children[1]["last_activity"]) != "210" || string(children[2]["last_activity"]) != "220" {
+		string(children[1]["last_activity"]) != "101" || string(children[2]["last_activity"]) != "220" {
 		t.Fatalf("wrong projected tree: %s", live.projectSessionActivity([]byte(body)))
 	}
 }
@@ -263,18 +301,21 @@ done
 		tmux("send-keys", "-t", target, "Enter")
 	}
 
+	before := sessionRow().activityBaseline()
+	time.Sleep(1100 * time.Millisecond)
+	send("background", "ready")
 	go a.SessionEventLoop()
 	first := waitForSample(time.Time{})
-	before := rawInt(sessionRow().LastActivity)
-	if first.Activity.at != before || before == 0 {
-		t.Fatalf("initial activity = %d, raw %d", first.Activity.at, before)
+	startRaw := rawInt(sessionRow().LastActivity)
+	if first.Activity.at != before || startRaw <= before {
+		t.Fatalf("first activity = %d, raw = %d, created = %d", first.Activity.at, startRaw, before)
 	}
-	t.Logf("Initial                        tmux=%d  observed=%d", before, first.Activity.at)
+	t.Logf("Redraw before observer start   tmux=%d  observed=%d", startRaw, first.Activity.at)
 
 	send("background", "ready")
 	redraw := waitForSample(time.Now())
 	rawRedraw := rawInt(sessionRow().LastActivity)
-	if rawRedraw <= before || redraw.Activity.at != before {
+	if rawRedraw <= startRaw || redraw.Activity.at != before {
 		t.Fatalf("identical redraw: raw = %d, confirmed = %d, started at %d", rawRedraw, redraw.Activity.at, before)
 	}
 	t.Logf("Redrew the same text           tmux=%d  observed=%d", rawRedraw, redraw.Activity.at)
@@ -296,13 +337,13 @@ done
 	checkHTTP(before)
 	t.Logf("Selected a quiet window        tmux=%d  observed=%d", rawSwitch, switched.Activity.at)
 
-	send("foreground", "new background output")
+	tmux("select-window", "-t", "="+name+":foreground")
+	send("background", "new background output")
 	updated := waitForSample(time.Now())
-	rawOutput := rawInt(sessionRow().LastActivity)
-	if updated.Activity.at != rawOutput || rawOutput <= rawSwitch {
-		t.Fatalf("background output: raw = %d, confirmed = %d, switch = %d", rawOutput, updated.Activity.at, rawSwitch)
+	if updated.Activity.at <= rawSwitch {
+		t.Fatalf("background output: confirmed = %d, switch = %d", updated.Activity.at, rawSwitch)
 	}
-	checkHTTP(rawOutput)
-	t.Logf("New output in the background   tmux=%d  observed=%d", rawOutput, updated.Activity.at)
+	checkHTTP(updated.Activity.at)
+	t.Logf("New shell output in background observed=%d", updated.Activity.at)
 	t.Log("Flat list, tree, overview, and project timestamps agree.")
 }

@@ -190,6 +190,7 @@ func (a *API) SessionEventLoop() {
 		pid  int
 	}
 	files := map[fileKey]string{}
+	var activities activityTranscripts
 	for range t.C {
 		out, err := a.TT.Run("ls", "--json")
 		if err != nil {
@@ -219,15 +220,19 @@ func (a *API) SessionEventLoop() {
 			paused[s.Name] = s.Mem != nil && s.Mem.Paused
 		}
 		panes := scanSessionPanes(rt)
-		agentPanes := make(map[string]bool)
+		agentPanes := make(map[string]agentProc)
 		procs, _ := agentProcsByPane(panes, false, agentPanes)
+		for i := range panes {
+			panes[i].agent = agentPanes[panes[i].id]
+		}
+		now := time.Now()
+		activities = activities.sample(panes, now)
 		panesBySession := make(map[string][]sessionPane, len(sessions))
 		activePanes := make(map[string]string, len(sessions))
 		for _, pane := range panes {
 			if row, ok := rows[pane.session]; !ok || row.identity() != pane.identity {
 				continue
 			}
-			pane.agent = agentPanes[pane.id]
 			panesBySession[pane.session] = append(panesBySession[pane.session], pane)
 			if pane.active {
 				activePanes[pane.session] = pane.id
@@ -285,7 +290,7 @@ func (a *API) SessionEventLoop() {
 			a.Push.Broadcast(p)
 			a.Events.Broadcast(p)
 		}
-		now := time.Now()
+		now = time.Now()
 		for name := range sessions {
 			cap := capture(name)
 			prior, _ := a.Live.get(name)
