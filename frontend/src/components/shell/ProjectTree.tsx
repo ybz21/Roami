@@ -1,6 +1,6 @@
 import { useRegisteredAgents } from '../../agent-registry'
 // 项目下按会话的派生关系组织导航，目录归属只用于打开目标。
-import { useState, type ReactNode } from 'react'
+import { useEffect, useReducer, useState, type ReactNode } from 'react'
 import { Dropdown, Tooltip } from 'antd'
 import { useI18n } from '../../i18n'
 import type { AgentKind } from '../../agent-kind'
@@ -61,6 +61,20 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
   const agents = useRegisteredAgents()
   const { t } = useI18n()
   const [closed, setClosed] = useState<Set<string>>(readClosed)
+  const [, tick] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined
+    const sync = () => {
+      clearInterval(timer)
+      if (!document.hidden) {
+        tick()
+        timer = setInterval(tick, 15_000)
+      }
+    }
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', sync) }
+  }, [])
   const toggle = (key: string) => setClosed((cur) => {
     const next = new Set(cur)
     if (next.has(key)) next.delete(key); else next.add(key)

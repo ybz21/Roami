@@ -12,48 +12,54 @@ import (
 type sessionPane struct {
 	session, identity, id, dir string
 	pid                        int
-	activity                   int64
-	active, agent              bool
+	activity, confirmedAt      int64
+	width, height              int
+	active                     bool
+	agent                      agentProc
 }
 
 func scanSessionPanes(rt runtime.Runtime) []sessionPane {
 	const format = "#{session_name}\t#{session_id}:#{session_created}\t#{pane_id}\t#{pane_pid}\t" +
-		"#{window_activity}\t#{&&:#{window_active},#{pane_active}}\t#{pane_current_path}"
+		"#{window_activity}\t#{&&:#{window_active},#{pane_active}}\t#{pane_width}\t#{pane_height}\t#{pane_current_path}"
 	out, err := rt.TmuxOutput("list-panes", "-a", "-F", format)
 	if err != nil {
 		return nil
 	}
 	var panes []sessionPane
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.SplitN(line, "\t", 7)
-		if len(parts) != 7 {
+		parts := strings.SplitN(line, "\t", 9)
+		if len(parts) != 9 {
 			continue
 		}
 		pid, _ := strconv.Atoi(parts[3])
 		activity, _ := strconv.ParseInt(parts[4], 10, 64)
+		width, _ := strconv.Atoi(parts[6])
+		height, _ := strconv.Atoi(parts[7])
 		panes = append(panes, sessionPane{
 			session: parts[0], identity: parts[1], id: parts[2], pid: pid,
-			activity: activity, active: parts[5] == "1", dir: parts[6],
+			activity: activity, active: parts[5] == "1", width: width, height: height, dir: parts[8],
 		})
 	}
 	return panes
 }
 
 type paneActivity struct {
-	screen     [sha256.Size]byte
-	observedAt int64
+	screen        [sha256.Size]byte
+	observedAt    int64
+	width, height int
 }
 
 type sessionActivity struct {
-	identity string
-	at       int64
-	panes    map[string]paneActivity
+	identity  string
+	at        int64
+	confirmed bool
+	panes     map[string]paneActivity
 }
 
 func (s sessionActivity) observe(row sessListItem, panes []sessionPane, now int64, capture func(string) (string, bool)) sessionActivity {
 	identity := row.identity()
 	if identity != s.identity {
-		s = sessionActivity{identity: identity}
+		s = sessionActivity{identity: identity, at: row.activityBaseline()}
 	}
 	if identity == "" || row.dormant() || len(panes) == 0 {
 		return s
@@ -61,6 +67,10 @@ func (s sessionActivity) observe(row sessListItem, panes []sessionPane, now int6
 
 	next := make(map[string]paneActivity, len(panes))
 	for _, pane := range panes {
+		if usesTranscriptActivity(pane.agent.Kind) {
+			s.confirm(pane.confirmedAt)
+			continue
+		}
 		old, seen := s.panes[pane.id]
 		if seen {
 			next[pane.id] = old
@@ -74,14 +84,20 @@ func (s sessionActivity) observe(row sessListItem, panes []sessionPane, now int6
 			continue
 		}
 		// tmux advances window_activity on focus and on any PTY bytes, even an identical redraw.
-		hash := paneActivityHash(text, pane.agent)
-		next[pane.id] = paneActivity{screen: hash, observedAt: now}
-		if !seen || hash != old.screen {
-			s.at = max(s.at, pane.activity)
+		hash := paneActivityHash(text, pane.agent.Kind != "")
+		next[pane.id] = paneActivity{screen: hash, observedAt: now, width: pane.width, height: pane.height}
+		if seen && old.width == pane.width && old.height == pane.height && hash != old.screen {
+			s.confirm(pane.activity)
 		}
 	}
 	s.panes = next
 	return s
+}
+
+func (s *sessionActivity) confirm(at int64) {
+	if at > 0 && (!s.confirmed || at > s.at) {
+		s.at, s.confirmed = at, true
+	}
 }
 
 func paneActivityHash(text string, agent bool) [sha256.Size]byte {
@@ -111,7 +127,15 @@ func (l *liveTable) sessionActivity(row sessListItem) int64 {
 	if at, ok := l.observedActivity(row); ok {
 		return at
 	}
-	return rawInt(row.LastActivity)
+	return row.activityBaseline()
+}
+
+func (s sessListItem) activityBaseline() int64 {
+	if !s.dormant() && s.identity() != "" {
+		created, _ := strconv.ParseInt(s.Created, 10, 64)
+		return created
+	}
+	return rawInt(s.LastActivity)
 }
 
 func (l *liveTable) observedActivity(row sessListItem) (int64, bool) {
@@ -138,8 +162,8 @@ func (l *liveTable) projectSessionActivity(body []byte) []byte {
 		if err := json.Unmarshal(raw, &row); err != nil {
 			return raw
 		}
-		at, observed := l.observedActivity(row.sessListItem)
-		changed := observed && at != rawInt(row.LastActivity)
+		at := l.sessionActivity(row.sessListItem)
+		changed := len(row.LastActivity) > 0 && at != rawInt(row.LastActivity)
 		if !changed && len(row.Children) == 0 {
 			return raw
 		}

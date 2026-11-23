@@ -30,6 +30,9 @@ import (
 func cmdlineHasCodex(pid int) bool { return argvIsCodex(processArgv(pid)) }
 
 func codexSessionsRoot() string {
+	if dir := strings.TrimSpace(os.Getenv("CODEX_HOME")); dir != "" {
+		return filepath.Join(dir, "sessions")
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".codex", "sessions")
 }
