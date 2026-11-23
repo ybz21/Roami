@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { RoutingStrategy } from './model-routing-api'
 import { api } from '../../api'
 
-export type ModelSource = { connector?: 'openrouter-free'; pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; accountRoutingAvailable?: boolean; id: string; name: string; baseUrl: string; protocol: string; authMode: string; skipTlsVerification?: boolean; hasKey?: boolean; apiKey?: string }
+export type ModelSource = { connector?: 'openrouter-free'; pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; accountRoutingAvailable?: boolean; id: string; name: string; sourceKey?: string; baseUrl: string; protocol: string; authMode: string; skipTlsVerification?: boolean; hasKey?: boolean; apiKey?: string; headerNames?: string[]; headers?: Record<string, string> }
 export type ModelCandidate = { sourceId: string; model: string }
 export type CatalogModel = { id: string; aliases?: string[]; name: string; protocol: string; strategy: 'fixed' | 'failover' | RoutingStrategy; aggregate?: boolean; enabled?: boolean; freeOnly?: boolean; allowPlan?: boolean; requireTools?: boolean; minContext?: number; cooldownSeconds?: number; onLimit?: boolean; onExhausted?: boolean; weights?: Record<string, number>; candidates: ModelCandidate[] }
 export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string>; defaultModel?: string }
@@ -11,8 +11,13 @@ const normalizeCatalog = (data: ModelCatalog): ModelCatalog => ({ ...data, sourc
 export const MODEL_CATALOG_CHANGED = 'roami:model-catalog-changed'
 export const modelProtocols = ['openai-completions', 'openai-responses', 'anthropic-messages']
 export const openRouterConnection = { connector: 'openrouter-free', baseUrl: 'https://openrouter.ai/api/v1', protocol: 'openai-completions', authMode: 'bearer' } as const
+export const sourceModelName = (source: Pick<ModelSource, 'sourceKey' | 'id'>, model: string) => (source.sourceKey?.trim() || source.id) + '/' + model
 export function catalogFailure(cause: any): string {
   const code = cause?.apiError?.code || cause?.message
+  if (code === 'INVALID_MODEL_SOURCE_HEADERS') return 'hub.headers.invalid'
+  if (code === 'MODEL_HEADERS_REQUIRED_FOR_ENDPOINT') return 'hub.headers.newEndpoint'
+  if (code === 'INVALID_MODEL_SOURCE_KEY') return 'hub.sourceKey.invalid'
+  if (code === 'MODEL_SOURCE_KEY_IN_USE') return 'hub.sourceKey.inUse'
   return code === 'MODEL_GATEWAY_KEY_DISABLED' ? 'hub.error.connectionDisabled' : code === 'MODEL_CONFIGURATION_BUSY' ? 'agent.models.busy' : code === 'MODEL_CATALOG_CHANGED' || code === 'AGENT_CONFIG_CHANGED' ? 'hub.error.changed' : code === 'MODEL_ROUTE_CYCLE' ? 'pool.cycle' : code === 'MODEL_CATALOG_IN_USE' ? 'hub.error.inUse' : code === 'INVALID_MODEL_CATALOG' || code === 'INVALID_MODEL_PROTOCOL' ? 'hub.error.invalid' : code === 'MODEL_KEY_REQUIRED_FOR_ENDPOINT' ? 'agent.models.newEndpointKey' : 'hub.error.failed'
 }
 export function useModelCatalog() {

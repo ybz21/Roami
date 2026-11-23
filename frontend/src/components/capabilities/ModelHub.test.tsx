@@ -426,13 +426,49 @@ it('updates an existing source without fetching models and retains its stored ke
   const name = await screen.findByLabelText('hub.name')
   expect(screen.getByRole('region', { name: 'hub.source' }).querySelector('input')).toBe(name)
   fireEvent.change(name, { target: { value: 'Renamed source' } })
+  fireEvent.change(screen.getByLabelText('hub.sourceKey.label'), { target: { value: 'bladeai' } })
   fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
   const dialog = await screen.findByRole('alertdialog')
   fireEvent.click(within(dialog).getByRole('button', { name: 'agent.models.save' }))
   await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({
-    sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '' })], models: catalog.models,
+    sources: [expect.objectContaining({ id: 'upstream', name: 'Renamed source', apiKey: '', sourceKey: 'bladeai' })], models: catalog.models,
   })))
+  expect(await screen.findByText('bladeai/priced-model')).toBeTruthy()
   expect(vi.mocked(api).mock.calls.some(([, path]) => path.endsWith('/discover'))).toBe(false)
+})
+
+it('saves source headers with a masked existing value and removes saved headers explicitly', async () => {
+  const fallback = vi.mocked(api).getMockImplementation()!
+  let names = ['X-User-Id']
+  const path = '/agent/model-gateway/catalog'
+  vi.mocked(api).mockImplementation(async (method, url, body, options) => {
+    if (url !== path) return fallback(method, url, body, options)
+    if (method === 'PUT') names = Object.keys(body.sources[0].headers)
+    return { data: { ...catalog, sources: [{ ...catalog.sources[0], headerNames: names }] } }
+  })
+  mount('catalog/source/upstream')
+  const edit = async () => fireEvent.click(await screen.findByRole('button', { name: 'hub.directory.changeConnection' }))
+  const save = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'agent.models.save' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'agent.models.save' }))
+  }
+  await edit()
+  expect(screen.getByPlaceholderText('hub.headers.kept')).toHaveProperty('value', '')
+  fireEvent.click(screen.getByRole('button', { name: 'hub.headers.add' }))
+  fireEvent.change(screen.getAllByLabelText('hub.headers.name')[1], { target: { value: 'x-user-id' } })
+  expect(screen.getByText('hub.headers.invalidName')).toBeTruthy()
+  fireEvent.change(screen.getAllByLabelText('hub.headers.name')[1], { target: { value: 'X-Title' } })
+  fireEvent.change(screen.getAllByLabelText('hub.headers.value')[1], { target: { value: 'Test app' } })
+  await save()
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', path, expect.objectContaining({
+    sources: [expect.objectContaining({ headers: { 'X-User-Id': '', 'X-Title': 'Test app' } })],
+  })))
+  await edit()
+  for (const remove of screen.getAllByRole('button', { name: 'hub.headers.remove' })) fireEvent.click(remove)
+  await save()
+  await waitFor(() => expect(api).toHaveBeenCalledWith('PUT', path, expect.objectContaining({
+    sources: [expect.objectContaining({ headers: {} })],
+  })))
 })
 
 it('opens connection editing after fetching an existing source and keeps model changes out of the connection save', async () => {

@@ -3,9 +3,9 @@ import { App } from 'antd'
 import { Alert, Button, Checkbox, Input, Select, Popconfirm, Pagination } from './model-controls'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { ChevronDown, LinkIcon, PlusIcon, SearchIcon } from '../../icons'
+import { ChevronDown, LinkIcon, PlusIcon, SearchIcon, TrashIcon } from '../../icons'
 import { configuredSourceModels } from './configured-source-models'
-import { catalogFailure, modelProtocols, openRouterConnection, type ModelCatalog, type ModelSource } from './model-hub-api'
+import { catalogFailure, modelProtocols, openRouterConnection, sourceModelName, type ModelCatalog, type ModelSource } from './model-hub-api'
 
 const discoveryErrors: Record<string, string> = {
   MODEL_LIST_UNAUTHORIZED: 'hub.directory.unauthorized',
@@ -18,6 +18,7 @@ const discoveryErrors: Record<string, string> = {
 export type SourceDraft = {
   source: ModelSource
   original: ModelSource
+  headerRows?: HeaderRow[]
   managing?: boolean
   editing: boolean
   directory: string[] | null
@@ -29,8 +30,11 @@ export type SourceDraft = {
   fetchRequested?: boolean
   manualOpen: boolean
 }
+type HeaderRow = { id: number; name: string; value: string }
 export const initialSourceDraft = (source: ModelSource, existing: boolean): SourceDraft => ({ source: { ...source, apiKey: '' }, original: source, editing: !existing, directory: null, selected: [], query: '', manual: '', manualOpen: false })
-const connectionKey = (source: ModelSource) => JSON.stringify([source.id, source.connector, source.baseUrl, source.apiKey, source.protocol, source.authMode, !!source.skipTlsVerification])
+const connectionKey = (source: ModelSource, headerRows?: HeaderRow[]) => JSON.stringify([source.id, source.connector, source.baseUrl, source.apiKey, source.protocol, source.authMode, !!source.skipTlsVerification, source.headerNames, headerRows])
+const headerNamePattern = /^[!#$%&'*+.\x5e_`|~\-\da-z]+$/i
+const maxSourceHeaders = 16
 const normalizeURL = (value: string) => value.trim().replace(/\/+$/, '')
 const sourceName = (source: ModelSource) => {
   if (source.name.trim()) return source.name.trim()
@@ -51,17 +55,28 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
   const urlHintId = useId()
+  const sourceKeyErrorId = useId()
   const [confirming, setConfirming] = useState(false), [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false), [readError, setReadError] = useState('')
   const request = useRef<AbortController | null>(null)
   const current = useRef(draft); current.current = draft
   const source = draft.source, existing = catalog.sources.find(row => row.id === source.id)
-  const key = connectionKey(source)
+  const key = connectionKey(source, draft.headerRows)
   const normalizedURL = normalizeURL(source.baseUrl)
+  const sourceKey = source.sourceKey?.trim() || source.id
+  const sourceKeyError = !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(sourceKey) ? 'hub.sourceKey.invalid' : catalog.sources.some(row => row.id !== source.id && (row.sourceKey || row.id) === sourceKey) ? 'hub.sourceKey.inUse' : ''
   const url = parseSourceURL(normalizedURL)
   const urlError = !!normalizedURL && !url
   const urlHint = urlError ? 'hub.directory.invalidBaseUrl' : url?.protocol === 'http:' ? 'hub.directory.plainHttp' : ''
   const connectionOnly = !!existing && draft.editing
+  const savedHeaders = (source.headerNames || []).map(name => name.toLowerCase())
+  const headerRows = draft.headerRows ?? (source.headerNames || []).map((name, id) => ({ id, name, value: '' }))
+  const pendingHeaders = Object.fromEntries(headerRows.map(row => [row.name.trim(), row.value]))
+  const distinctNames = new Set(headerRows.map(row => row.name.trim().toLowerCase()))
+  const invalidNames = distinctNames.size !== headerRows.length || headerRows.some(row => !headerNamePattern.test(row.name.trim()))
+  const missingValues = headerRows.some(row => !row.value.trim() && (row.value !== '' || !savedHeaders.includes(row.name.trim().toLowerCase())))
+  const needsHeaders = !!existing && normalizedURL !== existing.baseUrl && headerRows.some(row => !row.value.trim() && savedHeaders.includes(row.name.trim().toLowerCase()))
+  const headerError = needsHeaders ? 'hub.headers.newEndpoint' : invalidNames ? 'hub.headers.invalidName' : missingValues ? 'hub.headers.missingValue' : ''
   useEffect(() => { request.current?.abort(); request.current = null; setLoading(false); setReadError(''); return () => request.current?.abort() }, [key])
   const patch = (next: Partial<SourceDraft>) => onChange({ ...draft, ...next })
   const editConnection = () => {
@@ -74,13 +89,19 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const updateSource = (next: Partial<ModelSource>) => {
     const updated = { ...source, ...next }
     if (next.baseUrl !== undefined && normalizeURL(next.baseUrl) !== normalizedURL) updated.skipTlsVerification = undefined
-    if (!connectionOnly && connectionKey(updated) !== key) { request.current?.abort(); patch({ source: updated, directory: null, selected: [], fetchRequested: false }) }
+    if (!connectionOnly && connectionKey(updated, draft.headerRows) !== key) { request.current?.abort(); patch({ source: updated, directory: null, selected: [], fetchRequested: false }) }
     else patch({ source: updated })
   }
+  const updateHeaders = (headerRows: HeaderRow[]) => {
+    if (connectionOnly) patch({ headerRows })
+    else patch({ headerRows, directory: null, selected: [], fetchRequested: false })
+  }
+  const updateHeader = (id: number, change: Partial<Pick<HeaderRow, 'name' | 'value'>>) => updateHeaders(headerRows.map(row => row.id === id ? { ...row, ...change } : row))
+  const addHeader = () => updateHeaders([...headerRows, { id: Math.max(-1, ...headerRows.map(row => row.id)) + 1, name: '', value: '' }])
   const openRouter = source.connector === openRouterConnection.connector
   const canChangeConnector = !!existing && normalizedURL === openRouterConnection.baseUrl && source.protocol === openRouterConnection.protocol
   const needsKey = !!existing?.hasKey && normalizedURL !== existing.baseUrl && !source.apiKey
-  const validConnection = !!url && !needsKey
+  const validConnection = !!url && !needsKey && !headerError && !sourceKeyError
   const attached = configuredSourceModels(catalog.models, source.id)
   const added = new Set(attached.map(model => model.candidates[0].model))
   const manual = [...new Set(draft.manual.split(/\r?\n/).map(value => value.trim()).filter(Boolean))]
@@ -89,8 +110,8 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const additions = [...new Set([...selected, ...manual])].filter(value => !added.has(value))
   const removed = new Set((draft.removed || []).filter(value => added.has(value) && !manual.includes(value)))
   const removedCount = attached.filter(model => removed.has(model.candidates[0].model)).length
-  const sourceConflict = !!existing && (connectionKey(existing) !== connectionKey(draft.original) || existing.name !== draft.original.name)
-  const changedConnection = !!existing && (connectionKey({ ...existing, apiKey: '' }) !== key || source.name.trim() !== existing.name)
+  const sourceConflict = !!existing && (connectionKey(existing) !== connectionKey(draft.original) || existing.name !== draft.original.name || existing.sourceKey !== draft.original.sourceKey)
+  const changedConnection = !!existing && (connectionKey({ ...existing, apiKey: '' }) !== key || source.name.trim() !== existing.name || sourceKey !== (existing.sourceKey || existing.id))
   const overLimit = catalog.models.length - removedCount + additions.length > 1000
   const managing = !existing || !!draft.managing
   const removesModels = !connectionOnly && removedCount > 0
@@ -99,7 +120,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const canSave = !sourceConflict && canRead && !busy && !loading && (connectionOnly ? changedConnection : !invalidManual && !overLimit && (!existing || additions.length > 0 || removesModels))
   const cancel = () => {
     if (!existing) return
-    if (connectionOnly && !sourceConflict) patch({ source: { ...existing, apiKey: '' }, editing: false })
+    if (connectionOnly && !sourceConflict) patch({ source: { ...existing, apiKey: '' }, headerRows: undefined, editing: false })
     else onChange(initialSourceDraft(existing, true))
   }
   const number = (value: number) => new Intl.NumberFormat(locale).format(value)
@@ -111,7 +132,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }
   const listed = openRouter && draft.directory !== null ? draft.directory : [...new Set([...(draft.directory || []), ...added])]
   const visible = listed.filter(id =>
-    [id, draft.directory === null ? '' : draft.directoryNames?.[id] || '', ...(savedNames.get(id) || [])].some(value => value.toLowerCase().includes(query)),
+    [sourceModelName(source, id), draft.directory === null ? '' : draft.directoryNames?.[id] || '', ...(savedNames.get(id) || [])].some(value => value.toLowerCase().includes(query)),
   )
   const currentPage = Math.min(page, Math.max(1, Math.ceil(visible.length / 30)))
   useEffect(() => { setPage(1) }, [draft.query, draft.directory])
@@ -124,7 +145,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
     const abort = new AbortController(); request.current = abort
     setLoading(true); setReadError(''); if (existing) patch({ managing: true })
     try {
-      const { data } = await api('POST', '/agent/model-gateway/catalog/discover', { revision: catalog.revision, source: { ...source, baseUrl: normalizedURL } }, { signal: abort.signal })
+      const { data } = await api('POST', '/agent/model-gateway/catalog/discover', { revision: catalog.revision, source: { ...source, baseUrl: normalizedURL, headers: draft.headerRows === undefined ? undefined : pendingHeaders } }, { signal: abort.signal })
       if (!abort.signal.aborted) {
         const directoryNames = Object.fromEntries((data.details || []).map((row: { id: string; name?: string }) => [row.id, row.name || '']))
         onChange({ ...current.current, directory: data.models, directoryNames, managing: true, editing: false, fetchRequested: false, selected: current.current.selected.filter(value => data.models.includes(value)) })
@@ -138,7 +159,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }, [draft.fetchRequested, canRead, busy])
   const save = async () => {
     if (!canSave) return
-    const nextSource = existing && !connectionOnly ? {...existing,apiKey:''} : { ...source, name: sourceName(source), baseUrl: normalizedURL }
+    const nextSource = existing && !connectionOnly ? {...existing,apiKey:''} : { ...source, name: sourceName(source), baseUrl: normalizedURL, headers: draft.headerRows === undefined ? undefined : pendingHeaders }
     const nextModels = connectionOnly ? catalog.models.map(model => !model.aggregate && model.candidates[0].sourceId === source.id ? {...model,protocol:source.protocol} : model) : catalog.models.filter(model => model.aggregate || model.candidates[0].sourceId !== source.id || !removed.has(model.candidates[0].model)).map(model => !model.aggregate && model.candidates[0].sourceId === source.id ? { ...model, protocol: source.protocol } : model)
     for (const model of connectionOnly ? [] : additions) nextModels.push({ id: globalThis.crypto?.randomUUID?.() || 'model-' + Math.random().toString(36).slice(2), name: model, protocol: source.protocol, strategy: 'fixed', candidates: [{ sourceId: source.id, model }] })
     if (await onSave({ ...catalog, sources: existing ? catalog.sources.map(row => row.id === source.id ? nextSource : row) : [...catalog.sources, nextSource], models: nextModels })) { message.success(t('agent.models.saved')); if (!existing) onBack() }
@@ -152,12 +173,17 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
     <Popconfirm danger={removesModels} open={confirming} onOpenChange={setConfirming} title={t(removesModels ? 'hub.directory.applyModels' : 'hub.sourceApply')} description={t(removesModels ? 'hub.directory.removeImpact' : 'hub.sourceImpact')} okText={t('agent.models.save')} onConfirm={save} />
     <div className="tt-model-source-content">
       {authentication}
-      {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
+      {sourceConflict && <Alert type="warning" role="alert" message={t('hub.directory.sourceChanged')} action={<Button onClick={() => onChange({ ...draft, source: { ...existing!, apiKey: '' }, original: existing!, headerRows: undefined, directory: null, editing: true })}>{t('hub.directory.useLatest')}</Button>} />}
       {error && <Alert type="error" role="alert" message={t(error)} action={<Button onClick={retry}>{t('capabilities.models.reread')}</Button>} />}
       <section className="tt-model-source-connection" aria-label={t('hub.source')}>
         {draft.editing && <label className="agent-settings-field">
           {t('hub.directory.sourceName')}
           <Input aria-label={t('hub.name')} value={source.name} maxLength={100} placeholder={source.pluginSourceId ? undefined : t('hub.directory.autoName')} onChange={event => updateSource({ name: event.target.value })} />
+        </label>}
+        {draft.editing && <label className="agent-settings-field">
+          {t('hub.sourceKey.label')}
+          <Input value={source.sourceKey || ''} placeholder={source.id} maxLength={160} autoCapitalize="none" spellCheck={false} aria-describedby={sourceKeyError ? sourceKeyErrorId : undefined} status={sourceKeyError ? 'error' : undefined} onChange={event => updateSource({ sourceKey: event.target.value })} />
+          {sourceKeyError && <span className="tt-model-source-warning" id={sourceKeyErrorId} role="alert">{t(sourceKeyError)}</span>}
         </label>}
         {draft.editing && !source.pluginSourceId && <>
           {canChangeConnector && <label className="agent-settings-field">{t('modelInteraction.sourceType')}<Select virtual={false} aria-label={t('modelInteraction.sourceType')} value={source.connector || 'api'} options={[{ value: 'api', label: t('modelInteraction.sourceType.api') }, { value: 'openrouter-free', label: t('hub.openRouter.name') }]} onChange={value => updateSource(value === 'openrouter-free' ? openRouterConnection : { connector: undefined })} /></label>}
@@ -173,6 +199,18 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
             {!openRouter && <label className="agent-settings-field">{t('capabilities.models.authMode')}<Select virtual={false} aria-label={t('capabilities.models.authMode')} value={source.authMode} options={['api_key', 'bearer'].map(value => ({ value, label: t('capabilities.models.auth.' + value) }))} onChange={authMode => updateSource({ authMode })} /></label>}
             {url?.protocol === 'https:' && <Checkbox checked={source.skipTlsVerification} onChange={event => updateSource({ skipTlsVerification: event.target.checked })}>{t('hub.directory.skipTlsVerification')}</Checkbox>}
           </div></details>
+          <details className="tt-model-source-options" open={!!source.headerNames?.length || undefined}>
+            <summary>{t('hub.headers.title')}<ChevronDown /></summary>
+            <div>
+              {headerRows.map(row => <div className="tt-model-source-header-row" key={row.id}>
+                <label className="agent-settings-field">{t('hub.headers.name')}<Input value={row.name} maxLength={128} autoComplete="off" autoCapitalize="none" spellCheck={false} onChange={event => updateHeader(row.id, { name: event.target.value })} /></label>
+                <label className="agent-settings-field">{t('hub.headers.value')}<Input.Password value={row.value} maxLength={4096} autoComplete="new-password" placeholder={normalizedURL === existing?.baseUrl && savedHeaders.includes(row.name.trim().toLowerCase()) ? t('hub.headers.kept') : undefined} onChange={event => updateHeader(row.id, { value: event.target.value })} /></label>
+                <button type="button" className="tt-act danger" aria-label={t('hub.headers.remove')} onClick={() => updateHeaders(headerRows.filter(header => header.id !== row.id))}><TrashIcon size={16} /></button>
+              </div>)}
+              {headerError && <p role="alert" className="tt-model-source-warning">{t(headerError)}</p>}
+              {headerRows.length < maxSourceHeaders && <Button type="default" className="tt-model-source-add-header" icon={<PlusIcon />} onClick={addHeader}>{t('hub.headers.add')}</Button>}
+            </div>
+          </details>
         </>}
         {!draft.editing && <div className="tt-model-source-summary"><LinkIcon size={18} /><div><strong>{sourceName(source)}</strong>{!source.pluginSourceId && sourceName(source) !== source.baseUrl && <small>{source.baseUrl}</small>}</div><button type="button" className="tt-act" disabled={busy} onClick={editConnection}>{t('hub.directory.changeConnection')}</button></div>}
         {!connectionOnly && <div className="tt-model-source-read"><Button type={draft.directory === null ? 'primary' : 'default'} loading={loading} disabled={!canRead || busy} onClick={() => void read()}>{t(openRouter ? 'hub.openRouter.fetch' : existing && !draft.managing ? 'modelInteraction.manageModels' : existing && draft.directory === null ? 'hub.directory.updateModels' : draft.directory === null ? 'hub.directory.fetch' : 'hub.directory.refetch')}</Button>{!existing && draft.directory === null && <span>{t('hub.directory.readHint')}</span>}</div>}
@@ -186,7 +224,13 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         {managing && !!(draft.directory?.length || attached.length) && <div className="tt-model-directory-selection"><Checkbox checked={!!selectable.length && selectedVisible.length === selectable.length} indeterminate={selectedVisible.length > 0 && selectedVisible.length < selectable.length} disabled={!selectable.length} onChange={event => selectModels(selectable, event.target.checked)}>{t(draft.query ? 'hub.directory.selectMatches' : 'hub.directory.selectAll')}</Checkbox>{!!selected.length && <button type="button" className="tt-act" onClick={() => patch({ selected: [] })}>{t('hub.directory.clear')}</button>}</div>}
         <div className="tt-model-directory-list">{visible.slice((currentPage - 1) * 30, currentPage * 30).map(model => {
           const saved = attached.filter(row => row.candidates[0].model === model)
-          return <div className="tt-model-directory-row" key={model}>{managing ? <Checkbox disabled={busy || loading} checked={checked(model)} onChange={event => selectModels([model], event.target.checked)}><span>{model}</span></Checkbox> : <strong className="tt-model-directory-name">{model}</strong>}{!!saved.length && <div className="tt-model-directory-actions">{draft.directory !== null && !draft.directory.includes(model) && <span className="tt-model-source-warning">{t('hub.directory.notListed')}</span>}{saved.map(row => <button key={row.id} type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>)}</div>}</div>
+          return <div className="tt-model-directory-row" key={model}>
+            <div className="tt-model-directory-identity">
+              {managing ? <Checkbox disabled={busy || loading} checked={checked(model)} onChange={event => selectModels([model], event.target.checked)}><span>{model}</span></Checkbox> : <strong className="tt-model-directory-name">{model}</strong>}
+              <code>{sourceModelName(source, model)}</code>
+            </div>
+            {!!saved.length && <div className="tt-model-directory-actions">{draft.directory !== null && !draft.directory.includes(model) && <span className="tt-model-source-warning">{t('hub.directory.notListed')}</span>}{saved.map(row => <button key={row.id} type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>)}</div>}
+          </div>
         })}</div>
         {!visible.length && <p className="agent-settings-hint">{t(listed.length ? 'hub.directory.noMatches' : openRouter && draft.directory !== null ? 'hub.openRouter.empty' : 'orchestration.noConfiguredModels')}</p>}
       {visible.length > 30 && <Pagination current={currentPage} total={visible.length} pageSize={30} onChange={setPage} />}

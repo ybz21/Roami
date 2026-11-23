@@ -12,7 +12,8 @@ import (
 func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 	type route struct {
 		URL, Protocol, AuthMode, Credential, Model string
-		SkipTLSVerification                        bool `json:",omitempty"`
+		SkipTLSVerification                        bool              `json:",omitempty"`
+		Headers                                    map[string]string `json:",omitempty"`
 	}
 	sources := map[string]ModelSource{}
 	for _, source := range catalog.Sources {
@@ -23,7 +24,7 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		routes := []route{}
 		for _, candidate := range model.Candidates {
 			source := sources[candidate.SourceID]
-			routes = append(routes, route{source.BaseURL, source.Protocol, source.AuthMode, source.APIKey + source.PluginRevision, candidate.Model, source.SkipTLSVerification})
+			routes = append(routes, route{source.BaseURL, source.Protocol, source.AuthMode, source.APIKey + source.PluginRevision, candidate.Model, source.SkipTLSVerification, source.Headers})
 		}
 		raw, err := json.Marshal(struct {
 			Protocol, Strategy string

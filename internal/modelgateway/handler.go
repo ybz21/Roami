@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,10 +50,21 @@ func NewHandler(ledger *Ledger) *Handler {
 }
 
 func (h *Handler) sourceClient(source ModelSource) *http.Client {
+	client := h.Client
 	if source.SkipTLSVerification {
-		return h.uncheckedTLS
+		client = h.uncheckedTLS
 	}
-	return h.Client
+	if len(source.Headers) == 0 {
+		return client
+	}
+	withHeaders := *client
+	transport := client.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	endpoint, _ := url.Parse(source.BaseURL)
+	withHeaders.Transport = sourceHeaderTransport{RoundTripper: transport, endpoint: endpoint, headers: source.Headers}
+	return &withHeaders
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

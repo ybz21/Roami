@@ -19,20 +19,23 @@ import (
 )
 
 type ModelSource struct {
-	ID                       string `json:"id"`
-	Connector                string `json:"connector,omitempty"`
-	PluginSourceID           string `json:"pluginSourceId,omitempty"`
-	PluginRevision           string `json:"pluginRevision,omitempty"`
-	PluginDesktop            bool   `json:"pluginDesktop,omitempty"`
-	PluginDesktopUnavailable bool   `json:"pluginDesktopUnavailable,omitempty"`
-	AccountRoutingAvailable  bool   `json:"accountRoutingAvailable,omitempty"`
-	Name                     string `json:"name"`
-	BaseURL                  string `json:"baseUrl"`
-	Protocol                 string `json:"protocol"`
-	AuthMode                 string `json:"authMode"`
-	SkipTLSVerification      bool   `json:"skipTlsVerification,omitempty"`
-	APIKey                   string `json:"apiKey,omitempty"`
-	HasKey                   bool   `json:"hasKey,omitempty"`
+	ID                       string            `json:"id"`
+	Connector                string            `json:"connector,omitempty"`
+	PluginSourceID           string            `json:"pluginSourceId,omitempty"`
+	PluginRevision           string            `json:"pluginRevision,omitempty"`
+	PluginDesktop            bool              `json:"pluginDesktop,omitempty"`
+	PluginDesktopUnavailable bool              `json:"pluginDesktopUnavailable,omitempty"`
+	AccountRoutingAvailable  bool              `json:"accountRoutingAvailable,omitempty"`
+	Name                     string            `json:"name"`
+	SourceKey                *string           `json:"sourceKey,omitempty"`
+	BaseURL                  string            `json:"baseUrl"`
+	Protocol                 string            `json:"protocol"`
+	AuthMode                 string            `json:"authMode"`
+	SkipTLSVerification      bool              `json:"skipTlsVerification,omitempty"`
+	APIKey                   string            `json:"apiKey,omitempty"`
+	HasKey                   bool              `json:"hasKey,omitempty"`
+	Headers                  map[string]string `json:"headers,omitempty"`
+	HeaderNames              []string          `json:"headerNames,omitempty"`
 }
 type ModelCandidate struct {
 	SourceID string `json:"sourceId"`
@@ -271,6 +274,7 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	for i := range v.Sources {
 		v.Sources[i].HasKey = v.Sources[i].APIKey != ""
 		v.Sources[i].APIKey = ""
+		v.Sources[i].hideHeaderValues()
 		if v.Sources[i].PluginSourceID != "" && s.plugins != nil {
 			if source, err := s.plugins.ReadSource(v.Sources[i].PluginSourceID); err == nil {
 				v.Sources[i].PluginDesktop = source.ProviderID == "doubao-work"
@@ -287,11 +291,20 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	return v
 }
 func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (ModelSource, error) {
+	if p.SourceKey == nil {
+		p.SourceKey = previous.SourceKey
+	} else if key := strings.TrimSpace(*p.SourceKey); key == "" {
+		p.SourceKey = nil
+	} else if !catalogID.MatchString(key) {
+		return ModelSource{}, errors.New("INVALID_MODEL_SOURCE_KEY")
+	} else {
+		p.SourceKey = &key
+	}
 	if p.Connector != "" && (p.Connector != openRouterFreeConnector || p.PluginSourceID != "") {
 		return ModelSource{}, catalogError()
 	}
 	if p.PluginSourceID != "" {
-		if s.plugins == nil || p.ID != p.PluginSourceID || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || strings.ContainsAny(p.Name, "\r\n\x00") {
+		if len(p.Headers) > 0 || s.plugins == nil || p.ID != p.PluginSourceID || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || strings.ContainsAny(p.Name, "\r\n\x00") {
 			return ModelSource{}, catalogError()
 		}
 		if _, err := s.plugins.ReadSource(p.PluginSourceID); err != nil {
@@ -300,7 +313,7 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 		if previous.ID != "" && previous.PluginSourceID != p.PluginSourceID {
 			return ModelSource{}, catalogError()
 		}
-		return ModelSource{ID: p.ID, PluginSourceID: p.PluginSourceID, PluginRevision: previous.PluginRevision, Name: strings.TrimSpace(p.Name), BaseURL: "https://magpie.invalid/" + p.ID, Protocol: "openai-completions", AuthMode: "plugin"}, nil
+		return ModelSource{ID: p.ID, PluginSourceID: p.PluginSourceID, PluginRevision: previous.PluginRevision, Name: strings.TrimSpace(p.Name), SourceKey: p.SourceKey, BaseURL: "https://magpie.invalid/" + p.ID, Protocol: "openai-completions", AuthMode: "plugin"}, nil
 	}
 	if previous.PluginSourceID != "" {
 		return ModelSource{}, catalogError()
@@ -333,6 +346,11 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 	if len(p.APIKey) > 8192 {
 		return ModelSource{}, catalogError()
 	}
+	p.Headers, err = validateSourceHeaders(p, previous)
+	if err != nil {
+		return ModelSource{}, err
+	}
+	p.HeaderNames = nil
 	p.HasKey = false
 	p.AccountRoutingAvailable = false
 	return p, nil
@@ -350,6 +368,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		previous[p.ID] = p
 	}
 	sources := map[string]ModelSource{}
+	sourceKeys := map[string]bool{}
 	for i := range v.Sources {
 		p := &v.Sources[i]
 		validated, err := s.validatedSource(*p, previous[p.ID])
@@ -359,6 +378,14 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		if _, exists := sources[p.ID]; exists {
 			return catalogError()
 		}
+		key := validated.ID
+		if validated.SourceKey != nil {
+			key = *validated.SourceKey
+		}
+		if sourceKeys[key] {
+			return errors.New("MODEL_SOURCE_KEY_IN_USE")
+		}
+		sourceKeys[key] = true
 		*p = validated
 		sources[p.ID] = *p
 	}

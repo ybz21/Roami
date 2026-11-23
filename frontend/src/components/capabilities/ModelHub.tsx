@@ -23,7 +23,7 @@ import MagpiePluginImport, {pluginFailure} from './MagpiePluginImport'
 import MagpieSourceSettings from './MagpieSourceSettings'
 import ModelSourceEditor, { initialSourceDraft, type SourceDraft } from './ModelSourceEditor'
 import { GatewaySettingsForm, GatewayReconciliation, useGatewaySettings } from '../settings/gateway-settings'
-import { openRouterConnection, useModelCatalog, type ModelSource, type CatalogModel } from './model-hub-api'
+import { openRouterConnection, sourceModelName, useModelCatalog, type ModelSource, type CatalogModel } from './model-hub-api'
 import '../settings/agent-settings.css'
 import './model-hub.css'
 
@@ -104,10 +104,14 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
     const protocol = sources.find(source => source.id === sourceId)?.protocol || model.protocol
     updateModel({ ...(index === 0 ? { protocol } : {}), candidates: model.candidates.map((row, i) => i === index ? { ...row, sourceId } : row) })
   }
-  const candidateFields = (index: number) => <>
-    <label className="agent-settings-field">{t('hub.source')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.source')} value={model.candidates[index].sourceId || undefined} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={sourceId => selectSource(sourceId, index)} /></label>
-    <label className="agent-settings-field">{t('hub.upstreamModel')}<Input aria-label={t('hub.upstreamModel')} value={model.candidates[index].model} onChange={event => updateModel({ candidates: model.candidates.map((row, i) => i === index ? { ...row, model: event.target.value } : row) })} /></label>
-  </>
+  const candidateFields = (index: number) => {
+    const candidate = model.candidates[index], upstream = sources.find(source => source.id === candidate.sourceId)
+    return <>
+      <label className="agent-settings-field">{t('hub.source')}<Select virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.source')} value={candidate.sourceId || undefined} options={sources.map(source => ({ value: source.id, label: source.name }))} onChange={sourceId => selectSource(sourceId, index)} /></label>
+      <label className="agent-settings-field">{t('hub.upstreamModel')}<Input aria-label={t('hub.upstreamModel')} value={candidate.model} onChange={event => updateModel({ candidates: model.candidates.map((row, i) => i === index ? { ...row, model: event.target.value } : row) })} /></label>
+      {upstream && candidate.model.trim() && <code className="agent-settings-hint tt-model-source-qualified">{sourceModelName(upstream, candidate.model.trim())}</code>}
+    </>
+  }
   const sourceReferences = (sourceId: string) => [
     ...models.filter(model => model.candidates.some(candidate => candidate.sourceId === sourceId) &&
       (model.aggregate || model.candidates[0].sourceId !== sourceId || value.uses[model.id]?.length)),
@@ -166,7 +170,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
   const editor = detail === 'pricing' ? <div className="tt-model-hub-scroll">{error}<GatewaySettingsForm controller={billing} mode="prices" active models={priceModels} /></div> : detail === 'import' ? <MagpiePluginImport onRetry={controller.retry} revision={value.revision} onImported={() => { controller.retry(); back() }} /> : detail === 'local' ? <LocalModelSources onImported={() => { controller.retry(); back() }} /> : detail === 'source' ? sourceEditor : <div className="tt-model-hub-scroll">{error}{modelEditor}</div>
   const editorTitle = detail === 'source' && id !== 'new' ? sourceBase.name : t(detail === 'pricing' ? 'agent.gateway.defaultPrice' : detail === 'import' ? 'hub.plugin.import' : detail === 'local' ? 'hub.local.title' : detail === 'source' ? newOpenRouter ? 'hub.openRouter.name' : 'hub.addSource' : 'hub.editModel')
   const fullDetail = detail === 'source' || detail === 'pricing'
-  const rows = sources.filter(source => (!sourceQuery || (source.name + ' ' + source.baseUrl + ' ' + configuredSourceModels(models, source.id).map(row => row.name + ' ' + row.candidates[0].model).join(' ')).toLowerCase().includes(sourceQuery.trim().toLowerCase())) && (!sourceType || (source.connector || (source.pluginSourceId ? 'plugin' : 'api')) === sourceType)).map(source => {
+  const rows = sources.filter(source => (!sourceQuery || (source.name + ' ' + source.baseUrl + ' ' + (source.sourceKey || source.id) + ' ' + configuredSourceModels(models, source.id).map(row => row.name + ' ' + sourceModelName(source, row.candidates[0].model)).join(' ')).toLowerCase().includes(sourceQuery.trim().toLowerCase())) && (!sourceType || (source.connector || (source.pluginSourceId ? 'plugin' : 'api')) === sourceType)).map(source => {
     const attached = configuredSourceModels(models, source.id)
     const preview = new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(attached.slice(0, 3).map(model => model.name))
     let label = source.name
