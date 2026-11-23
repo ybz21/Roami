@@ -3,8 +3,13 @@ import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '../../i18n'
+import geminiLogo from '../../assets/agents/gemini.svg'
 import { ProjectTree } from './ProjectTree'
 import type { TreeTask } from './task-tree'
+
+vi.mock('../../agent-registry', () => ({
+  useRegisteredAgents: () => [{ kind: 'gemini', displayName: 'Gemini CLI', interactive: true }],
+}))
 
 afterEach(cleanup)
 const task = (path: string, name: string, sessions: TreeTask['sessions']): TreeTask => ({ key: `wt:${path}`, path, name, branch: 'fix/rsi', ahead: 0, unfinished: false, sessions })
@@ -18,6 +23,17 @@ it('handles the first close menu click without opening the session row', async (
   expect(close).toHaveBeenCalledOnce()
   expect(close).toHaveBeenCalledWith('test-session')
   expect(open).not.toHaveBeenCalled()
+})
+
+it('shows the Gemini logo in the session derive menu and keeps the selected parent', async () => {
+  const derive = vi.fn()
+  const worktree = task('/rsi', 'Session workspace', [{ name: 'parent', label: 'Parent session' }])
+  render(<I18nProvider><ProjectTree tree={{ projects: [{ key: 'p', name: 'Roami', dir: '/repo', needs: 0, tasks: [worktree] }], loose: [] }} activeTask={null} activeSession={null} onProject={vi.fn()} onSession={vi.fn()} onNewInTask={derive} /></I18nProvider>)
+  fireEvent.contextMenu(screen.getByRole('button', { name: 'Parent session' }))
+  const entry = await screen.findByRole('menuitem', { name: 'Gemini CLI' })
+  expect(entry.querySelector('img')?.getAttribute('src')).toBe(geminiLogo)
+  fireEvent.click(entry)
+  expect(derive).toHaveBeenCalledWith(worktree.key, 'gemini', 'parent')
 })
 
 it('shows recorded descendants under their parent and opens a child in its actual workspace', () => {
