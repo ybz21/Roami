@@ -10,7 +10,7 @@ import (
 )
 
 func TestStructuredFollowupsRetainContextAfterSuccessFailureAndCancellation(t *testing.T) {
-	for _, provider := range []string{"gemini", "opencode", "pi"} {
+	for _, provider := range []string{"antigravity", "opencode", "pi"} {
 		t.Run(provider, func(t *testing.T) {
 			s, binding := sessionFixture(t)
 			snapshot, scope, scoped, err := paneProcessSnapshot(binding.PID)
@@ -18,7 +18,7 @@ func TestStructuredFollowupsRetainContextAfterSuccessFailureAndCancellation(t *t
 				t.Fatal(err)
 			}
 			binding.ProviderID, binding.Scope, binding.Processes = "fixture-session", scope, scoped
-			if provider == "gemini" {
+			if provider == "antigravity" {
 				binding.ProviderID = "a1b2c3d4-1234-5678-9abc-0123456789ab"
 			}
 			binding.ForeignProcesses = map[int]string{}
@@ -37,6 +37,10 @@ func TestStructuredFollowupsRetainContextAfterSuccessFailureAndCancellation(t *t
 				t.Fatal(err)
 			}
 			bin := filepath.Join(t.TempDir(), provider)
+			if provider == "antigravity" {
+				bin = filepath.Join(filepath.Dir(bin), "agy")
+				t.Setenv("GEMINI_API_KEY", "fixture")
+			}
 			script := `#!/usr/bin/env python3
 import json, os, sys, time
 from pathlib import Path
@@ -46,17 +50,22 @@ if kind == "opencode" and args[:2] == ["session", "export"]:
     print(Path("export.json").read_text())
     sys.exit(0)
 flag = "--session" if kind == "opencode" else "--session-id"
-if kind == "gemini":
-    flag = "--resume"
-    assert "--session-id" not in args, args
-    assert args[args.index("--approval-mode") + 1] == "auto_edit", args
+if kind == "agy":
+    flag = "--conversation"
+    assert args[args.index("--mode") + 1] == "accept-edits", args
+    assert args[args.index("--input-format") + 1] == "stream-json", args
     assert args[args.index("--output-format") + 1] == "stream-json", args
+    assert json.loads(args[args.index("--settings") + 1])["modelProvider"] == "gemini", args
 session = args[args.index(flag) + 1]
 assert session == os.environ["TEST_PROVIDER_SESSION"], args
 assert args[args.index("--model") + 1] == "fixture/model", args
 if kind == "opencode":
     assert "--auto" in args, args
 prompt = args[-1] if kind == "pi" else sys.stdin.read()
+if kind == "agy":
+    event = json.loads(prompt)
+    assert event["event"] == "user", event
+    prompt = event["message"]["content"]
 with Path("executed.jsonl").open("a") as log:
     log.write(json.dumps({"prompt": prompt, "provider": "fixture-session"}) + "\n")
 text = "Reply to " + prompt
@@ -70,10 +79,10 @@ if kind == "opencode":
             {"type": "assistant", "finish": "stop", "time": {"completed": stamp}, "content": [{"type": "text", "text": text}]},
             {"type": "idle", "outcome": "succeeded"}]}))
     print(json.dumps({"type": "text", "sessionID": "fixture-session", "part": {"text": text}}))
-elif kind == "gemini":
-    print(json.dumps({"type": "init", "session_id": session}))
-    print(json.dumps({"type": "message", "role": "assistant", "content": text, "delta": True}))
-    print(json.dumps({"type": "result", "status": "error" if failed else "success"}))
+elif kind == "agy":
+    print(json.dumps({"event": "init", "conversation_id": session}))
+    print(json.dumps({"event": "result", "result": {
+        "conversation_id": session, "status": "ERROR" if failed else "SUCCESS", "response": text}}))
 else:
     print(json.dumps({"type": "session", "id": "fixture-session"}))
     print(json.dumps({"type": "message_end", "message": {"role": "assistant", "stopReason": "error" if failed else "stop", "content": [{"type": "text", "text": text}]}}))

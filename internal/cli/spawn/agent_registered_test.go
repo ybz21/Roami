@@ -26,14 +26,15 @@ func TestRegisteredPromptFileLaunches(t *testing.T) {
 	}
 }
 
-func TestGeminiLaunchesWithPinnedConversationAndStdin(t *testing.T) {
+func TestAntigravityPromptsUseVendorFlags(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
-	config := AgentConfig{Kind: "gemini", Workdir: "/tmp", Interactive: true, Model: "gemini-2.5-flash", Permission: "auto", SessionUUID: "a1b2c3d4-1234-5678-9abc-0123456789ab"}
-	launch := "cd '/tmp' && gemini --model gemini-2.5-flash --session-id " + config.SessionUUID + " --approval-mode auto_edit"
+	config := AgentConfig{Kind: "antigravity", Workdir: "/tmp", Interactive: true, Model: "example-model", Permission: "auto", SessionUUID: "a1b2c3d4-1234-5678-9abc-0123456789ab"}
+	launch := "cd '/tmp' && agy --model example-model --mode accept-edits"
 	if got := config.InteractiveFromPromptFile("/tmp/agent prompt"); got != launch+` --prompt-interactive "$(cat '/tmp/agent prompt')"` {
 		t.Fatalf("interactive launch: %s", got)
 	}
-	if got := config.CommandFromPromptFile("/tmp/agent prompt"); got != launch+" < '/tmp/agent prompt'" {
+	if got := config.CommandFromPromptFile("/tmp/agent prompt"); got != launch+` --print "$(cat '/tmp/agent prompt')"` {
 		t.Fatalf("headless launch: %s", got)
 	}
 }

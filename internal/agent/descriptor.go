@@ -8,6 +8,7 @@ type Descriptor struct {
 	SetupCommand string `json:"setupCommand,omitempty"`
 	Command      string `json:"command"`
 	Interactive  bool   `json:"interactive"`
+	Managed      bool   `json:"managed"`
 	Models       bool   `json:"models"`
 	CanInstall   bool   `json:"canInstall"`
 }
@@ -30,7 +31,9 @@ func Describe(a Agent) Descriptor {
 	if flag, ok := a.(interface{ PromptFlag() string }); ok {
 		d.PromptFlag = flag.PromptFlag()
 	}
-	_, d.CanInstall = InstallPackage(a.Kind())
+	_, npm := InstallPackage(a.Kind())
+	d.CanInstall = d.CanInstall || npm
+	d.Managed = a.Kind() != "antigravity" || AntigravityManagedConfigured()
 	return d
 }
 

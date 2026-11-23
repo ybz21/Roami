@@ -8,7 +8,7 @@ import (
 )
 
 func structuredExecutor(kind string) bool {
-	return kind == "opencode" || kind == "pi" || kind == "gemini"
+	return kind == "opencode" || kind == "pi" || kind == "antigravity"
 }
 
 // Consume LF-delimited native events; Unicode separators inside JSON strings are data.
@@ -67,8 +67,8 @@ func (p *structuredOutput) consume(line []byte) {
 	if len(bytes.TrimSpace(line)) == 0 {
 		return
 	}
-	if p.kind == "gemini" {
-		p.consumeGemini(line)
+	if p.kind == "antigravity" {
+		p.consumeAntigravity(line)
 		return
 	}
 	var e struct {

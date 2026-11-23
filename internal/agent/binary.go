@@ -17,9 +17,16 @@ func ResolveBinary(kind string) (string, error) {
 	if err == nil {
 		return path, nil
 	}
-	if a.Kind() == "opencode" {
+	var localBin string
+	switch a.Kind() {
+	case "opencode":
+		localBin = filepath.Join(".opencode", "bin")
+	case "antigravity":
+		localBin = filepath.Join(".local", "bin")
+	}
+	if localBin != "" {
 		if home, homeErr := os.UserHomeDir(); homeErr == nil && filepath.IsAbs(home) {
-			if path, fallbackErr := exec.LookPath(filepath.Join(home, ".opencode", "bin", a.Bin())); fallbackErr == nil {
+			if path, fallbackErr := exec.LookPath(filepath.Join(home, localBin, a.Bin())); fallbackErr == nil {
 				return path, nil
 			}
 		}

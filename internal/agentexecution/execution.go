@@ -166,10 +166,15 @@ func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	if a := agent.Get(spec.Executor); a == nil || a.Kind() != spec.Executor {
+	a := agent.Get(spec.Executor)
+	if a == nil || a.Kind() != spec.Executor {
 		return Status{}, fmt.Errorf("INVALID_EXECUTOR")
 	}
-	if spec.Persistent && !agent.Describe(agent.Get(spec.Executor)).Interactive {
+	descriptor := agent.Describe(a)
+	if !descriptor.Managed {
+		return Status{}, fmt.Errorf("EXECUTOR_AUTH_REQUIRED")
+	}
+	if spec.Persistent && !descriptor.Interactive {
 		return Status{}, fmt.Errorf("EXECUTOR_PERSISTENCE_UNSUPPORTED")
 	}
 	invalidTarget := (spec.ProjectID == "" && !filepath.IsAbs(spec.Directory)) ||
