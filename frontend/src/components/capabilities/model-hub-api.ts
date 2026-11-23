@@ -16,6 +16,7 @@ export function catalogFailure(cause: any): string {
   const code = cause?.apiError?.code || cause?.message
   if (code === 'INVALID_MODEL_SOURCE_HEADERS') return 'hub.headers.invalid'
   if (code === 'MODEL_HEADERS_REQUIRED_FOR_ENDPOINT') return 'hub.headers.newEndpoint'
+  if (code === 'MODEL_SOURCE_KEY_REQUIRED') return 'hub.sourceKey.required'
   if (code === 'INVALID_MODEL_SOURCE_KEY') return 'hub.sourceKey.invalid'
   if (code === 'MODEL_SOURCE_KEY_IN_USE') return 'hub.sourceKey.inUse'
   return code === 'MODEL_GATEWAY_KEY_DISABLED' ? 'hub.error.connectionDisabled' : code === 'MODEL_CONFIGURATION_BUSY' ? 'agent.models.busy' : code === 'MODEL_CATALOG_CHANGED' || code === 'AGENT_CONFIG_CHANGED' ? 'hub.error.changed' : code === 'MODEL_ROUTE_CYCLE' ? 'pool.cycle' : code === 'MODEL_CATALOG_IN_USE' ? 'hub.error.inUse' : code === 'INVALID_MODEL_CATALOG' || code === 'INVALID_MODEL_PROTOCOL' ? 'hub.error.invalid' : code === 'MODEL_KEY_REQUIRED_FOR_ENDPOINT' ? 'agent.models.newEndpointKey' : 'hub.error.failed'

@@ -61,6 +61,10 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			reject(w, 400, "INVALID_MODEL_CATALOG")
 			return true
 		}
+		if value.Revision == s.value.Revision && !s.applying && !newSourcesHaveKeys(value.Sources, s.value.Sources) {
+			reject(w, 400, "MODEL_SOURCE_KEY_REQUIRED")
+			return true
+		}
 		err = s.update(r.Context(), value)
 		if err == nil {
 			writeJSON(w, 200, map[string]any{"data": s.view(r.Context())})

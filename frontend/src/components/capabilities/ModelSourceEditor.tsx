@@ -34,6 +34,7 @@ type HeaderRow = { id: number; name: string; value: string }
 export const initialSourceDraft = (source: ModelSource, existing: boolean): SourceDraft => ({ source: { ...source, apiKey: '' }, original: source, editing: !existing, directory: null, selected: [], query: '', manual: '', manualOpen: false })
 const connectionKey = (source: ModelSource, headerRows?: HeaderRow[]) => JSON.stringify([source.id, source.connector, source.baseUrl, source.apiKey, source.protocol, source.authMode, !!source.skipTlsVerification, source.headerNames, headerRows])
 const headerNamePattern = /^[!#$%&'*+.\x5e_`|~\-\da-z]+$/i
+const sourceKeyPattern = /^[A-Za-z0-9-]{1,160}$/
 const maxSourceHeaders = 16
 const normalizeURL = (value: string) => value.trim().replace(/\/+$/, '')
 const sourceName = (source: ModelSource) => {
@@ -63,8 +64,8 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   const source = draft.source, existing = catalog.sources.find(row => row.id === source.id)
   const key = connectionKey(source, draft.headerRows)
   const normalizedURL = normalizeURL(source.baseUrl)
-  const sourceKey = source.sourceKey?.trim() || source.id
-  const sourceKeyError = !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(sourceKey) ? 'hub.sourceKey.invalid' : catalog.sources.some(row => row.id !== source.id && (row.sourceKey || row.id) === sourceKey) ? 'hub.sourceKey.inUse' : ''
+  const sourceKey = source.sourceKey ?? (existing ? existing.sourceKey ?? existing.id : '')
+  const sourceKeyError = !sourceKey ? 'hub.sourceKey.required' : !sourceKeyPattern.test(sourceKey) ? 'hub.sourceKey.invalid' : catalog.sources.some(row => row.id !== source.id && (row.sourceKey || row.id) === sourceKey) ? 'hub.sourceKey.inUse' : ''
   const url = parseSourceURL(normalizedURL)
   const urlError = !!normalizedURL && !url
   const urlHint = urlError ? 'hub.directory.invalidBaseUrl' : url?.protocol === 'http:' ? 'hub.directory.plainHttp' : ''
@@ -145,7 +146,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
     const abort = new AbortController(); request.current = abort
     setLoading(true); setReadError(''); if (existing) patch({ managing: true })
     try {
-      const { data } = await api('POST', '/agent/model-gateway/catalog/discover', { revision: catalog.revision, source: { ...source, baseUrl: normalizedURL, headers: draft.headerRows === undefined ? undefined : pendingHeaders } }, { signal: abort.signal })
+      const { data } = await api('POST', '/agent/model-gateway/catalog/discover', { revision: catalog.revision, source: { ...source, sourceKey, baseUrl: normalizedURL, headers: draft.headerRows === undefined ? undefined : pendingHeaders } }, { signal: abort.signal })
       if (!abort.signal.aborted) {
         const directoryNames = Object.fromEntries((data.details || []).map((row: { id: string; name?: string }) => [row.id, row.name || '']))
         onChange({ ...current.current, directory: data.models, directoryNames, managing: true, editing: false, fetchRequested: false, selected: current.current.selected.filter(value => data.models.includes(value)) })
@@ -159,7 +160,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
   }, [draft.fetchRequested, canRead, busy])
   const save = async () => {
     if (!canSave) return
-    const nextSource = existing && !connectionOnly ? {...existing,apiKey:''} : { ...source, name: sourceName(source), baseUrl: normalizedURL, headers: draft.headerRows === undefined ? undefined : pendingHeaders }
+    const nextSource = existing && !connectionOnly ? {...existing,apiKey:''} : { ...source, sourceKey, name: sourceName(source), baseUrl: normalizedURL, headers: draft.headerRows === undefined ? undefined : pendingHeaders }
     const nextModels = connectionOnly ? catalog.models.map(model => !model.aggregate && model.candidates[0].sourceId === source.id ? {...model,protocol:source.protocol} : model) : catalog.models.filter(model => model.aggregate || model.candidates[0].sourceId !== source.id || !removed.has(model.candidates[0].model)).map(model => !model.aggregate && model.candidates[0].sourceId === source.id ? { ...model, protocol: source.protocol } : model)
     for (const model of connectionOnly ? [] : additions) nextModels.push({ id: globalThis.crypto?.randomUUID?.() || 'model-' + Math.random().toString(36).slice(2), name: model, protocol: source.protocol, strategy: 'fixed', candidates: [{ sourceId: source.id, model }] })
     if (await onSave({ ...catalog, sources: existing ? catalog.sources.map(row => row.id === source.id ? nextSource : row) : [...catalog.sources, nextSource], models: nextModels })) { message.success(t('agent.models.saved')); if (!existing) onBack() }
@@ -182,7 +183,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
         </label>}
         {draft.editing && <label className="agent-settings-field">
           {t('hub.sourceKey.label')}
-          <Input value={source.sourceKey || ''} placeholder={source.id} maxLength={160} autoCapitalize="none" spellCheck={false} aria-describedby={sourceKeyError ? sourceKeyErrorId : undefined} status={sourceKeyError ? 'error' : undefined} onChange={event => updateSource({ sourceKey: event.target.value })} />
+          <Input aria-label={t('hub.sourceKey.label')} required disabled={loading || busy} value={sourceKey} maxLength={160} autoCapitalize="none" spellCheck={false} aria-describedby={sourceKeyError ? sourceKeyErrorId : undefined} status={sourceKeyError ? 'error' : undefined} onChange={event => updateSource({ sourceKey: event.target.value })} />
           {sourceKeyError && <span className="tt-model-source-warning" id={sourceKeyErrorId} role="alert">{t(sourceKeyError)}</span>}
         </label>}
         {draft.editing && !source.pluginSourceId && <>

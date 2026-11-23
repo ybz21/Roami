@@ -124,6 +124,11 @@ func openCatalog(l *Ledger) (*CatalogStore, error) {
 		s.value.AccessKeys = d.AccessKeys
 		s.value.RolesBackup = d.RolesBackup
 		s.value.AgentKeys = d.AgentKeys
+		if assignSourceKeys(s.value.Sources) {
+			if err := s.persist(s.value); err != nil {
+				return nil, err
+			}
+		}
 	} else if err == sql.ErrNoRows {
 		token, e := randomCatalogID()
 		if e != nil {
@@ -134,6 +139,7 @@ func openCatalog(l *Ledger) (*CatalogStore, error) {
 			s.value.Sources = append(s.value.Sources, ModelSource{ID: "existing", Name: route.endpoint, BaseURL: route.endpoint, Protocol: "openai-completions", AuthMode: "bearer", APIKey: route.key})
 			s.value.Models = append(s.value.Models, CatalogModel{ID: "existing-main", Name: route.model, Protocol: "openai-completions", Strategy: "fixed", Candidates: []ModelCandidate{{"existing", route.model}}})
 		}
+		assignSourceKeys(s.value.Sources)
 		if e := s.persist(s.value); e != nil {
 			return nil, e
 		}
@@ -293,12 +299,13 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (ModelSource, error) {
 	if p.SourceKey == nil {
 		p.SourceKey = previous.SourceKey
-	} else if key := strings.TrimSpace(*p.SourceKey); key == "" {
-		p.SourceKey = nil
-	} else if !catalogID.MatchString(key) {
-		return ModelSource{}, errors.New("INVALID_MODEL_SOURCE_KEY")
 	} else {
-		p.SourceKey = &key
+		if *p.SourceKey == "" {
+			return ModelSource{}, errors.New("MODEL_SOURCE_KEY_REQUIRED")
+		}
+		if !sourceKeyPattern.MatchString(*p.SourceKey) {
+			return ModelSource{}, errors.New("INVALID_MODEL_SOURCE_KEY")
+		}
 	}
 	if p.Connector != "" && (p.Connector != openRouterFreeConnector || p.PluginSourceID != "") {
 		return ModelSource{}, catalogError()
@@ -378,17 +385,17 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		if _, exists := sources[p.ID]; exists {
 			return catalogError()
 		}
-		key := validated.ID
 		if validated.SourceKey != nil {
-			key = *validated.SourceKey
+			key := *validated.SourceKey
+			if sourceKeys[key] {
+				return errors.New("MODEL_SOURCE_KEY_IN_USE")
+			}
+			sourceKeys[key] = true
 		}
-		if sourceKeys[key] {
-			return errors.New("MODEL_SOURCE_KEY_IN_USE")
-		}
-		sourceKeys[key] = true
 		*p = validated
 		sources[p.ID] = *p
 	}
+	assignSourceKeys(v.Sources)
 	validate := func(rows []CatalogModel) error {
 		seen := map[string]bool{}
 		for _, m := range rows {
