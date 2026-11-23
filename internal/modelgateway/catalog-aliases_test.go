@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 func TestAggregateRenameKeepsBoundCallsAndNestedReferences(t *testing.T) {
@@ -37,7 +39,7 @@ func TestAggregateRenameKeepsBoundCallsAndNestedReferences(t *testing.T) {
 		t.Fatal("binding identity or default lost")
 	}
 	reopened, err := openCatalog(h.Ledger)
-	if err != nil || findCatalogModel(reopened.value.Models, "old") == nil {
+	if err != nil || modelcatalog.FindModel(reopened.value.Models, "old") == nil {
 		t.Fatal("rename not persisted", err)
 	}
 	for _, id := range []string{"old", "new", "parent"} {
@@ -61,7 +63,7 @@ func TestAggregateAliasValidationAndMemberBounds(t *testing.T) {
 		next := old
 		next.ID = "new"
 		next.Aliases = aliases
-		if validateModelAliases([]CatalogModel{old, {ID: "other"}}, []CatalogModel{next}) == nil {
+		if modelcatalog.ValidateAliases([]CatalogModel{old, {ID: "other"}}, []CatalogModel{next}) == nil {
 			t.Fatalf("invalid aliases accepted: %v", aliases)
 		}
 	}
@@ -72,7 +74,7 @@ func TestAggregateAliasValidationAndMemberBounds(t *testing.T) {
 		for i := 0; i < count; i++ {
 			c := ModelCandidate{"work", fmt.Sprintf("m%d", i)}
 			m.Candidates = append(m.Candidates, c)
-			m.Weights[candidateIdentity(c)] = 1
+			m.Weights[c.Identity()] = 1
 		}
 		v.Models = append(v.Models[:1], m)
 		err := h.Catalog.update(context.Background(), v)
@@ -148,7 +150,7 @@ func TestNativeRenameKeepsBoundCallsAndUpstreamIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	reopened, err := openCatalog(h.Ledger)
-	if err != nil || findCatalogModel(reopened.value.Models, old) == nil {
+	if err != nil || modelcatalog.FindModel(reopened.value.Models, old) == nil {
 		t.Fatal("native alias not persisted", err)
 	}
 	if len(h.Catalog.view(context.Background()).Uses["native-new"]) == 0 {
@@ -165,7 +167,7 @@ func TestNativeRenameKeepsBoundCallsAndUpstreamIdentity(t *testing.T) {
 	for _, aggregate := range []bool{false, true} {
 		previous := CatalogModel{ID: "old", Aggregate: aggregate, Protocol: "openai-completions"}
 		next := CatalogModel{ID: "new", Aliases: []string{"old"}, Aggregate: !aggregate, Protocol: previous.Protocol}
-		if validateModelAliases([]CatalogModel{previous}, []CatalogModel{next}) == nil {
+		if modelcatalog.ValidateAliases([]CatalogModel{previous}, []CatalogModel{next}) == nil {
 			t.Fatal("alias changed model type")
 		}
 	}

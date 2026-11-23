@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ybz21/Roami/internal/modelgateway/protocoltest"
 )
 
 func readBillingAudit(t *testing.T, h *Handler, id string) []requestAttemptDetail {
@@ -144,7 +145,7 @@ func TestRequestAttemptBillingMatchesCallAndServerObservation(t *testing.T) {
 func TestCatalogRequestAuditUsesServerObservationForBilling(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-Request-Id", "provider-audit")
-		writeProtocolFixture(w, "openai-completions", false)
+		protocoltest.WriteResponse(w, "openai-completions", false)
 	}))
 	defer upstream.Close()
 	h := catalogHandler(t, upstream.URL+"/v1", "openai-completions")
@@ -157,7 +158,7 @@ func TestCatalogRequestAuditUsesServerObservationForBilling(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = monitor.Close() })
 	h.Monitor = monitor
-	body, err := json.Marshal(protocolFixtureRequest("openai-completions", false))
+	body, err := json.Marshal(protocoltest.Request("openai-completions", false))
 	if err != nil {
 		t.Fatal(err)
 	}

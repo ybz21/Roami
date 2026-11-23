@@ -3,65 +3,24 @@ package modelgateway
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 	"github.com/ybz21/Roami/internal/modelplugins"
 	"golang.org/x/sync/singleflight"
 )
 
-type ModelSource struct {
-	ID                       string            `json:"id"`
-	Connector                string            `json:"connector,omitempty"`
-	PluginSourceID           string            `json:"pluginSourceId,omitempty"`
-	PluginRevision           string            `json:"pluginRevision,omitempty"`
-	PluginDesktop            bool              `json:"pluginDesktop,omitempty"`
-	PluginDesktopUnavailable bool              `json:"pluginDesktopUnavailable,omitempty"`
-	AccountRoutingAvailable  bool              `json:"accountRoutingAvailable,omitempty"`
-	Name                     string            `json:"name"`
-	SourceKey                *string           `json:"sourceKey,omitempty"`
-	BaseURL                  string            `json:"baseUrl"`
-	Protocol                 string            `json:"protocol"`
-	AuthMode                 string            `json:"authMode"`
-	SkipTLSVerification      bool              `json:"skipTlsVerification,omitempty"`
-	APIKey                   string            `json:"apiKey,omitempty"`
-	HasKey                   bool              `json:"hasKey,omitempty"`
-	Headers                  map[string]string `json:"headers,omitempty"`
-	HeaderNames              []string          `json:"headerNames,omitempty"`
-}
-type ModelCandidate struct {
-	SourceID string `json:"sourceId"`
-	Model    string `json:"model"`
-}
-type CatalogModel struct {
-	Aggregate       bool             `json:"aggregate,omitempty"`
-	HideMembers     bool             `json:"hideMembers,omitempty"`
-	GatewayHidden   bool             `json:"gatewayHidden,omitempty"`
-	Enabled         *bool            `json:"enabled,omitempty"`
-	FreeOnly        bool             `json:"freeOnly,omitempty"`
-	AllowPlan       bool             `json:"allowPlan,omitempty"`
-	RequireTools    bool             `json:"requireTools,omitempty"`
-	MinContext      int              `json:"minContext,omitempty"`
-	CooldownSeconds int              `json:"cooldownSeconds,omitempty"`
-	OnLimit         *bool            `json:"onLimit,omitempty"`
-	OnExhausted     *bool            `json:"onExhausted,omitempty"`
-	Weights         map[string]int   `json:"weights,omitempty"`
-	ID              string           `json:"id"`
-	Aliases         []string         `json:"aliases,omitempty"`
-	GatewayAlias    string           `json:"gatewayAlias,omitempty"`
-	Name            string           `json:"name"`
-	Protocol        string           `json:"protocol"`
-	Strategy        string           `json:"strategy"`
-	Candidates      []ModelCandidate `json:"candidates"`
-}
+const groupSource = modelcatalog.GroupSource
+
+type ModelSource = modelcatalog.ModelSource
+type ModelCandidate = modelcatalog.ModelCandidate
+type CatalogModel = modelcatalog.CatalogModel
+
 type ModelCatalog struct {
 	Revision        string                   `json:"revision"`
 	Sources         []ModelSource            `json:"sources"`
@@ -103,108 +62,13 @@ type CatalogStore struct {
 	plugins        *modelplugins.Manager
 }
 
-var catalogID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$`)
-
-func catalogError() error { return errors.New("INVALID_MODEL_CATALOG") }
+func catalogError() error { return modelcatalog.ErrInvalid }
 func randomCatalogID() (string, error) {
 	var b [24]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
-}
-func openCatalog(l *Ledger) (*CatalogStore, error) {
-	s := &CatalogStore{ledger: l, agents: agentproviders.NewStore(l.paths.Data)}
-	var raw string
-	err := l.db.QueryRow(`SELECT value FROM gateway_catalog WHERE id=1`).Scan(&raw)
-	if err == nil {
-		var d catalogDisk
-		if json.Unmarshal([]byte(raw), &d) != nil || len(d.Token) != 48 || d.Port < 0 || d.Port > 65535 || !validStoredGatewayAccessKey(d.AccessKey) || !validStoredGatewayAccessKeys(d.AccessKeys) {
-			return nil, catalogError()
-		}
-		s.value = d.Catalog
-		s.value.Port = d.Port
-		s.value.LANEnabled = d.LANEnabled
-		s.value.Token = d.Token
-		s.value.AccessKey = d.AccessKey
-		s.value.AccessKeys = d.AccessKeys
-		s.value.RolesBackup = d.RolesBackup
-		s.value.AgentKeys = d.AgentKeys
-		if assignSourceKeys(s.value.Sources) {
-			if err := s.persist(s.value); err != nil {
-				return nil, err
-			}
-		}
-	} else if err == sql.ErrNoRows {
-		token, e := randomCatalogID()
-		if e != nil {
-			return nil, e
-		}
-		s.value = ModelCatalog{Sources: []ModelSource{}, Models: []CatalogModel{}, Drafts: []CatalogModel{}, Token: token}
-		if route, e := readNodeModels(l.paths, "main"); e == nil {
-			s.value.Sources = append(s.value.Sources, ModelSource{ID: "existing", Name: route.endpoint, BaseURL: route.endpoint, Protocol: "openai-completions", AuthMode: "bearer", APIKey: route.key})
-			s.value.Models = append(s.value.Models, CatalogModel{ID: "existing-main", Name: route.model, Protocol: "openai-completions", Strategy: "fixed", Candidates: []ModelCandidate{{"existing", route.model}}})
-		}
-		assignSourceKeys(s.value.Sources)
-		if e := s.persist(s.value); e != nil {
-			return nil, e
-		}
-	} else {
-		return nil, err
-	}
-	return s, nil
-}
-func (s *CatalogStore) persist(value ModelCatalog) error {
-	revision, err := randomCatalogID()
-	if err != nil {
-		return err
-	}
-	value.Revision = revision
-	// Suspend route evidence until the committed catalog and its fingerprints agree.
-	if err := writeCatalogVerificationRevision(s.ledger.paths.Data, ModelCatalog{}); err != nil {
-		return err
-	}
-	raw, err := json.Marshal(catalogDisk{Catalog: value, Port: value.Port, LANEnabled: value.LANEnabled, Token: value.Token, RolesBackup: value.RolesBackup, AgentKeys: value.AgentKeys, AccessKey: value.AccessKey, AccessKeys: value.AccessKeys})
-	if err != nil {
-		return err
-	}
-	err = s.ledger.db.Tx(func(tx *sql.Tx) error {
-		if err := pruneCatalogRouting(tx, value); err != nil {
-			return err
-		}
-		_, e := tx.Exec(`INSERT INTO gateway_catalog(id,value) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value`, string(raw))
-		return e
-	})
-	if err == nil {
-		s.value = value
-		err = writeCatalogVerificationRevision(s.ledger.paths.Data, value)
-	}
-	return err
-}
-func (s *CatalogStore) snapshot() ModelCatalog {
-	raw, _ := json.Marshal(s.value)
-	var v ModelCatalog
-	_ = json.Unmarshal(raw, &v)
-	// Aggregate member filtering must not become a request cost policy.
-	for _, models := range [][]CatalogModel{v.Models, v.Drafts} {
-		for i := range models {
-			if models[i].Aggregate {
-				models[i].FreeOnly = false
-				models[i].AllowPlan = false
-			}
-		}
-	}
-	v.Token = s.value.Token
-	v.AccessKey = s.value.AccessKey
-	v.AccessKeys = append([]gatewayAccessKey(nil), s.value.AccessKeys...)
-	v.Port = s.value.Port
-	v.LANEnabled = s.value.LANEnabled
-	v.RolesBackup = s.value.RolesBackup
-	v.AgentKeys = map[string]agentKeyState{}
-	for kind, key := range s.value.AgentKeys {
-		v.AgentKeys[kind] = key
-	}
-	return v
 }
 func (s *CatalogStore) uses(ctx context.Context) map[string][]string {
 	uses, _ := s.modelReferences(ctx, true)
@@ -261,10 +125,10 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	v := s.snapshot()
 	v.BaseURL = s.baseURL
 	v.Uses = s.uses(ctx)
-	hidden := hiddenGatewayMembers(v.Models)
+	hidden := modelcatalog.HiddenGatewayMembers(v.Models)
 	for i, model := range v.Models {
-		v.Models[i].GatewayHidden = model.hiddenAtGateway(hidden)
-		for _, alias := range model.additionalGatewayNames() {
+		v.Models[i].GatewayHidden = model.HiddenAtGateway(hidden)
+		for _, alias := range model.AdditionalGatewayNames() {
 			for _, use := range v.Uses[alias] {
 				if !containsField(v.Uses[model.ID], use) {
 					v.Uses[model.ID] = append(v.Uses[model.ID], use)
@@ -281,15 +145,13 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	for _, role := range []string{"main", "worker"} {
 		if route, err := readNodeModels(s.ledger.paths, role); err == nil {
 			v.RoamiModels[role] = route.model
-			if model := findCatalogModel(v.Models, route.model); model != nil && strings.TrimRight(route.endpoint, "/") == s.baseURL+"/v1" {
+			if model := modelcatalog.FindModel(v.Models, route.model); model != nil && strings.TrimRight(route.endpoint, "/") == s.baseURL+"/v1" {
 				v.RoamiModels[role] = model.ID
 			}
 		}
 	}
 	for i := range v.Sources {
-		v.Sources[i].HasKey = v.Sources[i].APIKey != ""
-		v.Sources[i].APIKey = ""
-		v.Sources[i].hideHeaderValues()
+		v.Sources[i] = v.Sources[i].Public()
 		if v.Sources[i].PluginSourceID != "" && s.plugins != nil {
 			if source, err := s.plugins.ReadSource(v.Sources[i].PluginSourceID); err == nil {
 				v.Sources[i].PluginDesktop = source.ProviderID == "doubao-work"
@@ -306,16 +168,11 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	return v
 }
 func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (ModelSource, error) {
-	if p.SourceKey == nil {
-		p.SourceKey = previous.SourceKey
-	} else {
-		if *p.SourceKey == "" {
-			return ModelSource{}, errors.New("MODEL_SOURCE_KEY_REQUIRED")
-		}
-		if !sourceKeyPattern.MatchString(*p.SourceKey) {
-			return ModelSource{}, errors.New("INVALID_MODEL_SOURCE_KEY")
-		}
+	key, err := modelcatalog.SourceKey(p.SourceKey, previous.SourceKey)
+	if err != nil {
+		return ModelSource{}, err
 	}
+	p.SourceKey = key
 	if p.Connector != "" && (p.Connector != openRouterFreeConnector || p.PluginSourceID != "") {
 		return ModelSource{}, catalogError()
 	}
@@ -335,41 +192,14 @@ func (s *CatalogStore) validatedSource(p ModelSource, previous ModelSource) (Mod
 		return ModelSource{}, catalogError()
 	}
 
-	p.BaseURL = strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
-	if p.Connector == openRouterFreeConnector && (p.BaseURL != openRouterBaseURL || p.Protocol != "openai-completions" || p.AuthMode != "bearer") {
-		return ModelSource{}, catalogError()
-	}
-	u, err := url.Parse(p.BaseURL)
-	if !catalogID.MatchString(p.ID) || strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.BaseURL) > 2000 || err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.ContainsAny(p.Name+p.BaseURL+p.APIKey, "\r\n\x00") {
-		return ModelSource{}, catalogError()
-	}
-	if u.Scheme != "https" && u.Scheme != "http" || p.SkipTLSVerification && u.Scheme != "https" {
-		return ModelSource{}, catalogError()
+	p, err = modelcatalog.NormalizeHTTPSource(p)
+	if err != nil {
+		return ModelSource{}, err
 	}
 	if s.isGatewaySource(p.BaseURL) {
 		return ModelSource{}, catalogError()
 	}
-	if !containsField([]string{"openai-completions", "openai-responses", "anthropic-messages"}, p.Protocol) || !containsField([]string{"api_key", "bearer"}, p.AuthMode) {
-		return ModelSource{}, catalogError()
-	}
-	if p.APIKey == "" {
-		old := previous
-		if old.BaseURL != p.BaseURL && old.APIKey != "" {
-			return ModelSource{}, errors.New("MODEL_KEY_REQUIRED_FOR_ENDPOINT")
-		}
-		p.APIKey = old.APIKey
-	}
-	if len(p.APIKey) > 8192 {
-		return ModelSource{}, catalogError()
-	}
-	p.Headers, err = validateSourceHeaders(p, previous)
-	if err != nil {
-		return ModelSource{}, err
-	}
-	p.HeaderNames = nil
-	p.HasKey = false
-	p.AccountRoutingAvailable = false
-	return p, nil
+	return modelcatalog.ResolveCredentials(p, previous)
 }
 
 func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
@@ -397,72 +227,31 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		if validated.SourceKey != nil {
 			key := *validated.SourceKey
 			if sourceKeys[key] {
-				return errors.New("MODEL_SOURCE_KEY_IN_USE")
+				return modelcatalog.ErrDuplicateSourceKey
 			}
 			sourceKeys[key] = true
 		}
 		*p = validated
 		sources[p.ID] = *p
 	}
-	assignSourceKeys(v.Sources)
-	validate := func(rows []CatalogModel) error {
-		seen := map[string]bool{}
-		for i, m := range rows {
-			rows[i].GatewayHidden = false
-			if m.HideMembers && !m.Aggregate {
-				return catalogError()
-			}
-			limit := 8
-			if m.Aggregate {
-				limit = maxAggregateMembers
-			}
-			if !catalogID.MatchString(m.ID) || m.ID == gatewayDefaultModel || strings.TrimSpace(m.Name) == "" || len(m.Name) > 200 || seen[m.ID] || !(m.Aggregate && validateAggregate(m) || !m.Aggregate && containsField([]string{"fixed", "failover"}, m.Strategy)) || len(m.Candidates) == 0 || len(m.Candidates) > limit || m.Strategy == "fixed" && len(m.Candidates) != 1 || m.Strategy == "failover" && len(m.Candidates) < 2 {
-				return catalogError()
-			}
-			seen[m.ID] = true
-			for _, c := range m.Candidates {
-				if c.SourceID == groupSource {
-					if !m.Aggregate || !catalogID.MatchString(c.Model) {
-						return catalogError()
-					}
-					continue
-				}
-				p, ok := sources[c.SourceID]
-				if !ok || !m.Aggregate && c.SourceID == m.Candidates[0].SourceID && p.Protocol != m.Protocol || c.Model == "" || len(c.Model) > 200 || strings.ContainsAny(c.Model, "\r\n\x00") {
-					return catalogError()
-				}
-			}
-		}
-		return nil
-	}
-	if err := validate(v.Models); err != nil {
+	modelcatalog.AssignSourceKeys(v.Sources)
+	if err := modelcatalog.ValidateModels(v.Models, sources); err != nil {
 		return err
 	}
-	if err := validateModelAliases(s.value.Models, v.Models); err != nil {
+	if err := modelcatalog.ValidateAliases(s.value.Models, v.Models); err != nil {
 		return err
 	}
-	// Store group references canonically, including references in saved drafts.
-	for _, rows := range [][]CatalogModel{v.Models, v.Drafts} {
-		for i := range rows {
-			for j, candidate := range rows[i].Candidates {
-				if candidate.SourceID == groupSource {
-					if model := findCatalogModel(v.Models, candidate.Model); model != nil {
-						rows[i].Candidates[j].Model = model.ID
-					}
-				}
-			}
-		}
-	}
-	if err := validateRoutingGraph(v.Models); err != nil {
+	modelcatalog.CanonicalizeGroups(v.Models, v.Drafts)
+	if err := modelcatalog.ValidateRoutingGraph(v.Models); err != nil {
 		return err
 	}
-	if err := validate(v.Drafts); err != nil {
+	if err := modelcatalog.ValidateModels(v.Drafts, sources); err != nil {
 		return err
 	}
 	uses, known := s.references(ctx)
 	for _, old := range s.value.Models {
-		for _, id := range append([]string{old.ID}, old.additionalGatewayNames()...) {
-			if findCatalogModel(v.Models, id) == nil && (!known || len(uses[id]) > 0) {
+		for _, id := range append([]string{old.ID}, old.AdditionalGatewayNames()...) {
+			if modelcatalog.FindModel(v.Models, id) == nil && (!known || len(uses[id]) > 0) {
 				return errors.New("MODEL_CATALOG_IN_USE")
 			}
 		}

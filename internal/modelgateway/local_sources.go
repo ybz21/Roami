@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ybz21/Roami/internal/agentproviders"
+	"github.com/ybz21/Roami/internal/modelgateway/lan"
 )
 
 type localSourceView struct {
@@ -164,5 +165,5 @@ func (s *CatalogStore) isGatewaySource(raw string) bool {
 	if u.Port() != gateway.Port() {
 		return false
 	}
-	return containsField([]string{gateway.Hostname(), "localhost", "127.0.0.1", "::1"}, u.Hostname()) || containsField(gatewayLANAddresses(), u.Hostname())
+	return containsField([]string{gateway.Hostname(), "localhost", "127.0.0.1", "::1"}, u.Hostname()) || containsField(lan.PrivateIPv4Addresses(), u.Hostname())
 }

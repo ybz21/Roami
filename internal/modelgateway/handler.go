@@ -3,19 +3,19 @@ package modelgateway
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ybz21/Roami/internal/modelgateway/protocol"
+	"github.com/ybz21/Roami/internal/modelgateway/upstream"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
@@ -24,7 +24,7 @@ type Handler struct {
 	Monitor        *MonitorStore
 	Plugins        *modelplugins.Manager
 	Catalog        *CatalogStore
-	lan            *gatewayLAN // Protected by Catalog.mu.
+	network        networkSettings
 	Ledger         *Ledger
 	Client         *http.Client
 	uncheckedTLS   *http.Client
@@ -36,18 +36,8 @@ type Handler struct {
 }
 
 func NewHandler(ledger *Ledger) *Handler {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	unchecked := transport.Clone()
-	if unchecked.TLSClientConfig == nil {
-		unchecked.TLSClientConfig = &tls.Config{}
-	}
-	unchecked.TLSClientConfig.InsecureSkipVerify = true // Only selected by an explicit catalog source setting.
-	noRedirect := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &Handler{
-		Ledger:       ledger,
-		Client:       &http.Client{Transport: transport, CheckRedirect: noRedirect},
-		uncheckedTLS: &http.Client{Transport: unchecked, CheckRedirect: noRedirect},
-	}
+	verified, unchecked := upstream.NewClients()
+	return &Handler{Ledger: ledger, Client: verified, uncheckedTLS: unchecked}
 }
 
 func (h *Handler) sourceClient(source ModelSource) *http.Client {
@@ -55,17 +45,7 @@ func (h *Handler) sourceClient(source ModelSource) *http.Client {
 	if source.SkipTLSVerification {
 		client = h.uncheckedTLS
 	}
-	if len(source.Headers) == 0 {
-		return client
-	}
-	withHeaders := *client
-	transport := client.Transport
-	if transport == nil {
-		transport = http.DefaultTransport
-	}
-	endpoint, _ := url.Parse(source.BaseURL)
-	withHeaders.Transport = sourceHeaderTransport{RoundTripper: transport, endpoint: endpoint, headers: source.Headers}
-	return &withHeaders
+	return upstream.WithHeaders(client, source.BaseURL, source.Headers)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -355,17 +335,17 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(status)
-	capture := usageCapture{stream: strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")}
+	capture := protocol.NewCapture("openai-completions", strings.Contains(response.Header.Get("Content-Type"), "text/event-stream"))
 	buffer := make([]byte, 32<<10)
 	complete := false
 	for {
 		n, readErr := response.Body.Read(buffer)
 		if n > 0 {
-			capture.feed(buffer[:n])
+			capture.Feed(buffer[:n])
 			if _, err = w.Write(buffer[:n]); err != nil {
 				break
 			}
-			if capture.stream {
+			if capture.Streaming() {
 				if f, ok := w.(http.Flusher); ok {
 					f.Flush()
 				}
@@ -377,7 +357,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if status >= 200 && status < 300 {
-		usage = capture.finish(complete)
+		usage = capture.Finish(complete)
 		if usage != nil {
 			code = ""
 		} else {

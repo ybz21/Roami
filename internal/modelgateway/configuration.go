@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 type Configuration struct {
@@ -39,7 +41,7 @@ func (c Configuration) validate() error {
 		return fmt.Errorf("INVALID_MODEL_PROXY_CONFIG")
 	}
 	for source, policy := range c.Pricing.Sources {
-		if !catalogID.MatchString(source) || !policy.validate() {
+		if !modelcatalog.ValidID(source) || !policy.validate() {
 			return fmt.Errorf("INVALID_MODEL_PROXY_CONFIG")
 		}
 	}

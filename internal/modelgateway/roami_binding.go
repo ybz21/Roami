@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 func (s *CatalogStore) runtimeModels(r *http.Request, method string, patch map[string]any) (map[string]any, error) {
@@ -88,10 +89,10 @@ func (h *Handler) applyRoamiModels(w http.ResponseWriter, r *http.Request) {
 		if input.Role != "" {
 			names = []string{input.Model}
 		}
-		hidden := hiddenGatewayMembers(s.value.Models)
+		hidden := modelcatalog.HiddenGatewayMembers(s.value.Models)
 		for _, name := range names {
-			model := findCatalogModel(s.value.Models, name)
-			if model == nil || model.hiddenAtGateway(hidden) {
+			model := modelcatalog.FindModel(s.value.Models, name)
+			if model == nil || model.HiddenAtGateway(hidden) {
 				s.mu.Unlock()
 				reject(w, 400, "INVALID_MODEL_PROTOCOL")
 				return

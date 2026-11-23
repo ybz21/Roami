@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ybz21/Roami/internal/modelgateway/protocoltest"
 	metadb "github.com/ybz21/Roami/internal/storage"
 )
 
@@ -31,7 +32,7 @@ func TestUpstreamResponseReceiptEndToEnd(t *testing.T) {
 					}
 					w.WriteHeader(status)
 					if status == 200 {
-						_ = json.NewEncoder(w).Encode(fixtureProtocolResponse("openai-completions"))
+						_ = json.NewEncoder(w).Encode(protocoltest.Response("openai-completions"))
 					} else {
 						_, _ = io.WriteString(w, `{"error":{"message":"PRIVATE_ERROR_BODY"}}`)
 					}
@@ -51,7 +52,7 @@ func TestUpstreamResponseReceiptEndToEnd(t *testing.T) {
 					if mode == "bridge" {
 						protocol, path, agent = "anthropic-messages", "/v1/messages", "claude"
 					}
-					body, _ := json.Marshal(protocolFixtureRequest(protocol, false))
+					body, _ := json.Marshal(protocoltest.Request(protocol, false))
 					r := httptest.NewRequest("POST", path, strings.NewReader(string(body)))
 					r.Header.Set("Authorization", "Bearer "+h.Catalog.credential(agent))
 					r.Header.Set("X-Request-Id", "client-correlation")
@@ -174,7 +175,7 @@ func TestUpstreamResponseReceiptConversionFailure(t *testing.T) {
 	}))
 	defer upstream.Close()
 	h := catalogHandler(t, upstream.URL+"/v1", "openai-completions")
-	body, _ := json.Marshal(protocolFixtureRequest("anthropic-messages", false))
+	body, _ := json.Marshal(protocoltest.Request("anthropic-messages", false))
 	r := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(string(body)))
 	r.Header.Set("Authorization", "Bearer "+h.Catalog.credential("claude"))
 	h.publicModels(httptest.NewRecorder(), r)

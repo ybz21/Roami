@@ -164,7 +164,7 @@ func routeCapabilityBlock(model CatalogModel, advertised *modelplugins.Model) st
 }
 
 func routeAllowed(model CatalogModel, candidate ModelCandidate, pluginModel *modelplugins.Model, quota routingQuota, pricing PricingConfig) bool {
-	if !model.enabled() || routeCapabilityBlock(model, pluginModel) != "" {
+	if !model.IsEnabled() || routeCapabilityBlock(model, pluginModel) != "" {
 		return false
 	}
 	if !model.FreeOnly {
@@ -211,12 +211,12 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 			m.FreeOnly = true
 		}
 		choice := &routingChoice{handler: h, model: configured, nodes: map[string]*routingNode{}, providersReserved: map[string]bool{}, blocks: map[ModelCandidate]string{}, contexts: map[ModelCandidate]int{}}
-		if !m.enabled() {
+		if !m.IsEnabled() {
 			return choice, nil
 		}
 		for _, candidate := range m.Candidates {
 			choice.blocks[candidate] = "source"
-			weight := m.Weights[candidateIdentity(candidate)]
+			weight := m.Weights[candidate.Identity()]
 			if weight == 0 {
 				weight = 1
 			}
@@ -238,7 +238,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 					continue
 				}
 				id := "group/" + childModel.ID
-				target := routeTarget{ID: id, Member: candidateIdentity(candidate), Kind: "group", Weight: weight, Channel: *h.routing.channel(id, now)}
+				target := routeTarget{ID: id, Member: candidate.Identity(), Kind: "group", Weight: weight, Channel: *h.routing.channel(id, now)}
 				childMemory := h.routing.memory(child.model, h.Ledger)
 				ranked := rankRouteTargets(child.model.Strategy, child.targets, now, childMemory)
 				if len(ranked) > 0 {
@@ -327,7 +327,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				if count > 256 {
 					return nil, errors.New("MODEL_ROUTE_TOO_LARGE")
 				}
-				channelID := candidateIdentity(candidate) + "/" + account.Key
+				channelID := candidate.Identity() + "/" + account.Key
 				channel := *h.routing.channel(channelID, now)
 				if now.Sub(channel.RecentAt) > time.Hour {
 					channel.Input, channel.Output = 0, 0
@@ -336,7 +336,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 				if account.Type == "api" || account.Type == "api_key" || fact.source.PluginSourceID == "" {
 					kind = "key"
 				}
-				target := routeTarget{ID: channelID, Member: candidateIdentity(candidate), Kind: kind, Weight: weight, Quota: quota, Channel: channel}
+				target := routeTarget{ID: channelID, Member: candidate.Identity(), Kind: kind, Weight: weight, Quota: quota, Channel: channel}
 				price, known := config.Pricing.routePriceAt(candidate.SourceID, candidate.Model, now)
 				if !known && pluginModel != nil && pluginModel.Cost != nil && config.Currency == "USD" {
 					price = ModelPricing{pluginModel.Cost.Input, pluginModel.Cost.Output, pluginModel.Cost.CacheRead}
@@ -522,7 +522,7 @@ func (h *Handler) restRoute(leaf routingLeaf, model CatalogModel, status int, re
 	defer h.routing.mu.Unlock()
 	now := h.Ledger.now()
 	channel := h.routing.channel(leaf.ChannelID, now)
-	duration := time.Duration(model.cooldown()) * time.Second
+	duration := time.Duration(model.Cooldown()) * time.Second
 	if retry > duration {
 		duration = retry
 	}

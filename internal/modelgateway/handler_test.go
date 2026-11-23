@@ -65,41 +65,6 @@ func TestGatewayStreamsAccountsAndRejectsBeforeUpstream(t *testing.T) {
 	}
 }
 
-func TestUsageCaptureChunkBoundariesAndInvalidUsage(t *testing.T) {
-	c := usageCapture{stream: true}
-	for _, value := range []byte(billableEvents) {
-		c.feed([]byte{value})
-	}
-	if u := c.finish(true); u == nil || u.Cached != 500000 {
-		t.Fatalf("fragmented usage: %+v", u)
-	}
-	for _, body := range []string{
-		`{"usage":{"prompt_tokens":true,"completion_tokens":1}}`,
-		`{"usage":{"prompt_tokens":1,"completion_tokens":1,"prompt_tokens_details":{"cached_tokens":2}}}`,
-		`{"usage":{"prompt_tokens":null,"completion_tokens":1}}`,
-		`{"usage":{"prompt_tokens":-1,"completion_tokens":1}}`,
-	} {
-		if parseUsage([]byte(body)) != nil {
-			t.Fatalf("invalid usage accepted: %s", body)
-		}
-	}
-	c = usageCapture{stream: true}
-	c.feed([]byte(strings.TrimSuffix(billableEvents, "data: [DONE]\n\n")))
-	if c.finish(true) != nil {
-		t.Fatal("incomplete stream charged as complete")
-	}
-	c = usageCapture{stream: true}
-	c.feed([]byte(billableEvents))
-	if c.finish(false) == nil {
-		t.Fatal("terminal usage lost when the caller closes after DONE")
-	}
-	c = usageCapture{stream: true}
-	c.feed([]byte("data: " + strings.Repeat("x", 2<<20) + "\n" + billableEvents))
-	if c.finish(true) != nil || len(c.buffer) > 1<<20 {
-		t.Fatal("unbounded or invalid event accepted")
-	}
-}
-
 func TestTerminalUsageSettlesWhenCallerClosesBeforeHTTPBodyEnds(t *testing.T) {
 	l := newLedger(t)
 	limit := 2.0

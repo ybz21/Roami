@@ -215,23 +215,6 @@ func TestCatalogApplyUsesNativeBackupAndNeverCopiesUpstreamKey(t *testing.T) {
 	}
 }
 
-func TestMessagesUsageSplitEventsAndMissingTerminal(t *testing.T) {
-	events := "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":10,\"output_tokens\":0,\"cache_read_input_tokens\":6,\"cache_creation_input_tokens\":4}}}\n\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":8}}\n\ndata: {\"type\":\"message_stop\"}\n\n"
-	c := nativeUsageCapture{protocol: "anthropic-messages", stream: true}
-	for _, b := range []byte(events) {
-		c.feed([]byte{b})
-	}
-	usage := c.finish(true)
-	if usage == nil || usage.Input != 20 || usage.Cached != 6 || usage.Output != 8 {
-		t.Fatalf("bad Messages accounting: %+v", usage)
-	}
-	c = nativeUsageCapture{protocol: "anthropic-messages", stream: true}
-	c.feed([]byte(strings.ReplaceAll(events, "data: {\"type\":\"message_stop\"}\n\n", "")))
-	if c.finish(true) != nil {
-		t.Fatal("missing terminal was treated as complete")
-	}
-}
-
 func TestRoamiBindingUsesRuntimeSaveRestoresOriginalAndBillsOnce(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any

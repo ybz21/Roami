@@ -3,6 +3,8 @@ package modelgateway
 import (
 	"net/http"
 	"time"
+
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
@@ -11,7 +13,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.URL.Query().Get("model")
-	if !catalogID.MatchString(id) {
+	if !modelcatalog.ValidID(id) {
 		reject(w, 400, "INVALID_MODEL_CATALOG")
 		return
 	}
@@ -20,7 +22,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 	h.Catalog.mu.Unlock()
 	var model *CatalogModel
 	for _, value := range catalog.Models {
-		if value.matchesGatewayName(id) {
+		if value.MatchesGatewayName(id) {
 			copy := value
 			model = &copy
 			break
@@ -38,7 +40,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 	var observation *requestObservationSummary
 	if h.Monitor != nil {
 		if rows, _, readErr := h.Monitor.Snapshot(); readErr == nil {
-			value := routeObservation(rows, append([]string{model.ID}, model.additionalGatewayNames()...), h.Monitor.now().Add(-time.Hour).UnixMilli())
+			value := routeObservation(rows, append([]string{model.ID}, model.AdditionalGatewayNames()...), h.Monitor.now().Add(-time.Hour).UnixMilli())
 			observation = &value
 		}
 	}

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 type qualityProbe struct {
@@ -64,8 +66,8 @@ func (h *Handler) runQualityProbe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	routeCheck := input.RouteID != ""
-	if routeCheck && (!catalogID.MatchString(input.RouteID) || input.SourceID != "" || input.Model != "") ||
-		!routeCheck && (!catalogID.MatchString(input.SourceID) || len(input.Model) > 200) {
+	if routeCheck && (!modelcatalog.ValidID(input.RouteID) || input.SourceID != "" || input.Model != "") ||
+		!routeCheck && (!modelcatalog.ValidID(input.SourceID) || len(input.Model) > 200) {
 		reject(w, 400, "INVALID_MONITOR_QUERY")
 		return
 	}
@@ -76,7 +78,7 @@ func (h *Handler) runQualityProbe(w http.ResponseWriter, r *http.Request) {
 	found := false
 	for _, model := range catalog.Models {
 		if routeCheck {
-			if model.matchesGatewayName(input.RouteID) {
+			if model.MatchesGatewayName(input.RouteID) {
 				alias, found = model, true
 				break
 			}

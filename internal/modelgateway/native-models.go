@@ -1,23 +1,25 @@
 package modelgateway
 
 import (
-	"github.com/ybz21/Roami/internal/agentproviders"
 	"strings"
+
+	"github.com/ybz21/Roami/internal/agentproviders"
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
-const gatewayDefaultModel = "roami-default"
+const gatewayDefaultModel = modelcatalog.DefaultModelID
 
 func (s *CatalogStore) modelOptions(catalog ModelCatalog) []agentproviders.ModelOption {
 	models := make([]agentproviders.ModelOption, 0, len(catalog.Models)+1)
 	if s.defaultModel(catalog) != nil {
 		models = append(models, agentproviders.ModelOption{ID: gatewayDefaultModel, Name: "Roami Default"})
 	}
-	hidden := hiddenGatewayMembers(catalog.Models)
+	hidden := modelcatalog.HiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
-		if (model.Aggregate && !model.enabled()) || model.hiddenAtGateway(hidden) {
+		if (model.Aggregate && !model.IsEnabled()) || model.HiddenAtGateway(hidden) {
 			continue
 		}
-		models = append(models, agentproviders.ModelOption{ID: model.publicGatewayName(), Name: model.Name})
+		models = append(models, agentproviders.ModelOption{ID: model.PublicGatewayName(), Name: model.Name})
 	}
 	return models
 }
@@ -42,13 +44,13 @@ func (s *CatalogStore) defaultModel(catalog ModelCatalog) *CatalogModel {
 	if err != nil {
 		return nil
 	}
-	hidden := hiddenGatewayMembers(catalog.Models)
+	hidden := modelcatalog.HiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
-		if (model.Aggregate && !model.enabled()) || model.hiddenAtGateway(hidden) {
+		if (model.Aggregate && !model.IsEnabled()) || model.HiddenAtGateway(hidden) {
 			continue
 		}
 		if strings.TrimRight(route.endpoint, "/") == s.baseURL+"/v1" {
-			if model.matchesGatewayName(route.model) {
+			if model.MatchesGatewayName(route.model) {
 				return &model
 			}
 			continue

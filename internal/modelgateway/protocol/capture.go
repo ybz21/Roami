@@ -1,11 +1,11 @@
-package modelgateway
+package protocol
 
 import (
 	"bytes"
 	"encoding/json"
 )
 
-type nativeUsageCapture struct {
+type Capture struct {
 	protocol             string
 	stream               bool
 	buffer               []byte
@@ -63,7 +63,7 @@ func nativeUsage(raw json.RawMessage, protocol string) *Usage {
 	}
 	return &Usage{input, output, cached}
 }
-func (c *nativeUsageCapture) feed(data []byte) {
+func (c *Capture) Feed(data []byte) {
 	if c.protocol == "openai-completions" {
 		c.chat.stream = c.stream
 		c.chat.feed(data)
@@ -90,7 +90,7 @@ func (c *nativeUsageCapture) feed(data []byte) {
 		}
 	}
 }
-func (c *nativeUsageCapture) event(line []byte) {
+func (c *Capture) event(line []byte) {
 	if !bytes.HasPrefix(line, []byte("data:")) {
 		return
 	}
@@ -139,7 +139,7 @@ func (c *nativeUsageCapture) event(line []byte) {
 		c.invalid = true
 	}
 }
-func (c *nativeUsageCapture) finish(complete bool) *Usage {
+func (c *Capture) Finish(complete bool) *Usage {
 	if c.protocol == "openai-completions" {
 		return c.chat.finish(complete)
 	}
@@ -168,3 +168,9 @@ func (c *nativeUsageCapture) finish(complete bool) *Usage {
 	}
 	return nativeUsage(response.Usage, c.protocol)
 }
+
+func NewCapture(format string, stream bool) *Capture {
+	return &Capture{protocol: format, stream: stream}
+}
+
+func (c *Capture) Streaming() bool { return c.stream }

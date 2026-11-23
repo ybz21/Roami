@@ -1,4 +1,4 @@
-package modelgateway
+package catalog
 
 import (
 	"regexp"
@@ -11,7 +11,7 @@ const maxSourceKeyLength = 160
 var sourceKeyPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,160}$`)
 
 // Reserve saved keys before assigning keys to legacy and automatically imported sources.
-func assignSourceKeys(sources []ModelSource) bool {
+func AssignSourceKeys(sources []ModelSource) bool {
 	used := make(map[string]bool, len(sources))
 	for _, source := range sources {
 		if source.SourceKey != nil && sourceKeyPattern.MatchString(*source.SourceKey) {
@@ -47,7 +47,7 @@ func assignSourceKeys(sources []ModelSource) bool {
 	return changed
 }
 
-func newSourcesHaveKeys(next, previous []ModelSource) bool {
+func NewSourcesHaveKeys(next, previous []ModelSource) bool {
 	saved := make(map[string]bool, len(previous))
 	for _, source := range previous {
 		saved[source.ID] = true
@@ -58,4 +58,17 @@ func newSourcesHaveKeys(next, previous []ModelSource) bool {
 		}
 	}
 	return true
+}
+
+func SourceKey(input, previous *string) (*string, error) {
+	if input == nil {
+		return previous, nil
+	}
+	if *input == "" {
+		return nil, ErrSourceKeyRequired
+	}
+	if !sourceKeyPattern.MatchString(*input) {
+		return nil, ErrInvalidSourceKey
+	}
+	return input, nil
 }

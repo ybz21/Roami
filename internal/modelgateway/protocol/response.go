@@ -1,4 +1,4 @@
-package modelgateway
+package protocol
 
 import (
 	"bufio"
@@ -7,11 +7,12 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 )
 
-type protocolResult struct {
+type Result struct {
 	reasoningBuffer       strings.Builder
 	argumentBuffers       map[int]*strings.Builder
 	textBuffer            strings.Builder
@@ -21,16 +22,16 @@ type protocolResult struct {
 	Size                  int
 }
 
-func newProtocolResult() *protocolResult {
-	return &protocolResult{Stop: "stop", Calls: map[int]*protocolCall{}}
+func NewResult() *Result {
+	return &Result{Stop: "stop", Calls: map[int]*protocolCall{}}
 }
-func (r *protocolResult) call(index int) *protocolCall {
+func (r *Result) call(index int) *protocolCall {
 	if r.Calls[index] == nil {
 		r.Calls[index] = &protocolCall{}
 	}
 	return r.Calls[index]
 }
-func (r *protocolResult) calls() []protocolCall {
+func (r *Result) CallsInOrder() []protocolCall {
 	keys := make([]int, 0, len(r.Calls))
 	for key := range r.Calls {
 		keys = append(keys, key)
@@ -42,7 +43,7 @@ func (r *protocolResult) calls() []protocolCall {
 	}
 	return calls
 }
-func (r *protocolResult) text(text string, output func(string) error) error {
+func (r *Result) text(text string, output func(string) error) error {
 	r.Size += len(text)
 	if r.Size > 32<<20 {
 		return protocolFailure()
@@ -54,11 +55,11 @@ func (r *protocolResult) text(text string, output func(string) error) error {
 	}
 	return nil
 }
-func (r *protocolResult) addReasoning(text string) {
+func (r *Result) addReasoning(text string) {
 	r.reasoningBuffer.WriteString(text)
 	r.Reasoning = r.reasoningBuffer.String()
 }
-func (r *protocolResult) addArguments(index int, text string) {
+func (r *Result) addArguments(index int, text string) {
 	call := r.call(index)
 	if r.argumentBuffers == nil {
 		r.argumentBuffers = map[int]*strings.Builder{}
@@ -72,7 +73,7 @@ func (r *protocolResult) addArguments(index int, text string) {
 	buffer.WriteString(text)
 	call.Arguments = buffer.String()
 }
-func (r *protocolResult) event(raw []byte, format string, output func(string) error) error {
+func (r *Result) Consume(raw []byte, format string, output func(string) error) error {
 	if bytes.Equal(bytes.TrimSpace(raw), []byte("[DONE]")) {
 		r.Terminal = true
 		return nil
@@ -81,7 +82,7 @@ func (r *protocolResult) event(raw []byte, format string, output func(string) er
 	if json.Unmarshal(raw, &event) != nil {
 		return protocolFailure()
 	}
-	if event["error"] != nil || containsField([]string{"error", "response.failed", "response.incomplete"}, fieldText(event, "type")) {
+	if event["error"] != nil || slices.Contains([]string{"error", "response.failed", "response.incomplete"}, fieldText(event, "type")) {
 		return errors.New("MODEL_GATEWAY_UPSTREAM_FAILED")
 	}
 	switch format {
@@ -197,7 +198,7 @@ func (r *protocolResult) event(raw []byte, format string, output func(string) er
 		case "response.function_call_arguments.done":
 			r.call(int(index)).Arguments = fieldText(event, "arguments")
 		case "response.completed":
-			final, e := decodeProtocolResult(objectValue(event["response"]), format)
+			final, e := DecodeResult(objectValue(event["response"]), format)
 			if e != nil {
 				return e
 			}
@@ -225,8 +226,8 @@ func (r *protocolResult) event(raw []byte, format string, output func(string) er
 	}
 	return nil
 }
-func decodeProtocolResult(raw map[string]any, format string) (*protocolResult, error) {
-	r := newProtocolResult()
+func DecodeResult(raw map[string]any, format string) (*Result, error) {
+	r := NewResult()
 	if raw == nil || raw["error"] != nil {
 		return nil, protocolFailure()
 	}
@@ -311,22 +312,22 @@ func decodeProtocolResult(raw map[string]any, format string) (*protocolResult, e
 
 type protocolCaptureReader struct {
 	io.Reader
-	capture *nativeUsageCapture
+	capture *Capture
 }
 
 func (r protocolCaptureReader) Read(p []byte) (int, error) {
 	n, e := r.Reader.Read(p)
 	if n > 0 {
-		r.capture.feed(p[:n])
+		r.capture.Feed(p[:n])
 	}
 	return n, e
 }
-func (b *protocolBridge) forward(w http.ResponseWriter, response *http.Response, capture *nativeUsageCapture) (complete bool, failure error) {
-	result := newProtocolResult()
+func (b *Bridge) Forward(w http.ResponseWriter, response *http.Response, capture *Capture) (complete bool, failure error) {
+	result := NewResult()
 	encoder := newProtocolEncoder(w, b)
 	defer func() {
 		if failure != nil {
-			encoder.fail(protocolCode(failure))
+			encoder.fail(ErrorCode(failure))
 		}
 	}()
 	reader := protocolCaptureReader{Reader: response.Body, capture: capture}
@@ -339,7 +340,7 @@ func (b *protocolBridge) forward(w http.ResponseWriter, response *http.Response,
 			if len(data) == 0 {
 				return nil
 			}
-			e := result.event([]byte(strings.Join(data, "\n")), b.to, func(text string) error {
+			e := result.Consume([]byte(strings.Join(data, "\n")), b.to, func(text string) error {
 				return encoder.textWithReasoning(text, result.Reasoning)
 			})
 			data = nil
@@ -354,7 +355,7 @@ func (b *protocolBridge) forward(w http.ResponseWriter, response *http.Response,
 			}
 			if line == "" {
 				if e := dispatch(); e != nil {
-					encoder.fail(protocolCode(e))
+					encoder.fail(ErrorCode(e))
 					return false, e
 				}
 				if result.Terminal {
@@ -369,7 +370,7 @@ func (b *protocolBridge) forward(w http.ResponseWriter, response *http.Response,
 			return false, scanner.Err()
 		}
 		if e := dispatch(); e != nil {
-			encoder.fail(protocolCode(e))
+			encoder.fail(ErrorCode(e))
 			return true, e
 		}
 		if !result.Terminal {
@@ -388,7 +389,7 @@ func (b *protocolBridge) forward(w http.ResponseWriter, response *http.Response,
 		if json.Unmarshal(raw, &value) != nil {
 			return true, protocolFailure()
 		}
-		result, e = decodeProtocolResult(value, b.to)
+		result, e = DecodeResult(value, b.to)
 		if e != nil {
 			return true, e
 		}
@@ -396,13 +397,13 @@ func (b *protocolBridge) forward(w http.ResponseWriter, response *http.Response,
 			return true, e
 		}
 	}
-	usage := capture.finish(true)
+	usage := capture.Finish(true)
 	if usage == nil {
 		encoder.fail("MODEL_PROXY_USAGE_UNKNOWN")
 		return true, errors.New("MODEL_PROXY_USAGE_UNKNOWN")
 	}
 	if e := encoder.finish(result, usage); e != nil {
-		encoder.fail(protocolCode(e))
+		encoder.fail(ErrorCode(e))
 		return true, e
 	}
 	return true, nil

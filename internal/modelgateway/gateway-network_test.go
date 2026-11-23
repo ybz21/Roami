@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/ybz21/Roami/internal/modelgateway/lan"
 )
 
 func TestGatewayLANAcceptsExternalKeysAndBothProtocols(t *testing.T) {
@@ -69,7 +71,7 @@ func TestGatewayLANAcceptsExternalKeysAndBothProtocols(t *testing.T) {
 }
 
 func TestGatewayNetworkToggleBindsAndClosesLANAddresses(t *testing.T) {
-	if len(gatewayLANAddresses()) == 0 {
+	if len(lan.PrivateIPv4Addresses()) == 0 {
 		t.Skip("host has no private IPv4 interface")
 	}
 	hostListener, err := net.Listen("tcp4", "127.0.0.1:0")
@@ -85,15 +87,15 @@ func TestGatewayNetworkToggleBindsAndClosesLANAddresses(t *testing.T) {
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodPut, "/v1/model-gateway/network", strings.NewReader(body)))
 		return w
 	}
-	if w := toggle(`{"enabled":true}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"enabled":true`) || h.lan == nil || len(h.lan.urls) == 0 {
+	if w := toggle(`{"enabled":true}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"enabled":true`) || h.network.binding == nil || len(h.network.binding.URLs()) == 0 {
 		t.Fatalf("enable network: %d %s", w.Code, w.Body)
 	}
-	lan := h.lan
-	t.Cleanup(lan.close)
-	if w := toggle(`{"enabled":false}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"enabled":false`) || h.lan != nil || h.Catalog.value.LANEnabled {
+	binding := h.network.binding
+	t.Cleanup(binding.Close)
+	if w := toggle(`{"enabled":false}`); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"enabled":false`) || h.network.binding != nil || h.Catalog.value.LANEnabled {
 		t.Fatalf("disable network: %d %s", w.Code, w.Body)
 	}
-	for _, address := range lan.urls {
+	for _, address := range binding.URLs() {
 		if listener, err := net.Listen("tcp4", strings.TrimPrefix(address, "http://")); err != nil {
 			t.Fatalf("LAN address remained open: %v", err)
 		} else {

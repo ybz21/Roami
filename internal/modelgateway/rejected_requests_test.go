@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+
+	"github.com/ybz21/Roami/internal/modelgateway/protocoltest"
 )
 
 func TestCatalogRejectionDoesNotBlockSharedDailyBudget(t *testing.T) {
@@ -41,14 +43,14 @@ func TestCatalogRejectionDoesNotBlockSharedDailyBudget(t *testing.T) {
 						_, _ = io.WriteString(w, `{"error":{"message":"rejected"}}`)
 						return
 					}
-					_ = json.NewEncoder(w).Encode(fixtureProtocolResponse(route.source))
+					_ = json.NewEncoder(w).Encode(protocoltest.Response(route.source))
 				}))
 				defer upstream.Close()
 				h := catalogHandler(t, upstream.URL+"/v1", route.source)
 				if err := h.Ledger.Configure(testConfiguration(floatPointer(100))); err != nil {
 					t.Fatal(err)
 				}
-				body, _ := json.Marshal(protocolFixtureRequest(route.protocol, false))
+				body, _ := json.Marshal(protocoltest.Request(route.protocol, false))
 				requestWithKey(h, h.Catalog.credential(route.agent), route.path, string(body))
 				stats, err := h.Ledger.Statistics(1)
 				if err != nil || len(stats.Recent) != 1 {
@@ -70,7 +72,7 @@ func TestCatalogRejectionDoesNotBlockSharedDailyBudget(t *testing.T) {
 					{"opencode", "openai-completions", "/v1/chat/completions"},
 					{"codex", "openai-responses", "/v1/responses"},
 				} {
-					body, _ := json.Marshal(protocolFixtureRequest(next.protocol, false))
+					body, _ := json.Marshal(protocoltest.Request(next.protocol, false))
 					response := requestWithKey(h, h.Catalog.credential(next.agent), next.path, string(body))
 					if response.Code != 200 {
 						t.Fatalf("rejection blocked %s: %d %s", next.agent, response.Code, response.Body)

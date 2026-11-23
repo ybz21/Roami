@@ -1,10 +1,9 @@
-package modelgateway
+package catalog
 
 import (
 	"errors"
 	"maps"
-	"net/http"
-	"net/url"
+	"net/textproto"
 	"slices"
 	"strings"
 
@@ -13,9 +12,12 @@ import (
 
 const maxSourceHeaders = 16
 
-func (s *ModelSource) hideHeaderValues() {
+func (s ModelSource) Public() ModelSource {
+	s.HasKey = s.APIKey != ""
+	s.APIKey = ""
 	s.HeaderNames = slices.Sorted(maps.Keys(s.Headers))
 	s.Headers = nil
+	return s
 }
 
 func validateSourceHeaders(source, previous ModelSource) (map[string]string, error) {
@@ -36,7 +38,7 @@ func validateSourceHeaders(source, previous ModelSource) (map[string]string, err
 		if len(name) > 128 || !httpguts.ValidHeaderFieldName(name) {
 			return nil, badHeader
 		}
-		name = http.CanonicalHeaderKey(name)
+		name = textproto.CanonicalMIMEHeaderKey(name)
 		if _, duplicate := headers[name]; duplicate || reservedSourceHeader(strings.ToLower(name)) {
 			return nil, badHeader
 		}
@@ -67,23 +69,4 @@ func reservedSourceHeader(name string) bool {
 		return true
 	}
 	return strings.HasPrefix(name, "x-roami-") || strings.HasPrefix(name, "x-forwarded-")
-}
-
-type sourceHeaderTransport struct {
-	http.RoundTripper
-	endpoint *url.URL
-	headers  map[string]string
-}
-
-func (t sourceHeaderTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	if t.endpoint != nil && r.URL.Scheme == t.endpoint.Scheme && strings.EqualFold(r.URL.Host, t.endpoint.Host) {
-		r = r.Clone(r.Context())
-		if r.Header == nil {
-			r.Header = make(http.Header)
-		}
-		for name, value := range t.headers {
-			r.Header.Set(name, value)
-		}
-	}
-	return t.RoundTripper.RoundTrip(r)
 }

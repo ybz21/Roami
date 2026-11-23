@@ -9,12 +9,13 @@ import (
 
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentproviders"
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 	"github.com/ybz21/Roami/internal/modelplugins"
 )
 
 const (
-	openRouterFreeConnector = "openrouter-free"
-	openRouterBaseURL       = "https://openrouter.ai/api/v1"
+	openRouterFreeConnector = modelcatalog.OpenRouterFreeConnector
+	openRouterBaseURL       = modelcatalog.OpenRouterBaseURL
 )
 
 func openRouterFreeModel(row agentproviders.SourceModelDetail) bool {

@@ -1,10 +1,12 @@
-package modelgateway
+// Package protocol converts wire formats between OpenAI and Anthropic.
+package protocol
 
 import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -31,7 +33,7 @@ type protocolRequest struct {
 	Parallel          *bool
 	Stream            bool
 }
-type protocolBridge struct {
+type Bridge struct {
 	from, to, model string
 	request         protocolRequest
 }
@@ -162,7 +164,7 @@ func decodeProtocolRequest(body []byte, format string) (protocolRequest, error) 
 		if role == "developer" {
 			role = "system"
 		}
-		if !containsField([]string{"system", "user", "assistant", "tool"}, role) {
+		if !slices.Contains([]string{"system", "user", "assistant", "tool"}, role) {
 			return protocolFailure()
 		}
 		q.Messages = append(q.Messages, protocolMessage{Role: role, Content: parts})
@@ -196,7 +198,7 @@ func decodeProtocolRequest(body []byte, format string) (protocolRequest, error) 
 		for _, value := range arrayValue(raw["messages"]) {
 			m := objectValue(value)
 			role := fieldText(m, "role")
-			if !containsField([]string{"user", "assistant", "system"}, role) {
+			if !slices.Contains([]string{"user", "assistant", "system"}, role) {
 				return q, protocolFailure()
 			}
 			msg := protocolMessage{Role: role}
@@ -333,7 +335,7 @@ func decodeProtocolRequest(body []byte, format string) (protocolRequest, error) 
 			}
 			return nil
 		}
-		if format == "openai-responses" && containsField([]string{"web_search", "web_search_preview", "tool_search"}, kind) {
+		if format == "openai-responses" && slices.Contains([]string{"web_search", "web_search_preview", "tool_search"}, kind) {
 			q.DisabledTools = append(q.DisabledTools, kind)
 			return nil
 		}
@@ -423,7 +425,7 @@ func decodeProtocolRequest(body []byte, format string) (protocolRequest, error) 
 	if q.Choice == "required" && len(q.Tools) == 0 {
 		return q, protocolFailure()
 	}
-	if !containsField([]string{"", "auto", "none", "required", "named"}, q.Choice) {
+	if !slices.Contains([]string{"", "auto", "none", "required", "named"}, q.Choice) {
 		return q, protocolFailure()
 	}
 	if q.Choice == "named" {
@@ -763,11 +765,11 @@ func (q protocolRequest) encode(format, model string) ([]byte, error) {
 	}
 	return json.Marshal(out)
 }
-func prepareProtocolBridge(body []byte, from, to, model string) ([]byte, *protocolBridge, error) {
-	return prepareProtocolBridgeWithStreaming(body, from, to, model, false)
+func prepareProtocolBridge(body []byte, from, to, model string) ([]byte, *Bridge, error) {
+	return Prepare(body, from, to, model, false)
 }
 
-func prepareProtocolBridgeWithStreaming(body []byte, from, to, model string, forceStreaming bool) ([]byte, *protocolBridge, error) {
+func Prepare(body []byte, from, to, model string, forceStreaming bool) ([]byte, *Bridge, error) {
 	if from == to {
 		var raw map[string]json.RawMessage
 		if json.Unmarshal(body, &raw) != nil {
@@ -784,7 +786,7 @@ func prepareProtocolBridgeWithStreaming(body []byte, from, to, model string, for
 	upstream := q
 	upstream.Stream = upstream.Stream || forceStreaming
 	out, e := upstream.encode(to, model)
-	return out, &protocolBridge{from: from, to: to, request: q}, e
+	return out, &Bridge{from: from, to: to, request: q}, e
 }
 
 func namespacedToolName(namespace, name string) string {

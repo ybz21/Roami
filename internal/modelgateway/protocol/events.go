@@ -1,6 +1,8 @@
-package modelgateway
+package protocol
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,7 +12,7 @@ import (
 
 type protocolEncoder struct {
 	writer                      http.ResponseWriter
-	bridge                      *protocolBridge
+	bridge                      *Bridge
 	id, messageID               string
 	sequence                    int
 	started, failed, textOpened bool
@@ -18,8 +20,12 @@ type protocolEncoder struct {
 	thinkingPrefix              string
 }
 
-func newProtocolEncoder(w http.ResponseWriter, b *protocolBridge) *protocolEncoder {
-	id, _ := randomCatalogID()
+func newProtocolEncoder(w http.ResponseWriter, b *Bridge) *protocolEncoder {
+	var nonce [24]byte
+	id := ""
+	if _, err := rand.Read(nonce[:]); err == nil {
+		id = hex.EncodeToString(nonce[:])
+	}
 	if len(b.request.DisabledTools) > 0 {
 		w.Header().Set("X-Roami-Unsupported-Tools", strings.Join(b.request.DisabledTools, ","))
 	}
@@ -28,7 +34,7 @@ func newProtocolEncoder(w http.ResponseWriter, b *protocolBridge) *protocolEncod
 	}
 	return &protocolEncoder{writer: w, bridge: b, id: "resp_" + id, messageID: "msg_" + id}
 }
-func protocolCode(e error) string {
+func ErrorCode(e error) string {
 	if strings.HasPrefix(e.Error(), "MODEL_") {
 		return e.Error()
 	}
@@ -194,7 +200,7 @@ func (e *protocolEncoder) responseTool(call protocolCall, index int) (map[string
 	}
 	return item, nil
 }
-func protocolStop(r *protocolResult) string {
+func protocolStop(r *Result) string {
 	if len(r.Calls) > 0 {
 		return "tool_calls"
 	}
@@ -203,11 +209,11 @@ func protocolStop(r *protocolResult) string {
 	}
 	return "stop"
 }
-func (e *protocolEncoder) finish(r *protocolResult, u *Usage) error {
+func (e *protocolEncoder) finish(r *Result, u *Usage) error {
 	if len(e.bridge.request.DisabledTools) > 0 {
 		e.writer.Header().Set("X-Roami-Unsupported-Tools", strings.Join(e.bridge.request.DisabledTools, ","))
 	}
-	calls := r.calls()
+	calls := r.CallsInOrder()
 	for i := range calls {
 		call := &calls[i]
 		allowed := false
@@ -445,7 +451,10 @@ func (e *protocolEncoder) failStatus(code string, status int) {
 	}
 	errorValue := map[string]any{"type": "api_error", "code": code, "message": code}
 	if !e.started {
-		writeJSON(e.writer, status, map[string]any{"type": "error", "error": errorValue})
+		e.writer.Header().Set("Content-Type", "application/json")
+		e.writer.Header().Set("Cache-Control", "no-store")
+		e.writer.WriteHeader(status)
+		_ = json.NewEncoder(e.writer).Encode(map[string]any{"type": "error", "error": errorValue})
 		return
 	}
 	if e.bridge.from == "openai-responses" {
@@ -457,4 +466,10 @@ func (e *protocolEncoder) failStatus(code string, status int) {
 	} else {
 		_ = e.event("", map[string]any{"error": errorValue})
 	}
+}
+
+func (b *Bridge) SetResponseModel(model string) { b.model = model }
+
+func (b *Bridge) WriteFailure(w http.ResponseWriter, code string, status int) {
+	newProtocolEncoder(w, b).failStatus(code, status)
 }

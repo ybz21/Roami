@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ybz21/Roami/internal/agentproviders"
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 type CapabilityFact struct {
@@ -220,14 +221,14 @@ func (s *CatalogStore) directoryRows(ctx context.Context, catalog ModelCatalog, 
 	}
 	configured := map[ModelCandidate]bool{}
 	rows := []ModelDirectoryRow{}
-	hidden := hiddenGatewayMembers(catalog.Models)
+	hidden := modelcatalog.HiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
 		kind := "single"
 		if model.Aggregate {
 			kind = "aggregate"
 		}
-		entry := ModelDirectoryRow{ID: model.ID, Name: model.Name, Kind: kind, Protocol: model.Protocol, Configured: true, Enabled: model.enabled(), FreeOnly: model.FreeOnly, Pricing: "unknown", Capabilities: unknownCapabilities(), Candidates: model.Candidates}
-		entry.GatewayAlias, entry.GatewayHidden = model.GatewayAlias, model.hiddenAtGateway(hidden)
+		entry := ModelDirectoryRow{ID: model.ID, Name: model.Name, Kind: kind, Protocol: model.Protocol, Configured: true, Enabled: model.IsEnabled(), FreeOnly: model.FreeOnly, Pricing: "unknown", Capabilities: unknownCapabilities(), Candidates: model.Candidates}
+		entry.GatewayAlias, entry.GatewayHidden = model.GatewayAlias, model.HiddenAtGateway(hidden)
 		if model.FreeOnly {
 			entry.Pricing = "free-only"
 		} else if model.Aggregate && freeRoutePrice(model.ID) && allMembersFree(model, 0) {

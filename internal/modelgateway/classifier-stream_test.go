@@ -7,11 +7,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	wireprotocol "github.com/ybz21/Roami/internal/modelgateway/protocol"
+	"github.com/ybz21/Roami/internal/modelgateway/protocoltest"
 )
 
 func TestClassifierStreamReturnsOneJSONMessageWithActualUsage(t *testing.T) {
-	body, _ := json.Marshal(protocolFixtureRequest("anthropic-messages", false))
-	wire, bridge, err := prepareProtocolBridgeWithStreaming(body, "anthropic-messages", "openai-completions", "configured-model", true)
+	body, _ := json.Marshal(protocoltest.Request("anthropic-messages", false))
+	wire, bridge, err := wireprotocol.Prepare(body, "anthropic-messages", "openai-completions", "configured-model", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,18 +22,18 @@ func TestClassifierStreamReturnsOneJSONMessageWithActualUsage(t *testing.T) {
 	if err := json.Unmarshal(wire, &request); err != nil {
 		t.Fatal(err)
 	}
-	if request["stream"] != true || bridge.request.Stream || request["model"] != "configured-model" {
+	if request["stream"] != true || request["model"] != "configured-model" {
 		t.Fatalf("changed downstream mode or route: %s", wire)
 	}
 	if objectValue(request["stream_options"])["include_usage"] != true {
 		t.Fatal("usage was not requested")
 	}
 	upstream := httptest.NewRecorder()
-	writeProtocolFixture(upstream, "openai-completions", true)
-	bridge.model = "saved-alias"
+	protocoltest.WriteResponse(upstream, "openai-completions", true)
+	bridge.SetResponseModel("saved-alias")
 	out := httptest.NewRecorder()
-	capture := &nativeUsageCapture{protocol: "openai-completions", stream: true}
-	complete, err := bridge.forward(out, upstream.Result(), capture)
+	capture := wireprotocol.NewCapture("openai-completions", true)
+	complete, err := bridge.Forward(out, upstream.Result(), capture)
 	if err != nil || !complete || out.Code != 200 {
 		t.Fatalf("conversion: %v %v %s", complete, err, out.Body)
 	}
@@ -55,8 +58,8 @@ func TestClassifierStreamReturnsOneJSONMessageWithActualUsage(t *testing.T) {
 }
 
 func TestClassifierStreamNeverTurnsTruncatedOutputIntoSuccess(t *testing.T) {
-	body, _ := json.Marshal(protocolFixtureRequest("anthropic-messages", false))
-	_, bridge, err := prepareProtocolBridgeWithStreaming(body, "anthropic-messages", "openai-completions", "configured-model", true)
+	body, _ := json.Marshal(protocoltest.Request("anthropic-messages", false))
+	_, bridge, err := wireprotocol.Prepare(body, "anthropic-messages", "openai-completions", "configured-model", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +67,7 @@ func TestClassifierStreamNeverTurnsTruncatedOutputIntoSuccess(t *testing.T) {
 	upstream.Header().Set("Content-Type", "text/event-stream")
 	_, _ = upstream.WriteString("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n")
 	out := httptest.NewRecorder()
-	_, err = bridge.forward(out, &http.Response{Header: upstream.Header(), Body: upstream.Result().Body}, &nativeUsageCapture{protocol: "openai-completions", stream: true})
+	_, err = bridge.Forward(out, &http.Response{Header: upstream.Header(), Body: upstream.Result().Body}, wireprotocol.NewCapture("openai-completions", true))
 	if err == nil || !strings.Contains(out.Body.String(), "MODEL_GATEWAY_INTERRUPTED") || strings.Contains(out.Body.String(), "partial") {
 		t.Fatalf("partial classifier accepted: %v %s", err, out.Body)
 	}

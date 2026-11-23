@@ -1,6 +1,6 @@
-package modelgateway
+package catalog
 
-func hiddenGatewayMembers(models []CatalogModel) map[ModelCandidate]bool {
+func HiddenGatewayMembers(models []CatalogModel) map[ModelCandidate]bool {
 	byID := make(map[string]CatalogModel, len(models))
 	for _, model := range models {
 		if model.Aggregate {
@@ -16,7 +16,7 @@ func hiddenGatewayMembers(models []CatalogModel) map[ModelCandidate]bool {
 		}
 		visited[model.ID] = true
 		for _, member := range model.Candidates {
-			if member.SourceID != groupSource {
+			if member.SourceID != GroupSource {
 				hidden[member] = true
 			} else if group, ok := byID[member.Model]; ok {
 				hide(group)
@@ -31,7 +31,7 @@ func hiddenGatewayMembers(models []CatalogModel) map[ModelCandidate]bool {
 	return hidden
 }
 
-func (m CatalogModel) hiddenAtGateway(members map[ModelCandidate]bool) bool {
+func (m CatalogModel) HiddenAtGateway(members map[ModelCandidate]bool) bool {
 	if m.Aggregate {
 		return false
 	}

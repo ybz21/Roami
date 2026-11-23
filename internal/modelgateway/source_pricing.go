@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 type PriceRule struct {
@@ -125,7 +127,7 @@ func (h *Handler) sourcePricingManagement(w http.ResponseWriter, r *http.Request
 		return false
 	}
 	id := strings.TrimPrefix(r.URL.Path, prefix)
-	if !catalogID.MatchString(id) || h.Catalog == nil {
+	if !modelcatalog.ValidID(id) || h.Catalog == nil {
 		reject(w, 400, "INVALID_MODEL_PROXY_CONFIG")
 		return true
 	}

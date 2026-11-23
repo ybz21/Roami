@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 type requestTotals struct {
@@ -50,7 +51,7 @@ func (h *Handler) requestRouteIDs(route string) []string {
 		defer h.Catalog.mu.Unlock()
 		for _, model := range h.Catalog.value.Models {
 			if model.Aggregate && model.ID == route {
-				return append([]string{route}, model.additionalGatewayNames()...)
+				return append([]string{route}, model.AdditionalGatewayNames()...)
 			}
 		}
 	}
@@ -142,7 +143,7 @@ func (h *Handler) requestMonitorManagement(w http.ResponseWriter, r *http.Reques
 		return true
 	}
 	route := query.Get("routeId")
-	if route != "" && !catalogID.MatchString(route) {
+	if route != "" && !modelcatalog.ValidID(route) {
 		reject(w, 400, "INVALID_MONITOR_QUERY")
 		return true
 	}

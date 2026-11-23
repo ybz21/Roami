@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
 
 // Loopback URLs and aliases stay unchanged when an upstream credential or route changes.
@@ -20,9 +22,9 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		sources[source.ID] = source
 	}
 	fingerprints := map[string]string{}
-	hidden := hiddenGatewayMembers(catalog.Models)
+	hidden := modelcatalog.HiddenGatewayMembers(catalog.Models)
 	for _, model := range catalog.Models {
-		if model.hiddenAtGateway(hidden) {
+		if model.HiddenAtGateway(hidden) {
 			continue
 		}
 		routes := []route{}
@@ -40,7 +42,7 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		digest := sha256.Sum256(raw)
 		fingerprint := hex.EncodeToString(digest[:])
 		fingerprints[model.ID] = fingerprint
-		for _, alias := range model.additionalGatewayNames() {
+		for _, alias := range model.AdditionalGatewayNames() {
 			fingerprints[alias] = fingerprint
 		}
 	}
