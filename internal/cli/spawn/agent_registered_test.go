@@ -26,6 +26,18 @@ func TestRegisteredPromptFileLaunches(t *testing.T) {
 	}
 }
 
+func TestGeminiLaunchesWithPinnedConversationAndStdin(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	config := AgentConfig{Kind: "gemini", Workdir: "/tmp", Interactive: true, Model: "gemini-2.5-flash", Permission: "auto", SessionUUID: "a1b2c3d4-1234-5678-9abc-0123456789ab"}
+	launch := "cd '/tmp' && gemini --model gemini-2.5-flash --session-id " + config.SessionUUID + " --approval-mode auto_edit"
+	if got := config.InteractiveFromPromptFile("/tmp/agent prompt"); got != launch+` --prompt-interactive "$(cat '/tmp/agent prompt')"` {
+		t.Fatalf("interactive launch: %s", got)
+	}
+	if got := config.CommandFromPromptFile("/tmp/agent prompt"); got != launch+" < '/tmp/agent prompt'" {
+		t.Fatalf("headless launch: %s", got)
+	}
+}
+
 func TestNativeOpenCodeLaunchOutsidePATH(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "user's home")
 	t.Setenv("HOME", home)

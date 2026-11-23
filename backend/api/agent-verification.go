@@ -75,8 +75,16 @@ func (a *API) verificationSignature(ctx context.Context, row agentinventory.Prof
 		paths = []string{filepath.Join(configRoot("PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "auth.json")}
 	case "opencode":
 		paths = []string{filepath.Join(configRoot("XDG_DATA_HOME", filepath.Join(home, ".local", "share")), "opencode", "auth.json")}
+	case "gemini":
+		root := filepath.Join(configRoot("GEMINI_CLI_HOME", home), ".gemini")
+		paths = []string{filepath.Join(root, "settings.json"), filepath.Join(root, "oauth_creds.json")}
 	}
 	material := fmt.Sprintf("%s:%s:%d:%d:%s", row.Kind, row.Binary, info.Size(), info.ModTime().UnixNano(), revision)
+	if row.Kind == "gemini" {
+		for _, name := range []string{"GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_GEMINI_BASE_URL", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "GEMINI_MODEL"} {
+			material += "\x00" + os.Getenv(name)
+		}
+	}
 	if a.AgentVerification != nil {
 		data, e := os.ReadFile(filepath.Join(a.AgentVerification.root, "agents", "model-catalog-revision"))
 		if e != nil && !os.IsNotExist(e) {
@@ -161,6 +169,10 @@ func (a *API) VerifyProfessionalAgent(c *gin.Context) {
 	defer cancel()
 	prompt := "Reply with exactly ROAMI_READY. Do not call tools, read files, or modify anything."
 	args := runner.OneShotArgs(agent.StartOpts{MaxTurns: "1"})
+	if kind == "gemini" {
+		// This empty directory is created for the probe and removed on exit.
+		args = append(args, "--skip-trust")
+	}
 	if positional, ok := runner.(interface{ OneShotPromptArg() bool }); ok && positional.OneShotPromptArg() {
 		args = append(args, prompt)
 	}

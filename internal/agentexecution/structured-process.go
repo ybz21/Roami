@@ -17,6 +17,14 @@ import (
 )
 
 func structuredArgs(spec Spec, provider string) []string {
+	if spec.Executor == "gemini" {
+		args := agent.Get("gemini").OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission})
+		args = append(args, "--output-format", "stream-json")
+		if provider != "" {
+			args = append(args, "--resume", provider)
+		}
+		return args
+	}
 	var args []string
 	if spec.Executor == "opencode" {
 		args = agent.Get("opencode").OneShotArgs(agent.StartOpts{Model: spec.Model, Permission: spec.Permission})
@@ -38,6 +46,11 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 		spec.Prompt = sessionPrompt(dir, spec)
 	}
 	result := Result{State: "failed", ExitCode: -1, Summary: "EXECUTOR_START_FAILED"}
+	if spec.Executor == "gemini" && provider != "" && !agent.ValidGeminiSessionID(provider) {
+		result.Summary = "INVALID_EXECUTOR_EVENT_STREAM"
+		result.FinishedMS = time.Now().UnixMilli()
+		return result, ""
+	}
 	if provider == "" && spec.Executor == "pi" {
 		provider = uuid.NewString()
 	}
@@ -54,7 +67,7 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 	cmd := exec.CommandContext(runCtx, bin, structuredArgs(spec, provider)...)
 	cmd.Dir = receipt.Workspace.Directory
 	cmd.Env = gitcontext.ForDirectory(os.Environ())
-	if spec.Executor == "opencode" {
+	if spec.Executor == "opencode" || spec.Executor == "gemini" {
 		cmd.Stdin = strings.NewReader(spec.Prompt)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}

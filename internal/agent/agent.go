@@ -7,6 +7,7 @@
 //	claude   --session-id <uuid>（我们指定）  claude --resume <id>
 //	codex    不支持（只能事后认）             codex resume <id>
 //	pi       --session-id <uuid>（我们指定）  pi --session <id>
+//	gemini   --session-id <uuid>（我们指定）  gemini --resume <id>
 //	opencode 不支持                        不支持
 //
 // 从前这些差异散成一串 `if kind == "codex"`（spawn/agent.go、revive、collect

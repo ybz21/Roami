@@ -13,6 +13,7 @@ func TestProfessionalInstallArgs(t *testing.T) {
 	for kind, want := range map[string][]string{
 		"codex":    {"install", "-g", "@openai/codex"},
 		"claude":   {"install", "-g", "@anthropic-ai/claude-code"},
+		"gemini":   {"install", "-g", "@google/gemini-cli"},
 		"opencode": {"install", "-g", "opencode-ai"},
 		"pi":       {"install", "-g", "--ignore-scripts", "@earendil-works/pi-coding-agent"},
 	} {

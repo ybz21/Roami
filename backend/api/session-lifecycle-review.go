@@ -82,11 +82,10 @@ func (a *API) lifecycleReview(ctx context.Context, o life.Operation) (any, error
 		command := spec.Command
 		if command == runner.Bin() {
 			command = strings.Join(append([]string{command}, runner.InteractiveArgs(agent.StartOpts{Permission: "dangerously-skip-permissions"})...), " ")
-		}
-		command = reviewAgentCommand(ctx, spec.Agent, command)
-		if flag := agent.Describe(runner).PromptFlag; flag != "" {
+		} else if flag := agent.Describe(runner).PromptFlag; flag != "" {
 			command += " " + flag
 		}
+		command = reviewAgentCommand(ctx, spec.Agent, command)
 		command += " " + shellQuote(prompt)
 		o, err = a.reviewCheckpoint(o, "review-launch-intent", true)
 		if err != nil {
