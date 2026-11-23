@@ -102,3 +102,41 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 :not(pre) > code { background: var(--bg-container); border-radius: var(--r-xs); padding-inline: var(--sp-1); }
 details { border-block-start: 1px solid var(--border-subtle); }
 summary { padding-block: var(--sp-3); min-height: var(--tap); cursor: pointer; font-weight: 700; }
+
+.architecture { margin: 0 0 var(--sp-4); }
+.architecture-box {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-xs);
+  background: var(--bg-container);
+}
+.architecture-box span { color: var(--text-dim); }
+.architecture-boundary { border-inline-start: var(--sp-1) solid var(--accent); }
+.architecture-flow {
+  width: 1px;
+  height: var(--sp-3);
+  margin-inline: auto;
+  background: var(--text-dim);
+}
+.architecture-branches, .architecture-platforms {
+  display: grid;
+  gap: var(--sp-3);
+}
+.architecture-branches {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+.architecture-branches::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: calc((100% - var(--sp-3)) / 6);
+  inset-inline-end: calc((100% - var(--sp-3)) / 3);
+  border-top: 1px solid var(--text-dim);
+}
+.architecture-platforms {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12em), 1fr));
+}
+.architecture-lane { min-width: 0; }

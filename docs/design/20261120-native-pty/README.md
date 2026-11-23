@@ -4,9 +4,9 @@
 
 开工先将 tmux 接入 `SessionBackend`，再做 Linux 单窗格宿主，随后验 macOS。Windows 并行用 crosspty 做 PowerShell 真机探针。若 Job 清理、退出取证或关闭排空无法通过，回退到 `x/sys/windows` 直接调用 ConPTY。
 
-- [调研与选型（HTML）](index.html#recommended-stack) 给出采用的技术栈、回退条件和开工顺序。
+- [调研与选型（HTML）](index.html#recommended-stack) 给出方案优劣、采用的技术栈和回退条件。
 - [产品设计（HTML）](product.html) 说明终端接管、重连和旧会话体验。
-- [会话宿主与 Unix 试点（HTML）](tech.html) 包含宿主托管、升级排空、传输协议和实施门槛。
+- [代码分层图（HTML）](tech.html#layers) 标明两层接口、tmux 和原生分支、以及平台实现的落点。宿主托管和协议细节同页可查。
 - [tmux 迁移清单（HTML）](capabilities.html) 映射能力、宿主契约及试点缺失时的行为。
 - [Windows 整包移植（HTML）](windows.html) 记录 Go 候选约束、系统调用差异、PowerShell 和 Agent 启动验收。
 - [验证记录（Markdown）](acceptance.md) 保留已跑探针、整包构建回执和评审对应项。

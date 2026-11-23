@@ -20,7 +20,80 @@
   <main>
     <article>
       <h1>技术设计</h1>
-      <p class="lead">三平台共用一套 Go 会话宿主和终端接口。一个窗格对应一个 PTY，宿主负责持有进程、管理连接和提供可核对的生命周期。</p>
+      <section aria-labelledby="layers">
+        <h2 id="layers">代码分层</h2>
+        <figure class="architecture" aria-label="从 Web、CLI 和 Agent 到两层接口及平台实现">
+          <div class="architecture-box">
+            <strong>Web、CLI、Agent</strong>
+            <span>协议、界面、Agent 任务入口</span>
+          </div>
+          <div class="architecture-flow" aria-hidden="true"></div>
+          <div class="architecture-box">
+            <strong>统一业务层 · <code>SessionService</code></strong>
+            <span>会话 ID、授权、台账、围栏、路由</span>
+          </div>
+          <div class="architecture-flow" aria-hidden="true"></div>
+          <div class="architecture-box architecture-boundary">
+            <strong>第一层接口 · <code>SessionBackend</code></strong>
+            <span>创建、观测、附着、捕获、输入、停止</span>
+          </div>
+          <div class="architecture-branches">
+            <div class="architecture-lane">
+              <div class="architecture-flow" aria-hidden="true"></div>
+              <div class="architecture-box">
+                <strong>tmux 适配器</strong>
+                <span>命令、附着、屏幕捕获</span>
+              </div>
+            </div>
+            <div class="architecture-lane">
+              <div class="architecture-flow" aria-hidden="true"></div>
+              <div class="architecture-box">
+                <strong>原生会话 · 本机 IPC</strong>
+                <span>Unix socket / Windows 命名管道</span>
+              </div>
+              <div class="architecture-flow" aria-hidden="true"></div>
+              <div class="architecture-box">
+                <strong>独立 Go 宿主 · <code>roami-sessiond</code></strong>
+                <span>窗格、控制权、VT 屏幕、重连</span>
+              </div>
+              <div class="architecture-flow" aria-hidden="true"></div>
+              <div class="architecture-box architecture-boundary">
+                <strong>第二层接口 · <code>TerminalBackend</code></strong>
+                <span>启动、读写、改尺寸、退出</span>
+              </div>
+              <div class="architecture-flow" aria-hidden="true"></div>
+              <div class="architecture-platforms">
+                <div class="architecture-box">
+                  <strong>macOS / Linux</strong>
+                  <span><code>creack/pty</code>（控制 TTY、进程组；Linux 可用 cgroup）</span>
+                </div>
+                <div class="architecture-box">
+                  <strong>Windows</strong>
+                  <span><code>crosspty</code>（ConPTY 管道、Job Object）</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <p><strong>首个改动</strong> 把第一层接口注入现有 <code>SessionService</code>，用类型化创建参数替换 <code>tmuxruntime.CreateOpts</code>。第二层接口只在原生宿主内使用。</p>
+        <details>
+          <summary>展开代码落点与接口边界</summary>
+          <div class="table" role="region" tabindex="0" aria-label="包与依赖边界">
+            <table>
+              <thead><tr><th scope="col">目录</th><th scope="col">职责</th></tr></thead>
+              <tbody>
+                <tr><th scope="row"><code>internal/application</code>（现有）</th><td>调用第一层接口。由 CLI / Web 入口注入实现；新建按默认后端路由，已有终端按台账记录路由。<code>sessionstore</code> / <code>sessionlifecycle</code> 继续持久化会话身份、操作和围栏。Agent 执行结果仍由 <code>agentexecution</code> 核对。</td></tr>
+                <tr><th scope="row"><code>internal/sessionbackend</code>（新增）</th><td>放 <code>SessionBackend</code>、类型化请求和会话 / 窗格引用。<code>Create(ctx, spec)</code> 接收操作 ID 和创建意图；<code>Observe</code> 返回存在、退出或待确认。<code>Attach</code> 返回可分离流，<code>Capture</code> 返回最近若干行文本。分屏与暂停按能力开放。</td></tr>
+                <tr><th scope="row"><code>internal/tmuxruntime</code>（现有）</th><td>实现第一层的 tmux 分支。继续用精确目标、粘贴后独立提交，以及既有窗格观察。Web 端 <code>backend/pty</code> 逐步只负责 WebSocket 升级、授权与流桥接。</td></tr>
+                <tr><th scope="row"><code>internal/sessionipc</code> / <code>internal/sessionhost</code>（新增）</th><td>IPC 客户端实现第一层接口。宿主只依赖会话契约、终端契约和台账，两个进程共用协议。宿主负责窗格、VT、日志和控制权，各端终端断开仅取消订阅。<code>cmd/roami-sessiond</code> 注入宿主和 IPC 监听。</td></tr>
+                <tr><th scope="row"><code>internal/terminal</code>（新增）</th><td>定义 <code>TerminalBackend.Start(ctx, spec)</code>，参数为可执行文件、argv、cwd、env 和尺寸。宿主使用读写、<code>Resize</code>、<code>Wait</code> 和显式停止/释放。在 <code>pty_unix.go</code> 用 <code>linux || darwin</code> 构建约束共享 Unix PTY。<code>pty_windows.go</code> 封装 ConPTY 及 Windows 启动方式。文件描述符、Windows 句柄和系统调用留在实现内部。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>平台差异还在 IPC 的端点与身份校验、安装和宿主管理。Unix 进程组、Linux cgroup 与 Windows Job 分别取证，统一返回运行状态。<code>Wait</code> 返回进程结果，输出排空单独观察。</p>
+          <p class="source"><a href="../../../internal/application/session.go">现有 SessionService</a> · <a href="../../../internal/sessionlifecycle/operation-store.go">操作台账</a> · <a href="../../../internal/agentexecution/session-lifecycle.go">Agent 证据</a> · <a href="https://pkg.go.dev/cmd/go#hdr-Build_constraints">Go 构建约束</a></p>
+        </details>
+      </section>
 
       <section aria-labelledby="current">
         <h2 id="current">现有链路与改造落点</h2>
@@ -36,27 +109,6 @@
             </tbody>
           </table>
         </div>
-      </section>
-
-      <section aria-labelledby="layers">
-        <h2 id="layers">进程归属与接口</h2>
-        <pre aria-label="终端架构">Web xterm.js / roami session
-          │  会话操作、终端输入、订阅
-          ▼
-Roami 会话服务（授权、台账、工作区与执行绑定）
-          │
-          ├─ tmux 兼容适配器 → tmux server
-          │
-          └─ 本机 IPC → roami-sessiond（独立 Go 宿主）
-                          ├─ 窗口与窗格、VT 状态、日志、退出观测
-                          └─ PTY 适配器 → 每窗格一个 shell / Agent</pre>
-        <ul>
-          <li><strong>平台接口。</strong> <code>Start(spec)</code> 接收可执行文件、argv、cwd、env 和初始尺寸，返回可读写的终端、<code>Resize</code>、<code>Wait</code> 和具名的停止与释放操作。启动请求的 context 只约束创建，在创建确认后由宿主持有进程。分离连接只取消订阅，优雅停止、强制停止和资源释放各走明确的操作。<code>Wait</code> 只由宿主执行一次，之后共享退出结果。输入、读出、关闭及进程回收之间定义所有权，关闭和失败收尾可重试。</li>
-          <li><strong>会话接口。</strong> 覆盖创建、观测、附着、定向输入、捕获、进程停止和布局操作。附着订阅和服务端启动请求分别定生命周期。允许观测返回「确认存在」「确认退出」「状态待确认」，并附对应证据。</li>
-          <li><strong>本机 IPC。</strong> Web 和 CLI 通过用户级 Unix socket 或 Windows 本地命名管道连接。socket 使用用户专属运行目录和同 UID 校验，命名管道使用显式 DACL 和本地连接限制。握手绑定实例根、宿主 ID 与可协商协议版本。</li>
-          <li><strong>授权和并发。</strong> 每次输入先核对会话归属、窗格代次、当前控制权及生命周期围栏；受管任务走已有修订和提示绑定。自动粘贴、提交和交互输入共用单窗格有序写队列，粘贴与 Enter 作为同一操作中的两个有序动作。写入回执只证明写入已发生，任务结果仍由执行器证据和宿主观察确认。阻塞后状态不明确时禁止自动重投。</li>
-        </ul>
-        <p class="source"><a href="../../../internal/tmuxruntime/runtime.go">现有提交、捕获与日志代码</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights">Microsoft 命名管道权限</a></p>
       </section>
 
       <section aria-labelledby="supervision">

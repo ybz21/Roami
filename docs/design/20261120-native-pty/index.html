@@ -11,7 +11,7 @@
     <nav aria-label="设计文档">
       <a href="index.html" aria-current="page">调研与选型</a>
       <a href="product.html">产品设计</a>
-      <a href="tech.html">技术设计</a>
+      <a href="tech.html#layers">架构图</a>
       <a href="capabilities.html">迁移清单</a>
       <a href="windows.html">Windows</a>
       <a href="tech.html#acceptance">验证记录</a>
@@ -62,58 +62,33 @@
       </section>
 
       <section aria-labelledby="options">
-        <h2 id="options">选型依据</h2>
-        <p>目前 WebSocket 的外层 PTY 运行 <code>tmux attach</code>，shell 和 Agent 由 tmux server 持有。切到原生后端后，Roami 宿主接手窗格进程、重连、屏幕捕获和退出观测。</p>
+        <h2 id="options">方案优劣</h2>
+        <div class="table" role="region" aria-label="主要 PTY 与多路复用方案对比" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">方案</th><th scope="col">优点</th><th scope="col">缺点</th><th scope="col">结论</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Go 宿主 + <code>creack/pty</code>、<code>crosspty</code></th><td>复用 Unix PTY。Windows PTY 兼容 Go 1.24.0。Roami 掌握会话身份与重连。</td><td>需实现宿主、快照和排空。crosspty 的 Job、输出收尾及退出证据还需真机验证。</td><td><strong>首选</strong></td></tr>
+              <tr><th scope="row">Go 宿主 + 直接调用 ConPTY</th><td>可明确控制 Windows 线程、管道、Job 和程序退出。</td><td>要维护 Win32 启动、资源回收和关闭顺序。</td><td>Windows 回退</td></tr>
+              <tr><th scope="row"><code>go-pty v0.2.3</code></th><td>一套 Go 库覆盖 Unix PTY 和 Windows ConPTY。</td><td>要求 Go 1.25；仍需宿主，Windows Job 与启动控制要补。</td><td>行为对照</td></tr>
+              <tr><th scope="row">Zellij</th><td>已有分屏、多客户端、重连和原生 Windows。</td><td>会话身份、受管输入、证据和捕获要适配其 CLI 与状态模型。</td><td>多路复用对照</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="source"><a href="https://github.com/Kodecable/crosspty/tree/v1.2.0">crosspty v1.2.0</a> · <a href="https://github.com/golang/sys/blob/v0.41.0/windows/syscall_windows.go">x/sys Windows 绑定</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a> · <a href="https://zellij.dev/news/remote-sessions-windows-cli/">Zellij 0.44.0 公告</a> · <a href="https://github.com/zellij-org/zellij/releases/tag/v0.46.0">Zellij v0.46.0 发行包</a></p>
         <details>
-          <summary>展开候选方案比较</summary>
-          <div class="table" role="region" aria-label="PTY 候选方案比较" tabindex="0">
+          <summary>展开其它候选</summary>
+          <div class="table" role="region" aria-label="其它候选方案对比" tabindex="0">
             <table>
-              <thead><tr><th scope="col">方案</th><th scope="col">适配 Roami 的收益</th><th scope="col">成本与判断</th></tr></thead>
+              <thead><tr><th scope="col">方案</th><th scope="col">优点</th><th scope="col">缺点</th></tr></thead>
               <tbody>
-                <tr>
-                  <th scope="row">统一 Go 接口 + 系统 API</th>
-                  <td>复用现用的 <code>creack/pty v1.1.24</code> 和 <code>x/sys v0.41.0</code>。Go 宿主可控制创建、句柄、关闭顺序和进程事件。</td>
-                  <td>Unix 采用现有库，Windows 直接调用是 <code>crosspty</code> 未通过门槛时的回退。Roami 可控制参数与环境、关闭排空、进程证据和 Job Object。</td>
-                </tr>
-                <tr>
-                  <th scope="row"><code>Kodecable/crosspty</code> v1.2.0</th>
-                  <td>纯 Go 统一 PTY，Unix 内部复用 <code>creack/pty</code>，Windows 使用 ConPTY，含可选 Job 进程组清理。采用时新增模块，最低 Go 1.24.0 和现用 PTY 依赖版本与 Roami 对齐。</td>
-                  <td>Windows 首选。<code>Close</code> 会终止子进程，<code>Wait</code> 返回 -1 时可能是观察失败。需要验证最后输出、退出证据、宿主崩溃和 Job 归属。</td>
-                </tr>
-                <tr>
-                  <th scope="row"><code>charmbracelet/x/conpty</code> v0.2.0</th>
-                  <td>Go Windows 封装，提供建管道、启动、读写、调尺寸与关闭。原型可以快速接入。</td>
-                  <td>备选。审阅的 <code>Spawn</code> 收起了主线程句柄，若要挂 Job 后再放行，需验证或扩展接口。<code>Close</code> 调用原生关闭后才关输出读端，必须保持输出排空。</td>
-                </tr>
-                <tr>
-                  <th scope="row"><code>aymanbagabas/go-pty</code> v0.2.3</th>
-                  <td>把 Unix PTY 与 Windows ConPTY 统一为 Go 的启动、读写、尺寸和等待接口。</td>
-                  <td>与 crosspty 用同一批探针对照。v0.2.3 需要 Go 1.25，采用它将同时涉及主工程及传递依赖升级；Windows Job 和启动时的主线程控制仍要单独评估。</td>
-                </tr>
-                <tr>
-                  <th scope="row"><code>microsoft/node-pty</code></th>
-                  <td>支持三平台，VS Code 等使用。适合作 PowerShell 和 ConPTY 行为对照。</td>
-                  <td>作为默认宿主会引入 Node 进程和按平台发布的原生扩展，增加安装、升级和故障定位链路。</td>
-                </tr>
-                <tr>
-                  <th scope="row">WezTerm <code>portable-pty</code> 0.9.0</th>
-                  <td>WezTerm 的 Rust PTY 库，可独立使用，覆盖 Unix PTY 和 Windows ConPTY。</td>
-                  <td>可作为 API 与终端行为对照。接进现有 Go 服务要另发 Rust 进程或维护 FFI，Roami 仍需做会话管理。</td>
-                </tr>
-                <tr>
-                  <th scope="row">Zellij</th>
-                  <td>完整 multiplexer，包含会话、分屏、远程附着和自动化。0.44.0 于 2026-03-23 引入原生 Windows 支持，已查到 v0.46.0 的 Windows x64 安装包。</td>
-                  <td>如果目标改为复用外部 multiplexer，先对照实测。接管生命周期、受管输入和屏幕捕获需要重新适配它的 CLI 与状态语义。</td>
-                </tr>
-                <tr>
-                  <th scope="row">Unix 保留 tmux，Windows 使用 WSL</th>
-                  <td>最快保住现有分屏和会话用法，可用作过渡期对照。</td>
-                  <td>WSL 中的 tmux 持有的是 Linux PTY。原生 Windows PowerShell 路线仍需 Windows 控制台语义和独立验收。</td>
-                </tr>
+                <tr><th scope="row">Charm <code>x/conpty v0.2.0</code></th><td>Go 封装，原型接入快。</td><td>启动后主线程句柄已关闭，Job 绑定后放行需要扩展；关闭时要保持输出排空。</td></tr>
+                <tr><th scope="row"><code>node-pty</code></th><td>三平台覆盖，已有 VS Code 等使用。</td><td>引入 Node 宿主或 sidecar，并按平台分发原生扩展。</td></tr>
+                <tr><th scope="row">WezTerm <code>portable-pty 0.9.0</code></th><td>Rust PTY 库可独立使用，覆盖 Unix 和 ConPTY。</td><td>Go 接入需要额外 Rust 进程或 FFI，会话管理仍由 Roami 实现。</td></tr>
+                <tr><th scope="row">tmux + WSL</th><td>保留现有分屏和会话流程。</td><td>WSL 的 tmux 持有 Linux PTY，Windows PowerShell 仍缺原生控制台语义。</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="source"><a href="../../../go.mod">Roami Go 依赖</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start.go">creack/pty Unix 启动</a> · <a href="https://github.com/creack/pty/blob/v1.1.24/start_windows.go">creack/pty Windows 占位</a> · <a href="https://github.com/golang/sys/blob/v0.41.0/windows/syscall_windows.go">x/sys Windows 绑定</a> · <a href="https://github.com/charmbracelet/x/blob/74ce264f24fc7e97da2a0a5beba634c65dcf4af1/conpty/conpty_windows.go">Charm ConPTY 源码</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a> · <a href="https://github.com/Kodecable/crosspty/tree/v1.2.0">crosspty v1.2.0</a> · <a href="https://docs.rs/portable-pty/0.9.0/portable_pty/">portable-pty API</a> · <a href="https://zellij.dev/news/remote-sessions-windows-cli/">Zellij 0.44.0 公告</a> · <a href="https://github.com/zellij-org/zellij/releases/tag/v0.46.0">Zellij v0.46.0 发行包</a> · <a href="https://github.com/microsoft/node-pty">node-pty</a> · <a href="https://github.com/tmux/tmux/wiki/Getting-Started">tmux 架构</a></p>
+          <p class="source"><a href="https://github.com/charmbracelet/x/blob/74ce264f24fc7e97da2a0a5beba634c65dcf4af1/conpty/conpty_windows.go">Charm ConPTY 源码</a> · <a href="https://github.com/microsoft/node-pty">node-pty</a> · <a href="https://docs.rs/portable-pty/0.9.0/portable_pty/">portable-pty API</a> · <a href="https://github.com/tmux/tmux/wiki/Getting-Started">tmux 架构</a></p>
         </details>
       </section>
 
