@@ -8,9 +8,8 @@ import MobileSubPage from '../MobileSubPage'
 import { chargeText } from '../settings/model-charges'
 import { Alert, Button, Spin } from './model-controls'
 import type { ModelCatalog } from './model-hub-api'
-import { loadRequestDetail, type RequestAttempt, type RequestDetail, type RequestOutcome } from './gateway-request-api'
+import { loadRequestDetail, requestBlockReasons, type RequestAttempt, type RequestDetail, type RequestOutcome } from './gateway-request-api'
 
-const knownReasons = ['source', 'authorization', 'directory', 'notListed', 'tools', 'context', 'pricing', 'quota', 'cooldown']
 const feeStateLabel = {
   pending: 'gatewayTrace.feePending',
   unknown: 'agent.proxy.state.unknown',
@@ -92,7 +91,7 @@ export default function GatewayRequestDetail({ id, catalog, routeId, onBack, onS
       {row.outcome === 'blocked' && <section className="tt-request-blocks"><h3>{t('gatewayTrace.whyBlocked')}</h3>
         {Object.keys(row.blocks || {}).length > 0
           ? <ul>{Object.entries(row.blocks || {}).map(([reason, total]) => <li key={reason}>
-            <span>{t('gatewayTrace.reason.' + (knownReasons.includes(reason) ? reason : 'unknown'))}</span><strong>{count.format(total)}</strong>
+            <span>{t('gatewayTrace.reason.' + (requestBlockReasons.includes(reason) ? reason : 'unknown'))}</span><strong>{count.format(total)}</strong>
           </li>)}</ul>
           : <p className="agent-settings-hint">{t('gatewayTrace.reason.unknown')}</p>}
       </section>}

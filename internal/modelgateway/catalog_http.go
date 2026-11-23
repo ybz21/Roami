@@ -302,6 +302,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	}
 	observed := &observedRequestWriter{ResponseWriter: w}
 	trace := newRequestObservation(observed, catalog, *model, kind)
+	if probe, ok := r.Context().Value(qualityProbeContext{}).(*qualityProbe); ok {
+		probe.Trace = trace
+	}
 	w = observed
 	defer trace.finish(r, observed, h)
 	if !model.enabled() {

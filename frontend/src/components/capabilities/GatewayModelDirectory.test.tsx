@@ -44,4 +44,57 @@ it('keeps paid upstream models out of the default directory and never infers fre
  expect(screen.getByText(/directory.inputs.*directory.modality.text.*directory.modality.image/)).toBeTruthy()
  expect(vi.mocked(api).mock.calls[0][1]).toContain('/agent/model-gateway/models?all=true&refresh=true')
  expect(vi.mocked(api).mock.calls.some(([method])=>method!=='GET')).toBe(false)
+ expect(screen.queryByRole('button', { name: 'directory.testModel' })).toBeNull()
+})
+
+it('tests the selected gateway route even when discovery fails and shows the final 503 and upstream 400', async () => {
+ let complete: (payload: unknown) => void = () => {}
+ vi.mocked(api).mockImplementation(async method => {
+   if (method === 'GET') throw Object.assign(new Error('AGENT_RUNTIME_UNAVAILABLE'), { status: 503 })
+   return new Promise(resolve => { complete = resolve })
+ })
+ render(<App><GatewayModelDirectory catalog={catalog} onSource={vi.fn()} /></App>)
+ await screen.findByText('directory.loadFailed')
+ const pool = screen.getByRole('region', { name: 'gatewayWorkspace.kind.pool' })
+ const test = within(pool).getByRole('button', { name: 'directory.testModel' })
+ expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')).toHaveLength(0)
+ fireEvent.click(test)
+ fireEvent.click(test)
+ expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')).toHaveLength(1)
+ expect(api).toHaveBeenCalledWith('POST', '/agent/model-gateway/monitor/check', { routeId: 'pool', rule: 'answer' }, expect.anything())
+ expect(test.hasAttribute('disabled')).toBeTruthy()
+ complete({ data: {
+   success: false, status: 503, error: 'MODEL_ROUTE_NO_AVAILABLE_MEMBER', durationMs: 12, attempts: 2,
+   sourceId: 'a', upstreamModel: 'vendor/model', upstreamStatus: 400,
+ } })
+ expect(await within(pool).findByText('gatewayTrace.exhausted · HTTP 503')).toBeTruthy()
+ expect(within(pool).getByText('Source A · vendor/model · directory.testUpstreamStatus')).toBeTruthy()
+ expect(test.hasAttribute('disabled')).toBe(false)
+})
+
+it('reports a partial refresh separately and shows the cooldown before any upstream call', async () => {
+ vi.mocked(api).mockImplementation(async method => method === 'GET'
+   ? { data: { revision: 'r1', models: [], refreshFailures: ['a'] } }
+   : { data: { success: false, status: 503, error: 'MODEL_ROUTE_NO_AVAILABLE_MEMBER', durationMs: 0, attempts: 0, blocks: { cooldown: 2 } } })
+ render(<App><GatewayModelDirectory catalog={catalog} onSource={vi.fn()} /></App>)
+ await screen.findByText('directory.partialRefresh')
+ const pool = screen.getByRole('region', { name: 'gatewayWorkspace.kind.pool' })
+ fireEvent.click(within(pool).getByRole('button', { name: 'directory.testModel' }))
+ expect(await within(pool).findByText('gatewayTrace.blockedBeforeSend · HTTP 503')).toBeTruthy()
+ expect(within(pool).getByText('directory.testBlockedReason')).toBeTruthy()
+})
+
+it('shows a 503 from the test service and allows a successful retry', async () => {
+ const probe = vi.fn()
+   .mockRejectedValueOnce(Object.assign(new Error('AGENT_RUNTIME_UNAVAILABLE'), { status: 503 }))
+   .mockResolvedValueOnce({ data: { success: true, status: 200, durationMs: 25, attempts: 1 } })
+ vi.mocked(api).mockImplementation(async method => method === 'GET' ? { data: { revision: 'r1', models: [] } } : probe())
+ render(<App><GatewayModelDirectory catalog={catalog} onSource={vi.fn()} /></App>)
+ const pool = screen.getByRole('region', { name: 'gatewayWorkspace.kind.pool' })
+ const test = within(pool).getByRole('button', { name: 'directory.testModel' })
+ fireEvent.click(test)
+ await within(pool).findByText('directory.testUnavailable · HTTP 503')
+ fireEvent.click(test)
+ await within(pool).findByText('directory.testPassed · HTTP 200')
+ expect(probe).toHaveBeenCalledTimes(2)
 })
