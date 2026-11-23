@@ -47,7 +47,7 @@ it('keeps paid upstream models out of the default directory and never infers fre
  expect(screen.queryByRole('button', { name: 'directory.testModel' })).toBeNull()
 })
 
-it('tests the selected gateway route even when discovery fails and shows the final 503 and upstream 400', async () => {
+it('tests the selected gateway route even when discovery fails and shows the final 503 and upstream 502', async () => {
  let complete: (payload: unknown) => void = () => {}
  vi.mocked(api).mockImplementation(async method => {
    if (method === 'GET') throw Object.assign(new Error('AGENT_RUNTIME_UNAVAILABLE'), { status: 503 })
@@ -65,7 +65,7 @@ it('tests the selected gateway route even when discovery fails and shows the fin
  expect(test.hasAttribute('disabled')).toBeTruthy()
  complete({ data: {
    success: false, status: 503, error: 'MODEL_ROUTE_NO_AVAILABLE_MEMBER', durationMs: 12, attempts: 2,
-   sourceId: 'a', upstreamModel: 'vendor/model', upstreamStatus: 400,
+   sourceId: 'a', upstreamModel: 'vendor/model', upstreamStatus: 502,
  } })
  expect(await within(pool).findByText('gatewayTrace.exhausted · HTTP 503')).toBeTruthy()
  expect(within(pool).getByText('Source A · vendor/model · directory.testUpstreamStatus')).toBeTruthy()
@@ -97,4 +97,15 @@ it('shows a 503 from the test service and allows a successful retry', async () =
  fireEvent.click(test)
  await within(pool).findByText('directory.testPassed · HTTP 200')
  expect(probe).toHaveBeenCalledTimes(2)
+})
+
+it('labels an upstream 400 as a request rejection instead of failed failover', async () => {
+ vi.mocked(api).mockImplementation(async method => method === 'GET'
+   ? { data: { revision: 'r1', models: [] } }
+   : { data: { success: false, status: 400, error: 'MODEL_HTTP_400', durationMs: 12, attempts: 1, upstreamStatus: 400 } })
+ render(<App><GatewayModelDirectory catalog={catalog} onSource={vi.fn()} /></App>)
+ const pool = screen.getByRole('region', { name: 'gatewayWorkspace.kind.pool' })
+ fireEvent.click(within(pool).getByRole('button', { name: 'directory.testModel' }))
+ await within(pool).findByText('gatewayTrace.upstreamRejected · HTTP 400')
+ expect(within(pool).queryByText(/gatewayTrace.exhausted/)).toBeNull()
 })

@@ -4,6 +4,7 @@ import { pollWhileVisible } from '../../visible-poll'
 
 export type RequestOutcome = 'success' | 'recovered' | 'blocked' | 'exhausted' | 'interrupted' | 'failed' | 'cancelled' | 'unknown'
 export const requestBlockReasons = ['source', 'authorization', 'directory', 'notListed', 'tools', 'context', 'pricing', 'quota', 'cooldown']
+export const upstreamRejectedRequest = (status: number) => [400, 413, 415, 422].includes(status)
 export const requestFailureReasons = ['blocked', 'exhausted', 'interrupted', 'upstreamLimited', 'upstreamUnauthorized', 'upstreamTimeout', 'connectFailed', 'dailyLimit', 'quota', 'failed'] as const
 export type RequestFailureReason = typeof requestFailureReasons[number]
 export type RequestSwitchFilter = '' | 'any' | 'failed'

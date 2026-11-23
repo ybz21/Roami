@@ -2,6 +2,7 @@ package modelgateway
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -20,6 +21,16 @@ func (m CatalogModel) cooldown() int {
 }
 func (m CatalogModel) switchLimit() bool     { return m.OnLimit == nil || *m.OnLimit }
 func (m CatalogModel) switchExhausted() bool { return m.OnExhausted == nil || *m.OnExhausted }
+
+func upstreamRouteFailure(status int) bool {
+	switch status {
+	case http.StatusUnauthorized, http.StatusPaymentRequired, http.StatusForbidden, http.StatusNotFound, http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return true
+	default:
+		return status >= 500 && status < 600
+	}
+}
+
 func validateRoutingGraph(models []CatalogModel) error {
 	byID := map[string]CatalogModel{}
 	for _, model := range models {

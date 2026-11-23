@@ -6,7 +6,7 @@ import { useI18n } from '../../i18n'
 import { api } from '../../api'
 import type { ModelCatalog, ModelDirectoryEntry } from './model-hub-api'
 import { configuredGatewayModels, freeGatewayModel, prioritizeGatewayModels, useGatewayModelCatalog } from './gateway-model-catalog'
-import { requestBlockReasons } from './gateway-request-api'
+import { requestBlockReasons, upstreamRejectedRequest } from './gateway-request-api'
 import ModelCapabilities from './ModelCapabilities'
 import GatewayInspector from './GatewayInspector'
 import './gateway-model-directory.css'
@@ -17,6 +17,13 @@ type RouteTest = {
   blocks?: Record<string, number>; sourceId?: string; upstreamModel?: string; upstreamStatus?: number
 }
 type RouteTestUnavailable = { unavailable: true; status?: number }
+function routeTestResultLabel(outcome: RouteTest) {
+  if (outcome.success) return 'directory.testPassed'
+  if (outcome.error === 'MODEL_ROUTE_NO_AVAILABLE_MEMBER') return outcome.attempts ? 'gatewayTrace.exhausted' : 'gatewayTrace.blockedBeforeSend'
+  if (outcome.error === 'MODEL_PROXY_DAILY_LIMIT') return 'gatewayTrace.dailyLimit'
+  if (upstreamRejectedRequest(outcome.status)) return 'gatewayTrace.upstreamRejected'
+  return 'directory.testFailed'
+}
 const rowKey = (row: ModelDirectoryEntry) => (row.configured ? 'configured' : row.candidates?.[0]?.sourceId) + ':' + row.id
 const kindOf = (row: ModelDirectoryEntry) => row.configured ? row.kind === 'aggregate' ? 'pool' : 'native' : 'upstream'
 const stateOf = (row: ModelDirectoryEntry) => !row.configured ? 'gatewayWorkspace.upstream' : row.enabled ? 'modelInteraction.configured' : 'hub.gateway.disabled'
@@ -48,9 +55,6 @@ function ModelRow({ row, users, sources, active, revision, onSelect }: {
   const number = new Intl.NumberFormat(locale)
   const outcome = typeof check === 'object' && 'success' in check ? check : undefined
   const unavailable = typeof check === 'object' && 'unavailable' in check ? check : undefined
-  const failure = outcome?.error === 'MODEL_ROUTE_NO_AVAILABLE_MEMBER'
-    ? outcome.attempts ? 'gatewayTrace.exhausted' : 'gatewayTrace.blockedBeforeSend'
-    : outcome?.error === 'MODEL_PROXY_DAILY_LIMIT' ? 'gatewayTrace.dailyLimit' : 'directory.testFailed'
   const reasons = outcome && Object.entries(outcome.blocks || {}).map(([reason, count]) =>
     t('directory.testBlockedReason', { reason: t('gatewayTrace.reason.' + (requestBlockReasons.includes(reason) ? reason : 'unknown')), count: number.format(count) }))
   const actualSource = outcome?.sourceId && sources.find(source => source.id === outcome.sourceId)?.name
@@ -65,7 +69,7 @@ function ModelRow({ row, users, sources, active, revision, onSelect }: {
     <div className="tt-directory-test-result" role="status" hidden={!outcome && !unavailable}>
       {unavailable && <strong className="is-failed">{t('directory.testUnavailable')}{unavailable.status && ' · HTTP ' + unavailable.status}</strong>}
       {outcome && <>
-        <strong className={outcome.success ? 'is-success' : 'is-failed'}>{t(outcome.success ? 'directory.testPassed' : failure)}{outcome.status > 0 && ' · HTTP ' + outcome.status}</strong>
+        <strong className={outcome.success ? 'is-success' : 'is-failed'}>{t(routeTestResultLabel(outcome))}{outcome.status > 0 && ' · HTTP ' + outcome.status}</strong>
         {reasons && reasons.length > 0 && <span>{new Intl.ListFormat(locale).format(reasons)}</span>}
         {outcome.upstreamModel && <span>{[actualSource, outcome.upstreamModel, outcome.upstreamStatus ? t('directory.testUpstreamStatus', { status: outcome.upstreamStatus }) : ''].filter(Boolean).join(' · ')}</span>}
         <span>{t('pool.trace.attemptCount', { count: number.format(outcome.attempts) })} · {new Intl.NumberFormat(locale, { style: 'unit', unit: 'millisecond' }).format(outcome.durationMs)}</span>

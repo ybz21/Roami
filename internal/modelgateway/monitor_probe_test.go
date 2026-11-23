@@ -17,11 +17,11 @@ func TestRouteProbeUsesAggregateFailoverAndReportsCooldown(t *testing.T) {
 			var primary, backup atomic.Int64
 			h := aggregateFixture(t, func(w http.ResponseWriter, _ *http.Request) {
 				primary.Add(1)
-				http.Error(w, "upstream private error detail", http.StatusBadRequest)
+				http.Error(w, "upstream private error detail", http.StatusBadGateway)
 			}, func(w http.ResponseWriter, _ *http.Request) {
 				backup.Add(1)
 				if failBackup {
-					http.Error(w, "upstream private error detail", http.StatusBadRequest)
+					http.Error(w, "upstream private error detail", http.StatusBadGateway)
 					return
 				}
 				w.Header().Set("Content-Type", "text/event-stream")
@@ -53,7 +53,7 @@ func TestRouteProbeUsesAggregateFailoverAndReportsCooldown(t *testing.T) {
 				}
 				return
 			}
-			if result.Success || result.Status != http.StatusServiceUnavailable || result.UpstreamStatus != http.StatusBadRequest || result.Error != "MODEL_ROUTE_NO_AVAILABLE_MEMBER" {
+			if result.Success || result.Status != http.StatusServiceUnavailable || result.UpstreamStatus != http.StatusBadGateway || result.Error != "MODEL_ROUTE_NO_AVAILABLE_MEMBER" {
 				t.Fatalf("exhausted probe: %+v", result)
 			}
 			if blocked := check(); blocked.Success || blocked.Status != http.StatusServiceUnavailable || blocked.Attempts != 0 || blocked.Blocks["cooldown"] != 2 || primary.Load() != 1 || backup.Load() != 1 {

@@ -8,7 +8,7 @@ import MobileSubPage from '../MobileSubPage'
 import { chargeText } from '../settings/model-charges'
 import { Alert, Button, Spin } from './model-controls'
 import type { ModelCatalog } from './model-hub-api'
-import { loadRequestDetail, requestBlockReasons, type RequestAttempt, type RequestDetail, type RequestOutcome } from './gateway-request-api'
+import { loadRequestDetail, requestBlockReasons, upstreamRejectedRequest, type RequestAttempt, type RequestDetail, type RequestOutcome } from './gateway-request-api'
 
 const feeStateLabel = {
   pending: 'gatewayTrace.feePending',
@@ -24,6 +24,7 @@ function attemptReason(attempt: RequestAttempt, outcome: RequestOutcome) {
   if (attempt.status === 402) return 'reason.quota'
   if (attempt.status === 401 || attempt.status === 403) return 'upstreamUnauthorized'
   if (attempt.status === 408 || attempt.status === 504) return 'upstreamTimeout'
+  if (upstreamRejectedRequest(attempt.status)) return 'upstreamRejected'
   if (attempt.error === 'MODEL_TRANSPORT_FAILED') return 'connectFailed'
   if (attempt.status === 0) return 'noResponse'
   return attempt.status >= 200 && attempt.status < 300 && outcome === 'interrupted' ? 'interrupted' : 'failed'

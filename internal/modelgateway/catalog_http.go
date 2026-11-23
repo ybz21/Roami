@@ -596,9 +596,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 			call.upstream = responseReceipt(response)
 			status = response.StatusCode
 			observation.stream = strings.Contains(response.Header.Get("Content-Type"), "text/event-stream")
-			if choice != nil && status >= 400 {
+			if choice != nil && upstreamRouteFailure(status) {
 				h.restRoute(leaf, *model, status, retryDelay(response.Header.Get("Retry-After"), h.Ledger.now()))
-				retry := status >= 400
+				retry := true
 				if status == 429 {
 					retry = model.switchLimit()
 				}
