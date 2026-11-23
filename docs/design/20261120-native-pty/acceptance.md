@@ -56,6 +56,10 @@ internal/storage/layout.go:139:14: undefined: unix.LOCK_SH
 | P1 VT、协议、进程和隔离 | [试点验收](tech.html#acceptance) 与 [连接协议](tech.html#protocol)；分开 PTY 和任务证据，明确双实例、重放和后续规则落点。 |
 | P2 资料结构 | 选型、Unix 试点、Windows 移植分开，验证入口改为 HTML 页内锚点，保留 Markdown 原始回执。 |
 
+2026-11-23 的[复审](https://github.com/ybz21/Roami/pull/1023#issuecomment-7095594865)对应[平台依赖门槛](tech.html#platform-detail)、[原子切换和幂等](tech.html#admission)、[排空保留和清理](tech.html#drain-retention)及 [crosspty 退出证据](windows.html#pty)。这些是实现验收契约。
+
+临时 SQLite 模型验证了并发切换只有一次 CAS 成功、过期路由拒绝新操作、已受理操作跨代仍只有一次启动占位、排空上限阻挡升级以及回滚代次递增。该模型只验证事务约束，实际宿主和窗格的并发行为列入实现验收。
+
 ## 实现阶段验收
 
 | 范围 | 场景与通过条件 |
@@ -63,6 +67,8 @@ internal/storage/layout.go:139:14: undefined: unix.LOCK_SH
 | 三平台原生 PTY | Linux amd64 与 arm64、macOS arm64 与 amd64、Windows 首发版本 x64 再到 arm64。验证交互 shell、TTY/控制台判定、含空格和中文的 cwd / argv / env、初始尺寸、动态调整、Ctrl+C、退出码。Windows 重点验 PowerShell 7、PSReadLine、ConPTY 排空和 Job Object；两种 Windows 架构的发布声明以各自实测为准。 |
 | 终端一致性 | 同一窗格在 CLI、桌面与 Android 真机中验证中文、分块 UTF-8、备用屏、光标、鼠标/翻页、粘贴、Shift+Enter、后台和旋转。用 shell、vim、Codex、Claude Code 在支持的平台对照现有实现，至少覆盖一次运行中重连与一次已退出后的捕获。按 Roami Web UI 验收规程检查移动交互。 |
 | 进程与恢复 | Web 服务重启、宿主软件滚动升级后，既有会话的窗格代次和 OS 进程身份保持一致，新建走新宿主，旧宿主排空后才停止。宿主崩溃、输出堵塞、权限错误、半启动、PID 复用时正确区分未知与确认退出，证据完整才释放围栏。并发创建/停止只对目标会话生效，重连和超时均不重复投递输入。 |
+| 原子切换与幂等 | 多个 Web 实例用同一操作 ID 在切换前后并发提交，只产生一个窗格。覆盖旧宿主拒绝、已受理创建跨代完成、成功回执丢失和启动结果未知。并发升级只允许一个 CAS 成功，回滚也递增代次。 |
+| 排空保留 | 两代排空时再次升级被拦截，展示阻塞会话且已运行进程可继续连接。显式终止或重开只影响确认的会话，围栏保留到取得退出证据。只有宿主退出且版本无引用时才移除二进制。 |
 | 发版与回滚 | 同实例验证 tmux 旧会话和原生会话并存，切换默认项后两者均可按原归属附着。回滚使用兼容两种后端的版本。分别验证 Windows 的安装、更新及用户身份，CI 交叉编译与真实运行均通过。 |
 | 性能基线 | 在同一主机和输出负载下，用 1、10、30 个会话对照旧链路与原生链路。记录首屏和重连 P50/P95、输入到回显延迟、空闲/繁忙时 CPU 与 RSS、句柄和 goroutine 数。让一个客户端停止读取，其他订阅者和窗格应继续运行，恢复时画面不重复或缺段。 |
 

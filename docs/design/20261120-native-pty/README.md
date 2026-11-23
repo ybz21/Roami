@@ -9,4 +9,4 @@ Roami 自己管理会话，底层复用系统 PTY。先抽离 tmux 会话接口�
 - [Windows 整包移植（HTML）](windows.html) 记录 Go 候选约束、系统调用差异、PowerShell 和 Agent 启动验收。
 - [验证记录（Markdown）](acceptance.md) 保留已跑探针、整包构建回执和评审对应项。
 
-代码基线为 Roami `6108a657`。2026-11-21 修订参考 [PR #1023 的设计评审](https://github.com/ybz21/Roami/pull/1023#issuecomment-7062408930)。
+代码基线为 Roami `6108a657`。修订参考 [11 月 21 日设计评审](https://github.com/ybz21/Roami/pull/1023#issuecomment-7062408930)与 [11 月 23 日复审](https://github.com/ybz21/Roami/pull/1023#issuecomment-7095594865)。

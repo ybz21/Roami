@@ -25,13 +25,14 @@
       <section aria-labelledby="pty">
         <h2 id="pty">同一批探针比较三种 ConPTY 封装</h2>
         <ul>
-          <li><strong>crosspty v1.2.0 优先。</strong> 能悬挂启动、分配 Job 后再恢复。现有 Job 句柄封装在库内，默认组清理与 Roami 的证据、内存约束需要对齐。<code>Wait() == -1</code> 必须保留不确定性，客户端断开不会调用库的 <code>Close()</code>。检查非默认 Job 限制、只关闭 I/O、崩溃后进程组退出、输出排空和失败清理能否通过包装或小改实现。</li>
-          <li><strong>go-pty v0.2.3 作对照。</strong> 记录 Go 1.25 与传递依赖的升级影响，核对主线程与 Job 控制、进程等待证据和关闭排空。当前版本的 Windows 启动路径在库内关闭主线程句柄，使用悬挂启动时要验证放行机制。</li>
+          <li><strong>crosspty v1.2.0 优先。</strong> 采用时新增 Go 模块，最低 Go 1.24.0。能悬挂启动、分配 Job 后再恢复。现有 Job 句柄封装在库内，默认组清理与 Roami 的证据、内存约束需要对齐。成功启动后，库的 <code>Close()</code> 执行进程终止流程。客户端断开只取消订阅。检查非默认 Job 限制、只关闭 I/O、崩溃后进程组退出、输出排空和失败清理能否通过包装或小改实现。</li>
+          <li><strong>go-pty v0.2.3 作对照。</strong> 采用时新增 Go 模块，工程与 CI 的最低 Go 版本需要升至 1.25.0，同时评估传递依赖。核对主线程与 Job 控制、进程等待证据和关闭排空。当前版本的 Windows 启动路径在库内关闭主线程句柄，使用悬挂启动时要验证放行机制。</li>
           <li><strong>直接调用 ConPTY 作对照和回退。</strong> 若库需要绕过其进程模型才能满足宿主管理契约，使用现有 <code>x/sys/windows</code> 写薄适配器，复用 Microsoft 原生 API。启动时 <code>EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED</code>，将进程放进 Job，再 <code>ResumeThread</code>。</li>
         </ul>
+        <p>在 crosspty 的 Windows 实现中，<code>WaitForSingleObject</code> 未确认进程终止，或 <code>GetExitCodeProcess</code> 取退出码失败，都可能使 <code>Wait()</code> 返回 <code>-1</code>。这一个返回值无法区分两种情况。宿主缺少独立证据时保留待确认状态和工作区围栏。</p>
         <p>为三种候选录制相同的交互与进程场景。验证嵌套 Job、<code>JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE</code> 或等价的退出回收证据，确认只有目标 Job 受影响。PTY 输出排空和进程退出分别观察。同步管道使用独立读写循环，由收尾路径关闭 ConPTY；24H2 的 <code>ClosePseudoConsole</code> 可立即返回，仍以管道 EOF 或保留的截断证据及进程结果判定终态。</p>
         <p>24H2 起有公开的 <code>ReleasePseudoConsole</code> 让控制台随最后一个客户端断开退出。crosspty 对之前的系统版本存在访问旧 HPCON 内部布局的兼容分支。首发基线要求公开 API 路径，旧版本兼容独立评估。Windows 真机结果决定封装选型。</p>
-        <p class="source"><a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/process_windows.go">crosspty 创建与退出</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/conpty_windows.go">crosspty 的 ConPTY 路径</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/cmd_windows.go">go-pty Windows 进程启动</a> · <a href="https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session">ConPTY 建连</a> · <a href="https://learn.microsoft.com/en-us/windows/console/closepseudoconsole">ConPTY 关闭</a> · <a href="https://learn.microsoft.com/en-us/windows/console/releasepseudoconsole">ReleasePseudoConsole</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects">Job Objects</a></p>
+        <p class="source"><a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/process_windows.go">crosspty 创建与退出取证</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/pty_windows.go">crosspty Close 与 Wait</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/conpty_windows.go">crosspty 的 ConPTY 路径</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/cmd_windows.go">go-pty Windows 进程启动</a> · <a href="https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session">ConPTY 建连</a> · <a href="https://learn.microsoft.com/en-us/windows/console/closepseudoconsole">ConPTY 关闭</a> · <a href="https://learn.microsoft.com/en-us/windows/console/releasepseudoconsole">ReleasePseudoConsole</a> · <a href="https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects">Job Objects</a></p>
       </section>
 
       <section aria-labelledby="port">

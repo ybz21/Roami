@@ -65,22 +65,31 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
         <p>每个节点和实例根只有一个接收新建的宿主；同一实例允许多个按宿主 ID 寻址的排空宿主。每个宿主有独立 IPC 端点和服务注册。宿主登记保存 <code>host_instance_id</code>、启动代次与系统进程身份、二进制版本、协议版本范围、端点和状态；每个会话写入后端、宿主 ID、窗格 ID、运行代次和进程身份。标签、工作区、任务及恢复来源沿用台账。</p>
         <ol>
           <li><strong>准备。</strong> 安装新版本到版本化路径，独立启动并通过身份、权限、上线健康检查和协议握手。宿主日志按版本与实例归档。Web/CLI 需能同时与新旧宿主的协议版本通信，失败时保持既有路由。</li>
-          <li><strong>切换。</strong> 旧宿主先停止接收新建、让已受理创建完成或落下可查回执，再用持久化的当前宿主指针和代次将新建指向新版。创建请求携带该代次，迟到请求由旧宿主拒绝。已有会话按登记宿主继续附着和输入。切换中断时以持久化代次重新确认准入宿主，确认前暂缓新建。</li>
-          <li><strong>排空。</strong> 旧宿主持有已有 PTY/ConPTY，等会话自然退出后再撤服务注册并清理旧二进制。升级验收必须证明旧会话的宿主和窗格进程身份不变、新会话归新版。回滚只改新建指针，仍兼容已经创建的两代会话。</li>
+          <li><strong>切换。</strong> 在持久台账的一次写事务中校验目标宿主就绪、未开始退役且排空代数符合上限，再对 <code>(current_host, generation)</code> 做 CAS。只有仍匹配预期的旧指针和代次时，才把指针改为目标宿主、递增代次，并更新两者的接收与排空状态。回滚也用同一事务并递增代次。结果不明确时读回持久状态，再确认新建路由。已有会话继续按原宿主附着和输入。</li>
+          <li><strong>排空。</strong> 旧宿主继续持有其窗格并完成已受理的创建。每实例保留一个接收新建的宿主和最多两代排空宿主。切换会超过两代时先暂停升级，现有各代会话仍可用。</li>
           <li><strong>故障。</strong> 有权限的本地 CLI 可在 Web 不可用时继续普通会话，受管任务仍依赖已有围栏和宿主证据。IPC 权限错误、超时或协议不兼容都保留待确认，不自动开替代会话。宿主异常退出由系统重拉新运行代次，旧进程按可验证身份对账；机器重启后只启动当前配置的准入版本。确认原窗格已退出才允许从台账重开。</li>
         </ol>
+        <h3 id="admission">并发创建与幂等</h3>
+        <p>同一个创建操作从首次提交到重试沿用 <code>operation_id</code>。所有 Web 和 CLI 实例共享同一份操作台账，以实例和 <code>operation_id</code> 为唯一键，绑定授权范围、启动参数摘要和执行宿主。每个创建请求携带 <code>expected_generation</code>。同一操作 ID 只接受相同的授权范围与启动参数。</p>
+        <p>宿主创建窗格前，在与指针切换串行化的写事务中先查操作回执。已有归属时返回该操作的状态或结果。新操作只有在当前宿主和 <code>expected_generation</code> 都匹配时才能落下唯一的受理记录。工作线程以状态 CAS 从已受理进入启动中，提交后才启动 PTY。切换前已受理的操作仍由旧宿主完成。切换后的旧宿主在未受理请求触发 PTY 前返回 <code>STALE_GENERATION</code>。</p>
+        <p>收到 <code>STALE_GENERATION</code> 后，调用方重新读取 <code>current_host</code>、<code>generation</code> 及该 <code>operation_id</code> 的回执。已有归属则查询原宿主或返回已存在的结果。仍未受理时可用原 <code>operation_id</code> 和新代次重新提交。若进程可能已启动但回执不完整，保留原归属和围栏，先查证再处理。并发调用使用同一操作 ID 时最多只允许一个启动者。</p>
+        <h3 id="drain-retention">排空状态与清理</h3>
+        <p>节点诊断显示每代宿主的版本、排空起始时间、仍在运行的会话、未结操作、二进制占用和阻塞原因。达到上限时提示等待会话退出或处理指定会话。排空不设自动终止期限。</p>
+        <p>用户有权限并明确确认后，可终止指定会话，或在接受原进程与未保存状态会结束后，选择终止并在当前宿主按台账重开。先走现有停止和围栏流程取得退出证据，再按恢复规则创建新运行并关联来源。结果待确认时保持旧宿主与围栏。</p>
+        <p>确认没有活跃窗格或未结操作后，先在同一台账事务中将排空宿主标记为退役中，再正常停止。确认宿主退出后，注销服务并移除端点。除部署中的候选版本和运行实例引用的版本外，每实例最多保留一个已退役版本供回滚。二进制无运行或回滚引用时才可删除。会话历史和日志按既有保留策略处理。</p>
         <p>Unix socket 放在短路径的用户私有运行目录，绑定实例根的摘要及宿主 ID。Linux 用 <code>SO_PEERCRED</code>，macOS 用 <code>getpeereid</code> 核对 peer UID，并检查端点所有权。Windows 管道要求用户或登录 SID 的访问控制和远程连接限制，详见<a href="windows.html">Windows 整包移植</a>。</p>
         <p class="source"><a href="../../../install.sh">现有 systemd 与 LaunchAgent 托管</a> · <a href="../../../start.sh">Web 服务启动与重启</a></p>
       </section>
 
       <section aria-labelledby="platform-detail">
         <h2 id="platform-detail">平台适配</h2>
-        <p>将接口和启动参数放在同一 Go 包，由构建标签选中 Unix 或 Windows 的实现。上层使用统一的列行尺寸、退出结果和字节流接口。Unix 的 <code>*os.File</code>、Windows 的管道和句柄留在各自适配器里。两种后端在现有 Go 依赖上即可实现，可随 Roami 按目标平台编译，无需为 PTY 层引入 CGO 或额外运行时。</p>
+        <p>将接口和启动参数放在同一 Go 包，由构建标签选中 Unix 或 Windows 的实现。上层使用统一的列行尺寸、退出结果和字节流接口。Unix 的 <code>*os.File</code>、Windows 的管道和句柄留在各自适配器里。两种候选库的 PTY 探针已用 <code>CGO_ENABLED=0</code> 交叉编译通过。Go 版本与依赖取决于最终选型。</p>
         <p>同一组契约测试覆盖启动、双向输入输出、初始尺寸、在线调整、退出与重复关闭。能力存在平台差异时由适配器明确报告，例如信号、暂停和进程组观测，上层根据能力提供操作。</p>
         <h3>macOS / Linux</h3>
         <p>以 <code>StartWithSize</code> 建控制终端和初始尺寸，子进程使用登录 shell 或指定可执行文件。由 master 读写，以 <code>Setsize</code> 更新尺寸并由系统通知前台进程组。宿主记录 PID、系统启动标识、进程启动时间以及 session ID / PGID。交互 shell 会把作业放入不同进程组，回收前验证运行身份并以 Linux cgroup 或经验证的 macOS 会话进程归属核对退出。启动参数显式携带获准的每会话环境，登录 shell 初始化 PATH、nvm 与用户配置；<code>SSH_AUTH_SOCK</code> 等会话变量按启动来源传入。验证 <code>TERM</code> 与真实 VT 能力、平台可用的 UTF-8 locale。</p>
         <h3>Windows / PowerShell</h3>
-        <p>Windows 适配器通过系统 ConPTY 启动 PowerShell 和 Agent。先评估 crosspty、go-pty 与直接调用 ConPTY 对进程身份、关闭排空及 Job Object 的支持。启动、引号、管道、签名与整包移植的验收条件见<a href="windows.html">Windows 整包移植</a>。</p>
+        <p>Windows 适配器通过系统 ConPTY 启动 PowerShell 和 Agent。采用 <code>crosspty v1.2.0</code> 需新增模块，最低 Go 版本为 1.24.0，与当前工程一致。采用 <code>go-pty v0.2.3</code> 需新增模块并评估将工程及 CI 升级至 Go 1.25.0 或以上，以及传递依赖变化。直接调用 ConPTY 的探针使用仓库现有 <code>x/sys v0.41.0</code>。启动、关闭排空、Job Object 及整包验收见<a href="windows.html">Windows 整包移植</a>。</p>
+        <p class="source"><a href="../../../go.mod">Roami Go 依赖</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/go.mod">crosspty 依赖</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a></p>
       </section>
 
       <section aria-labelledby="screen">
@@ -116,7 +125,7 @@ Roami 会话服务（授权、台账、工作区与执行绑定）
         <ol>
           <li><strong>先抽业务接口。</strong> 以现有 tmux 为第一个 SessionBackend。按<a href="capabilities.html">迁移清单</a>迁移 API、CLI 和 Agent 调用点，先跑旧行为回归。TerminalBackend 只供原生宿主调用，处理 PTY、进程和操作系统能力。Windows 整包单独立项，候选 PTY 探针可并行。</li>
           <li><strong>宿主与普通会话试点。</strong> Linux 和 macOS 从单窗格开始，完成屏幕捕获、断线回连和 Web 重启恢复。先在隔离实例开启原生后端，复用会话台账和连接入口。旧记录识别为 tmux。新建记录写入不可变的后端与运行身份，部署版本支持双读，首个用户可用版本由独立宿主持有 PTY，并通过双版本排空演练。</li>
-          <li><strong>迁移剩余功能。</strong> 补齐窗口、分屏和 CLI 操作，接入 Agent 输入和执行生命周期。启动前先持久化操作 ID、目标和工作区租约，再向宿主发起同一操作可查的创建。一旦创建结果中断，按操作 ID 查询当前宿主和已写入的观测证据，禁止重新开一个窗格来碰运气。</li>
+          <li><strong>迁移剩余功能。</strong> 补齐窗口、分屏和 CLI 操作，接入 Agent 输入和执行生命周期。启动前先持久化操作 ID、目标和工作区租约，再按<a href="#admission">并发创建与幂等契约</a>发起创建。结果中断时按操作记录和原归属宿主核对退出或创建证据。</li>
           <li><strong>确认退出再恢复。</strong> Web 重启时按宿主实例与窗格代次接续。宿主不可达时保留工作区围栏。进程等待结果、带身份的系统观测或宿主重启证据明确后，才对历史做相应状态变更。宿主或整机重启后，可按台账重开并用支持的 Agent 对话 ID 恢复；新会话有新运行身份和恢复来源。原进程内存和未持久化输出随宿主故障丢失。</li>
           <li><strong>切换与回滚。</strong> 一次只改变新建默认项；运行中的会话继续按已登记后端连接。保留支持两种后端的版本和恢复路径，避免回退到无法读取原生会话的版本。旧后端只有在活跃会话自然排空、历史和复原路径验收后，才评估停止安装和维护。</li>
         </ol>

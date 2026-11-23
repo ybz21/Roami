@@ -19,7 +19,7 @@
   </header>
   <main>
     <article>
-      <p class="date">2026-11-21 · 评审修订 · Roami 6108a657</p>
+      <p class="date">2026-11-23 · 复审修订 · Roami 6108a657</p>
       <h1>三平台原生终端</h1>
       <p class="lead"><strong>推荐由 Roami 自己管理会话，底层复用系统 PTY。Unix 用现有 <code>creack/pty</code>，Windows 先对比 <code>crosspty</code>、<code>go-pty</code> 和直接调用 ConPTY。</strong></p>
       <p>浏览器目前通过一个外层 PTY 运行 <code>tmux attach</code>。真正的 shell 和 Agent 在 tmux server 持有的窗格中。只换外层 PTY，底下仍要有 tmux server。三平台原生运行需要由 Roami 接手窗格进程、分离重连、屏幕捕获和退出观测。</p>
@@ -53,7 +53,7 @@
               </tr>
               <tr>
                 <th scope="row"><code>Kodecable/crosspty</code> v1.2.0</th>
-                <td>纯 Go 统一 PTY，Unix 内部复用 <code>creack/pty</code>，Windows 使用 ConPTY，含可选 Job 进程组清理。Go 1.24 与 PTY 依赖版本和 Roami 一致。</td>
+                <td>纯 Go 统一 PTY，Unix 内部复用 <code>creack/pty</code>，Windows 使用 ConPTY，含可选 Job 进程组清理。采用时新增模块，最低 Go 1.24.0 和现用 PTY 依赖版本与 Roami 对齐。</td>
                 <td>Windows 优先验证。<code>Close</code> 会终止子进程，<code>Wait</code> 返回 -1 时可能是观察失败。需要验证最后输出、退出证据、宿主崩溃和 Job 归属。</td>
               </tr>
               <tr>
