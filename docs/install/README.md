@@ -111,9 +111,19 @@ curl -fsSL https://raw.githubusercontent.com/ybz21/Roam/main/install.sh | bash
 - `ROAMI_SYSTEM=1` —— 注册**系统级** systemd 服务（`/etc/systemd/system`，需 root/sudo）。
 - `ROAMI_NO_SERVICE=1` —— 只装二进制，不注册服务。
 - `ROAMI_FROM_SOURCE=1` —— 在 clone 内从源码构建（需 go+node），而非下载 release。
+- `ROAMI_INSTALL_GEMINI=1` —— 部署时安装官方 Gemini CLI 并检查启动、续聊参数。需要 Node.js 20+ 和 npm。复用已安装的兼容版本。
 - `ROAMI_NO_ZRAM=1` —— 跳过 Linux 压缩交换区配置；默认在运行 systemd 的 Linux 上自动尝试启用。
 - `ROAMI_ZRAM_SIZE=16G` —— 压缩交换区逻辑容量，默认物理内存的一半。
 - `ROAMI_ZRAM_MEMORY_LIMIT=4G` —— 压缩区实际内存上限，默认物理内存的 1/8。
+
+从源码部署并启用 Gemini CLI：
+
+```bash
+ROAMI_FROM_SOURCE=1 ROAMI_INSTALL_GEMINI=1 bash install.sh
+```
+
+安装器在切换 Roami 服务前准备 Gemini CLI。Gemini 账户通过终端完成登录。
+部署后，已经打开的网页通过版本提示或浏览器刷新加载新版前端。
 
 安装和升级在完整包校验、存储预检及智能体验证通过后，从该版本程序提取内置的
 zram 配置脚本。已有 zram 或 zswap 时保留配置；首次启用需要管理员权限。

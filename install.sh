@@ -20,6 +20,7 @@
 #   ROAMI_ZRAM_SIZE=16G    指定压缩交换区逻辑容量（默认物理内存的一半）
 #   ROAMI_ZRAM_MEMORY_LIMIT=4G 压缩区实际内存上限（默认物理内存的 1/8）
 #   ROAMI_FROM_SOURCE=1    在仓库 clone 内从源码构建（需 go+node），而非下载 release
+#   ROAMI_INSTALL_GEMINI=1 同时安装并验证 Gemini CLI（需 Node.js 20+ 和 npm）
 #
 # 开发/源码构建请用 start.sh --dev（会从源码构建 CLI/chrome/skills + 前后端）。
 #
@@ -42,6 +43,7 @@ INSTALL_ACTIVATED=0
 INSTALL_QUIESCED=0
 INSTALL_LOCKED=0
 INSTALL_PREVIOUS=""
+INSTALL_GEMINI_PATH=""
 
 # ── 输出助手 ─────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -146,23 +148,30 @@ preflight_storage() {
 service_path_environment() {
   local prefix suffix key value
   local format="${1:-systemd}"
+  local -a keys=()
   for prefix in ROAMI ROAM TTMUX; do
     for suffix in HOME DATA CONFIG DATABASE_DIR BACKUP_DIR; do
-      key="${prefix}_${suffix}"
-      value="${!key:-}"
-      [ -n "$value" ] || continue
-      if [ "$format" = plist ]; then
-        value="${value//&/\&amp;}"
-        value="${value//</\&lt;}"
-        value="${value//>/\&gt;}"
-        printf '<key>%s</key><string>%s</string>\n' "$key" "$value"
-        continue
-      fi
-      value="${value//\\/\\\\}"
-      value="${value//\"/\\\"}"
-      value="${value//%/%%}"
-      printf 'Environment="%s=%s"\n' "$key" "$value"
+      keys+=("${prefix}_${suffix}")
     done
+  done
+  if [ -n "$INSTALL_GEMINI_PATH" ]; then
+    local PATH="$INSTALL_GEMINI_PATH"
+    keys+=(PATH)
+  fi
+  for key in "${keys[@]}"; do
+    value="${!key:-}"
+    [ -n "$value" ] || continue
+    if [ "$format" = plist ]; then
+      value="${value//&/\&amp;}"
+      value="${value//</\&lt;}"
+      value="${value//>/\&gt;}"
+      printf '<key>%s</key><string>%s</string>\n' "$key" "$value"
+      continue
+    fi
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//%/%%}"
+    printf 'Environment="%s=%s"\n' "$key" "$value"
   done
 }
 
@@ -210,6 +219,17 @@ install_binary() {
   step "验证智能体运行环境..."
   run_as_service_user "$INSTALL_SLOT/bin/roami" agent install-probe --runtime-dir "$INSTALL_SLOT/runtime" || die "智能体验证失败，现有安装未修改"
   info "完整包准备完成"
+}
+
+install_gemini() {
+  [ "${ROAMI_INSTALL_GEMINI:-0}" = 1 ] || return 0
+  local script="$INSTALL_SLOT/install/install-gemini-cli.sh"
+  local prefix="$INSTALL_RUN_HOME/.local"
+  [ -f "$script" ] || die "当前运行包缺少 Gemini CLI 安装脚本，请使用较新的完整包"
+  step "准备 Gemini CLI..."
+  INSTALL_GEMINI_PATH="$prefix/bin:$PATH"
+  run_as_service_user env "PATH=$INSTALL_GEMINI_PATH" bash "$script" "$prefix" \
+    || die "Gemini CLI 准备失败，Roami 服务版本未切换"
 }
 
 restart_existing_service() {
@@ -538,6 +558,7 @@ echo ""
 trap cleanup_installation EXIT
 detect_asset
 install_binary
+install_gemini
 ensure_tmux
 ensure_chrome || warn "Chrome 安装失败，可稍后安装"
 ensure_adb || warn "ADB 安装失败，可稍后安装"
