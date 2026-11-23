@@ -21,6 +21,7 @@ type activityTranscript struct {
 	recheckAt time.Time
 	info      os.FileInfo
 	at        int64
+	offset    int64
 }
 
 func usesTranscriptActivity(kind string) bool { return kind == "codex" || kind == "claude" }
@@ -78,19 +79,35 @@ func (record *activityTranscript) read(kind string) {
 		return
 	}
 	defer file.Close()
-	const maxRead = 512 << 10
-	lines, err := readFrom(file, max(0, info.Size()-maxRead), info.Size())
-	if err != nil {
-		return
+	at, offset := record.at, record.offset
+	if !sameFile || info.Size() <= old.Size() {
+		at, offset = 0, 0
 	}
-	if !sameFile || info.Size() < old.Size() {
-		record.at = 0
-	}
-	record.info = info
+	// Continue before the first complete row on each page, including on cold start.
+	const pageLines = 128
 	now := time.Now()
-	for _, line := range lines {
-		record.at = max(record.at, transcriptMessageTime(kind, string(line.Text), now))
+	end := info.Size()
+	nextOffset := offset
+	for end > offset {
+		lines, _, _, err := readTailBefore(file, pageLines, end)
+		if err != nil {
+			return
+		}
+		if len(lines) == 0 {
+			break
+		}
+		nextOffset = max(nextOffset, lastComplete(lines, offset))
+		for _, line := range lines {
+			if line.At >= offset {
+				at = max(at, transcriptMessageTime(kind, string(line.Text), now))
+			}
+		}
+		if offset == 0 && at > 0 {
+			break
+		}
+		end = lines[0].At
 	}
+	record.info, record.at, record.offset = info, at, nextOffset
 }
 
 func transcriptMessageTime(kind, text string, now time.Time) int64 {
@@ -117,22 +134,31 @@ func transcriptMessageTime(kind, text string, now time.Time) int64 {
 }
 
 func activityTranscriptFile(name string, p agentProc, uniqueCodexDir bool) string {
-	if file, managed := managedTranscript(name, p.Kind); managed {
+	file, managed := managedTranscript(name, p.Kind)
+	if file != "" {
 		return file
 	}
-	argv, started := processArgv(p.Pid), processStart(p.Pid)
+	return nativeActivityTranscriptFile(p, uniqueCodexDir && !managed)
+}
+
+func nativeActivityTranscriptFile(p agentProc, uniqueCodexDir bool) string {
+	argv := processArgv(p.Pid)
 	if p.Kind == "codex" {
 		id := codexResumeID(argv)
-		if id == "" && (!uniqueCodexDir || started.IsZero() || p.Dir == "") {
-			return ""
+		if id != "" {
+			if file := codexActivityFile(id, "", time.Time{}); file != "" {
+				return file
+			}
+			return providerTranscriptFile(codexSessionsRoot(), "-"+id+".jsonl", false)
 		}
-		file := codexActivityFile(id, p.Dir, started)
-		if file == "" && id != "" {
-			file = providerTranscriptFile(codexSessionsRoot(), "-"+id+".jsonl", false)
+		if uniqueCodexDir && p.Dir != "" {
+			if started := processStart(p.Pid); !started.IsZero() {
+				return codexActivityFile("", p.Dir, started)
+			}
 		}
-		return file
+		return ""
 	}
-	id := claudeProcessSession(p.Pid, started)
+	id := claudeProcessSession(p.Pid)
 	if id == "" {
 		id = argvSessionID(argv)
 	}
@@ -142,10 +168,7 @@ func activityTranscriptFile(name string, p agentProc, uniqueCodexDir bool) strin
 	return ""
 }
 
-func claudeProcessSession(pid int, started time.Time) string {
-	if started.IsZero() {
-		return ""
-	}
+func claudeProcessSession(pid int) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
@@ -156,13 +179,19 @@ func claudeProcessSession(pid int, started time.Time) string {
 	}
 	var record struct {
 		PID       int    `json:"pid"`
-		StartedAt int64  `json:"startedAt"`
+		ProcStart string `json:"procStart"`
 		SessionID string `json:"sessionId"`
 	}
-	if json.Unmarshal(raw, &record) != nil || record.PID != pid || !uuidLike.MatchString(record.SessionID) {
+	if json.Unmarshal(raw, &record) != nil || record.PID != pid || record.ProcStart == "" || !uuidLike.MatchString(record.SessionID) {
 		return ""
 	}
-	if delta := time.UnixMilli(record.StartedAt).Sub(started); delta < -3*time.Second || delta > 3*time.Second {
+	stat, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	end := strings.LastIndexByte(string(stat), ')')
+	if err != nil || end == -1 {
+		return ""
+	}
+	fields := strings.Fields(string(stat[end+1:]))
+	if len(fields) < 20 || fields[19] != record.ProcStart {
 		return ""
 	}
 	return record.SessionID

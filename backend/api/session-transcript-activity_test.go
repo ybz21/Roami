@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -63,6 +64,21 @@ func TestSessionActivityTranscriptReadsCompleteRecordsAfterRestart(t *testing.T)
 	fresh.read("codex")
 	if fresh.at != second.Unix() {
 		t.Fatalf("metadata update advanced time to %d", fresh.at)
+	}
+}
+
+func TestSessionActivityTranscriptFindsReplyBeforeRecentMetadata(t *testing.T) {
+	at := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	reply := `{"timestamp":"` + at.Format(time.RFC3339) + `","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"text":"Latest reply"}]}}` + "\n"
+	metadata := `{"type":"event_msg","payload":{"type":"token_count","detail":"` + strings.Repeat("x", 8192) + `"}}` + "\n"
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	if err := os.WriteFile(path, []byte(reply+strings.Repeat(metadata, 300)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	record := activityTranscript{file: path}
+	record.read("codex")
+	if record.at != at.Unix() {
+		t.Fatalf("time behind recent metadata = %d, want %d", record.at, at.Unix())
 	}
 }
 
