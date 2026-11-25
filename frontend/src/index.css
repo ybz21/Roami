@@ -683,7 +683,38 @@ html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 .tt-pathbar-empty { height: 100%; display: grid; place-items: center; color: var(--text-dimmer); font-size: var(--fs-sm); padding: var(--sp-4); text-align: center; }
 
 /* ── 标签条右端「新建 ▾」与任务空态（22 设计 §3.3）── */
-.tt-tabs-end { display: flex; align-items: center; flex: 0 0 auto; padding: 0 6px; border-left: 1px solid var(--border-subtle); }
+.tt-tabs-end { display: flex; align-items: center; gap: var(--sp-1); flex: 0 0 auto; padding: 0 6px; border-left: 1px solid var(--border-subtle); }
+.tt-solo-shell {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  overflow: hidden; background: var(--bg-base);
+}
+.tt-solo-workspace {
+  position: relative; flex: 1; min-height: 0; min-width: 0;
+  display: flex; overflow: clip; background: var(--bg-base);
+}
+.tt-solo-main {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; background: var(--bg-term);
+}
+.tt-solo-brand {
+  position: relative; flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  height: 100%; padding: 0 var(--sp-3);
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-bright); text-decoration: none;
+  transition: background .12s;
+}
+.tt-solo-brand img { flex: 0 0 auto; }
+.tt-solo-brand .wd {
+  font-size: var(--fs-body); font-weight: 800; letter-spacing: .5px; line-height: 1.15;
+  background: var(--brand-grad); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:where(html[data-pointer="fine"]) .tt-solo-brand:hover { background: var(--list-hover); }
+.tt-solo-brand:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+html[data-pointer="coarse"] .tt-solo-brand::after {
+  content: ''; position: absolute; inset: calc((var(--tap) - var(--topbar-h)) / -2) 0;
+}
 .tt-tabs-empty {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: var(--sp-1); color: var(--text-dim); font-size: var(--fs-body);

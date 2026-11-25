@@ -23,7 +23,6 @@ import { FileView } from '../files/fileview'
 import { FileTypeIcon } from '../files/file-icons'
 import { ChangesView, FilePathBar, type FileTabMode } from '../files/FilePathBar'
 import type { FileTab } from './term-tabs-store'
-import FileWorkspace from '../files/FileWorkspace'
 import GitPanel from '../git/GitPanel'
 import MobileSubPage from '../MobileSubPage'
 import { PaneCloseConfirm, type PaneCloseTarget } from './PaneCloseConfirm'
@@ -41,12 +40,11 @@ import { codexReconnectFailed, codexResumeCommand } from './codex-recovery'
 import { useI18n } from '../../i18n'
 import { SESSION_MIME, buildIntro, canDrop, readDrag } from '../shell/session-drop'
 import { currentNodeId, useCurrentNodeId } from '../cluster/node-url'
-import { OPEN_FILE_INTENT, requestIntent } from '../../intents'
 import { useLayout } from '../../layout'
 import { savePreferences, saveWorkspace, usePreferences } from '../../preferences'
 import { PromptDialog } from '../prompt'
 import { readSessionScreen, useSessionScreen } from './session-screen'
-import { SessionTitle, TabName, sessionDisplay, sessionLabel, useSessionLabel } from '../sessions/session-label'
+import { TabName, sessionDisplay, sessionLabel, useSessionLabel } from '../sessions/session-label'
 import { sessionProject, useSessionProject } from '../sessions/session-project'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useEdgeSwipe } from '../shell/edge-swipe'
@@ -67,6 +65,8 @@ export default function TerminalPane(props: {
   onClosePage?: (key: string) => void
   onClosePages?: (keys: string[]) => void
   tabBarHost?: HTMLElement | null
+  tabLead?: ReactNode
+  tabEnd?: ReactNode
   fontSize: number; setFontSize: (n: number) => void
   statusMap: Record<string, TermStatus>; setStatus: (n: string, s: TermStatus) => void
   activityMap?: Record<string, { running: boolean; waiting: boolean; identity?: string }>
@@ -82,7 +82,6 @@ export default function TerminalPane(props: {
   sessionVisible?: boolean
   /** 终端 Focus：传了才渲染工具条右侧那枚按钮（手机没有这个概念） */
   focus?: { on: boolean; toggle: () => void; hint: string }
-  fileDock?: 'right' | 'left'   // 文件面板停靠：'right'=右侧浮动抽屉（默认），'left'=左侧 VSCode 栏（新标签全屏页）
   /** 标签条右端「新建 ▾」：在当前任务里开终端 / 去项目页开新任务。不传就不画 */
   /** 标签条「新建」：三样都在当前任务的 worktree 里派生；taskLabel 写在菜单顶上说明白 */
   onNew?: { terminal: () => void; agent: (kind: AgentKind) => void; taskLabel?: string }
@@ -111,7 +110,7 @@ export default function TerminalPane(props: {
 }) {
   const registeredAgents = useRegisteredAgents()
   const node = useCurrentNodeId()
-  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, sessionVisible = true, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, sessionTask, onReturnToSession, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
+  const { terms, active, setActive, closeTerm, pageTabs, activePage, onPageTab, onClosePage, onClosePages, tabBarHost, tabLead, tabEnd, fontSize, setFontSize, statusMap, setStatus, activityMap, termRefs, sendKey, onCollapse, claudeMap, claudeView, setClaudeView, codexMap, codexView, setCodexView, openCodeMap, openCodeView, setOpenCodeView, agentKinds, onRename, onReorder, sessionVisible = true, focus, onNew, onOpenSession, inspector, onOpenFile, onOpenGit, fileTabs, activeFile, taskDir, sessionTask, onReturnToSession, onFileTab, onCloseFile, onPinFile, onFileMode, reveal } = props
   const activeProject = useSessionProject(active)
   const activeLabel = useSessionLabel(active)
   const opaqueLabel = !!activeProject && (activeLabel === active || /^\d{4}-\d{4}-\d{4}-\d{4}(?:-[a-z0-9]+)?$/i.test(activeLabel))
@@ -129,7 +128,6 @@ export default function TerminalPane(props: {
     if (prev.has(p) === dirty) return prev
     const n = new Set(prev); dirty ? n.add(p) : n.delete(p); return n
   })
-  const fileDock = props.fileDock || 'right'
   const { message, modal } = AntApp.useApp()
   const { t } = useI18n()
   const lifecycle = useSessionLifecycle()
@@ -268,13 +266,10 @@ export default function TerminalPane(props: {
     savePreferences({ showVoiceButton: next })
   }
 
-  // 文件侧栏（终端视图下也可用）：定位到当前会话的工作目录。左侧停靠时默认展开。
-  // 编辑器多 tab / 打开的文件 / 拖拽调宽等都下沉到 <FileWorkspace>（左侧停靠时用），这里只保留 showFiles。
-  const [showFiles, setShowFiles] = useState(fileDock === 'left')
+  // 手机与无右栏时的文件 / Git 二级页开关
+  const [showFiles, setShowFiles] = useState(false)
   const [showGit, setShowGit] = useState(false)
   const [cwd, setCwd] = useState('')
-  // 右侧停靠：文件 / Git 不再是这里的抽屉，归右栏三面板（InspectorPanels，22 设计 §3.4），
-  // 这里只把「要看哪个」递上去。左侧停靠（#/term 独立页）的 FileWorkspace 照旧。
   const toggleFiles = () => setShowFiles((s) => !s)
   const toggleGit = () => setShowGit((s) => !s)
   // 稳定引用：这两个回调经 ChatShell 的 context 送到每一条工具行，引用一变整卷对话的 memo 全失效
@@ -300,10 +295,6 @@ export default function TerminalPane(props: {
   useEffect(() => { setDockFileReq(null) }, [active])
   const openFileRef = useRef<(path: string, line?: number) => void>(() => {})
   openFileRef.current = (path, line) => {
-    if (fileDock === 'left') {
-      requestIntent(OPEN_FILE_INTENT, { path, line, side: true })
-      return
-    }
     if (onOpenFile) { onOpenFile(path, line); return }
     setShowFiles(true)
     setDockFileReq((prev) => ({ path, nonce: (prev?.nonce || 0) + 1 }))
@@ -732,17 +723,11 @@ export default function TerminalPane(props: {
     icon={agentMarks(name)} files={resourcesOf(name)} active={selected} activeFile={curFile} dirtyFiles={dirtyFiles}
     sessionButton={{ get current() { return sessionButtons.current[name] || null } }}
     onSession={() => setActive(name)} onFile={path => onFileTab?.(path, name)} onCloseFile={closeFile} />
-  const sessionTab = (
-    <>
-      {statusDot(active ? dotOf(active) : '#f85149')}
-      {active && agentMarks(active)}
-      {active && <SessionTitle name={active} />}
-    </>
-  )
   // 标签条：左侧「收起」固定不滚，标签区独立横滚（14 §7.1）。
   // 收起按钮原来跟着标签一起滚，会话一多它就滑出视口——那是常驻动作，不该跟着内容跑。
   const tabStrip = (
     <div className="tt-tabs-wrap">
+      {tabLead}
       {onCollapse && (
         <div className="tt-tabs-lead">
           <TBtn icon={TI.collapse} label={t('common.collapse')} onClick={onCollapse} />
@@ -925,20 +910,23 @@ export default function TerminalPane(props: {
           </button>
         </Dropdown>
       )}
-      {onNew && (
+      {(onNew || tabEnd || inspector) && (
         <div className="tt-tabs-end">
-          <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: [{
-            type: 'group' as const, label: onNew.taskLabel ? t('tabs.newInTask', { task: onNew.taskLabel }) : t('tabs.newHere'),
-            children: [
-              { key: 'terminal', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: onNew.terminal },
-              ...registeredAgents.map(agent => ({ key: agent.kind, icon: <AgentLogo kind={agent.kind} size={14} />, label: agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName }), disabled: !agent.interactive, onClick: () => onNew.agent(agent.kind) })),
-            ],
-          }] }}>
-            <button type="button" className="tt-tbtn" title={t('tabs.new')}>
-              <PlusIcon size={13} /><span>{t('tabs.new')}</span>
-              <span style={{ color: 'var(--text-dimmer)', display: 'inline-flex' }}><ChevronDown size={11} /></span>
-            </button>
-          </Dropdown>
+          {onNew && (
+            <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: [{
+              type: 'group' as const, label: onNew.taskLabel ? t('tabs.newInTask', { task: onNew.taskLabel }) : t('tabs.newHere'),
+              children: [
+                { key: 'terminal', icon: <TerminalIcon size={14} />, label: t('tabs.newTerminal'), onClick: onNew.terminal },
+                ...registeredAgents.map(agent => ({ key: agent.kind, icon: <AgentLogo kind={agent.kind} size={14} />, label: agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName }), disabled: !agent.interactive, onClick: () => onNew.agent(agent.kind) })),
+              ],
+            }] }}>
+              <button type="button" className="tt-tbtn" title={t('tabs.new')}>
+                <PlusIcon size={13} /><span>{t('tabs.new')}</span>
+                <span style={{ color: 'var(--text-dimmer)', display: 'inline-flex' }}><ChevronDown size={11} /></span>
+              </button>
+            </Dropdown>
+          )}
+          {tabEnd}
           {inspector && (
             <button type="button" className={`tt-tbtn ico${inspector.open ? ' on' : ''}`} onClick={inspector.toggle}
               aria-label={t('inspector.toggle')} title={t('inspector.toggle')} aria-pressed={inspector.open}>
@@ -1077,8 +1065,6 @@ export default function TerminalPane(props: {
       <span className="tt-sep" />
       <TBtn icon={promptOff ? TI.bellOff : TI.bellOn} label={t('prompt.popup')} on={!promptOff}
         title={promptOff ? t('prompt.popupOff') : t('prompt.popupOn')} onClick={togglePromptOff} />
-      {fileDock === 'left' && <TBtn icon={TI.folder} label={t('chat.files')} on={showFiles} title={t('terminal.fileBrowserTitle')} onClick={toggleFiles} />}
-      {fileDock === 'left' && <TBtn icon={TI.git} label={t('git.title')} on={showGit} title={t('terminal.gitPanelTitle')} onClick={toggleGit} />}
       <span className="tt-spacer" />
       <span className="tt-tgroup">
         <TBtn icon={TI.scrollUp} title={t('terminal.scrollHistory')} onClick={() => active && termRefs.current[active]?.scroll(-12)} />
@@ -1301,47 +1287,24 @@ export default function TerminalPane(props: {
       >
         <span style={{ position: 'fixed', left: ctx?.x ?? -1000, top: ctx?.y ?? -1000, width: 1, height: 1, pointerEvents: 'none' }} />
       </Dropdown>
-      {/* 独立全屏页（左侧文件停靠）：顶部细标题栏显示会话名，横跨左右；下面才是「左文件 / 右会话」 */}
-      {fileDock === 'left' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderBottom: '1px solid var(--border)', minHeight: 32 }}>
-          <span style={{ color: 'var(--text-bright)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active || ''}</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, background: 'var(--brand-grad)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Roami</span>
+      <div ref={phoneRootRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {phoneChrome || (tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip)}
+          {curFile
+            ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)}
+                onBack={isPhone ? undefined : onReturnToSession} onClose={() => closeFile(curFile)} />
+            : !phoneChrome && sessionToolbar}
+          {active && !curFile && <><SessionReviewStatus name={active} open={onOpenSession} /><SessionMemoryBanner name={active} /></>}
+          {isPhone && active && reconnectFailure && !curFile &&
+            <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
+              <span>{t('terminal.recoveryAlert')}</span><strong>{t('terminal.recoveryAction')}</strong>
+            </button>}
+          {terminalArea}
+          {!curFile && sessionBottom}
         </div>
-      )}
-      {/* 内容主体：左侧走 <FileWorkspace>（文件树 + 编辑器多 tab）；右侧抽屉走原地布局。
-          会话（终端）各部件用上面抽出的 sessionTab/sessionToolbar/terminalArea/sessionBottom 复用。 */}
-      {fileDock === 'left' ? (
-        <FileWorkspace
-          dir={cwd} accent="var(--accent)"
-          explorerOpen={showFiles} onExplorerClose={() => setShowFiles(false)} onExplorerOpen={() => setShowFiles(true)}
-          leadingTitle={active || ''} leadingTab={sessionTab}
-          leadingContent={terminalArea} chrome={<>{sessionToolbar}{active && !curFile && <><SessionReviewStatus name={active} open={onOpenSession} /><SessionMemoryBanner name={active} /></>}</>} footer={sessionBottom}
-        />
-      ) : (
-        <div ref={phoneRootRef} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {phoneChrome || (tabBarHost ? createPortal(tabStrip, tabBarHost) : tabStrip)}
-            {curFile
-              ? <FilePathBar path={curFile} root={taskDir || ''} mode={(fileTabs || []).find((f) => f.path === curFile)?.mode || 'source'} onMode={(m) => onFileMode?.(curFile, m)}
-                  onBack={isPhone ? undefined : onReturnToSession} onClose={() => closeFile(curFile)} />
-              : !phoneChrome && sessionToolbar}
-            {active && !curFile && <><SessionReviewStatus name={active} open={onOpenSession} /><SessionMemoryBanner name={active} /></>}
-            {isPhone && active && reconnectFailure && !curFile &&
-              <button type="button" className="tt-recovery-alert" onClick={() => { void openRecovery() }}>
-                <span>{t('terminal.recoveryAlert')}</span><strong>{t('terminal.recoveryAction')}</strong>
-              </button>}
-            {terminalArea}
-            {!curFile && sessionBottom}
-          </div>
-        </div>
-      )}
-      {/* 文件树也进 Inspector：它是最后一种「从右边出来一块」的浮层（420 fixed，
-          同样盖住终端）。收进来之后 文件 / Git / Worktree 三者互斥——同一时刻只有一个
-          Inspector，关掉栈顶自然露出下面那个（图纸 panels-desktop.html §二）。 */}
-      {/* 右停靠的文件 / Git 抽屉没了：归右栏 InspectorPanels（22 设计 §3.4）。
-          这里只剩左停靠（#/term 独立页）和手机上没有右栏时的文件 / Git 二级页。 */}
-      {fileDock === 'right' && (!onOpenFile || isPhone) && (
+      </div>
+      {/* 手机和无右栏场景下的文件 / Git 二级页；桌面端由右栏 InspectorPanels 承接。 */}
+      {(!onOpenFile || isPhone) && (
         <AdaptivePanel open={showFiles} layer="session" title={t('nav.files')}
           onClose={() => setShowFiles(false)}>
           <FileBrowser dir={cwd} accent="var(--accent)" layout="dock" onClose={() => setShowFiles(false)}

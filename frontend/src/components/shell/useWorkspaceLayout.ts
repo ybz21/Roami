@@ -98,10 +98,11 @@ export type WorkspaceLayout = {
  * @param hasTerms 是否有已打开的终端；没有就永远是 Page 态
  * @param taskView 任务视图：不看 hasTerms / dockOpen，直接 focus
  */
-export function useWorkspaceLayout(hasTerms: boolean, taskView = false): WorkspaceLayout {
+export function useWorkspaceLayout(hasTerms: boolean, taskView = false, options?: { hasNav?: boolean }): WorkspaceLayout {
   const layout = useLayout()
   const [prefs] = usePreferences()
   const ws = prefs.workspace
+  const hasNav = options?.hasNav ?? true
 
   const [viewport, setViewport] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth))
   useEffect(() => {
@@ -139,7 +140,7 @@ export function useWorkspaceLayout(hasTerms: boolean, taskView = false): Workspa
   }, [ws])
 
   const large = layout.size === 'large'
-  const navWidth = large ? (navCollapsed ? NAV_RAIL : NAV_WIDTH) : NAV_RAIL
+  const navWidth = hasNav ? (large ? (navCollapsed ? NAV_RAIL : NAV_WIDTH) : NAV_RAIL) : 0
   const workspaceWidth = Math.max(0, viewport - navWidth)
 
   const mode = resolveMode({ hasTerms, dockOpen, focus, size: layout.size, workspaceWidth, taskView })
