@@ -20,38 +20,37 @@
   <main>
     <article>
       <h1>tmux 迁移清单</h1>
-      <p class="lead">先把现有调用收进按业务操作定义的 SessionBackend，再逐项接上原生宿主。每项能力决定哪些入口可以开放给原生会话。</p>
+      <p class="lead">先收口到 <code>SessionBackend</code>，再按验收进度逐项开放给原生会话。</p>
 
       <section aria-labelledby="capabilities">
-        <h2 id="capabilities">现有能力、原生契约与试点范围</h2>
+        <h2 id="capabilities">能力替换表</h2>
         <div class="table" role="region" aria-label="能力迁移对照" tabindex="0">
           <table>
-            <thead><tr><th scope="col">现有能力</th><th scope="col">原生宿主契约</th><th scope="col">试点与验收</th></tr></thead>
+            <thead><tr><th scope="col">能力</th><th scope="col">原生做法</th><th scope="col">何时开放</th></tr></thead>
             <tbody>
-              <tr><th scope="row">会话身份与事务</th><td>按稳定 ID 和运行代次创建、观测、关闭。由现有台账处理工作区、派生关系、任务与客户端重试。兼容适配器内继续严格匹配 tmux 目标。</td><td>单窗格试点必需。重名、超时、重试、双后端并存时不得误接另一个会话。</td></tr>
-              <tr><th scope="row">终端附着与尺寸</th><td>每窗格独立订阅同一输出流。连接分离与进程停止分别处理。改尺寸使用<a href="product.html#control">控制权代次</a>。</td><td>新建、列出、附着、分离、关闭和断线续放首轮可用，覆盖 Web 与 CLI 多客户端。</td></tr>
-              <tr><th scope="row">最近活跃时间</th><td>替换 <code>window_activity</code>。宿主分别记录最近实际输入与输出时间，会话聚合取最近值，按现有列表使用场景对照。</td><td>首轮纳入列表验收。附着、被动回放和健康探测不增加工作活跃时间。</td></tr>
-              <tr><th scope="row">纯文本 Capture</th><td>返回运行代次、屏幕模式、最近 N 行文本及有效范围。分别提供可见屏和含历史的调用，用屏幕模型构建结果。</td><td>首轮供 <code>capture</code>。自动确认、互审命中、内存整理使用的文本须在同一输出录制上比对后启用。</td></tr>
-              <tr><th scope="row">滚动、光标、点选</th><td>由 VT 状态给出备用屏、光标、鼠标跟踪模式与编码；窗格焦点使用窗口布局。普通屏查历史，备用屏按当前模式路由滚轮或翻页。</td><td>原生单窗格先过滚动和按键回归。布局及 pane 级坐标路由随分屏启用。</td></tr>
-              <tr><th scope="row">持久终端日志</th><td>宿主接手 <code>pipe-pane</code>。输出带窗格代次和序号，按流顺序写入可轮转日志，明确可回看区间。保留会话日志入口与来源。</td><td>首轮必需。对照同一序号的日志与快照，区分原始输出、解释后的屏幕和执行器结构化回执。</td></tr>
-              <tr><th scope="row">普通与受管输入</th><td>普通会话支持文本、按键和粘贴。受管会话发送多行内容时按当前应用模式编码括号粘贴，独立发送 Enter，两动作由同一操作串行，不可被并发交互插入。</td><td>普通输入首轮可用。受管入口在提示绑定、独立提交、IME、Shift+Enter 和结果不明时防重投验收后开放。</td></tr>
-              <tr><th scope="row">每会话内存治理</th><td>Linux 为原生会话建立 cgroup scope，按新宿主和会话身份解析 scope，沿用配置上限与归属。Windows 用 Job Object 评估内存限制，不可声明 Unix 压缩与回收等价。</td><td>有管理要求时必须在启动前获得约束，否则报告缺失，试点仅开放明确允许该能力组合的会话。默认切换前验单会话超限不影响同机其他会话。</td></tr>
-              <tr><th scope="row">进程和恢复</th><td>用 PID、启动身份、Unix 进程组/cgroup 或 Windows Job 证明进程归属。停止与重新创建继续受资源围栏约束。</td><td><code>processes / process-stop / pause / resume / reclaim / compact</code> 按能力启用。原生会话不借 tmux 的进程观测结果推断退出。</td></tr>
-              <tr><th scope="row">窗口、分屏、蜂群</th><td>宿主记录 window/pane 布局、活动窗格和按窗格的会话能力。受管任务独立对齐执行证据和提示绑定。</td><td>首轮单窗格不提供 <code>nw / lw / kw / sp / kp</code>。<code>fork</code>、蜂群和受管任务按迁移与回归进度开放。旧会话继续走 tmux。</td></tr>
+              <tr><th scope="row">身份、对账与归属</th><td>稳定 ID + 运行代次；<code>sessmeta</code> 按宿主分片对账，休眠按重启批次汇总；<code>session_homes</code> 脱离 <code>$N</code>。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">附着与改尺寸</th><td>每窗格一条流，断开不杀进程；<a href="product.html#control">控制代次</a>管尺寸，窄屏只看左右滑。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">活跃时间</th><td>只记真实打字和输出时间（替代 <code>window_activity</code>），探测不刷新。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">抓屏 Capture</th><td>从服务端 VT 取可见屏或含历史纯文本，内部可取行样式。</td><td>首轮供 <code>capture</code>；自动确认/互审比对后开</td></tr>
+              <tr><th scope="row">滚动、点选、移光标</th><td>宿主下发权威模式并唯一答查询；保留 <code>move-cursor</code>（识别暗/灰建议）。</td><td>首轮单窗格</td></tr>
+              <tr><th scope="row">环境变量</th><td>启动时经 <code>spec.Env</code> 传入，废弃敲 <code>export</code> 的 <code>InjectEnv</code>。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">终端日志</th><td>宿主按序号写可轮转日志，替代 <code>pipe-pane</code>。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">打字与受管输入</th><td>打字走轻量帧；受管任务走带 <code>request_id</code> 的 <code>submit</code>（括号粘贴 + 独立回车）。</td><td>打字首轮；受管验完开</td></tr>
+              <tr><th scope="row">内存限额</th><td>Linux 用 cgroup scope；Windows 用 Job Object（不等价于压缩交换）。</td><td>按平台能力</td></tr>
+              <tr><th scope="row">进程/目录与恢复</th><td>跨平台启动身份与 cwd 观测替代 <code>/proc</code> 与 <code>pane_current_path</code>。</td><td>按平台能力</td></tr>
+              <tr><th scope="row">窗口、分屏与蜂群</th><td>三层布局树 + 预留 <code>LayoutBackend</code>，Web 直接 CSS 排布各窗格。</td><td>接口先落，入口分批开</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="source"><a href="../../../internal/tmuxruntime/session.go">会话与活跃时间</a> · <a href="../../../backend/pty/pty.go">Web 终端状态</a> · <a href="../../../internal/memguard/pane-scope.go">现有 scope 匹配</a> · <a href="../../../internal/cli/spawn/spawn.go">日志挂接</a> · <a href="../../../backend/api/session-lifecycle-review.go">互审 Capture</a> · <a href="../../../internal/cli/spawn/autoconfirm.go">确认探测</a> · <a href="../../../internal/agentexecution/session-lifecycle.go">受管会话绑定</a> · <a href="../../../internal/session/window.go">窗口与分屏 CLI</a></p>
       </section>
 
       <section aria-labelledby="work">
-        <h2 id="work">代码迁移顺序</h2>
+        <h2 id="work">代码收口顺序</h2>
         <ol>
-          <li>沿 <code>backend/ttmux</code>、<code>internal/session</code> 和 <code>internal/tmuxruntime</code> 理清调用。先迁移创建、列表、目标解析、退出观测，再迁移捕获、定向送键和窗口操作。兼容适配器继续使用已验证的 tmux 调用规则。</li>
-          <li>处理直接执行 tmux 的旁路。基线用 Go 文件筛查得到 30 行直接调用匹配，包含测试。按用途识别旁路并按落点复核，迁移后以直接调用集中在兼容适配器和对应测试为准。</li>
-          <li>原生提供者接入后按会话能力开放入口。业务代码用台账和能力查询决定操作，停止、历史与受管任务保留真实证据。</li>
+          <li>收口 <code>ttmux</code>、<code>application</code>、<code>session</code>、<code>revive</code>、<code>sessmeta</code>、<code>worktree/sessionhome</code> 的 60+ 处调用：先新建/列表/对账/退出，再抓屏/移光标/输入/窗口。</li>
+          <li>清掉所有 tmux 旁路：30 行字面量 <code>"tmux"</code> 直调 + <code>tmuxBin()</code>/<code>tmuxBinary()</code> 包装直调（<code>sessmeta</code>、<code>worktree</code>、<code>api/pane.go</code>），只留兼容适配器碰 tmux。</li>
+          <li>按会话能力位开放入口，停止与恢复全程保留真实证据。</li>
         </ol>
-        <p class="source"><a href="../../../backend/ttmux/client.go">进程内核心入口</a> · <a href="../../../backend/pty/revive.go">Web 懒恢复入口</a> · <a href="../../../internal/revive/revive.go">恢复策略</a> · <a href="../../../backend/api/session-lifecycle-create.go">创建和取消补偿</a></p>
       </section>
     </article>
   </main>

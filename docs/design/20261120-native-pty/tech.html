@@ -21,121 +21,123 @@
     <article>
       <section aria-labelledby="layers">
         <h1 id="layers">Roami 终端架构</h1>
-        <p class="lead">上层共用会话接口。系统差异留在 PTY 和本机通信。</p>
+        <p class="lead">业务只认 <code>SessionBackend</code>，系统差异全压在底层 PTY 和本机通信。</p>
         <figure class="architecture">
           <picture>
             <source media="(max-width: 820px)" srcset="terminal-architecture-compact.svg">
-            <img src="terminal-architecture.svg" alt="Web、CLI 和 Agent 调用统一会话接口 SessionBackend。它分为 tmux 和原生宿主。原生宿主内的 TerminalBackend 分为 macOS/Linux 的 Unix PTY 和 Windows 的 ConPTY。">
+            <img src="terminal-architecture.svg" alt="Web、CLI 和 Agent 调用统一会话接口 SessionBackend，分为 tmux 和独立原生宿主 roami-sessiond；宿主内 TerminalBackend 分为 Unix PTY 和 Windows ConPTY。">
           </picture>
         </figure>
-        <p>先给 <code>SessionService</code> 接上 <code>SessionBackend</code>。tmux 先走这条路，再接原生宿主。</p>
         <details>
-          <summary>代码放在哪</summary>
-          <div class="table" role="region" tabindex="0" aria-label="包与依赖边界">
+          <summary>代码分层（5 个包）</summary>
+          <div class="table" role="region" tabindex="0" aria-label="包与职责">
             <table>
-              <thead><tr><th scope="col">目录</th><th scope="col">职责</th></tr></thead>
+              <thead><tr><th scope="col">包</th><th scope="col">职责</th></tr></thead>
               <tbody>
-                <tr><th scope="row"><code>internal/application</code></th><td><code>SessionService</code> 管会话 ID、权限、工作区和后端选择。台账和任务证据继续用现有模块。</td></tr>
-                <tr><th scope="row"><code>internal/sessionbackend</code></th><td><code>SessionBackend</code> 统一创建、查询、连接、捕获、写入和停止。结果分为存在、已退出和待确认。</td></tr>
-                <tr><th scope="row"><code>internal/tmuxruntime</code></th><td>封装 tmux 命令、目标解析、附着与捕获。</td></tr>
-                <tr><th scope="row"><code>internal/sessionipc</code> / <code>internal/sessionhost</code></th><td>前者负责本机通信，后者持有窗格和 PTY。Unix socket 和 Windows 命名管道共享一套协议。</td></tr>
-                <tr><th scope="row"><code>internal/terminal</code></th><td><code>TerminalBackend</code> 统一启动、读写、改尺寸和退出。<code>pty_unix.go</code> 用 <code>linux || darwin</code> 构建约束，<code>pty_windows.go</code> 管 ConPTY 和 Job。文件描述符和句柄留在各自实现内。</td></tr>
+                <tr><th scope="row"><code>internal/application</code>、<code>session</code>、<code>revive</code></th><td>上层统一走 <code>SessionBackend</code>；台账按宿主各自对账，休眠按重启批次汇总；<code>session_homes</code> 改用通用运行 ID 替代 tmux <code>$N</code>。</td></tr>
+                <tr><th scope="row"><code>internal/sessionbackend</code></th><td>第一层接口：创建（带 <code>Env</code>）、查询（活着/已退/待确认）、连上、抓屏、输入、停止；按 <code>Session → Window → Pane</code> 寻址，预留 <code>LayoutBackend</code>。</td></tr>
+                <tr><th scope="row"><code>internal/tmuxruntime</code></th><td>兼容实现，保留 tmux 精确目标和粘贴回车规则。</td></tr>
+                <tr><th scope="row"><code>internal/sessionipc</code> / <code>sessionhost</code></th><td>基于 <code>yamux</code> 多路复用；宿主管布局树、窗格、VT、日志和控制权；切换与防重用独立小库 <code>session-host.db</code>，不碰主库 <code>meta.db</code>。</td></tr>
+                <tr><th scope="row"><code>internal/terminal</code></th><td>第二层接口：<strong>必选核心</strong>（启动/读写/缩放/终止/等待/释放）+ <strong>可选能力</strong>（进程查证/内存限额/暂停）。句柄与系统调用留在 <code>pty_unix.go</code> / <code>pty_windows.go</code>。</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="source"><a href="../../../internal/application/session.go">现有 SessionService</a> · <a href="../../../internal/sessionlifecycle/operation-store.go">操作台账</a> · <a href="../../../internal/agentexecution/session-lifecycle.go">Agent 证据</a> · <a href="https://pkg.go.dev/cmd/go#hdr-Build_constraints">Go 构建约束</a></p>
         </details>
       </section>
 
       <details class="technical-detail">
-        <summary>现有代码怎么接</summary>
+        <summary>现有代码改哪几处</summary>
         <section aria-labelledby="current">
-          <h2 id="current">改哪几处</h2>
-          <p><code>SessionService</code> 目前直接用 tmux 的创建参数。先换成统一类型，再收拢 <code>backend/pty</code>、CLI 和 Agent 里直接调 tmux 的地方。WebSocket 只处理连接和字节流。</p>
-          <p class="source"><a href="../../../internal/application/session.go">会话服务</a> · <a href="../../../backend/pty/pty.go">现有 WebSocket</a> · <a href="../../../backend/ttmux/client.go">现有 tmux 客户端</a> · <a href="capabilities.html">迁移清单</a></p>
-        </section>
-      </details>
-
-      <details class="technical-detail">
-        <summary>服务重启和宿主升级</summary>
-        <section aria-labelledby="supervision">
-          <h2 id="supervision">升级时保住正在跑的会话</h2>
-          <p><code>roami-sessiond</code> 独立运行。Linux 用 systemd 用户服务，macOS 用 LaunchAgent，Windows 先验用户登录任务。Web 重启后按宿主 ID 接回原窗格。</p>
-          <p>新宿主通过健康和协议检查后，在同一事务里检查排空上限，再 CAS 更新 <code>current_host</code>、<code>generation</code> 和新旧宿主的接收状态。回滚同样递增代次。旧宿主继续服务已有会话。</p>
-          <h3 id="admission">重试最多创建一次</h3>
-          <p>每次创建带 <code>operation_id</code> 和 <code>expected_generation</code>。宿主在和切换串行的事务中核对权限、参数、指针和代次，写入唯一受理记录。工作线程用 CAS 将记录改为启动中，再打开 PTY。</p>
-          <p>旧宿主用 <code>STALE_GENERATION</code> 拒绝未受理的过期请求。客户端重读路由并查原操作 ID。已受理的仍由原宿主处理。确认未受理时才用原 ID 重试。结果不明时保留归属和工作区围栏，先查证。</p>
-          <h3 id="drain-retention">旧宿主什么时候退出</h3>
-          <p>每实例最多两代排空。满了先暂停升级，节点诊断列明挡住升级的会话。用户可等待，或明确确认结束指定会话。按台账重开需先确认原进程退出。</p>
-          <p>确认没有活跃窗格和未结请求后，在台账里标为退役，确认宿主退出再清端点。二进制无引用才删除，最多留一个已退役版本供回滚。</p>
-          <p class="source"><a href="../../../install.sh">现有服务安装</a> · <a href="../../../start.sh">Web 服务重启</a></p>
-        </section>
-      </details>
-
-      <details class="technical-detail">
-        <summary>各平台怎么启动进程</summary>
-        <section aria-labelledby="platform-detail">
-          <h2 id="platform-detail">系统差异留在适配器</h2>
+          <h2 id="current">收口清单</h2>
           <ul>
-            <li>macOS/Linux 用 <code>creack/pty</code> 建 TTY。Linux 可用 cgroup，macOS 按进程归属核对退出。停止前核对 PID 和启动身份。</li>
-            <li>Windows 首选 <code>crosspty v1.2.0</code>，新增模块，最低 Go 1.24.0。<code>go-pty v0.2.3</code> 作对照，最低 Go 1.25.0。回退时用现有 <code>x/sys/windows</code>。</li>
-            <li>本机通信也分平台。Unix socket 校验同一用户，Windows 命名管道用用户访问控制并拒绝远程连接。</li>
+            <li>收口 60+ 处 <code>tmuxruntime</code> 引用及 <code>tmuxBin()</code>/<code>tmuxBinary()</code> 绕路直调（<code>sessmeta</code>、<code>worktree</code>、<code>api/pane.go</code>）。</li>
+            <li><code>sessmeta.Reconcile</code> 改按宿主分片，单宿主失联只标待确认，不误杀别的宿主活会话。</li>
+            <li>启动期传 <code>spec.Env</code> 替代往 shell 敲 <code>export</code> 的 <code>InjectEnv</code>；抽离 <code>agentlifecycle</code> 里 Linux 专用的 <code>/proc</code> 读取。</li>
+            <li>前端 <code>Terminal.tsx</code> 补“被动固定列宽 + 水平滚动”，关掉 xterm 自动回复查询，改用宿主下发的权威模式。</li>
           </ul>
-          <p class="source"><a href="windows.html">Windows 启动与验收</a> · <a href="https://github.com/Kodecable/crosspty/blob/v1.2.0/go.mod">crosspty 依赖</a> · <a href="https://github.com/aymanbagabas/go-pty/blob/v0.2.3/go.mod">go-pty 依赖</a></p>
+          <p class="source"><a href="capabilities.html">逐项迁移清单</a></p>
         </section>
       </details>
 
       <details class="technical-detail">
-        <summary>断线怎么接回</summary>
+        <summary>多窗口和上下/左右分屏预留</summary>
+        <section aria-labelledby="layout-api">
+          <h2 id="layout-api">三层模型 + <code>LayoutBackend</code></h2>
+          <p>模型固定为 <code>Session → Window[] → LayoutNode（二叉树：叶子是 Pane，分叉记 horizontal/vertical 与 ratio）</code>。首轮单窗格即“1 窗口 + 1 叶子”，以后加分屏底层 PTY 与流不动。</p>
+          <ul>
+            <li><strong>预留接口：</strong><code>NewWindow</code> / <code>ListWindows</code> / <code>SelectWindow</code> / <code>CloseWindow</code>，<code>SplitPane(paneID, dir, ratio, spec)</code>、<code>ResizeSplit</code>、<code>FocusPane</code>、<code>ClosePane</code>，配 <code>layout_changed</code> 事件。</li>
+            <li><strong>渲染分工：</strong>Web 端直接按布局树用 CSS 排多个 xterm.js；CLI 端先按窗口/窗格切换附着。</li>
+          </ul>
+          <p class="source"><a href="../../../internal/session/window.go">现有窗口命令</a></p>
+        </section>
+      </details>
+
+      <details class="technical-detail">
+        <summary>宿主托管、不停会话升级与防重创建</summary>
+        <section aria-labelledby="supervision">
+          <h2 id="supervision">独立宿主 + <code>session-host.db</code></h2>
+          <p><code>roami-sessiond</code> 支持三平台按需脱离父进程自动拉起（<code>Setsid</code> / <code>DETACHED_PROCESS</code>），systemd / LaunchAgent / 计划任务作为常驻增强；Web 重启不动它。</p>
+          <p>宿主登记、路由指针 <code>(current_host, generation)</code> 与创建回执存于独立冻结 schema 的 <code>session-host.db</code>，不与主库 <code>meta.db</code> 互相阻塞或冲突。切换与回滚均用单事务 CAS 并递增代次。</p>
+          <h3 id="admission">并发重试最多建一次</h3>
+          <p>创建带 <code>operation_id</code> 和 <code>expected_generation</code>，与切换串行落受理记录后再开 PTY；过期请求回 <code>STALE_GENERATION</code>，调用方重查路由确认未受理才重试，结果不明时保留围栏先查证。</p>
+          <h3 id="drain-retention">老宿主善后</h3>
+          <p>最多留 2 代旧宿主，满了暂停升级；无活窗格和未结请求后标退役、退出、删端点，最多留 1 个旧版二进制备回滚。</p>
+        </section>
+      </details>
+
+      <details class="technical-detail">
+        <summary>三平台底层、本机通信与 CI 门禁</summary>
+        <section aria-labelledby="platform-detail">
+          <h2 id="platform-detail">平台边界</h2>
+          <ul>
+            <li><strong>Unix：</strong><code>creack/pty</code>；Linux 用 cgroup/<code>/proc</code>，macOS 用无 cgo 系统接口验进程与目录。</li>
+            <li><strong>Windows：</strong><code>crosspty v1.2.0</code> 并行对照 <code>x/sys/windows</code> 原生 ConPTY，详见<a href="windows.html">Windows 移植</a>。</li>
+            <li><strong>IPC：</strong>单连接跑 <code>hashicorp/yamux</code>。Unix socket 放短路径私有目录（全路径 ≤ 90 字节，避 macOS 104 字节上限）验 UID；Windows 用 <code>go-winio</code> 命名管道验权限拒远端（或三端统一 <code>127.0.0.1:0</code> + 私有 256-bit Token）。</li>
+            <li><strong>CI 防腐烂：</strong>除薄平台文件外业务层零系统调用，CI 跑三平台交叉编译。</li>
+          </ul>
+        </section>
+      </details>
+
+      <details class="technical-detail">
+        <summary>断线接回、VT 状态与连接协议</summary>
         <section aria-labelledby="screen">
-          <h2 id="screen">断线后怎么接回画面</h2>
-          <ol>
-            <li>宿主持续读 PTY，把输出和尺寸变化按窗格代次排序。断开浏览器或 CLI 只取消订阅。</li>
-            <li>同代次有缓存就从最后序号续放。缓存不足时先取快照，再接收更晚的输出。慢客户端独立重同步。</li>
-            <li>快照先用 <code>charmbracelet/x/vt v0.1.0</code> 试验，要求 Go 1.24.2。与 xterm headless 比对换屏、滚动、宽字符和终端查询。</li>
-            <li>当前控制方可以输入和改尺寸。宿主丢掉旧控制方迟到的事件。</li>
-          </ol>
-          <p class="source"><a href="https://github.com/charmbracelet/x/blob/43427fdbad12fde220b737fc36303291a5ce4602/vt/go.mod">Go VT 依赖</a> · <a href="https://github.com/xtermjs/xterm.js">xterm.js</a></p>
+          <h2 id="screen">画面同步</h2>
+          <p>宿主持续读 PTY 按序号写入有界缓冲：短断线续传，长断线发完整快照（含滚动历史和终端模式）。服务端 VT 先验 <code>charmbracelet/x/vt v0.1.0</code>（需 Go 1.24.2+），对照 xterm headless 测回放和 30 会话内存。<strong>服务端 VT 是 DA/DSR/OSC 查询的唯一回答方</strong>（尤其保证 Windows ConPTY 的 <code>ESC[6n</code> 即时应答），客户端屏蔽自动回传。</p>
         </section>
-      </details>
-
-      <details class="technical-detail">
-        <summary>终端连接协议</summary>
         <section aria-labelledby="protocol">
-          <h2 id="protocol">连接与回放协议</h2>
-          <div class="table" role="region" aria-label="协议消息与状态" tabindex="0">
+          <h2 id="protocol">协议消息</h2>
+          <div class="table" role="region" aria-label="协议消息" tabindex="0">
             <table>
-              <thead><tr><th scope="col">消息</th><th scope="col">最小字段</th><th scope="col">处理</th></tr></thead>
+              <thead><tr><th scope="col">消息</th><th scope="col">作用</th></tr></thead>
               <tbody>
-                <tr><th scope="row"><code>hello / attach</code></th><td>协议范围、实例、宿主、会话、窗格、运行代次，可选最后已应用序号。</td><td>协商版本和能力，核对身份，判断续放或快照；不兼容时保留观测为待确认。</td></tr>
-                <tr><th scope="row"><code>snapshot</code></th><td>窗格代次、屏幕尺寸、截止序号、VT 屏幕与模式状态。</td><td>建立同一序号边界的快照和订阅，客户端应用后从其后接收连续事件。</td></tr>
-                <tr><th scope="row"><code>output / resized / exited</code></th><td>一条窗格事件流的连续序号。终端字节用二进制帧，改尺寸及退出用控制帧。</td><td>按顺序应用，区分进程退出和输出读完。出现序号缺口或缓冲溢出，暂停旧订阅并重取快照。</td></tr>
-                <tr><th scope="row"><code>claim / input / resize</code></th><td>请求 ID、窗格代次、控制权代次、目标窗格。resize 含列行，input 另有输入载荷。</td><td>宿主授权、排序、校验并发世代。相同尺寸去重；丢弃过小、超界或迟到尺寸。可查询写入回执，超时的不确定输入不重放。</td></tr>
-                <tr><th scope="row"><code>resync / detach</code></th><td>窗格代次与最近应用的序号。</td><td>释放订阅或恢复输出，不触发进程终止。</td></tr>
+                <tr><th scope="row"><code>hello / attach</code></th><td>校验版本与身份，决定续传或快照。</td></tr>
+                <tr><th scope="row"><code>snapshot</code></th><td>下发截止序号、列行尺寸、含历史屏幕快照与权威模式（备用屏/鼠标/SGR/<code>DECCKM</code>/光标）。</td></tr>
+                <tr><th scope="row"><code>output / mode / resized / layout_changed / exited</code></th><td>按序号渲染；二进制帧前 8 字节大端序号 + VT 数据；区分进程退出与输出读完；漏号重同步。</td></tr>
+                <tr><th scope="row"><code>claim / input / move-cursor / resize</code></th><td>日常低延迟交互（携控制代次，不逐键落回执）；<code>move-cursor</code> 按暗/灰样式避误吞建议。</td></tr>
+                <tr><th scope="row"><code>submit</code></th><td>受管任务专用：带 <code>request_id</code>、括号粘贴 + 独立回车并落回执，超时不重发。</td></tr>
+                <tr><th scope="row"><code>resync / detach</code></th><td>重拉快照或取消订阅，不杀进程。</td></tr>
               </tbody>
             </table>
           </div>
-          <p>Web 以一条附着流对应一个窗格。首版 WebSocket 控制帧用 JSON，输出二进制帧用 8 字节大端序号加 VT 数据，输入控制帧携带请求 ID 和 UTF-8 文本或字节数组。本机 IPC 用 4 字节大端帧长、消息种类和载荷，使用每窗格独立附着流。输出记录和每客户端发送队列分别设上限。上线前根据录制和 30 会话基线确定默认值；达到上限时慢客户端重同步，日志则轮转并暴露可查询范围。</p>
         </section>
       </details>
 
       <details class="technical-detail">
-        <summary>迁移和回滚</summary>
+        <summary>迁移与回滚</summary>
         <section aria-labelledby="migration">
-          <h2 id="migration">迁移和回滚</h2>
+          <h2 id="migration">三步走</h2>
           <ol>
-            <li>先让 tmux 按统一会话接口工作，复用原台账和任务绑定。</li>
-            <li>原生宿主先跑单窗格，验重连和升级，再开分屏与受管任务。Windows 单独验整包。</li>
-            <li>切换和回滚只改变新建默认项。已有会话按原归属连接。宿主崩溃时，确认原进程退出后才可按台账重开。</li>
+            <li>tmux 接进统一接口，改好分宿主对账与归属，过老回归。</li>
+            <li>隔离实例跑单窗格原生试点（快照、<code>move-cursor</code>、手机水平看屏、双版本升级）。</li>
+            <li>切默认和回滚只动新建，老会话照常连；确认进程真退才允许从台账重开。</li>
           </ol>
-          <p class="source"><a href="capabilities.html">逐项迁移清单</a> · <a href="#admission">创建和重试规则</a></p>
         </section>
       </details>
+
       <section aria-labelledby="acceptance">
         <h2 id="acceptance">验证进度</h2>
-        <p>Linux PTY 已实跑。macOS/Windows 探针已交叉编译。Windows 整包和真机仍待验证。</p>
-        <p>试点还要验快照一致性、30 会话资源占用、宿主升级与双实例隔离。</p>
-        <p class="source"><a href="acceptance.md">实验结果与验收清单</a> · <a href="windows.html#go-no-go">Windows 验收</a></p>
+        <p>已跑通 Linux PTY 和三平台探针交叉编译；待验 VT 历史快照与 30 会话开销、主库升级下的旧宿主排空、手机手势、双实例隔离和 Windows 真机整包。</p>
+        <p class="source"><a href="acceptance.md">实验记录与验收表</a> · <a href="windows.html#go-no-go">Windows 放行门槛</a></p>
       </section>
     </article>
   </main>
