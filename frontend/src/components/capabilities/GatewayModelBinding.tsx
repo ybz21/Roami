@@ -2,72 +2,57 @@ import { useEffect, useState } from 'react'
 import { Alert, Button, Popconfirm, Radio, Select, message } from 'antd'
 import { api } from '../../api'
 import { type AgentKind } from '../../agent-kind'
-import { type AgentModelView } from '../../agent-registry'
+import type { AgentModelView } from '../../agent-registry'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
+import { selectableGatewayModels } from './gateway-model-catalog'
 import { catalogFailure, useModelCatalog } from './model-hub-api'
 import { getHashParams } from '../../route-hash'
 import './model-hub.css'
 
-const discoveredPrefix = 'source-model:'
 const gatewayDefault = 'roami-default'
-const defaultSource = 'gateway:default'
 const endpoint = (value: string) => value.replace(/\/+$/, '').replace(/\/v1$/, '')
+
 export default function GatewayModelBinding({ kind, view, onChanged, onModelLabel, installed = true }: { kind: AgentKind; view: AgentModelView; onChanged: () => Promise<void>; onModelLabel?: (label: string) => void; installed?: boolean }) {
   const { t } = useI18n(), catalog = useModelCatalog(), { phone } = useLayout()
-  const [mode, setMode] = useState<'official' | 'custom' | null>(null), [source, setSource] = useState(''), [model, setModel] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const [directory, setDirectory] = useState<{ key: string; models: string[]; loading: boolean; error: string }>({ key: '', models: [], loading: false, error: '' }), [directoryVersion, setDirectoryVersion] = useState(0), [search, setSearch] = useState('')
-  const sources = catalog.value?.sources || []
+  const [mode, setMode] = useState<'official' | 'custom' | null>(null)
+  const [model, setModel] = useState('')
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const models = catalog.value?.models || []
   const profile = view.profiles.find(profile => profile.applied || profile.id === view.activeId) || view.profiles.find(profile => endpoint(profile.baseUrl) === endpoint(view.current.baseUrl || ''))
   const throughGateway = !!profile && !!catalog.value?.baseUrl && endpoint(profile.baseUrl) === endpoint(catalog.value.baseUrl)
   const currentID = kind === 'claude' ? view.current.model?.replace(/^roami-claude\//, '').replace(/\[1m\]$/, '') : view.current.model
   const usesDefault = throughGateway && currentID === gatewayDefault
-  const currentModel = (throughGateway ? models.find(model => model.id === (usesDefault ? catalog.value?.defaultModel : currentID) || !!currentID && (model.gatewayAlias === currentID || model.aliases?.includes(currentID))) : undefined) || models.find(model => {
-    if (model.aggregate) return false
-    const source = sources.find(source => source.id === model.candidates[0].sourceId)
-    return profile && source && source.protocol === profile.protocol && endpoint(source.baseUrl) === endpoint(profile.baseUrl) && model.candidates[0].model === view.current.model
-  })
+  const currentModel = throughGateway
+    ? models.find(model => model.id === currentID || !!currentID && (model.gatewayAlias === currentID || model.aliases?.includes(currentID)))
+    : models.find(model => {
+      const candidate = model.candidates[0]
+      if (!profile || model.aggregate || !candidate || candidate.model !== view.current.model) return false
+      const source = catalog.value?.sources.find(source => source.id === candidate.sourceId)
+      return source && source.protocol === profile.protocol && endpoint(source.baseUrl) === endpoint(profile.baseUrl)
+    })
   const currentMode = view.mode || (profile || view.current.provider && view.current.provider !== 'openai' ? 'custom' : 'official')
   const selectedMode = mode || currentMode
-  const currentSource = currentModel?.aggregate ? '@group' : currentModel?.candidates[0].sourceId
-  const selectedSource = source || (usesDefault ? defaultSource : currentSource) || defaultSource
-  const defaultSelected = selectedSource === defaultSource
-  const directoryKey = selectedSource + ':' + catalog.value?.revision
-  const remote = directory.key === directoryKey ? directory : { models: [], loading: false, error: '' }
-  useEffect(() => {
-    if (selectedSource === '@group' || selectedMode !== 'custom' || !selectedSource || defaultSelected || !catalog.value?.revision || !installed) return
-    const abort = new AbortController()
-    const key = selectedSource + ':' + catalog.value.revision
-    setDirectory({ key, models: [], loading: true, error: '' })
-    void api('POST', '/agent/model-gateway/catalog/source-models', { kind, sourceId: selectedSource, revision: catalog.value.revision }, { signal: abort.signal }).then(({ data }) => {
-      if (!abort.signal.aborted) setDirectory({ key, models: Array.isArray(data?.models) ? data.models.filter((model: unknown): model is string => typeof model === 'string' && !!model && model.length <= 200) : [], loading: false, error: '' })
-    }).catch(cause => {
-      if (!abort.signal.aborted) setDirectory({ key, models: [], loading: false, error: cause?.apiError?.code === 'MODEL_CATALOG_CHANGED' ? 'hub.error.changed' : cause?.apiError?.code === 'MODEL_LIST_UNSUPPORTED' ? 'hub.sourceListUnsupported' : 'hub.sourceListFailed' })
-    })
-    return () => abort.abort()
-  }, [kind, selectedMode, selectedSource, defaultSelected, catalog.value?.revision, installed, directoryVersion])
-  const options = models.filter(model => selectedSource === '@group' ? model.aggregate : !model.aggregate && model.candidates[0].sourceId === selectedSource).map(model => ({ value: model.id, label: model.name, title: model.aggregate ? model.name : model.candidates[0].model, upstreamModel: model.aggregate ? model.id : model.candidates[0].model, configured: true, disabled: model.enabled === false || !!model.gatewayHidden }))
-  const pendingModel = model.startsWith(discoveredPrefix) ? decodeURIComponent(model.slice(discoveredPrefix.length)) : ''
-  const query = search.trim()
-  if (!defaultSelected && selectedSource !== '@group') for (const id of new Set([...remote.models, ...(pendingModel ? [pendingModel] : []), ...(query && query.length <= 200 ? [query] : [])])) {
-    if (!options.some(option => option.upstreamModel === id)) options.push({ value: discoveredPrefix + encodeURIComponent(id), label: id, title: id, upstreamModel: id, configured: false, disabled: false })
-  }
-  const selectedOption = options.find(option => option.value === model) || (pendingModel ? options.find(option => option.upstreamModel === pendingModel) : undefined) || (selectedSource === currentSource ? options.find(option => option.value === currentModel?.id) : undefined)
-  const selected = selectedOption?.value
+  const available = selectableGatewayModels(catalog.value)
+  const hasDefault = available.some(model => model.id === catalog.value?.defaultModel)
+  const options = available.map(model => ({ value: model.id, label: model.name, title: model.name, callId: model.gatewayAlias || model.id }))
+  if (hasDefault) options.unshift({ value: gatewayDefault, label: t('hub.gatewayDefault'), title: t('hub.gatewayDefault'), callId: gatewayDefault })
+  const currentSelection = usesDefault ? gatewayDefault : currentModel?.id
+  const choice = model || currentSelection || (!throughGateway && hasDefault ? gatewayDefault : undefined)
+  const selected = options.find(option => option.value === choice)?.value
   const currentLabel = usesDefault ? t('hub.gatewayDefault') : currentModel?.name || view.current.model || t('agent.models.notConfigured')
   const gatewayApplied = throughGateway && !!profile?.applied && !view.changed
   const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.filter(model => !model.gatewayHidden && (!model.aggregate || model.enabled !== false)).map(model => ({ id: model.gatewayAlias || model.id, name: model.name }))]
   const catalogCurrent = kind !== 'pi' && kind !== 'opencode' || !!profile?.models && JSON.stringify(profile.models) === JSON.stringify(expectedModels)
-  const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || catalogCurrent && throughGateway && !!profile?.applied && (defaultSelected ? usesDefault : !usesDefault && !!selected && selected === currentModel?.id))
-  const valid = installed && (selectedMode === 'official' || (defaultSelected ? !!catalog.value?.defaultModel : !!selectedSource && !!selected && !selectedOption?.disabled && !!catalog.value))
+  const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || gatewayApplied && catalogCurrent && !!selected && selected === currentSelection)
+  const valid = installed && (selectedMode === 'official' || !!selected && !!catalog.value && !catalog.error)
   useEffect(() => { onModelLabel?.(usesDefault ? t('hub.gatewayDefault') : currentModel?.name || '') }, [usesDefault, currentModel?.name, onModelLabel, t])
   const apply = async () => {
     if (!valid || busy || applied) return
     setBusy(true); setError('')
     try {
       if (selectedMode === 'official') await api('POST', `/agent/professional/${kind}/models/default`, { revision: view.revision })
-      else await api('POST', '/agent/model-gateway/catalog/apply', { kind, ...(defaultSelected ? { model: gatewayDefault } : { sourceId: selectedSource, ...(selectedOption!.configured ? { model: selected } : { upstreamModel: selectedOption!.upstreamModel }) }), revision: view.revision, catalogRevision: catalog.value!.revision })
+      else await api('POST', '/agent/model-gateway/catalog/apply', { kind, model: selected, revision: view.revision, catalogRevision: catalog.value!.revision })
       await onChanged(); setMode(null); catalog.retry(); message.success(t('capabilities.models.appliedMessage'))
       window.dispatchEvent(new Event('roam:agent-models-changed'))
     } catch (cause) { setError(catalogFailure(cause)) } finally { setBusy(false) }
@@ -78,14 +63,18 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
     {currentMode === 'custom' && profile?.applied && !view.changed && !throughGateway && <p role="status">{t('hub.directConnection')}</p>}
     <Radio.Group className="tt-model-binding-mode" aria-label={t('hub.connectionMode')} value={selectedMode} optionType="button" onChange={event => setMode(event.target.value)} disabled={busy} options={['official', 'custom'].map(value => ({ value, label: t('hub.mode.' + value) }))} />
     {!installed && <p>{t('hub.installFirst')}</p>}
-    {(error || selectedMode === 'custom' && catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={() => { catalog.retry(); void onChanged() }}>{t('capabilities.models.reread')}</Button>} />}
+    {(error || selectedMode === 'custom' && catalog.error) && <Alert type="error" message={t(error || catalog.error)} action={<Button onClick={() => { setError(''); catalog.retry(); void onChanged() }}>{t('capabilities.models.reread')}</Button>} />}
     {selectedMode === 'official' ? <p>{t('hub.factoryHint')}</p> : <>
-      <div className="tt-model-binding-field"><label htmlFor={'agent-source-' + kind}>{t('hub.upstreamSource')}</label><Select id={'agent-source-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('hub.upstreamSource')} placeholder={t('hub.chooseSource')} value={selectedSource} options={[{ value: defaultSource, label: t('hub.gatewayDefault') }, ...sources.map(source => ({ value: source.id, label: source.name })), ...(models.some(model => model.aggregate) ? [{ value: '@group', label: t('pool.groups') }] : [])]} onChange={source => { setSource(source); setModel(''); setSearch('') }} disabled={busy || !installed} loading={!catalog.value && !catalog.error} /></div>
-      {defaultSelected ? <p role="status">{t(catalog.value && !catalog.value.defaultModel ? 'hub.gatewayDefaultMissing' : 'hub.gatewayDefaultHint', { name: { claude: 'Claude Code', codex: 'Codex', pi: 'Pi', opencode: 'OpenCode' }[kind] })}</p> : <>
-        <div className="tt-model-binding-field"><label htmlFor={'agent-model-' + kind}>{t('modelUsage.model')}</label><Select id={'agent-model-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }} aria-label={t('modelUsage.model')} placeholder={t('hub.chooseModel')} value={selected} options={options} placement={phone ? 'topLeft' : 'bottomLeft'} showSearch loading={remote.loading} onSearch={setSearch} onChange={value => { setModel(value); setSearch('') }} filterOption={(input, option) => String(option?.label || '').toLowerCase().includes(input.toLowerCase()) || String(option?.upstreamModel || '').toLowerCase().includes(input.toLowerCase())} disabled={busy || !installed || !selectedSource} /></div>
-        {remote.error && <div className="tt-model-binding-actions"><p role="status">{t(remote.error)}</p><Button onClick={() => { catalog.retry(); setDirectoryVersion(value => value + 1) }}>{t('agent.retry')}</Button></div>}
-        {catalog.value && (!sources.length || selectedSource && !remote.loading && !remote.error && !options.length) && <p>{t(sources.length ? 'hub.sourceNoModels' : 'hub.noCompatibleSource')}</p>}
-      </>}
+      <div className="tt-model-binding-field">
+        <label htmlFor={'agent-model-' + kind}>{t('modelUsage.model')}</label>
+        <Select id={'agent-model-' + kind} virtual={false} classNames={{ popup: { root: 'tt-capability-select-popup' } }}
+          aria-label={t('modelUsage.model')} placeholder={t('hub.chooseModel')} value={selected} options={options}
+          placement={phone ? 'topLeft' : 'bottomLeft'} showSearch onChange={setModel}
+          filterOption={(input, option) => [option?.label, option?.callId, option?.value].some(text => text?.toLowerCase().includes(input.trim().toLowerCase()))}
+          loading={!catalog.value && !catalog.error} disabled={busy || !installed || !!catalog.error || !options.length} />
+      </div>
+      {catalog.value && !catalog.error && !options.length && <p role="status">{t('gatewayWorkspace.noCallable')}</p>}
+      {selected === gatewayDefault && <p>{t('hub.gatewayDefaultHint')}</p>}
       {throughGateway && !catalogCurrent && <p role="status">{t('hub.gatewayCatalogChanged')}</p>}
       <details><summary>{t('hub.compatibility')}</summary><p>{t('hub.continuationHint')}</p></details>
     </>}

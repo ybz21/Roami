@@ -72,7 +72,7 @@ it('preserves an unapplied model choice when revisiting the setup step', async (
 it('keeps an empty catalog incomplete and points to unified model source management', async () => {
   fixture.catalog.models = []; fixture.catalog.roamiModels = {}
   const view = show()
-  await screen.findByText('先添加模型连接，再为智能体选择模型。')
+  await screen.findByText('还没有可调用的模型，请先配置模型源。')
   expect(view.ready).toHaveBeenLastCalledWith(false)
   expect((screen.getByRole('button', { name: '验证可用性' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: '管理模型' }))

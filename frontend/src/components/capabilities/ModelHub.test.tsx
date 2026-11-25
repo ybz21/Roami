@@ -118,9 +118,9 @@ it('saves an added model directly and makes it selectable by agents without publ
   page.unmount()
   render(<App><GatewayModelBinding kind="codex" view={{ current: {}, profiles: [], revision: 'cli-r1', canRestore: false, changed: false, configPaths: [] }} onChanged={async () => {}} /></App>)
   fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
-  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.upstreamSource' }))
-  fireEvent.click(await screen.findByTitle('Saved source'))
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'modelUsage.model' }))
+  const input = screen.getByRole('combobox', { name: 'modelUsage.model' })
+  await waitFor(() => expect(input).not.toHaveProperty('disabled', true))
+  fireEvent.mouseDown(input)
   expect(await screen.findByText('New coding model')).toBeTruthy()
 })
 it('uses the upstream model ID as the name when the optional display name is blank', async () => {
@@ -748,16 +748,16 @@ it('removes only the configured model from its source list', async () => {
   expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: catalog.sources, models: [] }))
 })
 
-it('offers published pools as a source and does not discover an upstream for a routing group', async () => {
+it('offers published pools in the shared model picker without upstream discovery', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   vi.mocked(api).mockImplementation(async (method, path, body, options) => path === '/agent/model-gateway/catalog' ? { data: { ...catalog, models: [...catalog.models, { id: 'free-pool', name: 'Free pool', aggregate: true, enabled: true, freeOnly: true, strategy: 'smart', protocol: 'openai-completions', candidates: [{ sourceId: 'upstream', model: 'priced-model' }] }] } } : original(method, path, body, options))
   render(<App><GatewayModelBinding kind="codex" view={{ current: {}, profiles: [], revision: 'cli-r1', canRestore: false, changed: false, configPaths: [] }} onChanged={async () => {}} /></App>)
   fireEvent.click(screen.getByRole('radio', { name: 'hub.mode.custom' }))
-  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'hub.upstreamSource' }))
-  fireEvent.click(await screen.findByTitle('pool.groups'))
-  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'modelUsage.model' }))
+  const input = screen.getByRole('combobox', { name: 'modelUsage.model' })
+  await waitFor(() => expect(input).not.toHaveProperty('disabled', true))
+  fireEvent.mouseDown(input)
   expect(await screen.findByTitle('Free pool')).toBeTruthy()
-  expect(vi.mocked(api).mock.calls.filter(([, path, body]) => path.endsWith('/source-models') && body.sourceId === '@group')).toHaveLength(0)
+  expect(vi.mocked(api).mock.calls.filter(([, path]) => path.endsWith('/source-models'))).toHaveLength(0)
 })
 
 
