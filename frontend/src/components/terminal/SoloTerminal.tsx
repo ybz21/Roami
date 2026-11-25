@@ -3,10 +3,16 @@ import { useEffect, useState } from 'react'
 import { useAgentKindInventory } from '../../agent-kind'
 import { api } from '../../api'
 import { useBrowserEnvironment } from '../../app/useBrowserEnvironment'
+import { useClusterNavigation } from '../../app/useClusterNavigation'
 import { useTerminalRuntime } from '../../app/useTerminalRuntime'
 import { useI18n } from '../../i18n'
 import { ExitFullscreenIcon, FullscreenIcon, SearchIcon } from '../../icons'
 import { useLayout } from '../../layout'
+import { startControlLink, stopControlLink } from '../../p2p/transport'
+import { useLinkStatus } from '../../p2p/use-link-status'
+import { usePreferences } from '../../preferences'
+import { pollWhileVisible } from '../../visible-poll'
+import { hubReasonText } from '../cluster/hub-health'
 import type { FileTabMode } from '../files/FilePathBar'
 import { useNativeSessionList } from '../sessions/native-session-list'
 import { sessionDisplay, sessionLabel, setSessionLabels, updateSessionLabel, useSessionLabel } from '../sessions/session-label'
@@ -18,8 +24,12 @@ import { InspectorColumn } from '../shell/InspectorColumn'
 import { InspectorPanels, type InspectorPanelKind } from '../shell/InspectorPanels'
 import { matchHotkey, useKeybindings } from '../shell/keybindings'
 import { GlobalSearch, openPalette, type PaletteActions, type PaletteItem } from '../shell/palette'
+import type { StatusAction } from '../shell/status-cells'
+import { systemCells } from '../shell/status-system'
 import { loadTreeSrc } from '../shell/task-tree-snapshot'
 import { useWorkspaceLayout } from '../shell/useWorkspaceLayout'
+import { WorkspaceStatusBar } from '../shell/WorkspaceStatusBar'
+import UpdateBanner from '../UpdateBanner'
 import type { FileTab } from './term-tabs-store'
 import TerminalPane from './TerminalPane'
 
@@ -37,13 +47,22 @@ export default function SoloTerminal({ name }: { name: string }) {
   const activeProject = useSessionProject(name)
   const space = useWorkspaceLayout(true, true, { hasNav: false })
   const keys = useKeybindings()
-  const { isFs, fsSupported, toggleFs } = useBrowserEnvironment()
+  const [prefs] = usePreferences()
+  const { online, roamVersion, isFs, fsSupported, toggleFs } = useBrowserEnvironment()
+  const { clusterNodes, curNode, hubHealth } = useClusterNavigation((route) => { location.hash = '#/' + route })
+  const link = useLinkStatus()
+  useEffect(() => {
+    if (prefs.p2pEnabled) startControlLink()
+    else stopControlLink()
+    return stopControlLink
+  }, [prefs.p2pEnabled])
 
   const [tabBarHost, setTabBarHost] = useState<HTMLDivElement | null>(null)
   const [fileTabs, setFileTabs] = useState<FileTab[]>([])
   const [activeFile, setActiveFile] = useState('')
   const [reveal, setReveal] = useState<{ path: string; line: number; nonce: number } | undefined>()
   const [fetchedCwd, setFetchedCwd] = useState('')
+  const [git, setGit] = useState<{ branch: string; ahead: number; behind: number; files: number; state: string; conflicts: number } | null>(null)
   const [searchNonce, setSearchNonce] = useState(0)
   const [panel, setPanelLocal] = useState<InspectorPanelKind>(() => {
     try {
@@ -111,6 +130,20 @@ export default function SoloTerminal({ name }: { name: string }) {
 
   const sessionDir = knownDir || fetchedCwd || activeProject?.dir || ''
   const sessionTaskKey = taskKeyOf(name, activeProject?.worktree)
+
+  useEffect(() => {
+    if (!hasSider || !sessionDir) { setGit(null); return }
+    const poll = pollWhileVisible(async (signal) => {
+      const d = (await api('GET', `/git/status?dir=${encodeURIComponent(sessionDir)}`, undefined, { signal }))?.data
+      if (signal.aborted) return
+      const len = (v: unknown) => (Array.isArray(v) ? v.length : Number(v) || 0)
+      setGit(d?.repo ? {
+        branch: d.branch || '', ahead: d.ahead || 0, behind: d.behind || 0,
+        files: len(d.files), state: d.state || '', conflicts: len(d.conflicts),
+      } : null)
+    }, 15000)
+    return poll.stop
+  }, [hasSider, sessionDir])
 
   useEffect(() => { document.title = `Roami · ${sessionDisplay(name) || name}` }, [name, label])
 
@@ -186,6 +219,27 @@ export default function SoloTerminal({ name }: { name: string }) {
   const displayName = sessionLabel(name) || name
   const inspectorScope = activeProject ? `${activeProject.name} · ${displayName}` : displayName
 
+  const statusCells = systemCells({
+    online,
+    node: curNode ? { name: curNode.name, online: curNode.online, latencyMs: curNode.latencyMs } : null,
+    hubAlarm: hubHealth.level === 'ok' ? undefined : hubReasonText(hubHealth, t),
+    clustered: clusterNodes.length > 0,
+    sessions: 1,
+    waiting: runtime.activityMap[name]?.waiting ? 1 : 0,
+    unfinished: 0,
+    agents: agentKinds[name] || nativeId ? 1 : 0,
+    version: roamVersion,
+    git,
+    projectKey: activeProject?.key || '',
+    swarms: 0,
+    link,
+    t,
+  })
+  const onStatusAction = (a: StatusAction) => {
+    if (a.kind === 'route') location.hash = a.id
+    else if (a.kind === 'pluginView') location.hash = '#/capabilities/plugins/' + encodeURIComponent(a.id)
+  }
+
   const tabLead = hasSider ? (
     <a href="#/home" className="tt-solo-brand" title={t('nav.home')} aria-label={t('nav.home')}>
       <img src="/logo-mark.svg" width={20} height={20} alt="" aria-hidden="true" />
@@ -212,6 +266,7 @@ export default function SoloTerminal({ name }: { name: string }) {
   return (
     <div className="tt-solo-shell">
       <SessionMemoryAlerts onOpen={paletteActions.openSession} visibleSession={!activeFile ? name : undefined} />
+      <UpdateBanner />
       <GlobalSearch items={paletteItems} actions={paletteActions} dir={sessionDir} />
       {hasSider && <div className="tt-global-tabs" ref={setTabBarHost} />}
       <div className="tt-solo-workspace">
@@ -273,6 +328,7 @@ export default function SoloTerminal({ name }: { name: string }) {
           onClose={() => { if (!space.inspectorCollapsed) toggleInspector() }}
         />
       )}
+      {hasSider && <WorkspaceStatusBar system={statusCells} onAction={onStatusAction} />}
     </div>
   )
 }
