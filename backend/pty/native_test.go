@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -129,5 +130,62 @@ func TestNativeWebSocketBridgeEndToEnd(t *testing.T) {
 	st, err := client.Observe(ctx, ref.SessionID)
 	if err != nil || st.Status != sessionbackend.StatusAlive || len(st.Windows[0].Layout.PaneIDs()) != 2 {
 		t.Fatalf("expected alive 2-pane session after WS reconnect, got %+v err=%v", st, err)
+	}
+}
+
+func TestHandlerWithNativeCompatWebSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix shell integration test")
+	}
+	gin.SetMode(gin.TestMode)
+	host := sessionhost.NewHost(sessionhost.Config{HostID: "compat-ws-host", LogsDir: t.TempDir()})
+	defer host.Shutdown(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ref, err := host.Create(ctx, sessionbackend.CreateSpec{
+		SessionID: "compat-demo",
+		Exe:       "/bin/sh",
+		Cols:      80,
+		Rows:      24,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	r := gin.New()
+	r.GET("/api/term/:name", HandlerWithNative(host))
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/api/term/" + ref.SessionID + "?cols=100&rows=30"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("compat WS dial failed: %v", err)
+	}
+	defer ws.Close()
+
+	// Ping/pong and plain input matching Terminal.tsx wire protocol.
+	_ = ws.WriteJSON(map[string]any{"type": "ping", "id": "p1"})
+	_ = ws.WriteJSON(map[string]any{"type": "resize", "cols": 110, "rows": 32})
+	_ = ws.WriteMessage(websocket.TextMessage, []byte("echo COMPAT_WEB_NATIVE_OK\n"))
+
+	var out strings.Builder
+	sawPong := false
+	_ = ws.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for !sawPong || !strings.Contains(out.String(), "COMPAT_WEB_NATIVE_OK") {
+		mt, data, err := ws.ReadMessage()
+		if err != nil {
+			t.Fatalf("compat WS read failed (pong=%v out=%q): %v", sawPong, out.String(), err)
+		}
+		if mt == websocket.TextMessage {
+			var msg map[string]any
+			if json.Unmarshal(data, &msg) == nil && msg["type"] == "pong" && msg["id"] == "p1" {
+				sawPong = true
+			}
+		} else if mt == websocket.BinaryMessage {
+			out.Write(data)
+		}
 	}
 }

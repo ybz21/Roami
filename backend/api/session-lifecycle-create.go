@@ -11,6 +11,7 @@ import (
 
 	"github.com/ybz21/Roami/backend/worktree"
 	"github.com/ybz21/Roami/internal/memguard"
+	"github.com/ybz21/Roami/internal/sessionbackend"
 	life "github.com/ybz21/Roami/internal/sessionlifecycle"
 	"github.com/ybz21/Roami/internal/sessionreview"
 	"github.com/ybz21/Roami/internal/sessionstore"
@@ -126,6 +127,9 @@ func (a *API) lifecyclePrepareSession(ctx context.Context, o life.Operation) (an
 			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_PARENT_UNAVAILABLE"))
 		}
 	}
+	if a.NativeBackend != nil {
+		return a.lifecyclePrepareNativeSession(ctx, o, rt, prepared)
+	}
 	identity, err := rt.SessionIdentity(o.ResourceID)
 	if err != nil {
 		return nil, err
@@ -170,6 +174,46 @@ func (a *API) lifecyclePrepareSession(ctx context.Context, o life.Operation) (an
 	return lifecycleSession{Identity: identity}, nil
 }
 
+func (a *API) lifecyclePrepareNativeSession(ctx context.Context, o life.Operation, rt runtime.Runtime, prepared lifecycleWorkspace) (lifecycleSession, error) {
+	if !o.Has("session-intent") {
+		var err error
+		o, err = a.Lifecycle.Mutate(o.ID, o.Revision, func(o *life.Operation) error { o.Receipts["session-intent"] = json.RawMessage(`true`); return nil })
+		if err != nil {
+			return lifecycleSession{}, err
+		}
+	}
+	ref, err := a.NativeBackend.Create(ctx, sessionbackend.CreateSpec{
+		SessionID:   o.ResourceID,
+		OperationID: o.ID,
+		Label:       o.Intent.Name,
+		Dir:         prepared.Path,
+		LoginShell:  true,
+	})
+	if err != nil {
+		return lifecycleSession{}, lifecycleFailure(err)
+	}
+	identity := nativeSessionIdentity(ref.HostInstanceID, ref.SessionID)
+	meta := sessmeta.New(rt.HomeDir)
+	meta.DataDir = rt.DataDir
+	if err = meta.Put(sessmeta.Row{
+		Session:        o.ResourceID,
+		Label:          o.Intent.Name,
+		Parent:         o.Intent.Parent,
+		CreatedBy:      "lifecycle",
+		InitialCwd:     prepared.Path,
+		Backend:        string(sessionbackend.BackendNative),
+		HostInstanceID: ref.HostInstanceID,
+	}); err != nil {
+		return lifecycleSession{}, err
+	}
+	repo, _ := a.WT.ResolveRepo(ctx, prepared.Path)
+	if err = meta.SetHome(o.ResourceID, prepared.Path, repo.Root); err != nil {
+		return lifecycleSession{}, err
+	}
+	a.WT.BindSessionHome(o.ResourceID, prepared.Path)
+	return lifecycleSession{Identity: identity}, nil
+}
+
 func (a *API) lifecycleTrack(ctx context.Context, o life.Operation) (any, error) {
 	if o.CancelRequested || o.Intent.Launch == nil || !o.Intent.Launch.AutoReview {
 		return nil, nil
@@ -202,9 +246,17 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 		return nil, err
 	}
 	rt := lifecycleRuntime(ctx)
-	actual, err := rt.SessionIdentity(o.ResourceID)
-	if err != nil || actual != session.Identity {
-		return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
+	nativeSess := isNativeIdentity(session.Identity)
+	if nativeSess {
+		st, ok := a.nativeSession(ctx, o.ResourceID)
+		if !ok || nativeSessionIdentity(st.HostInstanceID, st.SessionID) != session.Identity {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
+		}
+	} else {
+		actual, err := rt.SessionIdentity(o.ResourceID)
+		if err != nil || actual != session.Identity {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
+		}
 	}
 	launch := o.Intent.Launch
 	command := launch.Command
@@ -247,6 +299,17 @@ func (a *API) lifecycleLaunch(ctx context.Context, o life.Operation) (any, error
 	if err != nil {
 		return nil, err
 	}
+	if nativeSess {
+		if _, err = a.NativeBackend.Submit(ctx, sessionbackend.Target{SessionID: o.ResourceID}, sessionbackend.SubmitReq{
+			RequestID:      o.ID,
+			Payload:        command,
+			SubmitEnter:    true,
+			BracketedPaste: false,
+		}); err != nil {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_RESULT_UNKNOWN: %w", err))
+		}
+		return true, nil
+	}
 	if err = rt.SendShellCommand("="+o.ResourceID+":", command); err != nil {
 		return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_RESULT_UNKNOWN: %w", err))
 	}
@@ -268,6 +331,15 @@ func (a *API) lifecycleCompensate(ctx context.Context, o life.Operation) (any, e
 		o = latest
 	}
 	rt := lifecycleRuntime(ctx)
+	if session, e := life.Result[lifecycleSession](o, "session"); e == nil && isNativeIdentity(session.Identity) {
+		if _, ok := a.nativeSession(ctx, o.ResourceID); ok {
+			_ = a.NativeBackend.Close(ctx, o.ResourceID)
+		}
+		meta := sessmeta.New(rt.HomeDir)
+		meta.DataDir = rt.DataDir
+		_ = meta.OnKill(o.ResourceID)
+		return true, nil
+	}
 	identity, err := rt.SessionIdentity(o.ResourceID)
 	if err != nil {
 		return nil, err

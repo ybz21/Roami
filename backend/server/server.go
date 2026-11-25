@@ -87,6 +87,7 @@ func New(cfg Config) *gin.Engine {
 	tt := ttmux.New(cfg.TTmuxBin)
 	a := auth.New(cfg.Password, cfg.TOTPSecret, cfg.TOTPState, cfg.LockAfter, cfg.LockSecs, cfg.SavePassword)
 	h := api.New(tt, cfg.BrowserHome, cfg.DataDir, cfg.EmbeddedBin)
+	h.NativeBackend = cfg.NativeSessionBackend
 	startProjectOKRCollector(r, h, cfg.Lifecycle)
 	go h.SyncLoop()                 // 后台兜底远端同步（10 §3 第三档），失败静默
 	go h.AgentLinkLoop()            // 会话 ↔ claude 对话 id 对账、归属跟着 worktree 走（api/session-home-sync.go）
@@ -367,7 +368,7 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/2fa/disable", a.TOTPDisable) // 关闭
 
 		// 实时通道
-		g.GET("/term/:name", pty.Handler)
+		g.GET("/term/:name", pty.HandlerWithNative(cfg.NativeSessionBackend))
 		mountNativeTerminal(g, cfg.NativeSessionBackend)
 		g.GET("/browser/stream", browser.Handler) // 镜像全局 Chrome 画面
 		g.GET("/browser/tabs", browser.Tabs)      // 标签页：列出

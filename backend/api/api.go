@@ -25,7 +25,9 @@ import (
 	"github.com/ybz21/Roami/internal/agentproviders"
 	"github.com/ybz21/Roami/internal/id"
 	"github.com/ybz21/Roami/internal/metadb"
+	"github.com/ybz21/Roami/internal/sessionbackend"
 	"github.com/ybz21/Roami/internal/sessionlifecycle"
+	"strconv"
 )
 
 // labelOption 会话展示名所在的 tmux 用户选项（与 CLI 侧 runtime.LabelOption 同名，
@@ -59,6 +61,7 @@ type API struct {
 	Meta              *metadb.DB        // 台账库直连；降级时各 store 自动退回 JSON
 	agentLink         *agentLinker      // 把手敲起来的 claude 会话认到它那段对话上
 	projectOKRGitHub  okr.GitHub
+	NativeBackend     sessionbackend.SessionBackend
 }
 
 // New 组装 API。台账库的握手在这里做一次：库的位置由 ttmux 报，不是后端自己拼
@@ -247,11 +250,14 @@ func (a *API) resolveSession(token string) string {
 // Sessions GET /sessions[?tree=1] —— tree=1 返回 parent 投影树（ls --tree --json，
 // 节点带 parent/children，供 W2 父子分组）；缺省平铺（兼容旧调用方）。
 func (a *API) Sessions(c *gin.Context) {
+	transform := func(raw []byte) []byte {
+		return a.Live.projectSessionActivity(a.mergeNativeSessionsJSON(c.Request.Context(), raw))
+	}
 	if c.Query("tree") == "1" {
-		a.writeCLIJSON(c, a.Live.projectSessionActivity, "ls", "--tree", "--json")
+		a.writeCLIJSON(c, transform, "ls", "--tree", "--json")
 		return
 	}
-	a.writeCLIJSON(c, a.Live.projectSessionActivity, "ls", "--json")
+	a.writeCLIJSON(c, transform, "ls", "--json")
 }
 func (a *API) NewSession(c *gin.Context) {
 	var b struct {
@@ -279,6 +285,9 @@ func (a *API) NewSession(c *gin.Context) {
 // 走 CLI 的 `roami session new --json` 而不是自己拼 tmux new-session：会话 id 的生成、
 // @roam_name 的落地只有一份实现（CLI 侧），后端不再复制一遍。
 func (a *API) newSession(label, dir string) (string, error) {
+	if a.NativeBackend != nil {
+		return a.createNativeSession(context.Background(), label, dir)
+	}
 	if a.TT.Local() {
 		return a.TT.CreateSession(context.Background(), label, strings.TrimSpace(dir))
 	}
@@ -348,6 +357,14 @@ func (a *API) RenameSession(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
+	if _, ok := a.nativeSession(c.Request.Context(), sess); ok {
+		if err := a.NativeBackend.Rename(c.Request.Context(), sess, label); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "NATIVE_ERROR", "message": err.Error()}})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"name": sess, "label": label}})
+		return
+	}
 	out, err := a.TT.Run("rename", sess, label)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "TTMUX_ERROR", "message": ttmux.StripANSI(out)}})
@@ -359,6 +376,14 @@ func (a *API) RenameSession(c *gin.Context) {
 // 走 roami session kill --yes（非交互）：孤儿收养/meta 清理在 CLI 内完成；?cascade=1 级联杀子树。
 func (a *API) KillSession(c *gin.Context) {
 	name := a.sessionTarget(c)
+	if _, ok := a.nativeSession(c.Request.Context(), name); ok {
+		if err := a.NativeBackend.Close(c.Request.Context(), name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "NATIVE_ERROR", "message": err.Error()}})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": "ok"})
+		return
+	}
 	args := []string{"kill", name, "--yes"}
 	if c.Query("cascade") == "1" {
 		args = append(args, "--cascade")
@@ -369,7 +394,18 @@ func (a *API) KillSession(c *gin.Context) {
 	a.text(c, args...)
 }
 func (a *API) Capture(c *gin.Context) {
-	a.text(c, "capture", a.sessionTarget(c), "--lines", c.DefaultQuery("lines", "200"))
+	name := a.sessionTarget(c)
+	if _, ok := a.nativeSession(c.Request.Context(), name); ok {
+		lines, _ := strconv.Atoi(c.DefaultQuery("lines", "200"))
+		res, err := a.NativeBackend.Capture(c.Request.Context(), sessionbackend.Target{SessionID: name}, sessionbackend.CaptureOpts{Lines: lines})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "NATIVE_ERROR", "message": err.Error()}})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": res.Text})
+		return
+	}
+	a.text(c, "capture", name, "--lines", c.DefaultQuery("lines", "200"))
 }
 
 // Keys POST /sessions/:name/keys —— 向会话注入原始按键（不追加回车）。
@@ -378,6 +414,17 @@ func (a *API) Capture(c *gin.Context) {
 // 而 Claude/Codex 的权限确认/选项菜单需要这些键来选择。
 func (a *API) Keys(c *gin.Context) {
 	name := a.sessionTarget(c)
+	if _, ok := a.nativeSession(c.Request.Context(), name); ok {
+		var b struct {
+			Keys []string `json:"keys"`
+		}
+		if err := c.ShouldBindJSON(&b); err != nil || len(b.Keys) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
+			return
+		}
+		a.writeNativeKeys(c, name, b.Keys)
+		return
+	}
 	unlock, leaseErr := lifecycleRuntime(c.Request.Context()).InputLease("=" + name)
 	if leaseErr != nil {
 		lifecycleError(c, leaseErr)
@@ -411,8 +458,13 @@ func (a *API) Keys(c *gin.Context) {
 // 走 ttmux 转发（尊重 TMUX_BIN）+ =name 精确匹配；display-message 对 =name 静默输出空，
 // 所以用 list-panes 取 active pane（与 fork 的父 cwd 解析同款）。
 func (a *API) SessionCwd(c *gin.Context) {
+	name := a.sessionTarget(c)
+	if st, ok := a.nativeSession(c.Request.Context(), name); ok {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"dir": st.Cwd}})
+		return
+	}
 	dir := ""
-	if out, err := a.TT.Run("list-panes", "-t", "="+a.sessionTarget(c), "-F", "#{pane_active}\t#{pane_current_path}"); err == nil {
+	if out, err := a.TT.Run("list-panes", "-t", "="+name, "-F", "#{pane_active}\t#{pane_current_path}"); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 			active, cwd, ok := strings.Cut(line, "\t")
 			if ok && (dir == "" || active == "1") {
@@ -432,6 +484,19 @@ func (a *API) SessionType(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&b); err != nil || b.Text == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
+		return
+	}
+	if _, ok := a.nativeSession(c.Request.Context(), name); ok {
+		if _, err := a.NativeBackend.Submit(c.Request.Context(), sessionbackend.Target{SessionID: name}, sessionbackend.SubmitReq{
+			RequestID:      "type-" + id.New(),
+			Payload:        b.Text,
+			SubmitEnter:    false,
+			BracketedPaste: false,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "NATIVE_ERROR", "message": err.Error()}})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": "ok"})
 		return
 	}
 	a.text(c, "send-keys", "-t", "="+name+":", "-l", b.Text)

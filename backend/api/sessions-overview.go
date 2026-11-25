@@ -100,8 +100,13 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"code": "TTMUX", "message": err.Error()}})
 		return
 	}
+	mergedRaw := a.mergeNativeSessionsJSON(c.Request.Context(), []byte(out))
 	var list []sessListItem
-	_ = json.Unmarshal([]byte(out), &list)
+	_ = json.Unmarshal(mergedRaw, &list)
+	nativeByID := map[string]string{}
+	for _, ns := range a.listNativeSummaries(c.Request.Context()) {
+		nativeByID[ns.ID] = nativeSessionIdentity(ns.HostInstanceID, ns.ID)
+	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 8*time.Second)
 	defer cancel()
 	ann := a.WT.Annotations(ctx)
@@ -133,6 +138,9 @@ func (a *API) SessionsOverview(c *gin.Context) {
 		}
 		it := overviewItem{Name: s.Name, Label: s.Label, Parent: s.Parent, Cwd: s.Dir, LastActivity: a.Live.sessionActivity(s), Dormant: s.State == "dormant"}
 		it.Identity = s.identity()
+		if nid, ok := nativeByID[s.Name]; ok {
+			it.Identity = nid
+		}
 		it.Mem = s.Mem
 		if review, ok := reviews[s.Name]; ok {
 			it.Review = &review
