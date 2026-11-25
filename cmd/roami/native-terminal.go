@@ -17,7 +17,13 @@ import (
 
 func nativeTerminalEnabled() bool {
 	v := strings.TrimSpace(strings.ToLower(os.Getenv("ROAMI_NATIVE_TERMINAL")))
-	return v == "1" || v == "true" || v == "on"
+	if v == "0" || v == "false" || v == "off" {
+		return false
+	}
+	if v == "1" || v == "true" || v == "on" {
+		return true
+	}
+	return runtime.GOOS == "windows"
 }
 
 // maybeConnectNativeTerminal enables the native roami-sessiond backend when ROAMI_NATIVE_TERMINAL=1.
