@@ -86,18 +86,11 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 	}
 
 	var paneMu sync.RWMutex
-	activePane := paneID
 	var lastMode sessionbackend.TerminalMode
-	setActivePane := func(pid string) {
+	setActivePane := func(_ string) {
 		paneMu.Lock()
-		activePane = pid
 		lastMode = sessionbackend.TerminalMode{}
 		paneMu.Unlock()
-	}
-	getActivePane := func() string {
-		paneMu.RLock()
-		defer paneMu.RUnlock()
-		return activePane
 	}
 	setMode := func(m sessionbackend.TerminalMode) {
 		paneMu.Lock()
@@ -115,6 +108,7 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 
 	resizeCh := make(chan [2]uint16, 4)
 	selectCellCh := make(chan [2]int, 4)
+	moveCursorCh := make(chan [2]int, 4)
 	showBar := true
 	layoutBackend, _ := backend.(sessionbackend.LayoutBackend)
 
@@ -131,6 +125,7 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 			ShowStatusBar: &showBar,
 			ResizeCh:      resizeCh,
 			SelectCellCh:  selectCellCh,
+			MoveCursorCh:  moveCursorCh,
 			OnActivePane:  setActivePane,
 			OnMode:        setMode,
 			Cols:          lastCols,
@@ -192,9 +187,9 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 					}
 					continue
 				case "move-cursor":
-					target := sessionbackend.Target{SessionID: name, PaneID: getActivePane()}
-					if lease, lerr := backend.ClaimControl(ctx, target, clientID); lerr == nil {
-						_ = backend.MoveCursor(ctx, target, lease.ControlGen, ctrl.Col, ctrl.Row)
+					select {
+					case moveCursorCh <- [2]int{ctrl.Col, ctrl.Row}:
+					default:
 					}
 					continue
 				case "scroll":

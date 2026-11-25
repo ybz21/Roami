@@ -114,7 +114,7 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 			}
 			continue
 		case prefixAwaitEscBracket:
-			if b == '[' {
+			if b == '[' || b == 'O' {
 				f.state = prefixAwaitCSI
 			} else {
 				f.state = prefixIdle
@@ -173,7 +173,8 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 			}
 			continue
 		}
-		// Single-key F2 (\x1bOQ or \x1b[12~) opens the menu without needing Ctrl+b or adding Esc lag.
+		// Single-key F2 (\x1bOQ or \x1b[12~) opens the menu, and Alt+Arrow (\x1b[1;3A/B/C/D)
+		// switches split panes directly without needing Ctrl+b or adding Esc lag.
 		if b == 0x1b {
 			if i+2 < len(chunk) && chunk[i+1] == 'O' && chunk[i+2] == 'Q' {
 				flush()
@@ -186,6 +187,30 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 				actions = append(actions, Action{Kind: ActionOpenMenu})
 				i += 4
 				continue
+			}
+			if i+5 < len(chunk) && chunk[i+1] == '[' && chunk[i+2] == '1' && chunk[i+3] == ';' && chunk[i+4] == '3' {
+				switch chunk[i+5] {
+				case 'A':
+					flush()
+					actions = append(actions, Action{Kind: ActionFocusUp})
+					i += 5
+					continue
+				case 'B':
+					flush()
+					actions = append(actions, Action{Kind: ActionFocusDown})
+					i += 5
+					continue
+				case 'C':
+					flush()
+					actions = append(actions, Action{Kind: ActionFocusRight})
+					i += 5
+					continue
+				case 'D':
+					flush()
+					actions = append(actions, Action{Kind: ActionFocusLeft})
+					i += 5
+					continue
+				}
 			}
 		}
 		if b == f.Prefix {
@@ -271,6 +296,7 @@ type AttachOptions struct {
 	ShowStatusBar *bool            // nil = auto-enabled on interactive raw TTY with >= 6 rows
 	ResizeCh      <-chan [2]uint16 // optional external resize feed (e.g. WebSocket resize frames)
 	SelectCellCh  <-chan [2]int    // optional 0-based (col, row) click-to-focus feed for multi-pane layouts
+	MoveCursorCh  <-chan [2]int    // optional 0-based (col, row) move-cursor feed (Web click-to-move-cursor)
 	OnActivePane  func(paneID string)
 	OnMode        func(mode sessionbackend.TerminalMode)
 	Cols          uint16
@@ -521,7 +547,8 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			inComposite.Store(true)
 			switchPane, detached, exited, runErr = pumpMultiPane(
 				attachCtx, backend, layout, opts.SessionID, *multiWin, paneID, opts.ClientID,
-				inCh, inErrCh, resizeCh, opts.SelectCellCh, opts.OnActivePane, &curCols, &curRows, paneRowsFor, filter, writeOut, buildStatusSeq,
+				inCh, inErrCh, resizeCh, opts.SelectCellCh, opts.MoveCursorCh, opts.OnActivePane,
+				&curCols, &curRows, paneRowsFor, filter, writeOut, buildStatusSeq, opts.RawTTY && hasFD,
 			)
 			inComposite.Store(false)
 		} else {
@@ -558,7 +585,7 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 
 			switchPane, detached, exited, runErr = pumpPane(
 				attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
-				stream, inCh, inErrCh, filter, writeOut, drawStatusBar, opts.OnMode, showStatus, c, pRows,
+				stream, inCh, inErrCh, opts.MoveCursorCh, filter, writeOut, drawStatusBar, opts.OnMode, showStatus, c, pRows,
 			)
 			_ = stream.Close()
 			_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
@@ -605,6 +632,7 @@ func pumpPane(
 	stream sessionbackend.PaneStream,
 	inCh <-chan []byte,
 	inErrCh <-chan error,
+	moveCursorCh <-chan [2]int,
 	filter *PrefixFilter,
 	writeOut func([]byte) error,
 	drawStatusBar func(pane string, prefixPending bool),
@@ -635,6 +663,13 @@ func pumpPane(
 		select {
 		case <-ctx.Done():
 			return "", true, false, nil
+
+		case pt, ok := <-moveCursorCh:
+			if !ok {
+				moveCursorCh = nil
+				continue
+			}
+			_ = backend.MoveCursor(ctx, target, *controlGen, pt[0], pt[1])
 
 		case ev, ok := <-stream.Events():
 			if !ok {

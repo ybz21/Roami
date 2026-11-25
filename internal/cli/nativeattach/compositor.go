@@ -7,12 +7,18 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/ybz21/Roami/internal/sessionbackend"
 	"github.com/ybz21/Roami/internal/sessionhost"
+)
+
+const (
+	enableMouseClickANSI  = "\x1b[?1000h\x1b[?1006h"
+	disableMouseClickANSI = "\x1b[?1006l\x1b[?1000l"
 )
 
 // paneRect is a pane's exact 0-based cell rectangle inside the composited window viewport.
@@ -141,6 +147,60 @@ func borderGlyph(m borderMask) rune {
 	}
 }
 
+// sameLayoutTree reports whether two split trees have identical pane topology and ratios,
+// so pure ActivePaneID focus changes do not trigger a full multi-pane reconnect.
+func sameLayoutTree(a, b *sessionbackend.LayoutNode) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Kind != b.Kind || a.PaneID != b.PaneID || a.Dir != b.Dir || math.Abs(a.Ratio-b.Ratio) > 1e-6 {
+		return false
+	}
+	return sameLayoutTree(a.First, b.First) && sameLayoutTree(a.Second, b.Second)
+}
+
+type sgrMouseClick struct {
+	col int // 0-based cell X
+	row int // 0-based cell Y
+}
+
+// extractSGRMouseClicks strips SGR mouse sequences (\x1b[<btn;col;rowM or m) from raw input
+// and returns any left-button press coordinates so clicking a split pane immediately focuses it.
+func extractSGRMouseClicks(data []byte) (remaining []byte, clicks []sgrMouseClick) {
+	if !bytes.Contains(data, []byte("\x1b[<")) {
+		return data, nil
+	}
+	out := make([]byte, 0, len(data))
+	i := 0
+	for i < len(data) {
+		if i+3 < len(data) && data[i] == 0x1b && data[i+1] == '[' && data[i+2] == '<' {
+			j := i + 3
+			for j < len(data) && ((data[j] >= '0' && data[j] <= '9') || data[j] == ';') {
+				j++
+			}
+			if j < len(data) && (data[j] == 'M' || data[j] == 'm') {
+				kind := data[j]
+				body := string(data[i+3 : j])
+				parts := bytes.Split([]byte(body), []byte(";"))
+				if len(parts) == 3 && kind == 'M' {
+					btn, err1 := strconv.Atoi(string(parts[0]))
+					col, err2 := strconv.Atoi(string(parts[1]))
+					row, err3 := strconv.Atoi(string(parts[2]))
+					// btn==0 is primary left-button press; ignore wheel (64/65) and drag (32+).
+					if err1 == nil && err2 == nil && err3 == nil && btn == 0 && col >= 1 && row >= 1 {
+						clicks = append(clicks, sgrMouseClick{col: col - 1, row: row - 1})
+					}
+				}
+				i = j + 1
+				continue
+			}
+		}
+		out = append(out, data[i])
+		i++
+	}
+	return out, clicks
+}
+
 // renderCompositeFrame renders all panes in layout plus box-drawing dividers and status bar into one ANSI frame.
 func renderCompositeFrame(
 	layout cellLayout,
@@ -216,21 +276,44 @@ func renderCompositeFrame(
 			return false
 		}
 		ar := activeRect
-		// Left or right vertical edge of active pane
 		if (cx == ar.X-1 || cx == ar.X+ar.W) && cy >= ar.Y && cy < ar.Y+ar.H {
 			return true
 		}
-		// Top or bottom horizontal edge of active pane
 		if (cy == ar.Y-1 || cy == ar.Y+ar.H) && cx >= ar.X && cx < ar.X+ar.W {
 			return true
 		}
 		return false
 	}
 
+	// Draw directional arrows (◀/▶/▲/▼) on the divider pointing at the focused pane so focus is unmistakable.
+	focusPointer := func(cx, cy int) (rune, bool) {
+		if activeRect == nil {
+			return 0, false
+		}
+		ar := activeRect
+		if cy == ar.Y && cx == ar.X+ar.W {
+			return '◀', true
+		}
+		if cy == ar.Y && cx == ar.X-1 {
+			return '▶', true
+		}
+		if cx == ar.X && cy == ar.Y+ar.H {
+			return '▲', true
+		}
+		if cx == ar.X && cy == ar.Y-1 {
+			return '▼', true
+		}
+		return 0, false
+	}
+
 	for pt, m := range masks {
-		color := "\x1b[0;90m" // dim gray for inactive border
+		if arrow, ok := focusPointer(pt.x, pt.y); ok {
+			fmt.Fprintf(&b, "\x1b[%d;%dH\x1b[1;36m%c\x1b[0m", pt.y+1, pt.x+1, arrow)
+			continue
+		}
+		color := "\x1b[0;90m"
 		if touchesActive(pt.x, pt.y) {
-			color = "\x1b[0;36m" // bright cyan for active pane border
+			color = "\x1b[0;36m"
 		}
 		fmt.Fprintf(&b, "\x1b[%d;%dH%s%c\x1b[0m", pt.y+1, pt.x+1, color, borderGlyph(m))
 	}
@@ -274,7 +357,7 @@ type paneEventMsg struct {
 
 // pumpMultiPane subscribes to every pane in win simultaneously, resizes each pane to its exact
 // tiled dimensions, composites them side-by-side / top-to-bottom with box-drawing borders, and
-// routes keyboard input to the focused pane.
+// routes keyboard + click input to the focused pane.
 func pumpMultiPane(
 	ctx context.Context,
 	backend sessionbackend.SessionBackend,
@@ -287,12 +370,14 @@ func pumpMultiPane(
 	inErrCh <-chan error,
 	resizeCh <-chan struct{},
 	selectCellCh <-chan [2]int,
+	moveCursorCh <-chan [2]int,
 	onActivePane func(string),
 	curCols, curRows *atomic.Uint32,
 	paneRowsFor func(uint16) uint16,
 	filter *PrefixFilter,
 	writeOut func([]byte) error,
 	buildStatusSeq func(pane string, prefixPending bool) []byte,
+	enableCLIMouse bool,
 ) (switchPane string, detached bool, exited bool, err error) {
 	paneIDs := win.Layout.PaneIDs()
 	if len(paneIDs) == 0 {
@@ -326,6 +411,9 @@ func pumpMultiPane(
 	emus := make(map[string]*sessionhost.Emulator, len(paneIDs))
 
 	cleanup := func() {
+		if enableCLIMouse {
+			_ = writeOut([]byte(disableMouseClickANSI))
+		}
 		cancelSub()
 		for pid, st := range streams {
 			_ = st.Close()
@@ -421,15 +509,19 @@ func pumpMultiPane(
 		return writeOut(frame)
 	}
 
-	// Clear terminal once on entering composite view, then flush coalesced frames at ~60fps.
+	// Clear terminal once on entering composite view, enable CLI mouse click-to-focus, and flush at ~60fps.
 	if err := writeOut([]byte(clearScreenHome)); err != nil {
 		return "", false, false, err
+	}
+	if enableCLIMouse {
+		_ = writeOut([]byte(enableMouseClickANSI))
 	}
 	if err := renderNow(); err != nil {
 		return "", false, false, err
 	}
 
 	dirty := false
+	var lastSwitchAt time.Time
 	ticker := time.NewTicker(16 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -438,14 +530,27 @@ func pumpMultiPane(
 			return
 		}
 		activePaneID = next
+		lastSwitchAt = time.Now()
 		if onActivePane != nil {
 			onActivePane(next)
 		}
 		if layoutBackend != nil {
-			_, _ = layoutBackend.FocusPane(subCtx, sessionID, win.ID, next)
+			if updated, err := layoutBackend.FocusPane(subCtx, sessionID, win.ID, next); err == nil {
+				win.Version = updated.Version
+				win.ActivePaneID = updated.ActivePaneID
+			}
 		}
 		_ = renderNow()
 		dirty = false
+	}
+
+	focusAtCell := func(col, row int) {
+		for _, r := range cellLay.Panes {
+			if col >= r.X && col < r.X+r.W && row >= r.Y && row < r.Y+r.H {
+				focusPane(r.PaneID)
+				return
+			}
+		}
 	}
 
 	for {
@@ -458,10 +563,21 @@ func pumpMultiPane(
 				selectCellCh = nil
 				continue
 			}
-			for _, r := range cellLay.Panes {
+			focusAtCell(pt[0], pt[1])
+
+		case pt, ok := <-moveCursorCh:
+			if !ok {
+				moveCursorCh = nil
+				continue
+			}
+			// Clicking a different pane focuses it first; don't also fire cursor arrows on the same click.
+			if time.Since(lastSwitchAt) < 350*time.Millisecond {
+				continue
+			}
+			if r, ok := rectByPane[activePaneID]; ok {
 				if pt[0] >= r.X && pt[0] < r.X+r.W && pt[1] >= r.Y && pt[1] < r.Y+r.H {
-					focusPane(r.PaneID)
-					break
+					target := sessionbackend.Target{SessionID: sessionID, PaneID: activePaneID}
+					_ = backend.MoveCursor(subCtx, target, controlGens[activePaneID], pt[0]-r.X, pt[1]-r.Y)
 				}
 			}
 
@@ -494,7 +610,6 @@ func pumpMultiPane(
 
 		case msg := <-evCh:
 			if msg.closed || msg.ev.Kind == sessionbackend.EventExited {
-				// Re-enter outer loop so remaining sibling panes expand cleanly.
 				next := activePaneID
 				if msg.paneID == activePaneID {
 					if candidate, ok := pickNextPane(subCtx, backend, sessionID, activePaneID); ok && candidate != activePaneID {
@@ -519,8 +634,18 @@ func pumpMultiPane(
 					dirty = true
 				}
 			case sessionbackend.EventLayoutChanged:
-				if msg.ev.Window != nil && msg.ev.Window.Version != win.Version {
-					return activePaneID, false, false, nil
+				if msg.ev.Window != nil {
+					if !sameLayoutTree(win.Layout, msg.ev.Window.Layout) {
+						return activePaneID, false, false, nil
+					}
+					win.Version = msg.ev.Window.Version
+					if msg.ev.Window.ActivePaneID != "" && msg.ev.Window.ActivePaneID != activePaneID && win.Layout.ContainsPane(msg.ev.Window.ActivePaneID) {
+						activePaneID = msg.ev.Window.ActivePaneID
+						if onActivePane != nil {
+							onActivePane(activePaneID)
+						}
+						dirty = true
+					}
 				}
 			case sessionbackend.EventResyncNeeded:
 				return activePaneID, false, false, nil
@@ -528,6 +653,14 @@ func pumpMultiPane(
 
 		case chunk := <-inCh:
 			cleaned := FilterAutoReplies(chunk)
+			if len(cleaned) == 0 {
+				continue
+			}
+			// Handle SGR mouse clicks (CLI click-to-focus pane) before forwarding bytes to the shell.
+			cleaned, clicks := extractSGRMouseClicks(cleaned)
+			for _, click := range clicks {
+				focusAtCell(click.col, click.row)
+			}
 			if len(cleaned) == 0 {
 				continue
 			}
@@ -617,6 +750,9 @@ func pumpMultiPane(
 						return res.switchPane, false, false, nil
 					}
 				case ActionOpenMenu:
+					if enableCLIMouse {
+						_ = writeOut([]byte(disableMouseClickANSI))
+					}
 					c := uint16(curCols.Load())
 					pr := paneRowsFor(uint16(curRows.Load()))
 					res, oerr := runCommandMenu(subCtx, backend, layoutBackend, sessionID, activePaneID, inCh, inErrCh, writeOut, c, pr)
@@ -634,6 +770,9 @@ func pumpMultiPane(
 					}
 					return activePaneID, false, false, nil
 				case ActionOpenWindowSwitcher:
+					if enableCLIMouse {
+						_ = writeOut([]byte(disableMouseClickANSI))
+					}
 					c := uint16(curCols.Load())
 					pr := paneRowsFor(uint16(curRows.Load()))
 					res, oerr := runWindowSwitcher(subCtx, backend, layoutBackend, sessionID, activePaneID, inCh, inErrCh, writeOut, c, pr)

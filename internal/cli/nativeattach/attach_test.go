@@ -295,6 +295,36 @@ func TestMultiPaneCompositorSideBySideAndVertical(t *testing.T) {
 		return err == nil && strings.Contains(capLeft.Text, "BACK_ON_LEFT_PANE")
 	}, "Ctrl+b Left-Arrow routed input back to left pane")
 
+	// Also verify SGR mouse click focuses the right pane (col 70, row 5 -> 1-based \x1b[<0;70;5M) and Alt+Left returns left!
+	_, _ = inW.Write([]byte("\x1b[<0;70;5M"))
+	time.Sleep(100 * time.Millisecond)
+	_, _ = inW.Write([]byte("echo MOUSE_CLICK_RIGHT_OK\n"))
+	waitFor(t, 4*time.Second, func() bool {
+		cur, err := host.Observe(ctx, ref.SessionID)
+		if err != nil || len(cur.Windows) == 0 || cur.Windows[0].Layout == nil {
+			return false
+		}
+		for _, pid := range cur.Windows[0].Layout.PaneIDs() {
+			if pid == ref.PaneID {
+				continue
+			}
+			capR, cerr := host.Capture(ctx, sessionbackend.Target{SessionID: ref.SessionID, PaneID: pid}, sessionbackend.CaptureOpts{Lines: 20})
+			if cerr == nil && strings.Contains(capR.Text, "MOUSE_CLICK_RIGHT_OK") {
+				return true
+			}
+		}
+		return false
+	}, "SGR mouse click focused right pane")
+
+	// Alt+Left (\x1b[1;3D) switches back left directly without Ctrl+b.
+	_, _ = inW.Write([]byte("\x1b[1;3D"))
+	time.Sleep(100 * time.Millisecond)
+	_, _ = inW.Write([]byte("echo ALT_ARROW_LEFT_OK\n"))
+	waitFor(t, 4*time.Second, func() bool {
+		capLeft, err := host.Capture(ctx, sessionbackend.Target{SessionID: ref.SessionID, PaneID: ref.PaneID}, sessionbackend.CaptureOpts{Lines: 30})
+		return err == nil && strings.Contains(capLeft.Text, "ALT_ARROW_LEFT_OK")
+	}, "Alt+Left focused left pane")
+
 	// Split vertically (Ctrl+b ") on the left pane and verify horizontal divider '─' renders too.
 	_, _ = inW.Write([]byte{DefaultPrefix, '"'})
 	waitFor(t, 4*time.Second, func() bool {
