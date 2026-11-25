@@ -104,6 +104,15 @@ func (m *menuInput) nextKey(ctx context.Context) (menuKey, error) {
 			}
 		}
 		if len(m.buf) >= 3 && (m.buf[1] == '[' || m.buf[1] == 'O') {
+			// Pressing F2 again inside the menu toggles it closed cleanly.
+			if m.buf[1] == 'O' && m.buf[2] == 'Q' {
+				m.buf = m.buf[3:]
+				return menuKey{kind: menuKeyEsc}, nil
+			}
+			if m.buf[1] == '[' && len(m.buf) >= 5 && m.buf[2] == '1' && m.buf[3] == '2' && m.buf[4] == '~' {
+				m.buf = m.buf[5:]
+				return menuKey{kind: menuKeyEsc}, nil
+			}
 			code := m.buf[2]
 			m.buf = m.buf[3:]
 			switch code {
@@ -232,17 +241,17 @@ func runCommandMenuWithInput(
 				return overlayOutcome{switchPane: pane}, true, nil
 			}
 			return overlayOutcome{}, false, nil
-		case actionKey == '%':
+		case actionKey == '%' || actionKey == '|':
 			if pane, ok := splitCurrentPane(ctx, layout, sessionID, currentPaneID, sessionbackend.SplitHorizontal, cols, rows); ok {
 				return overlayOutcome{switchPane: pane}, true, nil
 			}
 			return overlayOutcome{refresh: true}, true, nil
-		case actionKey == '"':
+		case actionKey == '"' || actionKey == '-':
 			if pane, ok := splitCurrentPane(ctx, layout, sessionID, currentPaneID, sessionbackend.SplitVertical, cols, rows); ok {
 				return overlayOutcome{switchPane: pane}, true, nil
 			}
 			return overlayOutcome{refresh: true}, true, nil
-		case actionKey == 'o' || actionKey == 'O':
+		case actionKey == 'o' || actionKey == 'O' || actionKey == '\t':
 			if next, ok := pickNextPaneInWindow(ctx, backend, layout, sessionID, currentPaneID); ok && next != currentPaneID {
 				return overlayOutcome{switchPane: next}, true, nil
 			}
@@ -347,17 +356,26 @@ func buildCommandMenuItems(st sessionbackend.SessionState, currentPaneID string)
 		}
 	}
 
+	curPaneCount := 1
+	for _, w := range st.Windows {
+		if w.Layout != nil && (w.Layout.ContainsPane(currentPaneID) || w.ID == st.ActiveWindowID) {
+			curPaneCount = len(w.Layout.PaneIDs())
+			break
+		}
+	}
+	closeLabel := "关闭当前窗口"
+	if curPaneCount > 1 {
+		closeLabel = "关闭当前窗格"
+	}
+
 	items = append(items,
-		menuItem{kind: menuItemHeader, label: "常用操作（↑/↓ 选择回车，或直接按右侧快捷键）"},
-		menuItem{kind: menuItemAction, label: "左右分屏（同屏一分为二）", shortcut: "%", actionKey: '%', selectable: true},
-		menuItem{kind: menuItemAction, label: "上下分屏（同屏一分为二）", shortcut: `"`, actionKey: '"', selectable: true},
-		menuItem{kind: menuItemAction, label: "切换焦点到下一窗格（或 Ctrl+b+方向键）", shortcut: "o", actionKey: 'o', selectable: true},
-		menuItem{kind: menuItemAction, label: "新建窗口并切过去", shortcut: "c", actionKey: 'c', selectable: true},
-		menuItem{kind: menuItemAction, label: "窗口与分屏树（含实时输出预览）", shortcut: "w", actionKey: 'w', selectable: true},
-		menuItem{kind: menuItemAction, label: "关闭当前窗格", shortcut: "x", actionKey: 'x', selectable: true},
-		menuItem{kind: menuItemAction, label: "关闭当前窗口", shortcut: "&", actionKey: '&', selectable: true},
-		menuItem{kind: menuItemAction, label: "脱离会话（放后台继续运行）", shortcut: "d", actionKey: 'd', selectable: true},
-		menuItem{kind: menuItemAction, label: "返回终端", shortcut: "Esc", actionKey: 'q', selectable: true},
+		menuItem{kind: menuItemHeader, label: "常用操作"},
+		menuItem{kind: menuItemAction, label: "左右分屏", shortcut: "|", actionKey: '|', selectable: true},
+		menuItem{kind: menuItemAction, label: "上下分屏", shortcut: "-", actionKey: '-', selectable: true},
+		menuItem{kind: menuItemAction, label: "切换窗格", shortcut: "Tab", actionKey: '\t', selectable: true},
+		menuItem{kind: menuItemAction, label: "新建窗口", shortcut: "c", actionKey: 'c', selectable: true},
+		menuItem{kind: menuItemAction, label: closeLabel, shortcut: "x", actionKey: 'x', selectable: true},
+		menuItem{kind: menuItemAction, label: "放后台（脱离会话）", shortcut: "d", actionKey: 'd', selectable: true},
 	)
 	return items
 }
@@ -446,7 +464,7 @@ func renderCommandMenuBox(st sessionbackend.SessionState, currentPaneID string, 
 		}
 	}
 
-	footer := " ↑/↓ 选择 · Enter 确认 · 快捷键直达 · Esc 返回 "
+	footer := " ↑/↓ 选择 · Enter 确认 · w 窗格预览 · Esc 返回 "
 	footer = clipDisplay(footer, innerW-2)
 	fPad := innerW - displayWidth(footer) - 1
 	if fPad < 0 {

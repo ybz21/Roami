@@ -188,4 +188,29 @@ func TestHandlerWithNativeCompatWebSocket(t *testing.T) {
 			out.Write(data)
 		}
 	}
+
+	// Verify tmux-like Ctrl+b % splits side-by-side right over the Web compat WS, and select-pane focuses left.
+	_ = ws.WriteMessage(websocket.TextMessage, []byte{0x02, '%'})
+	_ = ws.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for !strings.Contains(out.String(), "│") {
+		mt, data, err := ws.ReadMessage()
+		if err != nil {
+			t.Fatalf("compat WS split divider wait failed: %v", err)
+		}
+		if mt == websocket.BinaryMessage {
+			out.Write(data)
+		}
+	}
+	_ = ws.WriteJSON(map[string]any{"type": "select-pane", "col": 2, "row": 2})
+	time.Sleep(120 * time.Millisecond)
+	_ = ws.WriteMessage(websocket.TextMessage, []byte("echo WEB_CLICK_LEFT_OK\n"))
+	deadline := time.Now().Add(4 * time.Second)
+	for time.Now().Before(deadline) {
+		capLeft, err := host.Capture(ctx, sessionbackend.Target{SessionID: ref.SessionID, PaneID: ref.PaneID}, sessionbackend.CaptureOpts{Lines: 20})
+		if err == nil && strings.Contains(capLeft.Text, "WEB_CLICK_LEFT_OK") {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("select-pane did not route Web input to left pane")
 }

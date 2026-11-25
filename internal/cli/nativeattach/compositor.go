@@ -286,6 +286,8 @@ func pumpMultiPane(
 	inCh <-chan []byte,
 	inErrCh <-chan error,
 	resizeCh <-chan struct{},
+	selectCellCh <-chan [2]int,
+	onActivePane func(string),
 	curCols, curRows *atomic.Uint32,
 	paneRowsFor func(uint16) uint16,
 	filter *PrefixFilter,
@@ -301,6 +303,9 @@ func pumpMultiPane(
 		if !win.Layout.ContainsPane(activePaneID) {
 			activePaneID = paneIDs[0]
 		}
+	}
+	if onActivePane != nil {
+		onActivePane(activePaneID)
 	}
 
 	cols := int(curCols.Load())
@@ -433,6 +438,9 @@ func pumpMultiPane(
 			return
 		}
 		activePaneID = next
+		if onActivePane != nil {
+			onActivePane(next)
+		}
 		if layoutBackend != nil {
 			_, _ = layoutBackend.FocusPane(subCtx, sessionID, win.ID, next)
 		}
@@ -444,6 +452,18 @@ func pumpMultiPane(
 		select {
 		case <-ctx.Done():
 			return "", true, false, nil
+
+		case pt, ok := <-selectCellCh:
+			if !ok {
+				selectCellCh = nil
+				continue
+			}
+			for _, r := range cellLay.Panes {
+				if pt[0] >= r.X && pt[0] < r.X+r.W && pt[1] >= r.Y && pt[1] < r.Y+r.H {
+					focusPane(r.PaneID)
+					break
+				}
+			}
 
 		case <-resizeCh:
 			c := int(curCols.Load())

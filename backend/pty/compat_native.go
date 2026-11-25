@@ -3,14 +3,15 @@ package pty
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/ybz21/Roami/internal/cli/nativeattach"
 	"github.com/ybz21/Roami/internal/sessionbackend"
 )
 
@@ -34,6 +35,22 @@ func HandlerWithNative(nativeBackend sessionbackend.SessionBackend) gin.HandlerF
 	}
 }
 
+type wsBinaryWriter struct {
+	writeMessage func(int, []byte) error
+}
+
+func (w *wsBinaryWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	cp := make([]byte, len(p))
+	copy(cp, p)
+	if err := w.writeMessage(websocket.BinaryMessage, cp); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
 func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, name string, initial sessionbackend.SessionState) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -52,20 +69,6 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 	if clientID == "" {
 		clientID = fmt.Sprintf("web-%s-%d", c.ClientIP(), time.Now().UnixNano())
 	}
-	target := sessionbackend.Target{SessionID: name, PaneID: paneID}
-
-	lease, err := backend.ClaimControl(ctx, target, clientID)
-	if err != nil {
-		_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(closeSessionGone, "session gone"))
-		return
-	}
-	controlGen := lease.ControlGen
-	if lease.PaneID != "" {
-		target.PaneID = lease.PaneID
-	}
-	defer func() {
-		_ = backend.ReleaseControl(context.Background(), target, clientID, controlGen)
-	}()
 
 	lastCols, lastRows := uint16(100), uint16(30)
 	if cl, err := strconv.Atoi(c.Query("cols")); err == nil && cl >= minCols && cl <= 1000 {
@@ -74,14 +77,6 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 	if r, err := strconv.Atoi(c.Query("rows")); err == nil && r >= minRows && r <= 500 {
 		lastRows = uint16(r)
 	}
-	_ = backend.Resize(ctx, target, controlGen, lastCols, lastRows)
-
-	stream, err := backend.Attach(ctx, target, sessionbackend.AttachOpts{ClientID: clientID})
-	if err != nil {
-		_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(closeSessionGone, "session gone"))
-		return
-	}
-	defer stream.Close()
 
 	var writeMu sync.Mutex
 	writeMessage := func(messageType int, data []byte) error {
@@ -90,52 +85,60 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 		return conn.WriteMessage(messageType, data)
 	}
 
-	var modeMu sync.RWMutex
+	var paneMu sync.RWMutex
+	activePane := paneID
 	var lastMode sessionbackend.TerminalMode
+	setActivePane := func(pid string) {
+		paneMu.Lock()
+		activePane = pid
+		lastMode = sessionbackend.TerminalMode{}
+		paneMu.Unlock()
+	}
+	getActivePane := func() string {
+		paneMu.RLock()
+		defer paneMu.RUnlock()
+		return activePane
+	}
+	setMode := func(m sessionbackend.TerminalMode) {
+		paneMu.Lock()
+		lastMode = m
+		paneMu.Unlock()
+	}
+	getMode := func() sessionbackend.TerminalMode {
+		paneMu.RLock()
+		defer paneMu.RUnlock()
+		return lastMode
+	}
 
-	// Host stream -> xterm.js WebSocket (raw binary bytes, matching tmux pty.Handler).
+	inR, inW := io.Pipe()
+	defer inW.Close()
+
+	resizeCh := make(chan [2]uint16, 4)
+	selectCellCh := make(chan [2]int, 4)
+	showBar := true
+	layoutBackend, _ := backend.(sessionbackend.LayoutBackend)
+
+	// Reuse nativeattach so Web xterm.js gets the exact same multi-pane splits, bottom status bar,
+	// interactive Ctrl+b m menu, and Ctrl+b w window switcher as CLI attach.
 	go func() {
 		defer cancel()
-		for ev := range stream.Events() {
-			if ev.Mode != nil {
-				modeMu.Lock()
-				lastMode = *ev.Mode
-				modeMu.Unlock()
-			}
-			switch ev.Kind {
-			case sessionbackend.EventSnapshot:
-				payload := make([]byte, 0, 7+len(ev.Data))
-				payload = append(payload, "\x1b[2J\x1b[H"...)
-				payload = append(payload, ev.Data...)
-				if werr := writeMessage(websocket.BinaryMessage, payload); werr != nil {
-					return
-				}
-			case sessionbackend.EventOutput:
-				if len(ev.Data) > 0 {
-					if werr := writeMessage(websocket.BinaryMessage, ev.Data); werr != nil {
-						return
-					}
-				}
-			case sessionbackend.EventExited:
-				_ = writeMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				_ = conn.Close()
-				return
-			}
-		}
+		_ = nativeattach.Attach(ctx, backend, layoutBackend, nativeattach.AttachOptions{
+			SessionID:     name,
+			PaneID:        paneID,
+			ClientID:      clientID,
+			In:            inR,
+			Out:           &wsBinaryWriter{writeMessage: writeMessage},
+			ShowStatusBar: &showBar,
+			ResizeCh:      resizeCh,
+			SelectCellCh:  selectCellCh,
+			OnActivePane:  setActivePane,
+			OnMode:        setMode,
+			Cols:          lastCols,
+			Rows:          lastRows,
+		})
 		_ = writeMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 		_ = conn.Close()
 	}()
-
-	writeInput := func(data []byte) error {
-		werr := backend.WriteInput(ctx, target, controlGen, data)
-		if errors.Is(werr, sessionbackend.ErrStaleControl) {
-			if next, cerr := backend.ClaimControl(ctx, target, clientID); cerr == nil {
-				controlGen = next.ControlGen
-				werr = backend.WriteInput(ctx, target, controlGen, data)
-			}
-		}
-		return werr
-	}
 
 	for {
 		mt, data, err := conn.ReadMessage()
@@ -172,21 +175,30 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 						continue
 					}
 					lastCols, lastRows = ctrl.Cols, ctrl.Rows
-					rerr := backend.Resize(ctx, target, controlGen, ctrl.Cols, ctrl.Rows)
-					if errors.Is(rerr, sessionbackend.ErrStaleControl) {
-						if next, cerr := backend.ClaimControl(ctx, target, clientID); cerr == nil {
-							controlGen = next.ControlGen
-							_ = backend.Resize(ctx, target, controlGen, ctrl.Cols, ctrl.Rows)
+					select {
+					case resizeCh <- [2]uint16{ctrl.Cols, ctrl.Rows}:
+					default:
+						select {
+						case <-resizeCh:
+						default:
 						}
+						resizeCh <- [2]uint16{ctrl.Cols, ctrl.Rows}
+					}
+					continue
+				case "select-pane":
+					select {
+					case selectCellCh <- [2]int{ctrl.Col, ctrl.Row}:
+					default:
 					}
 					continue
 				case "move-cursor":
-					_ = backend.MoveCursor(ctx, target, controlGen, ctrl.Col, ctrl.Row)
+					target := sessionbackend.Target{SessionID: name, PaneID: getActivePane()}
+					if lease, lerr := backend.ClaimControl(ctx, target, clientID); lerr == nil {
+						_ = backend.MoveCursor(ctx, target, lease.ControlGen, ctrl.Col, ctrl.Row)
+					}
 					continue
 				case "scroll":
-					modeMu.RLock()
-					m := lastMode
-					modeMu.RUnlock()
+					m := getMode()
 					if m.AltScreen && m.MouseOn && (ctrl.Dir == "up" || ctrl.Dir == "down") {
 						lines := ctrl.Lines
 						if lines <= 0 {
@@ -216,15 +228,13 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 						for i := 0; i < lines; i++ {
 							buf = append(buf, seq...)
 						}
-						_ = writeInput(buf)
+						_, _ = inW.Write(buf)
 					}
-					continue
-				case "select-pane":
 					continue
 				}
 			}
 		}
-		if err := writeInput(data); err != nil {
+		if _, err := inW.Write(data); err != nil {
 			return
 		}
 	}

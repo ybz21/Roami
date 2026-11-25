@@ -40,7 +40,7 @@ func formatStatusBarText(info statusBarInfo, cols uint16) string {
 		w = 10
 	}
 	if info.PrefixPending {
-		msg := ` [Ctrl+b] m:菜单 w:选窗口 c:新窗口 n/p:切窗口 1-9:窗口 %:左右 ":上下 o:切窗格 x:关窗格 &:关窗口 d:脱离`
+		msg := " [Ctrl+b] 空格:菜单  |:左右分屏  -:上下分屏  Tab:切窗格  c:新窗口  x:关闭  d:放后台"
 		return padOrClipDisplay(msg, w)
 	}
 
@@ -83,7 +83,7 @@ func formatStatusBarText(info statusBarInfo, cols uint16) string {
 		left.WriteString(paneHint)
 	}
 
-	right := `Ctrl+b m:菜单 w:窗口 c:新窗口 %/":分屏 d:脱离 `
+	right := "F2 / Ctrl+b 空格: 菜单 "
 	leftStr := left.String()
 	leftW := displayWidth(leftStr)
 	rightW := displayWidth(right)
@@ -92,7 +92,7 @@ func formatStatusBarText(info statusBarInfo, cols uint16) string {
 		return leftStr + strings.Repeat(" ", w-leftW-rightW) + right
 	}
 	// Narrow terminal: use compact hint so window tabs remain visible.
-	shortRight := "Ctrl+b m:菜单 w:窗口 d:脱离 "
+	shortRight := "F2 菜单 "
 	shortRightW := displayWidth(shortRight)
 	if leftW+shortRightW+2 <= w {
 		return leftStr + strings.Repeat(" ", w-leftW-shortRightW) + shortRight

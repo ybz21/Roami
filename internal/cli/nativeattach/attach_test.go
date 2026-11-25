@@ -60,6 +60,17 @@ func TestPrefixFilterChords(t *testing.T) {
 	if !bytes.Equal(acts[0].Data, []byte{DefaultPrefix, DefaultPrefix, 'z'}) {
 		t.Fatalf("forwarded bytes = %v, want [%d %d 'z']", acts[0].Data, DefaultPrefix, DefaultPrefix)
 	}
+	// Also verify ergonomic shortcuts: F2 single-key menu, Ctrl+b Space, |, -, Tab.
+	ergo := f.Feed([]byte{0x1b, 'O', 'Q', DefaultPrefix, ' ', DefaultPrefix, '|', DefaultPrefix, '-', DefaultPrefix, '\t'})
+	wantErgo := []ActionKind{ActionOpenMenu, ActionOpenMenu, ActionSplitH, ActionSplitV, ActionNextPane}
+	if len(ergo) != len(wantErgo) {
+		t.Fatalf("ergo got %d actions %+v, want %d", len(ergo), ergo, len(wantErgo))
+	}
+	for i, want := range wantErgo {
+		if ergo[i].Kind != want {
+			t.Fatalf("ergo[%d] = %v, want %v", i, ergo[i].Kind, want)
+		}
+	}
 }
 
 func TestStatusBarFormattingAndWidthClipping(t *testing.T) {
@@ -73,7 +84,7 @@ func TestStatusBarFormattingAndWidthClipping(t *testing.T) {
 		ActivePaneID:   "p-2",
 	}
 	wide := formatStatusBarText(info, 120)
-	if !strings.Contains(wide, "[dev]") || !strings.Contains(wide, "1:main") || !strings.Contains(wide, "2:logs*") || !strings.Contains(wide, "Ctrl+b m:菜单") {
+	if !strings.Contains(wide, "[dev]") || !strings.Contains(wide, "1:main") || !strings.Contains(wide, "2:logs*") || !strings.Contains(wide, "F2 / Ctrl+b 空格: 菜单") {
 		t.Fatalf("unexpected wide status bar: %q", wide)
 	}
 	if gotW := displayWidth(wide); gotW != 120 {
@@ -143,11 +154,11 @@ func TestAttachMenuAndWindowSwitcher(t *testing.T) {
 	}()
 
 	waitFor(t, 4*time.Second, func() bool {
-		return strings.Contains(out.String(), "Ctrl+b m:菜单") && strings.Contains(out.String(), "2:logs")
+		return strings.Contains(out.String(), "F2 / Ctrl+b 空格: 菜单") && strings.Contains(out.String(), "2:logs")
 	}, "bottom status bar rendered")
 
-	// Open interactive command menu (Ctrl+b m): verify box-drawn menu lists windows inline and supports ↑/↓ + Enter.
-	_, _ = inW.Write([]byte{DefaultPrefix, 'm'})
+	// Open interactive command menu with single-key F2: verify box-drawn menu lists windows inline and supports ↑/↓ + Enter.
+	_, _ = inW.Write([]byte{0x1b, 'O', 'Q'})
 	waitFor(t, 3*time.Second, func() bool {
 		s := out.String()
 		return strings.Contains(s, "Roami 终端菜单") && strings.Contains(s, "╭─") && strings.Contains(s, "2:logs")

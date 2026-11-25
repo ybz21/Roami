@@ -75,11 +75,8 @@ func sessionCommandPage(command string) (Page, bool) {
 			{"roami session a dev:2", "简写：进入 dev 的第 2 个窗口"},
 		}, []string{
 			"省略 SESSION 时交互选择；别名 a。",
-			"进入原生终端后底部会显示窗口状态栏与热键提示：",
-			"  Ctrl+b m / ?  打开交互菜单（可手动切窗口、新建窗口、分屏、脱离）",
-			"  Ctrl+b w      打开窗口/分屏列表（方向键选择并回车进入）",
-			"  Ctrl+b c      新建窗口    Ctrl+b n / p  上/下一个窗口    Ctrl+b 1-9  按序号切窗口",
-			"  Ctrl+b % / \"  左右/上下分屏    Ctrl+b o  切窗格    Ctrl+b x  关窗格    Ctrl+b d  脱离",
+			"进入原生终端后，按 F2（或 Ctrl+b 空格）即可打开中文菜单，方向键操作分屏、切窗口、放后台。",
+			"也支持常用直达键：Ctrl+b |/-（左右/上下分屏）、Ctrl+b Tab/方向键（切窗格）、Ctrl+b c（新窗口）、Ctrl+b d（放后台）。",
 		}},
 
 		"detach": {"脱离当前会话", "[SESSION]", nil, nil, []string{"省略 SESSION 时脱离当前客户端；别名 d。"}},

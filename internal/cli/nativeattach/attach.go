@@ -91,7 +91,8 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 		}
 	}
 
-	for _, b := range chunk {
+	for i := 0; i < len(chunk); i++ {
+		b := chunk[i]
 		switch f.state {
 		case prefixAwaitCSI:
 			f.state = prefixIdle
@@ -130,13 +131,13 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 			case b == 'd' || b == 'D':
 				flush()
 				actions = append(actions, Action{Kind: ActionDetach})
-			case b == '%':
+			case b == '%' || b == '|':
 				flush()
 				actions = append(actions, Action{Kind: ActionSplitH})
-			case b == '"':
+			case b == '"' || b == '-':
 				flush()
 				actions = append(actions, Action{Kind: ActionSplitV})
-			case b == 'o':
+			case b == 'o' || b == '\t':
 				flush()
 				actions = append(actions, Action{Kind: ActionNextPane})
 			case b == 'x':
@@ -154,7 +155,7 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 			case b == '&':
 				flush()
 				actions = append(actions, Action{Kind: ActionCloseWindow})
-			case b == 'm' || b == '?':
+			case b == ' ' || b == '\r' || b == '\n' || b == 'm' || b == '?':
 				flush()
 				actions = append(actions, Action{Kind: ActionOpenMenu})
 			case b == 'w':
@@ -171,6 +172,21 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 				}
 			}
 			continue
+		}
+		// Single-key F2 (\x1bOQ or \x1b[12~) opens the menu without needing Ctrl+b or adding Esc lag.
+		if b == 0x1b {
+			if i+2 < len(chunk) && chunk[i+1] == 'O' && chunk[i+2] == 'Q' {
+				flush()
+				actions = append(actions, Action{Kind: ActionOpenMenu})
+				i += 2
+				continue
+			}
+			if i+4 < len(chunk) && chunk[i+1] == '[' && chunk[i+2] == '1' && chunk[i+3] == '2' && chunk[i+4] == '~' {
+				flush()
+				actions = append(actions, Action{Kind: ActionOpenMenu})
+				i += 4
+				continue
+			}
 		}
 		if b == f.Prefix {
 			f.state = prefixAwaitKey
@@ -252,7 +268,11 @@ type AttachOptions struct {
 	In            io.Reader
 	Out           io.Writer
 	RawTTY        bool
-	ShowStatusBar *bool // nil = auto-enabled on interactive raw TTY with >= 6 rows
+	ShowStatusBar *bool            // nil = auto-enabled on interactive raw TTY with >= 6 rows
+	ResizeCh      <-chan [2]uint16 // optional external resize feed (e.g. WebSocket resize frames)
+	SelectCellCh  <-chan [2]int    // optional 0-based (col, row) click-to-focus feed for multi-pane layouts
+	OnActivePane  func(paneID string)
+	OnMode        func(mode sessionbackend.TerminalMode)
 	Cols          uint16
 	Rows          uint16
 }
@@ -431,29 +451,48 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 	var activeGen uint64
 	var inComposite atomic.Bool
 	resizeCh := make(chan struct{}, 1)
+	handleResize := func(c, r uint16) {
+		if c == 0 || r == 0 {
+			return
+		}
+		curCols.Store(uint32(c))
+		curRows.Store(uint32(r))
+		if inComposite.Load() {
+			select {
+			case resizeCh <- struct{}{}:
+			default:
+			}
+			return
+		}
+		resizeTargetMu.Lock()
+		t := activeTarget
+		gen := activeGen
+		resizeTargetMu.Unlock()
+		if showStatus && r >= 6 {
+			_ = writeOut([]byte(applyScrollRegion(paneRowsFor(r))))
+		}
+		if t.SessionID != "" && gen > 0 {
+			_ = backend.Resize(attachCtx, t, gen, c, paneRowsFor(r))
+		}
+		drawStatusBar(t.PaneID, false)
+	}
 	if hasFD {
-		go ttyraw.WatchResize(attachCtx, inFD, func(c, r uint16) {
-			curCols.Store(uint32(c))
-			curRows.Store(uint32(r))
-			if inComposite.Load() {
+		go ttyraw.WatchResize(attachCtx, inFD, handleResize)
+	}
+	if opts.ResizeCh != nil {
+		go func() {
+			for {
 				select {
-				case resizeCh <- struct{}{}:
-				default:
+				case <-attachCtx.Done():
+					return
+				case sz, ok := <-opts.ResizeCh:
+					if !ok {
+						return
+					}
+					handleResize(sz[0], sz[1])
 				}
-				return
 			}
-			resizeTargetMu.Lock()
-			t := activeTarget
-			gen := activeGen
-			resizeTargetMu.Unlock()
-			if showStatus && r >= 6 {
-				_ = writeOut([]byte(applyScrollRegion(paneRowsFor(r))))
-			}
-			if t.SessionID != "" && gen > 0 {
-				_ = backend.Resize(attachCtx, t, gen, c, paneRowsFor(r))
-			}
-			drawStatusBar(t.PaneID, false)
-		})
+		}()
 	}
 
 	filter := NewPrefixFilter(opts.Prefix)
@@ -482,7 +521,7 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			inComposite.Store(true)
 			switchPane, detached, exited, runErr = pumpMultiPane(
 				attachCtx, backend, layout, opts.SessionID, *multiWin, paneID, opts.ClientID,
-				inCh, inErrCh, resizeCh, &curCols, &curRows, paneRowsFor, filter, writeOut, buildStatusSeq,
+				inCh, inErrCh, resizeCh, opts.SelectCellCh, opts.OnActivePane, &curCols, &curRows, paneRowsFor, filter, writeOut, buildStatusSeq,
 			)
 			inComposite.Store(false)
 		} else {
@@ -494,6 +533,9 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			controlGen := lease.ControlGen
 			paneID = lease.PaneID
 			target.PaneID = paneID
+			if opts.OnActivePane != nil {
+				opts.OnActivePane(paneID)
+			}
 
 			resizeTargetMu.Lock()
 			activeTarget = target
@@ -516,7 +558,7 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 
 			switchPane, detached, exited, runErr = pumpPane(
 				attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
-				stream, inCh, inErrCh, filter, writeOut, drawStatusBar, showStatus, c, pRows,
+				stream, inCh, inErrCh, filter, writeOut, drawStatusBar, opts.OnMode, showStatus, c, pRows,
 			)
 			_ = stream.Close()
 			_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
@@ -566,6 +608,7 @@ func pumpPane(
 	filter *PrefixFilter,
 	writeOut func([]byte) error,
 	drawStatusBar func(pane string, prefixPending bool),
+	onMode func(sessionbackend.TerminalMode),
 	showStatus bool,
 	cols, paneRows uint16,
 ) (switchPane string, detached bool, exited bool, err error) {
@@ -596,6 +639,9 @@ func pumpPane(
 		case ev, ok := <-stream.Events():
 			if !ok {
 				return "", false, true, nil
+			}
+			if ev.Mode != nil && onMode != nil {
+				onMode(*ev.Mode)
 			}
 			switch ev.Kind {
 			case sessionbackend.EventSnapshot:
