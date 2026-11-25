@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ybz21/Roami/internal/sessionbackend"
 )
@@ -15,17 +16,144 @@ type overlayOutcome struct {
 	refresh    bool
 }
 
-type switcherRow struct {
-	windowID    string
-	windowIndex int
-	windowName  string
-	paneID      string
-	isWindow    bool
-	isActiveWin bool
-	isActiveP   bool
+type menuKeyKind uint8
+
+const (
+	menuKeyNone menuKeyKind = iota
+	menuKeyUp
+	menuKeyDown
+	menuKeyLeft
+	menuKeyRight
+	menuKeyEnter
+	menuKeyEsc
+	menuKeyChar
+)
+
+type menuKey struct {
+	kind menuKeyKind
+	ch   byte
 }
 
-// runCommandMenu opens a tmux-like interactive command menu overlay (`Ctrl+b m` / `Ctrl+b ?`).
+// menuInput buffers raw bytes from inCh so arrow keys split across SSH packets
+// (\x1b then [A) or SS3 sequences (\x1bOA) parse reliably without falsely exiting on Esc.
+type menuInput struct {
+	inCh    <-chan []byte
+	inErrCh <-chan error
+	buf     []byte
+}
+
+func newMenuInput(inCh <-chan []byte, inErrCh <-chan error) *menuInput {
+	return &menuInput{inCh: inCh, inErrCh: inErrCh}
+}
+
+func (m *menuInput) readChunk(ctx context.Context, timeout time.Duration) (bool, error) {
+	if timeout > 0 {
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return false, context.Canceled
+		case err := <-m.inErrCh:
+			return false, err
+		case chunk := <-m.inCh:
+			cleaned := FilterAutoReplies(chunk)
+			if len(cleaned) > 0 {
+				m.buf = append(m.buf, cleaned...)
+				return true, nil
+			}
+			return false, nil
+		case <-timer.C:
+			return false, nil
+		}
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return false, context.Canceled
+		case err := <-m.inErrCh:
+			return false, err
+		case chunk := <-m.inCh:
+			cleaned := FilterAutoReplies(chunk)
+			if len(cleaned) > 0 {
+				m.buf = append(m.buf, cleaned...)
+				return true, nil
+			}
+		}
+	}
+}
+
+func (m *menuInput) nextKey(ctx context.Context) (menuKey, error) {
+	for len(m.buf) == 0 {
+		if _, err := m.readChunk(ctx, 0); err != nil {
+			return menuKey{}, err
+		}
+	}
+	b := m.buf[0]
+	if b == 0x1b {
+		// Wait briefly for follow-up bytes so lone Esc exits while split \x1b[A / \x1bOA parses as arrow keys.
+		for len(m.buf) < 3 {
+			got, err := m.readChunk(ctx, 40*time.Millisecond)
+			if err != nil {
+				return menuKey{}, err
+			}
+			if !got {
+				break
+			}
+			if len(m.buf) >= 2 && m.buf[1] != '[' && m.buf[1] != 'O' {
+				break
+			}
+		}
+		if len(m.buf) >= 3 && (m.buf[1] == '[' || m.buf[1] == 'O') {
+			code := m.buf[2]
+			m.buf = m.buf[3:]
+			switch code {
+			case 'A':
+				return menuKey{kind: menuKeyUp}, nil
+			case 'B':
+				return menuKey{kind: menuKeyDown}, nil
+			case 'C':
+				return menuKey{kind: menuKeyRight}, nil
+			case 'D':
+				return menuKey{kind: menuKeyLeft}, nil
+			default:
+				return menuKey{kind: menuKeyNone}, nil
+			}
+		}
+		m.buf = m.buf[1:]
+		return menuKey{kind: menuKeyEsc}, nil
+	}
+
+	m.buf = m.buf[1:]
+	switch b {
+	case '\r', '\n':
+		return menuKey{kind: menuKeyEnter}, nil
+	case 0x03: // Ctrl+C
+		return menuKey{kind: menuKeyEsc}, nil
+	default:
+		return menuKey{kind: menuKeyChar, ch: b}, nil
+	}
+}
+
+type menuItemKind uint8
+
+const (
+	menuItemHeader menuItemKind = iota
+	menuItemWindow
+	menuItemAction
+)
+
+type menuItem struct {
+	kind       menuItemKind
+	label      string
+	shortcut   string
+	actionKey  byte
+	windowID   string
+	paneID     string
+	selectable bool
+}
+
+// runCommandMenu opens a centered, box-drawn interactive menu (`Ctrl+b m` / `Ctrl+b ?`).
+// Users can navigate with ↑/↓ (or j/k) + Enter OR press any displayed shortcut key directly.
 func runCommandMenu(
 	ctx context.Context,
 	backend sessionbackend.SessionBackend,
@@ -36,107 +164,329 @@ func runCommandMenu(
 	writeOut func([]byte) error,
 	cols, rows uint16,
 ) (overlayOutcome, error) {
+	return runCommandMenuWithInput(ctx, backend, layout, sessionID, currentPaneID, newMenuInput(inCh, inErrCh), writeOut, cols, rows)
+}
+
+func runCommandMenuWithInput(
+	ctx context.Context,
+	backend sessionbackend.SessionBackend,
+	layout sessionbackend.LayoutBackend,
+	sessionID, currentPaneID string,
+	mi *menuInput,
+	writeOut func([]byte) error,
+	cols, rows uint16,
+) (overlayOutcome, error) {
 	st, err := backend.Observe(ctx, sessionID)
 	if err != nil {
 		return overlayOutcome{refresh: true}, nil
 	}
 
+	items := buildCommandMenuItems(st, currentPaneID)
+	selected := firstSelectableIndex(items)
+	// Default cursor onto the first actionable split/menu command if only 1 window exists,
+	// or onto the first non-current window if multiple windows exist for quick switching.
+	if len(st.Windows) <= 1 {
+		for i, it := range items {
+			if it.kind == menuItemAction && it.selectable {
+				selected = i
+				break
+			}
+		}
+	} else {
+		for i, it := range items {
+			if it.kind == menuItemWindow && it.windowID != st.ActiveWindowID {
+				selected = i
+				break
+			}
+		}
+	}
+
+	defer func() { _ = writeOut([]byte("\x1b[?25h")) }()
+
+	execAction := func(actionKey byte) (overlayOutcome, bool, error) {
+		switch {
+		case actionKey == 'q' || actionKey == 'Q' || actionKey == 0x1b:
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey == 'd' || actionKey == 'D':
+			return overlayOutcome{detached: true}, true, nil
+		case actionKey == 'w' || actionKey == 'W':
+			res, werr := runWindowSwitcherWithInput(ctx, backend, layout, sessionID, currentPaneID, mi, writeOut, cols, rows)
+			return res, true, werr
+		case actionKey == 'c' || actionKey == 'C':
+			if pane, ok := createAndSelectWindow(ctx, layout, sessionID, cols, rows); ok {
+				return overlayOutcome{switchPane: pane}, true, nil
+			}
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey == 'n' || actionKey == 'N':
+			if pane, ok := stepWindow(ctx, backend, layout, sessionID, currentPaneID, +1); ok {
+				return overlayOutcome{switchPane: pane}, true, nil
+			}
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey == 'p' || actionKey == 'P':
+			if pane, ok := stepWindow(ctx, backend, layout, sessionID, currentPaneID, -1); ok {
+				return overlayOutcome{switchPane: pane}, true, nil
+			}
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey >= '1' && actionKey <= '9':
+			if pane, ok := selectWindowByNumber(ctx, backend, layout, sessionID, int(actionKey-'0')); ok {
+				return overlayOutcome{switchPane: pane}, true, nil
+			}
+			return overlayOutcome{}, false, nil
+		case actionKey == '%':
+			if pane, ok := splitCurrentPane(ctx, layout, sessionID, currentPaneID, sessionbackend.SplitHorizontal, cols, rows); ok {
+				return overlayOutcome{switchPane: pane}, true, nil
+			}
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey == '"':
+			if pane, ok := splitCurrentPane(ctx, layout, sessionID, currentPaneID, sessionbackend.SplitVertical, cols, rows); ok {
+				return overlayOutcome{switchPane: pane}, true, nil
+			}
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey == 'o' || actionKey == 'O':
+			if next, ok := pickNextPaneInWindow(ctx, backend, layout, sessionID, currentPaneID); ok && next != currentPaneID {
+				return overlayOutcome{switchPane: next}, true, nil
+			}
+			return overlayOutcome{refresh: true}, true, nil
+		case actionKey == 'x' || actionKey == 'X':
+			return closeCurrentPane(ctx, backend, layout, sessionID, currentPaneID), true, nil
+		case actionKey == '&':
+			return closeCurrentWindow(ctx, backend, layout, sessionID, currentPaneID), true, nil
+		}
+		return overlayOutcome{}, false, nil
+	}
+
+	for {
+		frame := renderCommandMenuBox(st, currentPaneID, items, selected, int(cols), int(rows))
+		if err := writeOut([]byte(frame)); err != nil {
+			return overlayOutcome{}, err
+		}
+
+		k, err := mi.nextKey(ctx)
+		if err != nil {
+			if err == context.Canceled {
+				return overlayOutcome{detached: true}, nil
+			}
+			return overlayOutcome{}, err
+		}
+		switch k.kind {
+		case menuKeyEsc:
+			return overlayOutcome{refresh: true}, nil
+		case menuKeyUp:
+			selected = stepSelectable(items, selected, -1)
+		case menuKeyDown:
+			selected = stepSelectable(items, selected, +1)
+		case menuKeyEnter:
+			if selected >= 0 && selected < len(items) && items[selected].selectable {
+				it := items[selected]
+				if it.kind == menuItemWindow {
+					if layout != nil {
+						_ = layout.SelectWindow(ctx, sessionID, it.windowID)
+						if it.paneID != "" {
+							_, _ = layout.FocusPane(ctx, sessionID, it.windowID, it.paneID)
+						}
+					}
+					return overlayOutcome{switchPane: it.paneID}, nil
+				}
+				if res, done, aerr := execAction(it.actionKey); done || aerr != nil {
+					return res, aerr
+				}
+			}
+		case menuKeyChar:
+			switch k.ch {
+			case 'j', 'J':
+				selected = stepSelectable(items, selected, +1)
+			case 'k', 'K':
+				selected = stepSelectable(items, selected, -1)
+			default:
+				if res, done, aerr := execAction(k.ch); done || aerr != nil {
+					return res, aerr
+				}
+			}
+		}
+	}
+}
+
+func buildCommandMenuItems(st sessionbackend.SessionState, currentPaneID string) []menuItem {
+	var items []menuItem
+	if len(st.Windows) > 0 {
+		items = append(items, menuItem{kind: menuItemHeader, label: fmt.Sprintf("窗口直达（共 %d 个，按数字键或回车切换）", len(st.Windows))})
+		for i, w := range st.Windows {
+			name := w.Name
+			if name == "" {
+				name = w.ID
+			}
+			paneCount := 1
+			activePane := w.ActivePaneID
+			if w.Layout != nil {
+				panes := w.Layout.PaneIDs()
+				paneCount = len(panes)
+				if activePane == "" && len(panes) > 0 {
+					activePane = panes[0]
+				}
+			}
+			mark := ""
+			if w.ID == st.ActiveWindowID || (w.Layout != nil && w.Layout.ContainsPane(currentPaneID)) {
+				mark = " [当前]"
+			}
+			shortcut := ""
+			var aKey byte
+			if i < 9 {
+				shortcut = fmt.Sprintf("%d", i+1)
+				aKey = byte('1' + i)
+			}
+			label := fmt.Sprintf("%d:%s (%d窗格)%s", i+1, name, paneCount, mark)
+			items = append(items, menuItem{
+				kind:       menuItemWindow,
+				label:      label,
+				shortcut:   shortcut,
+				actionKey:  aKey,
+				windowID:   w.ID,
+				paneID:     activePane,
+				selectable: true,
+			})
+		}
+	}
+
+	items = append(items,
+		menuItem{kind: menuItemHeader, label: "常用操作（↑/↓ 选择回车，或直接按右侧快捷键）"},
+		menuItem{kind: menuItemAction, label: "左右分屏（同屏一分为二）", shortcut: "%", actionKey: '%', selectable: true},
+		menuItem{kind: menuItemAction, label: "上下分屏（同屏一分为二）", shortcut: `"`, actionKey: '"', selectable: true},
+		menuItem{kind: menuItemAction, label: "切换焦点到下一窗格（或 Ctrl+b+方向键）", shortcut: "o", actionKey: 'o', selectable: true},
+		menuItem{kind: menuItemAction, label: "新建窗口并切过去", shortcut: "c", actionKey: 'c', selectable: true},
+		menuItem{kind: menuItemAction, label: "窗口与分屏树（含实时输出预览）", shortcut: "w", actionKey: 'w', selectable: true},
+		menuItem{kind: menuItemAction, label: "关闭当前窗格", shortcut: "x", actionKey: 'x', selectable: true},
+		menuItem{kind: menuItemAction, label: "关闭当前窗口", shortcut: "&", actionKey: '&', selectable: true},
+		menuItem{kind: menuItemAction, label: "脱离会话（放后台继续运行）", shortcut: "d", actionKey: 'd', selectable: true},
+		menuItem{kind: menuItemAction, label: "返回终端", shortcut: "Esc", actionKey: 'q', selectable: true},
+	)
+	return items
+}
+
+func firstSelectableIndex(items []menuItem) int {
+	for i, it := range items {
+		if it.selectable {
+			return i
+		}
+	}
+	return 0
+}
+
+func stepSelectable(items []menuItem, cur, delta int) int {
+	n := len(items)
+	if n == 0 {
+		return 0
+	}
+	for step := 1; step <= n; step++ {
+		idx := (cur + delta*step + n*10) % n
+		if items[idx].selectable {
+			return idx
+		}
+	}
+	return cur
+}
+
+func renderCommandMenuBox(st sessionbackend.SessionState, currentPaneID string, items []menuItem, selected, cols, rows int) string {
 	label := st.Label
 	if label == "" {
 		label = st.SessionID
 	}
 	winIdx, winName := activeWindowLabel(st, currentPaneID)
 
+	boxW := 60
+	if cols > 0 && cols-4 < boxW {
+		boxW = cols - 4
+	}
+	if boxW < 34 {
+		boxW = 34
+	}
+	innerW := boxW - 2
+
+	var boxLines []string
+	title := fmt.Sprintf(" Roami 终端菜单 [%s] · %d:%s ", label, winIdx, winName)
+	title = clipDisplay(title, innerW-2)
+	titlePad := innerW - displayWidth(title) - 1
+	if titlePad < 0 {
+		titlePad = 0
+	}
+	boxLines = append(boxLines, "\x1b[36m╭─\x1b[1;36m"+title+"\x1b[0;36m"+strings.Repeat("─", titlePad)+"╮\x1b[0m")
+
+	for i, it := range items {
+		if it.kind == menuItemHeader {
+			hdr := " " + clipDisplay(it.label, innerW-2)
+			pad := innerW - displayWidth(hdr)
+			if pad < 0 {
+				pad = 0
+			}
+			boxLines = append(boxLines, "\x1b[36m│\x1b[0;2m"+hdr+strings.Repeat(" ", pad)+"\x1b[0;36m│\x1b[0m")
+			continue
+		}
+		rightTag := ""
+		if it.shortcut != "" {
+			rightTag = "[" + it.shortcut + "] "
+		}
+		rightW := displayWidth(rightTag)
+		prefix := "   "
+		if i == selected {
+			prefix = " ▸ "
+		}
+		avail := innerW - displayWidth(prefix) - rightW - 1
+		if avail < 6 {
+			avail = 6
+		}
+		text := clipDisplay(it.label, avail)
+		gap := innerW - displayWidth(prefix) - displayWidth(text) - rightW
+		if gap < 1 {
+			gap = 1
+		}
+		lineContent := prefix + text + strings.Repeat(" ", gap) + rightTag
+		if i == selected {
+			boxLines = append(boxLines, "\x1b[36m│\x1b[1;30;46m"+padOrClipDisplay(lineContent, innerW)+"\x1b[0;36m│\x1b[0m")
+		} else {
+			boxLines = append(boxLines, "\x1b[36m│\x1b[0m"+prefix+text+strings.Repeat(" ", gap)+"\x1b[33m"+rightTag+"\x1b[0;36m│\x1b[0m")
+		}
+	}
+
+	footer := " ↑/↓ 选择 · Enter 确认 · 快捷键直达 · Esc 返回 "
+	footer = clipDisplay(footer, innerW-2)
+	fPad := innerW - displayWidth(footer) - 1
+	if fPad < 0 {
+		fPad = 0
+	}
+	boxLines = append(boxLines, "\x1b[36m╰─\x1b[0;2m"+footer+"\x1b[0;36m"+strings.Repeat("─", fPad)+"╯\x1b[0m")
+
+	startX := 1
+	if cols > boxW {
+		startX = (cols-boxW)/2 + 1
+	}
+	startY := 1
+	if rows > len(boxLines) {
+		startY = (rows-len(boxLines))/2 + 1
+	}
+
 	var b strings.Builder
 	b.WriteString(resetScrollRegion)
 	b.WriteString("\x1b[2J\x1b[H\x1b[?25l")
-	fmt.Fprintf(&b, "\x1b[1;36m=== Roami 终端菜单 [%s] ===\x1b[0m\r\n", label)
-	fmt.Fprintf(&b, "\x1b[2m当前位置：窗口 %d:%s · 窗格 %s（共 %d 个窗口）\x1b[0m\r\n\r\n", winIdx, winName, currentPaneID, len(st.Windows))
-	lines := []string{
-		"  [w]  切换窗口 / 查看分屏列表（方向键选择）",
-		"  [c]  新建窗口并切过去",
-		"  [n]  下一个窗口        [p]  上一个窗口",
-		"  [1-9] 按序号直接切换窗口",
-		"  [%]  左右分屏          [\"]  上下分屏",
-		"  [o]  切换到下一个窗格",
-		"  [x]  关闭当前窗格      [&]  关闭当前窗口",
-		"  [d]  脱离会话（保持后台运行）",
-		"  [q / Esc]  返回终端",
-	}
-	for _, line := range lines {
-		b.WriteString(line)
-		b.WriteString("\r\n")
-	}
-	b.WriteString("\r\n\x1b[33m按对应按键执行：\x1b[0m")
-	if err := writeOut([]byte(b.String())); err != nil {
-		return overlayOutcome{}, err
-	}
-	defer func() { _ = writeOut([]byte("\x1b[?25h")) }()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return overlayOutcome{detached: true}, nil
-		case rerr := <-inErrCh:
-			return overlayOutcome{}, rerr
-		case chunk := <-inCh:
-			cleaned := FilterAutoReplies(chunk)
-			if len(cleaned) == 0 {
-				continue
-			}
-			key := cleaned[0]
-			switch {
-			case key == 'q' || key == 'Q' || key == 0x1b || key == 0x03 || key == '\r' || key == '\n':
-				return overlayOutcome{refresh: true}, nil
-			case key == 'd' || key == 'D':
-				return overlayOutcome{detached: true}, nil
-			case key == 'w' || key == 'W':
-				return runWindowSwitcher(ctx, backend, layout, sessionID, currentPaneID, inCh, inErrCh, writeOut, cols, rows)
-			case key == 'c' || key == 'C':
-				if pane, ok := createAndSelectWindow(ctx, layout, sessionID, cols, rows); ok {
-					return overlayOutcome{switchPane: pane}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key == 'n' || key == 'N':
-				if pane, ok := stepWindow(ctx, backend, layout, sessionID, currentPaneID, +1); ok {
-					return overlayOutcome{switchPane: pane}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key == 'p' || key == 'P':
-				if pane, ok := stepWindow(ctx, backend, layout, sessionID, currentPaneID, -1); ok {
-					return overlayOutcome{switchPane: pane}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key >= '1' && key <= '9':
-				if pane, ok := selectWindowByNumber(ctx, backend, layout, sessionID, int(key-'0')); ok {
-					return overlayOutcome{switchPane: pane}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key == '%':
-				if pane, ok := splitCurrentPane(ctx, layout, sessionID, currentPaneID, sessionbackend.SplitHorizontal, cols, rows); ok {
-					return overlayOutcome{switchPane: pane}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key == '"':
-				if pane, ok := splitCurrentPane(ctx, layout, sessionID, currentPaneID, sessionbackend.SplitVertical, cols, rows); ok {
-					return overlayOutcome{switchPane: pane}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key == 'o' || key == 'O':
-				if next, ok := pickNextPaneInWindow(ctx, backend, layout, sessionID, currentPaneID); ok && next != currentPaneID {
-					return overlayOutcome{switchPane: next}, nil
-				}
-				return overlayOutcome{refresh: true}, nil
-			case key == 'x' || key == 'X':
-				return closeCurrentPane(ctx, backend, layout, sessionID, currentPaneID), nil
-			case key == '&':
-				return closeCurrentWindow(ctx, backend, layout, sessionID, currentPaneID), nil
-			}
+	for i, line := range boxLines {
+		if rows > 0 && startY+i > rows {
+			break
 		}
+		fmt.Fprintf(&b, "\x1b[%d;%dH%s", startY+i, startX, line)
 	}
+	return b.String()
 }
 
-// runWindowSwitcher opens an interactive window/pane tree picker (`Ctrl+b w`).
+type switcherRow struct {
+	windowID    string
+	windowIndex int
+	windowName  string
+	paneID      string
+	preview     string
+	isWindow    bool
+	isActiveWin bool
+	isActiveP   bool
+}
+
+// runWindowSwitcher opens an interactive window/pane tree picker (`Ctrl+b w`) with live pane previews.
 func runWindowSwitcher(
 	ctx context.Context,
 	backend sessionbackend.SessionBackend,
@@ -144,6 +494,18 @@ func runWindowSwitcher(
 	sessionID, currentPaneID string,
 	inCh <-chan []byte,
 	inErrCh <-chan error,
+	writeOut func([]byte) error,
+	cols, rows uint16,
+) (overlayOutcome, error) {
+	return runWindowSwitcherWithInput(ctx, backend, layout, sessionID, currentPaneID, newMenuInput(inCh, inErrCh), writeOut, cols, rows)
+}
+
+func runWindowSwitcherWithInput(
+	ctx context.Context,
+	backend sessionbackend.SessionBackend,
+	layout sessionbackend.LayoutBackend,
+	sessionID, currentPaneID string,
+	mi *menuInput,
 	writeOut func([]byte) error,
 	cols, rows uint16,
 ) (overlayOutcome, error) {
@@ -156,7 +518,8 @@ func runWindowSwitcher(
 		if err != nil || st.Status != sessionbackend.StatusAlive || len(st.Windows) == 0 {
 			return overlayOutcome{exited: true}, nil
 		}
-		items := buildSwitcherRows(st, currentPaneID)
+		previews := fetchPanePreviews(ctx, backend, st)
+		items := buildSwitcherRows(st, currentPaneID, previews)
 		if len(items) == 0 {
 			return overlayOutcome{refresh: true}, nil
 		}
@@ -176,57 +539,50 @@ func runWindowSwitcher(
 			selected = 0
 		}
 
-		if err := writeOut([]byte(renderSwitcherView(st, items, selected))); err != nil {
+		if err := writeOut([]byte(renderSwitcherView(st, items, selected, int(cols), int(rows)))); err != nil {
 			return overlayOutcome{}, err
 		}
 
-		select {
-		case <-ctx.Done():
-			return overlayOutcome{detached: true}, nil
-		case rerr := <-inErrCh:
-			return overlayOutcome{}, rerr
-		case chunk := <-inCh:
-			cleaned := FilterAutoReplies(chunk)
-			if len(cleaned) == 0 {
-				continue
+		k, err := mi.nextKey(ctx)
+		if err != nil {
+			if err == context.Canceled {
+				return overlayOutcome{detached: true}, nil
 			}
-			// Handle ANSI arrow keys (\x1b[A up, \x1b[B down) before single-byte keys.
-			if len(cleaned) >= 3 && cleaned[0] == 0x1b && cleaned[1] == '[' {
-				switch cleaned[2] {
-				case 'A': // Up
-					selected = (selected - 1 + len(items)) % len(items)
-					continue
-				case 'B': // Down
-					selected = (selected + 1) % len(items)
-					continue
+			return overlayOutcome{}, err
+		}
+		switch k.kind {
+		case menuKeyEsc:
+			return overlayOutcome{refresh: true}, nil
+		case menuKeyUp:
+			selected = (selected - 1 + len(items)) % len(items)
+		case menuKeyDown:
+			selected = (selected + 1) % len(items)
+		case menuKeyEnter:
+			it := items[selected]
+			if layout != nil {
+				_ = layout.SelectWindow(ctx, sessionID, it.windowID)
+				if it.paneID != "" {
+					_, _ = layout.FocusPane(ctx, sessionID, it.windowID, it.paneID)
 				}
 			}
-			key := cleaned[0]
+			return overlayOutcome{switchPane: it.paneID}, nil
+		case menuKeyChar:
 			switch {
-			case key == 'q' || key == 'Q' || key == 0x1b || key == 0x03:
+			case k.ch == 'q' || k.ch == 'Q':
 				return overlayOutcome{refresh: true}, nil
-			case key == 'j' || key == 'J':
+			case k.ch == 'j' || k.ch == 'J':
 				selected = (selected + 1) % len(items)
-			case key == 'k' || key == 'K':
+			case k.ch == 'k' || k.ch == 'K':
 				selected = (selected - 1 + len(items)) % len(items)
-			case key == '\r' || key == '\n':
-				it := items[selected]
-				if layout != nil {
-					_ = layout.SelectWindow(ctx, sessionID, it.windowID)
-					if it.paneID != "" {
-						_, _ = layout.FocusPane(ctx, sessionID, it.windowID, it.paneID)
-					}
-				}
-				return overlayOutcome{switchPane: it.paneID}, nil
-			case key >= '1' && key <= '9':
-				if pane, ok := selectWindowByNumber(ctx, backend, layout, sessionID, int(key-'0')); ok {
+			case k.ch >= '1' && k.ch <= '9':
+				if pane, ok := selectWindowByNumber(ctx, backend, layout, sessionID, int(k.ch-'0')); ok {
 					return overlayOutcome{switchPane: pane}, nil
 				}
-			case key == 'c' || key == 'C':
+			case k.ch == 'c' || k.ch == 'C':
 				if pane, ok := createAndSelectWindow(ctx, layout, sessionID, cols, rows); ok {
 					return overlayOutcome{switchPane: pane}, nil
 				}
-			case key == '%':
+			case k.ch == '%':
 				it := items[selected]
 				if pane, ok := splitCurrentPane(ctx, layout, sessionID, it.paneID, sessionbackend.SplitHorizontal, cols, rows); ok {
 					if layout != nil {
@@ -234,7 +590,7 @@ func runWindowSwitcher(
 					}
 					return overlayOutcome{switchPane: pane}, nil
 				}
-			case key == '"':
+			case k.ch == '"':
 				it := items[selected]
 				if pane, ok := splitCurrentPane(ctx, layout, sessionID, it.paneID, sessionbackend.SplitVertical, cols, rows); ok {
 					if layout != nil {
@@ -242,7 +598,7 @@ func runWindowSwitcher(
 					}
 					return overlayOutcome{switchPane: pane}, nil
 				}
-			case key == 'x' || key == 'X':
+			case k.ch == 'x' || k.ch == 'X':
 				if layout != nil {
 					it := items[selected]
 					if it.isWindow {
@@ -251,16 +607,54 @@ func runWindowSwitcher(
 						_, _ = layout.ClosePane(ctx, sessionID, it.paneID)
 					}
 				}
-			case key == 'm' || key == 'M':
-				return runCommandMenu(ctx, backend, layout, sessionID, currentPaneID, inCh, inErrCh, writeOut, cols, rows)
-			case key == 'd' || key == 'D':
+			case k.ch == 'm' || k.ch == 'M':
+				return runCommandMenuWithInput(ctx, backend, layout, sessionID, currentPaneID, mi, writeOut, cols, rows)
+			case k.ch == 'd' || k.ch == 'D':
 				return overlayOutcome{detached: true}, nil
 			}
 		}
 	}
 }
 
-func buildSwitcherRows(st sessionbackend.SessionState, currentPaneID string) []switcherRow {
+func fetchPanePreviews(ctx context.Context, backend sessionbackend.SessionBackend, st sessionbackend.SessionState) map[string]string {
+	out := make(map[string]string)
+	pCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	for _, w := range st.Windows {
+		if w.Layout == nil {
+			continue
+		}
+		for _, pid := range w.Layout.PaneIDs() {
+			capRes, err := backend.Capture(pCtx, sessionbackend.Target{SessionID: st.SessionID, PaneID: pid}, sessionbackend.CaptureOpts{Lines: 6})
+			if err != nil {
+				continue
+			}
+			lines := strings.Split(capRes.Text, "\n")
+			fallback := ""
+			for i := len(lines) - 1; i >= 0; i-- {
+				line := strings.TrimSpace(lines[i])
+				if line == "" {
+					continue
+				}
+				if fallback == "" {
+					fallback = line
+				}
+				// Skip bare shell prompts so the preview shows the last meaningful output/command.
+				if line == "$" || line == "#" || line == "%" || line == ">" {
+					continue
+				}
+				out[pid] = line
+				break
+			}
+			if out[pid] == "" && fallback != "" {
+				out[pid] = fallback
+			}
+		}
+	}
+	return out
+}
+
+func buildSwitcherRows(st sessionbackend.SessionState, currentPaneID string, previews map[string]string) []switcherRow {
 	var rows []switcherRow
 	for i, w := range st.Windows {
 		name := w.Name
@@ -281,6 +675,7 @@ func buildSwitcherRows(st sessionbackend.SessionState, currentPaneID string) []s
 			windowIndex: i + 1,
 			windowName:  name,
 			paneID:      activePane,
+			preview:     previews[activePane],
 			isWindow:    true,
 			isActiveWin: isActiveWin,
 			isActiveP:   activePane == currentPaneID,
@@ -292,6 +687,7 @@ func buildSwitcherRows(st sessionbackend.SessionState, currentPaneID string) []s
 					windowIndex: i + 1,
 					windowName:  name,
 					paneID:      pid,
+					preview:     previews[pid],
 					isWindow:    false,
 					isActiveWin: isActiveWin,
 					isActiveP:   pid == currentPaneID,
@@ -302,38 +698,103 @@ func buildSwitcherRows(st sessionbackend.SessionState, currentPaneID string) []s
 	return rows
 }
 
-func renderSwitcherView(st sessionbackend.SessionState, items []switcherRow, selected int) string {
+func renderSwitcherView(st sessionbackend.SessionState, items []switcherRow, selected, cols, rows int) string {
 	label := st.Label
 	if label == "" {
 		label = st.SessionID
 	}
-	var b strings.Builder
-	b.WriteString(resetScrollRegion)
-	b.WriteString("\x1b[2J\x1b[H\x1b[?25l")
-	fmt.Fprintf(&b, "\x1b[1;36m=== 切换窗口 / 窗格 [%s] ===\x1b[0m\r\n", label)
-	b.WriteString("\x1b[2m↑/↓(或 j/k) 选择  Enter 进入  1-9 直达窗口  c 新建窗口  %/\" 分屏  x 关闭  m 菜单  Esc 返回\x1b[0m\r\n\r\n")
+	boxW := 78
+	if cols > 0 && cols-4 < boxW {
+		boxW = cols - 4
+	}
+	if boxW < 40 {
+		boxW = 40
+	}
+	innerW := boxW - 2
+
+	var boxLines []string
+	title := fmt.Sprintf(" 切换窗口 / 窗格 [%s] ", label)
+	title = clipDisplay(title, innerW-2)
+	titlePad := innerW - displayWidth(title) - 1
+	if titlePad < 0 {
+		titlePad = 0
+	}
+	boxLines = append(boxLines, "\x1b[36m╭─\x1b[1;36m"+title+"\x1b[0;36m"+strings.Repeat("─", titlePad)+"╮\x1b[0m")
+
 	for i, it := range items {
-		prefix := "  "
+		prefix := "   "
 		if i == selected {
-			prefix = "\x1b[1;30;46m> "
+			prefix = " ▸ "
 		}
+		var base string
 		if it.isWindow {
 			tag := ""
 			if it.isActiveWin {
-				tag = " [当前窗口]"
+				tag = " [当前]"
 			}
-			fmt.Fprintf(&b, "%s[%d] %s (%s)  窗格:%s%s", prefix, it.windowIndex, it.windowName, it.windowID, it.paneID, tag)
+			base = fmt.Sprintf("[%d] %s (%s)%s", it.windowIndex, it.windowName, it.windowID, tag)
 		} else {
 			tag := ""
 			if it.isActiveP {
 				tag = " *"
 			}
-			fmt.Fprintf(&b, "%s    └─ 窗格 %s%s", prefix, it.paneID, tag)
+			base = fmt.Sprintf("  └─ 窗格 %s%s", it.paneID, tag)
 		}
+		previewPart := ""
+		if it.preview != "" {
+			rem := innerW - displayWidth(prefix) - displayWidth(base) - 4
+			if rem >= 8 {
+				previewPart = "  │ " + clipDisplay(it.preview, rem)
+			}
+		}
+		line := prefix + base + previewPart
 		if i == selected {
-			b.WriteString(" \x1b[0m")
+			boxLines = append(boxLines, "\x1b[36m│\x1b[1;30;46m"+padOrClipDisplay(line, innerW)+"\x1b[0;36m│\x1b[0m")
+		} else {
+			clippedBase := clipDisplay(prefix+base, innerW)
+			rem := innerW - displayWidth(clippedBase)
+			if previewPart != "" && rem > 0 {
+				clippedPrev := clipDisplay(previewPart, rem)
+				pad := innerW - displayWidth(clippedBase) - displayWidth(clippedPrev)
+				if pad < 0 {
+					pad = 0
+				}
+				boxLines = append(boxLines, "\x1b[36m│\x1b[0m"+clippedBase+"\x1b[2m"+clippedPrev+strings.Repeat(" ", pad)+"\x1b[0;36m│\x1b[0m")
+			} else {
+				pad := innerW - displayWidth(clippedBase)
+				if pad < 0 {
+					pad = 0
+				}
+				boxLines = append(boxLines, "\x1b[36m│\x1b[0m"+clippedBase+strings.Repeat(" ", pad)+"\x1b[0;36m│\x1b[0m")
+			}
 		}
-		b.WriteString("\r\n")
+	}
+
+	footer := " ↑/↓ 选择 · Enter 进入 · 1-9 直达 · c 新建 · %/\" 分屏 · x 关闭 · m 菜单 · Esc 返回 "
+	footer = clipDisplay(footer, innerW-2)
+	fPad := innerW - displayWidth(footer) - 1
+	if fPad < 0 {
+		fPad = 0
+	}
+	boxLines = append(boxLines, "\x1b[36m╰─\x1b[0;2m"+footer+"\x1b[0;36m"+strings.Repeat("─", fPad)+"╯\x1b[0m")
+
+	startX := 1
+	if cols > boxW {
+		startX = (cols-boxW)/2 + 1
+	}
+	startY := 1
+	if rows > len(boxLines) {
+		startY = (rows-len(boxLines))/2 + 1
+	}
+
+	var b strings.Builder
+	b.WriteString(resetScrollRegion)
+	b.WriteString("\x1b[2J\x1b[H\x1b[?25l")
+	for i, line := range boxLines {
+		if rows > 0 && startY+i > rows {
+			break
+		}
+		fmt.Fprintf(&b, "\x1b[%d;%dH%s", startY+i, startX, line)
 	}
 	return b.String()
 }

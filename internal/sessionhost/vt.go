@@ -641,6 +641,56 @@ func (e *Emulator) CaptureText(lines int, includeHistory bool) string {
 	return strings.Join(out, "\n")
 }
 
+// RenderRowFixed serializes exactly e.cur.cols display cells of rowIdx with ANSI styles
+// and trailing spaces (no trailing newline or erase-to-EOL) for side-by-side pane compositing.
+func (e *Emulator) RenderRowFixed(rowIdx int) string {
+	if rowIdx < 0 || rowIdx >= e.cur.rows {
+		return strings.Repeat(" ", e.cur.cols)
+	}
+	row := e.cur.grid[rowIdx]
+	var b bytes.Buffer
+	var lastStyle string
+	written := 0
+	for x := 0; x < len(row); x++ {
+		c := row[x]
+		if c.width == 0 {
+			continue
+		}
+		w := int(c.width)
+		if w == 0 {
+			w = 1
+		}
+		if written+w > e.cur.cols {
+			break
+		}
+		style := cellStyle(c)
+		if style != lastStyle {
+			if style == "" {
+				b.WriteString("\x1b[0m")
+			} else {
+				b.WriteString("\x1b[0;")
+				b.WriteString(style)
+				b.WriteByte('m')
+			}
+			lastStyle = style
+		}
+		if c.ch == 0 {
+			b.WriteByte(' ')
+		} else {
+			b.WriteRune(c.ch)
+		}
+		written += w
+	}
+	if lastStyle != "" {
+		b.WriteString("\x1b[0m")
+	}
+	for written < e.cur.cols {
+		b.WriteByte(' ')
+		written++
+	}
+	return b.String()
+}
+
 // SnapshotANSI serializes scrollback + active screen + cursor + modes so a reconnecting
 // xterm.js client reproduces the host terminal cleanly at an exact sequence boundary.
 func (e *Emulator) SnapshotANSI() []byte {

@@ -146,12 +146,27 @@ func TestAttachMenuAndWindowSwitcher(t *testing.T) {
 		return strings.Contains(out.String(), "Ctrl+b m:菜单") && strings.Contains(out.String(), "2:logs")
 	}, "bottom status bar rendered")
 
-	// Open interactive command menu (Ctrl+b m), verify menu appears, then press 'w' for window switcher, then '2' to enter logs.
+	// Open interactive command menu (Ctrl+b m): verify box-drawn menu lists windows inline and supports ↑/↓ + Enter.
 	_, _ = inW.Write([]byte{DefaultPrefix, 'm'})
 	waitFor(t, 3*time.Second, func() bool {
-		return strings.Contains(out.String(), "Roami 终端菜单")
-	}, "interactive command menu")
+		s := out.String()
+		return strings.Contains(s, "Roami 终端菜单") && strings.Contains(s, "╭─") && strings.Contains(s, "2:logs")
+	}, "interactive box command menu with inline windows")
 
+	// Default selection in a 2-window session highlights the non-current window (2:logs); pressing Enter jumps directly!
+	_, _ = inW.Write([]byte{'\r'})
+	waitFor(t, 4*time.Second, func() bool {
+		cur, err := host.Observe(ctx, ref.SessionID)
+		return err == nil && cur.ActiveWindowID == win2.ID
+	}, "Enter in menu jumped directly to window 2")
+
+	// Open menu again, press ↓ (split across two writes like SSH) to verify arrow-key handling, then 'w' for switcher.
+	_, _ = inW.Write([]byte{DefaultPrefix, 'm'})
+	time.Sleep(100 * time.Millisecond)
+	_, _ = inW.Write([]byte{0x1b})
+	time.Sleep(10 * time.Millisecond)
+	_, _ = inW.Write([]byte{'[', 'B'})
+	time.Sleep(80 * time.Millisecond)
 	_, _ = inW.Write([]byte{'w'})
 	waitFor(t, 3*time.Second, func() bool {
 		return strings.Contains(out.String(), "切换窗口 / 窗格")
@@ -172,6 +187,108 @@ func TestAttachMenuAndWindowSwitcher(t *testing.T) {
 		}
 		return len(cur.Windows[1].Layout.PaneIDs()) == 2
 	}, "split inside window 2")
+
+	_, _ = inW.Write([]byte{DefaultPrefix, 'd'})
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Attach returned error: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("Attach did not detach cleanly")
+	}
+	_ = inW.Close()
+}
+
+func TestMultiPaneCompositorSideBySideAndVertical(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix shell integration test")
+	}
+	// Verify geometry math for 2-pane horizontal + nested vertical split.
+	win := sessionbackend.NewSinglePaneWindow("w-1", "main", "n-1", "p-1")
+	if err := win.Split("p-1", sessionbackend.SplitHorizontal, 0.5, "s-1", "n-2", "p-2"); err != nil {
+		t.Fatalf("Split H: %v", err)
+	}
+	if err := win.Split("p-2", sessionbackend.SplitVertical, 0.5, "s-2", "n-3", "p-3"); err != nil {
+		t.Fatalf("Split V: %v", err)
+	}
+	lay := computeCellLayout(win.Layout, 101, 23)
+	if len(lay.Panes) != 3 || len(lay.Dividers) != 2 {
+		t.Fatalf("unexpected cell layout: panes=%+v dividers=%+v", lay.Panes, lay.Dividers)
+	}
+	if lay.Panes[0].W != 50 || lay.Panes[1].X != 51 || lay.Panes[1].W != 50 || lay.Panes[2].Y != 12 {
+		t.Fatalf("unexpected pane rects: %+v", lay.Panes)
+	}
+
+	// End-to-end real multi-pane compositing test: split right, write to right pane, focus left with Ctrl+b ←,
+	// write to left pane, and verify both outputs + vertical border │ render together on screen.
+	host := sessionhost.NewHost(sessionhost.Config{
+		HostID:  "cli-compositor-test",
+		LogsDir: t.TempDir(),
+	})
+	defer host.Shutdown(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ref, err := host.Create(ctx, sessionbackend.CreateSpec{
+		SessionID: "split-demo",
+		Exe:       "/bin/sh",
+		Cols:      100,
+		Rows:      24,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	showBar := true
+	inR, inW := io.Pipe()
+	out := &syncBuffer{}
+	done := make(chan error, 1)
+	go func() {
+		done <- Attach(ctx, host, host, AttachOptions{
+			SessionID:     ref.SessionID,
+			In:            inR,
+			Out:           out,
+			ShowStatusBar: &showBar,
+			Cols:          101,
+			Rows:          24,
+		})
+	}()
+
+	time.Sleep(150 * time.Millisecond)
+	_, _ = inW.Write([]byte("echo LEFT_SIDE_VISIBLE\n"))
+	waitFor(t, 4*time.Second, func() bool {
+		return strings.Contains(out.String(), "LEFT_SIDE_VISIBLE")
+	}, "left pane initial output")
+
+	// Split horizontally (Ctrl+b %): both panes should now composite side-by-side with '│'.
+	_, _ = inW.Write([]byte{DefaultPrefix, '%'})
+	waitFor(t, 4*time.Second, func() bool {
+		return strings.Contains(out.String(), "│")
+	}, "vertical split divider rendered")
+
+	time.Sleep(150 * time.Millisecond)
+	_, _ = inW.Write([]byte("echo RIGHT_SIDE_VISIBLE\n"))
+	waitFor(t, 4*time.Second, func() bool {
+		s := out.String()
+		return strings.Contains(s, "RIGHT_SIDE_VISIBLE") && strings.Contains(s, "│")
+	}, "right pane output alongside divider")
+
+	// Switch focus left using Ctrl+b Left-Arrow and send a command to the left pane.
+	_, _ = inW.Write([]byte{DefaultPrefix, 0x1b, '[', 'D'})
+	time.Sleep(100 * time.Millisecond)
+	_, _ = inW.Write([]byte("echo BACK_ON_LEFT_PANE\n"))
+	waitFor(t, 4*time.Second, func() bool {
+		capLeft, err := host.Capture(ctx, sessionbackend.Target{SessionID: ref.SessionID, PaneID: ref.PaneID}, sessionbackend.CaptureOpts{Lines: 30})
+		return err == nil && strings.Contains(capLeft.Text, "BACK_ON_LEFT_PANE")
+	}, "Ctrl+b Left-Arrow routed input back to left pane")
+
+	// Split vertically (Ctrl+b ") on the left pane and verify horizontal divider '─' renders too.
+	_, _ = inW.Write([]byte{DefaultPrefix, '"'})
+	waitFor(t, 4*time.Second, func() bool {
+		return strings.Contains(out.String(), "─")
+	}, "horizontal split divider rendered")
 
 	_, _ = inW.Write([]byte{DefaultPrefix, 'd'})
 	select {

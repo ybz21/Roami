@@ -39,6 +39,10 @@ const (
 	ActionCloseWindow
 	ActionOpenMenu
 	ActionOpenWindowSwitcher
+	ActionFocusLeft
+	ActionFocusRight
+	ActionFocusUp
+	ActionFocusDown
 )
 
 type Action struct {
@@ -47,11 +51,20 @@ type Action struct {
 	Index int // 1-based window index for ActionSelectWindow
 }
 
+type prefixState uint8
+
+const (
+	prefixIdle prefixState = iota
+	prefixAwaitKey
+	prefixAwaitEscBracket
+	prefixAwaitCSI
+)
+
 // PrefixFilter intercepts tmux-style prefix key chords (Ctrl+b followed by
-// d/m/?/w/c/n/p/1-9/%/"/o/x/&) while passing all other input untouched across chunk boundaries.
+// d/m/?/w/c/n/p/1-9/%/"/o/x/& or arrow keys) while passing all other input untouched across chunk boundaries.
 type PrefixFilter struct {
-	Prefix  byte
-	pending bool
+	Prefix byte
+	state  prefixState
 }
 
 func NewPrefixFilter(prefix byte) *PrefixFilter {
@@ -63,7 +76,7 @@ func NewPrefixFilter(prefix byte) *PrefixFilter {
 
 // Pending reports whether the prefix key was pressed and awaits the next command byte.
 func (f *PrefixFilter) Pending() bool {
-	return f.pending
+	return f.state != prefixIdle
 }
 
 func (f *PrefixFilter) Feed(chunk []byte) []Action {
@@ -79,8 +92,40 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 	}
 
 	for _, b := range chunk {
-		if f.pending {
-			f.pending = false
+		switch f.state {
+		case prefixAwaitCSI:
+			f.state = prefixIdle
+			switch b {
+			case 'A':
+				flush()
+				actions = append(actions, Action{Kind: ActionFocusUp})
+			case 'B':
+				flush()
+				actions = append(actions, Action{Kind: ActionFocusDown})
+			case 'C':
+				flush()
+				actions = append(actions, Action{Kind: ActionFocusRight})
+			case 'D':
+				flush()
+				actions = append(actions, Action{Kind: ActionFocusLeft})
+			default:
+				buf = append(buf, f.Prefix, 0x1b, '[', b)
+			}
+			continue
+		case prefixAwaitEscBracket:
+			if b == '[' {
+				f.state = prefixAwaitCSI
+			} else {
+				f.state = prefixIdle
+				buf = append(buf, f.Prefix, 0x1b, b)
+			}
+			continue
+		case prefixAwaitKey:
+			if b == 0x1b {
+				f.state = prefixAwaitEscBracket
+				continue
+			}
+			f.state = prefixIdle
 			switch {
 			case b == 'd' || b == 'D':
 				flush()
@@ -128,7 +173,7 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 			continue
 		}
 		if b == f.Prefix {
-			f.pending = true
+			f.state = prefixAwaitKey
 			continue
 		}
 		buf = append(buf, b)
@@ -340,20 +385,20 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 		return werr
 	}
 
-	drawStatusBar := func(pane string, prefixPending bool) {
+	buildStatusSeq := func(pane string, prefixPending bool) []byte {
 		if !showStatus {
-			return
+			return nil
 		}
 		c := uint16(curCols.Load())
 		r := uint16(curRows.Load())
 		if r < 6 {
-			return
+			return nil
 		}
 		obsCtx, obsCancel := context.WithTimeout(attachCtx, 2*time.Second)
 		st, err := backend.Observe(obsCtx, opts.SessionID)
 		obsCancel()
 		if err != nil {
-			return
+			return nil
 		}
 		label := st.Label
 		if label == "" {
@@ -366,14 +411,17 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 				break
 			}
 		}
-		seq := renderStatusBarSequence(statusBarInfo{
+		return renderStatusBarSequence(statusBarInfo{
 			SessionLabel:   label,
 			Windows:        st.Windows,
 			ActiveWindowID: activeWin,
 			ActivePaneID:   pane,
 			PrefixPending:  prefixPending,
 		}, c, r)
-		if len(seq) > 0 {
+	}
+
+	drawStatusBar := func(pane string, prefixPending bool) {
+		if seq := buildStatusSeq(pane, prefixPending); len(seq) > 0 {
 			_ = writeOut(seq)
 		}
 	}
@@ -381,10 +429,19 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 	var resizeTargetMu sync.Mutex
 	var activeTarget sessionbackend.Target
 	var activeGen uint64
+	var inComposite atomic.Bool
+	resizeCh := make(chan struct{}, 1)
 	if hasFD {
 		go ttyraw.WatchResize(attachCtx, inFD, func(c, r uint16) {
 			curCols.Store(uint32(c))
 			curRows.Store(uint32(r))
+			if inComposite.Load() {
+				select {
+				case resizeCh <- struct{}{}:
+				default:
+				}
+				return
+			}
 			resizeTargetMu.Lock()
 			t := activeTarget
 			gen := activeGen
@@ -402,40 +459,68 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 	filter := NewPrefixFilter(opts.Prefix)
 
 	for {
-		target := sessionbackend.Target{SessionID: opts.SessionID, PaneID: paneID}
-		lease, err := backend.ClaimControl(attachCtx, target, opts.ClientID)
-		if err != nil {
-			return err
+		// Check whether the window containing paneID currently has multiple tiled panes.
+		var multiWin *sessionbackend.Window
+		if curSt, oerr := backend.Observe(attachCtx, opts.SessionID); oerr == nil && curSt.Status == sessionbackend.StatusAlive {
+			for i := range curSt.Windows {
+				w := curSt.Windows[i]
+				if w.Layout != nil && (w.Layout.ContainsPane(paneID) || (paneID == "" && w.ID == curSt.ActiveWindowID)) {
+					if len(w.Layout.PaneIDs()) > 1 {
+						cp := w.Clone()
+						multiWin = &cp
+					}
+					break
+				}
+			}
 		}
-		controlGen := lease.ControlGen
-		paneID = lease.PaneID
-		target.PaneID = paneID
 
-		resizeTargetMu.Lock()
-		activeTarget = target
-		activeGen = controlGen
-		resizeTargetMu.Unlock()
+		var switchPane string
+		var detached, exited bool
+		var runErr error
 
-		c := uint16(curCols.Load())
-		r := uint16(curRows.Load())
-		pRows := paneRowsFor(r)
-		if showStatus && r >= 6 {
-			_ = writeOut([]byte(applyScrollRegion(pRows)))
-		}
-		_ = backend.Resize(attachCtx, target, controlGen, c, pRows)
+		if multiWin != nil {
+			inComposite.Store(true)
+			switchPane, detached, exited, runErr = pumpMultiPane(
+				attachCtx, backend, layout, opts.SessionID, *multiWin, paneID, opts.ClientID,
+				inCh, inErrCh, resizeCh, &curCols, &curRows, paneRowsFor, filter, writeOut, buildStatusSeq,
+			)
+			inComposite.Store(false)
+		} else {
+			target := sessionbackend.Target{SessionID: opts.SessionID, PaneID: paneID}
+			lease, err := backend.ClaimControl(attachCtx, target, opts.ClientID)
+			if err != nil {
+				return err
+			}
+			controlGen := lease.ControlGen
+			paneID = lease.PaneID
+			target.PaneID = paneID
 
-		stream, err := backend.Attach(attachCtx, target, sessionbackend.AttachOpts{ClientID: opts.ClientID})
-		if err != nil {
+			resizeTargetMu.Lock()
+			activeTarget = target
+			activeGen = controlGen
+			resizeTargetMu.Unlock()
+
+			c := uint16(curCols.Load())
+			r := uint16(curRows.Load())
+			pRows := paneRowsFor(r)
+			if showStatus && r >= 6 {
+				_ = writeOut([]byte(applyScrollRegion(pRows)))
+			}
+			_ = backend.Resize(attachCtx, target, controlGen, c, pRows)
+
+			stream, err := backend.Attach(attachCtx, target, sessionbackend.AttachOpts{ClientID: opts.ClientID})
+			if err != nil {
+				_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
+				return err
+			}
+
+			switchPane, detached, exited, runErr = pumpPane(
+				attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
+				stream, inCh, inErrCh, filter, writeOut, drawStatusBar, showStatus, c, pRows,
+			)
+			_ = stream.Close()
 			_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
-			return err
 		}
-
-		switchPane, detached, exited, runErr := pumpPane(
-			attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
-			stream, inCh, inErrCh, filter, writeOut, drawStatusBar, showStatus, c, pRows,
-		)
-		_ = stream.Close()
-		_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
 
 		if runErr != nil {
 			return runErr
@@ -540,6 +625,9 @@ func pumpPane(
 					}
 				}
 			case sessionbackend.EventLayoutChanged:
+				if ev.Window != nil && ev.Window.Layout != nil && len(ev.Window.Layout.PaneIDs()) > 1 {
+					return target.PaneID, false, false, nil
+				}
 				drawStatusBar(target.PaneID, filter.Pending())
 			case sessionbackend.EventResyncNeeded:
 				return target.PaneID, false, false, nil
