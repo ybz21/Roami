@@ -18,8 +18,8 @@ import (
 const DefaultPrefix byte = 0x02 // Ctrl+b, matching tmux muscle memory.
 
 const (
-	// Restore normal screen buffer, cursor visibility, mouse tracking, bracketed paste, and SGR attributes.
-	terminalResetOnExit = "\x1b[?1049l\x1b[?25h\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[0m"
+	// Restore scroll region, normal screen buffer, cursor visibility, mouse tracking, bracketed paste, and SGR attributes.
+	terminalResetOnExit = "\x1b[r\x1b[?1049l\x1b[?25h\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[0m"
 	clearScreenHome     = "\x1b[2J\x1b[H"
 )
 
@@ -32,15 +32,23 @@ const (
 	ActionSplitV
 	ActionNextPane
 	ActionClosePane
+	ActionNewWindow
+	ActionNextWindow
+	ActionPrevWindow
+	ActionSelectWindow
+	ActionCloseWindow
+	ActionOpenMenu
+	ActionOpenWindowSwitcher
 )
 
 type Action struct {
-	Kind ActionKind
-	Data []byte
+	Kind  ActionKind
+	Data  []byte
+	Index int // 1-based window index for ActionSelectWindow
 }
 
-// PrefixFilter intercepts tmux-style prefix key chords (Ctrl+b followed by d/%/"/o/x)
-// while passing all other input untouched across arbitrary read chunk boundaries.
+// PrefixFilter intercepts tmux-style prefix key chords (Ctrl+b followed by
+// d/m/?/w/c/n/p/1-9/%/"/o/x/&) while passing all other input untouched across chunk boundaries.
 type PrefixFilter struct {
 	Prefix  byte
 	pending bool
@@ -51,6 +59,11 @@ func NewPrefixFilter(prefix byte) *PrefixFilter {
 		prefix = DefaultPrefix
 	}
 	return &PrefixFilter{Prefix: prefix}
+}
+
+// Pending reports whether the prefix key was pressed and awaits the next command byte.
+func (f *PrefixFilter) Pending() bool {
+	return f.pending
 }
 
 func (f *PrefixFilter) Feed(chunk []byte) []Action {
@@ -68,22 +81,43 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 	for _, b := range chunk {
 		if f.pending {
 			f.pending = false
-			switch b {
-			case 'd', 'D':
+			switch {
+			case b == 'd' || b == 'D':
 				flush()
 				actions = append(actions, Action{Kind: ActionDetach})
-			case '%':
+			case b == '%':
 				flush()
 				actions = append(actions, Action{Kind: ActionSplitH})
-			case '"':
+			case b == '"':
 				flush()
 				actions = append(actions, Action{Kind: ActionSplitV})
-			case 'o':
+			case b == 'o':
 				flush()
 				actions = append(actions, Action{Kind: ActionNextPane})
-			case 'x':
+			case b == 'x':
 				flush()
 				actions = append(actions, Action{Kind: ActionClosePane})
+			case b == 'c':
+				flush()
+				actions = append(actions, Action{Kind: ActionNewWindow})
+			case b == 'n':
+				flush()
+				actions = append(actions, Action{Kind: ActionNextWindow})
+			case b == 'p':
+				flush()
+				actions = append(actions, Action{Kind: ActionPrevWindow})
+			case b == '&':
+				flush()
+				actions = append(actions, Action{Kind: ActionCloseWindow})
+			case b == 'm' || b == '?':
+				flush()
+				actions = append(actions, Action{Kind: ActionOpenMenu})
+			case b == 'w':
+				flush()
+				actions = append(actions, Action{Kind: ActionOpenWindowSwitcher})
+			case b >= '1' && b <= '9':
+				flush()
+				actions = append(actions, Action{Kind: ActionSelectWindow, Index: int(b - '0')})
 			default:
 				if b == f.Prefix {
 					buf = append(buf, f.Prefix)
@@ -165,15 +199,17 @@ func matchAutoReplyCSI(s []byte) int {
 }
 
 type AttachOptions struct {
-	SessionID string
-	PaneID    string
-	ClientID  string
-	Prefix    byte
-	In        io.Reader
-	Out       io.Writer
-	RawTTY    bool
-	Cols      uint16
-	Rows      uint16
+	SessionID     string
+	WindowID      string
+	PaneID        string
+	ClientID      string
+	Prefix        byte
+	In            io.Reader
+	Out           io.Writer
+	RawTTY        bool
+	ShowStatusBar *bool // nil = auto-enabled on interactive raw TTY with >= 6 rows
+	Cols          uint16
+	Rows          uint16
 }
 
 // Attach connects a local CLI terminal (or custom streams in tests) to a native session pane.
@@ -222,6 +258,17 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 		rows = 24
 	}
 
+	showStatus := opts.RawTTY && hasFD && rows >= 6
+	if opts.ShowStatusBar != nil {
+		showStatus = *opts.ShowStatusBar && rows >= 6
+	}
+	paneRowsFor := func(termRows uint16) uint16 {
+		if showStatus && termRows >= 6 {
+			return termRows - 1
+		}
+		return termRows
+	}
+
 	state, err := backend.Observe(ctx, opts.SessionID)
 	if err != nil {
 		return err
@@ -230,6 +277,22 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 		return fmt.Errorf("session %q already exited", opts.SessionID)
 	}
 	paneID := opts.PaneID
+	if paneID == "" && opts.WindowID != "" {
+		for _, w := range state.Windows {
+			if w.ID == opts.WindowID {
+				if layout != nil {
+					_ = layout.SelectWindow(ctx, opts.SessionID, w.ID)
+				}
+				paneID = w.ActivePaneID
+				if paneID == "" && w.Layout != nil {
+					if ids := w.Layout.PaneIDs(); len(ids) > 0 {
+						paneID = ids[0]
+					}
+				}
+				break
+			}
+		}
+	}
 	if paneID == "" {
 		paneID = state.ActivePaneID
 	}
@@ -237,8 +300,8 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 	attachCtx, cancelAttach := context.WithCancel(ctx)
 	defer cancelAttach()
 
-	// Single stdin reader goroutine lives for the entire attach session so pane switches
-	// never leak a blocked os.Stdin.Read goroutine.
+	// Single stdin reader goroutine lives for the entire attach session so pane/window switches
+	// and interactive menus never leak a blocked os.Stdin.Read goroutine.
 	inCh := make(chan []byte, 32)
 	inErrCh := make(chan error, 1)
 	go func() {
@@ -277,6 +340,44 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 		return werr
 	}
 
+	drawStatusBar := func(pane string, prefixPending bool) {
+		if !showStatus {
+			return
+		}
+		c := uint16(curCols.Load())
+		r := uint16(curRows.Load())
+		if r < 6 {
+			return
+		}
+		obsCtx, obsCancel := context.WithTimeout(attachCtx, 2*time.Second)
+		st, err := backend.Observe(obsCtx, opts.SessionID)
+		obsCancel()
+		if err != nil {
+			return
+		}
+		label := st.Label
+		if label == "" {
+			label = st.SessionID
+		}
+		activeWin := st.ActiveWindowID
+		for _, w := range st.Windows {
+			if w.Layout != nil && w.Layout.ContainsPane(pane) {
+				activeWin = w.ID
+				break
+			}
+		}
+		seq := renderStatusBarSequence(statusBarInfo{
+			SessionLabel:   label,
+			Windows:        st.Windows,
+			ActiveWindowID: activeWin,
+			ActivePaneID:   pane,
+			PrefixPending:  prefixPending,
+		}, c, r)
+		if len(seq) > 0 {
+			_ = writeOut(seq)
+		}
+	}
+
 	var resizeTargetMu sync.Mutex
 	var activeTarget sessionbackend.Target
 	var activeGen uint64
@@ -288,9 +389,13 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			t := activeTarget
 			gen := activeGen
 			resizeTargetMu.Unlock()
-			if t.SessionID != "" && gen > 0 {
-				_ = backend.Resize(attachCtx, t, gen, c, r)
+			if showStatus && r >= 6 {
+				_ = writeOut([]byte(applyScrollRegion(paneRowsFor(r))))
 			}
+			if t.SessionID != "" && gen > 0 {
+				_ = backend.Resize(attachCtx, t, gen, c, paneRowsFor(r))
+			}
+			drawStatusBar(t.PaneID, false)
 		})
 	}
 
@@ -311,7 +416,13 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 		activeGen = controlGen
 		resizeTargetMu.Unlock()
 
-		_ = backend.Resize(attachCtx, target, controlGen, uint16(curCols.Load()), uint16(curRows.Load()))
+		c := uint16(curCols.Load())
+		r := uint16(curRows.Load())
+		pRows := paneRowsFor(r)
+		if showStatus && r >= 6 {
+			_ = writeOut([]byte(applyScrollRegion(pRows)))
+		}
+		_ = backend.Resize(attachCtx, target, controlGen, c, pRows)
 
 		stream, err := backend.Attach(attachCtx, target, sessionbackend.AttachOpts{ClientID: opts.ClientID})
 		if err != nil {
@@ -321,7 +432,7 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 
 		switchPane, detached, exited, runErr := pumpPane(
 			attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
-			stream, inCh, inErrCh, filter, writeOut, uint16(curCols.Load()), uint16(curRows.Load()),
+			stream, inCh, inErrCh, filter, writeOut, drawStatusBar, showStatus, c, pRows,
 		)
 		_ = stream.Close()
 		_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
@@ -341,10 +452,12 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			continue
 		}
 		if exited {
-			// If sibling panes remain in the session, move to the active remaining pane.
 			if next, ok := pickNextPane(attachCtx, backend, opts.SessionID, paneID); ok && next != paneID {
 				paneID = next
 				continue
+			}
+			if opts.RawTTY && hasFD {
+				_, _ = io.WriteString(opts.Out, terminalResetOnExit)
 			}
 			_, _ = fmt.Fprintf(opts.Out, "\r\n[session %s exited]\r\n", opts.SessionID)
 			return nil
@@ -367,7 +480,9 @@ func pumpPane(
 	inErrCh <-chan error,
 	filter *PrefixFilter,
 	writeOut func([]byte) error,
-	cols, rows uint16,
+	drawStatusBar func(pane string, prefixPending bool),
+	showStatus bool,
+	cols, paneRows uint16,
 ) (switchPane string, detached bool, exited bool, err error) {
 	writeInput := func(data []byte) error {
 		if len(data) == 0 {
@@ -399,20 +514,33 @@ func pumpPane(
 			}
 			switch ev.Kind {
 			case sessionbackend.EventSnapshot:
-				if err := writeOut([]byte(clearScreenHome)); err != nil {
-					return "", false, false, err
+				if showStatus {
+					if err := writeOut([]byte(applyScrollRegion(paneRows) + clearScreenHome)); err != nil {
+						return "", false, false, err
+					}
+				} else {
+					if err := writeOut([]byte(clearScreenHome)); err != nil {
+						return "", false, false, err
+					}
 				}
 				if len(ev.Data) > 0 {
 					if err := writeOut(ev.Data); err != nil {
 						return "", false, false, err
 					}
 				}
+				drawStatusBar(target.PaneID, filter.Pending())
 			case sessionbackend.EventOutput:
 				if len(ev.Data) > 0 {
 					if err := writeOut(ev.Data); err != nil {
 						return "", false, false, err
 					}
+					if showStatus && outputMayResetStatusBar(ev.Data) {
+						_ = writeOut([]byte(applyScrollRegion(paneRows)))
+						drawStatusBar(target.PaneID, filter.Pending())
+					}
 				}
+			case sessionbackend.EventLayoutChanged:
+				drawStatusBar(target.PaneID, filter.Pending())
 			case sessionbackend.EventResyncNeeded:
 				return target.PaneID, false, false, nil
 			case sessionbackend.EventExited:
@@ -424,7 +552,13 @@ func pumpPane(
 			if len(cleaned) == 0 {
 				continue
 			}
-			for _, act := range filter.Feed(cleaned) {
+			wasPending := filter.Pending()
+			actions := filter.Feed(cleaned)
+			nowPending := filter.Pending()
+			if nowPending != wasPending {
+				drawStatusBar(target.PaneID, nowPending)
+			}
+			for _, act := range actions {
 				switch act.Kind {
 				case ActionForward:
 					if err := writeInput(act.Data); err != nil {
@@ -433,37 +567,79 @@ func pumpPane(
 				case ActionDetach:
 					return "", true, false, nil
 				case ActionSplitH, ActionSplitV:
-					if layout == nil {
-						continue
-					}
 					dir := sessionbackend.SplitHorizontal
 					if act.Kind == ActionSplitV {
 						dir = sessionbackend.SplitVertical
 					}
-					_, newPaneID, serr := layout.SplitPane(ctx, target.SessionID, target.PaneID, sessionbackend.SplitSpec{
-						Dir:  dir,
-						Cols: cols,
-						Rows: rows,
-					})
-					if serr == nil && newPaneID != "" {
+					if newPaneID, ok := splitCurrentPane(ctx, layout, target.SessionID, target.PaneID, dir, cols, paneRows); ok {
 						return newPaneID, false, false, nil
 					}
 				case ActionNextPane:
-					if next, ok := pickNextPane(ctx, backend, target.SessionID, target.PaneID); ok && next != target.PaneID {
+					if next, ok := pickNextPaneInWindow(ctx, backend, layout, target.SessionID, target.PaneID); ok && next != target.PaneID {
 						return next, false, false, nil
 					}
 				case ActionClosePane:
-					if layout == nil {
-						continue
-					}
-					win, cerr := layout.ClosePane(ctx, target.SessionID, target.PaneID)
-					if cerr != nil {
-						continue
-					}
-					if win == nil || win.ActivePaneID == "" {
+					res := closeCurrentPane(ctx, backend, layout, target.SessionID, target.PaneID)
+					if res.exited {
 						return "", false, true, nil
 					}
-					return win.ActivePaneID, false, false, nil
+					if res.switchPane != "" {
+						return res.switchPane, false, false, nil
+					}
+				case ActionNewWindow:
+					if pane, ok := createAndSelectWindow(ctx, layout, target.SessionID, cols, paneRows); ok {
+						return pane, false, false, nil
+					}
+				case ActionNextWindow:
+					if pane, ok := stepWindow(ctx, backend, layout, target.SessionID, target.PaneID, +1); ok {
+						return pane, false, false, nil
+					}
+				case ActionPrevWindow:
+					if pane, ok := stepWindow(ctx, backend, layout, target.SessionID, target.PaneID, -1); ok {
+						return pane, false, false, nil
+					}
+				case ActionSelectWindow:
+					if pane, ok := selectWindowByNumber(ctx, backend, layout, target.SessionID, act.Index); ok {
+						return pane, false, false, nil
+					}
+				case ActionCloseWindow:
+					res := closeCurrentWindow(ctx, backend, layout, target.SessionID, target.PaneID)
+					if res.exited {
+						return "", false, true, nil
+					}
+					if res.switchPane != "" {
+						return res.switchPane, false, false, nil
+					}
+				case ActionOpenMenu:
+					res, oerr := runCommandMenu(ctx, backend, layout, target.SessionID, target.PaneID, inCh, inErrCh, writeOut, cols, paneRows)
+					if oerr != nil {
+						return "", false, false, oerr
+					}
+					if res.detached {
+						return "", true, false, nil
+					}
+					if res.exited {
+						return "", false, true, nil
+					}
+					if res.switchPane != "" {
+						return res.switchPane, false, false, nil
+					}
+					return target.PaneID, false, false, nil
+				case ActionOpenWindowSwitcher:
+					res, oerr := runWindowSwitcher(ctx, backend, layout, target.SessionID, target.PaneID, inCh, inErrCh, writeOut, cols, paneRows)
+					if oerr != nil {
+						return "", false, false, oerr
+					}
+					if res.detached {
+						return "", true, false, nil
+					}
+					if res.exited {
+						return "", false, true, nil
+					}
+					if res.switchPane != "" {
+						return res.switchPane, false, false, nil
+					}
+					return target.PaneID, false, false, nil
 				}
 			}
 

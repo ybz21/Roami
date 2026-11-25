@@ -106,7 +106,58 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 		t.Fatalf("capture by label missing CLI_NATIVE_OK: %q", captured)
 	}
 
-	// Split pane horizontally, verify windows list shows 2 panes, then close new pane.
+	// Window & pane subcommands: create named window `logs`, list, select, split with --right, pane ls, then close.
+	winID, errOut, handled, code := run("window", "new", "cli-e2e", "logs")
+	if !handled || code != 0 || winID == "" {
+		t.Fatalf("window new failed: handled=%v code=%d out=%q err=%q", handled, code, winID, errOut)
+	}
+	winList, errOut, handled, code := run("window", "ls", "cli-e2e")
+	if !handled || code != 0 || !strings.Contains(winList, "logs") || !strings.Contains(winList, "[活跃]") {
+		t.Fatalf("window ls failed: handled=%v code=%d out=%q err=%q", handled, code, winList, errOut)
+	}
+	_, errOut, handled, code = run("window", "select", "cli-e2e", "1")
+	if !handled || code != 0 {
+		t.Fatalf("window select 1 failed: handled=%v code=%d err=%q", handled, code, errOut)
+	}
+	splitPane, errOut, handled, code := run("pane", "split", "cli-e2e", "--right", "--window", "logs")
+	if !handled || code != 0 || splitPane == "" {
+		t.Fatalf("pane split --right --window logs failed: handled=%v code=%d out=%q err=%q", handled, code, splitPane, errOut)
+	}
+	paneList, errOut, handled, code := run("pane", "ls", "cli-e2e", "--window", "logs")
+	if !handled || code != 0 || !strings.Contains(paneList, splitPane) {
+		t.Fatalf("pane ls failed: handled=%v code=%d out=%q err=%q", handled, code, paneList, errOut)
+	}
+	_, errOut, handled, code = run("pane", "kill", "cli-e2e", splitPane)
+	if !handled || code != 0 {
+		t.Fatalf("pane kill failed: handled=%v code=%d err=%q", handled, code, errOut)
+	}
+
+	// Attach directly to `cli-e2e:logs` shorthand and detach via Ctrl+b d.
+	inWinR, inWinW := io.Pipe()
+	var winAttachOut, winAttachErr bytes.Buffer
+	winDone := make(chan int, 1)
+	go func() {
+		_, c := dispatchNativeSessionCLI("attach", []string{"cli-e2e:logs"}, inWinR, &winAttachOut, &winAttachErr)
+		winDone <- c
+	}()
+	time.Sleep(200 * time.Millisecond)
+	_, _ = inWinW.Write([]byte{nativeattach.DefaultPrefix, 'd'})
+	select {
+	case c := <-winDone:
+		if c != 0 {
+			t.Fatalf("attach cli-e2e:logs exited with %d, err=%q", c, winAttachErr.String())
+		}
+	case <-time.After(4 * time.Second):
+		t.Fatalf("attach cli-e2e:logs did not detach cleanly")
+	}
+	_ = inWinW.Close()
+
+	_, errOut, handled, code = run("window", "kill", "cli-e2e", "logs")
+	if !handled || code != 0 {
+		t.Fatalf("window kill logs failed: handled=%v code=%d err=%q", handled, code, errOut)
+	}
+
+	// Legacy sp/lw/kp aliases remain backward-compatible.
 	newPane, errOut, handled, code := run("sp", "cli-e2e", "-h")
 	if !handled || code != 0 || newPane == "" {
 		t.Fatalf("sp failed: handled=%v code=%d out=%q err=%q", handled, code, newPane, errOut)

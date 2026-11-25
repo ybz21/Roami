@@ -36,14 +36,35 @@ func maybeRunNativeSessionCLI(args []string) (bool, int) {
 	}
 	cmd, rest := args[0], args[1:]
 	switch cmd {
-	case "new", "ls", "a", "attach", "sp", "split", "kp", "nw", "lw", "kw", "capture", "send", "rename", "kill":
+	case "new", "ls", "a", "attach", "window", "pane", "sp", "split", "kp", "nw", "lw", "kw", "capture", "send", "rename", "kill":
 	default:
 		return false, 0
 	}
-	if len(rest) > 0 && (rest[0] == "--help" || rest[0] == "help") {
+	if isHelpInvocation(cmd, rest) {
 		return false, 0
 	}
 	return dispatchNativeSessionCLI(cmd, rest, os.Stdin, os.Stdout, os.Stderr)
+}
+
+func isHelpInvocation(cmd string, rest []string) bool {
+	if len(rest) == 0 {
+		return cmd == "window" || cmd == "pane"
+	}
+	// Preserve literal payloads for `send <session> --help` and legacy `sp -h` (horizontal split).
+	if cmd == "send" && len(rest) >= 2 {
+		return false
+	}
+	if (cmd == "sp" || cmd == "split") && len(rest) == 1 && rest[0] == "-h" {
+		return false
+	}
+	if rest[0] == "--help" || rest[0] == "-h" || rest[0] == "help" {
+		return true
+	}
+	last := rest[len(rest)-1]
+	if last == "--help" || (last == "-h" && cmd != "sp" && cmd != "split") {
+		return true
+	}
+	return false
 }
 
 func extractBackendFlag(args []string) (backend string, filtered []string, err error) {
@@ -134,6 +155,10 @@ func dispatchNativeSessionCLI(cmd string, args []string, in io.Reader, out, errO
 		return nativeCLIList(cli, rest, backendFlag == "native" || runtime.GOOS == "windows", out, errOut)
 	case "a", "attach":
 		return nativeCLIAttach(cli, rest, in, out, errOut)
+	case "window":
+		return nativeCLIWindow(cli, rest, in, out, errOut)
+	case "pane":
+		return nativeCLIPane(cli, rest, out, errOut)
 	case "sp", "split":
 		return nativeCLISplit(cli, rest, out, errOut)
 	case "kp":
@@ -477,8 +502,40 @@ func nativeCLIList(cli *sessionipc.Client, args []string, nativeOnly bool, out, 
 	return true, 0
 }
 
+// resolveNativeWindow resolves a window query by exact ID, exact Name, or 1-based index.
+func resolveNativeWindow(wins []sessionbackend.Window, query string) (sessionbackend.Window, error) {
+	if query == "" {
+		return sessionbackend.Window{}, sessionbackend.ErrWindowNotFound
+	}
+	for _, w := range wins {
+		if w.ID == query {
+			return w, nil
+		}
+	}
+	var nameMatches []sessionbackend.Window
+	for _, w := range wins {
+		if w.Name == query {
+			nameMatches = append(nameMatches, w)
+		}
+	}
+	if len(nameMatches) == 1 {
+		return nameMatches[0], nil
+	}
+	if len(nameMatches) > 1 {
+		ids := make([]string, len(nameMatches))
+		for i, w := range nameMatches {
+			ids[i] = w.ID
+		}
+		return sessionbackend.Window{}, fmt.Errorf("多个窗口同名 %q（%s），请改用窗口 ID 或序号", query, strings.Join(ids, ", "))
+	}
+	if idx, err := strconv.Atoi(query); err == nil && idx >= 1 && idx <= len(wins) {
+		return wins[idx-1], nil
+	}
+	return sessionbackend.Window{}, fmt.Errorf("找不到窗口 %q（共 %d 个窗口，可用 roami session window ls 查看）", query, len(wins))
+}
+
 func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, errOut io.Writer) (bool, int) {
-	var sessionQuery, paneID string
+	var sessionQuery, windowQuery, paneID string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--pane", "-p":
@@ -488,10 +545,23 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			}
 			i++
 			paneID = args[i]
+		case "--window", "-w":
+			if i+1 >= len(args) {
+				fmt.Fprintln(errOut, "missing value for --window")
+				return true, 2
+			}
+			i++
+			windowQuery = args[i]
 		default:
 			if !strings.HasPrefix(args[i], "-") && sessionQuery == "" {
 				sessionQuery = args[i]
 			}
+		}
+	}
+	// Support tmux-style `SESSION:WINDOW` shorthand when `--window` is not explicitly given.
+	if sessionQuery != "" && windowQuery == "" {
+		if sPart, wPart, ok := strings.Cut(sessionQuery, ":"); ok && sPart != "" && wPart != "" {
+			sessionQuery, windowQuery = sPart, wPart
 		}
 	}
 
@@ -561,8 +631,36 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 		sessionID = id
 	}
 
+	var windowID string
+	if windowQuery != "" {
+		wCtx, wCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		wins, err := cli.ListWindows(wCtx, sessionID)
+		if err != nil {
+			wCancel()
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		win, err := resolveNativeWindow(wins, windowQuery)
+		if err != nil {
+			wCancel()
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		if err := cli.SelectWindow(wCtx, sessionID, win.ID); err != nil {
+			wCancel()
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		wCancel()
+		windowID = win.ID
+		if paneID == "" {
+			paneID = win.ActivePaneID
+		}
+	}
+
 	if err := nativeattach.Attach(context.Background(), cli, cli, nativeattach.AttachOptions{
 		SessionID: sessionID,
+		WindowID:  windowID,
 		PaneID:    paneID,
 		In:        in,
 		Out:       out,
@@ -572,6 +670,315 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 		return true, 1
 	}
 	return true, 0
+}
+
+func nativeCLIWindow(cli *sessionipc.Client, args []string, in io.Reader, out, errOut io.Writer) (bool, int) {
+	if len(args) == 0 {
+		return false, 0
+	}
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "new":
+		var sessionQuery, name, dir string
+		attachAfter := false
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "-c", "--dir":
+				if i+1 >= len(rest) {
+					fmt.Fprintln(errOut, "missing value for --dir")
+					return true, 2
+				}
+				i++
+				dir = rest[i]
+			case "-a", "--attach":
+				attachAfter = true
+			default:
+				if strings.HasPrefix(rest[i], "-") {
+					fmt.Fprintf(errOut, "unknown flag %q\n", rest[i])
+					return true, 2
+				}
+				if sessionQuery == "" {
+					sessionQuery = rest[i]
+				} else if name == "" {
+					name = rest[i]
+				}
+			}
+		}
+		if sessionQuery == "" {
+			return false, 0
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		sessionID, err := resolveNativeSessionID(ctx, cli, sessionQuery)
+		if errors.Is(err, sessionbackend.ErrSessionNotFound) {
+			cancel()
+			return false, 0
+		}
+		if err != nil {
+			cancel()
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		win, err := cli.NewWindow(ctx, sessionID, sessionbackend.WindowSpec{Name: name, Dir: dir, LoginShell: true})
+		cancel()
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		if attachAfter && isReaderTTY(in) {
+			if err := nativeattach.Attach(context.Background(), cli, cli, nativeattach.AttachOptions{
+				SessionID: sessionID,
+				WindowID:  win.ID,
+				PaneID:    win.ActivePaneID,
+				In:        in,
+				Out:       out,
+				RawTTY:    true,
+			}); err != nil {
+				fmt.Fprintln(errOut, err)
+				return true, 1
+			}
+			return true, 0
+		}
+		fmt.Fprintln(out, win.ID)
+		return true, 0
+
+	case "ls", "list":
+		return nativeCLIListWindows(cli, rest, out, errOut)
+
+	case "select", "switch":
+		if len(rest) < 2 {
+			return false, 0
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		sessionID, err := resolveNativeSessionID(ctx, cli, rest[0])
+		if errors.Is(err, sessionbackend.ErrSessionNotFound) {
+			return false, 0
+		}
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		wins, err := cli.ListWindows(ctx, sessionID)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		win, err := resolveNativeWindow(wins, rest[1])
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		if err := cli.SelectWindow(ctx, sessionID, win.ID); err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		ui.Ok(out, "已切换窗口 %s (%s)", ui.Bold(win.Name), win.ID)
+		return true, 0
+
+	case "kill", "rm", "close":
+		if len(rest) < 1 {
+			return false, 0
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		sessionID, err := resolveNativeSessionID(ctx, cli, rest[0])
+		if errors.Is(err, sessionbackend.ErrSessionNotFound) {
+			return false, 0
+		}
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		var targetWinID string
+		if len(rest) >= 2 {
+			wins, err := cli.ListWindows(ctx, sessionID)
+			if err != nil {
+				fmt.Fprintln(errOut, err)
+				return true, 1
+			}
+			win, err := resolveNativeWindow(wins, rest[1])
+			if err != nil {
+				fmt.Fprintln(errOut, err)
+				return true, 1
+			}
+			targetWinID = win.ID
+		} else {
+			st, err := cli.Observe(ctx, sessionID)
+			if err != nil {
+				fmt.Fprintln(errOut, err)
+				return true, 1
+			}
+			targetWinID = st.ActiveWindowID
+		}
+		if err := cli.CloseWindow(ctx, sessionID, targetWinID); err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		ui.Ok(out, "窗口 %s 已关闭", ui.Bold(targetWinID))
+		return true, 0
+
+	default:
+		return false, 0
+	}
+}
+
+func nativeCLIPane(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
+	if len(args) == 0 {
+		return false, 0
+	}
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "ls", "list":
+		var sessionQuery, windowQuery string
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "-w", "--window":
+				if i+1 < len(rest) {
+					i++
+					windowQuery = rest[i]
+				}
+			default:
+				if !strings.HasPrefix(rest[i], "-") && sessionQuery == "" {
+					sessionQuery = rest[i]
+				}
+			}
+		}
+		if sessionQuery == "" {
+			return false, 0
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		sessionID, err := resolveNativeSessionID(ctx, cli, sessionQuery)
+		if errors.Is(err, sessionbackend.ErrSessionNotFound) {
+			return false, 0
+		}
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		st, err := cli.Observe(ctx, sessionID)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		var filterWinID string
+		if windowQuery != "" {
+			win, err := resolveNativeWindow(st.Windows, windowQuery)
+			if err != nil {
+				fmt.Fprintln(errOut, err)
+				return true, 1
+			}
+			filterWinID = win.ID
+		}
+		tw := tabwriter.NewWriter(out, 0, 2, 2, ' ', 0)
+		fmt.Fprintln(tw, "PANE\tWINDOW\tSTATE")
+		for i, w := range st.Windows {
+			if filterWinID != "" && w.ID != filterWinID {
+				continue
+			}
+			if w.Layout == nil {
+				continue
+			}
+			for _, pid := range w.Layout.PaneIDs() {
+				state := ""
+				if pid == st.ActivePaneID {
+					state = "[当前]"
+				} else if pid == w.ActivePaneID {
+					state = "[窗口活跃]"
+				}
+				fmt.Fprintf(tw, "%s\t%d:%s (%s)\t%s\n", pid, i+1, w.Name, w.ID, state)
+			}
+		}
+		_ = tw.Flush()
+		return true, 0
+
+	case "split":
+		dir := sessionbackend.SplitHorizontal
+		var sessionQuery, windowQuery, paneID, cwd string
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--right", "--horizontal", "-H":
+				dir = sessionbackend.SplitHorizontal
+			case "--down", "--vertical", "-V", "-v":
+				dir = sessionbackend.SplitVertical
+			case "--window", "-w":
+				if i+1 >= len(rest) {
+					fmt.Fprintln(errOut, "missing value for --window")
+					return true, 2
+				}
+				i++
+				windowQuery = rest[i]
+			case "--pane", "-p":
+				if i+1 >= len(rest) {
+					fmt.Fprintln(errOut, "missing value for --pane")
+					return true, 2
+				}
+				i++
+				paneID = rest[i]
+			case "-c", "--dir":
+				if i+1 >= len(rest) {
+					fmt.Fprintln(errOut, "missing value for --dir")
+					return true, 2
+				}
+				i++
+				cwd = rest[i]
+			default:
+				if strings.HasPrefix(rest[i], "-") {
+					fmt.Fprintf(errOut, "unknown flag %q\n", rest[i])
+					return true, 2
+				}
+				if sessionQuery == "" {
+					sessionQuery = rest[i]
+				}
+			}
+		}
+		if sessionQuery == "" {
+			return false, 0
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		sessionID, err := resolveNativeSessionID(ctx, cli, sessionQuery)
+		if errors.Is(err, sessionbackend.ErrSessionNotFound) {
+			return false, 0
+		}
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		st, err := cli.Observe(ctx, sessionID)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		if paneID == "" && windowQuery != "" {
+			win, err := resolveNativeWindow(st.Windows, windowQuery)
+			if err != nil {
+				fmt.Fprintln(errOut, err)
+				return true, 1
+			}
+			paneID = win.ActivePaneID
+		}
+		if paneID == "" {
+			paneID = st.ActivePaneID
+		}
+		_, newPaneID, err := cli.SplitPane(ctx, sessionID, paneID, sessionbackend.SplitSpec{
+			Dir:        dir,
+			Cwd:        cwd,
+			LoginShell: true,
+		})
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		fmt.Fprintln(out, newPaneID)
+		return true, 0
+
+	case "kill", "rm", "close":
+		return nativeCLIClosePane(cli, rest, out, errOut)
+
+	default:
+		return false, 0
+	}
 }
 
 func nativeCLISplit(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
@@ -721,19 +1128,23 @@ func nativeCLIListWindows(cli *sessionipc.Client, args []string, out, errOut io.
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
-	wins, err := cli.ListWindows(ctx, sessionID)
+	st, err := cli.Observe(ctx, sessionID)
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
 	tw := tabwriter.NewWriter(out, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "WINDOW\tNAME\tACTIVE_PANE\tPANES")
-	for _, w := range wins {
+	fmt.Fprintln(tw, "INDEX\tWINDOW\tNAME\tACTIVE_PANE\tPANES\tSTATE")
+	for i, w := range st.Windows {
 		var panes []string
 		if w.Layout != nil {
 			panes = w.Layout.PaneIDs()
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", w.ID, w.Name, w.ActivePaneID, strings.Join(panes, ","))
+		state := ""
+		if w.ID == st.ActiveWindowID {
+			state = "[活跃]"
+		}
+		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\n", i+1, w.ID, w.Name, w.ActivePaneID, strings.Join(panes, ","), state)
 	}
 	_ = tw.Flush()
 	return true, 0
@@ -753,7 +1164,17 @@ func nativeCLICloseWindow(cli *sessionipc.Client, args []string, _ io.Writer, er
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
-	if err := cli.CloseWindow(ctx, sessionID, args[1]); err != nil {
+	wins, err := cli.ListWindows(ctx, sessionID)
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	win, err := resolveNativeWindow(wins, args[1])
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	if err := cli.CloseWindow(ctx, sessionID, win.ID); err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
@@ -761,11 +1182,16 @@ func nativeCLICloseWindow(cli *sessionipc.Client, args []string, _ io.Writer, er
 }
 
 func nativeCLICapture(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
-	var sessionQuery, paneID string
+	var sessionQuery, windowQuery, paneID string
 	includeHistory := false
 	lines := 0
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--window", "-w":
+			if i+1 < len(args) {
+				i++
+				windowQuery = args[i]
+			}
 		case "--pane", "-p":
 			if i+1 < len(args) {
 				i++
@@ -799,7 +1225,22 @@ func nativeCLICapture(cli *sessionipc.Client, args []string, out, errOut io.Writ
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
-	res, err := cli.Capture(ctx, sessionbackend.Target{SessionID: sessionID, PaneID: paneID}, sessionbackend.CaptureOpts{
+	var windowID string
+	if windowQuery != "" && paneID == "" {
+		wins, err := cli.ListWindows(ctx, sessionID)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		win, err := resolveNativeWindow(wins, windowQuery)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return true, 1
+		}
+		windowID = win.ID
+		paneID = win.ActivePaneID
+	}
+	res, err := cli.Capture(ctx, sessionbackend.Target{SessionID: sessionID, WindowID: windowID, PaneID: paneID}, sessionbackend.CaptureOpts{
 		Lines:          lines,
 		IncludeHistory: includeHistory,
 	})
