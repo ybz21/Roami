@@ -164,10 +164,10 @@ type sgrMouseClick struct {
 	row int // 0-based cell Y
 }
 
-// extractSGRMouseClicks strips SGR mouse sequences (\x1b[<btn;col;rowM or m) from raw input
-// and returns any left-button press coordinates so clicking a split pane immediately focuses it.
+// extractSGRMouseClicks strips both SGR (\x1b[<btn;col;rowM/m) and legacy X10 (\x1b[M<cb><cx><cy>)
+// mouse sequences from raw input and returns left-button press coordinates so clicking a pane focuses it.
 func extractSGRMouseClicks(data []byte) (remaining []byte, clicks []sgrMouseClick) {
-	if !bytes.Contains(data, []byte("\x1b[<")) {
+	if !bytes.Contains(data, []byte("\x1b[<")) && !bytes.Contains(data, []byte("\x1b[M")) {
 		return data, nil
 	}
 	out := make([]byte, 0, len(data))
@@ -186,7 +186,6 @@ func extractSGRMouseClicks(data []byte) (remaining []byte, clicks []sgrMouseClic
 					btn, err1 := strconv.Atoi(string(parts[0]))
 					col, err2 := strconv.Atoi(string(parts[1]))
 					row, err3 := strconv.Atoi(string(parts[2]))
-					// btn==0 is primary left-button press; ignore wheel (64/65) and drag (32+).
 					if err1 == nil && err2 == nil && err3 == nil && btn == 0 && col >= 1 && row >= 1 {
 						clicks = append(clicks, sgrMouseClick{col: col - 1, row: row - 1})
 					}
@@ -194,6 +193,17 @@ func extractSGRMouseClicks(data []byte) (remaining []byte, clicks []sgrMouseClic
 				i = j + 1
 				continue
 			}
+		}
+		// Legacy X10 normal mouse report: ESC [ M cb cx cy (coordinates are byte - 33).
+		if i+5 < len(data) && data[i] == 0x1b && data[i+1] == '[' && data[i+2] == 'M' {
+			cb := int(data[i+3]) - 32
+			cx := int(data[i+4]) - 33
+			cy := int(data[i+5]) - 33
+			if cb == 0 && cx >= 0 && cy >= 0 {
+				clicks = append(clicks, sgrMouseClick{col: cx, row: cy})
+			}
+			i += 6
+			continue
 		}
 		out = append(out, data[i])
 		i++

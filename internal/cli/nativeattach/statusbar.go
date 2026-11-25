@@ -84,6 +84,9 @@ func formatStatusBarText(info statusBarInfo, cols uint16) string {
 	}
 
 	right := "F2 / Ctrl+b 空格: 菜单 "
+	if paneHint != "" {
+		right = "F2:菜单  F3:切窗格 "
+	}
 	leftStr := left.String()
 	leftW := displayWidth(leftStr)
 	rightW := displayWidth(right)

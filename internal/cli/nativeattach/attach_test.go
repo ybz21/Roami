@@ -60,9 +60,9 @@ func TestPrefixFilterChords(t *testing.T) {
 	if !bytes.Equal(acts[0].Data, []byte{DefaultPrefix, DefaultPrefix, 'z'}) {
 		t.Fatalf("forwarded bytes = %v, want [%d %d 'z']", acts[0].Data, DefaultPrefix, DefaultPrefix)
 	}
-	// Also verify ergonomic shortcuts: F2 single-key menu, Ctrl+b Space, |, -, Tab.
-	ergo := f.Feed([]byte{0x1b, 'O', 'Q', DefaultPrefix, ' ', DefaultPrefix, '|', DefaultPrefix, '-', DefaultPrefix, '\t'})
-	wantErgo := []ActionKind{ActionOpenMenu, ActionOpenMenu, ActionSplitH, ActionSplitV, ActionNextPane}
+	// Also verify ergonomic shortcuts: F2 single-key menu, F3 single-key next pane, Ctrl+b Space, |, -, Tab.
+	ergo := f.Feed([]byte{0x1b, 'O', 'Q', 0x1b, 'O', 'R', DefaultPrefix, ' ', DefaultPrefix, '|', DefaultPrefix, '-', DefaultPrefix, '\t'})
+	wantErgo := []ActionKind{ActionOpenMenu, ActionNextPane, ActionOpenMenu, ActionSplitH, ActionSplitV, ActionNextPane}
 	if len(ergo) != len(wantErgo) {
 		t.Fatalf("ergo got %d actions %+v, want %d", len(ergo), ergo, len(wantErgo))
 	}

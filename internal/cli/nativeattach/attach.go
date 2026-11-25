@@ -173,8 +173,8 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 			}
 			continue
 		}
-		// Single-key F2 (\x1bOQ or \x1b[12~) opens the menu, and Alt+Arrow (\x1b[1;3A/B/C/D)
-		// switches split panes directly without needing Ctrl+b or adding Esc lag.
+		// Single-key F2 (\x1bOQ / \x1b[12~) opens the menu, F3 (\x1bOR / \x1b[13~) cycles panes
+		// (works even inside an outer tmux that intercepts Ctrl+b and mouse), and Alt+Arrow focuses panes.
 		if b == 0x1b {
 			if i+2 < len(chunk) && chunk[i+1] == 'O' && chunk[i+2] == 'Q' {
 				flush()
@@ -182,11 +182,25 @@ func (f *PrefixFilter) Feed(chunk []byte) []Action {
 				i += 2
 				continue
 			}
-			if i+4 < len(chunk) && chunk[i+1] == '[' && chunk[i+2] == '1' && chunk[i+3] == '2' && chunk[i+4] == '~' {
+			if i+2 < len(chunk) && chunk[i+1] == 'O' && chunk[i+2] == 'R' {
 				flush()
-				actions = append(actions, Action{Kind: ActionOpenMenu})
-				i += 4
+				actions = append(actions, Action{Kind: ActionNextPane})
+				i += 2
 				continue
+			}
+			if i+4 < len(chunk) && chunk[i+1] == '[' && chunk[i+2] == '1' && chunk[i+4] == '~' {
+				if chunk[i+3] == '2' {
+					flush()
+					actions = append(actions, Action{Kind: ActionOpenMenu})
+					i += 4
+					continue
+				}
+				if chunk[i+3] == '3' {
+					flush()
+					actions = append(actions, Action{Kind: ActionNextPane})
+					i += 4
+					continue
+				}
 			}
 			if i+5 < len(chunk) && chunk[i+1] == '[' && chunk[i+2] == '1' && chunk[i+3] == ';' && chunk[i+4] == '3' {
 				switch chunk[i+5] {
