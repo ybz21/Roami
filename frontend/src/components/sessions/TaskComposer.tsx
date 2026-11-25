@@ -17,7 +17,7 @@ import { agentName, type AgentKind } from '../../agent-kind'
 import { useI18n } from '../../i18n'
 import { usePreferences } from '../../preferences'
 import ModelSelectionFields, { type ModelChoice } from '../capabilities/ModelSelectionFields'
-import { taskNameFromPrompt } from './NewSessionModal'
+import { taskNameFromPrompt } from './task-name'
 import { VoiceInput } from '../chat/VoiceInput'
 import { AgentLogo, ChevronDown, PaperclipIcon, TerminalIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
@@ -158,16 +158,10 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
     if (!dir || creating || (!native && setup.blocked)) return
     if (!prompt.trim()) { message.error(t('session.promptOrNameRequired')); return }
     if (!native && isGit && wtMode === 'existing' && !existing) { message.error(t('project.where.pickFirst')); return }
-    // 名字一律从需求派生：这就是任务名（23 设计 §3.3 #6），agent 不再改它
-    let finalName = taskNameFromPrompt(prompt)
-    if (!finalName) {
-      const d = new Date()
-      finalName = 'task-' + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0')
-    }
     try {
       setCreating(true)
       if (native) {
-        const { session, onCurrentNode } = await nativeSession.create(finalName, prompt, dir, modelChoice)
+        const { session, onCurrentNode } = await nativeSession.create(taskNameFromPrompt(prompt), prompt, dir, modelChoice)
         setPrompt('')
         if (onCurrentNode) openTerm(session)
         else message.info(t('modelSelection.createdOnOriginalNode'))
@@ -184,7 +178,7 @@ export const TaskComposer = forwardRef<TaskComposerHandle, {
       }
       const op = await submitLifecycle('create', {
         review: review.intent(prefs),
-        name: finalName, task: prompt, dir: sessionDir, worktree: !!(wantWt || adopt),
+        task: prompt, dir: sessionDir, worktree: !!(wantWt || adopt),
         ...(adopt ? { branch: adopt, existing: true } : baseReq),
         launch: lifecycleLaunchIntent(agent, prefs, prompt, wantWt ? 'new' : adopt ? 'adopt' : isGit ? 'repo' : 'plain', false, t),
       })

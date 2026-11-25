@@ -23,36 +23,7 @@ import { submitLifecycle, lifecycleLaunchIntent } from './session-lifecycle'
 import { sessionCreateError, useNativeSessionCreate } from './native-session-create'
 import { useReviewDraft, useSessionReviewControls } from './SessionReviewOptions'
 import { RepositorySetup, useRepositorySetup } from './RepositorySetup'
-
-// 由 prompt 首句推会话名：派活时用户只写了要干什么，名字不该再问一遍。
-// worktree 分支默认名：会话名 slug（小写、非字母数字转 -）
-// prompt 派生任务名：取首行、去引号标点、截 24 字、空白转 -；中文原样保留（tmux 会话名支持中文）。
-/**
- * 从需求派生一个**占位**名字。真名字由 agent 开工后 `roami session rename`（见 session.wt.brief*）。
- *
- * 三步：剥掉开头的招呼与人称（「你去/帮我/请…」——它们只说了「有人在派活」，
- * 没说这是什么活）、在首个标点处断句、按长度截断但不切在拉丁词中间。
- * 最后那条是这次修的：16 个字硬切，「你去英伟达的 DGX Spark 论坛…」被切成
- * 「你去英伟达的-DGX-Spark」，半个词吊在名字末尾。
- */
-export function taskNameFromPrompt(p: string, limit = 16): string {
-  const first = (p.trim().split(/\n/)[0] || '').replace(/["'`«»""'']/g, '').trim()
-  const lead = first.replace(/^(?:请|麻烦|帮我|帮忙|你去|你来|你先|你把|你|我要|我想|我们|给我|来|去)+\s*/, '')
-  const seg = (lead || first).split(/[，。,.!！？?;；:：]/)[0]
-  const base = seg.length >= 4 ? seg : (lead || first)
-  let cut = base.slice(0, limit)
-  if (base.length > limit) {
-    // 切点落在拉丁词/数字中间 → 退回上一个边界，别留半个词（Spar…、5.…）
-    if (/[A-Za-z0-9.]/.test(base[limit - 1]) && /[A-Za-z0-9.]/.test(base[limit])) {
-      const back = cut.replace(/[A-Za-z0-9.]+$/, '')
-      if (back.trim().length >= 4) cut = back
-    }
-    // 末尾剩一个孤零零的汉字，多半是被切成两半的词（「论坛」→「论」）：丢掉
-    const lone = cut.replace(/[\s]([\u4e00-\u9fff])$/, '')
-    if (lone.trim().length >= 4) cut = lone
-  }
-  return cut.trim().replace(/[-，。,.!！？?;；:：\s]+$/g, '').replace(/\s+/g, '-')
-}
+import { taskNameFromPrompt } from './task-name'
 
 export function NewSessionModal({ open, parent, onClose, onDone }: { open: boolean; parent?: string | null; onClose: () => void; onDone: (name: string) => void }) {
   const { phone } = useLayout()
@@ -61,7 +32,6 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const nativeSession = useNativeSessionCreate()
   const [prompt, setPrompt] = useState('')
   const [name, setName] = useState('')
-  const [nameTouched, setNameTouched] = useState(false)
   const [dir, setDir] = useState('')
   const [pick, setPick] = useState(false)
   const [agent, setAgent] = useState<AgentKind | 'none' | 'native'>('claude')
@@ -77,8 +47,6 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const review = useReviewDraft(agent, agents, isGitRepo && !!prompt.trim())
   const reviewControls = useSessionReviewControls(review)
   const [creating, setCreating] = useState(false)
-  // worktree 展开态（W1）：只选「基于」。分支不提前指定——后端按会话名占位，
-  // Agent 开工后按任务 git branch -m 语义化（交互修订 4：先建会话再建 worktree）。
   // base 选中值：本地分支存裸名；远端分支存 remote:<remote>:<branch> 编码
   // （冒号在 git ref 名里非法，编码无歧义），提交前拆回 {base, remote}
   const [base, setBase] = useState('')
@@ -90,7 +58,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const [prefs] = usePreferences()
   useEffect(() => {
     if (!open) return
-    setPrompt(''); setName(''); setNameTouched(false); setDir(''); setAgent('claude'); setWtMode('new'); review.reset()
+    setPrompt(''); setName(''); setDir(''); setAgent('claude'); setWtMode('new'); review.reset()
     setModelChoice(defaultModelChoice); nativeSession.reset()
     setBase(''); setBranches([]); setRemoteBranches([]); setDefBranch(''); setExistingWts([]); setMainPath(''); setExisting('')
     // 派生模式：目录默认父会话 cwd（可改成任意目录，与新建一致）
@@ -141,20 +109,12 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
   const ok = async () => {
     if (creating || agent !== 'native' && setup.blocked) return
     if (agent === 'native' && !prompt.trim()) return message.error(t('session.promptOrNameRequired'))
-    // prompt-first：名字可全派生；prompt 与名字都空才拦
-    let finalName = name.trim()
-    if (!finalName) {
-      if (!prompt.trim()) return message.error(t('session.promptOrNameRequired'))
-      finalName = taskNameFromPrompt(prompt)
-    }
-    if (!finalName) {
-      const d = new Date()
-      finalName = 'task-' + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0')
-    }
+    const explicitName = name.trim()
+    if (!explicitName && !prompt.trim()) return message.error(t('session.promptOrNameRequired'))
     try {
       setCreating(true)
       if (agent === 'native') {
-        const { session, onCurrentNode } = await nativeSession.create(finalName, prompt, dir.trim(), modelChoice)
+        const { session, onCurrentNode } = await nativeSession.create(explicitName || taskNameFromPrompt(prompt), prompt, dir.trim(), modelChoice)
         onClose()
         if (onCurrentNode) onDone(session)
         else message.info(t('modelSelection.createdOnOriginalNode'))
@@ -170,7 +130,7 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
       }
       const op = await submitLifecycle('create', {
         review: review.intent(prefs),
-        name: finalName, task: prompt, dir: sessionDir, parent: parent && !nativeSessionId(parent) ? parent : undefined,
+        name: explicitName || undefined, task: prompt, dir: sessionDir, parent: parent && !nativeSessionId(parent) ? parent : undefined,
         worktree: !!(madeWt || adopt), ...(adopt ? { branch: adopt, existing: true } : baseReq),
         launch: lifecycleLaunchIntent(agent, prefs, prompt, madeWt ? 'new' : adopt ? 'adopt' : isGitRepo ? 'repo' : 'plain', false, t),
       })
@@ -181,9 +141,8 @@ export function NewSessionModal({ open, parent, onClose, onDone }: { open: boole
     finally { setCreating(false) }
   }
   const form = <Space direction="vertical" style={{ width: '100%' }}>
-          {/* 名称是一等短输入(可留空自动命名)；需求是任务本体,发给 Agent/派生分支 */}
-          <Input placeholder={t('session.namePlaceholder2')} value={name} autoFocus
-            onChange={(e) => { setName(e.target.value); setNameTouched(true) }} />
+          <Input placeholder={t(agent === 'native' ? 'session.namePlaceholder2' : 'session.namePlaceholderId')} value={name} autoFocus
+            onChange={(e) => setName(e.target.value)} />
           {/* 顺序（交互修订 5）：先定位置——名字 → 目录 → 在哪干活；再定执行——Agent → 需求。
               派生模式目录固定 = 父会话 cwd（派生的语义就是在父目录干活），只读展示 */}
           {parent ? (

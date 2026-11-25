@@ -3388,6 +3388,7 @@ const zhCN = {
   'session.wt.briefAdopt': '1. 工作区 {path}：刚为已有分支 {branch} 创建的独立 worktree，比对基准 {base}；沿用分支，别改名、不另切。\n2. 先检查 git status、git log --oneline {base}..HEAD，保留已有成果，不自动 rebase/reset；按仓库约定安装所需依赖。\n3. 用 roami session rename {sess} <短名称> 设置 4–12 字的会话展示名。',
   'session.wt.briefReview': '\n另外：这个任务开了「空闲自动互审」，你歇下来之后会有另一个 agent 来审你的改动。',
   'session.namePlaceholder2': '会话名(短,留空则从需求自动起名)',
+  'session.namePlaceholderId': '会话名（留空使用会话 ID）',
   'session.wt.where': '在哪干活',
   'session.wt.mainRepo': '主仓库',
   'session.wt.newWt': '新建 worktree',

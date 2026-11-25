@@ -132,23 +132,29 @@ func TestWorktreeSessionLifecycle(t *testing.T) {
 	r, tmp, tmuxOut := e2eSetup(t)
 	repo := e2eRepo(t, tmp)
 
-	// ① 组合创建（先会话后 worktree）：不传分支 → 自动占位 roam/<会话名>，会话被 cd 进 worktree
+	// ① 缺省分支使用会话 ID，即使展示名与已有分支前缀冲突。
+	const label = "整理下docs目录"
+	cmd := exec.Command("git", "-C", repo, "branch", "docs/unified-sdk-design")
+	cmd.Env = scrubGitEnv()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("seed branch: %v %s", err, out)
+	}
 	code, resp := post(t, r, "/worktree-sessions", map[string]any{
-		"name": "e2e-main", "dir": repo, "base": "main",
+		"name": label, "dir": repo, "base": "main",
 	})
 	if code != 200 {
 		t.Fatalf("worktree-sessions: %d %v", code, resp)
 	}
 	data := resp["data"].(map[string]any)
 	wtPath := data["path"].(string)
-	if data["branch"] != "e2e-main" || !strings.Contains(wtPath, ".worktrees") {
+	if data["branch"] != data["session"] || !strings.Contains(wtPath, ".worktrees") {
 		t.Fatalf("bad data: %v", data)
 	}
 	// 会话名是不可变的会话 id，用户起的名字是展示名（tmux 用户选项 @roam_name）：
 	// 断言「叫什么名字的会话在不在」一律看展示名，定位会话一律用返回的 session。
 	labels := func() string { return tmuxOut("list-sessions", "-F", "#{@roam_name}") }
 	mainSess := data["session"].(string)
-	if !strings.Contains(labels(), "e2e-main") {
+	if !strings.Contains(labels(), label) {
 		t.Fatal("session not created")
 	}
 	// cd 是注入 shell 的异步键入，轮询等 pane cwd 落进 worktree
@@ -166,7 +172,7 @@ func TestWorktreeSessionLifecycle(t *testing.T) {
 	waitCwd(mainSess, wtPath)
 
 	// ② fork 子会话进新 worktree（仓库自动取父 cwd）
-	code, resp = post(t, r, "/sessions/e2e-main/fork-worktree", map[string]any{
+	code, resp = post(t, r, "/sessions/"+mainSess+"/fork-worktree", map[string]any{
 		"child": "e2e-kid", "branch": "roam/e2e-kid",
 	})
 	if code != 200 {
@@ -181,7 +187,7 @@ func TestWorktreeSessionLifecycle(t *testing.T) {
 	waitCwd(kidSess, kidPath)
 
 	// ②b 纯 fork（无 worktree）：显式 dir，parent 记入 meta，tree=1 投影可见
-	code, resp = post(t, r, "/sessions/e2e-main/fork", map[string]any{"child": "e2e-flat", "dir": repo})
+	code, resp = post(t, r, "/sessions/"+mainSess+"/fork", map[string]any{"child": "e2e-flat", "dir": repo})
 	if code != 200 {
 		t.Fatalf("fork: %d %v", code, resp)
 	}
@@ -215,7 +221,7 @@ func TestWorktreeSessionLifecycle(t *testing.T) {
 		}
 		walk(roots)
 		if !found {
-			t.Fatalf("e2e-flat not under e2e-main in tree: %s", w.Body.String())
+			t.Fatalf("e2e-flat not under %s in tree: %s", mainSess, w.Body.String())
 		}
 	}
 	// 收尾：清掉 flat 子会话，别影响后面 merge close 的占用语义
@@ -244,7 +250,7 @@ func TestWorktreeSessionLifecycle(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(wtPath, "feature.txt"), []byte("done\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, resp = post(t, r, "/sessions/e2e-main/close-with-worktree", map[string]any{
+	code, resp = post(t, r, "/sessions/"+mainSess+"/close-with-worktree", map[string]any{
 		"mode": "merge", "strategy": "squash", "path": wtPath,
 	})
 	if code != 200 {
@@ -256,7 +262,7 @@ func TestWorktreeSessionLifecycle(t *testing.T) {
 	if _, err := os.Stat(wtPath); err == nil {
 		t.Fatal("worktree survived merge close")
 	}
-	if strings.Contains(labels(), "e2e-main") {
+	if strings.Contains(labels(), label) {
 		t.Fatal("session survived merge close")
 	}
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { taskNameFromPrompt } from './NewSessionModal'
+import { taskNameFromPrompt } from './task-name'
 
 // 这个名字只是占位——真名字由 agent 开工后 roami session rename。但占位也不能难看到
 // 「你去英伟达的-DGX-Spark」这种：半个词吊在末尾，开头两个字还只是在说「有人在派活」。
-describe('taskNameFromPrompt：派生占位名', () => {
+describe('taskNameFromPrompt：提取任务主题', () => {
   it('剥掉开头的人称与招呼', () => {
     expect(taskNameFromPrompt('帮我把登录页的报错提示改一下')).toBe('把登录页的报错提示改一下')
     expect(taskNameFromPrompt('请修一下终端复制粘贴')).toBe('修一下终端复制粘贴')

@@ -110,6 +110,7 @@ describe('开任务 · 「已有」选择器', () => {
     await waitFor(() => expect(body('/session-lifecycle/operations')).toHaveLength(1))
     const intent = body('/session-lifecycle/operations')[0].intent
     expect(intent).toMatchObject({ dir: '/repo', branch: 'feat/old', existing: true, worktree: true })
+    expect(intent).not.toHaveProperty('name')
     expect(intent.launch.task).toBe('接着把 P2P 那条分支收尾')
     expect(intent.launch.preamble).toContain('{{PATH}}')
     expect(intent.launch.preamble).toContain('别改名')

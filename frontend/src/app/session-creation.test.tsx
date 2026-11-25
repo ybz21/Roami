@@ -26,7 +26,8 @@ afterEach(cleanup)
 it('forks from the current session when adding a terminal in the current workspace', async () => {
   const { result } = renderHook(() => useProjectActions(options()))
   await act(() => result.current.newTerminalInTask('shell'))
-  expect(mock.api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'create', intent: expect.objectContaining({ dir: '/work', parent: 'active', name: expect.any(String) }) }))
+  expect(mock.api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ kind: 'create', intent: expect.objectContaining({ dir: '/work', parent: 'active' }) }))
+  expect(mock.api.mock.calls[0][2].intent.name).toBeUndefined()
   expect(mock.api).not.toHaveBeenCalledWith('POST', '/sessions', expect.anything())
   expect(mock.open).toHaveBeenCalledWith('created', '/work')
 })
@@ -53,5 +54,5 @@ it('does not fall back to an unrelated new session after fork fails', async () =
 it('creates an independent session when the directory has no usable parent', async () => {
   const { result } = renderHook(() => useProjectActions(options()))
   await act(() => result.current.newTerminalAt('shell', '/fresh'))
-  expect(mock.api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ intent: expect.objectContaining({ name: 'fresh-sh', dir: '/fresh', parent: undefined }) }))
+  expect(mock.api).toHaveBeenCalledWith('POST', '/session-lifecycle/operations', expect.objectContaining({ intent: expect.objectContaining({ dir: '/fresh', parent: undefined }) }))
 })
