@@ -22,6 +22,9 @@ export function useGatewayModelCatalog(revision: string | undefined, active: boo
 
 export const prioritizeGatewayModels = <T extends { kind?: string }>(rows: T[]) => [...rows].sort((a, b) => Number(b.kind === 'aggregate') - Number(a.kind === 'aggregate'))
 export const freeGatewayModel = (row: ModelDirectoryEntry) => row.freeOnly || row.pricing === 'confirmed-free'
+export const selectableGatewayModels = (catalog?: ModelCatalog | null) =>
+  (catalog?.models || []).filter(model => !model.gatewayHidden && model.enabled !== false)
+
 export function configuredGatewayModels(catalog?: ModelCatalog, directory?: GatewayModelCatalog): ModelDirectoryEntry[] {
   const metadata = directory?.revision === catalog?.revision ? directory?.models || [] : []
   return prioritizeGatewayModels((catalog?.models || []).filter(model => !model.gatewayHidden).map(model => {

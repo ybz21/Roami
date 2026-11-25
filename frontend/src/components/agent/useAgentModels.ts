@@ -2,7 +2,7 @@ import { usePageEffect } from '../../page-activity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
 import { MODEL_CATALOG_CHANGED, type ModelCatalog, type ModelDirectoryEntry } from '../capabilities/model-hub-api'
-import { configuredGatewayModels, gatewayDirectoryPath, loadGatewayModels } from '../capabilities/gateway-model-catalog'
+import { configuredGatewayModels, gatewayDirectoryPath, loadGatewayModels, selectableGatewayModels } from '../capabilities/gateway-model-catalog'
 import { agentDataKey, invalidateAgentData } from './agent-data-cache'
 import { useAgentData } from './useAgentData'
 import { MODEL_SETTINGS_CHANGED, saveAgentModels, type AgentModelSettings } from './agent-models'
@@ -85,7 +85,7 @@ export function useAgentModels(node: string | null, role: 'main' | 'worker' = 'm
   const currentRouteId = throughGateway && currentModel === 'roami-default' ? catalog.value?.defaultModel : currentModel
   const currentRoute = gatewayModels.find(model => throughGateway ? model.id === currentRouteId || !!currentRouteId && model.aliases?.includes(currentRouteId) : !model.aggregate && model.candidates?.length === 1 && model.candidates[0].model === currentModel && catalog.value?.sources?.find(source => source.id === model.candidates[0].sourceId)?.baseUrl?.replace(/\/+$/, '') === endpoint?.replace(/\/+$/, ''))
   const selectedOption = currentRoute ? throughGateway ? currentRoute.id : gatewayChoice + currentRoute.id : currentModel
-  const choices = catalogAvailable ? gatewayModels.filter(model => model.enabled !== false).map(model => throughGateway ? model.id : gatewayChoice + model.id) : models
+  const choices = catalogAvailable ? selectableGatewayModels(catalog.value).map(model => throughGateway ? model.id : gatewayChoice + model.id) : models
   const modelDetails: Record<string, ModelDirectoryEntry> = {}
   const configured = configuredGatewayModels(catalog.value, directory)
   for (const model of gatewayModels) {
