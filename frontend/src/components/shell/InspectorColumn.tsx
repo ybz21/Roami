@@ -100,7 +100,7 @@ export function InspectorColumn({ width, bounds, overlay, onResize, onReset, col
             stepLabels={{ minus: t('workspace.widenPanel'), plus: t('workspace.narrowPanel') }} />
         </div>
       )}
-      {open && overlay && <div className="tt-dock-scrim" aria-hidden="true" />}
+      {open && overlay && <div className="tt-dock-scrim" onClick={onToggleCollapsed} aria-hidden="true" />}
       {/* 槽位 DOM 常驻：面板要 portal 进来，挂载点不能随开合出现/消失 */}
       <div
         ref={setInspectorSlot}
