@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
+	"github.com/ybz21/Roami/internal/filelock"
 	"github.com/ybz21/Roami/internal/memguard"
 )
 
@@ -43,10 +43,11 @@ func (r Runtime) SetPaused(name string, pause bool, reason string) error {
 		return err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(lock, false, false)
+	if err != nil {
 		return err
 	}
-	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	defer func() { _ = unlock() }()
 	if pause && reason != "manual" && r.MemoryResumeGrace(name) {
 		return nil
 	}

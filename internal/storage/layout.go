@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/sys/unix"
+	"github.com/ybz21/Roami/internal/filelock"
 	"gopkg.in/yaml.v3"
 )
 
@@ -136,18 +136,12 @@ func (p Paths) Lock(name string, exclusive bool) (func(), error) {
 	if e != nil {
 		return nil, e
 	}
-	how := unix.LOCK_SH
-	if exclusive {
-		how = unix.LOCK_EX
-	}
-	if name != "catalog" {
-		how |= unix.LOCK_NB
-	}
-	if e = unix.Flock(int(f.Fd()), how); e != nil {
+	unlock, e := filelock.Lock(f, !exclusive, name != "catalog")
+	if e != nil {
 		f.Close()
 		return nil, fmt.Errorf("STORAGE_BUSY: %s lock: %w", name, e)
 	}
-	return func() { _ = unix.Flock(int(f.Fd()), unix.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = unlock(); _ = f.Close() }, nil
 }
 func atomicJSON(path string, value any) error {
 	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {

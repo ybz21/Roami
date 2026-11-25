@@ -246,8 +246,7 @@ func RecordedScopeProcesses(directory string) ([]int, error) {
 	if err != nil || !filepath.IsAbs(directory) || filepath.Clean(directory) != directory || relative == "." || relative == ".." || strings.HasPrefix(relative, "../") || !strings.HasPrefix(base, "tmux-spawn-") || !strings.HasSuffix(base, ".scope") {
 		return nil, fmt.Errorf("invalid recorded pane scope")
 	}
-	var filesystem syscall.Statfs_t
-	if err := syscall.Statfs(root, &filesystem); err != nil || filesystem.Type != 0x63677270 {
+	if !isCgroup2Filesystem(root) {
 		return nil, fmt.Errorf("pane cgroup filesystem unavailable")
 	}
 	if info, err := os.Stat(directory); errors.Is(err, os.ErrNotExist) {

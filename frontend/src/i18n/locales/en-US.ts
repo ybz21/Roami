@@ -6363,6 +6363,9 @@ const enUS = {
   'modelSelection.capability.reasoning': 'Reasoning',
   'modelSelection.capability.structuredOutput': 'Structured output',
   'modelSelection.capability.streaming': 'Streaming',
+  'terminal.splitResize': 'Resize split pane',
+  'terminal.paneSwitcher': 'Switch pane',
+  'terminal.paneNumber': 'Pane {index}',
 
 }
 

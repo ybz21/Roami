@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 type codexInitialSource struct {
@@ -58,8 +59,7 @@ func initialCodexCompletion(binding SessionBinding, promptHash string) *codexIni
 			continue
 		}
 		resolved, err := filepath.EvalSymlinks(path)
-		owner, ok := info.Sys().(*syscall.Stat_t)
-		if err != nil || resolved != path || !ok || owner.Uid != uint32(os.Geteuid()) || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 {
+		if err != nil || resolved != path || !fsguard.OwnedByCurrentUser(info) || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 {
 			return nil
 		}
 		file, err := os.Open(path)

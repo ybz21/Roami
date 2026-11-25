@@ -8,12 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/cli/spawn"
 	"github.com/ybz21/Roami/internal/plugin/rpc"
+	"github.com/ybz21/Roami/internal/procctl"
 	"github.com/ybz21/Roami/internal/sessionstore"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -648,7 +648,7 @@ func runWithTimeout(cmd *exec.Cmd, d time.Duration) error {
 	//     就按交互式 TUI 走,把光标移动序列直接画到宿主进程的那条 tty 上——那正是互审陪跑会话
 	//     里刷屏的一大片 ^[[C^[[D(截图里那几十行)。stdout/stderr 早就被收进 buffer 了,
 	//     漏的就是这条 /dev/tty 的旁路。
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	procctl.SetDetached(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -658,7 +658,7 @@ func runWithTimeout(cmd *exec.Cmd, d time.Duration) error {
 	case err := <-done:
 		return err
 	case <-time.After(d):
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		procctl.SignalGroup(cmd.Process.Pid, true)
 		<-done
 		return fmt.Errorf("command timed out after %s", d)
 	}

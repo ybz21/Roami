@@ -4,9 +4,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/ybz21/Roami/internal/procctl"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
 
@@ -26,7 +26,7 @@ func LaunchAutoconfirm(rt runtime.Runtime, sess string) {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Env = os.Environ()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	procctl.SetDetached(cmd)
 	_ = cmd.Start()
 	if cmd.Process != nil {
 		_ = cmd.Process.Release()

@@ -32,6 +32,7 @@ import (
 	"github.com/ybz21/Roami/backend/pty"
 	"github.com/ybz21/Roami/backend/stream"
 	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/internal/sessionbackend"
 )
 
 //go:embed fallback.html
@@ -72,6 +73,9 @@ type Config struct {
 	NodeClient *node.Client
 	Bind       string
 	TLSEnabled bool
+
+	// NativeSessionBackend mounts the native roami-sessiond WebSocket bridge when configured.
+	NativeSessionBackend sessionbackend.SessionBackend
 }
 
 func New(cfg Config) *gin.Engine {
@@ -364,6 +368,7 @@ func New(cfg Config) *gin.Engine {
 
 		// 实时通道
 		g.GET("/term/:name", pty.Handler)
+		mountNativeTerminal(g, cfg.NativeSessionBackend)
 		g.GET("/browser/stream", browser.Handler) // 镜像全局 Chrome 画面
 		g.GET("/browser/tabs", browser.Tabs)      // 标签页：列出
 		g.POST("/browser/tabs", browser.NewTab)   // 标签页：新建

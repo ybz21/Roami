@@ -9,8 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 // Reported progress never supplies stop evidence or changes the execution outcome.
@@ -121,8 +122,7 @@ func claudeTranscriptPath(binding SessionBinding) (string, os.FileInfo) {
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 || info.Size() > 64<<20 {
 		return "", nil
 	}
-	owner, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || int(owner.Uid) != os.Geteuid() {
+	if !fsguard.OwnedByCurrentUser(info) {
 		return "", nil
 	}
 	return path, info
@@ -146,9 +146,9 @@ func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*
 	if info == nil {
 		return nil, nil, nil
 	}
-	owner := info.Sys().(*syscall.Stat_t)
+	_, ino, _ := fsguard.FileIdentity(info)
 
-	snapshot := claudeReportSnapshot{Format: 3, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: owner.Ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
+	snapshot := claudeReportSnapshot{Format: 3, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
 	cache := filepath.Join(launchDir, "reported-progress.json")
 	var previous claudeReportSnapshot
 	if readJSON(cache, &previous) == nil && previous.Format == snapshot.Format && previous.Path == snapshot.Path && previous.Size == snapshot.Size && previous.ModifiedNS == snapshot.ModifiedNS && previous.Inode == snapshot.Inode && previous.ProviderID == snapshot.ProviderID && previous.PromptID == snapshot.PromptID && previous.PromptHash == snapshot.PromptHash && previous.Directory == snapshot.Directory {

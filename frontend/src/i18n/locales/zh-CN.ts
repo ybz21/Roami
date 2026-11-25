@@ -6372,6 +6372,9 @@ const zhCN = {
   'modelSelection.capability.reasoning': '推理',
   'modelSelection.capability.structuredOutput': '结构化输出',
   'modelSelection.capability.streaming': '流式输出',
+  'terminal.splitResize': '调整分屏比例',
+  'terminal.paneSwitcher': '切换窗格',
+  'terminal.paneNumber': '窗格 {index}',
 
 }
 

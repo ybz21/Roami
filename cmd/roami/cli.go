@@ -100,6 +100,9 @@ func runSession(args []string) int {
 	if nativeSessionNewRequested(args) {
 		return runNativeSessionNew(args[1:])
 	}
+	if handled, code := maybeRunNativeSessionCLI(args); handled {
+		return code
+	}
 	return runSessionEngine(args)
 }
 

@@ -9,8 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 // File locks fence actual side effects across processes, including a worker with an expired lease.
@@ -23,18 +24,12 @@ func (s *Store) Lock(key string, shared, nonblocking bool) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	flags := syscall.LOCK_EX
-	if shared {
-		flags = syscall.LOCK_SH
-	}
-	if nonblocking {
-		flags |= syscall.LOCK_NB
-	}
-	if err = syscall.Flock(int(f.Fd()), flags); err != nil {
+	unlock, err := filelock.Lock(f, shared, nonblocking)
+	if err != nil {
 		f.Close()
 		return nil, err
 	}
-	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = unlock(); _ = f.Close() }, nil
 }
 
 func (s *Store) Acquire(ctx context.Context, key string, shared bool) (func(), error) {
@@ -45,7 +40,7 @@ func (s *Store) Acquire(ctx context.Context, key string, shared bool) (func(), e
 		if err == nil {
 			return release, nil
 		}
-		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+		if !errors.Is(err, filelock.ErrWouldBlock) {
 			return nil, err
 		}
 		select {

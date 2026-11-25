@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sys/unix"
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 const monitorRetention = 24 * time.Hour
@@ -74,11 +74,10 @@ func Open(path string, capacity int, now func() time.Time) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
-	fd, err := unix.Open(path, unix.O_CREAT|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0600)
+	file, err := fsguard.OpenNoFollow(path, true, true, 0600)
 	if err != nil {
 		return nil, err
 	}
-	file := os.NewFile(uintptr(fd), path)
 	fail := func(err error) (*Store, error) { file.Close(); return nil, err }
 	info, err := file.Stat()
 	if err != nil {

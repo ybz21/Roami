@@ -11,7 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 type LifecycleSnapshot struct {
@@ -68,8 +69,8 @@ func (s *Service) SnapshotState(ctx context.Context, path string) (state Lifecyc
 		if e != nil {
 			return state, e
 		}
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-			fmt.Fprintf(hash, "%d:%d\x00", stat.Dev, stat.Ino)
+		if dev, ino, ok := fsguard.FileIdentity(info); ok {
+			fmt.Fprintf(hash, "%d:%d\x00", dev, ino)
 		}
 	}
 	for _, args := range [][]string{{"rev-parse", "--absolute-git-dir"}, {"rev-parse", "HEAD"}, {"symbolic-ref", "HEAD"}, {"diff", "--binary", "HEAD", "--"}, {"status", "--porcelain=v1", "-z", "--untracked-files=all"}} {
@@ -98,8 +99,8 @@ func (s *Service) SnapshotState(ctx context.Context, path string) (state Lifecyc
 			if e != nil {
 				return state, e
 			}
-			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				fmt.Fprintf(hash, "%d:%d\x00", stat.Dev, stat.Ino)
+			if dev, ino, ok := fsguard.FileIdentity(info); ok {
+				fmt.Fprintf(hash, "%d:%d\x00", dev, ino)
 			}
 		}
 	}
@@ -132,8 +133,8 @@ func (s *Service) SnapshotState(ctx context.Context, path string) (state Lifecyc
 			return e
 		}
 		fmt.Fprintf(entry, "%q:%d:%d:%d\x00", rel, info.Mode(), info.Size(), info.ModTime().UnixNano())
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-			fmt.Fprintf(entry, "%d:%d\x00", stat.Dev, stat.Ino)
+		if dev, ino, ok := fsguard.FileIdentity(info); ok {
+			fmt.Fprintf(entry, "%d:%d\x00", dev, ino)
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
 			target, e := os.Readlink(p)

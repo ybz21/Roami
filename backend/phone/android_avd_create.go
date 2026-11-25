@@ -19,8 +19,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 // ── 目录：机型档 + 系统镜像 ──
@@ -344,7 +345,7 @@ func scanLinesCR(data []byte, atEOF bool) (int, []byte, error) {
 func streamCmd(timeout time.Duration, stdin interface{ Read([]byte) (int, error) },
 	onLine func(string), name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	procctl.SetProcessGroup(cmd)
 	if stdin != nil {
 		cmd.Stdin = stdin
 	}
@@ -362,10 +363,7 @@ func streamCmd(timeout time.Duration, stdin interface{ Read([]byte) (int, error)
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	timer := time.AfterFunc(timeout, func() {
-		pgid := cmd.Process.Pid
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
-		time.Sleep(2 * time.Second)
-		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+		procctl.TerminateGroup(cmd.Process, 2*time.Second)
 	})
 	defer timer.Stop()
 	sc := bufio.NewScanner(pr)

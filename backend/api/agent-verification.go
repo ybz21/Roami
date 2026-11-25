@@ -13,13 +13,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/agentinventory"
 	"github.com/ybz21/Roami/internal/gitcontext"
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 type agentProof struct {
@@ -180,12 +180,12 @@ func (a *API) VerifyProfessionalAgent(c *gin.Context) {
 	cmd.Dir = directory
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Env = gitcontext.ForDirectory(os.Environ())
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	procctl.SetProcessGroup(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return procctl.KillGroupErr(cmd.Process.Pid, true)
 	}
 	cmd.WaitDelay = time.Second
 	output := &verificationOutput{}
@@ -193,7 +193,7 @@ func (a *API) VerifyProfessionalAgent(c *gin.Context) {
 	cmd.Stderr = io.Discard
 	err = cmd.Run()
 	if cmd.Process != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		procctl.SignalGroup(cmd.Process.Pid, true)
 	}
 	if err != nil || !verificationResponse(output.text) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"code": "AGENT_VERIFICATION_FAILED"}})

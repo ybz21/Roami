@@ -14,11 +14,11 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/ybz21/Roami/internal/browsertabs"
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 var restarting atomic.Bool
@@ -112,11 +112,7 @@ func stopLocalChrome() error {
 		if currentChromePID() != pid {
 			return nil
 		}
-		signal := syscall.SIGTERM
-		if attempt == 1 {
-			signal = syscall.SIGKILL
-		}
-		if err := syscall.Kill(pid, signal); err != nil && err != syscall.ESRCH {
+		if err := procctl.KillPID(pid, attempt == 1); err != nil {
 			return err
 		}
 	}

@@ -1,0 +1,132 @@
+.tt-split-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-base);
+}
+
+.tt-split-branch {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tt-split-branch.horizontal {
+  flex-direction: row;
+}
+
+.tt-split-branch.vertical {
+  flex-direction: column;
+}
+
+.tt-split-slot {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tt-split-pane {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-base);
+}
+
+.tt-split-pane.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid var(--accent-border);
+}
+
+.tt-split-divider {
+  position: relative;
+  flex: 0 0 1px;
+  background: var(--border-subtle);
+  padding: 0;
+  border: 0;
+  touch-action: none;
+}
+
+.tt-split-divider.horizontal {
+  cursor: col-resize;
+}
+
+.tt-split-divider.vertical {
+  cursor: row-resize;
+}
+
+.tt-split-divider::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+}
+
+.tt-split-divider.horizontal::before {
+  inset: 0 -4px;
+}
+
+.tt-split-divider.vertical::before {
+  inset: -4px 0;
+}
+
+html[data-pointer="coarse"] .tt-split-divider.horizontal::before {
+  inset: 0 -22px;
+}
+
+html[data-pointer="coarse"] .tt-split-divider.vertical::before {
+  inset: -22px 0;
+}
+
+:where(html[data-pointer="fine"]) .tt-split-divider:hover,
+.tt-split-divider.dragging {
+  background: var(--accent);
+}
+
+.tt-split-mobile-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.tt-split-mobile-tab {
+  position: relative;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+html[data-pointer="coarse"] .tt-split-mobile-tab::before {
+  content: '';
+  position: absolute;
+  inset: -10px -4px;
+}
+
+.tt-split-mobile-tab.active {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--text-bright);
+}
+
+:where(html[data-pointer="fine"]) .tt-split-mobile-tab:hover {
+  color: var(--text-bright);
+  border-color: var(--accent-border);
+}

@@ -14,7 +14,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	creackpty "github.com/creack/pty"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
@@ -546,14 +545,14 @@ func Handler(c *gin.Context) {
 	// 用客户端带来的尺寸建 pty（StartWithSize 在 c.Start 前就把窗口大小设好）：
 	// 先 Start 再 Setsize 会让 tmux attach 按默认 80x24 画完首帧、随即因 SIGWINCH 整屏重画一次，
 	// 表现为进会话时闪一下 + 窄屏 TUI 留折行垃圾。
-	sz := &creackpty.Winsize{Rows: 30, Cols: 100}
+	sz := tmuxAttachSize{Rows: 30, Cols: 100}
 	if r, err := strconv.Atoi(c.Query("rows")); err == nil && r >= minRows && r <= 500 {
 		sz.Rows = uint16(r)
 	}
 	if cl, err := strconv.Atoi(c.Query("cols")); err == nil && cl >= minCols && cl <= 1000 {
 		sz.Cols = uint16(cl)
 	}
-	ptmx, err := creackpty.StartWithSize(cmd, sz)
+	ptmx, err := startTmuxAttachPTY(cmd, sz)
 	if err != nil {
 		conn.WriteMessage(websocket.TextMessage, []byte("\r\n[无法连接会话: "+name+"]\r\n"))
 		return
@@ -563,7 +562,7 @@ func Handler(c *gin.Context) {
 		_ = cmd.Process.Kill()
 		_, _ = cmd.Process.Wait()
 	}()
-	lastSize := *sz
+	lastSize := sz
 	// pty 输出和控制消息 pong 可能同时写 WebSocket。gorilla 只允许一个并发 writer，
 	// 所有连接级写入必须从这个小闸门经过，否则后台恢复探测会偶发 concurrent write panic。
 	var writeMu sync.Mutex
@@ -640,8 +639,8 @@ func Handler(c *gin.Context) {
 					if ctrl.Cols == lastSize.Cols && ctrl.Rows == lastSize.Rows {
 						continue
 					}
-					lastSize = creackpty.Winsize{Rows: ctrl.Rows, Cols: ctrl.Cols}
-					_ = creackpty.Setsize(ptmx, &lastSize)
+					lastSize = tmuxAttachSize{Rows: ctrl.Rows, Cols: ctrl.Cols}
+					_ = resizeTmuxAttachPTY(ptmx, lastSize)
 					continue
 				case "scroll":
 					// 普通屏走 copy-mode 才需在真实键入前退出；备用屏 TUI 喂的是滚轮，inCopyMode=false。

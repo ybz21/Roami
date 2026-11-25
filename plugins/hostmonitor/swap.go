@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/ybz21/Roami/internal/procctl"
 	"github.com/ybz21/Roami/pkg/plugin/sdk"
 )
 
@@ -107,16 +107,9 @@ func writeJob(ctx *sdk.Ctx, j swapJob) error {
 	return os.WriteFile(jobPath(ctx), b, 0o644)
 }
 
-// alive 判进程还在不在。信号 0 不真发信号,只做权限与存在性检查。
+// alive 判进程还在不在。
 func alive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	p, err := os.FindProcess(pid) // Unix 上这一步从不失败
-	if err != nil {
-		return false
-	}
-	return p.Signal(syscall.Signal(0)) == nil
+	return procctl.ProcessAlive(pid)
 }
 
 func swapStatus(ctx *sdk.Ctx) (SwapStatus, error) {
@@ -193,7 +186,7 @@ func startSwapCycle() (int, error) {
 		return 0, err
 	}
 	cmd := exec.Command(self, "plugin", "run", "host-monitor.swap-cycle")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	procctl.SetDetached(cmd)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
 	if err := cmd.Start(); err != nil {
 		return 0, err

@@ -4,10 +4,7 @@ package agentruntime
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
-	"os"
 	"path/filepath"
-	"syscall"
 
 	metadb "github.com/ybz21/Roami/internal/storage"
 )
@@ -34,17 +31,9 @@ func Resolve(home, data string) (Paths, error) {
 	sum := sha256.Sum256([]byte(layout.Instance + ":" + p.Data))
 	socket := filepath.Join(root, "agent-"+hex.EncodeToString(sum[:8])+".sock")
 	if len(socket) > 103 {
-		root = filepath.Join("/tmp", fmt.Sprintf("roami-agent-%d", os.Geteuid()))
-		if err := os.Mkdir(root, 0700); err != nil && !os.IsExist(err) {
-			return Paths{}, err
-		}
-		info, err := os.Lstat(root)
+		root, err = fallbackSocketDir()
 		if err != nil {
 			return Paths{}, err
-		}
-		st, ok := info.Sys().(*syscall.Stat_t)
-		if !info.IsDir() || info.Mode().Perm() != 0700 || !ok || int(st.Uid) != os.Geteuid() {
-			return Paths{}, fmt.Errorf("AGENT_SOCKET_DIRECTORY_UNSAFE")
 		}
 		socket = filepath.Join(root, "agent-"+hex.EncodeToString(sum[:8])+".sock")
 	}
