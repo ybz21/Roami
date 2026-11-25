@@ -5,7 +5,7 @@ import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { ChevronDown, LinkIcon, PlusIcon, SearchIcon, TrashIcon } from '../../icons'
 import { configuredSourceModels } from './configured-source-models'
-import { catalogFailure, modelProtocols, openRouterConnection, sourceModelName, type ModelCatalog, type ModelSource } from './model-hub-api'
+import { catalogFailure, modelProtocols, openRouterConnection, sourceModelName, type CatalogModel, type ModelCatalog, type ModelSource } from './model-hub-api'
 
 const discoveryErrors: Record<string, string> = {
   MODEL_LIST_UNAUTHORIZED: 'hub.directory.unauthorized',
@@ -49,10 +49,11 @@ function parseSourceURL(value: string) {
   } catch { return null }
 }
 
-export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, pricing, authentication, management }: {
+export default function ModelSourceEditor({ draft, onChange, catalog, busy, error, retry, onSave, onBack, onEditModel, modelActions, pricing, authentication, management }: {
   draft: SourceDraft; onChange: (draft: SourceDraft) => void; catalog: ModelCatalog; busy: boolean; error: string; retry: () => void
   onSave: (catalog: ModelCatalog) => Promise<boolean>; onBack: () => void
   pricing?: ReactNode; authentication?: ReactNode; management?: ReactNode; onEditModel: (id: string) => void
+  modelActions?: (model: CatalogModel, busy: boolean) => ReactNode
 }) {
   const { t, locale } = useI18n(), { message } = App.useApp()
   const urlHintId = useId()
@@ -232,7 +233,7 @@ export default function ModelSourceEditor({ draft, onChange, catalog, busy, erro
               {managing ? <Checkbox disabled={busy || loading} checked={checked(model)} onChange={event => selectModels([model], event.target.checked)}><span>{model}</span></Checkbox> : <strong className="tt-model-directory-name">{model}</strong>}
               <code>{sourceModelName(source, model)}</code>
             </div>
-            {!!saved.length && <div className="tt-model-directory-actions">{draft.directory !== null && !draft.directory.includes(model) && <span className="tt-model-source-warning">{t('hub.directory.notListed')}</span>}{saved.map(row => <button key={row.id} type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>)}</div>}
+            {!!saved.length && <div className="tt-model-directory-actions">{draft.directory !== null && !draft.directory.includes(model) && <span className="tt-model-source-warning">{t('hub.directory.notListed')}</span>}{saved.map(row => <div className="tt-model-directory-model-actions" key={row.id}><button type="button" className="tt-act" disabled={busy || loading} aria-label={t('hub.directory.editModel', { model: row.name })} onClick={() => onEditModel(row.id)}>{saved.length > 1 ? t('hub.directory.editModel', { model: row.name }) : t('capabilities.edit')}</button>{!managing && modelActions?.(row, busy || loading)}</div>)}</div>}
           </div>
         })}</div>
         {!visible.length && <p className="agent-settings-hint">{t(listed.length ? 'hub.directory.noMatches' : openRouter && draft.directory !== null ? 'hub.openRouter.empty' : 'orchestration.noConfiguredModels')}</p>}

@@ -1,3 +1,4 @@
+import CatalogDeleteAction from './CatalogDeleteAction'
 import AggregationPoolCard from './AggregationPoolCard'
 import AggregationEditor, { type AggregationSection } from './AggregationEditor'
 import { MAX_AGGREGATE_MEMBERS } from './routing-preview'
@@ -45,12 +46,15 @@ export default function ModelAggregationWorkspace({ active, catalog, busy, error
   const sources = catalog?.sources || []
   const valid = !!draft && !!draft.name.trim() && draft.id !== 'roami-default' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(draft.id) && draft.candidates.length > 0 && draft.candidates.length <= MAX_AGGREGATE_MEMBERS && (draft.aliases?.length || 0) + (original && draft.id !== original && !draft.aliases?.includes(draft.id) ? 1 : 0) <= 32 && draft.candidates.every(candidate => candidate.model && (candidate.sourceId === '@group' || sources.some(source => source.id === candidate.sourceId)) && Number.isInteger(draft.weights?.[identity(candidate)] ?? 1) && (draft.weights?.[identity(candidate)] ?? 1) >= 1 && (draft.weights?.[identity(candidate)] ?? 1) <= 1000) && !gatewayModelNameTaken(draft.id, original, catalog?.models || []) && !gatewayAliasError(draft, original, catalog?.models || [])
   const submit = async () => { if (!catalog || !draft || !valid || busy) return; const next = { ...draft, name: draft.name.trim(), gatewayAlias: draft.gatewayAlias?.trim() || undefined, aliases: [...new Set([...(draft.aliases || []), ...(original && original !== draft.id ? [original] : [])])].filter(id => id !== draft.id) }; if (await save({ ...catalog, models: original ? catalog.models.map(model => model.id === original ? next : model) : [...catalog.models, next] })) { cancel(); message.success(t('pool.saved')) } }
+  const deletion = (model: CatalogModel, card: boolean) => catalog && <CatalogDeleteAction target={{ kind: 'model', item: model }} catalog={catalog} busy={busy} save={save} card={card} onDeleted={() => {
+    setDrafts(previous => { const next = { ...previous }; delete next[draftKey(model.id)]; return next })
+    if (!card) onCloseRequested()
+  }} />
   const card = (model: CatalogModel) => {
     const savedDraft = drafts[draftKey(model.id)]
-    return <AggregationPoolCard key={model.id} model={model} disabled={busy} unsaved={!!savedDraft && JSON.stringify(savedDraft) !== JSON.stringify(model)} onOpen={() => onOpenRequested(model.id)} />
+    return <AggregationPoolCard key={model.id} model={model} disabled={busy} unsaved={!!savedDraft && JSON.stringify(savedDraft) !== JSON.stringify(model)} onOpen={() => onOpenRequested(model.id)} deletion={deletion(model, true)} />
   }
-  const remove = async () => { if (!catalog || !original || busy) return false; const saved = await save({ ...catalog, models: catalog.models.filter(row => row.id !== original) }); if (saved) cancel(); return saved }
-  const editor = draft && catalog && <AggregationEditor key={key} model={draft} original={original} catalog={catalog} active={active} busy={busy} valid={valid} error={error} retry={retry} section={original ? section : undefined} requestId={requestId} onSection={openSection} onChange={patch} onSave={() => void submit()} onCancel={cancel} onDelete={remove} onSource={onSource} onRequest={id => { if (original) onRequest(id, original) }} onTrace={id => openSection('requests', id)} onRequestLimits={onRequestLimits} />
+  const editor = draft && catalog && <AggregationEditor key={key} model={draft} original={original} catalog={catalog} active={active} busy={busy} valid={valid} error={error} retry={retry} section={original ? section : undefined} requestId={requestId} onSection={openSection} onChange={patch} onSave={() => void submit()} onCancel={cancel} deletion={savedPool && deletion(savedPool, false)} onSource={onSource} onRequest={id => { if (original) onRequest(id, original) }} onTrace={id => openSection('requests', id)} onRequestLimits={onRequestLimits} />
   const title = savedPool?.name || t('pool.create')
   if ((savedPool || newPoolOpen) && draft) return <section className="tt-routing-workspace tt-model-catalog-detail tt-aggregate-detail" hidden={!active} aria-label={t('hub.tab.aggregate')}>
     {phone ? active && <MobileSubPage title={title} search={false} onBack={requestId ? () => openSection('requests') : closeEditor} manageHistory={newPoolOpen}>{editor}</MobileSubPage> : <><header className="tt-pagehead"><BackButton onClick={closeEditor} /><h2>{title}</h2></header>{editor}</>}

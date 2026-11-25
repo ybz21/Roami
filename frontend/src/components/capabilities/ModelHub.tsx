@@ -1,3 +1,4 @@
+import CatalogDeleteAction from './CatalogDeleteAction'
 import ModelGatewayWorkspace from './ModelGatewayWorkspace'
 import ModelAggregationWorkspace from './ModelAggregationWorkspace'
 import ModelMonitoringWorkspace from './ModelMonitoringWorkspace'
@@ -10,7 +11,7 @@ import ModelUsageWorkspace from './ModelUsageWorkspace'
 import { useState } from 'react'
 import { App, Tabs } from 'antd'
 import { configuredSourceModels, configuredSourceModelIds } from './configured-source-models'
-import { Alert, Button, Dropdown, Input, Popconfirm, Select, Spin, TabBar } from './model-controls'
+import { Alert, Button, Dropdown, Input, Select, Spin, TabBar } from './model-controls'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { getHashParams } from '../../route-hash'
@@ -113,30 +114,26 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       {upstream && candidate.model.trim() && <code className="agent-settings-hint tt-model-source-qualified">{sourceModelName(upstream, candidate.model.trim())}</code>}
     </>
   }
-  const sourceReferences = (sourceId: string) => [
-    ...models.filter(model => model.candidates.some(candidate => candidate.sourceId === sourceId) &&
-      (model.aggregate || model.candidates[0].sourceId !== sourceId || value.uses[model.id]?.length)),
-    ...value.drafts.filter(model => model.candidates.some(candidate => candidate.sourceId === sourceId)),
-  ]
-  const sourceDependencies = detail === 'source' && id !== 'new' ? sourceReferences(sourceBase.id) : []
-  const removeSource = async () => {
-    const sourceId = sourceBase.id
-    if (sourceDependencies.length || controller.busy) return false
-    const saved = await controller.save({ ...value, sources: sources.filter(source => source.id !== sourceId), models: models.filter(model => model.candidates[0].sourceId !== sourceId) })
-    if (!saved) return false
-    setSourceDrafts(previous => { const next = { ...previous }; delete next[sourceId]; return next })
-    setSourcePrices(previous => { const next = { ...previous }; delete next[sourceId]; return next })
-    back()
-    return true
+  const clearRemovedModels = (ids: ReadonlySet<string>, draftId?: string) => {
+    setModelDrafts(previous => Object.fromEntries(Object.entries(previous).filter(([key]) => !ids.has(key) && key !== draftId)))
   }
+  const sourceDeletion = (source: ModelSource, card: boolean) => <CatalogDeleteAction target={{ kind: 'source', item: source }}
+    catalog={value} busy={controller.busy || !!addingAccount} save={controller.save} card={card} onDeleted={ids => {
+      setSourceDrafts(previous => { const next = { ...previous }; delete next[source.id]; return next })
+      setSourcePrices(previous => { const next = { ...previous }; delete next[source.id]; return next })
+      clearRemovedModels(ids)
+      if (!card) back()
+    }} />
+  const savedModel = models.find(row => row.id === id) || value.drafts.find(row => row.id === id)
+  const modelDeletion = (model: CatalogModel, busy: boolean, returnToList: boolean) => <CatalogDeleteAction target={{ kind: 'model', item: model }}
+    catalog={value} busy={busy} save={controller.save} onDeleted={ids => {
+      clearRemovedModels(ids, model.id)
+      if (returnToList) back()
+    }} />
   const sourceAuthentication = sourceBase.pluginSourceId ? <><Button className="tt-model-source-account-add" icon={<PlusIcon />} disabled={!!addingAccount || controller.busy} loading={addingAccount === sourceBase.id} onClick={() => void addAccount(sourceBase)}>{t('hub.plugin.addAccount')}</Button>{accountError && <Alert type="error" role="alert" message={t(accountError)} />}<MagpieSourceSettings key={sourceBase.id} sourceId={sourceBase.pluginSourceId} initiallyOpen={accountToAuthorize === sourceBase.id} onChanged={controller.retry}/></> : undefined
-  const sourceManagement = detail === 'source' && id !== 'new' && sources.some(source => source.id === id) ? <div className="tt-model-source-management">
-    <Popconfirm danger classNames={{ root: 'tt-model-connection-confirm' }} title={t('hub.deleteConnection', { name: sourceBase.name })} description={sourceBase.pluginDesktop ? t('hub.plugin.deleteDesktopHint') : undefined} onConfirm={removeSource} okText={t('capabilities.models.deleteAction')}>
-      <button type="button" className="tt-act danger" disabled={!!sourceDependencies.length || controller.busy}>{t('hub.deleteSource')}</button>
-    </Popconfirm>
-    {!!sourceDependencies.length && <p className="agent-settings-hint">{t('hub.sourceInUse', { models: new Intl.ListFormat(locale).format([...new Set(sourceDependencies.map(model => model.name))]) })}</p>}
-  </div> : undefined
-  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [sourceDraftKey]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} onSave={async next => {
+  const sourceManagement = detail === 'source' && id !== 'new' && sources.some(source => source.id === id)
+    ? <div className="tt-model-source-management">{sourceDeletion(sourceBase, false)}</div> : undefined
+  const connectionEditor = <ModelSourceEditor key={sourceBase.id} authentication={sourceAuthentication} management={sourceManagement} draft={sourceDraft} onChange={draft => setSourceDrafts(previous => ({ ...previous, [sourceDraftKey]: draft }))} catalog={value} busy={controller.busy} error={controller.error} retry={controller.retry} onBack={back} onEditModel={modelID => { setReturnSource(id); navigate('catalog/model/' + modelID) }} modelActions={(model, busy) => modelDeletion(model, busy, false)} onSave={async next => {
     const saved = await controller.save(next)
     if (saved) {
       setSourceDrafts(previous => { const next = { ...previous }; delete next[sourceDraftKey]; return next })
@@ -171,6 +168,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       <p className="agent-settings-hint">{t('hub.failoverHint')}</p>
     </details>
     <p className="agent-settings-hint">{t('hub.availableHint')}</p>
+    {savedModel && !savedModel.aggregate && <div className="tt-model-source-management">{modelDeletion(savedModel, controller.busy, true)}</div>}
     <div className="agent-settings-save"><Button disabled={controller.busy} onClick={()=>{setModelDrafts(previous=>{const next={...previous};delete next[id];return next});back()}}>{t('common.cancel')}</Button><Button type="primary" htmlType="submit" disabled={!validModel || controller.busy} loading={controller.busy}>{t('agent.models.save')}</Button></div>
   </form>
   const editor = detail === 'pricing' ? <div className="tt-model-hub-scroll">{error}<GatewaySettingsForm controller={billing} mode="prices" active models={priceModels} /></div> : detail === 'import' ? <MagpiePluginImport onRetry={controller.retry} revision={value.revision} onImported={() => { controller.retry(); back() }} /> : detail === 'local' ? <LocalModelSources onImported={() => { controller.retry(); back() }} /> : detail === 'source' ? sourceEditor : <div className="tt-model-hub-scroll">{error}{modelEditor}</div>
@@ -190,8 +188,7 @@ export default function ModelHub({ sub = '', onNav, embedded = false }: { sub?: 
       </dl>}
       {<div className="tt-model-connection-preview"><span>{t(attached.length ? 'hub.directory.total' : 'hub.empty.catalog', { count: new Intl.NumberFormat(locale).format(attached.length) })}</span>{!!attached.length && <p>{preview}</p>}</div>}
       {source.pluginDesktopUnavailable && <p className="agent-settings-hint">{t('hub.plugin.desktopOnly')}</p>}
-      <div className="tt-model-connection-footer"><div className="tt-model-connection-pricing"><span>{t('pricing.default')}</span><strong>{t('pricing.'+(billing.saved?.pricing.sources?.[source.id]?.default?.mode || 'inherit'))}</strong>{sourcePriceDraftChanged(sourcePrices[source.id],billing.saved?.pricing.sources?.[source.id]) && <small>{t('pricing.draftKept')}</small>}</div>{source.pluginSourceId && <Button className="tt-model-card-add-account" icon={<PlusIcon />} aria-label={t('modelInteraction.addAccountTo',{name:label})} disabled={!!addingAccount || controller.busy} loading={addingAccount === source.id} onClick={() => void addAccount(source)}>{t('hub.plugin.addAccount')}</Button>}</div>
-
+      <div className="tt-model-connection-footer"><div className="tt-model-connection-pricing"><span>{t('pricing.default')}</span><strong>{t('pricing.'+(billing.saved?.pricing.sources?.[source.id]?.default?.mode || 'inherit'))}</strong>{sourcePriceDraftChanged(sourcePrices[source.id],billing.saved?.pricing.sources?.[source.id]) && <small>{t('pricing.draftKept')}</small>}</div>{source.pluginSourceId && <Button className="tt-model-card-add-account" icon={<PlusIcon />} aria-label={t('modelInteraction.addAccountTo',{name:label})} disabled={!!addingAccount || controller.busy} loading={addingAccount === source.id} onClick={() => void addAccount(source)}>{t('hub.plugin.addAccount')}</Button>}{sourceDeletion(source, true)}</div>
     </section>
   })
   if (embedded && catalogDetail) return <div className="onboarding-model-editor">{draftNotice}{editor}</div>

@@ -193,4 +193,7 @@ html[data-size="compact"] .tt-model-catalog-actions { grid-template-columns:minm
 html[data-size="compact"] .tt-model-catalog-filters > .ui-input-wrap { grid-column:1/-1; width:100%; }
 .tt-model-connection-footer { display:flex; align-items:center; flex-wrap:wrap; gap:var(--sp-3); margin-top:auto; padding-top:var(--sp-3); border-top:1px solid var(--border-subtle); }
 .tt-model-connection-footer > .tt-model-connection-pricing { flex:1; min-width:0; padding:0; margin:0; border:0; }
-.tt-model-card-add-account { position:relative; flex-shrink:0; }
+.tt-model-card-add-account,.tt-model-card-delete { position:relative; flex-shrink:0; }
+.tt-model-card-delete { margin-inline-start:auto; }
+.tt-model-delete-description { overflow-wrap:anywhere; }
+.tt-model-directory-model-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--sp-2); }

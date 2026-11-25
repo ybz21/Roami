@@ -217,11 +217,11 @@ it('resumes a new draft from the list and keeps failed saves editable', async ()
  expect(screen.getByRole('checkbox', { name: 'native-a' }).getAttribute('aria-checked')).toBe('true')
 })
 
-it('keeps separate drafts for different cards and puts management actions in the detail', () => {
+it('keeps separate drafts and offers deletion on the card and in the detail', () => {
  const a = { id: 'alpha', name: 'Alpha', aggregate: true, protocol: 'openai-completions', strategy: 'smart' as const, candidates: [{ sourceId: 'a', model: 'native-a' }] }
  const b = { ...a, id: 'beta', name: 'Beta' }
  render(<App><ModelAggregationWorkspace {...requestNav} active catalog={{ ...catalog, models: [...catalog.models, a, b] }} busy={false} error="" save={vi.fn(async () => true)} retry={vi.fn()} onSource={vi.fn()} /></App>)
- expect(screen.queryByRole('button', { name: 'capabilities.models.deleteAction' })).toBeNull()
+ expect(within(screen.getByRole('region', { name: 'Alpha' })).getByRole('button', { name: 'modelDelete.action' })).toBeTruthy()
  fireEvent.click(within(screen.getByRole('region', { name: 'Alpha' })).getByRole('button', { name: 'pool.open' }))
  fireEvent.change(screen.getByLabelText('pool.name'), { target: { value: 'Alpha draft' } })
  fireEvent.mouseDown(screen.getByRole('tab', { name: 'pool.section.members' }))
@@ -315,4 +315,14 @@ it('keeps nested routing groups selectable without including the edited group it
  expect(screen.queryByRole('checkbox', { name: 'self' })).toBeNull()
  await pick('pool.source', 'Source A')
  expect(screen.getByRole('list', { name: 'orchestration.selectedPool' }).textContent).toContain('other')
+})
+
+it('deletes the selected pool from its card without changing other models', async () => {
+  const target = { ...catalog.models[0], id: 'pool-a', name: 'Alpha', aggregate: true, strategy: 'smart' as const }
+  const other = { ...target, id: 'pool-b', name: 'Beta' }
+  const save = vi.fn(async () => true)
+  render(<App><ModelAggregationWorkspace {...requestNav} active catalog={{ ...catalog, models: [...catalog.models, target, other] }} busy={false} error="" save={save} retry={vi.fn()} onSource={vi.fn()} /></App>)
+  fireEvent.click(within(screen.getByRole('region', { name: 'Alpha' })).getByRole('button', { name: 'modelDelete.action' }))
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'capabilities.models.deleteAction' }))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ models: [...catalog.models, other] })))
 })

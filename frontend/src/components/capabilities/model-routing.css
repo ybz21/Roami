@@ -84,7 +84,6 @@ html[data-pointer="coarse"] .tt-member-quick-actions { opacity:1; pointer-events
 .tt-aggregate-footer>div { display:flex; flex-shrink:0; gap:var(--sp-3); }
 .tt-aggregate-footer>span { min-width:0; }
 .tt-aggregate-footer small { display:block; font-size:var(--fs-meta); }
-.tt-aggregate-card .tt-pool-draft-label { margin-top:auto; }
 .tt-aggregate-editor-content .tt-model-source-management { margin-top:var(--sp-5); }
 html:is([data-size="compact"],[data-size="medium"]) .tt-routing-config-card { grid-template-columns:minmax(0,1fr); gap:var(--sp-4); }
 html:is([data-size="compact"],[data-size="medium"]) .tt-routing-members>li { grid-template-columns:var(--ctl-h) var(--sp-5) minmax(0,1fr); padding:var(--sp-3); gap:var(--sp-2); }

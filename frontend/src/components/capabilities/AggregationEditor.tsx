@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { Alert, Button, Checkbox, Input, InputNumber, Select, TabBar, Popconfirm } from './model-controls'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { Alert, Button, Checkbox, Input, InputNumber, Select, TabBar } from './model-controls'
 import { useI18n } from '../../i18n'
 import { ChevronRight } from '../../icons'
 import { usePageActive } from '../../page-activity'
@@ -17,10 +17,10 @@ import { useModelMemberFacts } from './model-member-facts'
 
 export type AggregationSection = 'members' | 'routing' | 'monitor' | 'requests'
 
-export default function AggregationEditor({ model, original, catalog, active, busy, valid, error, section, requestId, onSection, onChange, onSave, onCancel, onDelete, onSource, onRequest, onTrace, onRequestLimits, retry }: {
+export default function AggregationEditor({ model, original, catalog, active, busy, valid, error, section, requestId, onSection, onChange, onSave, onCancel, deletion, onSource, onRequest, onTrace, onRequestLimits, retry }: {
   model: CatalogModel; original: string | null; catalog: ModelCatalog; active: boolean; busy: boolean; valid: boolean; error: string
   section?: AggregationSection; requestId?: string; onSection: (section: AggregationSection) => void
-  onChange: (patch: Partial<CatalogModel>) => void; onSave: () => void; onCancel: () => void; onDelete: () => Promise<boolean>; onSource: (source: string) => void; onRequest: (id: string) => void; retry: () => void
+  onChange: (patch: Partial<CatalogModel>) => void; onSave: () => void; onCancel: () => void; deletion?: ReactNode; onSource: (source: string) => void; onRequest: (id: string) => void; retry: () => void
   onTrace: (id: string) => void; onRequestLimits: () => void
 }) {
   const { t, locale } = useI18n(), [creationTab, setCreationTab] = useState<AggregationSection>('members'), scroll = useRef<HTMLDivElement>(null)
@@ -65,7 +65,7 @@ export default function AggregationEditor({ model, original, catalog, active, bu
           <summary><ChevronRight />{t('orchestration.moreSettings')}{model.enabled === false && <small>{t('pool.disabled')}</small>}</summary>
           <div className="tt-aggregate-settings"><label className="agent-settings-field">{t('pool.modelId')}<Input id={fieldId + '-id'} aria-describedby={fieldId + '-id-error'} aria-invalid={!!idError && (attempted || touched.id)} aria-label={t('pool.modelId')} onBlur={() => setTouched(value => ({ ...value, id: true }))} value={model.id} disabled={busy} maxLength={160} onChange={event => onChange({ id: event.target.value })} />{idError && (attempted || touched.id) && <small className="tt-model-field-error" id={fieldId + '-id-error'} role="alert">{idError}</small>}</label>
           <p className="agent-settings-hint">{t(original ? 'pool.renameHint' : 'orchestration.autoId')}</p>
-          <div className="tt-model-source-management"><Checkbox disabled={busy} checked={model.enabled !== false} onChange={event => onChange({ enabled: event.target.checked })}>{t('pool.enabled')}</Checkbox>{saved && <Popconfirm title={t('pool.delete')} onConfirm={onDelete}><button type="button" className="tt-act danger" disabled={busy || !!catalog.uses[saved.id]?.length}>{t('capabilities.models.deleteAction')}</button></Popconfirm>}</div></div>
+          <div className="tt-model-source-management"><Checkbox disabled={busy} checked={model.enabled !== false} onChange={event => onChange({ enabled: event.target.checked })}>{t('pool.enabled')}</Checkbox>{deletion}</div></div>
         </details>
       </section>
       <section hidden={tab !== 'routing'} aria-label={t('pool.section.routing')}>

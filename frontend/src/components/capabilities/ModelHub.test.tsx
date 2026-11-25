@@ -635,7 +635,7 @@ it('routes each named choice in the New menu to its own creation flow', async ()
   expect(create.closest('.tt-model-catalog-actions')).toBeTruthy()
   expect(container.querySelector('.tt-model-connection-new')).toBeNull()
   expect(screen.queryByRole('button', { name: 'agent.gateway.defaultPrice' })).toBeNull()
-  expect(container.querySelector('.tt-model-connection-footer button')).toBeNull()
+  expect(container.querySelector('.tt-model-connection-footer button.tt-model-card-delete')).toBeTruthy()
   for (const [name, path] of [
     ['hub.openRouter.name hub.create.openRouter', 'source/new/openrouter'],
     ['hub.addSource hub.create.api', 'source/new'],
@@ -649,10 +649,10 @@ it('routes each named choice in the New menu to its own creation flow', async ()
   }
 })
 
-it('keeps the source card read-only and falls back to connection for single-credential routing links', async () => {
+it('keeps connection editing in detail and falls back for single-credential routing links', async () => {
   const navigate = vi.fn(), page = mount('', navigate)
   const card = await screen.findByRole('region', { name: 'Saved source' })
-  expect(within(card).getAllByRole('button')).toHaveLength(1)
+  expect(within(card).getByRole('button', { name: 'modelDelete.action' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'hub.renameSource' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'pricing.action' })).toBeNull()
   fireEvent.click(within(card).getByRole('button', { name: 'hub.openSource' }))
@@ -709,6 +709,23 @@ it('deletes a source from its connection settings and returns to the catalog', a
   expect(navigate).toHaveBeenLastCalledWith('capabilities/models/catalog')
 })
 
+it('confirms deletion directly from the source card', async () => {
+  const navigate = vi.fn()
+  mount('catalog', navigate)
+  const card = await screen.findByRole('region', { name: 'Saved source' })
+  fireEvent.click(within(card).getByRole('button', { name: 'modelDelete.action' }))
+  let dialog = await screen.findByRole('alertdialog')
+  expect(within(dialog).getByText('modelDelete.sourceImpact')).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: 'common.cancel' }))
+  expect(api).not.toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.anything())
+  fireEvent.click(within(card).getByRole('button', { name: 'modelDelete.action' }))
+  dialog = await screen.findByRole('alertdialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'capabilities.models.deleteAction' }))
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Saved source' })).toBeNull())
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: [], models: [] }))
+  expect(navigate).not.toHaveBeenCalled()
+})
+
 it('shows the referencing aggregate and preserves the source until it is released', async () => {
   const original = vi.mocked(api).getMockImplementation()!
   const pool = { ...catalog.models[0], id: 'wb-ds', name: 'WB DS', aggregate: true }
@@ -717,10 +734,18 @@ it('shows the referencing aggregate and preserves the source until it is release
     return original(method, path, body, options)
   })
   mount('catalog/source/upstream')
-  const remove = await screen.findByRole('button', { name: 'hub.deleteSource' }) as HTMLButtonElement
-  expect(remove.disabled).toBe(true)
-  expect(within(remove.closest('.tt-model-source-connection')!).getByText('hub.sourceInUse')).toBeTruthy()
+  fireEvent.click(await screen.findByRole('button', { name: 'hub.deleteSource' }))
+  expect(await screen.findByText('modelDelete.models')).toBeTruthy()
+  expect(screen.queryByRole('alertdialog')).toBeNull()
   expect(vi.mocked(api).mock.calls.some(([method]) => method === 'PUT')).toBe(false)
+})
+
+it('removes only the configured model from its source list', async () => {
+  mount('catalog/source/upstream')
+  fireEvent.click(await screen.findByRole('button', { name: 'modelDelete.action' }))
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'capabilities.models.deleteAction' }))
+  await waitFor(() => expect(screen.queryByText('priced-model', { selector: '.tt-model-directory-name' })).toBeNull())
+  expect(api).toHaveBeenCalledWith('PUT', '/agent/model-gateway/catalog', expect.objectContaining({ sources: catalog.sources, models: [] }))
 })
 
 it('offers published pools as a source and does not discover an upstream for a routing group', async () => {
