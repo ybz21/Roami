@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +49,67 @@ func TestLifecycleAcceptanceSurvivesClientDisconnect(t *testing.T) {
 	if err != nil || stored.State != "queued" || stored.Intent.Task != "Keep this original request" {
 		t.Fatalf("lost durable intent: %+v %v", stored, err)
 	}
+}
+
+func TestLifecycleRetryUsesSessionIDForLegacyImplicitBranch(t *testing.T) {
+	a, router := lifecycleAPI(t)
+	root := t.TempDir()
+	isolateTestStorage(t, root)
+	repo := e2eRepo(t, root)
+	a.WT = worktree.New(root, nil)
+	ctx := context.Background()
+	git := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = scrubGitEnv()
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	const existing = "docs/unified-sdk-design"
+	git("branch", existing)
+	head := git("rev-parse", existing)
+	session := "2026-1125-1102-k6gw"
+	path := filepath.Join(repo, ".worktrees", session)
+	o, err := a.Lifecycle.Accept("legacy-operation", session, "legacy-create-request", "create", life.Intent{Name: "整理下docs目录", Dir: repo, Worktree: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, legacyError := a.WT.Create(ctx, worktree.CreateReq{Dir: repo, Branch: "docs", Dirname: session, OperationID: o.ID, ExpectedPath: path})
+	if legacyError == nil || !strings.Contains(legacyError.Error(), "refs/heads/"+existing) {
+		t.Fatalf("fixture did not reproduce the name collision: %v", legacyError)
+	}
+	encoded, _ := json.Marshal(map[string]string{"path": path})
+	o, err = a.Lifecycle.Mutate(o.ID, o.Revision, func(op *life.Operation) error {
+		op.State, op.Stage, op.Epoch = "attention", "workspace", 3
+		op.Receipts["workspace-intent"] = encoded
+		op.ErrorCode, op.ErrorDetail = "LIFECYCLE_STEP_FAILED", legacyError.Error()
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, response := post(t, router, "/operations/"+o.ID+"/retry", map[string]any{"requestKey": "retry-legacy-create", "revision": o.Revision})
+	if code != http.StatusAccepted {
+		t.Fatalf("retry status=%d: %v", code, response)
+	}
+	worker := life.Worker{Store: a.Lifecycle, Steps: func(life.Operation) []life.Step {
+		return []life.Step{{Name: "workspace", Run: a.lifecyclePrepareWorkspace}}
+	}}
+	if err = worker.RunOne(ctx, o.ID); err != nil {
+		t.Fatal(err)
+	}
+	ready, err := a.Lifecycle.Get(o.ID)
+	if err != nil || ready.State != "succeeded" || ready.ResourceID != session || ready.Epoch != 4 {
+		t.Fatalf("retry did not finish the original operation: state=%s detail=%s err=%v", ready.State, ready.ErrorDetail, err)
+	}
+	workspace, err := life.Result[lifecycleWorkspace](ready, "workspace")
+	if err != nil || workspace.Path != path || workspace.Branch != session || git("rev-parse", existing) != head {
+		t.Fatalf("retry workspace=%+v err=%v", workspace, err)
+	}
+	t.Logf("Retry reused %s, created branch %s, and preserved %s", session, workspace.Branch, existing)
 }
 
 func TestLifecycleRetryActionIsIdempotentAndKeepsMergeReceipt(t *testing.T) {

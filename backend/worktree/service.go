@@ -254,10 +254,7 @@ type CreateReq struct {
 	Branch       string `json:"branch"` // 空 = 旧时间戳行为（兼容）
 	Base         string `json:"base"`   // 空 = 仓库默认分支
 	Remote       string `json:"remote"` // 非空则先 fetch remote base
-	// Dirname 指定 .worktrees/ 下的目录名，编排层一律传会话 id。
-	// 分支名派生自展示名，中文标题会被 autoBranch 清成空、兜底成字面量 "task"——
-	// 于是每个中文任务都叫 task/task-2/task-3，且 task 被收尾释放后原地复用同一路径，
-	// 新旧任务的会话归属、标注、开着的终端全指向同一个目录。会话 id 唯一且不回收。
+	// Dirname keeps session worktree paths stable across branch renames.
 	Dirname string `json:"dirname"`
 	// Existing = Branch 指的是一条**已存在的本地分支**：检出它，不新建分支。
 	// 「已有」于是不只有 worktree：手上那条还没工作区的分支，也能直接开一个进去接着干。

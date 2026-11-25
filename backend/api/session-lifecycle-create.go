@@ -88,7 +88,7 @@ func (a *API) lifecyclePrepareWorkspace(ctx context.Context, o life.Operation) (
 		}
 		branch := o.Intent.Branch
 		if branch == "" {
-			branch = autoBranch(o.Intent.Name)
+			branch = o.ResourceID
 		}
 		prepared.CreateResp, err = a.WT.Create(ctx, worktree.CreateReq{Dir: o.Intent.Dir, Branch: branch, Base: o.Intent.Base, Remote: o.Intent.Remote, Dirname: o.ResourceID, Existing: o.Intent.Existing, OperationID: o.ID, ExpectedPath: planned.Path})
 		if err != nil {

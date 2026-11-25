@@ -89,7 +89,7 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 	}
 	marker := filepath.Join(repo, "launch-result")
 	command := capturePrompt(marker)
-	intent := life.Intent{Name: "async fixture", Dir: repo, Worktree: true, Launch: &life.Launch{Command: command, Agent: "codex", Task: "Keep 'quotes' and $(literal) intact", Preamble: "{{PATH}}\n{{SESSION}}", TaskHeading: "Task", SetupHeading: "Setup"}}
+	intent := life.Intent{Dir: repo, Worktree: true, Launch: &life.Launch{Command: command, Agent: "codex", Task: "Keep 'quotes' and $(literal) intact", Preamble: "{{PATH}}\n{{SESSION}}", TaskHeading: "Task", SetupHeading: "Setup"}}
 	request := map[string]any{"kind": "create", "requestKey": "create-e2e-unique", "intent": intent}
 	accepted := call("POST", "/operations", request)
 	if accepted.Code != http.StatusAccepted {
@@ -150,6 +150,9 @@ func TestSessionLifecycleIsolatedE2E(t *testing.T) {
 	prepared, err := life.Result[lifecycleWorkspace](created, "workspace")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if label := rt.SessionLabel(o.ResourceID); label != o.ResourceID || prepared.Branch != o.ResourceID {
+		t.Fatalf("default label=%q and branch=%q must use session ID %s", label, prepared.Branch, o.ResourceID)
 	}
 	if !strings.Contains(string(data), intent.Launch.Task) || !strings.Contains(string(data), prepared.Path) || !strings.Contains(string(data), o.ResourceID) {
 		t.Fatalf("lost original input or actual identity: %s", data)

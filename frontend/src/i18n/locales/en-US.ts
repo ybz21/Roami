@@ -3382,6 +3382,7 @@ const enUS = {
   'session.wt.briefAdopt': '1. Workspace {path}: a new worktree for existing branch {branch}, compared against {base}. Keep this branch and its name.\n2. Check git status and git log --oneline {base}..HEAD; preserve existing work, avoid automatic rebase/reset, and install needed dependencies per repo conventions.\n3. Set the session display name: roami session rename {sess} <short name>.',
   'session.wt.briefReview': '\nAlso: this task has idle auto-review on — another agent will review your changes once you go idle.',
   'session.namePlaceholder2': 'Session name (short; leave empty to auto-name from the task)',
+  'session.namePlaceholderId': 'Session name (leave blank to use the session ID)',
   'session.wt.where': 'Workspace',
   'session.wt.mainRepo': 'Main repo',
   'session.wt.newWt': 'New worktree',

@@ -118,19 +118,14 @@ export function useProjectActions({ data, directory, workspace, runtime, isMobil
     const dir = key ? (taskPathOf(tree, key) || sessionProject(looseSessionOf(key))?.dir || '') : ''
     const available = tree.projects.flatMap(project => project.tasks).find(task => task.key === key)?.sessions.find(session => !session.dormant)?.name
     const parent = parentArg || (active && keyOf(active) === key ? active : available || (key && isLooseTask(key) ? looseSessionOf(key) : null))
-    await newTerminalAt(kind, dir, (parent && sessionLabel(parent)) || 'shell', key || undefined, parent || undefined)
+    await newTerminalAt(kind, dir, key || undefined, parent || undefined)
   }
-  const newTerminalAt = async (kind: 'shell' | AgentKind, dir: string, baseArg?: string, key?: TaskKey, parentArg?: string) => {
-    const base = baseArg || (dir ? dir.split('/').pop() : '') || 'shell'
-    const suffix = kind === 'shell' ? 'sh' : kind
-    let name = `${base}-${suffix}`
-    const taken = new Set(sessList.map((s) => s.label || s.name))
-    for (let i = 2; taken.has(name); i++) name = `${base}-${suffix}${i}`
+  const newTerminalAt = async (kind: 'shell' | AgentKind, dir: string, key?: TaskKey, parentArg?: string) => {
     try {
       const candidate = parentArg || tree.projects.flatMap(project => project.tasks).find(task => task.path === dir)?.sessions.find(session => !session.dormant)?.name
       const parent = candidate && !nativeSessionId(candidate) ? candidate : undefined
       const op = await submitLifecycle('create', {
-        name, dir, parent,
+        dir, parent,
         launch: lifecycleLaunchIntent(kind === 'shell' ? 'none' : kind, prefs, '', 'plain', false, t),
       })
       const actual = op.resourceId

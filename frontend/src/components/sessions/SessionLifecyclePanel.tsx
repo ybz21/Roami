@@ -12,6 +12,7 @@ import { blockingLifecycle, lifecycleAction, lifecycleEnded, useSessionLifecycle
 import './session-lifecycle.css'
 import { useNativeSessionList } from './native-session-list'
 import { nativeSessionName } from './session-record'
+import { taskNameFromPrompt } from './task-name'
 
 export function lifecycleStatus(op: LifecycleOperation, t: (key: string) => string) {
   if (op.state === 'attention') return t(op.kind === 'close' && op.receipts.stop ? 'session.lifecycle.cleanupFailed' : 'session.lifecycle.attention')
@@ -119,7 +120,7 @@ export function SessionLifecycleInbox({ onOpen, compact = false }: { onOpen: (na
         <div className="tt-lifecycle-scroll">
           {operations.failed && <p role="alert">{t('session.lifecycle.loadFailed')}</p>}
           {op ? <LifecycleOperationView key={op.operationId} op={op} onOpen={name => { setOpen(false); setSelected(null); onOpen(name) }} /> : active.length === 0 && nativeClosures.length === 0 ? <p>{t('session.lifecycle.empty')}</p> : active.map(o => <button type="button" className="tt-lifecycle-row" key={o.operationId} onClick={() => setSelected(o.operationId)}>
-            <strong>{o.intent.name || o.resourceId}</strong><span>{lifecycleStatus(o, t)}</span>
+            <strong>{o.intent.name || taskNameFromPrompt(o.intent.task || '') || o.resourceId}</strong><span>{lifecycleStatus(o, t)}</span>
           </button>)}
           {!op && nativeClosures.map(record => <button type="button" className="tt-lifecycle-row" key={record.nativeSessionId} onClick={() => { setOpen(false); onOpen(nativeSessionName(record.nativeSessionId)) }}>
             <strong>{record.title}</strong><span>{t(record.closureError ? 'session.lifecycle.attention' : record.lifecycle === 'closed' ? 'session.lifecycle.nativeClosed' : 'session.lifecycle.closing')}</span>

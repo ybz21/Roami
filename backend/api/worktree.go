@@ -287,9 +287,7 @@ func (a *API) SessionWorktreeStatus(c *gin.Context) {
 
 // ── 组合 WorktreeSession API（事务编排）──────────────────
 
-// autoBranch 从会话名派生占位分支（纯 slug，不强加前缀——用户想要什么前缀
-// 由 agent 开工后 `git branch -m` 自定，或走 W4 手动指定；roam 身份在
-// roam.* worktree config 里，不靠分支名）。
+// autoBranch derives the shared branch stem for race participants.
 func autoBranch(session string) string {
 	s := strings.ToLower(session)
 	s = strings.Map(func(r rune) rune {
