@@ -58,7 +58,7 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 	}
 
 	// Explicit --backend native creates on roami-sessiond without any env var.
-	out, errOut, handled, code := run("new", "--backend", "native", "--detach", "cli-e2e", "--", "/bin/sh")
+	out, errOut, handled, code := run("new", "--backend", "native", "--size", "100x30", "--detach", "cli-e2e", "--", "/bin/sh")
 	if !handled || code != 0 || out != "cli-e2e" {
 		t.Fatalf("new --backend native failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
 	}
@@ -66,28 +66,44 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 		_, _, _, _ = run("kill", "cli-e2e")
 	}()
 
-	// List sessions with `--backend native` and merged default `ls` (both without env var).
-	out, errOut, handled, code = run("ls", "--backend", "native")
-	if !handled || code != 0 || !strings.Contains(out, "cli-e2e") || !strings.Contains(out, "native") {
-		t.Fatalf("ls --backend native failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
+	// Re-running `new --backend native` with the same name reuses the existing session by default.
+	out, errOut, handled, code = run("new", "--backend", "native", "--detach", "cli-e2e")
+	if !handled || code != 0 || out != "cli-e2e" {
+		t.Fatalf("new reuse failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
 	}
 
-	// Send command and capture output (auto-routed with zero env var or flags).
-	_, errOut, handled, code = run("send", "cli-e2e", "echo CLI_NATIVE_OK")
+	// Rename and verify subsequent commands work by friendly label as well as ID.
+	_, errOut, handled, code = run("rename", "cli-e2e", "friendly-cli")
 	if !handled || code != 0 {
-		t.Fatalf("send failed: handled=%v code=%d err=%q", handled, code, errOut)
+		t.Fatalf("rename failed: handled=%v code=%d err=%q", handled, code, errOut)
+	}
+
+	// List sessions with `--backend native` (plain and --json) without env var.
+	out, errOut, handled, code = run("ls", "--backend", "native")
+	if !handled || code != 0 || !strings.Contains(out, "friendly-cli") || !strings.Contains(out, "[native]") {
+		t.Fatalf("ls --backend native failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
+	}
+	out, errOut, handled, code = run("ls", "--json")
+	if !handled || code != 0 || !strings.Contains(out, `"cli-e2e"`) || !strings.Contains(out, `"native"`) {
+		t.Fatalf("merged ls --json failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
+	}
+
+	// Send command and capture output using friendly label (zero env var or flags).
+	_, errOut, handled, code = run("send", "friendly-cli", "echo CLI_NATIVE_OK")
+	if !handled || code != 0 {
+		t.Fatalf("send by label failed: handled=%v code=%d err=%q", handled, code, errOut)
 	}
 	deadline := time.Now().Add(4 * time.Second)
 	captured := ""
 	for time.Now().Before(deadline) {
-		captured, _, _, _ = run("capture", "cli-e2e")
+		captured, _, _, _ = run("capture", "friendly-cli", "--lines", "50")
 		if strings.Contains(captured, "CLI_NATIVE_OK") {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 	if !strings.Contains(captured, "CLI_NATIVE_OK") {
-		t.Fatalf("capture missing CLI_NATIVE_OK: %q", captured)
+		t.Fatalf("capture by label missing CLI_NATIVE_OK: %q", captured)
 	}
 
 	// Split pane horizontally, verify windows list shows 2 panes, then close new pane.

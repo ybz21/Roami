@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -19,14 +21,15 @@ import (
 	"github.com/ybz21/Roami/internal/sessionbackend"
 	"github.com/ybz21/Roami/internal/sessionipc"
 	metadb "github.com/ybz21/Roami/internal/storage"
+	ui "github.com/ybz21/Roami/internal/terminalui"
 	"github.com/ybz21/Roami/internal/ttyraw"
 )
 
 // maybeRunNativeSessionCLI integrates native roami-sessiond sessions into `roami session`:
 //   - `new`: routes to native when `--backend native`, `ROAMI_NATIVE_TERMINAL=1`, or on Windows.
-//   - `ls`: merges live native sessions alongside legacy tmux sessions automatically.
-//   - target commands (`a/attach/sp/kp/nw/lw/kw/capture/send/rename/kill`): auto-route to an
-//     already-running native host when it owns the target session, without needing any env var.
+//   - `ls`: merges live native sessions alongside legacy tmux sessions (plain and --json).
+//   - target commands (`a/attach/sp/kp/nw/lw/kw/capture/send/rename/kill`): auto-route by ID
+//     or unique friendly label to an already-running native host without needing any env var.
 func maybeRunNativeSessionCLI(args []string) (bool, int) {
 	if len(args) == 0 {
 		return false, 0
@@ -161,10 +164,58 @@ func isReaderTTY(r io.Reader) bool {
 	return false
 }
 
+// resolveNativeSessionID resolves a session query by exact ID first, then unique friendly label.
+// Returns ErrSessionNotFound when no native session matches so callers can fall back to tmux.
+func resolveNativeSessionID(ctx context.Context, cli *sessionipc.Client, query string) (string, error) {
+	if query == "" {
+		return "", sessionbackend.ErrSessionNotFound
+	}
+	if _, err := cli.Observe(ctx, query); err == nil {
+		return query, nil
+	} else if !errors.Is(err, sessionbackend.ErrSessionNotFound) {
+		return "", err
+	}
+	list, err := cli.List(ctx)
+	if err != nil {
+		return "", err
+	}
+	var matches []string
+	for _, s := range list {
+		if s.ID == query {
+			return s.ID, nil
+		}
+		if s.Label == query {
+			matches = append(matches, s.ID)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return "", sessionbackend.ErrSessionNotFound
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("多个原生会话匹配 %q（%s），请改用会话 ID", query, strings.Join(matches, ", "))
+	}
+}
+
+func parseTermSize(raw string) (cols, rows uint16, err error) {
+	wStr, hStr, ok := strings.Cut(strings.ToLower(strings.TrimSpace(raw)), "x")
+	if !ok {
+		return 0, 0, fmt.Errorf("invalid --size %q (expected WIDTHxHEIGHT)", raw)
+	}
+	w, err1 := strconv.Atoi(wStr)
+	h, err2 := strconv.Atoi(hStr)
+	if err1 != nil || err2 != nil || w < 20 || w > 1000 || h < 6 || h > 500 {
+		return 0, 0, fmt.Errorf("invalid --size %q (expected 20..1000 x 6..500)", raw)
+	}
+	return uint16(w), uint16(h), nil
+}
+
 func nativeCLICreate(cli *sessionipc.Client, args []string, in io.Reader, out, errOut io.Writer) int {
 	spec := sessionbackend.CreateSpec{LoginShell: true}
 	detach := false
 	asJSON := false
+	reuse := true
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch arg {
@@ -186,6 +237,18 @@ func nativeCLICreate(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			}
 			i++
 			spec.Dir = args[i]
+		case "--size":
+			if i+1 >= len(args) {
+				fmt.Fprintln(errOut, "missing value for --size")
+				return 2
+			}
+			i++
+			cols, rows, err := parseTermSize(args[i])
+			if err != nil {
+				fmt.Fprintln(errOut, err)
+				return 2
+			}
+			spec.Cols, spec.Rows = cols, rows
 		case "--label":
 			if i+1 >= len(args) {
 				fmt.Fprintln(errOut, "missing value for --label")
@@ -194,6 +257,7 @@ func nativeCLICreate(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			i++
 			spec.Label = args[i]
 		case "--no-reuse":
+			reuse = false
 		default:
 			if strings.HasPrefix(arg, "-") {
 				fmt.Fprintf(errOut, "unknown flag %q\n", arg)
@@ -211,21 +275,50 @@ func nativeCLICreate(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			spec.Dir = cwd
 		}
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
-	ref, err := cli.Create(ctx, spec)
-	cancel()
-	if err != nil {
-		fmt.Fprintln(errOut, err)
-		return 1
+	defer cancel()
+
+	// Match `roami session new`: reuse an alive session with the same name/label unless --no-reuse.
+	var ref sessionbackend.SessionRef
+	reused := false
+	if reuse && spec.SessionID != "" {
+		if existingID, rerr := resolveNativeSessionID(ctx, cli, spec.SessionID); rerr == nil {
+			if st, oerr := cli.Observe(ctx, existingID); oerr == nil && st.Status == sessionbackend.StatusAlive {
+				ref = sessionbackend.SessionRef{
+					SessionID:      st.SessionID,
+					Label:          st.Label,
+					Backend:        sessionbackend.BackendNative,
+					HostInstanceID: st.HostInstanceID,
+					WindowID:       st.ActiveWindowID,
+					PaneID:         st.ActivePaneID,
+					Reused:         true,
+				}
+				reused = true
+			}
+		}
 	}
+	if !reused {
+		var err error
+		ref, err = cli.Create(ctx, spec)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return 1
+		}
+	}
+
 	if asJSON {
-		_ = json.NewEncoder(out).Encode(map[string]any{
+		payload := map[string]any{
 			"session": ref.SessionID,
 			"label":   ref.Label,
 			"backend": ref.Backend,
 			"window":  ref.WindowID,
 			"pane":    ref.PaneID,
-		})
+		}
+		if reused {
+			payload["reused"] = ref.SessionID
+		}
+		_ = json.NewEncoder(out).Encode(payload)
 		return 0
 	}
 	// Match `roami session new` / `tmux new`: attach immediately on an interactive TTY unless -d/--detach.
@@ -236,6 +329,8 @@ func nativeCLICreate(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			In:        in,
 			Out:       out,
 			RawTTY:    true,
+			Cols:      spec.Cols,
+			Rows:      spec.Rows,
 		}); err != nil {
 			fmt.Fprintln(errOut, err)
 			return 1
@@ -244,6 +339,52 @@ func nativeCLICreate(cli *sessionipc.Client, args []string, in io.Reader, out, e
 	}
 	fmt.Fprintln(out, ref.SessionID)
 	return 0
+}
+
+func nativeSummaryAsSessionJSON(s sessionbackend.SessionSummary) map[string]any {
+	label := s.Label
+	if label == "" {
+		label = s.ID
+	}
+	state := "live"
+	if s.Status == sessionbackend.StatusExited {
+		state = "exited"
+	}
+	return map[string]any{
+		"name":           s.ID,
+		"id":             s.ID,
+		"label":          label,
+		"backend":        string(s.Backend),
+		"hostInstanceId": s.HostInstanceID,
+		"windows":        s.Windows,
+		"created":        strconv.FormatInt(s.CreatedAt.Unix(), 10),
+		"last_activity":  strconv.FormatInt(s.LastActivityAt.Unix(), 10),
+		"attached":       s.Attached,
+		"state":          state,
+		"dir":            s.Dir,
+	}
+}
+
+func formatNativeSessionLines(list []sessionbackend.SessionSummary, w io.Writer) {
+	p := ui.P()
+	for _, s := range list {
+		ts := s.CreatedAt.Format("01-02 15:04")
+		display := s.Label
+		if display == "" {
+			display = s.ID
+		}
+		label := ui.Bold(display)
+		if s.ID != "" && s.ID != display {
+			label += p.Dim + "(" + s.ID + ")" + p.Reset
+		}
+		att := ui.Dim("[空闲]")
+		if s.Attached > 0 {
+			att = p.Green + "[已连接]" + p.Reset
+		}
+		tag := p.Dim + "[native]" + p.Reset
+		fmt.Fprintf(w, "   %s %s  %s%d 个窗口  %s%s  %s  %s\n",
+			ui.IconSession, label, p.Dim, s.Windows, ts, p.Reset, tag, att)
+	}
 }
 
 func nativeCLIList(cli *sessionipc.Client, args []string, nativeOnly bool, out, errOut io.Writer) (bool, int) {
@@ -272,42 +413,72 @@ func nativeCLIList(cli *sessionipc.Client, args []string, nativeOnly bool, out, 
 		return false, 0
 	}
 	if asJSON {
-		if list == nil {
-			list = []sessionbackend.SessionSummary{}
+		if nativeOnly {
+			if list == nil {
+				list = []sessionbackend.SessionSummary{}
+			}
+			enc := json.NewEncoder(out)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(list)
+			return true, 0
+		}
+		// Merge tmux JSON rows with native rows so `roami session ls --json` never hides tmux sessions.
+		var merged []map[string]any
+		var tmuxBuf bytes.Buffer
+		if app.New().WithOutput(&tmuxBuf).Run(append([]string{"ls"}, args...)) == nil {
+			var tmuxRows []map[string]any
+			if json.Unmarshal(bytes.TrimSpace(tmuxBuf.Bytes()), &tmuxRows) == nil {
+				for _, r := range tmuxRows {
+					if _, ok := r["backend"]; !ok {
+						r["backend"] = string(sessionbackend.BackendTmux)
+					}
+					merged = append(merged, r)
+				}
+			}
+		}
+		for _, s := range list {
+			merged = append(merged, nativeSummaryAsSessionJSON(s))
+		}
+		if merged == nil {
+			merged = []map[string]any{}
 		}
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
-		_ = enc.Encode(list)
+		_ = enc.Encode(merged)
 		return true, 0
 	}
-	// When not native-only, render legacy tmux sessions first so one `roami session ls` shows both.
-	if !nativeOnly {
-		_ = app.New().WithOutput(out).Run(append([]string{"ls"}, args...))
+
+	if nativeOnly {
+		if len(list) == 0 {
+			ui.Info(out, "没有原生会话")
+			return true, 0
+		}
+		fmt.Fprintln(out)
+		formatNativeSessionLines(list, out)
+		fmt.Fprintf(out, "\n   %s共 %d 个原生会话%s\n\n", ui.P().Dim, len(list), ui.P().Reset)
+		return true, 0
 	}
+
+	// Render legacy tmux sessions first, then append native rows in the same visual style.
+	var tmuxBuf bytes.Buffer
+	_ = app.New().WithOutput(&tmuxBuf).Run(append([]string{"ls"}, args...))
+	tmuxOut := tmuxBuf.String()
 	if len(list) == 0 {
-		if nativeOnly {
-			fmt.Fprintln(out, "(no native sessions)")
-		}
+		_, _ = io.WriteString(out, tmuxOut)
 		return true, 0
 	}
-	if !nativeOnly {
-		fmt.Fprintln(out, "Native PTY sessions (roami-sessiond):")
+	if !strings.Contains(tmuxOut, "没有活跃会话") && strings.TrimSpace(tmuxOut) != "" {
+		_, _ = io.WriteString(out, tmuxOut)
+	} else {
+		fmt.Fprintln(out)
 	}
-	tw := tabwriter.NewWriter(out, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "SESSION\tBACKEND\tSTATUS\tWINDOWS\tATTACHED\tDIR")
-	for _, s := range list {
-		name := s.ID
-		if s.Label != "" && s.Label != s.ID {
-			name = fmt.Sprintf("%s (%s)", s.ID, s.Label)
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%d\t%s\n", name, s.Backend, s.Status, s.Windows, s.Attached, s.Dir)
-	}
-	_ = tw.Flush()
+	formatNativeSessionLines(list, out)
+	fmt.Fprintf(out, "\n   %s另有 %d 个原生会话（native）%s\n\n", ui.P().Dim, len(list), ui.P().Reset)
 	return true, 0
 }
 
 func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, errOut io.Writer) (bool, int) {
-	var sessionID, paneID string
+	var sessionQuery, paneID string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--pane", "-p":
@@ -318,14 +489,15 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			i++
 			paneID = args[i]
 		default:
-			if !strings.HasPrefix(args[i], "-") && sessionID == "" {
-				sessionID = args[i]
+			if !strings.HasPrefix(args[i], "-") && sessionQuery == "" {
+				sessionQuery = args[i]
 			}
 		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	if sessionID == "" {
+	var sessionID string
+	if sessionQuery == "" {
 		list, err := cli.List(ctx)
 		cancel()
 		if err != nil {
@@ -338,19 +510,46 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 				alive = append(alive, s)
 			}
 		}
+		if len(alive) == 0 {
+			return false, 0
+		}
 		if len(alive) == 1 {
 			sessionID = alive[0].ID
-		} else if len(alive) == 0 {
-			return false, 0
+		} else if isReaderTTY(in) {
+			var b strings.Builder
+			fmt.Fprintf(&b, "\n   %s:\n\n", ui.Bold("选择要进入的原生会话"))
+			for i, s := range alive {
+				disp := s.ID
+				if s.Label != "" && s.Label != s.ID {
+					disp = fmt.Sprintf("%s (%s)", s.Label, s.ID)
+				}
+				fmt.Fprintf(&b, "   %d) %s  [native]\n", i+1, disp)
+			}
+			choice, ok := ui.ReadLine(b.String() + "\n   输入编号或名称: ")
+			if !ok {
+				return true, 1
+			}
+			if n, err := strconv.Atoi(choice); err == nil && n >= 1 && n <= len(alive) {
+				sessionID = alive[n-1].ID
+			} else {
+				rCtx, rCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				id, rerr := resolveNativeSessionID(rCtx, cli, choice)
+				rCancel()
+				if rerr != nil {
+					fmt.Fprintln(errOut, rerr)
+					return true, 1
+				}
+				sessionID = id
+			}
 		} else {
-			fmt.Fprintln(errOut, "multiple native sessions active; specify session name:")
+			fmt.Fprintln(errOut, "多个原生会话活跃，请指定名称或 ID：")
 			for _, s := range alive {
 				fmt.Fprintf(errOut, "  %s\n", s.ID)
 			}
 			return true, 2
 		}
 	} else {
-		_, err := cli.Observe(ctx, sessionID)
+		id, err := resolveNativeSessionID(ctx, cli, sessionQuery)
 		cancel()
 		if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 			return false, 0
@@ -359,6 +558,7 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 			fmt.Fprintln(errOut, err)
 			return true, 1
 		}
+		sessionID = id
 	}
 
 	if err := nativeattach.Attach(context.Background(), cli, cli, nativeattach.AttachOptions{
@@ -376,7 +576,7 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 
 func nativeCLISplit(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
 	dir := sessionbackend.SplitHorizontal
-	var sessionID, paneID, cwd string
+	var sessionQuery, paneID, cwd string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "-h":
@@ -394,21 +594,25 @@ func nativeCLISplit(cli *sessionipc.Client, args []string, out, errOut io.Writer
 				cwd = args[i]
 			}
 		default:
-			if !strings.HasPrefix(args[i], "-") && sessionID == "" {
-				sessionID = args[i]
+			if !strings.HasPrefix(args[i], "-") && sessionQuery == "" {
+				sessionQuery = args[i]
 			}
 		}
 	}
-	if sessionID == "" {
-		fmt.Fprintln(errOut, "usage: roami session sp <session> [-h|-v] [--pane ID]")
-		return true, 2
+	if sessionQuery == "" {
+		return false, 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	st, err := cli.Observe(ctx, sessionID)
+	sessionID, err := resolveNativeSessionID(ctx, cli, sessionQuery)
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	st, err := cli.Observe(ctx, sessionID)
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
@@ -429,7 +633,7 @@ func nativeCLISplit(cli *sessionipc.Client, args []string, out, errOut io.Writer
 }
 
 func nativeCLIClosePane(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
-	var sessionID, paneID string
+	var sessionQuery, paneID string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--pane", "-p":
@@ -439,24 +643,28 @@ func nativeCLIClosePane(cli *sessionipc.Client, args []string, out, errOut io.Wr
 			}
 		default:
 			if !strings.HasPrefix(args[i], "-") {
-				if sessionID == "" {
-					sessionID = args[i]
+				if sessionQuery == "" {
+					sessionQuery = args[i]
 				} else if paneID == "" {
 					paneID = args[i]
 				}
 			}
 		}
 	}
-	if sessionID == "" {
-		fmt.Fprintln(errOut, "usage: roami session kp <session> [paneId]")
-		return true, 2
+	if sessionQuery == "" {
+		return false, 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	st, err := cli.Observe(ctx, sessionID)
+	sessionID, err := resolveNativeSessionID(ctx, cli, sessionQuery)
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	st, err := cli.Observe(ctx, sessionID)
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
@@ -474,18 +682,21 @@ func nativeCLIClosePane(cli *sessionipc.Client, args []string, out, errOut io.Wr
 
 func nativeCLINewWindow(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
 	if len(args) < 1 {
-		fmt.Fprintln(errOut, "usage: roami session nw <session> [name]")
-		return true, 2
+		return false, 0
 	}
-	sessionID := args[0]
 	var name string
 	if len(args) > 1 {
 		name = args[1]
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err := cli.Observe(ctx, sessionID); errors.Is(err, sessionbackend.ErrSessionNotFound) {
+	sessionID, err := resolveNativeSessionID(ctx, cli, args[0])
+	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
+	}
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
 	}
 	win, err := cli.NewWindow(ctx, sessionID, sessionbackend.WindowSpec{Name: name, LoginShell: true})
 	if err != nil {
@@ -498,16 +709,19 @@ func nativeCLINewWindow(cli *sessionipc.Client, args []string, out, errOut io.Wr
 
 func nativeCLIListWindows(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
 	if len(args) < 1 {
-		fmt.Fprintln(errOut, "usage: roami session lw <session>")
-		return true, 2
+		return false, 0
 	}
-	sessionID := args[0]
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	wins, err := cli.ListWindows(ctx, sessionID)
+	sessionID, err := resolveNativeSessionID(ctx, cli, args[0])
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	wins, err := cli.ListWindows(ctx, sessionID)
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
@@ -527,12 +741,11 @@ func nativeCLIListWindows(cli *sessionipc.Client, args []string, out, errOut io.
 
 func nativeCLICloseWindow(cli *sessionipc.Client, args []string, _ io.Writer, errOut io.Writer) (bool, int) {
 	if len(args) < 2 {
-		fmt.Fprintln(errOut, "usage: roami session kw <session> <windowId>")
-		return true, 2
+		return false, 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := cli.CloseWindow(ctx, args[0], args[1])
+	sessionID, err := resolveNativeSessionID(ctx, cli, args[0])
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
@@ -540,12 +753,17 @@ func nativeCLICloseWindow(cli *sessionipc.Client, args []string, _ io.Writer, er
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
+	if err := cli.CloseWindow(ctx, sessionID, args[1]); err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
 	return true, 0
 }
 
 func nativeCLICapture(cli *sessionipc.Client, args []string, out, errOut io.Writer) (bool, int) {
-	var sessionID, paneID string
+	var sessionQuery, paneID string
 	includeHistory := false
+	lines := 0
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--pane", "-p":
@@ -553,26 +771,38 @@ func nativeCLICapture(cli *sessionipc.Client, args []string, out, errOut io.Writ
 				i++
 				paneID = args[i]
 			}
+		case "--lines", "-n":
+			if i+1 < len(args) {
+				i++
+				if n, err := strconv.Atoi(args[i]); err == nil && n > 0 {
+					lines = n
+				}
+			}
 		case "--history", "-S":
 			includeHistory = true
 		default:
-			if !strings.HasPrefix(args[i], "-") && sessionID == "" {
-				sessionID = args[i]
+			if !strings.HasPrefix(args[i], "-") && sessionQuery == "" {
+				sessionQuery = args[i]
 			}
 		}
 	}
-	if sessionID == "" {
-		fmt.Fprintln(errOut, "usage: roami session capture <session> [--pane ID]")
-		return true, 2
+	if sessionQuery == "" {
+		return false, 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := cli.Capture(ctx, sessionbackend.Target{SessionID: sessionID, PaneID: paneID}, sessionbackend.CaptureOpts{
-		IncludeHistory: includeHistory,
-	})
+	sessionID, err := resolveNativeSessionID(ctx, cli, sessionQuery)
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
+	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	res, err := cli.Capture(ctx, sessionbackend.Target{SessionID: sessionID, PaneID: paneID}, sessionbackend.CaptureOpts{
+		Lines:          lines,
+		IncludeHistory: includeHistory,
+	})
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
@@ -583,23 +813,25 @@ func nativeCLICapture(cli *sessionipc.Client, args []string, out, errOut io.Writ
 
 func nativeCLISend(cli *sessionipc.Client, args []string, _ io.Writer, errOut io.Writer) (bool, int) {
 	if len(args) < 2 {
-		fmt.Fprintln(errOut, "usage: roami session send <session> <text...>")
-		return true, 2
+		return false, 0
 	}
-	sessionID := args[0]
 	payload := strings.Join(args[1:], " ")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := cli.Submit(ctx, sessionbackend.Target{SessionID: sessionID}, sessionbackend.SubmitReq{
-		RequestID:      uuid.NewString(),
-		Payload:        payload,
-		SubmitEnter:    true,
-		BracketedPaste: false,
-	})
+	sessionID, err := resolveNativeSessionID(ctx, cli, args[0])
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
 	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	if _, err := cli.Submit(ctx, sessionbackend.Target{SessionID: sessionID}, sessionbackend.SubmitReq{
+		RequestID:      uuid.NewString(),
+		Payload:        payload,
+		SubmitEnter:    true,
+		BracketedPaste: false,
+	}); err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
@@ -608,16 +840,19 @@ func nativeCLISend(cli *sessionipc.Client, args []string, _ io.Writer, errOut io
 
 func nativeCLIRename(cli *sessionipc.Client, args []string, _ io.Writer, errOut io.Writer) (bool, int) {
 	if len(args) < 2 {
-		fmt.Fprintln(errOut, "usage: roami session rename <session> <label>")
-		return true, 2
+		return false, 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := cli.Rename(ctx, args[0], strings.Join(args[1:], " "))
+	sessionID, err := resolveNativeSessionID(ctx, cli, args[0])
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
 	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	if err := cli.Rename(ctx, sessionID, strings.Join(args[1:], " ")); err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}
@@ -626,16 +861,19 @@ func nativeCLIRename(cli *sessionipc.Client, args []string, _ io.Writer, errOut 
 
 func nativeCLIKill(cli *sessionipc.Client, args []string, _ io.Writer, errOut io.Writer) (bool, int) {
 	if len(args) < 1 {
-		fmt.Fprintln(errOut, "usage: roami session kill <session>")
-		return true, 2
+		return false, 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := cli.Close(ctx, args[0])
+	sessionID, err := resolveNativeSessionID(ctx, cli, args[0])
 	if errors.Is(err, sessionbackend.ErrSessionNotFound) {
 		return false, 0
 	}
 	if err != nil {
+		fmt.Fprintln(errOut, err)
+		return true, 1
+	}
+	if err := cli.Close(ctx, sessionID); err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}

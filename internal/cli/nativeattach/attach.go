@@ -18,7 +18,8 @@ import (
 const DefaultPrefix byte = 0x02 // Ctrl+b, matching tmux muscle memory.
 
 const (
-	terminalResetOnExit = "\x1b[?25h\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[0m"
+	// Restore normal screen buffer, cursor visibility, mouse tracking, bracketed paste, and SGR attributes.
+	terminalResetOnExit = "\x1b[?1049l\x1b[?25h\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[0m"
 	clearScreenHome     = "\x1b[2J\x1b[H"
 )
 
