@@ -52,6 +52,17 @@ vi.mock('../../app/useTerminalRuntime', () => ({
 vi.mock('../../app/useBrowserEnvironment', () => ({
   useBrowserEnvironment: () => ({ online: true, offline: false, roamVersion: '1.0.0', isFs: false, fsSupported: true, toggleFs: vi.fn() }),
 }))
+vi.mock('../../app/useClusterNavigation', () => ({
+  useClusterNavigation: () => ({ clusterNodes: [], curNodeId: '', curNode: null, hubHealth: { level: 'ok' }, nodeItems: [] }),
+}))
+vi.mock('../../p2p/transport', () => ({
+  startControlLink: vi.fn(),
+  stopControlLink: vi.fn(),
+}))
+vi.mock('../../p2p/use-link-status', () => ({
+  useLinkStatus: () => null,
+}))
+vi.mock('../UpdateBanner', () => ({ default: () => null }))
 vi.mock('../sessions/native-session-list', () => ({
   useNativeSessionList: () => ({ value: [], loaded: true }),
   refreshSessionLists: vi.fn(),
@@ -116,7 +127,7 @@ vi.mock('../cluster/node-url', () => ({
   nodeApi: (path: string) => `/api${path}`,
 }))
 vi.mock('../../preferences', () => ({
-  usePreferences: () => [{ workspace: { dpadOn: false, dpadSide: 'right', dpadHintSeen: true }, keybindings: {} }],
+  usePreferences: () => [{ workspace: { dpadOn: false, dpadSide: 'right', dpadHintSeen: true }, keybindings: {}, statusBar: { enabled: true, hidden: [], optIn: [] } }],
   savePreferences: vi.fn(),
   saveWorkspace: vi.fn(),
 }))
@@ -161,6 +172,12 @@ beforeEach(() => {
     if (path.endsWith('/cwd')) {
       return Promise.resolve({ data: { dir: '/repo/.worktrees/task-a' } })
     }
+    if (path.startsWith('/git/status')) {
+      return Promise.resolve({ data: { repo: true, branch: 'feat/demo', ahead: 0, behind: 0, files: ['a.ts'], state: '', conflicts: [] } })
+    }
+    if (path === '/plugins') {
+      return Promise.resolve({ data: [] })
+    }
     return Promise.resolve({ data: {} })
   })
 })
@@ -184,6 +201,10 @@ describe('SoloTerminal', () => {
     const brand = container.querySelector<HTMLAnchorElement>('.tt-solo-brand')
     expect(brand?.getAttribute('href')).toBe('#/home')
     expect(container.querySelector('.tt-session-toolbar')).not.toBeNull()
+    expect(container.querySelector('.tt-statusbar')).not.toBeNull()
+    await waitFor(() => {
+      expect(container.querySelector('.tt-statusbar')?.textContent).toContain('feat/demo')
+    })
 
     fireEvent.click(screen.getByRole('button', { name: '搜索' }))
     expect(mocks.openPalette).toHaveBeenCalledOnce()
@@ -217,6 +238,7 @@ describe('SoloTerminal', () => {
     })
     expect(screen.queryByTestId('solo-inspector')).toBeNull()
     expect(container.querySelector('.tt-solo-brand')).toBeNull()
+    expect(container.querySelector('.tt-statusbar')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '收起' }))
     expect(location.hash).toBe('#/home')
