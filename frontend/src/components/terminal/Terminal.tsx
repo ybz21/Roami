@@ -19,7 +19,7 @@ import type { ResumeHeal, TerminalDimensions } from './terminal-resize'
 import { parseTerminalPong, parseTerminalRevived } from './terminal-lifecycle'
 import { synchronizeTerminalAtlas } from './terminal-atlas'
 import { createTerminalRenderer, disposeTerminalWebgl } from './terminal-renderer'
-import { bindTerminalInput, clearTerminalDrop } from './terminal-ime'
+import { bindTerminalInput, clearTerminalInputContext } from './terminal-ime'
 import { useLayout } from '../../layout'
 
 export type TermStatus = 'connecting' | 'connected' | 'closed'
@@ -520,6 +520,7 @@ const Term = forwardRef<TermHandle, {
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
     ws.onopen = () => {
+      if (t0) clearTerminalInputContext(t0)
       silentReconnect.current = false
       retryDelay.current = RETRY_BASE_MS
       onStatus?.('connected')
@@ -609,7 +610,13 @@ const Term = forwardRef<TermHandle, {
   }
 
   useImperativeHandle(ref, () => ({
-    send: (s, keepFocus) => { const ws = wsRef.current; if (ws && ws.readyState === 1) ws.send(s); if (!keepFocus && !coarse) termRef.current?.focus() },
+    send: (s, keepFocus) => {
+      const term = termRef.current
+      if (term) clearTerminalInputContext(term)
+      const ws = wsRef.current
+      if (ws && ws.readyState === 1) ws.send(s)
+      if (!keepFocus && !coarse) term?.focus()
+    },
     fit: () => { applyResize() },
     copy: () => {
       const sel = termRef.current?.getSelection() || ''
@@ -800,6 +807,7 @@ const Term = forwardRef<TermHandle, {
       // 需配合后端 tmux set-option extended-keys always。
       if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault()
+        clearTerminalInputContext(term)
         const ws = wsRef.current
         if (ws && ws.readyState === 1) ws.send('\x1b[13;2u')
         return false
@@ -830,6 +838,7 @@ const Term = forwardRef<TermHandle, {
         onSelectionMenu?.({ x: 0, y: 0, selection })
         term.clearSelection()
       } else if (action === 'interrupt') {
+        clearTerminalInputContext(term)
         const ws = wsRef.current
         if (ws && ws.readyState === 1) ws.send('\x03')
       }
@@ -1069,7 +1078,7 @@ const Term = forwardRef<TermHandle, {
     // 这里对容器内所有 drop 统一 preventDefault（不拦冒泡，上层注入 @路径/上传照常）并清残值。
     const onDropGuard = (e: DragEvent) => {
       e.preventDefault()
-      clearTerminalDrop(term)
+      clearTerminalInputContext(term)
     }
     el.addEventListener('drop', onDropGuard)
 

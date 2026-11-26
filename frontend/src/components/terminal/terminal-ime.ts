@@ -21,13 +21,13 @@ type BrowserTerminal = {
   cancel: (event: Event) => void
 }
 
-export function clearTerminalDrop(term: Terminal): void {
+export function clearTerminalInputContext(term: Terminal): void {
   const helper = (term as unknown as { _core: BrowserTerminal })._core._compositionHelper
   if (term.textarea && !helper.isComposing && !helper._isSendingComposition) term.textarea.value = ''
 }
 
 // xterm 5.5 compatibility; remove after upgrading with the IME fixes in xtermjs/xterm.js#5759 and #6060.
-export function synchronizeTerminalIME(term: Terminal): () => void {
+function synchronizeTerminalIME(term: Terminal): () => void {
   const core = (term as unknown as { _core: BrowserTerminal })._core
   const helper = core._compositionHelper
   const textarea = term.textarea
@@ -43,6 +43,32 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
   const keydown = helper.keydown
   const changes = helper._handleAnyTextareaChanges
   let imeInput = false
+  let editableValue: string | undefined
+  let beforeEdit: { value: string; inputType: string; tailSelectionStart: number | null } | undefined
+  const resetEdit = () => {
+    editableValue = undefined
+    beforeEdit = undefined
+  }
+  const rememberInsert = (data: string, previous: string | undefined) => {
+    const value = textarea.value
+    if ((value === data || (previous !== undefined && value === previous + data)) && isTerminalEditText(value)) {
+      editableValue = value
+    }
+  }
+  const captureEdit = (event: InputEvent) => {
+    const value = textarea.value
+    const { selectionStart, selectionEnd } = textarea
+    beforeEdit = value && value === editableValue ? {
+      value,
+      inputType: event.inputType,
+      tailSelectionStart: selectionStart < selectionEnd && selectionEnd === value.length ? selectionStart : null,
+    } : undefined
+  }
+  // Keystrokes and pastes outside the browser edit can move the remote cursor.
+  const untrack = term.onData(resetEdit)
+  textarea.addEventListener('beforeinput', captureEdit)
+  textarea.addEventListener('blur', resetEdit)
+  term.element?.addEventListener('pointerdown', resetEdit, true)
   helper.keydown = function (event) {
     imeInput = false
     return keydown.call(this, event)
@@ -59,6 +85,7 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
   }
   helper.compositionstart = function () {
     imeInput = false
+    resetEdit()
     // A new composition must not cancel the preceding deferred commit.
     if (this._isSendingComposition) this._finalizeComposition(false)
     core._syncTextArea()
@@ -72,10 +99,31 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
     end.call(this)
   }
   core._inputEvent = function (event) {
+    const edit = beforeEdit?.inputType === event.inputType ? beforeEdit : undefined
+    beforeEdit = undefined
     // insertText and the deferred finalizer can report the same IME commit.
     if (event.inputType === 'insertText' && (helper.isComposing || helper._isSendingComposition)) return false
-    if (imeInput && !event.isComposing && !helper.isComposing && !helper._isSendingComposition
-      && !term.options.screenReaderMode) {
+    if (event.isComposing || helper.isComposing || helper._isSendingComposition || term.options.screenReaderMode) {
+      return input.call(this, event)
+    }
+    const previous = edit?.value
+    const current = textarea.value
+    if (current !== editableValue) editableValue = undefined
+    const selectedTail = event.inputType === 'insertText' && edit?.tailSelectionStart != null && event.data
+      && current === edit.value.slice(0, edit.tailSelectionStart) + event.data
+    if (previous && isTerminalEditText(current) && !this._keyPressHandled
+      && (selectedTail || event.inputType === 'insertReplacementText'
+        || (event.inputType === 'deleteContentBackward' && current.length <= previous.length))) {
+      // The PTY can only edit text before its cursor. Replay the changed tail of the last forwarded draft.
+      const data = terminalTailEdit(previous, current)
+      if (data) this.coreService.triggerDataEvent(data, true)
+      editableValue = current
+      imeInput = false
+      this._unprocessedDeadKey = false
+      this.cancel(event)
+      return true
+    }
+    if (imeInput) {
       const data = event.inputType === 'insertText' ? event.data
         : event.inputType === 'deleteContentBackward' ? '\x7f' : null
       if (data) {
@@ -83,13 +131,20 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
         if (this._keyPressHandled) return false
         this._unprocessedDeadKey = false
         this.coreService.triggerDataEvent(data, true)
+        if (event.inputType === 'insertText') rememberInsert(data, previous)
         this.cancel(event)
         return true
       }
     }
-    return input.call(this, event)
+    const handled = input.call(this, event)
+    if (handled && event.inputType === 'insertText' && event.data) rememberInsert(event.data, previous)
+    return handled
   }
   return () => {
+    untrack.dispose()
+    textarea.removeEventListener('beforeinput', captureEdit)
+    textarea.removeEventListener('blur', resetEdit)
+    term.element?.removeEventListener('pointerdown', resetEdit, true)
     helper.compositionstart = start
     helper.compositionend = end
     helper._finalizeComposition = finalize
@@ -97,6 +152,19 @@ export function synchronizeTerminalIME(term: Terminal): () => void {
     helper.keydown = keydown
     helper._handleAnyTextareaChanges = changes
   }
+}
+
+function isTerminalEditText(text: string): boolean {
+  return !/[\x00-\x1f\x7f-\x9f]/.test(text)
+}
+
+function terminalTailEdit(previous: string, current: string): string {
+  let prefix = 0
+  for (const char of previous) {
+    if (!current.startsWith(char, prefix)) break
+    prefix += char.length
+  }
+  return '\x7f'.repeat(Array.from(previous.slice(prefix)).length) + current.slice(prefix)
 }
 
 export function bindTerminalInput(term: Terminal, send: (data: string) => void): () => void {
