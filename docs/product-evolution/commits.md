@@ -1,0 +1,1234 @@
+# Roami 全量提交时间线
+
+> 基线 `eb1f9df1`，共 **1208 个提交**。包含功能、修复、文档、重构、测试和合并提交，不作类型过滤。
+> 按作者时间升序排列；作者时间、提交时间、父提交、标签、PR 号及完整提交说明见 [commits.csv](commits.csv)。
+> 本文是提交索引，不代表每项提交都对应独立发布或用户可见功能。
+
+## 2026-05（10）
+
+- `2026-05-27` · [`e5ab22fb`](https://github.com/ybz21/Roami/commit/e5ab22fbd606b77deddcdc41a61bce89bf785101) **feat** · feat: initial ttmux - a friendly tmux wrapper
+- `2026-05-27` · [`1dd3c97d`](https://github.com/ybz21/Roami/commit/1dd3c97d15c83ceddcb2b8543d49e0bea1169e64) **feat** · feat: AI-native task orchestration, README, skill, and installer
+- `2026-05-27` · [`00adf8aa`](https://github.com/ybz21/Roami/commit/00adf8aa7792320caca42857aaed5ad878649a1a) **feat** · feat: interactive TUI mode — ttmux with no args enters menu
+- `2026-05-27` · [`403c5a7a`](https://github.com/ybz21/Roami/commit/403c5a7ad0666e505951ef7cdcd1e3b1200ed68d) **fix** · fix: ANSI colors and arithmetic exit codes
+- `2026-05-27` · [`ccfd7ff2`](https://github.com/ybz21/Roami/commit/ccfd7ff2d9e3d8648cc934520d85a73e75a53361) **feat** · feat: multi-agent orchestration + SKILL.md 中文技能文档
+- `2026-05-27` · [`50e7d937`](https://github.com/ybz21/Roami/commit/50e7d9372855da8dbaf2d3b189bfae5a93108a66) **refactor** · refactor: move SKILL.md to skills/tmux/SKILL.md
+- `2026-05-27` · [`aaf72b00`](https://github.com/ybz21/Roami/commit/aaf72b001562954a9745248b44b40b7f55757fde) **feat** · feat: global env support — ttmux env set/rm/push
+- `2026-05-27` · [`aaddd15f`](https://github.com/ybz21/Roami/commit/aaddd15f6d637b9f0a0bbadea9ffb2d78912e723) **test** · test: add e2e test suite (15 cases)
+- `2026-05-27` · [`efdf9ab9`](https://github.com/ybz21/Roami/commit/efdf9ab9d93aa3f43f8208a5290045e6d11113b5) **feat** · feat: agent e2e test + SKILL.md overhaul from real testing
+- `2026-05-30` · [`e8324522`](https://github.com/ybz21/Roami/commit/e83245228a36876e1067453e9167e2e5c619bad3) **feat** · feat: 新增 father skill — Claude Code 多实例 AI 监护进程
+
+## 2026-06（166）
+
+- `2026-06-01` · [`619108f7`](https://github.com/ybz21/Roami/commit/619108f70965fa8774d463326bfd41a18e27c303) **fix** · fix: father skill 巡检改进 — 新增状态类型 + capture 空行处理
+- `2026-06-15` · [`e14919ec`](https://github.com/ybz21/Roami/commit/e14919ec6afef029547a9b0ebd599e0757aef807) **feat** · feat: 新增 ttmux-web (Go 后端 + Vite 前端) 脚手架
+- `2026-06-15` · [`82d28180`](https://github.com/ybz21/Roami/commit/82d2818027577329274390049517ae71e30e8b66) **feat** · feat: 蜂群编排(swarm) + ttmux 源码拆分 ttmux-cli/ + skill 更新
+- `2026-06-16` · [`bf080547`](https://github.com/ybz21/Roami/commit/bf08054727ce4913a96d4462ee6a027b30607b23) **fix** · fix: start-all.sh 退出时清理子进程 + swarm/cli 更新
+- `2026-06-16` · [`0b0a6b3a`](https://github.com/ybz21/Roami/commit/0b0a6b3adcdf2e7d74661214f4778fb80496b300) **feat** · feat(swarm): 依赖门控闭环 — 成员级 done 标记 + 级联解锁 + force
+- `2026-06-16` · [`142c925e`](https://github.com/ybz21/Roami/commit/142c925e91b04137c3ace8bf90b7a4b1a89338c1) **feat** · feat(browser): 在线浏览器镜像 — CDP screencast + 多 tab 管理
+- `2026-06-16` · [`b02ca3da`](https://github.com/ybz21/Roami/commit/b02ca3da43322f5319d533f97d66b28dcfb98548) **feat** · feat(swarm-web): 蜂群 Web 看板/广场 + 浏览器投屏增强 + CLI 拆分
+- `2026-06-17` · [`627543e2`](https://github.com/ybz21/Roami/commit/627543e29ca5dfd9f891d970056e8de22fab8d66) **docs** · docs(readme): 增补 swarm 蜂群编排 + Web 控制台 + 统一 spawn --agent / cc-swarm skill
+- `2026-06-17` · [`73575613`](https://github.com/ybz21/Roami/commit/735756130c2d6a5579e25291c72e57ef51a47af6) **feat** · feat(browser): 浏览器镜像页加「调试」按钮，反代 Chrome 原生 DevTools(F12)
+- `2026-06-17` · [`0969f69a`](https://github.com/ybz21/Roami/commit/0969f69a44f8eb37112137d7111412769d5a1e40) **docs** · docs: 重组 docs 为 design/install + 双语 README + frp 远程办公指南
+- `2026-06-17` · [`daade67e`](https://github.com/ybz21/Roami/commit/daade67e3821b5a1550675c4c65c02869dff73dd) **refactor** · refactor(cli): 拆出 cli/{ttmux-cli,chrome-cli}；chrome 独立为 ttmux-chrome
+- `2026-06-17` · [`15129aa8`](https://github.com/ybz21/Roami/commit/15129aa8311259da25ae220e24b0ea047d4fe340) **fix** · fix(web): 移动端会话终端加独立输入框，解决软键盘打完字发不出去
+- `2026-06-17` · [`bd24fe95`](https://github.com/ybz21/Roami/commit/bd24fe957b9636f039d5cfb67cc13862dde8279a) **fix** · fix(browser): 稳定 tab 顺序，修复轮询乱跳 + 新标签从左冒出
+- `2026-06-17` · [`1bb121ef`](https://github.com/ybz21/Roami/commit/1bb121efd874f253c36b846fca4aac235476baef) **brand** · brand: 启用品牌名 Roam + slogan "Code anywhere, anytime"（README + UI）
+- `2026-06-17` · [`f68f09d0`](https://github.com/ybz21/Roami/commit/f68f09d0b0555f0ba3d8b8bc2d54174161348895) **chore** · chore(cli,skills): chrome CLI 改名(原 ttmux-chrome) + skills 统一同步 + cc-swarm 注入 CLI 列表
+- `2026-06-17` · [`0466e470`](https://github.com/ybz21/Roami/commit/0466e4706e726e18db948bf00a2f285678e82e82) **feat** · feat(swarm): 成员引擎 claude/codex + master/worker 角色 + 提示词模板
+- `2026-06-17` · [`e52348a7`](https://github.com/ybz21/Roami/commit/e52348a712df8e265bec19d8f88993523ca0d91e) **fix** · fix(swarm): 成员交互式常驻可进入 + 自动过对话框 + 拓扑真 master + JSON/深链修复
+- `2026-06-17` · [`12de81bd`](https://github.com/ybz21/Roami/commit/12de81bda18e0da28b29997e245c8437452e0853) **fix** · fix(swarm): 拓扑图只有 master 没 worker 时空白 — all 为空但有 masterMember 仍画顶点
+- `2026-06-17` · [`8b10c524`](https://github.com/ybz21/Roami/commit/8b10c524e9e309f4c45642636edc1c4fac4ae94b) **feat** · feat(swarm-web): 成员抽屉半屏 + 初始化指令 Markdown 渲染 + 去终端快照；提示词模板改 markdown
+- `2026-06-18` · [`78f92edb`](https://github.com/ybz21/Roami/commit/78f92edb958ec236382dff5c759544870aeb0107) **feat** · feat(web): 对话页大改造 + 黑白主题 + 文件上传下载
+- `2026-06-19` · [`e7908fc6`](https://github.com/ybz21/Roami/commit/e7908fc6a02f344baa6bbfe8f59f9323023ee626) **feat** · feat(web): 浏览器旋转/自适应scheme/导航起始页 + 金属图标 + 蓝色主题统一
+- `2026-06-19` · [`05f9d68e`](https://github.com/ybz21/Roami/commit/05f9d68ef0031eb47ed00b7646b2259b8f3f308c) **feat** · feat(web): 系统配置加主题切换 + 全站统一 #/xxx 路由 + 侧边栏去主题按钮
+- `2026-06-21` · [`efe9e5b2`](https://github.com/ybz21/Roami/commit/efe9e5b2abfe8afd38079a4228a73bec4e7c0607) · Improve file management UI
+- `2026-06-21` · [`b363568e`](https://github.com/ybz21/Roami/commit/b363568e5936a3c9a28801f53f22e219e90207ed) · Improve file previews and icons
+- `2026-06-21` · [`fb8ef1c8`](https://github.com/ybz21/Roami/commit/fb8ef1c8e4c21e0298dec2e328b9097d68695b89) · Simplify directory row actions
+- `2026-06-21` · [`e48c0175`](https://github.com/ybz21/Roami/commit/e48c0175455a68cad3bcf788232f534de0c2ca5e) · Move file deletion to context menu
+- `2026-06-21` · [`87c2dbcb`](https://github.com/ybz21/Roami/commit/87c2dbcb3377b7d5f7628dbe5284723686213353) · Support relative file links in previews
+- `2026-06-21` · [`d9fcee76`](https://github.com/ybz21/Roami/commit/d9fcee76642dc5cea5ca31da307fafb33acce5a4) · Add machine file browser navigation
+- `2026-06-21` · [`ca8b015a`](https://github.com/ybz21/Roami/commit/ca8b015a3af0f041a0eee21a6eebba38fc21c6d5) · Show file previews inline
+- `2026-06-21` · [`425384c5`](https://github.com/ybz21/Roami/commit/425384c5b2ee492c6f850404f4dcb6a611194c12) · Improve file browser and swarm listener
+- `2026-06-21` · [`d7d64eff`](https://github.com/ybz21/Roami/commit/d7d64effcd58d48f399679e78d07d135a1f1fdcd) · Add terminal context menu hooks
+- `2026-06-21` · [`fcf99437`](https://github.com/ybz21/Roami/commit/fcf99437f8de1e8113b2d9f1ec66e9dcd86bd42d) · Refine chat transcript updates
+- `2026-06-21` · [`58fc117e`](https://github.com/ybz21/Roami/commit/58fc117eeb0c6313953641ac273b711921361354) · Show prompt confirmation dialog
+- `2026-06-21` · [`7192ba9f`](https://github.com/ybz21/Roami/commit/7192ba9f06d62646830ff779a6e5b4811db74534) · Isolate swarm sessions from regular listings
+- `2026-06-21` · [`5abc0ef4`](https://github.com/ybz21/Roami/commit/5abc0ef436d70a595dde6bcc7aa7477c0f91c7d6) · Improve terminal clipboard and prompt status
+- `2026-06-22` · [`0a874c88`](https://github.com/ybz21/Roami/commit/0a874c883efdd48b35b594cd6d73bad95bfe5b20) · Improve theme and mobile browser interactions
+- `2026-06-22` · [`26af2070`](https://github.com/ybz21/Roami/commit/26af2070d222a26fa20eba8e30faee3d026e245f) · Unify swarm leader model and dashboard UI
+- `2026-06-22` · [`4020964f`](https://github.com/ybz21/Roami/commit/4020964f548832c7364fde2f8cdb733467484103) · Filter handled swarm inbox messages
+- `2026-06-22` · [`a9a6e30d`](https://github.com/ybz21/Roami/commit/a9a6e30d16cc6962faa803e2bbe29d2290d99af0) **feat** · feat(web): i18n 体系 + 文件管理增强 + 终端右键屏蔽原生菜单 + 主题/路由优化
+- `2026-06-22` · [`2a57bf25`](https://github.com/ybz21/Roami/commit/2a57bf254727c34ad9cdb0550d08a419cddb46e4) · Add session rename support
+- `2026-06-22` · [`81730b2b`](https://github.com/ybz21/Roami/commit/81730b2b9f89e2f60e7639bf74f02d1935d43d10) · Detect idle swarm member state
+- `2026-06-22` · [`781b1965`](https://github.com/ybz21/Roami/commit/781b19654f5b9da8b79abe90c6047affb28fb428) · Add animated swarm office topology
+- `2026-06-22` · [`83a4b556`](https://github.com/ybz21/Roami/commit/83a4b556c6a1922a228c9bd7ed90e0fffa18ff03) · Simplify swarm office backdrop
+- `2026-06-22` · [`d117b3ba`](https://github.com/ybz21/Roami/commit/d117b3ba09f8845f80a3e0d2fd391ec234008ea9) · Differentiate swarm office agents
+- `2026-06-22` · [`3df6a2a2`](https://github.com/ybz21/Roami/commit/3df6a2a23fc6ba48e0c0325ce5d6fd688e46d069) · Refine swarm office agent hats
+- `2026-06-22` · [`736d61c1`](https://github.com/ybz21/Roami/commit/736d61c1f4fbe04dafa827f1fbbf4b66d74b2593) · Polish swarm office agent silhouettes
+- `2026-06-22` · [`eca8c66b`](https://github.com/ybz21/Roami/commit/eca8c66b9f9cc34351a8a0885e9c2407633cc98e) · Adjust swarm office hats and chair
+- `2026-06-22` · [`1f173d76`](https://github.com/ybz21/Roami/commit/1f173d764125e7617a8a2fb01e0948b011b28e7e) · Center swarm office layout and refine status detection
+- `2026-06-22` · [`47c0fb32`](https://github.com/ybz21/Roami/commit/47c0fb328be148ea721126555a60f1cb6eb47385) · Adapt swarm office view for mobile
+- `2026-06-22` · [`2c06ae72`](https://github.com/ybz21/Roami/commit/2c06ae72e9a82635ad19f458d2b387d8ae62c4c3) · Show plaza in narrow swarm layout
+- `2026-06-22` · [`9d41b800`](https://github.com/ybz21/Roami/commit/9d41b80054fc89ffe6f00dfb85d7150d2a0d2fd5) · Improve swarm active status detection
+- `2026-06-22` · [`edca54a3`](https://github.com/ybz21/Roami/commit/edca54a368479295d370acaf2cf0608fab428c09) · Mark swarm members busy on directed messages
+- `2026-06-22` · [`7f43dbce`](https://github.com/ybz21/Roami/commit/7f43dbce3895cf8076ade7a80ecc2385cb33faac) · Fix swarm status labels and football lineup defaults
+- `2026-06-22` · [`645f1b3e`](https://github.com/ybz21/Roami/commit/645f1b3e3155dde2e9f8cea7f1463ffcc46944cd) · Separate swarm office labels from monitors
+- `2026-06-22` · [`e5b6d32a`](https://github.com/ybz21/Roami/commit/e5b6d32addc55a9741ad2b0055eb298e6758d5e6) · Ignore temporary screenshot directory
+- `2026-06-22` · [`6a5c9d8b`](https://github.com/ybz21/Roami/commit/6a5c9d8b2aa61c0e93afcf42d0ae31464c41b543) · Add Go CLI swarm status core
+- `2026-06-22` · [`56093611`](https://github.com/ybz21/Roami/commit/56093611f410f760f00a55126c6ac76fbb700502) · Expand Go CLI command architecture
+- `2026-06-22` · [`15d9ea6a`](https://github.com/ybz21/Roami/commit/15d9ea6a6fc27f242e684bac035778fe3f305b7b) · Refine Go CLI package layout
+- `2026-06-22` · [`8b8d64b9`](https://github.com/ybz21/Roami/commit/8b8d64b9706bea19abe2383a623e524139f330fa) · Hide swarm sessions from Go CLI native listings
+- `2026-06-22` · [`8be40840`](https://github.com/ybz21/Roami/commit/8be40840ebddb55903ff1dc540254b995a503fb0) · Fix file preview height, swarm office labels, Claude badge
+- `2026-06-23` · [`44d8c598`](https://github.com/ybz21/Roami/commit/44d8c598090f41cf57e59f8f49b522f511abb8e2) · Complete native Go rewrite of the ttmux CLI
+- `2026-06-23` · [`6a33dab2`](https://github.com/ybz21/Roami/commit/6a33dab207114fa2267df400401260c58eb6f3e0) · Stop committing generated CLI artifacts; build/download on install
+- `2026-06-23` · [`5dfca2c2`](https://github.com/ybz21/Roami/commit/5dfca2c2a1de5e13e2da74261867b44fde84eadc) · start-all.sh: build ./ttmux (Go) on startup
+- `2026-06-23` · [`fe115d9c`](https://github.com/ybz21/Roami/commit/fe115d9c82441b1cb30d97ae5f9813cf9a92c2d8) · start-all.sh: install first, use system-level ttmux/chrome
+- `2026-06-23` · [`6d91112e`](https://github.com/ybz21/Roami/commit/6d91112ed04ad9419b250264359a567618783f47) · Fix terminal narrow strip and CJK mojibake (web + shell)
+- `2026-06-23` · [`be80c1ec`](https://github.com/ybz21/Roami/commit/be80c1ec8d6926ec471c2048eff54940d9146ff9) · Add PWA install-to-home-screen; include in-progress Git panel
+- `2026-06-23` · [`0562dfe0`](https://github.com/ybz21/Roami/commit/0562dfe0175f91a42ab448c46e06f82fd00a9b40) **swarm** · swarm: working-dir support + show Leader node before members
+- `2026-06-23` · [`a482d8ad`](https://github.com/ybz21/Roami/commit/a482d8ad8df65902b61297c491687368015fef2b) **swarm** · swarm: 用 auto\_leader 模板拉起 Leader，避免单干
+- `2026-06-23` · [`eea91609`](https://github.com/ybz21/Roami/commit/eea91609a632410c81be1d5dc7a72a415fcef341) · Merge pull request #2 from ybz21/feat/go-cli-core
+- `2026-06-23` · [`09a65e73`](https://github.com/ybz21/Roami/commit/09a65e733525a3daa129cda4540f5a68bd270075) **runtime** · runtime: 删除已废弃的 bash 桥死代码
+- `2026-06-23` · [`14414274`](https://github.com/ybz21/Roami/commit/14414274d93d8ee2968ee5f6825154c5ff34362b) · Merge pull request #3 from ybz21/chore/drop-dead-shell-bridge
+- `2026-06-23` · [`19ee55a3`](https://github.com/ybz21/Roami/commit/19ee55a3e9f1bbfed8baa72e036aba79eb4289cc) **swarm** · swarm: 成员细分角色(subrole) + 职责(duty) 模型
+- `2026-06-24` · [`7a24b670`](https://github.com/ybz21/Roami/commit/7a24b670c88db817eb9e6d339969dc7288551521) **feat** · feat: 语音输入 + 部署脚本模块化 + 移除 kanna（并含在途 TLS/浏览器设备模式等改动）
+- `2026-06-24` · [`cbba2ff2`](https://github.com/ybz21/Roami/commit/cbba2ff24addaff96bf458a4801ae02c89be3b19) · Merge pull request #4 from ybz21/feat/swarm-member-roles
+- `2026-06-24` · [`debea992`](https://github.com/ybz21/Roami/commit/debea992fe4b062eaaf8cf63513bed8d4a3cfd8f) **fix** · fix: start.sh 中文全角括号导致 set -u 变量展开失败
+- `2026-06-24` · [`3029ee1f`](https://github.com/ybz21/Roami/commit/3029ee1f3c6db70a483c86042c963a3dc87989d8) · Merge pull request #5 from so2liu/fix/start-sh-variable-expansion
+- `2026-06-24` · [`05077999`](https://github.com/ybz21/Roami/commit/050779996ac5d4653416ad54e099ebc15c9d5307) · web/swarm: 终端交互修复 + 构建优化 + 文件拖拽引用 + swarm 角色分工
+- `2026-06-24` · [`021077ef`](https://github.com/ybz21/Roami/commit/021077ef41292cd860aeaea710adeb42f48142bc) · Merge pull request #6 from ybz21/feat/swarm-member-roles
+- `2026-06-25` · [`680da63e`](https://github.com/ybz21/Roami/commit/680da63e624a67d263bd90257471cdf1e8a2656b) **feat** · feat: 终端/Chat 视图支持粘贴图片 + Shift+Enter 换行
+- `2026-06-25` · [`c4bca111`](https://github.com/ybz21/Roami/commit/c4bca111a2fcf2531ee00f383a475366fa37d5b6) **fix** · fix: 禁止移动端点击输入框时页面自动缩放
+- `2026-06-25` · [`fddbdf25`](https://github.com/ybz21/Roami/commit/fddbdf25bd8ccb8512af25233c5fe6714399ee81) **fix** · fix: 为横向 flex 布局添加 flex-wrap 防止移动端溢出
+- `2026-06-25` · [`9b5d4934`](https://github.com/ybz21/Roami/commit/9b5d4934628a1b5434f982f2aed5a00c231d7dfe) **fix** · fix: 撤回聊天输入区的 flex-wrap（会导致按钮换行）
+- `2026-06-25` · [`04977dd2`](https://github.com/ybz21/Roami/commit/04977dd24661bb0065ec7ae3d29ac79a0b35dc1c) · Merge pull request #7 from so2liu/feat/image-paste-shift-enter
+- `2026-06-25` · [`145a1cae`](https://github.com/ybz21/Roami/commit/145a1caedc7c8e462c37f8043b1d9c662fed1707) **browser** · browser: CDP Chrome 全屏(宿主机)/headless 默认 1920x1080
+- `2026-06-25` · [`982a4583`](https://github.com/ybz21/Roami/commit/982a458370ecc4cbf6acf30c94581b17c5472692) · Merge pull request #8 from ybz21/feat/chrome-window-fullscreen
+- `2026-06-25` · [`71b2a396`](https://github.com/ybz21/Roami/commit/71b2a3963e12108f99c24affbdde8c24fea3b9b6) **browser** · browser: Settings 里加 Chrome 启动配置面板
+- `2026-06-25` · [`b81504de`](https://github.com/ybz21/Roami/commit/b81504de24a5e7b26aa18aa5ede5524e60d9c45c) **fix** · fix: Codex 检测误报——排除 Claude 启动的 codex mcp-server 子进程
+- `2026-06-25` · [`3f10f98d`](https://github.com/ybz21/Roami/commit/3f10f98db844325485ff874b5fedbcbbf220bdee) · Merge pull request #9 from so2liu/fix/codex-detection-false-positive
+- `2026-06-25` · [`8e1af38a`](https://github.com/ybz21/Roami/commit/8e1af38a1e12406c93411d5d76721d1d1aecde3a) **fix** · fix: IP 地址创建会话失败 + 终端面板展开收缩后显示不完整 (#10, #11)
+- `2026-06-25` · [`bbf1a122`](https://github.com/ybz21/Roami/commit/bbf1a122703204aec4ad3334eb11def3c0d9d645) **browser** · browser: 无头/有头模式也可在 Settings 配置
+- `2026-06-25` · [`5cb4292e`](https://github.com/ybz21/Roami/commit/5cb4292e0f12271179ae9bd3acd994b40783d330) **fix** · fix: 所有 tmux -t 引用处统一净化会话名中的点号和冒号
+- `2026-06-25` · [`b58fc404`](https://github.com/ybz21/Roami/commit/b58fc4048cb90aeac20e0416bd3f0492a6debeb3) **fix** · fix: 前端 openTerm 也净化会话名，确保标签名与 tmux 实际名字一致
+- `2026-06-25` · [`3aee928b`](https://github.com/ybz21/Roami/commit/3aee928b4f22b1818b090c5360d4840e340bd33e) · Add repository quality gates
+- `2026-06-25` · [`6e168677`](https://github.com/ybz21/Roami/commit/6e168677a2b512b9b7a7254e4d6d32208f803217) · Fix web terminal pane selection
+- `2026-06-25` · [`2d97d6d7`](https://github.com/ybz21/Roami/commit/2d97d6d7cf67bb3e33a883587e4a47c8f7c73c95) **fix** · fix: 删除导致 React #310 崩溃的 useEffect，改用 onTransitionEnd 触发 resize
+- `2026-06-25` · [`45044078`](https://github.com/ybz21/Roami/commit/45044078a145443626b98c8d4347bdde49d4fdbf) · Merge pull request #13 from ybz21/feat/chrome-window-fullscreen
+- `2026-06-25` · [`9b57d7d3`](https://github.com/ybz21/Roami/commit/9b57d7d341a340baba915567fe19f572b8c753ca) · Refresh brand assets and README copy
+- `2026-06-25` · [`20969cfe`](https://github.com/ybz21/Roami/commit/20969cfec4e0392c57458feeebde71c4af0520d9) **feat** · feat: server-side user preferences with cross-device sync
+- `2026-06-25` · [`8c6767ec`](https://github.com/ybz21/Roami/commit/8c6767ec3be177732121c9e3618fa9bc24a7e904) **merge** · merge: resolve conflicts with upstream main (browser config feature)
+- `2026-06-25` · [`b7cc0b0f`](https://github.com/ybz21/Roami/commit/b7cc0b0f9e681a0508dd8ef89d72cbfe70ea0f99) **fix** · fix: remove hardcoded placeholder attrs to pass i18n audit
+- `2026-06-25` · [`611c4e4f`](https://github.com/ybz21/Roami/commit/611c4e4f102e5165ddb292283ba59e18182486bb) **browser** · browser: 修 macOS 上 ensureChrome 重复拉起导致狂弹 about:blank
+- `2026-06-25` · [`201a09e9`](https://github.com/ybz21/Roami/commit/201a09e9212001499ca90b985fb4d65ec55120ef) **feat** · feat: auto-upgrade detection from remote branch
+- `2026-06-25` · [`ab0ddae3`](https://github.com/ybz21/Roami/commit/ab0ddae33ba82c516e49c42910169f5d65250abd) **browser** · browser: CDP 端口被占自动换(并记录复用) + 启动失败原因回传 UI
+- `2026-06-25` · [`6f13523b`](https://github.com/ybz21/Roami/commit/6f13523bb899511e98b35e900d68bf7f7929e8e9) **fix** · fix: address review findings on upgrade feature
+- `2026-06-25` · [`4c4f1024`](https://github.com/ybz21/Roami/commit/4c4f1024e86cc70e2821fca431229889f3f1c382) **refactor** · refactor: upgrade does git pull + build + start.sh (no --dev)
+- `2026-06-25` · [`abe9044b`](https://github.com/ybz21/Roami/commit/abe9044b3d98c42397cb860ace0be15b43089d7b) **fix** · fix: address codex review — concurrency lock, npm install, error feedback
+- `2026-06-25` · [`83d2ce26`](https://github.com/ybz21/Roami/commit/83d2ce26cba85a7b36d77d4ed9be1c25dab8be88) · Merge remote-tracking branch 'fork/fix/mobile-input-zoom' into merge-to-fork
+- `2026-06-25` · [`de073216`](https://github.com/ybz21/Roami/commit/de07321629035c04274148f1ceddcee00da4714e) · Merge remote-tracking branch 'fork/feat/auto-upgrade' into merge-to-fork
+- `2026-06-25` · [`8406253d`](https://github.com/ybz21/Roami/commit/8406253dda3d91fcfb35e31f29f312d2a6943aa9) **web** · web: 文件浏览器隐藏文件开关 + pane 选择函数补注释
+- `2026-06-25` · [`0bc6b27b`](https://github.com/ybz21/Roami/commit/0bc6b27b86deb4d8e9beae77ad2186e797dffd8a) · Merge pull request #12 from catwithAI/fix/issues-10-11
+- `2026-06-25` · [`d059a691`](https://github.com/ybz21/Roami/commit/d059a691e3cedad80dd0a09ac0c0bdfc35ae6bdb) · Merge pull request #17 from ybz21/feat/chrome-window-fullscreen
+- `2026-06-25` · [`c9bb1e9e`](https://github.com/ybz21/Roami/commit/c9bb1e9e93bbe3190d8e74df781d12a41461f217) **UI** · UI: 会话列表两行布局 + 概览页自适应 + 图片粘贴加@前缀 + start.sh自动检测前端变更
+- `2026-06-25` · [`6925f756`](https://github.com/ybz21/Roami/commit/6925f756843d24d63b6191c06ed5b2e8d5fcf4f4) **UI** · UI: 侧栏底部按钮改为图标+tooltip + 筛选条防溢出 + 中间面板可拖拽调宽
+- `2026-06-25` · [`b62d9422`](https://github.com/ybz21/Roami/commit/b62d942206c99528aeed24ceea587ea855fc1ba8) **fix** · fix: xterm IME 切换英文输入法时拼音字母重复输入
+- `2026-06-25` · [`a56e8841`](https://github.com/ybz21/Roami/commit/a56e8841772ea3de53007fc5107e5e99abb7c501) **UI** · UI: 会话筛选条改为两行布局（搜索框+tab独占各一行）
+- `2026-06-25` · [`eb055698`](https://github.com/ybz21/Roami/commit/eb055698acd9a33219e201fcce2e82898ff6c2f5) · Merge remote-tracking branch 'origin/main' into my-main
+- `2026-06-25` · [`93d23223`](https://github.com/ybz21/Roami/commit/93d2322302b3c1210735271013b58c3b9c0c8182) · 文件浏览器：路径栏上方加最近目录快捷按钮
+- `2026-06-25` · [`70177046`](https://github.com/ybz21/Roami/commit/7017704605bf716e5c5dfc225cd14de194822cee) · Merge pull request #19 from catwithAI/main
+- `2026-06-25` · [`f54cc878`](https://github.com/ybz21/Roami/commit/f54cc87885edd18c77c6809830ee570be0b2af2c) · 移除自动升级功能（UpgradeBanner + upgrade API）
+- `2026-06-25` · [`2465005d`](https://github.com/ybz21/Roami/commit/2465005d61f4944446af41fd59c5830f0d7bebcc) **feat** · feat: 文件管理器排序功能（名称/种类/修改日期/创建日期/大小）
+- `2026-06-25` · [`a0ade6de`](https://github.com/ybz21/Roami/commit/a0ade6de4a0ddb266dd3b14c5a04cf64d8eb1e22) · Merge pull request #1 from catwithAI/feat/file-browser-sort
+- `2026-06-25` · [`620ff2ea`](https://github.com/ybz21/Roami/commit/620ff2eaab6809f97bf5554ab42fb343073b0340) · Merge branch 'ybz21:main' into main
+- `2026-06-25` · [`b921765e`](https://github.com/ybz21/Roami/commit/b921765e6fa93cc2597db85f28c29f3988eafa8e) · Merge pull request #20 from catwithAI/feat/file-browser-sort
+- `2026-06-25` · [`0449c383`](https://github.com/ybz21/Roami/commit/0449c383c63b7de63d02812f586dbe329d9cd835) **fix** · fix(server): gofmt backend/server/server.go (去掉多余空行)
+- `2026-06-25` · [`b301920d`](https://github.com/ybz21/Roami/commit/b301920dfe70d8e1d5eb4d204827d4e2bfc6aee8) **ci** · ci: Policy Review 容忍 fork PR 无评论权限（403 不再 fail）
+- `2026-06-25` · [`9a0d68d3`](https://github.com/ybz21/Roami/commit/9a0d68d38527370ee8539f46b91ed1ccd5f0a741) · Merge pull request #21 from ybz21/fix/pr-review-fork-comment
+- `2026-06-25` · [`bc751bb3`](https://github.com/ybz21/Roami/commit/bc751bb3721f9c68889cec9ff6b44765d743f17e) · Merge pull request #18 from so2liu/main
+- `2026-06-25` · [`56d10efa`](https://github.com/ybz21/Roami/commit/56d10efaa5bb580094b700e427e90b218fba505a) **feat** · feat(mobile): 软键盘悬浮不挤压布局 + 补 192px PWA 图标
+- `2026-06-25` · [`eb98a035`](https://github.com/ybz21/Roami/commit/eb98a035194ea3031c2c3cde4663f08351733b9f) · Merge remote-tracking branch 'origin/main' into feat/mobile-pwa-keyboard
+- `2026-06-25` · [`71066ee4`](https://github.com/ybz21/Roami/commit/71066ee46ce9b31d8d606764da827554787d59d6) · Merge pull request #22 from ybz21/feat/mobile-pwa-keyboard
+- `2026-06-26` · [`9ca808b9`](https://github.com/ybz21/Roami/commit/9ca808b90d6c7d9fcc42c765c6447a11ed6d0069) **feat** · feat(tls): 自签证书拆分根 CA + 叶子，新增「下载证书」入口
+- `2026-06-26` · [`832e73e3`](https://github.com/ybz21/Roami/commit/832e73e37fa4a1a566e25e10e17651204f0ea308) · Merge pull request #23 from ybz21/feat/tls-ca-cert-download
+- `2026-06-26` · [`fc117748`](https://github.com/ybz21/Roami/commit/fc117748e9f9e54f404067972dcd5ed9575e1a83) · Merge branch 'ybz21:main' into main
+- `2026-06-26` · [`9673a518`](https://github.com/ybz21/Roami/commit/9673a518bd140c3bfceb2e9b444152c300b2f97a) · 移动端体验优化 + Codex 误检修复 + 偏好系统改进
+- `2026-06-26` · [`6e9dbdf1`](https://github.com/ybz21/Roami/commit/6e9dbdf1966fad3abbad67ccdad3a1730044dc7c) · 快捷命令持久化修复 + 添加按钮交互优化
+- `2026-06-26` · [`ee3d4d9f`](https://github.com/ybz21/Roami/commit/ee3d4d9f07a99237b763b640ce7b9ad8fa3e44b8) · 偏好持久化 + 终端状态 URL 恢复 + 快捷命令交互优化
+- `2026-06-26` · [`6498fcbe`](https://github.com/ybz21/Roami/commit/6498fcbe353be69fbbc7a9053fcdd306ecfba2e1) · 国际化修复：快捷命令弹窗和偏好概览中的硬编码文字改为 i18n
+- `2026-06-26` · [`41278abc`](https://github.com/ybz21/Roami/commit/41278abcbe50339d055ec29e92135ae897c82cab) · Merge pull request #24 from so2liu/main
+- `2026-06-26` · [`368f7dd9`](https://github.com/ybz21/Roami/commit/368f7dd9eb9270420b752ef4490d247bafaa8cfc) · Merge branch 'ybz21:main' into main
+- `2026-06-26` · [`a30d43cc`](https://github.com/ybz21/Roami/commit/a30d43ccb1901113bcab7c20446c853cc3da6e50) · start.sh: 启动前检查 ttmux CLI 是否可用，缺失时自动编译或报错
+- `2026-06-26` · [`08a4204e`](https://github.com/ybz21/Roami/commit/08a4204e8c40ca5f4df20ab05a6cd17f8b8d5578) · 页面加载时主动请求剪贴板权限，避免使用时才弹授权
+- `2026-06-26` · [`11338929`](https://github.com/ybz21/Roami/commit/11338929356425e75518601664c6f5a50a9c70bc) · 快捷命令点击后焦点回到输入框，避免 Enter 重复触发按钮
+- `2026-06-27` · [`77d04d36`](https://github.com/ybz21/Roami/commit/77d04d3632a78259a318ccea9127ab8edcecb428) **feat** · feat(mobile): 新增「手机」标签—Android/iOS 镜像+控制+三端配置
+- `2026-06-27` · [`58150dc9`](https://github.com/ybz21/Roami/commit/58150dc9e2d99e6e18e7e6b2bcb2ad3b8e050ee8) **feat** · feat(speech): 火山豆包 ASR 标准/极速版按 resourceId 选路 + OpenAI
+- `2026-06-27` · [`8ec668e9`](https://github.com/ybz21/Roami/commit/8ec668e9ed52e557eadb6e383700902ed08c532a) **feat** · feat(terminal): 全屏 TUI(备用屏)支持鼠标滚轮
+- `2026-06-27` · [`0c71cdb8`](https://github.com/ybz21/Roami/commit/0c71cdb85180a48810b12a4ddbd5fa451f3bbc4a) **feat** · feat(sessions): 会话列表新增 last\_activity 字段
+- `2026-06-27` · [`fd583c48`](https://github.com/ybz21/Roami/commit/fd583c48001262463302dda9c42f9ff8245a0d01) **chore** · chore(repo): Conventional Commits 规范+钩子 + babysit-pr 技能 + codex-review 文档
+- `2026-06-27` · [`73a34e2a`](https://github.com/ybz21/Roami/commit/73a34e2aa00e16ae6301e2ffe9fae18abc02080c) **refactor** · refactor(mobile): 设置页平台/来源两级分离 + 自适应安装 + iOS idb 修复
+- `2026-06-27` · [`9230e933`](https://github.com/ybz21/Roami/commit/9230e9337b6c3152838133aeb7f31f2814b9e5c9) **feat** · feat(mobile): 平台开关 + 按需(插件化)安装依赖
+- `2026-06-28` · [`523dd72b`](https://github.com/ybz21/Roami/commit/523dd72bda70c8807ff5ce587e9e7cad5fedd4d8) **fix** · fix(mobile): 平台开关可关闭（关掉=未启用，不再强制保持一个激活）
+- `2026-06-28` · [`c3bae9f5`](https://github.com/ybz21/Roami/commit/c3bae9f5e3d3afd35dcb2a6562811305c8319f74) · 修复守护/launchd 启动时中文会话名不显示的问题
+- `2026-06-28` · [`8524b9bd`](https://github.com/ybz21/Roami/commit/8524b9bd963820b7a22520b230fef4219f081469) · Fix browser screencast refresh on macOS fullscreen
+- `2026-06-28` · [`8e0e5c1a`](https://github.com/ybz21/Roami/commit/8e0e5c1a0756cbb13b6fd7c3e573f007c68dde20) · Merge pull request #25 from ybz21/feat/phone-mobile
+- `2026-06-29` · [`8429f112`](https://github.com/ybz21/Roami/commit/8429f112b8f600022c133647c951ee72a147fc5b) · Merge remote-tracking branch 'upstream/main'
+- `2026-06-29` · [`244ba703`](https://github.com/ybz21/Roami/commit/244ba7039ffa456758fabae4739a75518046cf00) · Merge pull request #26 from jagger-zxz/fix/browser-screencast-refresh
+- `2026-06-29` · [`286d3918`](https://github.com/ybz21/Roami/commit/286d3918ba0a6eae5663e0db8cf22f5183b50045) **feat** · feat(mobile): 手机连接配置重设计 + iOS 真机 + 自适应推流
+- `2026-06-29` · [`04dfa770`](https://github.com/ybz21/Roami/commit/04dfa770806970abc730f55d6b9ab37814bbeae2) **feat** · feat(mobile): 设置页双卡片 + 自适应动作条 + 镜像页修复
+- `2026-06-29` · [`fc088487`](https://github.com/ybz21/Roami/commit/fc088487e6c180d3178782d2db4c86a30dc47df2) · Merge pull request #27 from ybz21/feat/phone-connection-redesign
+- `2026-06-29` · [`0630fa6f`](https://github.com/ybz21/Roami/commit/0630fa6f742f2a12e68c93afd77dd271711b32ed) **fix** · fix(mobile): 手机页默认宽度对齐设置页（dock 420）
+- `2026-06-29` · [`dd99903f`](https://github.com/ybz21/Roami/commit/dd99903f91c051ced35a4974612070622a9cb902) · Merge pull request #28 from ybz21/fix/phone-page-width
+- `2026-06-29` · [`8aa1cc4b`](https://github.com/ybz21/Roami/commit/8aa1cc4b693e8e6956932b9f23a5c90bb9ceaeaf) · 修复会话名含斜杠时无法打开和删除的问题
+- `2026-06-30` · [`acdbdf1f`](https://github.com/ybz21/Roami/commit/acdbdf1f714894a215bc0265ab63490a0382c797) · 会话名/蜂群名禁止输入 / . : 特殊字符，创建和重命名时前端校验拦截
+- `2026-06-30` · [`f121e59c`](https://github.com/ybz21/Roami/commit/f121e59c80b066ca6c3ea0d13d7d39176b85bf9d) · Revert "会话名/蜂群名禁止输入 / . : 特殊字符，创建和重命名时前端校验拦截"
+- `2026-06-30` · [`d3ac9f15`](https://github.com/ybz21/Roami/commit/d3ac9f15885a04d23382795504fbaf5dd95321ea) · Merge pull request #29 from so2liu/main
+- `2026-06-30` · [`a2f8553b`](https://github.com/ybz21/Roami/commit/a2f8553bb73d339e88bad51d5a58a8ba17de6578) **refactor** · refactor(scripts): 按 install/phone/dev 分组重排部署脚本
+- `2026-06-30` · [`ba018d45`](https://github.com/ybz21/Roami/commit/ba018d45e8ca85e2e39296f090ced289217ffd34) · Merge pull request #30 from ybz21/refactor/scripts-layout
+
+## 2026-07（296）
+
+- `2026-07-01` · [`9f0cc3aa`](https://github.com/ybz21/Roami/commit/9f0cc3aa4b667a706ce830ec2726210eac269b36) **fix** · fix(browser): 消除镜像页打字/加载时的画面抖动
+- `2026-07-01` · [`d4f2af11`](https://github.com/ybz21/Roami/commit/d4f2af11663cd373c5ade47a091681cf7f76d9f2) **feat** · feat(files): 文件浏览器接入 Monaco 代码编辑器与平铺/VSCode 树双布局
+- `2026-07-01` · [`ef38ebd2`](https://github.com/ybz21/Roami/commit/ef38ebd2b8fd1231f4b13a437c57063a90b763e5) · Merge pull request #31 from ybz21/feat/file-editor-and-browser-jitter-fix
+- `2026-07-01` · [`9344d8a2`](https://github.com/ybz21/Roami/commit/9344d8a2e341a1d00c9c1bf899d872829ad4e38c) **feat** · feat(files): 文件工作区抽成统一组件 FileWorkspace，支持 VSCode 式双栏编辑
+- `2026-07-01` · [`099d7f99`](https://github.com/ybz21/Roami/commit/099d7f99a45511e8fa03613e118dca15421a823f) · Merge pull request #32 from ybz21/feat/vscode-file-workspace
+- `2026-07-01` · [`611cd6dd`](https://github.com/ybz21/Roami/commit/611cd6dd038a79732669248451cc3d834a046cb1) **feat** · feat(files): 打开的文件被外部改动时实时重载 + Markdown VSCode 式预览
+- `2026-07-01` · [`482f384d`](https://github.com/ybz21/Roami/commit/482f384d21c7929c59e01393a22cf28d4d3c8e7e) · Merge pull request #33 from ybz21/feat/file-live-reload-md-preview
+- `2026-07-01` · [`01e5ce90`](https://github.com/ybz21/Roami/commit/01e5ce9011954d55ec86325deaf3cde845e87ee2) · 修复 macOS TCC 保护目录导致文件列表接口无限阻塞的问题
+- `2026-07-01` · [`832a5635`](https://github.com/ybz21/Roami/commit/832a5635efc3693a2cff8a53d077c09acce5e784) · 目录访问超时错误信息 i18n 化
+- `2026-07-01` · [`782cf5bf`](https://github.com/ybz21/Roami/commit/782cf5bf775768f936df3126d238c2652cbb4b25) · Merge branch 'ybz21:main' into main
+- `2026-07-01` · [`a6f45362`](https://github.com/ybz21/Roami/commit/a6f45362da5259e1f91b2f863c6a4c94db139ed0) **fix** · fix(start): node\_modules 存在但依赖过期时自动重装前端依赖
+- `2026-07-01` · [`ba65f059`](https://github.com/ybz21/Roami/commit/ba65f059a110ae827877e983d639ee9710d602c8) · Merge pull request #3 from catwithAI/fix/frontend-deps-stale-reinstall
+- `2026-07-01` · [`8a5ae2c1`](https://github.com/ybz21/Roami/commit/8a5ae2c1091731b8e41af06292239e3a07b6cece) · Merge pull request #34 from so2liu/main
+- `2026-07-01` · [`04b65ac8`](https://github.com/ybz21/Roami/commit/04b65ac850bf5259bd13a51dbef843f8ad447bf5) · Merge pull request #35 from catwithAI/main
+- `2026-07-01` · [`45f63b6a`](https://github.com/ybz21/Roami/commit/45f63b6a550f7d2ec4b6aee92c949da4df236aaf) **fix** · fix(phone): 修复安装安卓依赖时卡住（孤儿进程持锁）
+- `2026-07-01` · [`8ec0f1d4`](https://github.com/ybz21/Roami/commit/8ec0f1d49afa52d9d8e5b7c2940e1caf1c94c469) · 修复文件拖拽到终端后覆盖层不消失的问题
+- `2026-07-02` · [`df4fc056`](https://github.com/ybz21/Roami/commit/df4fc0567ae4b4b4b23a70c25890784103e01b12) **docs** · docs(frontend): 规划文件树右键菜单
+- `2026-07-02` · [`4dd3364c`](https://github.com/ybz21/Roami/commit/4dd3364c216e679aa07be8715a0bd08caa940cb3) **feat** · feat(frontend): 增强文件树右键菜单
+- `2026-07-02` · [`fa248bc9`](https://github.com/ybz21/Roami/commit/fa248bc9f3f0f9fcff599561b4d9d4bf6c8915e7) **fix** · fix(frontend): 恢复文件页终端分栏拖拽
+- `2026-07-02` · [`14d9f499`](https://github.com/ybz21/Roami/commit/14d9f499cafa473d103726bb2bd969771a377819) · Merge pull request #36 from catwithAI/fix/phone-install-orphan-lock
+- `2026-07-02` · [`c7606efc`](https://github.com/ybz21/Roami/commit/c7606efcaec9458ab1f5c59b96fb79f8af2a90c9) **fix** · fix(frontend): 保持文件右键目标高亮
+- `2026-07-02` · [`99b3bd95`](https://github.com/ybz21/Roami/commit/99b3bd954650190905a4e932b7a16d3d7885aa65) **fix** · fix(frontend): 同步会话列表选中态
+- `2026-07-02` · [`a246db0e`](https://github.com/ybz21/Roami/commit/a246db0efe0816891b18eba4e1a802d3623bb791) **fix** · fix(cli): tmux server 未启动时会话数误报为 1
+- `2026-07-02` · [`d8479bb5`](https://github.com/ybz21/Roami/commit/d8479bb59436269d8d4197333a28e6ada465bbde) **fix** · fix(frontend): 强化会话列表选中高亮
+- `2026-07-02` · [`7c0586e7`](https://github.com/ybz21/Roami/commit/7c0586e740f00bfe02d7e1fc0f531175ba428a67) **fix** · fix(cli): 补齐 list-sessions 错误处理并加 e2e 回归断言
+- `2026-07-02` · [`994cc3c2`](https://github.com/ybz21/Roami/commit/994cc3c2e7f6631586e3af0b53601d7a449f2a7d) · Merge pull request #39 from so2liu/feat/file-tree-context-menu
+- `2026-07-02` · [`25e12bc9`](https://github.com/ybz21/Roami/commit/25e12bc919ba4bbb9bad5b1a6a7e66f7c57c1b2e) · Merge pull request #38 from so2liu/fix/drag-overlay-stuck
+- `2026-07-02` · [`1fc7c8a9`](https://github.com/ybz21/Roami/commit/1fc7c8a9d373239d2815b5270c4a18fc053090d0) · Merge pull request #40 from so2liu/fix/info-session-count-no-server
+- `2026-07-02` · [`854584da`](https://github.com/ybz21/Roami/commit/854584dabecf20b3bf70e03122e33bd4459afde4) **fix** · fix(web): 终端滤掉应用鼠标上报序列，恢复 Claude/Codex 会话拖选复制
+- `2026-07-02` · [`5015528a`](https://github.com/ybz21/Roami/commit/5015528a9d09f6f6d5b082ce500a1fd3d16b1627) · Merge pull request #41 from ybz21/fix/web-terminal-copy-mouse
+- `2026-07-03` · [`92d5ee37`](https://github.com/ybz21/Roami/commit/92d5ee3764da4209f21852d3ac4f1a12c67b5b40) **fix** · fix(web): API 响应禁缓存，修复移动端文件实时重载失效
+- `2026-07-03` · [`0d1829e4`](https://github.com/ybz21/Roami/commit/0d1829e451cbf05f1d021406a1bd57ee25694af8) · Merge pull request #44 from ybz21/fix/api-no-store-cache
+- `2026-07-03` · [`129d55ae`](https://github.com/ybz21/Roami/commit/129d55aeae8cfed756bc46dc13e09af9041dcdc9) **fix** · fix(web): 文件树刷新时保留展开层级，不再折叠
+- `2026-07-03` · [`48793dce`](https://github.com/ybz21/Roami/commit/48793dce7d79d0fd2b31c1ac391b7162f38ea287) · Merge pull request #45 from ybz21/fix/filetree-keep-expanded-on-refresh
+- `2026-07-03` · [`42388b79`](https://github.com/ybz21/Roami/commit/42388b799b808c3788103fdff0fbdec11d4db705) **feat** · feat(web): 新建会话支持 Git Worktree 模式
+- `2026-07-03` · [`2c6bb2e0`](https://github.com/ybz21/Roami/commit/2c6bb2e0bfd2d2f53e59b20ad5660abe0e69881c) · Merge pull request #46 from so2liu/worktree-parsed-watching-oasis
+- `2026-07-04` · [`6d408f56`](https://github.com/ybz21/Roami/commit/6d408f56b1441aaa1876f12acfcfc9dd5d016241) **feat** · feat(web): Markdown 预览支持 Mermaid 图渲染
+- `2026-07-04` · [`a41327ea`](https://github.com/ybz21/Roami/commit/a41327ea79a03e84a39159bcf4ca290a4104df99) · Merge pull request #47 from ybz21/feat/markdown-mermaid
+- `2026-07-04` · [`8a0df0e9`](https://github.com/ybz21/Roami/commit/8a0df0e94ff04831e3b7c99f81744cc75267dd2c) **fix** · fix(web): 拖文件/tab 到右半区分栏（编辑器区+终端区），修拖动分栏失效
+- `2026-07-04` · [`e221394e`](https://github.com/ybz21/Roami/commit/e221394e71f3460a912249990277ea4a0381e6fa) · Merge pull request #48 from ybz21/fix/file-view-split-drag
+- `2026-07-04` · [`95ced6ff`](https://github.com/ybz21/Roami/commit/95ced6ffaff77e35f992a98009241cfa65c87e46) **fix** · fix(web): 文件预览加错误边界，懒加载 chunk 失败不再白屏崩溃
+- `2026-07-05` · [`1d6dd257`](https://github.com/ybz21/Roami/commit/1d6dd257d8ce16ec59c52624fb13f7fc8f0150ca) · Merge pull request #50 from ybz21/fix/file-view-error-boundary
+- `2026-07-06` · [`f8a8667b`](https://github.com/ybz21/Roami/commit/f8a8667b0a9873441b85840b532e7104b2539be0) **perf** · perf(web): 修复首屏误载 4MB monaco 块；静态资源 gzip 预压缩 + 长缓存
+- `2026-07-06` · [`cf83cae1`](https://github.com/ybz21/Roami/commit/cf83cae11e77cf41cb5b3708fa0b158d502ed67c) · Merge pull request #51 from ybz21/perf/web-first-load
+- `2026-07-06` · [`5fa627b5`](https://github.com/ybz21/Roami/commit/5fa627b5945c4eb6143d2c62c489f62d3190f54e) **perf** · perf(web): 首屏再瘦身 —— markdown/重页面懒加载、依赖块归位、Brotli 预压缩
+- `2026-07-07` · [`7b97e1e5`](https://github.com/ybz21/Roami/commit/7b97e1e548bb44021d5dd1a45feb98172c6a1c84) **feat** · feat(plugin): 插件系统 v1 + review-mesh 智能互审(含死会话/回灌修复)
+- `2026-07-07` · [`16366a84`](https://github.com/ybz21/Roami/commit/16366a84cae27d91349d013a28f81faadb4319ae) · Merge pull request #53 from ybz21/feat/plugin-review-mesh
+- `2026-07-07` · [`2ab24857`](https://github.com/ybz21/Roami/commit/2ab24857d2a91581a24eba90322d6e4757b236a2) **feat** · feat: 概览会话优先 + 文件浏览器右键全局统一 + 许可证改 AGPLv3
+- `2026-07-07` · [`73abba83`](https://github.com/ybz21/Roami/commit/73abba8375c2ee2a2495828fc6503b47b7bb4c82) · Merge pull request #54 from ybz21/feat/overview-order-file-ctxmenu-agpl
+- `2026-07-07` · [`f4f7249f`](https://github.com/ybz21/Roami/commit/f4f7249f8a3efb0de4c2bd957750fceaf6a93a54) **feat** · feat(feishu): 飞书桥改为自建应用双向机器人,@机器人 派活由 Agent 主导对话
+- `2026-07-07` · [`8594e77c`](https://github.com/ybz21/Roami/commit/8594e77c2dad65892f4ee19f30ff0ee761a605d5) · Merge pull request #55 from ybz21/feat/feishu-duplex-bot
+- `2026-07-07` · [`2ac968e8`](https://github.com/ybz21/Roami/commit/2ac968e8cc5ee5f862411ab484b5c50e61fc473c) **feat** · feat(feishu): 常驻管家 concierge——消息进大脑,复杂活委派 worker(M1+M2)
+- `2026-07-08` · [`d75e5e88`](https://github.com/ybz21/Roami/commit/d75e5e88ee07add4af74b9ddf56965accaf888dc) **docs** · docs(readme): add bilingual real-device screenshots; slim mobile nav
+- `2026-07-08` · [`0d7c17a8`](https://github.com/ybz21/Roami/commit/0d7c17a88f511c082388d49163fa9ef0cc9ff6ec) **refactor** · refactor(plugins): builtin 插件源码搬进根 plugins/ 目录(独立 Go 模块)
+- `2026-07-08` · [`5e85b1b9`](https://github.com/ybz21/Roami/commit/5e85b1b9298e43eca2b39a1008bad2143ab52f8a) · Merge pull request #57 from ybz21/feat/readme-screenshots-mobile
+- `2026-07-08` · [`0bb7077a`](https://github.com/ybz21/Roami/commit/0bb7077accef6c26edec167d0292eb739a3edf64) **refactor** · refactor(plugins): 每个插件独立 Go 模块(plugins/&lt;名&gt;/go.mod)
+- `2026-07-08` · [`ac9be03c`](https://github.com/ybz21/Roami/commit/ac9be03cade194112faa352faa8ffdb3a4f1f634) **docs** · docs(readme): add "chat with an agent on your phone" screenshot
+- `2026-07-08` · [`797d9396`](https://github.com/ybz21/Roami/commit/797d93963dc8466204c97c1c16222ea2a7736645) **refactor** · refactor(im): 飞书插件通用化为 IM 桥(provider 适配器,钉钉可扩展)
+- `2026-07-08` · [`a6d2e670`](https://github.com/ybz21/Roami/commit/a6d2e670d1b5a82935d690360ce616bf0f9630dc) · Merge pull request #58 from ybz21/feat/readme-mobile-chat
+- `2026-07-08` · [`5c639c8c`](https://github.com/ybz21/Roami/commit/5c639c8cdf4e4feaa47d08fff7def66698073911) **docs** · docs(readme): device-mockup hero (laptop + phone) and framed mobile shots
+- `2026-07-08` · [`46357a98`](https://github.com/ybz21/Roami/commit/46357a984f4f4d7da8c2515e57c98a076eca3206) · Merge pull request #56 from ybz21/feat/feishu-concierge
+- `2026-07-08` · [`a5d976b8`](https://github.com/ybz21/Roami/commit/a5d976b82116d5eef448daead758fd65f75dbc2d) · Merge remote-tracking branch 'origin/main' into feat/readme-mobile-chat
+- `2026-07-08` · [`8e9d0db9`](https://github.com/ybz21/Roami/commit/8e9d0db974c7ad9d6d9629f9dd01613719d68a14) · Merge pull request #59 from ybz21/feat/readme-mobile-chat
+- `2026-07-08` · [`952a23df`](https://github.com/ybz21/Roami/commit/952a23df067b4ca147180c62fa67aab137e647a1) · Merge remote-tracking branch 'origin/main' into perf/web-first-load-2
+- `2026-07-08` · [`87846f58`](https://github.com/ybz21/Roami/commit/87846f58a4ed16148ba36bb4f28f3fe78e02cef0) · Merge pull request #52 from ybz21/perf/web-first-load-2
+- `2026-07-08` · [`4197d7b8`](https://github.com/ybz21/Roami/commit/4197d7b8b303ace4f4787a3b0124bce7138759da) **docs** · docs: feature list, jsDelivr images, plugin dev guide, bold intro
+- `2026-07-08` · [`fc5e532d`](https://github.com/ybz21/Roami/commit/fc5e532d2063b612e83d829617382fbc584bc7eb) · Merge pull request #60 from ybz21/docs/features-and-cdn-images
+- `2026-07-08` · [`f3b4e941`](https://github.com/ybz21/Roami/commit/f3b4e941eea152226bd4e6edcf1647e683bc3f24) **docs** · docs: detailed feature list + tidy docs/design into topic folders
+- `2026-07-08` · [`5f5608b2`](https://github.com/ybz21/Roami/commit/5f5608b244b502a1a0d0759faa8c3e8145234ca9) · Merge pull request #61 from ybz21/docs/features-detail-and-design-tidy
+- `2026-07-08` · [`ea8e69f0`](https://github.com/ybz21/Roami/commit/ea8e69f0e1056a05ad8b39952fa572e9133927c0) **fix** · fix(cli): ttmux send 用 bracketed-paste 提交，多行 prompt 不再被拆/不发送 (#62)
+- `2026-07-08` · [`4fcc8f67`](https://github.com/ybz21/Roami/commit/4fcc8f677f034d8928f900925dfd7910f984a8d1) **fix** · fix(web): 侧栏底部按钮左对齐，图标与上方导航对齐 (#63)
+- `2026-07-08` · [`222fa275`](https://github.com/ybz21/Roami/commit/222fa27576f0566237253a31cd979686df6332f6) **feat** · feat(plugin): 卸载/禁用清理干净——停常驻会话、清孤儿数据、--purge 可选清配置
+- `2026-07-08` · [`b2b640de`](https://github.com/ybz21/Roami/commit/b2b640de735dfcd09b92bef5bfdab715b8253dac) · Merge pull request #64 from ybz21/feat/plugin-uninstall-cleanup
+- `2026-07-08` · [`c2de8e2e`](https://github.com/ybz21/Roami/commit/c2de8e2ebfd83463bfe27710ad83f5e61d9fc366) **docs** · docs: 移除已无引用的过期截图
+- `2026-07-08` · [`9e8cf2e8`](https://github.com/ybz21/Roami/commit/9e8cf2e80b13474be383c858765be51c3a28e53c) · Merge pull request #65 from ybz21/docs/remove-stale-images
+- `2026-07-08` · [`c22ee1fa`](https://github.com/ybz21/Roami/commit/c22ee1faa167fa6b1790ee5b1ad3d929a19eeea3) **feat** · feat(files): HTML 文件预览(源码/渲染切换,渲染走服务代理 iframe)
+- `2026-07-08` · [`1fa022ac`](https://github.com/ybz21/Roami/commit/1fa022ac7cddc585b6ff61b7c62b92853724086a) **feat** · feat(files): HTML 预览加「新标签打开」按钮 + tab 里默认直接渲染
+- `2026-07-08` · [`2021999f`](https://github.com/ybz21/Roami/commit/2021999f52b451fa3d176b0f4ce9021d1cf1a243) · Merge pull request #66 from ybz21/feat/html-file-preview
+- `2026-07-08` · [`56dbad41`](https://github.com/ybz21/Roami/commit/56dbad4150f1b1531295a9575109b94ce0e47171) **refactor** · refactor(files): 文件展示统一为 fileview/ 模块 + 各类型子组件
+- `2026-07-08` · [`a17d27e1`](https://github.com/ybz21/Roami/commit/a17d27e1823b0a39e14de047ec109a06a8e00fed) · Merge pull request #67 from ybz21/refactor/fileview-module
+- `2026-07-08` · [`252b3996`](https://github.com/ybz21/Roami/commit/252b39961af693d9c26228de9a18bcae0585db9a) **fix** · fix(web): 文件面板与 Git 面板可并存，不再互斥
+- `2026-07-08` · [`00131aa0`](https://github.com/ybz21/Roami/commit/00131aa09cce4e184b4e5f8843c7caf58637bf06) · Merge pull request #68 from ybz21/fix/files-git-coexist
+- `2026-07-08` · [`205656ca`](https://github.com/ybz21/Roami/commit/205656ca6fddbd1cede7c0d5e048533e46b7713d) **feat** · feat(web): 会话右侧文件抽屉统一为树视图（与左侧 Files 页一致）
+- `2026-07-09` · [`d1a0eaa1`](https://github.com/ybz21/Roami/commit/d1a0eaa1411a2c1a6a013aebc4fca61867373a4a) **feat** · feat(config): config.yaml 配置体系 + 首次设置/改密 + ~/.roam + 单一二进制
+- `2026-07-09` · [`45fb7ef9`](https://github.com/ybz21/Roami/commit/45fb7ef94586ca445370b9a0db56212f0edb3279) **docs** · docs(install): 安装/README 改用 config.yaml 与 roam 仓库
+- `2026-07-09` · [`1d7bd7f3`](https://github.com/ybz21/Roami/commit/1d7bd7f35a53e93d26265d7202ca9b426a02a06a) · Merge pull request #69 from ybz21/feat/overview-order-file-ctxmenu-agpl
+- `2026-07-09` · [`96818277`](https://github.com/ybz21/Roami/commit/9681827763e3b27976fa709790acc658ba165c46) **refactor** · refactor(install): install.sh 改为「下载二进制 + systemd 常驻」，源码构建并入 start.sh
+- `2026-07-09` · [`1d39067d`](https://github.com/ybz21/Roami/commit/1d39067db3dad4ee142eb056370d19b7e1f47d85) **docs** · docs(install): 部署文档对齐新模型（install.sh 装二进制+服务，源码走 start.sh --dev）
+- `2026-07-09` · [`49d7cfed`](https://github.com/ybz21/Roami/commit/49d7cfed34d6524ada694954e3ed436d0103e1ee) **fix** · fix(quality): 密钥扫描只看新增行，修 frp 文档占位误报
+- `2026-07-09` · [`e40dbc9b`](https://github.com/ybz21/Roami/commit/e40dbc9b6589997bbff1b85cac714faa102e77a5) · Merge pull request #70 from ybz21/feat/roam-config-and-packaging
+- `2026-07-09` · [`5847fd57`](https://github.com/ybz21/Roami/commit/5847fd5777b5e5e9192e61e7efd5bfa31075b053) **fix** · fix(install): 支持 prerelease 下载解析 + 自动装 tmux
+- `2026-07-09` · [`4fc3e947`](https://github.com/ybz21/Roami/commit/4fc3e947bebbd18442d9c6caad38b75bebe12564) **fix** · fix(ci): 修复 release 的 chrome 打包路径 + prerelease 自动标记 · `v0.1.0-rc.1`
+- `2026-07-09` · [`cc10a238`](https://github.com/ybz21/Roami/commit/cc10a2386bc9f6a6e68c06580565e5a046438f34) **docs** · docs(install): 「服务器」措辞改为「24 小时常驻的机器」
+- `2026-07-09` · [`70115872`](https://github.com/ybz21/Roami/commit/701158721da461b0e26b8d679969c1174cddc5ca) **feat** · feat(install): 安装时 best-effort 装 Chromium（浏览器镜像页依赖）
+- `2026-07-09` · [`2f8f15d7`](https://github.com/ybz21/Roami/commit/2f8f15d71f6682dbe555bbd20b0a54b0e3446514) **feat** · feat(overview): 首页 slogan 改为「随时随地，控制你的电脑干活」
+- `2026-07-09` · [`082a9b37`](https://github.com/ybz21/Roami/commit/082a9b37fc4d3b80339c9adc3d76ee7e41676c83) **feat** · feat: slogan 体现 AI + install.sh 安装 adb（手机镜像依赖）
+- `2026-07-09` · [`5381fd33`](https://github.com/ybz21/Roami/commit/5381fd331d730df4018d48726c796aed0cde7e6c) **feat** · feat: macOS launchd 部署 + 关于页 roam 版本与检测更新 · `v0.1.0-rc.2`
+- `2026-07-09` · [`a8521d73`](https://github.com/ybz21/Roami/commit/a8521d7351e88b8f99716974411a479f1a6d8f37) **fix** · fix(web): 手机端对话上传图片报 NO\_FILE + 图片统一走 /tmp 并插入绝对路径
+- `2026-07-09` · [`396e371f`](https://github.com/ybz21/Roami/commit/396e371fe01602d2c72dc0f8bbb7965136f51595) · Merge pull request #71 from ybz21/fix/mobile-chat-image-upload
+- `2026-07-09` · [`652cce8e`](https://github.com/ybz21/Roami/commit/652cce8edfdd80b8cdfcb782dfafeb5f42b6fe76) **fix** · fix(install): 服务改用 enable + restart，支持重跑升级
+- `2026-07-09` · [`021c4fbd`](https://github.com/ybz21/Roami/commit/021c4fbdca0dc7d471c9ef5d0a077faf00e89950) **fix** · fix(web): 手机端对话页布局优化——输入区竖排、工具栏横滑、禁下拉刷新
+- `2026-07-09` · [`99698780`](https://github.com/ybz21/Roami/commit/99698780fa2ab45b4456ae407fa609ebd0615d49) **fix** · fix(about): 版本号显示真实值 + 检测更新走后端代理（优雅降级）
+- `2026-07-09` · [`e8e9c61a`](https://github.com/ybz21/Roami/commit/e8e9c61a4f01260c113a3619b936d3d22e7f2fdf) **fix** · fix(ci): release 自动生成说明（generate\_release\_notes）
+- `2026-07-09` · [`5c1cd85c`](https://github.com/ybz21/Roami/commit/5c1cd85c870ab0cba4d9d0675a86a9f8520271a2) · Merge pull request #72 from ybz21/feat/mobile-chat-layout
+- `2026-07-10` · [`398d62c1`](https://github.com/ybz21/Roami/commit/398d62c16d42ac52e7d59c2a44034e8b8da5f632) **fix** · fix(web): 手机端/桌面 tab 可拖入另一分栏——加触屏拖拽+接盘覆盖层+点按菜单
+- `2026-07-10` · [`57188259`](https://github.com/ybz21/Roami/commit/57188259d2a9be24fddad78e1a13c1664afe8e09) · Merge pull request #73 from ybz21/feat/mobile-chat-layout
+- `2026-07-10` · [`12cb9fed`](https://github.com/ybz21/Roami/commit/12cb9fedff2955cc52b7a10ea5129f8b871c6079) **fix** · fix(web): 终端拖入系统文件走上传注入(不再新开标签) + 粘图去重
+- `2026-07-10` · [`38b4a1dd`](https://github.com/ybz21/Roami/commit/38b4a1dd1d28916e28d259768ef2b22d0abd0116) · Merge pull request #74 from ybz21/fix/term-file-drop-and-paste-dup
+- `2026-07-10` · [`73c811cf`](https://github.com/ybz21/Roami/commit/73c811cf511dc1464acfa2d70cde1c8768f218d9) **fix** · fix(browser): 切画质不再重连，根除切档时画面跳/页面忽大忽小
+- `2026-07-10` · [`289e0fe4`](https://github.com/ybz21/Roami/commit/289e0fe47a44b28522886b5e81391ae8cc173b29) · Merge pull request #75 from ybz21/fix/browser-auto-quality-jitter
+- `2026-07-11` · [`bb2fbd1f`](https://github.com/ybz21/Roami/commit/bb2fbd1fb425bb2d4512aa08490abcb5eec5556d) **fix** · fix(browser): 镜像视口稳定性三连修 + 三层设计文档
+- `2026-07-11` · [`2e394fc8`](https://github.com/ybz21/Roami/commit/2e394fc8e02c1e55c2dc27afc716fe7abcdc226b) · Merge pull request #76 from ybz21/fix/browser-mirror-viewport-stability
+- `2026-07-11` · [`d9c527ba`](https://github.com/ybz21/Roami/commit/d9c527ba23e86039d76d85ca26d9541c07694e07) **fix** · fix(browser): 降低补帧带宽并修正裁切坐标
+- `2026-07-11` · [`4bd0c1dc`](https://github.com/ybz21/Roami/commit/4bd0c1dc7a630c90b16f87b9d0c5eb6c166b787b) **feat** · feat(plugin): 内置插件支持卸载/恢复——软删 tombstone 防 SyncBuiltins 复活
+- `2026-07-11` · [`e14ae67e`](https://github.com/ybz21/Roami/commit/e14ae67eee8daefe4e3604d34bf848cb0086a9c6) **fix** · fix(web): 拖文件到对话插入@引用 + HTML 预览支持同目录相对引用
+- `2026-07-11` · [`ca8973d0`](https://github.com/ybz21/Roami/commit/ca8973d005b49f007bcf76a7bc41df18b9fc9cf8) · Merge pull request #77 from ybz21/fix/browser-mirror-viewport-stability
+- `2026-07-12` · [`b97e5a08`](https://github.com/ybz21/Roami/commit/b97e5a0868f201e7cb0ab5b1e52724b1c5339ecf) · Merge pull request #78 from ybz21/feat/plugin-uninstall
+- `2026-07-12` · [`5b2e7f5d`](https://github.com/ybz21/Roami/commit/5b2e7f5dc9d07e5dc14c77fcc5c7980f4e03de35) · Merge pull request #79 from ybz21/feat/file-panel-drag-preview
+- `2026-07-12` · [`73cabd2c`](https://github.com/ybz21/Roami/commit/73cabd2c1cfe1ec14233b807b1e16680831f31b3) **chore** · chore(cli): 从 help 移除旧任务编排块，与界面统一
+- `2026-07-12` · [`c7669a49`](https://github.com/ybz21/Roami/commit/c7669a494398d7b14cd9d68ff3cc73fe631a95a4) **chore** · chore(cli): 干掉旧任务编排命令入口
+- `2026-07-12` · [`10a83cf5`](https://github.com/ybz21/Roami/commit/10a83cf5fbcc5f9d26ddd0d1d389cec7ceaa9a94) · Merge pull request #80 from ybz21/chore/drop-legacy-spawn-help
+- `2026-07-12` · [`09d66506`](https://github.com/ybz21/Roami/commit/09d66506675e6e3d8d340eec0d56a0b27e77b946) **docs** · docs(design): worktree 管理设计 v0.5 + 全套页面 mockup
+- `2026-07-12` · [`1c4c83b4`](https://github.com/ybz21/Roami/commit/1c4c83b47875cade61b4405f3af5615a5f0081b0) **feat** · feat(cli): subSession 原语——fork/children/parent/ls --tree/kill --cascade
+- `2026-07-12` · [`523eb780`](https://github.com/ybz21/Roami/commit/523eb7808e7cf376e9f51ed1764aba8cf9c95c21) **feat** · feat(backend): Worktree 领域服务 + 组合 WorktreeSession API
+- `2026-07-12` · [`f8c09959`](https://github.com/ybz21/Roami/commit/f8c09959f94c36eb5f6b499e4d67d3818ae442d2) **feat** · feat(frontend): worktree 管理三界面——W1 分支卡/W4 管理抽屉/W7 关闭三选一
+- `2026-07-12` · [`c4caa5b7`](https://github.com/ybz21/Roami/commit/c4caa5b7cb9ba52099a5cf68c5275960e49e433c) **feat** · feat(frontend): 会话列表显示 worktree 归属——讲清 session↔worktree 关系
+- `2026-07-12` · [`86b28405`](https://github.com/ybz21/Roami/commit/86b28405e3fcdf6b1ba1ffebcda875d5d337bd9d) **feat** · feat(frontend): W2 会话列表仓库分组——worktree 会话挂在仓库组头下
+- `2026-07-12` · [`b3abd869`](https://github.com/ybz21/Roami/commit/b3abd869d98634f3741d99340040e9b03112b489) **feat** · feat(frontend): W2 对齐——⎇ 紧跟会话名/外部标识/组头仓库全貌计数/手机图标化
+- `2026-07-12` · [`73d18b79`](https://github.com/ybz21/Roami/commit/73d18b7961b0b1aece87085c9ca25ee771a22756) **feat** · feat(frontend): W1 交互修订——「在哪干活」三选一取代 worktree 复选框
+- `2026-07-12` · [`765c3202`](https://github.com/ybz21/Roami/commit/765c3202712d23fc79d9ab1b6dfeba9bf306ba7d) **feat** · feat(frontend): W1 prompt-first 派活——自然语言主输入,名字/分支全派生
+- `2026-07-12` · [`ea38cde6`](https://github.com/ybz21/Roami/commit/ea38cde64ce32a4fb72cae5c5509db1757223b0d) **feat** · feat(web): W3 Git 面板 worktree 态——对比 base + 合并操作条 + 管理入口
+- `2026-07-12` · [`a2eb3f4b`](https://github.com/ybz21/Roami/commit/a2eb3f4b9fd199b9dcf5f745b7549154c5f67d17) **fix** · fix(frontend): W1 名称回归一等输入——短名可留空,需求不再回填长串
+- `2026-07-12` · [`71fe1431`](https://github.com/ybz21/Roami/commit/71fe1431f09f06323efa8f39ed36bb61f3b85e11) **docs** · docs(design): mockup 收敛——删除未采用的 v2 视觉稿,v1 对齐当前实现
+- `2026-07-12` · [`42e8236e`](https://github.com/ybz21/Roami/commit/42e8236e98e2dcb8dd49964fabe70642d5e21898) **docs** · docs(design): mockup 图纸化重制——产品 token 忠实 + 交付图纸展台
+- `2026-07-12` · [`20097768`](https://github.com/ybz21/Roami/commit/200977688037df750a742df265bae9c539a975fe) **feat** · feat(worktree): 建会话流程反转 + W5/W6 竞赛落地
+- `2026-07-12` · [`b9c759ac`](https://github.com/ybz21/Roami/commit/b9c759ac0c72407ceaed72c4d9ea58a7687d1b05) **docs** · docs(design): worktree 设计 v0.6——流程反转 + W5/W6 落地对齐
+- `2026-07-12` · [`2698acd2`](https://github.com/ybz21/Roami/commit/2698acd254b13ac1f016a2a3dd4550a8f0372721) **fix** · fix(web): 拖文件后中文打字不再重放 @路径——掐掉 drop 灌进 xterm 隐藏输入框的残值
+- `2026-07-12` · [`c05aca1b`](https://github.com/ybz21/Roami/commit/c05aca1bde2c62420cffb2e7c017528c6cd225c1) · Merge pull request #82 from ybz21/roam/fix-file-drag
+- `2026-07-12` · [`d0eca038`](https://github.com/ybz21/Roami/commit/d0eca038ebe738a88ab170572a4682f0d4e08959) **fix** · fix(worktree): W1 顺序重排 + base 缺省本地主干 + 占位分支去 roam/ 前缀
+- `2026-07-12` · [`07f85431`](https://github.com/ybz21/Roami/commit/07f85431661ee673f9f02f74dff157fe9b285716) **docs** · docs(design): 交互修订 5 落档——W1 顺序/base 主干缺省/分支无前缀,mockup 同步
+- `2026-07-12` · [`1a6f79f8`](https://github.com/ybz21/Roami/commit/1a6f79f801ff00dcfed1052038957eab7f53d57d) **fix** · fix(worktree): 服务发起的提交不再依赖环境 git 身份（CI 修复）
+- `2026-07-12` · [`cb91be91`](https://github.com/ybz21/Roami/commit/cb91be91f03f5d00744e6641a765ab60ec37071e) · Merge pull request #81 from ybz21/feat/worktree-m1
+- `2026-07-12` · [`f6d7f25c`](https://github.com/ybz21/Roami/commit/f6d7f25c3553b98541d40f5f43076751162f3929) · Merge pull request #83 from ybz21/feat/worktree-m2
+- `2026-07-12` · [`52635529`](https://github.com/ybz21/Roami/commit/52635529714cc6d86464d1463ebb6ec2d304a98a) **fix** · fix(web): Worktree 管理抽屉不再被 Git 面板盖住
+- `2026-07-12` · [`95eac2fa`](https://github.com/ybz21/Roami/commit/95eac2faad565861426b4b35cd06f324b0c182df) **feat** · feat(session): 派生子会话 UI + W2 父子树（F 期收尾）
+- `2026-07-13` · [`d87d5fb5`](https://github.com/ybz21/Roami/commit/d87d5fb5f8afa85e4570810353cd655366eba727) **fix** · fix(frontend): 派生弹窗置灰原因明文——父目录非 git 仓库时说清为何只能父目录
+- `2026-07-13` · [`5a60d8c5`](https://github.com/ybz21/Roami/commit/5a60d8c58354be3fada36fb5d23207406a5af84b) **feat** · feat(frontend): 派生表单与新建会话合一——三选一/命名约定 prompt 全同款
+- `2026-07-13` · [`9229f7bb`](https://github.com/ybz21/Roami/commit/9229f7bbcda633c65f0f9cf33d6d04a11e0d89a8) **fix** · fix(frontend): Worktree 入口按钮改「Worktree 管理」+ tooltip 说明用途
+- `2026-07-13` · [`f2fdc74c`](https://github.com/ybz21/Roami/commit/f2fdc74c1a895e62c2f2f5bb83efb41018b7d10d) **feat** · feat(worktree): W4 管理页重做——跨仓库总览 + 对比/进入/损失确认全套
+- `2026-07-13` · [`b839c17b`](https://github.com/ybz21/Roami/commit/b839c17b32d73f6d25fcd93c81d34211196dd210) **docs** · docs(design): W4 重做版落档——跨仓库总览/对比/损失确认/孤儿复活
+- `2026-07-13` · [`65694be6`](https://github.com/ybz21/Roami/commit/65694be6e00648d274d66bd0854a85444e0bb255) · Merge pull request #85 from ybz21/feat/worktree-fork-ui
+- `2026-07-13` · [`afdd0ad9`](https://github.com/ybz21/Roami/commit/afdd0ad9915c629440fa264ae6040229594f2818) **fix** · fix(terminal): 右键菜单前同步 active pane，修复关错窗格
+- `2026-07-13` · [`80113464`](https://github.com/ybz21/Roami/commit/801134646bf07bfebf5a3c791aff3f06aab6be0e) **fix** · fix(browser): WSL 下浏览器镜像强制无头 + 新增外部打开 Windows 浏览器
+- `2026-07-13` · [`a0404a52`](https://github.com/ybz21/Roami/commit/a0404a529a4d636291b94cd8241b0167383fe164) **fix** · fix(files): 文件预览标签栏改用容器内滚动，避免顶飞文件树 dock
+- `2026-07-14` · [`e6367bbd`](https://github.com/ybz21/Roami/commit/e6367bbda63dd6c9243e56c0519658f33fc77942) **fix** · fix(plugin): 自动互审陪跑会话挂到被陪跑会话名下(meta 记 parent)
+- `2026-07-14` · [`27bbdc7d`](https://github.com/ybz21/Roami/commit/27bbdc7d5c8a11e173b098db7849ca2cf5c40017) · Merge pull request #87 from Boiled-Water-zy/fix/file-tab-scroll
+- `2026-07-14` · [`c60498d0`](https://github.com/ybz21/Roami/commit/c60498d052509fffba8313801f4c2dfa7678968b) · Merge pull request #89 from ybz21/fix/fork-session-auto-review-group
+- `2026-07-14` · [`cab9ca44`](https://github.com/ybz21/Roami/commit/cab9ca44c62dd5a002cbd7a44eb11a67267e0bcc) **docs** · docs(design): 08 项目(Project)概念提案——仓库即项目 + composer + 任务统一投影
+- `2026-07-14` · [`0e7a0c5d`](https://github.com/ybz21/Roami/commit/0e7a0c5d9e62f13e9caa76bfa2554328ced1a9b4) **docs** · docs(design): 08 修订——knownRepos 弱台账/finish 组合 API/溯源承诺收窄
+- `2026-07-14` · [`650bc0d3`](https://github.com/ybz21/Roami/commit/650bc0d3008ef80617b2e86b22f76dcb93ad99fa) **docs** · docs(design): 08 修订二——finish 冻结校验 expectedHead + 退场只看 worktree 存在性
+- `2026-07-14` · [`ed635b9a`](https://github.com/ybz21/Roami/commit/ed635b9acfb5ef2659a84fec12262f9e59bd2b77) **feat** · feat(files): 支持递归删除非空文件夹(recursive=1),前端确认弹窗警告连同内容删除
+- `2026-07-14` · [`0158cc52`](https://github.com/ybz21/Roami/commit/0158cc522ad087696e43320c9dda4d184e4ac7b0) **docs** · docs(design): 08 增补 §5 后端设计——project 纯读模型层落点/数据文件/聚合/finish 编排
+- `2026-07-14` · [`3daa2c52`](https://github.com/ybz21/Roami/commit/3daa2c52ca176ab16d596725f124ef6bc789a44c) **fix** · fix(files): 递归删除先原子改名+inode校验防TOCTOU误删; feat: 右键菜单补新建文件/目录、移动到、复制路径
+- `2026-07-14` · [`6f800046`](https://github.com/ybz21/Roami/commit/6f8000468dd8b05536dd42d0337eed6fb7f4e480) **fix** · fix(files): 修复互审 j999143 三处问题(move跨设备TOCTOU/复制残留/还原失败吞错)
+- `2026-07-14` · [`9cc1fbf1`](https://github.com/ybz21/Roami/commit/9cc1fbf1c2d64aa194a95dea72bf0a0628ef8ae2) **fix** · fix(files): 修复互审 j999332 两处问题(复制/移动失败清理可能误删并发创建的目标)
+- `2026-07-14` · [`28dd0c7b`](https://github.com/ybz21/Roami/commit/28dd0c7b58cd2c74deec28990f1fea19810fc97a) · Merge pull request #86 from Boiled-Water-zy/fix/pane-close-target
+- `2026-07-14` · [`6f608cb3`](https://github.com/ybz21/Roami/commit/6f608cb322e0eb82d06d17177fbcb67c776e1592) · Merge pull request #88 from Boiled-Water-zy/fix/wsl-browser-headless-and-external
+- `2026-07-14` · [`b2242284`](https://github.com/ybz21/Roami/commit/b2242284b0a258c52d86bb4b93f47c43b08da644) **docs** · docs(design): 08 P4 Worktree×命令行图版 + 任务驱动定位 + 蜂群编队入项目
+- `2026-07-14` · [`8e9e2cc3`](https://github.com/ybz21/Roami/commit/8e9e2cc3a4327cbf183ee838e244055e16c062b2) · Merge pull request #90 from ybz21/fix/delete-non-empty-dir
+- `2026-07-14` · [`e8eb5256`](https://github.com/ybz21/Roami/commit/e8eb5256ab43db6c5ab0ca5ca2e906a06f7f7474) **docs** · docs(design): 08 P5 蜂群×项目——编队卡体现 + 项目语境发起动线
+- `2026-07-14` · [`d52d9bb7`](https://github.com/ybz21/Roami/commit/d52d9bb7c218b120ee62cda93b8127fd819b7279) **feat** · feat(worktree): 新建会话可基于远端分支建 worktree
+- `2026-07-14` · [`2290ffa6`](https://github.com/ybz21/Roami/commit/2290ffa62cbb2f6f516e3c4b1436b20c0ef28bc2) **fix** · fix(worktree): 远端分支列表改用 %(refname) 剥前缀，避免短名歧义漏分支
+- `2026-07-14` · [`768bb81a`](https://github.com/ybz21/Roami/commit/768bb81a9f06654fc148c29a8c0d6a2e48ad3c26) **feat** · feat(plugin): 主机监控内置插件(CPU/GPU/内存/磁盘/网络仪表盘) (#91)
+- `2026-07-14` · [`d694038e`](https://github.com/ybz21/Roami/commit/d694038e5dbfc9ea0db0393238a4f3afe2e2fd26) · Merge pull request #92 from ybz21/feat/worktree-from-remote-branch
+- `2026-07-14` · [`1c751d5f`](https://github.com/ybz21/Roami/commit/1c751d5f3152635ae90d7e306546d37fa361265c) **feat** · feat(project): 项目页 M1——仓库即项目、composer 开干、任务流投影
+- `2026-07-14` · [`5c1325ba`](https://github.com/ybz21/Roami/commit/5c1325ba72a32271423eddff30eadf79c8f3d6f6) **fix** · fix(project): 列表页按钮改「＋ 新项目」——新任务是项目内 composer 的动作
+- `2026-07-14` · [`03619ab1`](https://github.com/ybz21/Roami/commit/03619ab1e57a7872cb306e4e0724168dc2de659b) **feat** · feat(project): 项目升一等存储对象——显式创建/移除，与 session 解耦
+- `2026-07-14` · [`93d5376f`](https://github.com/ybz21/Roami/commit/93d5376fddce516d95fc80423949092d6c4751ee) **fix** · fix(project): 列表排序稳定化——活动只展示不参与排序，防轮询跳变
+- `2026-07-14` · [`0f1a1691`](https://github.com/ybz21/Roami/commit/0f1a169107a99809de8568050d26072359914f8f) **feat** · feat(project): P2 严格对齐图纸 + 项目与 git 解绑
+- `2026-07-14` · [`303d1ebd`](https://github.com/ybz21/Roami/commit/303d1ebd595088912189a733dd50e50bf2c30a05) **fix** · fix(project): 视觉收敛——绿点只给干活中的 agent,返回改面包屑按钮
+- `2026-07-14` · [`91f6942b`](https://github.com/ybz21/Roami/commit/91f6942b578e6d6712d250960007af6e87f75d68) **fix** · fix(project): 去掉装饰性 ⌂ 图标块与卡片名前缀
+- `2026-07-14` · [`799e40c9`](https://github.com/ybz21/Roami/commit/799e40c94a10dc4fff596bb9684d76907e4bb148) **fix** · fix(project): 删头部 Worktree 管理按钮(与 tab 冲突) + 窄屏布局修整
+- `2026-07-14` · [`5a506ba2`](https://github.com/ybz21/Roami/commit/5a506ba27387347bacf90a177a8b21b4454a1e8b) **style** · style(project): 页面整体精修——终端工业风、居中限宽、composer hero
+- `2026-07-14` · [`7aeee4ef`](https://github.com/ybz21/Roami/commit/7aeee4ef5d4daa2a07bd5d6ea38465f0a0cfb5cc) **feat** · feat(project): 项目重命名 + 头部「＋ 命令行」开纯 shell 会话
+- `2026-07-14` · [`0e33914f`](https://github.com/ybz21/Roami/commit/0e33914f584f413d2059470f4435c882f6ceade8) **feat** · feat(project): 导航去「会话」入口,项目页成唯一主入口
+- `2026-07-14` · [`1791fc85`](https://github.com/ybz21/Roami/commit/1791fc85f141b8d7423e73aa7720621444592f68) **docs** · docs(design): 09 蜂群×项目创建动线——表单产出上下文不产出结构
+- `2026-07-14` · [`a868896d`](https://github.com/ybz21/Roami/commit/a868896d96f9a489bf29d78ae53916f6d441c8f8) **feat** · feat(swarm): 项目里创建蜂群落地(09 S1)——上下文进开场白,编排权留给指挥
+- `2026-07-14` · [`a969fbd6`](https://github.com/ybz21/Roami/commit/a969fbd6948d79dd32d5fd4e22dfd35dc8f0f69a) **feat** · feat(project): P3 收尾抽屉 + finish 组合 API + 收尾留痕(M2)
+- `2026-07-14` · [`3e10dc9d`](https://github.com/ybz21/Roami/commit/3e10dc9de738867e46bc1a0c3fa192adfed3c965) **feat** · feat(swarm): 09 S2——无指挥修复入口 + 班子建议同步建看板卡
+- `2026-07-14` · [`06013937`](https://github.com/ybz21/Roami/commit/06013937c728c3f5d558f22ffd3e242462d875e3) **feat** · feat(swarm): 项目内蜂群完整投影——任务流 ⬡ 分组 + P5 帧一编队卡 + 给指挥发话
+- `2026-07-15` · [`1705c052`](https://github.com/ybz21/Roami/commit/1705c052e040a14a647d91cf828f219ac93016bb) **style** · style(pages): 项目/蜂群/文件/浏览器/手机 五页左上角与标题样式统一
+- `2026-07-15` · [`eb2b7eeb`](https://github.com/ybz21/Roami/commit/eb2b7eebca9e53bc0e4e16c204887a7bd7ea864f) **style** · style(pages): 浏览器页工具栏去自垫内边距——移动端与手机页原点对齐
+- `2026-07-15` · [`06d50f93`](https://github.com/ybz21/Roami/commit/06d50f93d958d92ba2164653157ded0488d847a3) **style** · style(browser): 旋转按钮移到清晰度组后并统一样式
+- `2026-07-15` · [`8a280ad3`](https://github.com/ybz21/Roami/commit/8a280ad368dd82a76bed4a953ad04a733943223c) **feat** · feat(nav): 左边栏撤掉「蜂群」——从项目编队 tab 进,深链与概览跳转保留
+- `2026-07-15` · [`7e7a691e`](https://github.com/ybz21/Roami/commit/7e7a691e8ddece4397f9e1881624128c6dcfbc47) **feat** · feat(project): 新建项目支持新建文件夹——目录不存在自动 MkdirAll,支持 ~ 展开
+- `2026-07-15` · [`cc7c555b`](https://github.com/ybz21/Roami/commit/cc7c555b81f1a0956b571df1a1e5a358f5539c85) **feat** · feat(project): 列表排序可选——名称(默认)/创建时间/最近活跃,置顶恒前
+- `2026-07-15` · [`fc341842`](https://github.com/ybz21/Roami/commit/fc341842c5315213b70ca1b08ce92fbb9b3e8be6) **docs** · docs(design): P6 概览重构图纸——项目为主的作战地图(提案待确认)
+- `2026-07-15` · [`04b70217`](https://github.com/ybz21/Roami/commit/04b70217cf8ae28c9fa76a5df511ac6f430569f1) **feat** · feat(term): 终端点按/单击直接移动输入光标
+- `2026-07-15` · [`89fe5f17`](https://github.com/ybz21/Roami/commit/89fe5f17bba4632f5bf11cf3490970324c3fc917) **feat** · feat(overview): 概览重构为项目为主的作战地图(P6 落地)
+- `2026-07-15` · [`c148d9ee`](https://github.com/ybz21/Roami/commit/c148d9eef28975706b3f8fcd0171cb75bfdc580d) · Merge pull request #93 from ybz21/feat/project-concept-design
+- `2026-07-15` · [`44d8e018`](https://github.com/ybz21/Roami/commit/44d8e018ee95cc9756012ef4475e77067a6fa3b4) **fix** · fix(project): git 子目录不再误入册——瞬时错误不当非 git,读时 Rekey 自愈
+- `2026-07-15` · [`4249c868`](https://github.com/ybz21/Roami/commit/4249c8683bfb04e21bac12f51508c41693b3d93f) **feat** · feat(term): 触摸选区对齐原生体验——长按选词/拖动扩选/手柄微调，桌面补中键粘贴
+- `2026-07-15` · [`6a0df17b`](https://github.com/ybz21/Roami/commit/6a0df17b5b30627ca98f9e3e75e273e142ade56b) **feat** · feat(mobile): 文件/插件页手机端改两级导航——列表页点击后详情以全屏二级页展开
+- `2026-07-15` · [`ebf68dac`](https://github.com/ybz21/Roami/commit/ebf68dac111d22eaaec78326870444df12dcf036) **fix** · fix(term): 窄屏 TUI 花屏错位可一键/自动重绘复原
+- `2026-07-15` · [`bc0bf4af`](https://github.com/ybz21/Roami/commit/bc0bf4af8d7ac39f4d7d6e782c5052a8a3532d67) · Merge pull request #96 from ybz21/feat/mobile-two-level-nav
+- `2026-07-15` · [`25327f30`](https://github.com/ybz21/Roami/commit/25327f30c54c59c9feb9f2153e2e06a232d9b6cb) · Merge pull request #95 from ybz21/fix/project-dir-canonical
+- `2026-07-15` · [`93a1b99c`](https://github.com/ybz21/Roami/commit/93a1b99c19272c3a52af59f8a780449ead2e000b) · Merge pull request #94 from ybz21/fix/input-tap-cursor
+- `2026-07-15` · [`4dd10a19`](https://github.com/ybz21/Roami/commit/4dd10a199e3287934c820721c5c2332a5199f3e8) **docs** · docs(readme): README 重写为项目为主叙事 + 全套截图重拍（P6 落地后）
+- `2026-07-16` · [`72c014c8`](https://github.com/ybz21/Roami/commit/72c014c8c4536b349d0f35639278d64434101fbc) · Merge pull request #97 from ybz21/docs/readme-project-centric
+- `2026-07-16` · [`2a91aa96`](https://github.com/ybz21/Roami/commit/2a91aa961a64b3ac19ae3388d6b77008465c5e37) **docs** · docs(design): 10 已合入检测与收尾图纸——远端 fetch + ancestry/cherry 判定，待收尾拆双态（提案待确认）
+- `2026-07-16` · [`f0a46e07`](https://github.com/ybz21/Roami/commit/f0a46e0725050d7656622ec7c11c75d552aca24d) **feat** · feat(worktree): 已合入检测——远端 fetch + ancestry/cherry 判定，待收尾拆双态(10 M1-M3)
+- `2026-07-16` · [`dde66c25`](https://github.com/ybz21/Roami/commit/dde66c25f0aee5c52f621d35d874d4ce25f4210a) **docs** · docs(design): 10 端点名对齐实现——/git/worktree/sync（避开 GitOp op=sync 撞名）
+- `2026-07-16` · [`5d607cec`](https://github.com/ybz21/Roami/commit/5d607cec84db16c5927c10e92f86ff947aa8bedf) **fix** · fix(worktree): W7 关闭弹窗吃合入信号——已合入时绿色定心丸+默认清理，本地再合并禁用
+- `2026-07-16` · [`bc477474`](https://github.com/ybz21/Roami/commit/bc477474aabe212a0dd154b6c1b1d18f5a794f9d) **fix** · fix(worktree): Remove 兜底半删残缺态——force 下 RemoveAll+prune 自愈，卡死可重试
+- `2026-07-16` · [`91830e6f`](https://github.com/ybz21/Roami/commit/91830e6ff1eec06ff0e8f68398d7ee9ef2c33914) · Merge pull request #98 from ybz21/docs/merge-detect-finish
+- `2026-07-16` · [`2f985c74`](https://github.com/ybz21/Roami/commit/2f985c746b7c1ca35508cec9ce3054f7036905d5) · Merge pull request #99 from ybz21/feat/merge-detect
+- `2026-07-16` · [`4ce19f8d`](https://github.com/ybz21/Roami/commit/4ce19f8d748f72cfa60fe60d9ab9a0b4348365a8) **fix** · fix(session): 最近活跃时间滞后——session\_activity 不跟踪后台会话输出
+- `2026-07-16` · [`7a993ebd`](https://github.com/ybz21/Roami/commit/7a993ebd80222e4663f63b3a06d8d53b1c59d3c1) **fix** · fix(swarm): 活跃检测漏加 = 精确匹配——死会话被同前缀陪跑会话冒名顶替
+- `2026-07-16` · [`9175de13`](https://github.com/ybz21/Roami/commit/9175de1307f75b4ff3cf225788c02e55133e7010) **fix** · fix(project): 项目列表绿点对齐设计 W2——agent 在跑才绿，不再拿 attach 当活跃
+- `2026-07-16` · [`ed0d14fb`](https://github.com/ybz21/Roami/commit/ed0d14fbf56b6f7c7460291b2a09abfcd3105609) · Merge pull request #100 from ybz21/fix/activity-detection
+- `2026-07-16` · [`9315fd00`](https://github.com/ybz21/Roami/commit/9315fd008ae310447579f32270cc04c85f20d40d) **feat** · feat(project): 列表补上黄=待输入，补齐设计 W2 三态
+- `2026-07-16` · [`938df05d`](https://github.com/ybz21/Roami/commit/938df05dcf2583a91d990a3404bea8e1275e9ec5) **fix** · fix(worktree): 空 worktree 秒判「已合入」——S1 祖先前置「本地 base 有独占提交」
+- `2026-07-16` · [`39f29771`](https://github.com/ybz21/Roami/commit/39f297714ae0bd6574978171b3ecaff48d97d431) · Merge pull request #101 from ybz21/fix/worktree-false-merged
+- `2026-07-16` · [`69f9e3ce`](https://github.com/ybz21/Roami/commit/69f9e3ce661f521aae44dd652d5157c6c87f28c5) **feat** · feat(plugin): 互审轮数可配置——设置页 rounds + --rounds 覆盖，不再写死 3
+- `2026-07-17` · [`56f55af2`](https://github.com/ybz21/Roami/commit/56f55af239d52e039eb19dd8daf87696a305f139) · Merge pull request #104 from ybz21/feat/review-rounds-config
+- `2026-07-17` · [`a5ac761f`](https://github.com/ybz21/Roami/commit/a5ac761f3fe63616fe5550834d2cb377dbf99d4b) **feat** · feat(plugin): 定时任务插件 roam.cron (#105)
+- `2026-07-17` · [`b464bdb7`](https://github.com/ybz21/Roami/commit/b464bdb733056d4598ff480eb87482ae094cf8e8) **fix** · fix(worktree): 详情页三桶判据对齐后端概览——FF 合入孤儿也进「可清理」 (#102)
+- `2026-07-17` · [`3198c30f`](https://github.com/ybz21/Roami/commit/3198c30f3cb66f50f7ae6175747d555def0fe101) **refactor** · refactor(worktree): 合入判定改横向可扩展信号链 + ownWork 用分叉点(StartOid)守空 (#103)
+- `2026-07-17` · [`fdab3737`](https://github.com/ybz21/Roami/commit/fdab3737cf16c5ee0702a580ee89adaf4c0f4898) **fix** · fix(project): 项目页删会话不关 tab——补 closeTerm 把终端标签一起清掉
+- `2026-07-17` · [`47f13776`](https://github.com/ybz21/Roami/commit/47f137762818b4a4de5db10d21529e07c205cdea) · Merge pull request #106 from ybz21/fix/delete-session-close-tab
+- `2026-07-17` · [`eb3a1325`](https://github.com/ybz21/Roami/commit/eb3a13250eee855db8a603164c71eebf3fdbfcb0) **fix** · fix(session): 改名后子会话变孤儿——rename 两条路径都漏同步 meta parent
+- `2026-07-17` · [`9f0b4464`](https://github.com/ybz21/Roami/commit/9f0b4464230524a7c5b71b63b6fc606ad9e05f44) · Merge pull request #107 from ybz21/fix/session-derived-independence
+- `2026-07-17` · [`567de12e`](https://github.com/ybz21/Roami/commit/567de12e3205970652f22a42e67e1bc3b77c53be) **feat** · feat(project): 会话状态细化——已提交/已推送/已合入拆成三态
+- `2026-07-17` · [`8781a643`](https://github.com/ybz21/Roami/commit/8781a6435ceb6e3b5938964c7c5714af6d81f5e5) · Merge pull request #108 from ybz21/feat/session-status-stages
+- `2026-07-17` · [`e086ea24`](https://github.com/ybz21/Roami/commit/e086ea24f15459748a2fa7d5ea453f64f9abb21d) **feat** · feat(plugin): 定时任务插件加可视化配置——cron 编辑器 + 拉Agent/跑命令两类动作
+- `2026-07-17` · [`c675d438`](https://github.com/ybz21/Roami/commit/c675d438c82ad349ffc3449334732554bbee4e5b) **feat** · feat(plugin): 定时任务插件加可视化配置——cron 编辑器 + 拉Agent/跑命令两类动作 (#109)
+- `2026-07-17` · [`6af71e57`](https://github.com/ybz21/Roami/commit/6af71e572edbfda325d8cbb31a0d5f6a7e49d168) **fix** · fix(project): 非 git 项目详情页只列 top2——补 cwd 前缀认领把会话补全
+- `2026-07-17` · [`c32b1d65`](https://github.com/ybz21/Roami/commit/c32b1d6534a71a77207420743a8d0a63eb8c4c5a) · Merge pull request #110 from ybz21/fix/nongit-project-detail-missing-sessions
+- `2026-07-17` · [`181cb8eb`](https://github.com/ybz21/Roami/commit/181cb8eb9ee9ef4807c546f5ccb8431c0521ba8a) **docs** · docs(cluster): 多节点横向扩展设计三件套——概念/后端落地/前端交互 + 页面原型
+- `2026-07-17` · [`497dc109`](https://github.com/ybz21/Roami/commit/497dc10927732a603389feccb320a3b769917185) **fix** · fix(phone): 切来源清空地址——从本地 redroid 切「真机」不再带走 localhost:5555
+- `2026-07-17` · [`47ca52ff`](https://github.com/ybz21/Roami/commit/47ca52ff975ac6ca5e5e8abf556ed84321c3816e) **feat** · feat(project): 项目详情「开干」需求框支持传图片——Ctrl+V 粘贴/📎 选图
+- `2026-07-17` · [`7c9b1852`](https://github.com/ybz21/Roami/commit/7c9b1852f216113e6e2865807da609850cb7ae1e) · Merge pull request #112 from ybz21/fix/phone-connect-device-switch
+- `2026-07-17` · [`d440d77e`](https://github.com/ybz21/Roami/commit/d440d77e17b55c87a795dae78c6a2f325093dac3) · Merge pull request #111 from ybz21/feat/project-detail-image-paste
+- `2026-07-17` · [`8286ae1a`](https://github.com/ybz21/Roami/commit/8286ae1aea03da96503a7f15458cce2a3fd4a98a) **feat** · feat(cluster): 后端横向扩展数据面——两模式 + yamux 隧道 + Broker 反代 + 节点注册
+- `2026-07-17` · [`e0768edf`](https://github.com/ybz21/Roami/commit/e0768edf32ea6c3dd75629c8e6a42eda90752c82) **fix** · fix(project): 嵌套非 git 项目任务数外层0里层1——认领改最长前缀去随机漂移
+- `2026-07-17` · [`bdf27c9d`](https://github.com/ybz21/Roami/commit/bdf27c9d4f1a6b3878ec46a9f34618333c482035) **fix** · fix(phone): 真机脏配置自愈——不再带 redroid 地址/平板分辨率致连不上+物理屏错乱
+- `2026-07-17` · [`14ef2623`](https://github.com/ybz21/Roami/commit/14ef2623461e90d625cd8e5b2c645e5b6dddafec) · Merge pull request #115 from ybz21/fix/phone-device-self-heal
+- `2026-07-17` · [`71cad899`](https://github.com/ybz21/Roami/commit/71cad8994ee7cb4b53e738675763dd803ee6d660) **revert** · revert(cluster): 撤回直推 main 的后端提交，改到分支走 PR review
+- `2026-07-17` · [`ad715379`](https://github.com/ybz21/Roami/commit/ad7153796421cf66b22a6fee4c3077b880bcb62e) · Merge pull request #114 from ybz21/fix/temp-project-task-count-mismatch
+- `2026-07-18` · [`406e9fdc`](https://github.com/ybz21/Roami/commit/406e9fdc3f403a489c288b6f4ddfbb4d028c139c) **fix** · fix(term): 备用屏点按只移光标不发↑↓——消除稍点偏就上翻/下翻 (#117)
+- `2026-07-18` · [`15e010f2`](https://github.com/ybz21/Roami/commit/15e010f2ecbdb47e5d8a744b35f91d5bfad1036a) **feat** · feat(project): 项目详情加文件浏览 Tab + 命令行可开多个
+- `2026-07-18` · [`18b36cb2`](https://github.com/ybz21/Roami/commit/18b36cb232accd6e489ed049e02a24b4300d08eb) · Merge pull request #118 from ybz21/feat/project-file-browser
+- `2026-07-18` · [`5d1b4e04`](https://github.com/ybz21/Roami/commit/5d1b4e0474a0194fd53680738db925eab98232cd) **feat** · feat(overview): 概览页加 项目/会话 切换 tab，选择记进偏好
+- `2026-07-18` · [`96775bee`](https://github.com/ybz21/Roami/commit/96775bee0d0694b4c8bac376d8d02c943ea807a7) · Merge pull request #120 from ybz21/feat/overview-proj-sess-tab
+- `2026-07-18` · [`1bff37c7`](https://github.com/ybz21/Roami/commit/1bff37c79563665cd23e93efc843f18250885135) **fix** · fix(worktree): 缺省基准跟随远端主干最新，新 worktree 不再从旧 main 起步 (#119)
+- `2026-07-20` · [`0b583ad9`](https://github.com/ybz21/Roami/commit/0b583ad9a05ba847e2be344cfae506cef29bc414) **feat** · feat(p2p): 后端 WebRTC 直连传输（pion 信令/穿透/文件/埋点）
+- `2026-07-20` · [`e3a2f679`](https://github.com/ybz21/Roami/commit/e3a2f6790fa51a876ac3b2a25e7cdf02a12ef860) **feat** · feat(p2p): 前端 WebRTC 直连下载 + 状态角标 + 埋点
+- `2026-07-20` · [`6449b188`](https://github.com/ybz21/Roami/commit/6449b1883d568ef5b4029bd803c1776d9e4ca2b1) **docs** · docs(p2p): 直连传输设计/MVP/技术拆解 + frp 部署
+- `2026-07-20` · [`de18dde6`](https://github.com/ybz21/Roami/commit/de18dde6b5e1bc20e79b590297d332b6dbcad570) **feat** · feat(p2p): 设置页加 P2P 直连下载开关（网络抖动可关，回退 frp）
+- `2026-07-20` · [`20aadccc`](https://github.com/ybz21/Roami/commit/20aadccc34401a04aa1353be9886b878f742a231) **feat** · feat(p2p): 后端通用传输 — 共享 PC 模块 + 链路 + 镜像 DataChannel
+- `2026-07-20` · [`7bb9d1e3`](https://github.com/ybz21/Roami/commit/7bb9d1e3f13c171942e42f730e205574dbaa71a9) **feat** · feat(p2p): 前端 P2P 传输库 + 左边栏全局状态 + 镜像迁 P2P
+- `2026-07-20` · [`031f9a2c`](https://github.com/ybz21/Roami/commit/031f9a2c80bcd6ab5ab3e5b1f896842ea500b180) **feat** · feat(p2p): 文件下载全走 P2P + 流式落盘（picker/StreamSaver/Blob 三级）
+- `2026-07-20` · [`961c0f7c`](https://github.com/ybz21/Roami/commit/961c0f7c60043e819354b26dbe041bea2f448c9d) **docs** · docs(p2p): 通用传输实施计划（三类 PC 拥塞隔离 + 分阶段迁移）
+- `2026-07-20` · [`c76a3272`](https://github.com/ybz21/Roami/commit/c76a3272d9b8a3c62ea53b5c1788be06f4f315be) **fix** · fix(p2p): 行内文件下载按钮走 P2P（不再直连 frp file/raw）
+- `2026-07-20` · [`ba7f6be4`](https://github.com/ybz21/Roami/commit/ba7f6be46ef43db52bbabb08a9404af7311046ef) **feat** · feat(p2p): 左边栏状态改 SVG logo + 字号对齐 + 实时 RTT
+- `2026-07-20` · [`2996254d`](https://github.com/ybz21/Roami/commit/2996254d83ca58ac52d5c366058d587e1610e7dd) **refactor** · refactor(p2p): 设置项「P2P 直连下载」改名为「P2P 直连」（通用总开关）
+- `2026-07-20` · [`d6abc654`](https://github.com/ybz21/Roami/commit/d6abc65411a75d3892755991ec3a4d755b8b5af7) **feat** · feat(p2p): 设置页加 STUN 服务器 + 连接超时配置项（带默认值）
+- `2026-07-20` · [`c4578fa3`](https://github.com/ybz21/Roami/commit/c4578fa3f709b13f37cea711f78a85e068415e1c) **feat** · feat(p2p): STUN 输入框预填服务端当前默认值
+- `2026-07-20` · [`cfafda48`](https://github.com/ybz21/Roami/commit/cfafda4843b8687b07336c0971e3576f7b03b317) **fix** · fix(frontend): 浏览器镜像面板支持中文输入法输入
+- `2026-07-20` · [`13ff1544`](https://github.com/ybz21/Roami/commit/13ff15444c067bf3a5401277440411079d30eb41) **feat** · feat(p2p): 手机镜像迁到 P2P（media DataChannel + WS 回退）
+- `2026-07-20` · [`4af113a4`](https://github.com/ybz21/Roami/commit/4af113a4d5f4c2d33fa35884b92d560a0f68e3c6) **fix** · fix(p2p): 修复 PR #121 评审 P0/P1 + 改非trickle + 协议测试 + 合并前清理
+- `2026-07-20` · [`85f9f1f6`](https://github.com/ybz21/Roami/commit/85f9f1f65e2f472a2369a035e07df42dce584e14) **fix** · fix(p2p): ICE 候选收集(gather)上限可配、默认 30s，避免慢网 srflx 丢失
+- `2026-07-20` · [`9109ea46`](https://github.com/ybz21/Roami/commit/9109ea462f868d8ebc417c1cf4306eb9cf4e3058) **docs** · docs(p2p): 记录真机实测结论——手机蜂窝 CGNAT + 服务器无 IPv6 = 零成本无解
+- `2026-07-20` · [`aa518e5c`](https://github.com/ybz21/Roami/commit/aa518e5cda1e0ce578cf2087d46b33853efffaed) **feat** · feat(p2p): SCTP 缓冲调大 + 下载测速自适应回退，跨网被限速时自动切回 frp
+- `2026-07-21` · [`07c72cb8`](https://github.com/ybz21/Roami/commit/07c72cb8eaa1d24a899a086cd40c9c63dcd934b0) · Merge pull request #122 from Boiled-Water-zy/fix/browser-mirror-ime-input
+- `2026-07-21` · [`c18136ea`](https://github.com/ybz21/Roami/commit/c18136ead31b62ff6cbc093e4ea5c90ed761ebd9) · Merge pull request #121 from ybz21/feat/p2p-direct-transfer
+- `2026-07-21` · [`20fd165c`](https://github.com/ybz21/Roami/commit/20fd165c8b48dc7fa8b5c07e95f69efb425637d9) · Merge remote-tracking branch 'origin/main' into roam/fix-worktree-drawer-zindex
+- `2026-07-21` · [`fa6f4b08`](https://github.com/ybz21/Roami/commit/fa6f4b082c32297127f26999efea5f4c751d6fa5) · Merge pull request #84 from ybz21/roam/fix-worktree-drawer-zindex
+- `2026-07-21` · [`46c770d0`](https://github.com/ybz21/Roami/commit/46c770d0290eda2184829ff07ae40e8d3254b301) · Merge pull request #113 from ybz21/feat/cluster-multi-node-design
+- `2026-07-27` · [`6052e810`](https://github.com/ybz21/Roami/commit/6052e810ea87692a8e6c9837c6830849182f2228) **fix** · fix(chat): AskUserQuestion 渲染成可读问题卡片
+- `2026-07-27` · [`e526729c`](https://github.com/ybz21/Roami/commit/e526729c8497d8c5c6df3afd55fd38ee33575c11) · Merge pull request #124 from ybz21/fix/askuserquestion-render
+- `2026-07-27` · [`871f4ad3`](https://github.com/ybz21/Roami/commit/871f4ad353b54b3ddb0854b0aa6230418aad831d) **fix** · fix(swarm): 给蜂群持久化工作目录 dir，修 CLI 建的群在项目视图不显示
+- `2026-07-27` · [`a9615fb8`](https://github.com/ybz21/Roami/commit/a9615fb8c546ab021f1e081a389b9a2e2840f2d6) **feat** · feat(files): 文件行悬浮显示完整名字，预览悬浮窗加宽 (#127)
+- `2026-07-28` · [`924d402e`](https://github.com/ybz21/Roami/commit/924d402e985f4e8a4a0a80ce344f3ad2408be857) · Merge pull request #126 from ybz21/fix/swarm-project-attribution-dir
+- `2026-07-28` · [`36b74df0`](https://github.com/ybz21/Roami/commit/36b74df0aff5cbb806a987a546e974baef8a76a1) **fix** · fix(project): 会话归属在创建时钉死，cd 走不再掉出项目
+- `2026-07-28` · [`b29d7736`](https://github.com/ybz21/Roami/commit/b29d7736e86975c2ba5a11a2b1fed00ac9290b15) · Merge pull request #128 from ybz21/fix/session-project-sticky-home
+- `2026-07-28` · [`a906030b`](https://github.com/ybz21/Roami/commit/a906030b8b8b262d7308a1fe64a0cbb66cdc6025) **feat** · feat: 给 project / session / 记录一套稳定身份（id） (#129)
+- `2026-07-28` · [`eae28f99`](https://github.com/ybz21/Roami/commit/eae28f99223ccc0e3a56bc7f381446cdc3dd5259) **fix** · fix(term): 手机端终端闪烁、行内花屏与滚动灌垃圾字符 (#130)
+- `2026-07-28` · [`45b90509`](https://github.com/ybz21/Roami/commit/45b90509e668c87ada67dea6ce8020c791100998) **fix** · fix(term): 关标签/改名整页黑屏；导航栏改用会话 id (#131)
+- `2026-07-28` · [`8931f54c`](https://github.com/ybz21/Roami/commit/8931f54cc0da198212a2cb73228a772837322439) **feat** · feat(git): Git 面板重做——提交树 / 分支页 / worktree 分叉图 (#132)
+- `2026-07-28` · [`7f0b90a8`](https://github.com/ybz21/Roami/commit/7f0b90a831d74522ead37ffc024e5cfb4e8882bf) **feat** · feat(term): 会话导航栏重做——标签条 / 工具条统一为一套线性语言 (#133)
+- `2026-07-29` · [`bd3269b0`](https://github.com/ybz21/Roami/commit/bd3269b03dc43e580893e0e7625412c614121af6) **fix** · fix(web): 对话面板被 xterm 画布盖住 / 窄屏提问框识别 / 弹框点不没 / 语音开关联动 (#135)
+- `2026-07-29` · [`5c924e37`](https://github.com/ybz21/Roami/commit/5c924e376e2521811dfe5081846e3a3543bf494a) **refactor** · refactor(session): tmux 会话名改用不可变 id + 终端渲染器自救 (#134)
+- `2026-07-29` · [`2c907ef2`](https://github.com/ybz21/Roami/commit/2c907ef25d9cbc15c64726e419296a993bbab5a1) **fix** · fix(term): 久置回前台整链路重同步（只重建渲染器救不了内容坏掉的那类花屏） (#136)
+- `2026-07-30` · [`338963e5`](https://github.com/ybz21/Roami/commit/338963e509437ca7528ebe393ad491feac030cce) **refactor** · refactor(web): 移除对话面板重复的头部工具行 (#137)
+- `2026-07-31` · [`f783dad1`](https://github.com/ybz21/Roami/commit/f783dad17b6b5c2721881abf5f2f8b9cc572d811) **fix** · fix(files): 修复右键菜单与 HTML 文件预览 (#138)
+
+## 2026-08（96）
+
+- `2026-08-01` · [`4ad3c0ca`](https://github.com/ybz21/Roami/commit/4ad3c0caca52fc23e653bdf835fff08be336968a) **fix** · fix(file): 修复 iframe 预览下分隔栏拖拽中断 (#140)
+- `2026-08-02` · [`e2d14769`](https://github.com/ybz21/Roami/commit/e2d147695449ec4073ae9b97ad4c3df81c67174c) **fix** · fix(web): 消除终端闪屏与后台状态误报 (#139)
+- `2026-08-03` · [`0de1e9e8`](https://github.com/ybz21/Roami/commit/0de1e9e89ce1bbe5a0c8e997cbeb00cc1e13a2f6) · 响应式重做：唯一断点入口 + Workspace Shell 分栏契约（13/14 设计落地） (#143)
+- `2026-08-03` · [`a437e7af`](https://github.com/ybz21/Roami/commit/a437e7af7494277d91644f2d4bd5b5bb0ced6205) **feat** · feat(web): 桌面+移动响应式重做——13/14 设计落地 (#144)
+- `2026-08-03` · [`1dbf59d4`](https://github.com/ybz21/Roami/commit/1dbf59d40847a37ed78a317739ba76129491190b) **fix** · fix(web): 终端底部快捷键条被顶出可视区；分栏往左拖到 648 就顶死 (#145)
+- `2026-08-03` · [`ac350d29`](https://github.com/ybz21/Roami/commit/ac350d29193a896dd0d7c9a4fbfb5ff5e2cf768a) **style** · style(web): 顶栏与侧栏/页面同底，不再比左右两侧浅一档 (#146)
+- `2026-08-03` · [`8b1d45cd`](https://github.com/ybz21/Roami/commit/8b1d45cdc764d1a707d9955b8e9a7599def9f724) **fix** · fix(web): 对话态外壳 + 手机顶部 chrome 重设计 + 方向簇只在 TUI 出现 (#147)
+- `2026-08-04` · [`91627c65`](https://github.com/ybz21/Roami/commit/91627c65eb56c88834fb3035257f94a2b8faee1d) · 概览/项目/会话：三页分工 + 桌面版排布重做 (#148)
+- `2026-08-04` · [`1d1e604b`](https://github.com/ybz21/Roami/commit/1d1e604be50ce39f3e3ce1a97f03085eb54a527a) **fix** · fix(web): Git/Worktree 在手机上改走全屏二级页，并接管物理返回键 (#149)
+- `2026-08-04` · [`171bf2f9`](https://github.com/ybz21/Roami/commit/171bf2f9f7254108791ae1e3c46a067cfb54c9a8) **feat** · feat(web): Git/Worktree 在桌面成为 Shell 的第三列，不再是盖住终端的浮层 (#150)
+- `2026-08-04` · [`d1286009`](https://github.com/ybz21/Roami/commit/d1286009261b46e7345ce71e4cb9034d25ad2ec5) **style** · style(web): 桌面页头并进工具条，概览的重复计数去掉 (#151)
+- `2026-08-04` · [`4922caa7`](https://github.com/ybz21/Roami/commit/4922caa7d81e1686e44b8028db61853d4c73b2d6) **feat** · feat(web): Inspector 收尾——面板内分栏 + 文件树进列，四种壳收敛成一种 (#152)
+- `2026-08-04` · [`79c273c9`](https://github.com/ybz21/Roami/commit/79c273c99b7c0463ac165118362fbb05f0759320) **fix** · fix(term): 关闭窗格改为目标高亮 + 就地确认，不再依赖 tmux 原生底部提示 (#141)
+- `2026-08-04` · [`4f3d9efe`](https://github.com/ybz21/Roami/commit/4f3d9efe82b38397c60adf62bf9bf9c4911e7e69) · 概览回到 D1 原稿：活跃项目作战卡装回来 (#153)
+- `2026-08-04` · [`e79d114a`](https://github.com/ybz21/Roami/commit/e79d114a4184823ea38485246284ed957072c1cd) **feat** · feat(web): 新建项目选完目录后自动填名字（取路径最后一段） (#154)
+- `2026-08-04` · [`bc7f70a1`](https://github.com/ybz21/Roami/commit/bc7f70a1fab8a95d616f3038d160bf0800b12d46) **chore** · chore: 把本机噪声加进 .gitignore（工具缓存 / 运行态 / 手工备份） (#155)
+- `2026-08-04` · [`c7be46cc`](https://github.com/ybz21/Roami/commit/c7be46cc075878b43cf76c97165102ab0514dd6d) **assets** · assets: 交织丝带 logo 重建成矢量(蓝色版) (#156)
+- `2026-08-04` · [`f860beac`](https://github.com/ybz21/Roami/commit/f860beacae7d7c5640a667f56ee7519ff87661d7) **feat** · feat(web): 产品 logo 换成交织丝带（assets/logo-mobius.svg） (#157)
+- `2026-08-04` · [`e6468dfd`](https://github.com/ybz21/Roami/commit/e6468dfd31a5e431e46d234b31a36d9dadb51b32) **feat** · feat(browser): 移植 blade-agent 浏览器镜像的独有增量特性 (#158)
+- `2026-08-04` · [`d3cfee82`](https://github.com/ybz21/Roami/commit/d3cfee82592349d891870e8190bdb42286980634) **feat** · feat(web): 全站图标换成 SVG，蓝/绿各收成一支令牌 (#159)
+- `2026-08-04` · [`97656b2e`](https://github.com/ybz21/Roami/commit/97656b2eb3f118325e999238487103003fc1a1dd) **feat** · feat(search): 全局搜索做成引擎，可搜项目/会话/文件/插件/蜂群 (#160) (#160)
+- `2026-08-04` · [`8151fcb5`](https://github.com/ybz21/Roami/commit/8151fcb550d342533a3373d42a8bc64f198c92f2) **fix** · fix(web): 文件页那道分栏粗线收成 1px 细线 (#162)
+- `2026-08-04` · [`4768259d`](https://github.com/ybz21/Roami/commit/4768259d029ae55b77d60479a69f6215ce610c4a) **feat** · feat(browser): 跟随模式改成常驻的智能体/手动双态切换按钮 (#161)
+- `2026-08-05` · [`dac4b4a0`](https://github.com/ybz21/Roami/commit/dac4b4a085c2a5534b02b19a5f8529ee091626c5) **feat** · feat(web): 浏览器/手机两页的页头收成同一套组件 (#163)
+- `2026-08-05` · [`5256498b`](https://github.com/ybz21/Roami/commit/5256498b71bf37b4cbe12fdcbe7da2f54a2fa545) **feat** · feat(chat): Claude/Codex 对话渲染分三档密度，工具卡片重做 (#164)
+- `2026-08-05` · [`8905bdd3`](https://github.com/ybz21/Roami/commit/8905bdd3a316e816815a44a897420de5d4136a10) **feat** · feat(chat): 会话状态条（模式/上下文/任务进度）+ shell 命令行渲染修正 (#165)
+- `2026-08-05` · [`51a3eafe`](https://github.com/ybz21/Roami/commit/51a3eafe6e0d53996613f21a54d032ab1d2046d4) **fix** · fix(chat): 上下文百分比算错、状态条每格可点、新增四条 bar (#166)
+- `2026-08-05` · [`8adb7c83`](https://github.com/ybz21/Roami/commit/8adb7c837d444fb4ec038b33eaf54427758fc0b7) **feat** · feat(web): 点路径开右栏、Edit 卡片可点开文件、概览卡整张可点、状态条横滑 (#167)
+- `2026-08-05` · [`bf14b4e2`](https://github.com/ybz21/Roami/commit/bf14b4e29232a5341c3bd6c2e0413cc049c2a330) **fix** · fix(web): 对话里点文件名开右侧抽屉，抽屉内预览不再弹模态框 (#168)
+- `2026-08-05` · [`b737888e`](https://github.com/ybz21/Roami/commit/b737888ebd7c59f025c1485bfb083a7b6e132ca0) **feat** · feat(web): 文件抽屉分「文件夹 / 文件」两栏，中间可拖 (#169)
+- `2026-08-05` · [`9573ecff`](https://github.com/ybz21/Roami/commit/9573ecff56a4a348c6dc6430d584c1237e6167e3) **feat** · feat(web): 连续工具调用折成运行组，手机上路径可点开 (#170)
+- `2026-08-05` · [`4860a2f9`](https://github.com/ybz21/Roami/commit/4860a2f93476255a02b8f158470e75cbb9888a6c) **feat** · feat(web): 实时回显收成卡片，不再原样倒 TUI 尾巴 (#171)
+- `2026-08-05` · [`f6745640`](https://github.com/ybz21/Roami/commit/f67456408924e4c73f72a4b9ea8ac68a87eb4422) **feat** · feat(web): 手机底栏加两页 · 镜像两页页头按设计 17 重做 · 开干就地填完整表单 (#172)
+- `2026-08-06` · [`1479002f`](https://github.com/ybz21/Roami/commit/1479002fb2795df351ff0d5b8166c36c90c4ac76) **feat** · feat(web): composer 控制条重排，去掉会话名输入框 (#173)
+- `2026-08-06` · [`c9aaaeea`](https://github.com/ybz21/Roami/commit/c9aaaeea2cc06ecb5f8071c05c7671a932b82adb) **feat** · feat(web): 品牌标用官方色 · 项目页配色收敛 · 行尾动作改图标钮 · 标签条学 VSCode (#174)
+- `2026-08-06` · [`75aecdaa`](https://github.com/ybz21/Roami/commit/75aecdaa8119b18bf5a708187c480ff0f4eff8d0) **fix** · fix(web): 手指档点按钮点空、hover 粘住、浮层吞点击 (#175)
+- `2026-08-06` · [`e2d8e6e4`](https://github.com/ybz21/Roami/commit/e2d8e6e480846c3bdf0b60094df6e7ee55619a9f) **fix** · fix(web): 止住整页横跳 · hover 全局关进细指针 · 手指档不出浮层提示 (#176)
+- `2026-08-07` · [`5cc9f21f`](https://github.com/ybz21/Roami/commit/5cc9f21f306e0d5fb821beb48fcce6ddbc70a43a) **fix** · fix(backend): agent 判定只看启动段，prompt 里提到对方不再认错人 (#177)
+- `2026-08-07` · [`e85c9b6a`](https://github.com/ybz21/Roami/commit/e85c9b6a801e6af4f55197523d1de0f10f88f5df) **fix** · fix(web): 分隔条位置刷新后留在原处，不再弹回默认位 (#178)
+- `2026-08-07` · [`84d8d403`](https://github.com/ybz21/Roami/commit/84d8d403d2a7f9765d5506c6599fd76837961a0b) **fix** · fix(web): 输入法上屏的那记回车不再当成提交 (#180)
+- `2026-08-07` · [`f7dfe7aa`](https://github.com/ybz21/Roami/commit/f7dfe7aafe5de8d6271f9cc22a8a821dfa3d0c15) **feat** · feat(web): 对话输入框改成和「下任务」同一张输入卡 (#181)
+- `2026-08-07` · [`b152a4ac`](https://github.com/ybz21/Roami/commit/b152a4ac547ddc24365475b0320929992105099e) **feat** · feat(web): 文件抽屉改成两层折叠，每层各自记宽、各自能拖 (#179)
+- `2026-08-07` · [`f6a51e1f`](https://github.com/ybz21/Roami/commit/f6a51e1f220255bdfcf437842de8f8dcae4fd377) **feat** · feat(web): 侧栏去掉标语，导航默认收成轨 (#182)
+- `2026-08-07` · [`68735243`](https://github.com/ybz21/Roami/commit/687352432a590680a7a7fa7adb188ab1be8ea0ca) **feat** · feat(web): 右侧抽屉统一成两层折叠，向左长时终端让位 (#183)
+- `2026-08-07` · [`1baa2380`](https://github.com/ybz21/Roami/commit/1baa23801cdeae2c13fa76986115371d986c1905) **fix** · fix(web): HTML 预览在黑主题下不再挂一条白滚动条 (#185)
+- `2026-08-08` · [`4c262441`](https://github.com/ybz21/Roami/commit/4c262441acc1a4ef113a6036e0ab0187d2d82ed8) **feat** · feat(web): 概览并进项目页，合成一个工作台 (#186)
+- `2026-08-09` · [`8156be7e`](https://github.com/ybz21/Roami/commit/8156be7eacf17bc523139faa1649b840f6ddd62e) **feat** · feat(web): 导航收成 48 轨，分栏把手可点收放与步进 (#189)
+- `2026-08-10` · [`844915c6`](https://github.com/ybz21/Roami/commit/844915c67714abb66750c764fb6df2ab42221469) **fix** · fix(web): 「需要你」不再漏掉第 4 个以后的等待会话 (#188)
+- `2026-08-10` · [`9bdd7803`](https://github.com/ybz21/Roami/commit/9bdd7803c47a655e66dcf4821a8fe6f6edb4d258) **feat** · feat(cluster): 多机管理 P1 —— 中心/节点数据面 + 前端接入 + 设计稿 (#187)
+- `2026-08-10` · [`7cbebdf2`](https://github.com/ybz21/Roami/commit/7cbebdf268252d755b4254e9f95de4b8bdf33b11) **fix** · fix(web): 切机器不留残影 · 机器切换器进底座第一位 · 终端开关从侧栏去掉 (#190)
+- `2026-08-10` · [`4972260d`](https://github.com/ybz21/Roami/commit/4972260da4f7102e27c1e39773c2a2b6bc5beb03) **feat** · feat(web): 设置页重构（搜索 + 分类树 + 一类一页）· 前端架构拆分 (#191)
+- `2026-08-10` · [`5dbf5908`](https://github.com/ybz21/Roami/commit/5dbf590899b779f972279936dae46984ecae67d3) **feat** · feat(web): 终端标签按机器各记各的，切回来还在 (#192)
+- `2026-08-10` · [`df917f69`](https://github.com/ybz21/Roami/commit/df917f6947ffc6e03286be1137180d1e01fa2322) **fix** · fix(web): URL 没写标签时靠本机记录还原，别把上次开的一笔勾销 (#193)
+- `2026-08-10` · [`48faace9`](https://github.com/ybz21/Roami/commit/48faace947ae953ab6a81d0ebb39c5cf1d94ea38) **feat** · feat(backend): 加只绑回环的诊断口（ROAM\_PPROF），默认关 (#194)
+- `2026-08-10` · [`bd60090e`](https://github.com/ybz21/Roami/commit/bd60090e7a98448b2b60ce3124cb8ac8cf9e9075) **fix** · fix(web): 设置页页头并进工具条，与会话/项目页对齐 (#195)
+- `2026-08-11` · [`ef143890`](https://github.com/ybz21/Roami/commit/ef1438908d6e3677a513c9903bf97a09602beb04) **feat** · feat(web): 手机上能切机器了 —— 「更多」里加机器段 (#196)
+- `2026-08-11` · [`fa362e08`](https://github.com/ybz21/Roami/commit/fa362e089333e7f0be84d61a8ef28ec70fb493dd) **fix** · fix(cluster): 中心反代不再每请求新建 Transport —— 修 goroutine 泄漏 (#197)
+- `2026-08-11` · [`0083f46b`](https://github.com/ybz21/Roami/commit/0083f46b5f57831fd2043f9d0e7c80387745cba4) **fix** · fix(web): 懒加载失败自动重试 · 标签文字不再被裁 · 切换器下拉重排 (#198)
+- `2026-08-11` · [`0ddc8d9d`](https://github.com/ybz21/Roami/commit/0ddc8d9d307a55fde430ae73677b786667da36e7) **feat** · feat(cluster): 中心页 —— 让中心自己能被看见 (#199)
+- `2026-08-11` · [`16ca07ee`](https://github.com/ybz21/Roami/commit/16ca07ee0debd4ca5542c5224d9128f574467709) **feat** · feat(cluster): 中心异常主动冒泡 · 宿主机尺度 · 排布收口 (#200)
+- `2026-08-11` · [`d871fa89`](https://github.com/ybz21/Roami/commit/d871fa89efcb89cec6d97d151149b2e4db07d8a4) **feat** · feat(cluster): 中心复用监控插件的面板 · 中心页列表化 · 设置分段瘦身 (#201)
+- `2026-08-11` · [`fbd36349`](https://github.com/ybz21/Roami/commit/fbd363497c6e5ac0c283d277257cbb49e0744d39) **docs** · docs: README 大改 —— 按现在的系统重写 + 全部截图重拍 (#202)
+- `2026-08-11` · [`2492af31`](https://github.com/ybz21/Roami/commit/2492af313c0761f9b84e6e8943d41ad1f42a4889) **fix** · fix(files): HTML「新标签打开」改走 /file/serve，页面不再裸奔 (#203)
+- `2026-08-12` · [`809ed1f3`](https://github.com/ybz21/Roami/commit/809ed1f3197b6ab6ccf2d4eebf23b6894fe0ae6a) **fix** · fix(chrome-cli): chrome CLI 跟着「浏览器」设置走 · 同 profile 只留一台 Chrome (#204)
+- `2026-08-12` · [`86341d01`](https://github.com/ybz21/Roami/commit/86341d01041c7c56d75a69facb8a3b7ee0405b03) **feat** · feat(metadb): 台账收敛到一个 meta.db · 重启后项目和会话都还在 (#206)
+- `2026-08-12` · [`4db7dd9e`](https://github.com/ybz21/Roami/commit/4db7dd9ec5a3d3ea3117d3c415d1db91c0088a2d) **feat** · feat(sessions): 已结束的会话能看见、能一键重开 (#207)
+- `2026-08-12` · [`bda27e6c`](https://github.com/ybz21/Roami/commit/bda27e6c89bd6121f987636558f43dadbc1a50d9) **fix** · fix(swarm): swarm sql 找回 members/cards · e2e 基线首次全绿 (#208)
+- `2026-08-12` · [`366c3b10`](https://github.com/ybz21/Roami/commit/366c3b10e2e6b3d07b0b1c4ac6f3514561a290ab) **refactor** · refactor(race): RaceStore 搬出 package api · 顺手修掉 crown 的数据竞争 (#209)
+- `2026-08-12` · [`1a7f8b8d`](https://github.com/ybz21/Roami/commit/1a7f8b8df39dc14cbd06dabf1f5506df950b07f0) **feat** · feat(phone): 多设备摆出来点一下就换 —— 模拟器与真机同时挂着不再二选一 (#205)
+- `2026-08-13` · [`dad2bc6f`](https://github.com/ybz21/Roami/commit/dad2bc6fde982e681561076297ca79be7c7719fe) **fix** · fix(project): 收尾留痕进库 · 直连模式下不再被静默丢弃 (#210)
+- `2026-08-14` · [`7a1a19b0`](https://github.com/ybz21/Roami/commit/7a1a19b078c970ad826639057dbc215c114ebe3f) **perf** · perf(chat): 对话首屏只取尾部 · 滚上去不再被拽回底部 (#213)
+- `2026-08-14` · [`e53ff086`](https://github.com/ybz21/Roami/commit/e53ff086cc8be25125a30ea736047550869df0d1) **fix** · fix(term): 终端翻不动页 —— pane 级 tmux 命令的目标少了个冒号 (#214)
+- `2026-08-14` · [`f1583f89`](https://github.com/ybz21/Roami/commit/f1583f89242dda0918e97e418f31b36bcef20c06) **feat** · feat(phone): 模拟器归位 —— redroid 下线，AVD 能起停能新建 (#212)
+- `2026-08-14` · [`239eb9c3`](https://github.com/ybz21/Roami/commit/239eb9c3594f1e83fd9c4b4c8133980408b72b68) **fix** · fix(term): 手机久置回来进 session 还是花屏 —— 少的是内容层那一次重排 (#215)
+- `2026-08-14` · [`7ba02b86`](https://github.com/ybz21/Roami/commit/7ba02b86bde041bd7d9d3277148d81cdcf54f40c) **feat** · feat(files): 视频/音频在文件面板里直接放，别再只给一句「二进制文件」 (#216)
+- `2026-08-14` · [`290ea0df`](https://github.com/ybz21/Roami/commit/290ea0dfebb81237c2c9a5edec6c589519963b5b) **style** · style(phone): 页头收成一条灵动岛 · 画面顶到四周 (#217)
+- `2026-08-23` · [`e0a536a4`](https://github.com/ybz21/Roami/commit/e0a536a4b75809d438c6ce1308489c82daae9f68) **feat** · feat(reliability): 会话内存护栏 + 会话懒恢复 (#218)
+- `2026-08-23` · [`d1d0da22`](https://github.com/ybz21/Roami/commit/d1d0da22e3172245201edeefcfaecdb227e0cda2) **fix** · fix(memguard): 只认 cgroup v2 —— v1 上会把上限设到整个登录会话
+- `2026-08-23` · [`cf159806`](https://github.com/ybz21/Roami/commit/cf159806751cb522ffb210a6b534e8492a5bcc46) **fix** · fix(start): 装了自启后 start.sh 交给 systemd，别两套抢一个端口
+- `2026-08-23` · [`cc549485`](https://github.com/ybz21/Roami/commit/cc549485ed3c5950dd6e71867a971303f67ede8c) **fix** · fix(sessions): 会话列表认不出休眠会话 —— 点下去才发现要重开
+- `2026-08-23` · [`c86049e1`](https://github.com/ybz21/Roami/commit/c86049e1c238f60e6b26135e50208fdae83541da) **test** · test(reliability): 内存护栏 + 懒恢复的 e2e，16 条用例
+- `2026-08-23` · [`df008f4a`](https://github.com/ybz21/Roami/commit/df008f4a5fb31d2a3cc16e87a9f4329ac7a3740b) **fix** · fix(monitor): 交换空间用满要看得见 —— 它是整机卡死的前兆 (#211)
+- `2026-08-23` · [`d18d3a97`](https://github.com/ybz21/Roami/commit/d18d3a977a77ebb270a8e1aca5f8f82214b407c7) **test** · test(reliability): 补 U3 —— 盯住主机监控面板别再写回硬编码颜色
+- `2026-08-23` · [`9f2e28c4`](https://github.com/ybz21/Roami/commit/9f2e28c4eb3a38fb5e82fb7efc4ef536ad91d62b) **fix** · fix(memguard): 内存条报真占用，别把 page cache 当成漏
+- `2026-08-23` · [`875f21aa`](https://github.com/ybz21/Roami/commit/875f21aa1dee74e7feb94abad459bf31ce0c5ead) **feat** · feat(agent): 每型 agent 自述怎么恢复 —— codex 也能接回对话了
+- `2026-08-23` · [`8091ef67`](https://github.com/ybz21/Roami/commit/8091ef670d3e5708ee5ff740594c3aa9f87424b5) **refactor** · refactor(agent): 启动命令也收进契约 —— spawn 里最后四处 codex 分支清掉 (#219)
+- `2026-08-23` · [`92c12012`](https://github.com/ybz21/Roami/commit/92c120129cd0114e3ea4f798ecbd26f55b2d90e0) **feat** · feat(web): 四件体验 —— http 跳 https、项目支持 clone/新建目录、粘图不吞字、上传带 @ (#220)
+- `2026-08-24` · [`ce786bdf`](https://github.com/ybz21/Roami/commit/ce786bdf28e7ac8ad50841e4d03889ef672e73da) **fix** · fix(layout): 小屏开文件面板，右边空出一条黑边 —— Canvas 让掉的宽度没人接 (#221)
+- `2026-08-24` · [`27adc81d`](https://github.com/ybz21/Roami/commit/27adc81d4cbcb207d42d0be184c7df0193f251bd) **feat** · feat(mem): L2 总量闸 —— 每个会话都合规、加起来仍把机器压垮的那一档 (#222)
+- `2026-08-24` · [`733bf871`](https://github.com/ybz21/Roami/commit/733bf8712abecfa101c691526959f998abc64fdf) **feat** · feat(chat): 对话里被 @ 引用的图片，渲染成能点开的缩略图卡片 (#223)
+- `2026-08-25` · [`9e63edfc`](https://github.com/ybz21/Roami/commit/9e63edfcfb6da8935cdf4777cd9f6a71565659a7) **fix** · fix(avd): 本机模拟器起不来的三处 —— 4K 被按回 1080p、kvm 组要重新登录、无头下 -gpu host (#224)
+- `2026-08-26` · [`da0b3ea9`](https://github.com/ybz21/Roami/commit/da0b3ea9529ee3a33324b54baaed6b00acd40253) **feat** · feat(shell): 底部状态条 —— 条是壳，格是注册进来的（主机监控那六格走的是插件贡献点）(#225)
+- `2026-08-30` · [`aeea46f2`](https://github.com/ybz21/Roami/commit/aeea46f22d3b681fafe3f8c4936c1d0f816db5fd) **feat** · feat(shell): 把一个会话拖到另一个会话上 —— 告诉它对面是谁、怎么用 ttmux send 说话 (#226)
+- `2026-08-30` · [`42bd0db9`](https://github.com/ybz21/Roami/commit/42bd0db9e4eda0ae90550b6d45de9aa1ec31c32c) **feat** · feat(hostmon): Swap 那行加一颗「清空」—— 但先算能不能清，装不下就不给按 (#227)
+- `2026-08-30` · [`fab4c685`](https://github.com/ybz21/Roami/commit/fab4c68588e52cd0eae86602f9995c4665eb2acd) **perf** · perf(transcript): 按字节偏移读转录 —— 首屏 6.1s → 0.05s，不再每次轮询分配一整个文件 (#228)
+- `2026-08-31` · [`22c884d0`](https://github.com/ybz21/Roami/commit/22c884d0cdc43dcc075b8a868094f6bac32a5ea2) **fix** · fix(chat): Roam 塞进去的介绍词别画成「你说的话」 (#229)
+
+## 2026-09（46）
+
+- `2026-09-02` · [`c03dac99`](https://github.com/ybz21/Roami/commit/c03dac99e3e77887488035b25139171841b330cf) **feat** · feat(mirror): 镜像能「在新页面打开」，Chrome 自己的界面页不再赖在标签条上 (#231)
+- `2026-09-02` · [`a275e883`](https://github.com/ybz21/Roami/commit/a275e8836f7d5dcf38f0a1d8b5bbdee989e67166) **fix** · fix(browser): 远端浏览器钉成固定视口，加全屏 —— 拖窗格只改缩放，不再让页面重排 (#232)
+- `2026-09-02` · [`3c346dc5`](https://github.com/ybz21/Roami/commit/3c346dc5e73f8e3ff0c051888c1ba27c99d27c00) **fix** · fix(revive): 手敲 claude 的会话也能接回对话并回到 worktree；终端复制粘贴修复 (#230)
+- `2026-09-04` · [`2c8bc548`](https://github.com/ybz21/Roami/commit/2c8bc548ca809510aa2717cf17a2b711102648ff) **feat** · feat(workspace): 任务工作区——项目/任务/会话树、全局标签条、右栏跟当前 worktree；重启不杀 tmux、休眠会话准确接回 (#234)
+- `2026-09-04` · [`fde78864`](https://github.com/ybz21/Roami/commit/fde7886424145d85ab1c00e3832230fe2cd79b3d) **feat** · feat(workspace): 标签条能翻页/居中/看全部；侧栏项目点一下就展开；镜像页顶边对齐；右栏首次收起 (#235)
+- `2026-09-04` · [`4afb12df`](https://github.com/ybz21/Roami/commit/4afb12df50c051aee5354a323cfacfedf8152b51) **fix** · fix(shell): 右栏第一次进来真的收着了 —— 上一版被 mount 顺序掰开 (#236)
+- `2026-09-04` · [`45870655`](https://github.com/ybz21/Roami/commit/45870655a784d78756efd1db4e091ec8c9f60d49) **fix** · fix(shell): 文件页/插件页也满幅；文件栏默认收窄；侧栏搜索不再是个方框 (#237)
+- `2026-09-05` · [`9a08c091`](https://github.com/ybz21/Roami/commit/9a08c09109d53277aa19f64a96ab01e1875e7ac6) **feat** · feat(hostmon): 清 swap 改成后台任务；插件页拆平；\_ttmux-\* 会话不进树 (#238)
+- `2026-09-05` · [`960ec86f`](https://github.com/ybz21/Roami/commit/960ec86f5de1772bf2cd0a19ff45d4415c876d31) **fix** · fix(shell): 选中底改中性；外壳三条与侧栏同底；树里不再画分支；\_ttmux-\* 滤干净 (#239)
+- `2026-09-05` · [`0845ba6c`](https://github.com/ybz21/Roami/commit/0845ba6c8c980608a0712406e501865dc50888f4) **feat** · feat(shell): 项目页/设置页也拆平；手机镜像加全屏 (#240)
+- `2026-09-05` · [`fa25ffbd`](https://github.com/ybz21/Roami/commit/fa25ffbd6c8afb7ebd0ed454e91426a64076d80d) **perf** · perf(shell): 左栏树刷新即出——上一轮原料存本地，项目行不等 worktree (#243)
+- `2026-09-05` · [`4a17a4d9`](https://github.com/ybz21/Roami/commit/4a17a4d90acc16bc1fe92fced60684d0eab41d1c) **fix** · fix(session): 开工简报按真实选项拼、会话改名回来了；互审陪跑挂回被审那条下面 (#242)
+- `2026-09-05` · [`3739183e`](https://github.com/ybz21/Roami/commit/3739183ea11e925f3699eacd1ef6e37a819bf1f5) **fix** · fix(session): 简报按真正建出来的工作区选，非 git 目录不再被要求切分支 (#244)
+- `2026-09-05` · [`d2252336`](https://github.com/ybz21/Roami/commit/d2252336d492ba3958e86fe58098fb5221b14e34) **fix** · fix(shell): 会话表拉不到就别当「一个都没有」；休眠会话一律不滤 (#246)
+- `2026-09-06` · [`e486f7fc`](https://github.com/ybz21/Roami/commit/e486f7fccacd5e38cb50f5596147478b52bea636) **fix** · fix(chat): 刚起的会话别再挂 BAD\_FILE，起手的信任确认框搬进对话面板 (#251)
+- `2026-09-06` · [`7ee1e223`](https://github.com/ybz21/Roami/commit/7ee1e223511a8b6c785ea6a23c8e687a8bf71560) **feat** · feat(session): 「已有」也能是本地分支——为它开工作区进去接着干 (#250)
+- `2026-09-06` · [`de290c6b`](https://github.com/ybz21/Roami/commit/de290c6b216cda2b9aa49054062ea39cc8399553) **fix** · fix(chat): 终止按钮真的停得下来——Esc 之后升级成 Ctrl+C (#248)
+- `2026-09-06` · [`7655c7ee`](https://github.com/ybz21/Roami/commit/7655c7eef1d3debae7df0e178d91323c1756005a) **feat** · feat(chat): 对话输入行的「+」——档位直选、目标、审阅，值都从画面回读 (#247)
+- `2026-09-07` · [`89e5319e`](https://github.com/ybz21/Roami/commit/89e5319e89226cffe377cfaeee7b8605d43a21b6) **fix** · fix(tree): 合成行的右键菜单别把同一件事印两遍 (#253)
+- `2026-09-07` · [`83d76fde`](https://github.com/ybz21/Roami/commit/83d76fde3382a20bfa984685af754bc4dda54395) **fix** · fix(status): 底部那六格监控别机器一忙就整条消失 (#258)
+- `2026-09-07` · [`1d7d970f`](https://github.com/ybz21/Roami/commit/1d7d970fe99022cc934730eee84ae4786b007e9d) **feat** · feat(voice): 工具条语音输入 + 快捷键 ⌘⇧S；火山新版单个 API Key 鉴权 (#245)
+- `2026-09-07` · [`5f4ab97f`](https://github.com/ybz21/Roami/commit/5f4ab97faa8ec44f6dde5314ec23562c46d995f6) **fix** · fix(project): 从已在册仓库的 worktree 目录「新建项目」不再盖掉项目名 (#249)
+- `2026-09-07` · [`f5d23b4a`](https://github.com/ybz21/Roami/commit/f5d23b4ad83b75d281955be4eebc4fd847f5b4f1) **feat** · feat(mem): 回收不出东西就别空踩——L2 先把冷内存压进 zram (#252)
+- `2026-09-07` · [`d0145cb6`](https://github.com/ybz21/Roami/commit/d0145cb6378a76aca24ff2ba27506e1f06953c70) **fix** · fix(api): 返回 JSON 的端点只认 stdout —— 插件日志走 stderr，混进来整份响应就不是 JSON 了 (#254)
+- `2026-09-07` · [`8987cd5f`](https://github.com/ybz21/Roami/commit/8987cd5fb0bbd83f0748d0c0794fea6d68c49838) **docs** · docs(agents): PR 必须带截图 —— 连「图放哪」一起定死，附推图脚本 (#255)
+- `2026-09-07` · [`dce4bc95`](https://github.com/ybz21/Roami/commit/dce4bc959f740a3b91350bdbbf9b624f3a3b2eb6) **feat** · feat(selftest): 整套自检清单 + 一半能自动跑的脚本，每天 02:00 由定时任务过一遍 (#256)
+- `2026-09-07` · [`5f52b942`](https://github.com/ybz21/Roami/commit/5f52b942b6427a864c80925af7d3af90886ffbcb) **feat** · feat(cron): 执行记录、跑完通知我与产物 —— 定时任务不再只有一个「已触发 3」 (#257)
+- `2026-09-07` · [`40294bd6`](https://github.com/ybz21/Roami/commit/40294bd612a8c1480964c0db2eacc94e9e196136) **feat** · feat(cli): roam 成为唯一入口 —— roam im send / roam cron list / roam ls (#259)
+- `2026-09-07` · [`1e2a00d3`](https://github.com/ybz21/Roami/commit/1e2a00d3f8788aede48d6a45d74329b28eaf78be) **refactor** · refactor(brand)!: Roam → Roami（含 ~/.roam 迁移、roam 软链、环境变量双向兼容）(#260)
+- `2026-09-08` · [`57bf9f29`](https://github.com/ybz21/Roami/commit/57bf9f2969e80cab537a9e176c4e69b2430f01eb) **fix** · fix(tree): 非 git 项目的会话别再掉进「散会话」——项目页说它属于谁就是谁 (#261)
+- `2026-09-09` · [`9df1e91f`](https://github.com/ybz21/Roami/commit/9df1e91fc1733d5ad66038f5d6353bc08b63e42e) **fix** · fix(hub): 「Goroutine 持续增长」误报 —— 平线末尾跳一下不是趋势 (#262)
+- `2026-09-10` · [`ba403f99`](https://github.com/ybz21/Roami/commit/ba403f99f3623c157e9712c3fb3d98984b532fc6) **docs** · docs(p2p): 从中心进来的浏览器能不能直连那台机器 —— 能，并且量出来快 7 倍 (#263)
+- `2026-09-10` · [`a4fa54b5`](https://github.com/ybz21/Roami/commit/a4fa54b5f6563b6ec82cfc1ff36906b57d7d3eda) **perf** · perf(p2p): 建链 30 秒 → 0.7 秒 —— 别为几台不回话的 STUN 干等半分钟 (#266)
+- `2026-09-10` · [`d449ac10`](https://github.com/ybz21/Roami/commit/d449ac10103aca65c8d154535bdbc24f0a697680) **feat** · feat(p2p): STUN 配一整排，并让每台带上服务质量 —— 出厂参考 + 一键实测 + 优选 (#265)
+- `2026-09-10` · [`5428b3de`](https://github.com/ybz21/Roami/commit/5428b3de48c6dc66c422ed3627896e1a0fe31d32) **feat** · feat(statusbar): 直连状态挪进底部状态条 (#264)
+- `2026-09-11` · [`ca99b8c7`](https://github.com/ybz21/Roami/commit/ca99b8c7faed50a489fd7378a5cb88f550c3bff8) **fix** · fix(statusbar): 格子别在眼皮底下跑 —— 30 秒里最大位移 81px → 0px (#268)
+- `2026-09-11` · [`fc7033e0`](https://github.com/ybz21/Roami/commit/fc7033e024c476020e3e265a8c4e4f3abae0d818) **feat** · feat(p2p): 图片、视频、PDF 也走直连 —— Service Worker 拦 /api/file/raw，调用点一行不改 (#269)
+- `2026-09-11` · [`0195d537`](https://github.com/ybz21/Roami/commit/0195d537b6bd10708e476bef2719a04d8aa23383) **refactor** · refactor(statusbar): 机器与直连并成一格；设置页「文件传输」改名「网络加速」 (#270)
+- `2026-09-14` · [`17c0df93`](https://github.com/ybz21/Roami/commit/17c0df93591859205841748770bcb7ba6c169a70) **fix** · fix(files): 图片预览看得全也放得大 —— 适应窗口起步，能缩放、能拖、能滚 (#271)
+- `2026-09-14` · [`06f777d7`](https://github.com/ybz21/Roami/commit/06f777d7d70ff77042ecb48d6d3ec194d387a4a6) **feat** · feat(workspace): 右栏状态跟着标签走 —— 这个标签上次开着，切回来它还开着 (#272)
+- `2026-09-14` · [`489ecc9c`](https://github.com/ybz21/Roami/commit/489ecc9cfca0373f6cd0ade0263253b7bc505828) **feat** · feat(files): 文件树展开到哪几层也记住 —— 按根目录各记一份 (#273)
+- `2026-09-18` · [`54fa345f`](https://github.com/ybz21/Roami/commit/54fa345f7378506aa8f09bce080d03e56f1e50e2) **feat** · feat(plugin): 会话守护 roam.keepalive —— 屏幕太久没动就替你催一句，说什么按屏幕上看见的分叉 (#275)
+- `2026-09-19` · [`805f22e9`](https://github.com/ybz21/Roami/commit/805f22e9998137493cb83a763db6362501ce3a63) **perf** · perf(tree): 会话归位不再等 /projects——归属表先到先用、进快照；worktree 扫描并发、身份一条 git 读完 (#277)
+- `2026-09-22` · [`727b3a88`](https://github.com/ybz21/Roami/commit/727b3a885db796ca47de714db4583509f4348ebd) **feat** · feat(voice): 话筒与快捷键都是点一下开录、再点一下识别；快捷键可配置；5 分钟自动收尾 (#278)
+- `2026-09-22` · [`dadb7589`](https://github.com/ybz21/Roami/commit/dadb758939311068fbb08c8e514eaa7b5c681c3f) **feat** · feat(files): 文件各开一个标签、记住看到哪儿；回任务时回到上次看的标签 (#274)
+- `2026-09-22` · [`3738800c`](https://github.com/ybz21/Roami/commit/3738800c103e3b7deaf0eea722788d07729a86ad) **fix** · fix(sessions): 开工简报里把任务明确标出来 ——「任务：」 (#280)
+
+## 2026-10（227）
+
+- `2026-10-08` · [`2868d854`](https://github.com/ybz21/Roami/commit/2868d8542b94d45db5b94f67c33cf299c6599698) **feat** · feat(agents): show OpenCode and Pi logos in sessions (#284)
+- `2026-10-09` · [`3c187dfe`](https://github.com/ybz21/Roami/commit/3c187dfe3cb33a769d6b2a417872c4a9575370c1) **feat** · feat(agent): 统一注册并提供本机发现与额度插件 (#286)
+- `2026-10-09` · [`a5098491`](https://github.com/ybz21/Roami/commit/a509849175743d294cbbec4ac1390c9e440fa7a9) **feat** · feat(mobile): 完成手机版首页、会话与 Android App (#285)
+- `2026-10-09` · [`8e5eead6`](https://github.com/ybz21/Roami/commit/8e5eead654a9dd21c20512b9cb0f388b095d326e) **fix** · fix(agent): 用小时显示额度窗口 (#287)
+- `2026-10-09` · [`fd485b2d`](https://github.com/ybz21/Roami/commit/fd485b2d59c81204848acef69ae756ac5d87422e) **feat** · feat(workspace): 把侧栏页面接入统一标签栏 (#288)
+- `2026-10-10` · [`82e9fc9b`](https://github.com/ybz21/Roami/commit/82e9fc9b6a80d9b7e9e61d07d029718b49eae2dd) **fix** · fix(api): 后端抓屏一直抓空——tmux 3.4 对 capture-pane 要 =name: 才认，裸 =name 报找不到 pane (#282)
+- `2026-10-10` · [`020b508c`](https://github.com/ybz21/Roami/commit/020b508c7ed79a0fd3078b0909f7c71c48eedbc7) **fix** · fix(mobile): clarify navigation and notifications (#289)
+- `2026-10-10` · [`0571bc4f`](https://github.com/ybz21/Roami/commit/0571bc4f1921464c35300439e2a4053aca787ba9) **fix** · fix(settings): merge shortcut and tab menu updates (#290)
+- `2026-10-10` · [`07e25b68`](https://github.com/ybz21/Roami/commit/07e25b68da9052420251f19c6edeb0cd9c6a7af5) **fix** · fix(mobile): unify navigation search and page spacing (#291)
+- `2026-10-10` · [`f844e7fd`](https://github.com/ybz21/Roami/commit/f844e7fda4920530306e0af35782b92e56f9c4c4) **fix** · fix(mobile): open agent sessions in rendered view
+- `2026-10-10` · [`4ce30ffe`](https://github.com/ybz21/Roami/commit/4ce30ffe992a771ede3d4481bf3298a5ca08d03d) **fix** · fix(chat): use current Codex context tokens
+- `2026-10-10` · [`614be3e7`](https://github.com/ybz21/Roami/commit/614be3e78c83cddaecd8905dffff744b108a7ed8) **fix** · fix(mobile): align filter chip heights
+- `2026-10-10` · [`7aec7344`](https://github.com/ybz21/Roami/commit/7aec7344f9735d024b65dae8a13d60091a5a2765) **fix** · fix(chat): compact mobile status bar
+- `2026-10-10` · [`9a4dae8c`](https://github.com/ybz21/Roami/commit/9a4dae8c4d3cff7fe2916997665883041a05a699) **fix** · fix(mobile): align project activity and detail width
+- `2026-10-10` · [`24d71456`](https://github.com/ybz21/Roami/commit/24d71456b31594bb6ba280be1bababfbaa46152c) **feat** · feat(workspace): manage tabs and auto-recover plugin daemon
+- `2026-10-10` · [`f9eb4bef`](https://github.com/ybz21/Roami/commit/f9eb4befa00db1dce0b4d744e58ebdc3f5b2fe25) **feat** · feat(projects): integrate session activity and fill workspace (#300)
+- `2026-10-11` · [`42fa28b0`](https://github.com/ybz21/Roami/commit/42fa28b0d64a307066b98574709849e7696a982d) **fix** · fix(android): publish secure WebView app build
+- `2026-10-11` · [`99601832`](https://github.com/ybz21/Roami/commit/99601832b607f7a98d88c032a081cb765c3b7c1f) **fix** · fix(android): align app icons with web logo
+- `2026-10-11` · [`e9589089`](https://github.com/ybz21/Roami/commit/e95890899109cb08f30b910049dd42f542fbdd0d) **fix** · fix(mobile): stabilize projects and activity counts
+- `2026-10-11` · [`e96fe91e`](https://github.com/ybz21/Roami/commit/e96fe91ea6b552fc67d41d30a08ec4123bcf6ad1) **feat** · feat(mobile): show project beneath session title
+- `2026-10-11` · [`a9a20a41`](https://github.com/ybz21/Roami/commit/a9a20a417ddeb0aa083644d6beb94d7bfb387818) **fix** · fix(mobile): keep layout stable above keyboard
+- `2026-10-11` · [`07b3fe98`](https://github.com/ybz21/Roami/commit/07b3fe98a1955b5e9d5ee057bace2083a3c02fb7) **fix** · fix(mobile): restore updates and show live agent status (#306)
+- `2026-10-11` · [`1ff718c6`](https://github.com/ybz21/Roami/commit/1ff718c6f22dfd48978ccbde035b6dd306f125e3) **feat** · feat(android): reshape status widget as wide card (#307)
+- `2026-10-11` · [`10fb41fe`](https://github.com/ybz21/Roami/commit/10fb41fe068de4a256094e824be4723a3bcf5893) **feat** · feat(mobile): rotate status widget and refine session header (#308)
+- `2026-10-11` · [`caba3851`](https://github.com/ybz21/Roami/commit/caba385142274a09f86a7e1da546472638f35ffd) **fix** · fix(mobile): refresh, install entry, and agent activity detection (#309)
+- `2026-10-12` · [`96c7aa18`](https://github.com/ybz21/Roami/commit/96c7aa18193a30919e99addc8d42082ab04af6a5) **fix** · fix(activity): align live counts across web and Android (#310)
+- `2026-10-12` · [`545db575`](https://github.com/ybz21/Roami/commit/545db57512e0a16f278113eec448310a4960bc0e) **fix** · fix(chat): restore resumed Codex transcripts and touch scrolling
+- `2026-10-12` · [`623d181d`](https://github.com/ybz21/Roami/commit/623d181dabd31355fc64399d8907bbb15150f1cc) **fix** · fix(android): restore launcher badge for pending work
+- `2026-10-12` · [`ee281c51`](https://github.com/ybz21/Roami/commit/ee281c51008449ff0248be48690813e3e7275db3) **fix** · fix(status): detect OpenCode progress row as running
+- `2026-10-12` · [`2b3b5f45`](https://github.com/ybz21/Roami/commit/2b3b5f4584c1d74c64e4d5600b87bf7f61b8cd9e) **fix** · fix(status): track background OpenCode sessions
+- `2026-10-12` · [`445e2f6e`](https://github.com/ybz21/Roami/commit/445e2f6ea8f4f6f8ee887a21d8886fb2a7d3f80f) **fix** · fix(agent): skip stopped processes when probing activity (#315)
+- `2026-10-12` · [`219e8527`](https://github.com/ybz21/Roami/commit/219e85277aa1d826cb82b7c9e29d038c34e75acf) **fix** · fix(mobile): recover stalled Codex sessions on phone
+- `2026-10-12` · [`22c31e57`](https://github.com/ybz21/Roami/commit/22c31e571e008af038a00295617d50b074c4918a) **feat** · feat(agent): 为 Roami 新任务注入可编辑的能力说明 (#317)
+- `2026-10-13` · [`c31a2739`](https://github.com/ybz21/Roami/commit/c31a2739892cfe05b656c94e4a07720613c70d5b) **feat** · feat(overview): 新增 AI 足迹与对话任务使用统计 (#318)
+- `2026-10-13` · [`f7092be8`](https://github.com/ybz21/Roami/commit/f7092be8492c776e420fbe724e9950897566bb17) **fix** · fix(activity): 兼容旧版 Git 的足迹统计 (#319)
+- `2026-10-14` · [`db6b6a02`](https://github.com/ybz21/Roami/commit/db6b6a029c03c69c620323c1d1ab3f2a476ad7d9) **fix** · fix(activity): 归档历史提交并补齐足迹热力图 (#320)
+- `2026-10-14` · [`4cf1524d`](https://github.com/ybz21/Roami/commit/4cf1524daee56696f5638b8a79460cb324844187) **fix** · fix(activity): 收紧热力图并展示当天足迹 (#321)
+- `2026-10-14` · [`b8ef6a99`](https://github.com/ybz21/Roami/commit/b8ef6a994f1df1e508764a8fe3f8c3fb3e03436f) **fix** · fix(activity): 在热力图下按项目汇总当天足迹 (#322)
+- `2026-10-15` · [`6907b154`](https://github.com/ybz21/Roami/commit/6907b15414ab06ecc64517f286a2c649d27e13e5) **feat** · feat(files): 支持选择分支工作树 (#323)
+- `2026-10-17` · [`fa946945`](https://github.com/ybz21/Roami/commit/fa946945f12e0adc205bb5fff3c37a1b81911035) **fix** · fix(files): 兼容文件路径链接并支持手机内预览返回 (#327)
+- `2026-10-17` · [`a27f13a4`](https://github.com/ybz21/Roami/commit/a27f13a43e940e0e745cba2047c2e0a94d3084d6) **feat** · feat(cli): 统一 Roami 命令入口、核心架构与数据库布局 (#328)
+- `2026-10-19` · [`957a9599`](https://github.com/ybz21/Roami/commit/957a9599c35f47fed9aff08c33d691f818b7d8eb) **feat** · feat(agent): 接入主智能体框架与统一能力管理
+- `2026-10-19` · [`a6aec03a`](https://github.com/ybz21/Roami/commit/a6aec03a636d0deed412384910bca17f0a7f2401) **feat** · feat(agent): 完善执行器路由与对话设置体验 (#331)
+- `2026-10-19` · [`eb9332cd`](https://github.com/ybz21/Roami/commit/eb9332cd76a7623f0786f5a8e4894b67babc68e5) **feat** · feat(agent): 按 Muse 整理桌面任务与记忆工作台 (#332)
+- `2026-10-19` · [`c170ab74`](https://github.com/ybz21/Roami/commit/c170ab744941f10da76d32e4d5f9f307b0dcd4e5) **fix** · fix(agent): 将桌面会话操作统一到右侧工作台 (#333)
+- `2026-10-19` · [`74527ce0`](https://github.com/ybz21/Roami/commit/74527ce0ae2eb32b2a106365d577203220f6f2b4) **feat** · feat(agent): 整合任务消息工作台与可预览产物 (#337)
+- `2026-10-19` · [`7389b341`](https://github.com/ybz21/Roami/commit/7389b34120dcc199c6f3f14aea16435e2ce51faf) · 修复手机端聊天图片附件不显示且无法放大预览 (#336)
+- `2026-10-19` · [`dcd5e65b`](https://github.com/ybz21/Roami/commit/dcd5e65b9734423f8a16b3fc8bc0c231e3e7e869) **style** · style(mobile): narrow home chat bubble and input side spacing (WIP) (#334)
+- `2026-10-19` · [`6c9279f9`](https://github.com/ybz21/Roami/commit/6c9279f94e82687ce347fce22c7d4695f4782263) **fix** · fix(settings): settings UX fixes (#335)
+- `2026-10-20` · [`700b5a59`](https://github.com/ybz21/Roami/commit/700b5a597a6c476941c215ff09e1cd2bfbd40e7e) **fix** · fix(mobile): 将任务与记忆融入顶栏并统一首页间距
+- `2026-10-20` · [`7a36d805`](https://github.com/ybz21/Roami/commit/7a36d805372b3c6144a42cd52fd3b1c656d1dbae) **fix** · fix(agent): 修复首页任务分配、文件交付与续作恢复 (#339)
+- `2026-10-20` · [`e7c7f0fc`](https://github.com/ybz21/Roami/commit/e7c7f0fce174a431f87f833f9fa555fd5d082930) **fix** · fix(ui): 精简首页弹层和设置页文案 (#342)
+- `2026-10-20` · [`4b17583b`](https://github.com/ybz21/Roami/commit/4b17583b3f06e19b5db80480cc2195778aa23cf1) **fix** · fix(mobile): 将首页内容面板改为独立页面 (#344)
+- `2026-10-20` · [`0afaa8f3`](https://github.com/ybz21/Roami/commit/0afaa8f3924765edda40b8101af473ee17397bdc) **fix** · fix(ui): 简化后台任务刷新交互 (#346)
+- `2026-10-20` · [`9147a369`](https://github.com/ybz21/Roami/commit/9147a3693538be4da7a44239594817a55886e150) **perf** · perf(agent): 加速首页加载并简化模型选择 (#349)
+- `2026-10-20` · [`4ee80159`](https://github.com/ybz21/Roami/commit/4ee801590fbf44b2c656927120f8130315c61a08) **fix** · fix(agent): 简短回报成果并防止回调误续跑 (#353)
+- `2026-10-20` · [`8c8be5d0`](https://github.com/ybz21/Roami/commit/8c8be5d0bf37ba73895e3046be790629c7134570) **fix** · fix(agent): 解除执行硬限制并完善任务恢复与交付
+- `2026-10-20` · [`8cc6d296`](https://github.com/ybz21/Roami/commit/8cc6d296943b9846c9d19ec33c5d1b44b860dd9c) **feat** · feat(agent): 将发现与额度管理整合到智能体设置 (#356)
+- `2026-10-20` · [`602b5d81`](https://github.com/ybz21/Roami/commit/602b5d81818ad975036bb3e72f338bbb60b9b84d) **fix** · fix(agent): 按消息来源节点打开和下载成果 (#357)
+- `2026-10-20` · [`b7739c56`](https://github.com/ybz21/Roami/commit/b7739c560ccdd917fd4d08335f766cd31f0f1561) **fix** · fix(ui): 统一项目页视觉与侧栏导航布局 (#360)
+- `2026-10-20` · [`3002db97`](https://github.com/ybz21/Roami/commit/3002db9719b7f3c6f6bbe9a810b480a2f3762276) **fix** · fix(agent): 用自然提问验收默认交付与工作目录 (#361)
+- `2026-10-20` · [`10d55093`](https://github.com/ybz21/Roami/commit/10d55093acd93d1fed22298a72c5a992763f1d5d) **fix** · fix(ui): 统一提醒配色并精简侧栏与插件状态 (#366)
+- `2026-10-20` · [`e0b3db7b`](https://github.com/ybz21/Roami/commit/e0b3db7b61eec202ca34eb78ff1113eaf9d4775e) **fix** · fix(browser): 修复镜像空白并支持本机 Chrome 重启与自动恢复
+- `2026-10-20` · [`76753c2c`](https://github.com/ybz21/Roami/commit/76753c2cf31a2a1bbdf874a199bd792fb1d99d9b) **fix** · fix(agent): 修复工具参数纠错空转并保留修正进度 (#364)
+- `2026-10-20` · [`7fe6243e`](https://github.com/ybz21/Roami/commit/7fe6243e607fff4251d9b99ade49d38d9d0a52bc) **feat** · feat(agent): 首页提供只读链路队列与上下文调试 (#362)
+- `2026-10-20` · [`699815ce`](https://github.com/ybz21/Roami/commit/699815ce46e35269d61bd31fb4f6ebb15eeaae1b) **fix** · fix(agent): 修复调试窗口的 HTTP 参数校验 (#369)
+- `2026-10-20` · [`e707c2f4`](https://github.com/ybz21/Roami/commit/e707c2f4209970782662540c1fbc83468f167ca2) **fix** · fix(agent): 区分内部观测与可验证的任务交付 (#372)
+- `2026-10-20` · [`0698cf97`](https://github.com/ybz21/Roami/commit/0698cf974927a1e46e4a8038193ffb00e7f2e14e) **fix** · fix(frontend): 移除项目侧栏冗余空态提示 (#373)
+- `2026-10-20` · [`d92237fa`](https://github.com/ybz21/Roami/commit/d92237fad73a0a421d5b78700d64d5eb7affe186) **fix** · fix(agent): 对齐委派契约并先查找已命名目标 (#374)
+- `2026-10-20` · [`3db8407a`](https://github.com/ybz21/Roami/commit/3db8407a1f010a60ee93aed869a71e38ff786844) **fix** · fix(ui): 统一页面背景与分隔样式并完善设计规范
+- `2026-10-20` · [`e508e512`](https://github.com/ybz21/Roami/commit/e508e5127a661fb93a28ebc0b2e047072b08f886) **perf** · perf(frontend): 合并会话状态轮询并降低后台刷新负载 (#378)
+- `2026-10-20` · [`fe60c25b`](https://github.com/ybz21/Roami/commit/fe60c25baa75a4613fbb6016c74b6f6acc25759c) **fix** · fix(ui): 首页常驻显示任务入口 (#380)
+- `2026-10-20` · [`1953c3ed`](https://github.com/ybz21/Roami/commit/1953c3edfa85ced466aa466514b2e300eef02575) **fix** · fix(agent): 稳定截图交付并修正本机下载地址 (#384)
+- `2026-10-20` · [`e6da73e0`](https://github.com/ybz21/Roami/commit/e6da73e09d88c84e80749a6cc9393cc8321d8713) **refactor** · refactor(frontend): 按职责拆分应用入口与工作区 (#387)
+- `2026-10-20` · [`a9cfaa6e`](https://github.com/ybz21/Roami/commit/a9cfaa6e20ff6532381a890a262f2a6becda15b3) **fix** · fix(agent): 修复工具空转与浏览器查询阻塞 (#386)
+- `2026-10-21` · [`52bfd1be`](https://github.com/ybz21/Roami/commit/52bfd1be514bfb904ff6ccdf5c951eed80afffec) **fix** · fix(agent): 精简任务主题和交付详情并修复续作取证
+- `2026-10-21` · [`4032a2f7`](https://github.com/ybz21/Roami/commit/4032a2f70ecc45ec00afc05b74d02720a96973b2) **feat** · feat(agent): 任务内查看和干预子智能体并精简主会话 (#393)
+- `2026-10-21` · [`4cb2e27d`](https://github.com/ybz21/Roami/commit/4cb2e27db4da9dbe7e5bc03db9ef0a74709e0003) **feat** · feat(capabilities): 统一能力中心并纳入专业 Agent (#394)
+- `2026-10-21` · [`b7ea9982`](https://github.com/ybz21/Roami/commit/b7ea9982f5ddf3a2b7354631e5ff0c3939a48c62) **fix** · fix(agent): 查询实际建任务并恢复来源导航失败 (#396)
+- `2026-10-21` · [`c22c83f2`](https://github.com/ybz21/Roami/commit/c22c83f2dd7df4c74757e71a877646588ab197b8) **fix** · fix(cli)!: 收口Roami会话入口并隔离测试清理 (#399)
+- `2026-10-21` · [`78f31d58`](https://github.com/ybz21/Roami/commit/78f31d58c262e27833e8b76684476201febc054d) **fix** · fix(terminal): 修复共享字形图集失效导致的终端花屏 (#400)
+- `2026-10-21` · [`b01cdcbb`](https://github.com/ybz21/Roami/commit/b01cdcbb1b5a09eba81d996c4cf8c0b5aa0c6bcc) **fix** · fix(agent): 恢复文件交付与只读查询续作 (#401)
+- `2026-10-21` · [`24f90e20`](https://github.com/ybz21/Roami/commit/24f90e209f8f652bbc6bc9bdd93ee8b38dfb3437) **feat** · feat(agent): 完善Roami能力指引并接入ADB手机操作 (#403)
+- `2026-10-21` · [`ab8c7999`](https://github.com/ybz21/Roami/commit/ab8c7999dbe0518ecfdf6518b85bcb1401b673f2) **refactor** · refactor(capabilities): 统一 Skill 与 CLI 命令族入口 (#404)
+- `2026-10-21` · [`677b5edd`](https://github.com/ybz21/Roami/commit/677b5edd2ed303651e583c6492f293cc98631e93) **fix** · fix(browser): 隔离目标页连接并保留任务执行证据 (#406)
+- `2026-10-21` · [`20c6b149`](https://github.com/ybz21/Roami/commit/20c6b1491a60292c81cdada3b69428124846cb6c) **fix** · fix(agent): 主会话按任务交接和回答范围收尾 (#408)
+- `2026-10-22` · [`8bd3ad73`](https://github.com/ybz21/Roami/commit/8bd3ad73d33ed513277c9c44bcf309e7d507cd90) **fix** · fix(agent): 精简主会话上下文并解除检索阻塞 (#410)
+- `2026-10-22` · [`2714b6e5`](https://github.com/ybz21/Roami/commit/2714b6e51fff103c599c3c35b564635a854d1fd9) **feat** · feat(browser): 将标签池扩至 20 页并回收空闲标签 (#411)
+- `2026-10-22` · [`ac9d94bb`](https://github.com/ybz21/Roami/commit/ac9d94bb376c009f5e59033141a6bf6a710e1632) **fix** · fix(agent): 任务按时间排序并支持状态筛选 (#413)
+- `2026-10-22` · [`b6c2cf96`](https://github.com/ybz21/Roami/commit/b6c2cf96c31b4b97aa998484e0e0e0080caee86d) **fix** · fix(agent): 移除首页重复标题和顶部留白 (#415)
+- `2026-10-22` · [`bb3e23de`](https://github.com/ybz21/Roami/commit/bb3e23de44965c2c3f6b299b747954eb55a046d7) **feat** · feat(browser): 按来源分组并配置页面休眠回收 (#416)
+- `2026-10-22` · [`b3900fa2`](https://github.com/ybz21/Roami/commit/b3900fa2ab91fae3f30e6e205e46881c5ab5f9b5) **fix** · fix(tasks): 支持未初始化 Git 项目的工作区修复 (#417)
+- `2026-10-22` · [`69fdd472`](https://github.com/ybz21/Roami/commit/69fdd472135eae77d17cd3b504467ea2c8c8d8ec) **fix** · fix(files): 支持拖放文件到文件夹 (#420)
+- `2026-10-22` · [`4858f228`](https://github.com/ybz21/Roami/commit/4858f228a2bc8b92ffe2d9ee4f4d932f81588e64) **fix** · fix(agent): 续改复用原智能体并保留专业会话 (#421)
+- `2026-10-22` · [`3f03b452`](https://github.com/ybz21/Roami/commit/3f03b452afa658f9f7ace55dccabd8c068c5fd1b) · 为 OpenCode 增加对话视图并同步旧会话 (#325)
+- `2026-10-22` · [`c30a958d`](https://github.com/ybz21/Roami/commit/c30a958d8adc6b1445071033ee12300cee700317) **fix** · fix(frontend): 精简侧栏会话分组与缩进 (#423)
+- `2026-10-22` · [`8c7fd408`](https://github.com/ybz21/Roami/commit/8c7fd4083f5f2099f9a222818ef2e46dea161b96) **fix** · fix(agents): 识别本地 OpenCode 并展示已安装版本 (#424)
+- `2026-10-22` · [`99123ceb`](https://github.com/ybz21/Roami/commit/99123ceb6022d6559590c23d03569d32a1d84df1) **fix** · fix: 灰点标记休眠并按改动范围检查 Python (#427)
+- `2026-10-22` · [`a5367dfc`](https://github.com/ybz21/Roami/commit/a5367dfca555b183d5bd3be31318e5202658ee66) **feat** · feat(agents): 支持升级与模型服务预设切换 (#428)
+- `2026-10-22` · [`36bbac3f`](https://github.com/ybz21/Roami/commit/36bbac3fadc6c73bc1e6ec9309a28ece3c09b71e) **feat** · feat(agents): 支持下拉选择服务商模型 (#431)
+- `2026-10-22` · [`b0807c8e`](https://github.com/ybz21/Roami/commit/b0807c8e6bcb4f314acff41a1ec7035441a85813) **feat** · feat(agent): 持久托管 native 会话并打通任务与项目入口 (#430)
+- `2026-10-23` · [`9baf4764`](https://github.com/ybz21/Roami/commit/9baf476432783abb954d102de72f79122800dfd9) **feat** · feat(memory): 重做记忆浏览并归并重复偏好 (#432)
+- `2026-10-23` · [`53c61b2c`](https://github.com/ybz21/Roami/commit/53c61b2c97c9a4201e4380814cff5801cea44ef7) **fix** · fix(install): 打包智能体运行时并自动守护服务 (#433)
+- `2026-10-23` · [`9e57790f`](https://github.com/ybz21/Roami/commit/9e57790f95834a5581812ff4fd785b1c44dea4b9) **docs** · docs(readme): 展示众智之神海报与远程掌管能力 (#434) · `v0.2.0-rc.2`
+- `2026-10-23` · [`c5506e19`](https://github.com/ybz21/Roami/commit/c5506e1922192130366fb64c64fb8fb286267384) **fix** · fix(install): 在 GitHub API 限流时从订阅源查询发布版本 (#435)
+- `2026-10-23` · [`df868ac6`](https://github.com/ybz21/Roami/commit/df868ac61585ea4180f9de771bbf2510346f6dcc) **ci** · ci(release): 随版本发布签名 Android APK (#437)
+- `2026-10-23` · [`dc44c96f`](https://github.com/ybz21/Roami/commit/dc44c96f1b1d0daf88b6b217c73e5cdc4b3b461b) **feat** · feat(capabilities): 接入开放能力市场并统一 MCP 与专业任务调用 (#436)
+- `2026-10-23` · [`93616518`](https://github.com/ybz21/Roami/commit/93616518d3fa446b55dc31c6b5b1a765cea4872b) **fix** · fix(projects): 统一无会话项目卡片及管理操作 (#438)
+- `2026-10-24` · [`f0feabaf`](https://github.com/ybz21/Roami/commit/f0feabaf5dbe863dd41c26d0e9e3044516860dcf) **fix** · fix(agent): 修复空回复堆叠与连续打断后的回复卡死 (#439)
+- `2026-10-24` · [`078464fd`](https://github.com/ybz21/Roami/commit/078464fd6bc43087cfc616dd666a1a204f4f4509) **fix** · fix(documents): 修复手机 PDF 和 PPTX 预览与下载 (#441)
+- `2026-10-24` · [`568f9725`](https://github.com/ybz21/Roami/commit/568f9725856fbd9c060805abccd313a4912e9bb3) **docs** · docs(readme): 重写产品介绍并补充路线图与功能清单 (#442)
+- `2026-10-24` · [`b6d696b0`](https://github.com/ybz21/Roami/commit/b6d696b01ac4bd607d747608eaf9b10ffb905c81) **fix** · fix(mobile): 整理后台任务列表层级与会话入口 (#444)
+- `2026-10-24` · [`33768eac`](https://github.com/ybz21/Roami/commit/33768eac0050a0f4e863c8801c211330f3a6fe21) **feat** · feat(agent): 支持 RSI 实验流水线与问题复测闭环 (#440)
+- `2026-10-24` · [`f5d39a2c`](https://github.com/ybz21/Roami/commit/f5d39a2ce3db8ed3a625ccc563497e09273a11c5) **fix** · fix(agent): 补强 RSI 产物评分与首批问题修复 (#447)
+- `2026-10-25` · [`62abdba9`](https://github.com/ybz21/Roami/commit/62abdba98d561e6bf55ac79a530b6850b17ba090) **fix** · fix(agent): 修复 RSI 预算恢复与源码产物交付 (#448)
+- `2026-10-25` · [`c625d49e`](https://github.com/ybz21/Roami/commit/c625d49eba5cefeba60783edd02a69d60c8f6715) **feat** · feat(chat): 统一本地智能体会话与对话输入体验
+- `2026-10-25` · [`2c22c9eb`](https://github.com/ybz21/Roami/commit/2c22c9ebb00be789d96ee9244b496c36b04a5379) **fix** · fix(agent): 修复 RSI 文件恢复与交付 (#449)
+- `2026-10-25` · [`ac8a8c72`](https://github.com/ybz21/Roami/commit/ac8a8c72c7f17cad0952ac6ae44225069a1938d7) **fix** · fix(agent): 使用 Roami 品牌标识展示自身智能体
+- `2026-10-25` · [`33d3e5bf`](https://github.com/ybz21/Roami/commit/33d3e5bf4cb666ff372c8a8be52397283a01938d) **fix** · fix(codex): 修复恢复旧会话后手机记录为空 (#425)
+- `2026-10-25` · [`73cbca58`](https://github.com/ybz21/Roami/commit/73cbca581f1ba813ac117252bbd8c56273cbdab8) **fix** · fix(agent): 修复本机进程查询误入浏览器模式 (#452)
+- `2026-10-25` · [`f86c6f22`](https://github.com/ybz21/Roami/commit/f86c6f22b8ea7af0ddaf0f328c68e646651ecf5e) **fix** · fix(agent): 按作用域统一无工作区本机执行 (#453)
+- `2026-10-25` · [`57752964`](https://github.com/ybz21/Roami/commit/57752964a0732d52a63d088a9a282135cd32e040) **fix** · fix(sessions): 允许无 Git 目录创建任务
+- `2026-10-26` · [`d03df202`](https://github.com/ybz21/Roami/commit/d03df202ccfa57fb5dbf7a67ea262f438329a6dd) **fix** · fix(agent): 避免任务验收后重复回报结果 (#455)
+- `2026-10-26` · [`0b2d67fa`](https://github.com/ybz21/Roami/commit/0b2d67faf2cdb9cd6001d0d76c85913d2fc52780) **fix** · fix(chat): 将用量状态嵌入对话输入框 (#457)
+- `2026-10-26` · [`f3622829`](https://github.com/ybz21/Roami/commit/f36228290efcf8bdb2658365a9a7313ca28f7387) **feat** · feat(agent): 增加本地模型代理、限额与用量统计 (#458)
+- `2026-10-26` · [`b8791e2e`](https://github.com/ybz21/Roami/commit/b8791e2eda9970d340c59e97c72e04cd2b2465ec) **fix** · fix(execution): 恢复 Codex 完成回报与观察状态 (#461)
+- `2026-10-26` · [`7342f3ae`](https://github.com/ybz21/Roami/commit/7342f3aef09f2e1ac3c1454687e223e705027b93) **feat** · feat(agent): 按上游费用计费并按模型展示用量 (#459)
+- `2026-10-26` · [`dc22be9e`](https://github.com/ybz21/Roami/commit/dc22be9eb2379445a352d0fff16f4066a416ec44) **perf** · perf(frontend): 缩减首屏资源与非首页聊天预取 (#460) · `v0.2.1`
+- `2026-10-27` · [`c3f53abd`](https://github.com/ybz21/Roami/commit/c3f53abd8bca260bec4f261cae7a59b01f936324) **fix** · fix(agent): 修复任务续办归属、分项交办与会话命名 (#462)
+- `2026-10-27` · [`be3bbd9e`](https://github.com/ybz21/Roami/commit/be3bbd9ef7f0bc15c38d240b3035a532a96c2e9a) **feat** · feat(agent): 支持模型单价兜底与搜索管理 (#463)
+- `2026-10-27` · [`794957f0`](https://github.com/ybz21/Roami/commit/794957f0dcd79ab158f751beeada092a260da1b8) **feat** · feat(agent): 统一 RSI 费用限额并改进用量交互 (#464)
+- `2026-10-27` · [`af62d7d0`](https://github.com/ybz21/Roami/commit/af62d7d0f9b85781552955d6c52e8a656b32fcf4) **feat** · feat(rsi): 按运行查看工作流并统一模型限额 (#456)
+- `2026-10-28` · [`3d132f68`](https://github.com/ybz21/Roami/commit/3d132f68824e23c31e8dea79be5d5f706db09a75) **refactor** · refactor(rsi): 分离流程持久化与评测层并公开 Case 材料 (#465)
+- `2026-10-28` · [`9ba19a93`](https://github.com/ybz21/Roami/commit/9ba19a93bac96739f0aaff8c5acb455fa192188a) **refactor** · refactor(settings): 按用途整理五组设置并简化导航
+- `2026-10-28` · [`eb6372ed`](https://github.com/ybz21/Roami/commit/eb6372edb53828dd43daa4243639e46f4b9dd4ad) **fix** · fix(agent): 对话事件提交后立即推送到 Go 网关 (#468)
+- `2026-10-28` · [`bb9e7264`](https://github.com/ybz21/Roami/commit/bb9e7264fa5dcf47d10236b4152c63584591105a) **fix** · fix(mcp): 开启后自动保活并支持中文名称与描述 (#467)
+- `2026-10-28` · [`c8bd695f`](https://github.com/ybz21/Roami/commit/c8bd695fb6be60e1636d67a13c464b5300c59579) **fix** · fix(billing): 未配置模型单价时按零价继续请求 (#470)
+- `2026-10-28` · [`ac6a97b5`](https://github.com/ybz21/Roami/commit/ac6a97b539ea03ac6379f91fbc1e703dc377d35e) **fix** · fix(rsi): 修复统一限额、连带阻塞和评测总结
+- `2026-10-28` · [`7e809e69`](https://github.com/ybz21/Roami/commit/7e809e69e34ccee12025fed6bcc4377d505e1a5b) **docs** · docs(agents): 精简规则并按主题归位设计记录
+- `2026-10-28` · [`b509bb4f`](https://github.com/ybz21/Roami/commit/b509bb4f14688a7881c4e88be08d6b6d107d5c0d) **fix** · fix(mcp): 独立后台守护并解耦 Web 与 Agent 生命周期 (#471)
+- `2026-10-28` · [`3741c9ba`](https://github.com/ybz21/Roami/commit/3741c9baf3bef49cc321f8cf124986aef7a6025b) **fix** · fix(agent): 复用 Go 网关并修复失败回复状态竞态 (#473)
+- `2026-10-28` · [`5d289bbd`](https://github.com/ybz21/Roami/commit/5d289bbdb76b20d7fe5c5dea573baba52d55020f) **fix** · fix(rsi): 统一网关准入并保留正式评测阻塞证据 (#474)
+- `2026-10-28` · [`ad7cfbe9`](https://github.com/ybz21/Roami/commit/ad7cfbe9861cf88cb63a95728161e267ea6d2a2d) **fix** · fix(rsi): 按可见卡片验收筛选结果 (#475)
+- `2026-10-28` · [`5eedf9dd`](https://github.com/ybz21/Roami/commit/5eedf9dda84c75993a949578c4679287a3ab128d) **fix** · fix(rsi): 明确量化数据质量输出合同 (#476)
+- `2026-10-28` · [`c8a05e2f`](https://github.com/ybz21/Roami/commit/c8a05e2f1d1d10bd5647ca30d17b89d2039eb3ef) **fix** · fix(rsi): 保留独立重跑工作区并按轮次选取提交答案 (#478)
+- `2026-10-28` · [`010218d7`](https://github.com/ybz21/Roami/commit/010218d7b1b886644750b22b9260b04c7c7c8837) **fix** · fix(rsi): 修复交付原文、复盘错误与静态页验收 (#480)
+- `2026-10-29` · [`339c2f89`](https://github.com/ybz21/Roami/commit/339c2f89307d68c71db4adb09d25afa346c74383) **fix** · fix(agent): research 共享后台工具并保留 tool\_list 接口 (#479)
+- `2026-10-29` · [`6c33f365`](https://github.com/ybz21/Roami/commit/6c33f365521fc5c2db7c2caa0d4e251b64b4c171) **fix** · fix(rsi): 容纳合法图片请求并保留桥接错误 (#481)
+- `2026-10-29` · [`327018dd`](https://github.com/ybz21/Roami/commit/327018dd31b47b375e09d4af7cb69e07acf4a33a) **fix** · fix(rsi): 让 Codex 复盘统一经过模型网关 (#483)
+- `2026-10-29` · [`85ca2cc4`](https://github.com/ybz21/Roami/commit/85ca2cc4f88aa6c8c991ab040fe7a118e0cfd0fa) **fix** · fix(rsi): 恢复超时运行的工具证据 (#484)
+- `2026-10-29` · [`ad7619a7`](https://github.com/ybz21/Roami/commit/ad7619a7342a4a0b2411b7c396904c314306b527) **fix** · fix(rsi): 补齐演示文稿和工具失败的汇总原因 (#485)
+- `2026-10-29` · [`80da029b`](https://github.com/ybz21/Roami/commit/80da029b5b1a274f0887420c2b83a243be5ab870) **fix** · fix(rsi): 对齐原文换行并修复交办恢复参数 (#486)
+- `2026-10-29` · [`4a66e9f2`](https://github.com/ybz21/Roami/commit/4a66e9f2184ecc05ed09550969a203cfecacf2e9) **fix** · fix(rsi): 按图表页检查股票报告结构 (#487)
+- `2026-10-29` · [`0ec1b160`](https://github.com/ybz21/Roami/commit/0ec1b160321bf1051876d959fd42e70264ef3402) **fix** · fix(rsi): 评分沿用模型页准入并校正预算证据 (#488)
+- `2026-10-29` · [`e383b06c`](https://github.com/ybz21/Roami/commit/e383b06cef3da621ff55ba6ade10cfa500b20c6b) **feat** · feat(agent): 在对话中实时展示工具与派生执行过程 (#482)
+- `2026-10-29` · [`b730c55c`](https://github.com/ybz21/Roami/commit/b730c55ced2e7ff51f57d0d5758aab4220016e93) **feat** · feat(native): 为工作区图片读取提供受限视觉快照 (#489)
+- `2026-10-29` · [`bc76414b`](https://github.com/ybz21/Roami/commit/bc76414b0188ff0ea0faa324e29ff9e641069650) **feat** · feat(models): 增加本地网关计费限额并恢复管理页面 (#490)
+- `2026-10-29` · [`d77c2e3e`](https://github.com/ybz21/Roami/commit/d77c2e3ebb8a871d3513f4340b351931c6cb83de) **fix** · fix(rsi): 保留原生分数与媒体交付证据 (#491)
+- `2026-10-29` · [`9d9447e0`](https://github.com/ybz21/Roami/commit/9d9447e02b8bf3d5240eee64cbfc23c555252056) **fix** · fix(native): 保留六图对照并统一图片载荷预算 (#493)
+- `2026-10-29` · [`476de650`](https://github.com/ybz21/Roami/commit/476de65041f7ca92e4d2d164c2d8a17fdac65494) **fix** · fix(agent): 为内置任务分配独立可写目录 (#492)
+- `2026-10-29` · [`db2511af`](https://github.com/ybz21/Roami/commit/db2511af3f324d27dcfc914710ecc6d35a1895fc) **fix** · fix(rsi): 复盘与评分沿用底层模型配置 (#494)
+- `2026-10-29` · [`1583b1e1`](https://github.com/ybz21/Roami/commit/1583b1e19332946c1e3f0d131586b83287f07bf1) **fix** · fix(rsi): 修复运行结果、产物与配置交互 (#495)
+- `2026-10-29` · [`b0fb4a19`](https://github.com/ybz21/Roami/commit/b0fb4a19ecff52f22a0b55920890752aa74cc2ea) **fix** · fix(rsi): 容器继承模型窗口与压缩策略 (#496)
+- `2026-10-29` · [`8c57bc7e`](https://github.com/ybz21/Roami/commit/8c57bc7e46e9431325d9984ada94b3d805173203) **fix** · fix(agent): 普通答复默认走流式正文 (#477)
+- `2026-10-29` · [`d8ce98b4`](https://github.com/ybz21/Roami/commit/d8ce98b45a63c67eb6393ce6173f2b8006ee07b7) **fix** · fix(rsi): 保留无效判定回执与独立交付检查 (#497)
+- `2026-10-29` · [`01f8948e`](https://github.com/ybz21/Roami/commit/01f8948e1038d397c4c8a05669b35c793d94d29c) **fix** · fix(agent): 派发任务默认启用自动执行模式 (#498)
+- `2026-10-29` · [`850cddce`](https://github.com/ybz21/Roami/commit/850cddce7833099f57e51881cca647f06fabe3bf) **fix** · fix(rsi): 区分验收请求来源并保留统一每日限额
+- `2026-10-29` · [`480b61d9`](https://github.com/ybz21/Roami/commit/480b61d9940301b71a23fdf7de662db4dd5fcea0) **fix** · fix(rsi): 保留文稿比较的未评分状态与真实关联
+- `2026-10-29` · [`a7d6ead0`](https://github.com/ybz21/Roami/commit/a7d6ead01b10335101b9b087d020fba4d4ac10eb) **fix** · fix(model): 保留私有流的鉴权和代理错误码
+- `2026-10-29` · [`bcf5e3b1`](https://github.com/ybz21/Roami/commit/bcf5e3b1efb801f22afa61727fe8e3dcacbe4453) **fix** · fix(rsi): 鉴权阻断后停止派生调用并保留首发归因
+- `2026-10-29` · [`9e381ed1`](https://github.com/ybz21/Roami/commit/9e381ed118d32fc6ecb5ff2925c9d754e801730f) **fix** · fix(model): 保留失败请求的上游编号回执
+- `2026-10-29` · [`a2b60307`](https://github.com/ybz21/Roami/commit/a2b60307a84f30955dcf6f49e7df5be0485de52c) **fix** · fix(rsi): 超时后保留真实产物判定与失败原因
+- `2026-10-29` · [`83f0cdbf`](https://github.com/ybz21/Roami/commit/83f0cdbf4fc8d53b299c5a9cd59942cd3a2c045e) **fix** · fix(rsi): 验收复用有效模型配置并提供执行时长
+- `2026-10-29` · [`912c5876`](https://github.com/ybz21/Roami/commit/912c5876ebd9c34aa2153097ddc6c0b314443433) **fix** · fix(rsi): 标明超时后的产物核验来源
+- `2026-10-29` · [`63b88c9a`](https://github.com/ybz21/Roami/commit/63b88c9af3e399f4b3dae99907bd81e19a46fdf4) **fix** · fix(tasks): 避免附件收集上限误报文件不可用
+- `2026-10-29` · [`41673105`](https://github.com/ybz21/Roami/commit/4167310549204309bcc2cd438c34c7e83c68e805) **fix** · fix(rsi): 移除股票任务中的额外清洗约束
+- `2026-10-30` · [`8c1e364d`](https://github.com/ybz21/Roami/commit/8c1e364d782b6937dd2ab93a9bc800b09073f564) **fix** · fix(agent): 文件交付回报保留实际结果总结
+- `2026-10-30` · [`1df43e1c`](https://github.com/ybz21/Roami/commit/1df43e1c2e8a5d8f34daff3845109407ff10c257) **fix** · fix(rsi): 移除验收文稿的额外八页限制
+- `2026-10-30` · [`e0c5d584`](https://github.com/ybz21/Roami/commit/e0c5d58474b9e7499fc0b088390f0e22a14eb9ee) **fix** · fix(agent): 统一完成回报与默认主指令
+- `2026-10-30` · [`b78c527b`](https://github.com/ybz21/Roami/commit/b78c527bdb0b141452abfc57f548130a004f4f3c) **fix** · fix(rsi): 修复任务容器的 Office 导出和字体环境
+- `2026-10-30` · [`d2a57515`](https://github.com/ybz21/Roami/commit/d2a575158c838c79e548fe87d6c10c9718a4717a) **fix** · fix(models): 每日限额等待在途调用结算再准入
+- `2026-10-30` · [`e43a4816`](https://github.com/ybz21/Roami/commit/e43a481675c3af76023c7fbb5fe48cc1e17964ec) **fix** · fix(rsi): 评分前完整校验并冻结人工参考材料
+- `2026-10-30` · [`f9a84ca9`](https://github.com/ybz21/Roami/commit/f9a84ca94835a2590a403f7739c4b0e5e9641c0b) **fix** · fix(rsi): 仅在媒体判定器成功结束后发布有效分数
+- `2026-10-30` · [`285d8b21`](https://github.com/ybz21/Roami/commit/285d8b21aaf45f19781b1cb68f94a4312aaa6cfa) **fix** · fix(rsi): 保留CSV比较失败类别而不暴露参考数据
+- `2026-10-30` · [`df7c47cd`](https://github.com/ybz21/Roami/commit/df7c47cd50791fbb6d43c04befe60c6697372d74) **fix** · fix(rsi): CLI继承节点模型并统一每日限额
+- `2026-10-30` · [`3691e33e`](https://github.com/ybz21/Roami/commit/3691e33ed3cc05ef89f4ea00c2221de144394830) **fix** · fix(agent): 统一任务CLI指引并默认使用自动权限 (#518)
+- `2026-10-30` · [`b70ab03d`](https://github.com/ybz21/Roami/commit/b70ab03ddc967aba0833e9c7fa37b2825b59c428) **fix** · fix(rsi): 自动绑定本地网关并核对真实计费 (#519)
+- `2026-10-30` · [`1b8fff9f`](https://github.com/ybz21/Roami/commit/1b8fff9f2c0dd47228ecb407d15a12965d773ebc) **fix** · fix(rsi): 统一使用Go网关额度并移除框架限额 (#520)
+- `2026-10-30` · [`ef8f6f2e`](https://github.com/ybz21/Roami/commit/ef8f6f2ed91fcea2e4ac3c3d2a72fa470add4195) **fix** · fix(rsi): 将模型路由收归本地网关并补齐验收窗口 (#522)
+- `2026-10-30` · [`4ceb1d3e`](https://github.com/ybz21/Roami/commit/4ceb1d3e775904c65a054449d3e59ea33e7c5912) **fix** · fix(frontend): 修复 PDF 预览持续闪烁 (#521)
+- `2026-10-30` · [`b14962f0`](https://github.com/ybz21/Roami/commit/b14962f0c774607182adc511d65a790386421aed) **fix** · fix(tasks): 恢复待确认回报与产物并补齐交付 Case (#524)
+- `2026-10-30` · [`73706f48`](https://github.com/ybz21/Roami/commit/73706f4824e1bc07c5823ea210fcf14d2325a619) **fix** · fix(rsi): 修复机制入口与登录命令的工具环境 (#525)
+- `2026-10-30` · [`7ee2f80c`](https://github.com/ybz21/Roami/commit/7ee2f80c75bf386a3ccb53155544968d5123f24a) **fix** · fix(execution): 处理已退出进程的 stat 读取竞态 (#526)
+- `2026-10-30` · [`dda200df`](https://github.com/ybz21/Roami/commit/dda200dfe54e956673f01f1842962b29fec125ab) **feat** · feat(agent): 增加分层的演示文稿结构读取能力 (#527)
+- `2026-10-30` · [`8ed112cb`](https://github.com/ybz21/Roami/commit/8ed112cbd8dd5ba4eaca0170c6cfcccb6feecb43) **fix** · fix(agent): 在任务准备阶段读取显式文稿输入 (#529)
+- `2026-10-30` · [`5d13fe97`](https://github.com/ybz21/Roami/commit/5d13fe97e0538c5cb12d7773a150f2caabea91df) **fix** · fix(frontend): 修复对话中的本机文件链接打开空白 (#528)
+- `2026-10-30` · [`1830f455`](https://github.com/ybz21/Roami/commit/1830f455f4b8f2d5914be12a9600b6b629bfdd94) **fix** · fix(agent): 保留模型请求关联与重试用量回执 (#530)
+- `2026-10-30` · [`9e8dac3e`](https://github.com/ybz21/Roami/commit/9e8dac3ef9d223565d7253d20fbcb8dc5a7a8cc1) **fix** · fix(agent): 自动文稿准备遵守执行能力策略 (#531)
+- `2026-10-30` · [`6693d47d`](https://github.com/ybz21/Roami/commit/6693d47d1b85b0b9f7ec40c85cf05480f4aaa300) **fix** · fix(agent): 区分演示文稿绘制与位置顺序 (#535)
+- `2026-10-30` · [`9ca115ff`](https://github.com/ybz21/Roami/commit/9ca115ff82c3f3b9ff075af6043c999bdf953f12) **fix** · fix(agent): 关闭任务会话时自动停止执行并清理工作区 (#534)
+- `2026-10-30` · [`5ae3ec3c`](https://github.com/ybz21/Roami/commit/5ae3ec3c4b03764c3d8eba2dbeb55710ef1edb05) **fix** · fix(frontend): 修复标签右键菜单提前消失 (#533)
+- `2026-10-30` · [`7b4aa291`](https://github.com/ybz21/Roami/commit/7b4aa2918f96d9afb2e685c4ba98cb8a5866b876) **fix** · fix(agent): 让冻结请求回归包携带输入数据 (#536)
+- `2026-10-30` · [`0bf5faf5`](https://github.com/ybz21/Roami/commit/0bf5faf515389902439ab945fc00146cc97d64bf) **fix** · fix(agent): 分离宿主验收与冻结运行时回归 (#537)
+- `2026-10-30` · [`d0179d0f`](https://github.com/ybz21/Roami/commit/d0179d0f3b4cf36b1b77100d6ee4e31401779a74) **fix** · fix(frontend): 优化 PDF 适配、跳页与手机阅读 (#532)
+- `2026-10-31` · [`4a4ffc36`](https://github.com/ybz21/Roami/commit/4a4ffc36e77aaa388cbc212e085b269605541c53) **fix** · fix(workspace): 将会话标签统一保存到后台并跨端同步 (#539)
+- `2026-10-31` · [`ecc89132`](https://github.com/ybz21/Roami/commit/ecc89132a8b868d5629b2a83d9e93d95e9d1fe8b) **feat** · feat(skills): 以外挂技能提供PPTX编辑能力 (#538)
+- `2026-10-31` · [`a5c2c584`](https://github.com/ybz21/Roami/commit/a5c2c584d39da9543f10129046ddd7a1853c4167) **refactor** · refactor(agent): 将文稿读取与自动注入迁出核心 (#541)
+- `2026-10-31` · [`95530bea`](https://github.com/ybz21/Roami/commit/95530bea23e4b00104d55564b84dff5d302b9d48) **fix** · fix(agent): 返回本地 Skill 的完整资源目录 (#542)
+- `2026-10-31` · [`12fc47f4`](https://github.com/ybz21/Roami/commit/12fc47f4401da06cb896ac0f4de796820eafdcf8) **fix** · fix(agent): 在初始工具目录展示外挂 Skill 元数据 (#543)
+- `2026-10-31` · [`d82e76d3`](https://github.com/ybz21/Roami/commit/d82e76d3c7491587f4359f643208b07cb9e2063d) **fix** · fix(agent): 让已安装工作流进入实际执行上下文 (#544)
+- `2026-10-31` · [`eaeb6b7d`](https://github.com/ybz21/Roami/commit/eaeb6b7d4ca96bc53053edb87a1b443e12254d5e) **fix** · fix(rsi): 在隔离执行中继承保存的角色指令 (#545)
+- `2026-10-31` · [`75e0fe50`](https://github.com/ybz21/Roami/commit/75e0fe50335a9ac2a0f0cac25675911e8c05a40f) **fix** · fix(agent): 保留源副本契约并提供可选表格导出 (#546)
+- `2026-10-31` · [`2c60f575`](https://github.com/ybz21/Roami/commit/2c60f57502737b9e3891ba9a6af7a997ee901384) **fix** · fix(skill): 明确 CSV 导出规格与类型转换 (#547)
+- `2026-10-31` · [`8b51ea3c`](https://github.com/ybz21/Roami/commit/8b51ea3c191881459b98ed0c7dd728946a81bceb) **fix** · fix(skill): 聚焦演示文稿目标页并保留命名颜色 (#548)
+- `2026-10-31` · [`6069bcba`](https://github.com/ybz21/Roami/commit/6069bcbaedf93229f65ee2d948691ace0668df27) **fix** · fix(agent): 修复主对话追加状态与完成回调重派 (#540)
+- `2026-10-31` · [`3ca65e43`](https://github.com/ybz21/Roami/commit/3ca65e435a8923aba41b445b9a6845c188067c16) **fix** · fix(rsi): 保留媒体验收分项证据 (#549)
+- `2026-10-31` · [`b991fff8`](https://github.com/ybz21/Roami/commit/b991fff83f5aa6d17a6656d0397bc52296b4411b) **feat** · feat(models): 统一模型管理与智能体原厂和自定义切换 (#550)
+- `2026-10-31` · [`b1fefaf2`](https://github.com/ybz21/Roami/commit/b1fefaf22404b306f372818b0c7ae39af4d547db) **fix** · fix(rsi): 展示音频分区得分与折叠指标 (#551)
+- `2026-10-31` · [`504c2ec6`](https://github.com/ybz21/Roami/commit/504c2ec640f3c78639dc39572f18d13a518d712d) **feat** · feat(skills): 添加外挂整段视频拼接 (#552)
+- `2026-10-31` · [`8fcb07e0`](https://github.com/ybz21/Roami/commit/8fcb07e0e425f5108b87b3d149906e68542381b2) **fix** · fix(rsi): 忽略未开始请求的空模型连接 (#553)
+- `2026-10-31` · [`ea79bdee`](https://github.com/ybz21/Roami/commit/ea79bdee6f8dd16e7c78a87c2f30faca0c61cddc) **fix** · fix(agent): 保留模型传输失败定位证据 (#554)
+- `2026-10-31` · [`1a3e2736`](https://github.com/ybz21/Roami/commit/1a3e273648590b63c4f3054fcc6871d9af5ef8d8) **feat** · feat(skills): 添加有统计口径的数值概况 (#555)
+- `2026-10-31` · [`4d78a20e`](https://github.com/ybz21/Roami/commit/4d78a20e1301e4fe638ddefe5753af7a676cd27b) **fix** · fix(agent): 修复最终回复的产物下载链接 (#556)
+- `2026-10-31` · [`3db0ec95`](https://github.com/ybz21/Roami/commit/3db0ec95c7f976b4b687fc282f44b739b2d4949c) **fix** · fix(agent): 接通主Agent本地图片输入 (#557)
+- `2026-10-31` · [`e13a81bf`](https://github.com/ybz21/Roami/commit/e13a81bfa3a4862baccf318759cef9a5f45de9b2) **fix** · fix(agent): 派活前明确保存的角色图片能力 (#558)
+- `2026-10-31` · [`cebea4fa`](https://github.com/ybz21/Roami/commit/cebea4fa58b6a60a1d487385f7d1381504935497) **fix** · fix(agent): 修复启动取消并补齐统计溯源 (#559)
+- `2026-10-31` · [`06d84072`](https://github.com/ybz21/Roami/commit/06d840728068f4ba160fa834760426c6d95f298a) **fix** · fix(agent): 让前台Runtime随父进程退出 (#560)
+
+## 2026-11（367）
+
+- `2026-11-01` · [`37aded63`](https://github.com/ybz21/Roami/commit/37aded6367c25bc839e61fc9a8602be508453b44) **fix** · fix(agent): 传递已存在的执行窗口上下文 (#561)
+- `2026-11-01` · [`641bd5cc`](https://github.com/ybz21/Roami/commit/641bd5cc3ab5de69cade88473d326dd25ac706a3) **fix** · fix(agent): 区分成品交付与内部执行证据 (#562)
+- `2026-11-01` · [`a033ff9e`](https://github.com/ybz21/Roami/commit/a033ff9ee34b44048e98b2c5b4a81fc79d2218f8) **fix** · fix(skills): 补齐表格类型处理与报告证据 (#563)
+- `2026-11-01` · [`3b62f1f2`](https://github.com/ybz21/Roami/commit/3b62f1f2944b4bff3d6c568e72117fa61c179081) **feat** · feat(models): 统一模型连接并适配智能体协议 (#564)
+- `2026-11-01` · [`7afe3a44`](https://github.com/ybz21/Roami/commit/7afe3a44921ac448c7e3fd5d38b29b147b944773) **feat** · feat(agent): 衔接外挂工作流选择与已读上下文 (#565)
+- `2026-11-01` · [`d9045c98`](https://github.com/ybz21/Roami/commit/d9045c9850bdd12ed7978c1f2f3bf9ee6cb5f1a9) **fix** · fix(skills): 发布前核对未决数值表示 (#566)
+- `2026-11-01` · [`ce703ad8`](https://github.com/ybz21/Roami/commit/ce703ad8a59343df03ffdbee2f7ae5f2bce54780) **fix** · fix(rsi): 绑定原评分与复核产物的哈希 (#567)
+- `2026-11-01` · [`10060eea`](https://github.com/ybz21/Roami/commit/10060eeaff0f895c75010bef8fe68dc25d9c1379) **fix** · fix(rsi): 保留容器失败的私有错误证据 (#568)
+- `2026-11-01` · [`75b429bc`](https://github.com/ybz21/Roami/commit/75b429bc0c1d5013a7000e09ff9e1b64e4cff163) **fix** · fix(rsi): 保留中断前已完成的评分回执 (#569)
+- `2026-11-01` · [`321a024d`](https://github.com/ybz21/Roami/commit/321a024d6065ebd0056aaf2fcc87f03f97ef4722) **fix** · fix(skills): 区分列身份与数值表示 (#570)
+- `2026-11-01` · [`6b749199`](https://github.com/ybz21/Roami/commit/6b749199975baedd6990ac7740483f31910f6d55) **docs** · docs(rsi): 记录主后台视觉分工原题对照 (#571)
+- `2026-11-01` · [`f2ddc074`](https://github.com/ybz21/Roami/commit/f2ddc07476115394e69993c51a18f92308a5a2d0) **fix** · fix(rsi): 隔离错误模型JSON并保持研究队列运行 (#572)
+- `2026-11-01` · [`6c65a8f8`](https://github.com/ybz21/Roami/commit/6c65a8f844d0592c24463658a0804e4acf195d82) **fix** · fix(tabular): 约束相关性结论的变量与时间范围 (#573)
+- `2026-11-01` · [`45e5b095`](https://github.com/ybz21/Roami/commit/45e5b09573452557f87c2bbf56fc25621c8a2be2) **fix** · fix(rsi): 校验评分对象并保留失败回执 (#574)
+- `2026-11-01` · [`892fc9f3`](https://github.com/ybz21/Roami/commit/892fc9f342fefb5ff4dfc8c0cf363b9870823868) **feat** · feat(tabular): 增加源快照绑定的统计比较 (#576)
+- `2026-11-01` · [`143b0c61`](https://github.com/ybz21/Roami/commit/143b0c61f046f981b61dd2a2df071811dec21fdf) **feat** · feat(onboarding): 复用现有页面增加模型优先的新用户引导 (#577)
+- `2026-11-01` · [`eae0ac74`](https://github.com/ybz21/Roami/commit/eae0ac742fc314d7cfe400994e2c7d8a8f283f4c) **fix** · fix(agent): 返回可直接读取的 Skill 资源地址 (#578)
+- `2026-11-01` · [`5d66fbe8`](https://github.com/ybz21/Roami/commit/5d66fbe864dcd42b55e78abc700fea36ac6f2bea) **feat** · feat(models): 简化模型源配置并批量拉取模型 (#579)
+- `2026-11-01` · [`87e0dbaa`](https://github.com/ybz21/Roami/commit/87e0dbaa523b4f287a7ee234b154d1c6453b07f8) **fix** · fix(onboarding): 精简桌面与手机起步页 (#581)
+- `2026-11-01` · [`8ad137dc`](https://github.com/ybz21/Roami/commit/8ad137dcd012d121216015825bd531e6ccd8b001) **feat** · feat(rsi): 支持委托 AI 参考与演示稿质量复核 (#582)
+- `2026-11-01` · [`20f5005f`](https://github.com/ybz21/Roami/commit/20f5005f6cdd09e5d323b1c43cd80f34ea1e1b8d) **docs** · docs(rsi): 补齐参考池并归档定量演示稿 (#583)
+- `2026-11-02` · [`7a3d7443`](https://github.com/ybz21/Roami/commit/7a3d74432b0dfe9eeb99b255631f1f5c94d45293) **feat** · feat(models): 复用本地模型源并按默认智能体记账 (#584)
+- `2026-11-02` · [`d02e5fff`](https://github.com/ybz21/Roami/commit/d02e5fff25eec55db7c7618e2c20d6c3c333d71f) **fix** · fix(models): 修正本机直连预设的网关接入状态 (#585)
+- `2026-11-02` · [`38aa2b4c`](https://github.com/ybz21/Roami/commit/38aa2b4c7e06a4c27917e04ef83d2cbcec9ee764) **fix** · fix(models): 明确显示 Roami 模型网关接入 (#586)
+- `2026-11-02` · [`d552b9c6`](https://github.com/ybz21/Roami/commit/d552b9c6471a20158373c7aa83cc3adab686b2dd) **fix** · fix(models): 保留上游错误状态并隔离网关响应头 (#587)
+- `2026-11-02` · [`0d4cfe4c`](https://github.com/ybz21/Roami/commit/0d4cfe4c234c5732ec515b5de3f412aae38cb30b) **fix** · fix(agent): 按需分页加载列表与消息详情 (#588)
+- `2026-11-02` · [`840e1b77`](https://github.com/ybz21/Roami/commit/840e1b77185e5b6e224955208f40269877e4c085) **feat** · feat(files): 支持浏览器和安卓上传文件夹 (#326)
+- `2026-11-02` · [`08ad956b`](https://github.com/ybz21/Roami/commit/08ad956beaa55d5014445b315dec1765958cd4b1) **fix** · fix(web): 适配 Mac 终端快捷键并保留 Windows 操作 (#575)
+- `2026-11-02` · [`2105cd3a`](https://github.com/ybz21/Roami/commit/2105cd3a5f69e37961465777df11944fa57e8912) **fix** · fix(skills): 生成演示稿前预检实际渲染字体
+- `2026-11-02` · [`01768bd8`](https://github.com/ybz21/Roami/commit/01768bd89fa119bae27c117f53695beca5a93851) **feat** · feat(skills): 支持保留格式的演示稿文本替换
+- `2026-11-02` · [`208323f4`](https://github.com/ybz21/Roami/commit/208323f44e3a74501a8a081e4075cb5e01b75ed4) **fix** · fix(agent): 修复任务中断分类、原会话附图与续作恢复 (#597)
+- `2026-11-02` · [`bd1871e3`](https://github.com/ybz21/Roami/commit/bd1871e39a69637c959a72b7db28427c8af26d27) **test** · test(rsi): 增加任务中断与附图续作回归案例 (#602)
+- `2026-11-02` · [`baa193d3`](https://github.com/ybz21/Roami/commit/baa193d35ca5eb9327e7659593311ce4bc31ae7e) **fix** · fix(frontend): 独立打开任务结果文件预览 (#603)
+- `2026-11-02` · [`93b1428b`](https://github.com/ybz21/Roami/commit/93b1428b44cbc020d7775e48f986ad6445ef9565) **docs** · docs(design): 规划默认低中高四档思考强度 (#607)
+- `2026-11-02` · [`dfa496a1`](https://github.com/ybz21/Roami/commit/dfa496a19263887f4956c4849dec9fd7bb75a137) **feat** · feat(rsi): 增加多轮聊天与任务构建评测 (#606)
+- `2026-11-03` · [`5f80e81a`](https://github.com/ybz21/Roami/commit/5f80e81a75fe384a59066416f8dd3e9c5a28d730) **feat** · feat(skills): 添加事实绑定的行情报告流水线 (#608)
+- `2026-11-03` · [`550eaca6`](https://github.com/ybz21/Roami/commit/550eaca62968e65f76710316296a5dec379df4e1) **fix** · fix(rsi): 保留会话验收的网关阻塞原因 (#610)
+- `2026-11-03` · [`9cb5abb7`](https://github.com/ybz21/Roami/commit/9cb5abb79bd5d575adcc735d31397f5e61a91248) **fix** · fix(agent): 保留网关结算状态和回报失败原因 (#612)
+- `2026-11-03` · [`6462e857`](https://github.com/ybz21/Roami/commit/6462e857571b360d13fefab442d853d195287611) **fix** · fix(agent): 保留网关就绪与鉴权准入拒绝 (#614)
+- `2026-11-03` · [`518eccff`](https://github.com/ybz21/Roami/commit/518eccff52a6e175b2fc98a9902471e0195b83d6) **docs** · docs(rsi): 记录核心机制与行情修订稿验收 (#615)
+- `2026-11-03` · [`7612c087`](https://github.com/ybz21/Roami/commit/7612c08737e2937ad4dee282737b58f0f256ab7d) **fix** · fix(agent): 回报失败时保留可信产物与真实任务状态 (#617)
+- `2026-11-03` · [`c5dd1615`](https://github.com/ybz21/Roami/commit/c5dd16156d2294e31d55ce6548fa4f02eb334c4a) **feat** · feat(skill): 增加视频时序预览与实际帧回执 (#619)
+- `2026-11-03` · [`146db6f4`](https://github.com/ybz21/Roami/commit/146db6f4bf85f5bf79863e7f8aa910a3d5ffe421) **fix** · fix(agent): 校验模型能力并保留原生验收续跑控制 (#622)
+- `2026-11-03` · [`c4494f95`](https://github.com/ybz21/Roami/commit/c4494f95e871b163f0fb6d86bb4addfb68e9262d) **fix** · fix(agent): 精简历史保留可信派活回执 (#625)
+- `2026-11-03` · [`48ec9151`](https://github.com/ybz21/Roami/commit/48ec915177ebe97f708b8f44d4568b106856960b) **fix** · fix(agent): 无副作用纠正结束工具混合批次 (#627)
+- `2026-11-03` · [`91bcfc9e`](https://github.com/ybz21/Roami/commit/91bcfc9e93ccab5f5ec311ad884b630dbbd68418) **fix** · fix(agent): 保留历史回复的送达事实 (#629)
+- `2026-11-03` · [`4ad5d080`](https://github.com/ybz21/Roami/commit/4ad5d0808bb6ecf85c2758b90dca1f189a575877) **fix** · fix(models): 修复拒绝请求误记未知费用并补充模型编辑入口 (#630)
+- `2026-11-03` · [`0a2a89e4`](https://github.com/ybz21/Roami/commit/0a2a89e47eed2583d1334770289b2eb4e44ee4be) **fix** · fix(agent): 取消期间完整保存执行失败记录 (#632)
+- `2026-11-03` · [`07f41d51`](https://github.com/ybz21/Roami/commit/07f41d51a5601a82d15418d967ce7276ed66f790) **fix** · fix(models): 未知费用仅提示并保留已确认消费限额 (#633)
+- `2026-11-03` · [`efea2093`](https://github.com/ybz21/Roami/commit/efea2093514407b77f8adc6e08094a81f5a7cef0) **fix** · fix(models): 展示未知费用的 Token 与请求记录 (#637)
+- `2026-11-03` · [`6628657c`](https://github.com/ybz21/Roami/commit/6628657c1b502445da9c506a93e18b02d107c670) **fix** · fix(agent): 重复取消时完整保存停止收尾 (#636)
+- `2026-11-03` · [`4b9341af`](https://github.com/ybz21/Roami/commit/4b9341afc6456c5397af624f67e5fe7f3156132c) **fix** · fix(models): 三天后按日归并计费明细 (#638)
+- `2026-11-03` · [`5d176f7c`](https://github.com/ybz21/Roami/commit/5d176f7c5d02f6b8c79c7e4f6585635c4f41a128) **fix** · fix(execution): 保留工作区围栏拒绝的启动诊断 (#640)
+- `2026-11-03` · [`ed18dc99`](https://github.com/ybz21/Roami/commit/ed18dc992eab631922a081cc2d3b78e7ecd04df1) **fix** · fix(models): 将计费明细保留期改为48小时 (#641)
+- `2026-11-03` · [`d5748fbd`](https://github.com/ybz21/Roami/commit/d5748fbdc4ba971019086270dc9b52e422ac95b6) **fix** · fix(agent): 简化内置工具输入并计入 RSI 过程错误率 (#644)
+- `2026-11-03` · [`ffb158e0`](https://github.com/ybz21/Roami/commit/ffb158e0c025410e6af93bb30a7da56215755ab5) **docs** · docs(okr): 完成持续工作机制与 Roami 宣传工作台原型 (#580)
+- `2026-11-03` · [`af8d5ece`](https://github.com/ybz21/Roami/commit/af8d5ece0e39713b0948a0f9df38e6176b0a8d1c) **feat** · feat(okr): 打通目标、蜂群与项目文件并充分利用工作区 (#626)
+- `2026-11-03` · [`a135e5b1`](https://github.com/ybz21/Roami/commit/a135e5b13f2d9a394b5f4e0fdfb32a3e3f21b8b1) **feat** · feat(swarm)!: 统一 Main 编排、Three.js 协作与 CLI (#642)
+- `2026-11-03` · [`a4cb8348`](https://github.com/ybz21/Roami/commit/a4cb8348735fd454aef970b18361bf05b048235c) **fix** · fix(execution): 隔离未指定目录的专业任务工作区 (#647)
+- `2026-11-03` · [`b240588e`](https://github.com/ybz21/Roami/commit/b240588e8934f857b307c66e14024f0e4cc780b1) **fix** · fix(okr): 将目标与编辑归入看板并保持项目导航 (#646)
+- `2026-11-04` · [`810086ba`](https://github.com/ybz21/Roami/commit/810086ba29086bb3cdd6658f572d20ae3d4edeb2) **fix** · fix(okr): 恢复升级后的蜂群历史与执行团队关联 (#648)
+- `2026-11-04` · [`21a134db`](https://github.com/ybz21/Roami/commit/21a134db480cab1f190d4546a551e874f256802c) **fix** · fix(okr): 恢复活动场景并校正项目归属 (#650)
+- `2026-11-04` · [`8ebb9021`](https://github.com/ybz21/Roami/commit/8ebb90216f6476fc93ed6d2a8fbe1d21b2741397) **fix** · fix(agent): 统一四档思考强度与菜单对齐 (#649)
+- `2026-11-04` · [`01c6e435`](https://github.com/ybz21/Roami/commit/01c6e435032a48b7abdcf4fae03579470d05c4b9) **fix** · fix(rsi): 对齐对话工具契约并修复任务身份误判 (#651)
+- `2026-11-04` · [`42a7ce7b`](https://github.com/ybz21/Roami/commit/42a7ce7b91449466935c10143abba1b6dbe43e16) **fix** · fix(agent): 统一命令发现并保留工具拒绝证据 (#653)
+- `2026-11-04` · [`c47b246c`](https://github.com/ybz21/Roami/commit/c47b246c66c45f21e3089c7371561d1c59a84e8b) **feat** · feat(okr): 落地项目文件与团队执行闭环 (#654)
+- `2026-11-04` · [`9df2b700`](https://github.com/ybz21/Roami/commit/9df2b700091590bbe75cdf825d48653a1504d22b) **fix** · fix(rsi): 恢复评测准入并保留重复查询任务身份
+- `2026-11-04` · [`b063a68c`](https://github.com/ybz21/Roami/commit/b063a68cae2260fc64cb08672896e1072cc24fa2) **fix** · fix(frontend): 切换工作区标签时恢复上次页面 (#659)
+- `2026-11-05` · [`781238c7`](https://github.com/ybz21/Roami/commit/781238c716d5b4a64ad4f1e0abeeaf5b23ff2021) **docs** · docs(rsi): 记录恢复修复的完整质量验收
+- `2026-11-05` · [`2069a018`](https://github.com/ybz21/Roami/commit/2069a0186b894b71960d5d7d0f3c46d7d68c8356) **docs** · docs(rsi): 补充在途全套与来源核对结果
+- `2026-11-05` · [`12319e61`](https://github.com/ybz21/Roami/commit/12319e6129b0fdfc8890211074ea76808b2e51f4) **fix** · fix(rsi): 保留用户目的地并核对逐轮最终交付
+- `2026-11-05` · [`d6fb0011`](https://github.com/ybz21/Roami/commit/d6fb0011656660b379348589325adb0c0b043d22) **docs** · docs(rsi): 记录来源绑定修复的组合质量门禁
+- `2026-11-05` · [`e9ef09a0`](https://github.com/ybz21/Roami/commit/e9ef09a0d5810c41d93d9c08b2aa6ab1fea81b78) **docs** · docs(rsi): 记录完整执行与财务参考核验
+- `2026-11-05` · [`43819415`](https://github.com/ybz21/Roami/commit/4381941599f4cced5e39c04610c50b3d7efbfcef) **fix** · fix(rsi): 修复套件诊断选题并明确金额单位
+- `2026-11-05` · [`62ff000e`](https://github.com/ybz21/Roami/commit/62ff000e9f1b0916818f4d88e2025487cc6fc1c8) **fix** · fix(gateway): 按等待顺序准入模型请求
+- `2026-11-05` · [`987cfab9`](https://github.com/ybz21/Roami/commit/987cfab9519e6ebf12844b5e06a673a757dc8ec8) **feat** · feat(okr): 精简目标工作区并隔离固定主对话 (#661)
+- `2026-11-05` · [`3464cb00`](https://github.com/ybz21/Roami/commit/3464cb004b700a52963d6f78b4fffd4cfe1dfeb3) **feat** · feat(swarm): 保存长期成员身份与执行轮次 (#668)
+- `2026-11-05` · [`138b9170`](https://github.com/ybz21/Roami/commit/138b9170aa24c0c504de37759345ddf2a13b8b63) **fix** · fix(session): 展示会话派生层级并将任务正文置顶 (#663)
+- `2026-11-05` · [`e0fda2ae`](https://github.com/ybz21/Roami/commit/e0fda2aefb819ac5cf516477eb6d6dbba4b7c452) **fix** · fix(swarm): 恢复成员的原生对话上下文 (#669)
+- `2026-11-05` · [`6f1825a2`](https://github.com/ybz21/Roami/commit/6f1825a27923639d329d689d4c8da3f2b25bd8a5) **feat** · feat(swarm): 保留未派发成员的原生会话 (#671)
+- `2026-11-05` · [`868c9e1e`](https://github.com/ybz21/Roami/commit/868c9e1e73ccaefa3ed023f957d01191fbafe931) **fix** · fix(rsi): 恢复评测准入并保留重复查询任务身份 (#662)
+- `2026-11-05` · [`6c76bf99`](https://github.com/ybz21/Roami/commit/6c76bf992bb62c45a51cd3481093fef8946d4474) **fix** · fix(rsi): 保留用户目的地并核对逐轮最终交付 (#664)
+- `2026-11-05` · [`fbeee53b`](https://github.com/ybz21/Roami/commit/fbeee53b33ce02f47a4e42cbc69f7750e64ea794) **fix** · fix(rsi): 修复套件诊断选题并明确金额单位 (#665)
+- `2026-11-05` · [`189eef36`](https://github.com/ybz21/Roami/commit/189eef36c056a9f935c3196e3b60f241c85d37a6) **chore** · chore(gateway): 合并主线并保留验收索引
+- `2026-11-05` · [`3a3ff8c1`](https://github.com/ybz21/Roami/commit/3a3ff8c1d4d81fac85d228284eaaea52b82e3e22) **fix** · fix(gateway): 按等待顺序准入模型请求 (#667)
+- `2026-11-05` · [`83d47ff9`](https://github.com/ybz21/Roami/commit/83d47ff959ab07f25ad7b3327949a0bde5078880) **fix** · fix(sessions): 统一 Roami 会话展示与任务独立留存 (#670)
+- `2026-11-05` · [`b3314ce0`](https://github.com/ybz21/Roami/commit/b3314ce0e26077b984d15c1e1743178fbcc2b6b2) **fix** · fix(agent): 用原生命令完成证据恢复丢失回调
+- `2026-11-05` · [`7912d34f`](https://github.com/ybz21/Roami/commit/7912d34f25c95ff9f3f9666e50d7c51f0d7bd874) **fix** · fix(agent): 用原生命令完成证据恢复丢失回调 (#672)
+- `2026-11-05` · [`9fe36c39`](https://github.com/ybz21/Roami/commit/9fe36c391388d7aa262fb8ede97f42b088441797) **fix** · fix(frontend): 精简会话侧栏并将分支目录移至顶部 (#674)
+- `2026-11-05` · [`5c181322`](https://github.com/ybz21/Roami/commit/5c1813228077caa5614f24fadd1a277d0e8eccb3) **perf** · perf(ci): 按变更范围运行 Python 与 Skill 完整检查 (#673)
+- `2026-11-05` · [`c8a2a766`](https://github.com/ybz21/Roami/commit/c8a2a7669616669e56edfc000e1db0c0abd7b087) **fix** · fix(okr): 为每个指标独立展示趋势卡片 (#675)
+- `2026-11-05` · [`2e9f479c`](https://github.com/ybz21/Roami/commit/2e9f479c4706f3225559398f2ca3af136b5543b4) **fix** · fix(agent): 保留 Claude 压缩后的认证回合状态 (#676)
+- `2026-11-05` · [`9ddd58ac`](https://github.com/ybz21/Roami/commit/9ddd58acbf47b7f37c95f492dc6a1f6b9d50ba95) **fix** · fix(agent): 要求原生工具提交最终回复 (#678)
+- `2026-11-05` · [`96ad9685`](https://github.com/ybz21/Roami/commit/96ad9685e86d14b28855b99919aece8c2e661e1f) **fix** · fix(rsi): 保留 Go 模型准入耗时回执
+- `2026-11-05` · [`a35776b8`](https://github.com/ybz21/Roami/commit/a35776b85cb8991b80c81d4fdc36460313fde3c7) **feat** · feat(okr): 默认与 Main 对话并简化团队聊天入口 (#682)
+- `2026-11-05` · [`f4792f0a`](https://github.com/ybz21/Roami/commit/f4792f0a1dfe3f74fd5fa5cc4f9341cb6ea131d5) **feat** · feat(okr): 从聊天生成文件化看板和团队定义 (#681)
+- `2026-11-05` · [`8e48a3f8`](https://github.com/ybz21/Roami/commit/8e48a3f851749b65a22aec9fab5e12529f3d87d2) **fix** · fix(frontend): 移除会话顶栏分支入口 (#683)
+- `2026-11-05` · [`d5fca3ab`](https://github.com/ybz21/Roami/commit/d5fca3ab6b862783da1f5bdcd0234d71bd37a3f3) **fix** · fix(rsi): 按原文复核最终回复和必要提问
+- `2026-11-05` · [`4fe18406`](https://github.com/ybz21/Roami/commit/4fe18406065c29259c776e968bb7c09d1ce5fdc4) **docs** · docs(okr): 设计运行态与 Studio 的完整交互和 Skill 链路 (#685)
+- `2026-11-05` · [`f0eff979`](https://github.com/ybz21/Roami/commit/f0eff979c3a7f092e4bc015924d0c6303f001dda) **fix** · fix(rsi): 恢复 Main 未提交终答的原生工具调用 (#686)
+- `2026-11-06` · [`d7e7bf7e`](https://github.com/ybz21/Roami/commit/d7e7bf7ed34a73a78d201a8fb1614db69d07d217) **feat** · feat(okr): 提供可整体复制的通用编写 Skill 与项目模板 (#688)
+- `2026-11-06` · [`29f0c5f0`](https://github.com/ybz21/Roami/commit/29f0c5f093cd02d5f426eeeb3b614a4aaf121322) **feat** · feat(okr): 合并对话与协作并保留当前聊天 (#690)
+- `2026-11-06` · [`fa6ef5b8`](https://github.com/ybz21/Roami/commit/fa6ef5b8084880352e883bc87315a373da314e90) **feat** · feat(okr): 合并对话与协作并保留当前聊天 (#690)
+- `2026-11-06` · [`f68a5d88`](https://github.com/ybz21/Roami/commit/f68a5d88f75150b1ae20522d10e384bde5e37f68) **docs** · docs(okr): 沉淀持久团队日更与浏览器验收流程 (#691)
+- `2026-11-06` · [`0d8c3d9d`](https://github.com/ybz21/Roami/commit/0d8c3d9dd64f4dae8539e9508e8e6d4497c441bf) **fix** · fix(okr): 保留团队记忆版本并分页读取长期对话 (#692)
+- `2026-11-06` · [`f2337c3a`](https://github.com/ybz21/Roami/commit/f2337c3a1c76d2b5880a032cab9a5bc554303e17) **fix** · fix(okr): 依据宿主项目归属直达原成员会话 (#695)
+- `2026-11-06` · [`c380f515`](https://github.com/ybz21/Roami/commit/c380f5159452a093955541e39287344e82478e4d) **fix** · fix(swarm): 防止原生智能体冒用人类群聊入口 (#694)
+- `2026-11-06` · [`68b23436`](https://github.com/ybz21/Roami/commit/68b2343677beb9045bf41170380ecd6afca201a8) **feat** · feat(okr): 以日更Skill安全唤醒原项目Main (#697)
+- `2026-11-06` · [`fc11388e`](https://github.com/ybz21/Roami/commit/fc11388e90ac7c1dbbe245c952ad1a804d343b0d) **fix** · fix(agent): 支持普通 CLI 参数并解释未执行的调用 (#677)
+- `2026-11-06` · [`a0cc45e8`](https://github.com/ybz21/Roami/commit/a0cc45e8ac1e4492a53aa3806a5d46ff780dea94) **fix** · fix(agent): 读取任务详情时保留Main精简历史 (#700)
+- `2026-11-06` · [`eb0efd29`](https://github.com/ybz21/Roami/commit/eb0efd29813d99958778942db4af92f9924a69d9) **fix** · fix(swarm): 为群聊消息显示Main执行失败与原会话入口 (#701)
+- `2026-11-06` · [`47a12d4f`](https://github.com/ybz21/Roami/commit/47a12d4fbedff922bd1c9728f03dbaddd9fd5585) **fix** · fix(okr): 隔离首页与项目Main的消息及未读状态 (#703)
+- `2026-11-06` · [`2e7c70b4`](https://github.com/ybz21/Roami/commit/2e7c70b4b811e9ccf8f3210552e3af579e8ec425) **feat** · feat(okr): 为GitHub采集Skill保留原始响应与稳定身份 (#704)
+- `2026-11-06` · [`1b5aecde`](https://github.com/ybz21/Roami/commit/1b5aecde5a297e9f547814e9a0a09fe46cbfa5b3) **feat** · feat(okr): 绑定原成员职责并聚焦当前团队 (#706)
+- `2026-11-06` · [`963acde4`](https://github.com/ybz21/Roami/commit/963acde4d2de41a4357eb66db8319352bd31e607) **feat** · feat(okr): 声明职责绑定能力并提炼原团队操作规则 (#707)
+- `2026-11-06` · [`d0468ea6`](https://github.com/ybz21/Roami/commit/d0468ea671c4a7600806ec29fc53a51042516686) **feat** · feat(okr): 加载项目HTML看板并提供只读指标接口 (#708)
+- `2026-11-06` · [`ff6b2ddf`](https://github.com/ybz21/Roami/commit/ff6b2ddf52e648fc15adc2661bf983d2f9dbeac4) **fix** · fix(okr): 全屏Main打开时暂停后台HTML看板 (#710)
+- `2026-11-06` · [`f2790054`](https://github.com/ybz21/Roami/commit/f27900545cb7a0ce63c7a875c564b9c48ba7f6c8) **feat** · feat(okr): 将任务移入右侧工作区并以列表展示 (#712)
+- `2026-11-06` · [`62da757c`](https://github.com/ybz21/Roami/commit/62da757c33ecef2ad31c6f8aacc199dac24768e3) **feat** · feat(okr): 复用成员原生聊天并筛选工作区任务 (#714)
+- `2026-11-06` · [`21696dac`](https://github.com/ybz21/Roami/commit/21696dac5cbfe9a05b43574f0ee1956c625afd95) **fix** · fix(okr): 将旧注册成员接入原会话并保留草稿 (#715)
+- `2026-11-06` · [`40056102`](https://github.com/ybz21/Roami/commit/400561020c17b686b8c32d121528faca54686443) **feat** · feat(okr): 以来源 Skill 批次发布看板观测 (#717)
+- `2026-11-06` · [`b12994eb`](https://github.com/ybz21/Roami/commit/b12994eb04b4f526e0ed24510c9f92dff66c3838) **fix** · fix(chat): 用受管会话绑定隔离原生转录 (#719)
+- `2026-11-06` · [`8abfb4e2`](https://github.com/ybz21/Roami/commit/8abfb4e20dce7566c30f6a16999fb78cf7977c6f) **fix** · fix(okr): 整理右栏入口并支持拖拽与场景点击 (#722)
+- `2026-11-06` · [`d4ac4b63`](https://github.com/ybz21/Roami/commit/d4ac4b6364c6c20b66fd930e19c82d4c55aea8d9) **docs** · docs(okr): 沉淀原会话隔离与独立验收经验 (#724)
+- `2026-11-06` · [`db3397e3`](https://github.com/ybz21/Roami/commit/db3397e351dcadab9b2713de3e386aed2237df92) **fix** · fix(okr): Main复用完整Roami输入框 (#725)
+- `2026-11-06` · [`7e9e27e5`](https://github.com/ybz21/Roami/commit/7e9e27e58f1692c4a1528a40d4af6a8517b81993) **fix** · fix(okr): 返回入口移到标题左侧 (#727)
+- `2026-11-06` · [`cb860677`](https://github.com/ybz21/Roami/commit/cb860677a8ccddf5d359f9118d6382939e97948f) **feat** · feat(agent): 优化后台任务详情层级与下发信息展示 (#718)
+- `2026-11-06` · [`557cfe33`](https://github.com/ybz21/Roami/commit/557cfe330045a947d47aee24b70c59957e84f030) **fix** · fix(swarm): 保留Main给原成员的限定任务 (#730)
+- `2026-11-06` · [`c2d98108`](https://github.com/ybz21/Roami/commit/c2d981085e89beb2177d0e1140440c3448eaa533) **feat** · feat(cron): 隔离指定日程的常驻与单次调度 (#731)
+- `2026-11-06` · [`3a944e4d`](https://github.com/ybz21/Roami/commit/3a944e4d9d9762ce02eaa16bbff50634b60def3a) **feat** · feat(okr): 同一实例切换渲染对话与原生终端 (#734)
+- `2026-11-06` · [`23e693d8`](https://github.com/ybz21/Roami/commit/23e693d803e431298e011b0a9a8b60d2ba293245) **docs** · docs(okr): 为项目模板补充完整操作手册 (#735)
+- `2026-11-06` · [`f61f73f1`](https://github.com/ybz21/Roami/commit/f61f73f101fc814766ed9f8cf94a95b8d3438d14) **feat** · feat(okr): 添加B站公开统计Connector Skill (#737)
+- `2026-11-06` · [`898241c2`](https://github.com/ybz21/Roami/commit/898241c236c7b22249ffffe888bff59dde29b776) **fix** · fix(okr): 按模型容量分段整理长期对话历史 (#739)
+- `2026-11-06` · [`24956cda`](https://github.com/ybz21/Roami/commit/24956cdaedf854dc9096f819452021e28b3019a5) **docs** · docs(okr): 补齐团队记忆和日常运行规范 (#742)
+- `2026-11-07` · [`c6a95fcf`](https://github.com/ybz21/Roami/commit/c6a95fcf86a5ce7c723a37c52e37d98d8a617905) **refactor** · refactor(chat): 首页与OKR Main共用完整对话组件 (#749)
+- `2026-11-07` · [`dd9470c5`](https://github.com/ybz21/Roami/commit/dd9470c5f70556bcb8ba35dfd0bd0b8d5c826837) **fix** · fix(chat): Main回复逐段预览并保留核验 (#750)
+- `2026-11-07` · [`27291cfb`](https://github.com/ybz21/Roami/commit/27291cfbd823df944abb292f477e60f22be8a476) **docs** · docs(okr): 设计多OKR通信与SQLite数据机制 (#745)
+- `2026-11-07` · [`558e9042`](https://github.com/ybz21/Roami/commit/558e90423e8d6f2f832fed3a357c2847cd7ac95e) **feat** · feat(swarm): 按项目隔离团队与消息投递 (#751)
+- `2026-11-07` · [`63c4b264`](https://github.com/ybz21/Roami/commit/63c4b264e1fb2c2daf5976d20310fa7a416284ee) **fix** · fix(swarm): 建团队前核验来源并原子保存回执 (#752)
+- `2026-11-07` · [`6efd6a22`](https://github.com/ybz21/Roami/commit/6efd6a22bec8ba20726d453f17619646850b6642) **feat** · feat(swarm): 持久保存群聊收件箱和答复回执 (#753)
+- `2026-11-07` · [`60d2c283`](https://github.com/ybz21/Roami/commit/60d2c283641a91157f3dfd424187c54e61a406e2) **fix** · fix(chat): 完整展示用户消息并验证共享工具过程 (#755)
+- `2026-11-07` · [`84f741a3`](https://github.com/ybz21/Roami/commit/84f741a385c2d8af184d7cab44b43d6a8ca682cf) **feat** · feat(swarm): 保留目标来源并约束原成员续派 (#754)
+- `2026-11-07` · [`8668a32a`](https://github.com/ybz21/Roami/commit/8668a32ae57e28952f861d6ffe6f4751a33319e3) **fix** · fix(agent): 保留原生工具身份并拒绝旧用户写入口 (#756)
+- `2026-11-07` · [`2d9fc4a7`](https://github.com/ybz21/Roami/commit/2d9fc4a76cd67a860011085d316e99010515fad4) **docs** · docs(okr): 设计原批次恢复与结果去重机制 (#757)
+- `2026-11-07` · [`a291b8cd`](https://github.com/ybz21/Roami/commit/a291b8cde71e9dce14927ab6df19553022d6697e) **docs** · docs(okr): 记录真实流式与停止上线验收 (#758)
+- `2026-11-07` · [`bdb8e67f`](https://github.com/ybz21/Roami/commit/bdb8e67fbad268bddf5512af127c505dd4309b92) **fix** · fix(okr): 按上游拒绝缩小长会话摘要片段 (#760)
+- `2026-11-07` · [`5de21e9d`](https://github.com/ybz21/Roami/commit/5de21e9d3c7695c740d40c629e4d6b92edfc55f1) **fix** · fix(okr): 绑定主智能体的项目文件读取范围 (#762)
+- `2026-11-07` · [`7c9e465b`](https://github.com/ybz21/Roami/commit/7c9e465bcfe6ced3fd49f12e11878a39de208eb4) **fix** · fix(sessions): 修复关闭会话后工作树清理中断与重试 (#747)
+- `2026-11-07` · [`c2928cf5`](https://github.com/ybz21/Roami/commit/c2928cf5a44bb521b1b8247b5e1473fcf51c401a) **fix** · fix(agent): 修复验收后的预览与独立回传
+- `2026-11-07` · [`c6557dde`](https://github.com/ybz21/Roami/commit/c6557dde27f0993a1b60d088866b10d81b64b941) **fix** · fix(agent): 恢复原Codex直接消息的完成证据
+- `2026-11-07` · [`d6b381db`](https://github.com/ybz21/Roami/commit/d6b381db9cbbbdcde969379c5104230b1bea5379) **fix** · fix(agent): 受管成员续派禁止绕过原任务 (#767)
+- `2026-11-07` · [`19d2fe8b`](https://github.com/ybz21/Roami/commit/19d2fe8b8ddd4ad95d99fc8b7c2aceeb49a3a507) **feat** · feat(okr): 保存成员执行结果的独立宿主回执
+- `2026-11-07` · [`14122b98`](https://github.com/ybz21/Roami/commit/14122b98199b7d5da814c186c722d863b6ed724a) **feat** · feat(okr): 冻结成员结果并记录 Main 的真实观察
+- `2026-11-07` · [`39042dcd`](https://github.com/ybz21/Roami/commit/39042dcdf18a85966a2ba6cc50821aa160a89fe7) **fix** · fix(okr): 保留窗口缩放前选择的对话
+- `2026-11-07` · [`a162ced3`](https://github.com/ybz21/Roami/commit/a162ced3079d9b8ebee305639b87943151bd1e27) **feat** · feat(memory): 添加会话自动回收、告警与暂停 (#768)
+- `2026-11-07` · [`86471700`](https://github.com/ybz21/Roami/commit/86471700cdec2ab680a71c66e15c55875f4a559a) **feat** · feat(okr): 按协作批次展示 Main 的实际工具
+- `2026-11-07` · [`edb91064`](https://github.com/ybz21/Roami/commit/edb91064290699b8a835ee32a70eacff9618e597) **fix** · fix(install): 部署时自动配置压缩交换区 (#775)
+- `2026-11-07` · [`56eeb66c`](https://github.com/ybz21/Roami/commit/56eeb66ccee9e6f155331bdddcd6c8a18fc23424) **fix** · fix(main): 保留长历史审核证据并处理上下文超限
+- `2026-11-08` · [`cfb4ea6a`](https://github.com/ybz21/Roami/commit/cfb4ea6a9fab21d7d20492a4cd9c1c2fec1d1812) **fix** · fix(okr): 分离用户原文与未保存草稿上下文 (#778)
+- `2026-11-08` · [`4c55fc70`](https://github.com/ybz21/Roami/commit/4c55fc70f6f70855fd7b8b0901bfd240b048d9c2) **feat** · feat(okr): 用稳定回执恢复观测复盘和记忆追加 (#779)
+- `2026-11-08` · [`12eb2f1d`](https://github.com/ybz21/Roami/commit/12eb2f1d6d930d6a370ad8c87fb75ffad2370a87) **feat** · feat(okr): 接回成员结果并幂等写入项目
+- `2026-11-08` · [`c3c7692a`](https://github.com/ybz21/Roami/commit/c3c7692a6686f7da0089e0a9ef1024c171fe11d2) **fix** · fix(agent): 不把报告中的输入路径误报为缺失交付
+- `2026-11-08` · [`90625f39`](https://github.com/ybz21/Roami/commit/90625f39c55fd79576b6143779200ac61c45aad5) **feat** · feat(swarm): 接通原 Main 持续目标与成员消息唤醒 (#784)
+- `2026-11-08` · [`0d4d7b28`](https://github.com/ybz21/Roami/commit/0d4d7b280926e0b13a6284ed927271bcd37c7e7d) **fix** · fix(agent): 补齐持续目标指引与 Native 启动诊断 (#786)
+- `2026-11-08` · [`2a35800b`](https://github.com/ybz21/Roami/commit/2a35800b2f8b1e265e10be7f2587c338a032ad1a) **fix** · fix(sessions): 内存恢复正常后隐藏黄色状态条 (#780)
+- `2026-11-08` · [`9e33478a`](https://github.com/ybz21/Roami/commit/9e33478a8593b396e5e424307515fe4a7ec62411) **fix** · fix(mobile): 关闭会话时提供工作树清理选项 (#787)
+- `2026-11-08` · [`b4f4540b`](https://github.com/ybz21/Roami/commit/b4f4540bae90207efad9ea9e58e5ab470fe0469f) **fix** · fix(execution): 保留原会话续派的启动前诊断 (#788)
+- `2026-11-08` · [`e7e66b5a`](https://github.com/ybz21/Roami/commit/e7e66b5a70317c4b8dabb4aea4c7ac85acd31972) **feat** · feat(okr): 接通原目标日程与共享目录排队 (#789)
+- `2026-11-08` · [`dbaf1206`](https://github.com/ybz21/Roami/commit/dbaf120694842dda2cc4dc47e740b167ab96ae4e) **feat** · feat(speech): 将语音配置归入模型并接入火山识别 2.0 (#790)
+- `2026-11-08` · [`f83f8b96`](https://github.com/ybz21/Roami/commit/f83f8b965cf09ba143765f92e1552dc4a673bb0c) **feat** · feat(okr): 冻结原成员素材并保存独立审核 (#791)
+- `2026-11-08` · [`6062aecc`](https://github.com/ybz21/Roami/commit/6062aecceda8c339d796f1561206d1c4a97a4d20) **feat** · feat(okr): 增加发布协议与持久回执对账 (#793)
+- `2026-11-08` · [`da6760f4`](https://github.com/ybz21/Roami/commit/da6760f418f8d580c0e029efe4e53ff104c905a9) **fix** · fix(okr): 简化物料目录并保留既有发布流程 (#795)
+- `2026-11-08` · [`2ae2e78d`](https://github.com/ybz21/Roami/commit/2ae2e78ddc516c85e78ced4153595e3c3d336384) **fix** · fix(ui): 收起任务结果的历史长路径提示 (#794)
+- `2026-11-08` · [`193a8394`](https://github.com/ybz21/Roami/commit/193a839491bfd0322e800ab4f54722f3c147808d) **fix** · fix(okr): 提供验收与发布输入的恢复指引 (#797)
+- `2026-11-08` · [`f2e0a8d5`](https://github.com/ybz21/Roami/commit/f2e0a8d55d61b849ad6cce5118eb9639eb81d0ca) **fix** · fix(okr): 完善发布输入与原团队续作指引
+- `2026-11-08` · [`633714fb`](https://github.com/ybz21/Roami/commit/633714fb16355f345cb2bccda88a46238c53ea8f) **fix** · fix(okr): 将图片 ALT 绑定到冻结内容与独立审核
+- `2026-11-08` · [`b65c03fe`](https://github.com/ybz21/Roami/commit/b65c03fe8607820729c47af822270c4ac3cf6ff1) **fix** · fix(okr): 统一日常派工目录与复盘写回入口 (#803)
+- `2026-11-08` · [`e1f5cc8b`](https://github.com/ybz21/Roami/commit/e1f5cc8b68a0f622dc5f9d53538f1b55581df01e) **fix** · fix(agent): 为追加输入后的会话核验停止证据 (#805)
+- `2026-11-08` · [`45c287fe`](https://github.com/ybz21/Roami/commit/45c287fee0f8ccedf28ddad9b4fa4acdf65a6043) **fix** · fix(agent): 区分内部完成通知与会话身份变更 (#807)
+- `2026-11-08` · [`2b6c8db4`](https://github.com/ybz21/Roami/commit/2b6c8db431eeef5603ccbf8eeee862440cd7abf9) **fix** · fix(browser): 保留文件选择后的异步读取字节 (#811)
+- `2026-11-09` · [`65e293f8`](https://github.com/ybz21/Roami/commit/65e293f8b1cac209d969848a38b5f268200fd6f0) **fix** · fix(okr): 对齐受管调用与团队记忆契约 (#812)
+- `2026-11-09` · [`2de3746b`](https://github.com/ybz21/Roami/commit/2de3746b4679dacb9c0061330ca6feaa319e15b6) **feat** · feat(speech): 通过现有Node登录转写审计音轨 (#815)
+- `2026-11-09` · [`442520b6`](https://github.com/ybz21/Roami/commit/442520b6d1adee8894d52749f7938fb90f1ec612) **feat** · feat(okr): 从项目发布登记动态采集稿件数据 (#816)
+- `2026-11-09` · [`dfb3e1ae`](https://github.com/ybz21/Roami/commit/dfb3e1aeccaa510d125c852d61d8217adbbab779) **fix** · fix(swarm): 明确原生成员的提问和交接投递类型 (#818)
+- `2026-11-09` · [`7c796806`](https://github.com/ybz21/Roami/commit/7c7968062c4e13e2f286abdfa421737363799c4b) **fix** · fix(context): 整理长期会话时复用已验证摘要 (#819)
+- `2026-11-09` · [`b3770ea7`](https://github.com/ybz21/Roami/commit/b3770ea76834f53fd72fa6219305620568d6a2b0) **docs** · docs(okr): 固化真实发布与音轨审计经验 (#820)
+- `2026-11-09` · [`33ae2fa9`](https://github.com/ybz21/Roami/commit/33ae2fa9bf0d0450e281272bd1825a61b0bba23d) **fix** · fix(agent): 保留Shell程序语义并隔离引号错误 (#821)
+- `2026-11-09` · [`49342fde`](https://github.com/ybz21/Roami/commit/49342fdeee16b008ab8229787f496eb487638f9e) **feat** · feat(okr): 统一项目初始化模板与SQLite源库 (#823)
+- `2026-11-09` · [`6adb4f50`](https://github.com/ybz21/Roami/commit/6adb4f5003ecab76ca21bab6fc360f6f3f956e16) **fix** · fix(okr): 支持带持久回执的团队记忆局部编辑 (#824)
+- `2026-11-09` · [`4f2663a9`](https://github.com/ybz21/Roami/commit/4f2663a946114dea965f47e88067fd1b494fcbff) **fix** · fix(okr): 读取确认批次回执并明确重试冲突
+- `2026-11-09` · [`4bccf625`](https://github.com/ybz21/Roami/commit/4bccf6252692ce4da9aec47ab0d57d5b6a1075e3) **feat** · feat(okr): 绑定原生发布交接与公开对账 (#828)
+- `2026-11-09` · [`335a55dc`](https://github.com/ybz21/Roami/commit/335a55dcd1703014e192536ccd4b76ef6b47813a) **fix** · fix(okr): 验收后要求原团队有真实下一步 (#830)
+- `2026-11-09` · [`84b89cbb`](https://github.com/ybz21/Roami/commit/84b89cbbb9138317dbc684f213df6f9b283471fa) **fix** · fix(okr): 恢复每日执行的技能读取与长期团队记忆 (#834)
+- `2026-11-09` · [`77f006ca`](https://github.com/ybz21/Roami/commit/77f006ca4d00a488b11a9aafa6c1ba7b4b515376) **fix** · fix(okr): 按项目时区统计真实发布日期 (#835)
+- `2026-11-09` · [`ca59145d`](https://github.com/ybz21/Roami/commit/ca59145dbbc9e60d46fff7f655a7ffce2e551212) **docs** · docs(okr): 依据真实回执判断发布验收能力 (#836)
+- `2026-11-09` · [`58850a44`](https://github.com/ybz21/Roami/commit/58850a44d89382b685a2186395b8f120d24476e3) **feat** · feat(okr): 校验冻结音视频的独立 Main 审核证据 (#839)
+- `2026-11-09` · [`fb6b0370`](https://github.com/ybz21/Roami/commit/fb6b0370f5525ead8b09516c5e59fa98bf9a6b37) **fix** · fix(okr): 恢复已验收事实并明确交接执行职责 (#840)
+- `2026-11-09` · [`c0d97618`](https://github.com/ybz21/Roami/commit/c0d976185193441fef17e8c5f0bf1a7d2e671b02) **fix** · fix(okr): 允许原 Main 等待已核验的既有日程 (#842)
+- `2026-11-09` · [`33d1e9d3`](https://github.com/ybz21/Roami/commit/33d1e9d3b2384fa13fa2ba2b50799b066122cb4f) **docs** · docs(okr): 明确原生最终提交与平台回执接线 (#844)
+- `2026-11-09` · [`64b2f228`](https://github.com/ybz21/Roami/commit/64b2f228f9874e10e5dc800192bed74d1b99c9e3) **fix** · fix(okr): 明确复盘写入契约并保留原请求身份 (#845)
+- `2026-11-09` · [`4c0fa5e7`](https://github.com/ybz21/Roami/commit/4c0fa5e742146dec99380a4409d6336bb7d4a9c7) **feat** · feat(agent): 只读核验原生会话当前执行上下文
+- `2026-11-09` · [`c1afe403`](https://github.com/ybz21/Roami/commit/c1afe403d5e160b350c1b10e66516f2477a06e8e) **fix** · fix(ci): 排除未跟踪的Python测试字节码
+- `2026-11-09` · [`9288ed73`](https://github.com/ybz21/Roami/commit/9288ed73b23398f4732f9cb1288bff17478375f5) **docs** · docs(okr): 说明原发布通道和到期任务接续
+- `2026-11-10` · [`7baaeac4`](https://github.com/ybz21/Roami/commit/7baaeac4a7bdf929a90606d845c0dc8bca9edcd6) **docs** · docs(okr): 固化原通道接续与可访问文件交付规范 (#851)
+- `2026-11-10` · [`77c3eb3b`](https://github.com/ybz21/Roami/commit/77c3eb3b0fe4c714a023c719970ae2760c157494) **fix** · fix(okr): 明确稿件登记与取数的执行分工 (#853)
+- `2026-11-10` · [`1dc424bd`](https://github.com/ybz21/Roami/commit/1dc424bdbbc2f1480972aa094f0db60c02da4caf) **feat** · feat(sessions): 将会话创建与收尾迁入持久后台流程 (#857)
+- `2026-11-10` · [`e070516e`](https://github.com/ybz21/Roami/commit/e070516e9f8b9f9166063b0e6c98defa1731bd47) **feat** · feat(session): 增加进程树与内存查看及手动结束进程 (#858)
+- `2026-11-10` · [`f6e33a34`](https://github.com/ybz21/Roami/commit/f6e33a34874c2a8dd2b5d479004f25c6de6f24a0) **fix** · fix(models): 修复局域网模型源无法添加和修改 (#859)
+- `2026-11-10` · [`8b7c64f6`](https://github.com/ybz21/Roami/commit/8b7c64f6b63f423075030e694a910dc0f2ab61a5) **fix** · fix(sessions): 修复原生会话归档和分离 HEAD 关闭 (#861)
+- `2026-11-10` · [`d7168014`](https://github.com/ybz21/Roami/commit/d71680147f8cb59325500be6d473a6a6ab9ea3cc) **feat** · feat(models): 增加 Magpie 插件兼容与网关 Key 管理 (#860)
+- `2026-11-10` · [`e2f5818a`](https://github.com/ybz21/Roami/commit/e2f5818ab1e1f5390bc51d9b8f69100decd26979) **fix** · fix(okr): 拒绝遗漏当日阶段的排期等待 (#856)
+- `2026-11-10` · [`fb0b461d`](https://github.com/ybz21/Roami/commit/fb0b461dd5c62d1951e8180cc387d7d7763979ba) **fix** · fix(sessions): 释放失联执行名额并隐藏已完成收尾 (#862)
+- `2026-11-11` · [`9e83b972`](https://github.com/ybz21/Roami/commit/9e83b972658ea64e1b743d041816f977867776b7) **fix** · fix(models): 将桌面模型二级页签改为左侧导航 (#863)
+- `2026-11-11` · [`c06faa28`](https://github.com/ybz21/Roami/commit/c06faa28a56b425b0bfa6a801b0c585344db2b88) **fix** · fix(agent): 修复命令执行与最终回复的误拒绝 (#865)
+- `2026-11-11` · [`572d83ed`](https://github.com/ybz21/Roami/commit/572d83ed421b6e407a6eb5eff824cd98037acd22) **fix** · fix(sessions): 创建时显示加载动画并在受理关闭后隐藏会话 (#864)
+- `2026-11-11` · [`5b7873ea`](https://github.com/ybz21/Roami/commit/5b7873eae7432e6bfb70d7f8b13fc9bc8f1e67e5) **fix** · fix(agent): 精简回复工具回执与历史上下文 (#869)
+- `2026-11-11` · [`1c749e3b`](https://github.com/ybz21/Roami/commit/1c749e3bc5e428017ef4f6b4d187b776e88a57b5) **fix** · fix(agent): 加快问题交付并恢复聊天流与漏收消息 (#867)
+- `2026-11-11` · [`4ad0e688`](https://github.com/ybz21/Roami/commit/4ad0e688e1007266e92d128fd3464ff7d5906872) **fix** · fix(models): 支持直接编辑模型源名称 (#866)
+- `2026-11-11` · [`2bb15f2f`](https://github.com/ybz21/Roami/commit/2bb15f2f356037b87794308603859aa896784fb3) **refactor** · refactor(agent): 移除独立命令帮助工具 (#868)
+- `2026-11-11` · [`fdaa89c8`](https://github.com/ybz21/Roami/commit/fdaa89c8082359d7285e17d64b3718e9612a5db1) **fix** · fix(models): 修复模型选择器显示内部 ID 而非模型名称 (#832)
+- `2026-11-11` · [`a96d911e`](https://github.com/ybz21/Roami/commit/a96d911ec3fffbf9291617d0b30a04305f34a147) **fix** · fix(session): 自动恢复Codex漏跟踪后的原执行停止状态 (#872)
+- `2026-11-11` · [`2113fd66`](https://github.com/ybz21/Roami/commit/2113fd66416fafbd571d2d1c4a608daf7e412c9d) **feat** · feat(frontend): 在导航顶栏增加全屏切换 (#871)
+- `2026-11-11` · [`b5654a85`](https://github.com/ybz21/Roami/commit/b5654a85f6326a3df4ebb1a0b86767e60cbf46ff) **fix** · fix(sessions): 即时反馈关闭检查并合并重复点击 (#874)
+- `2026-11-11` · [`330c0b47`](https://github.com/ybz21/Roami/commit/330c0b474baf7ab97bf7504d716f48d6cae49603) **docs** · docs(okr): 合并通用分层看板设计与宣传运营实例 (#877)
+- `2026-11-11` · [`455b2089`](https://github.com/ybz21/Roami/commit/455b20895a56da6e92e3f38f3cc4da82786884fb) **fix** · fix(sessions): 用居中对话框突出关闭前检查 (#876)
+- `2026-11-11` · [`489a15cd`](https://github.com/ybz21/Roami/commit/489a15cd4ca624953578a6203de46f9dd3b6e075) **fix** · fix(chat): 修复文件交付并隔离群聊节点快照 (#848)
+- `2026-11-11` · [`1c7a0ba7`](https://github.com/ybz21/Roami/commit/1c7a0ba7eb2a307d8dc2bd63a0fd16a53bf578a1) **fix** · fix(agent): 识别长期 Codex 会话的大历史结束回执 (#878)
+- `2026-11-11` · [`149bd497`](https://github.com/ybz21/Roami/commit/149bd497991ef05c80676490bc2b711290dd20f5) **fix** · fix(models): 保留 OpenCode 与 Pi 的网关模型显示名称 (#875)
+- `2026-11-11` · [`e0a65f5b`](https://github.com/ybz21/Roami/commit/e0a65f5b2367d9d662d74b0ecb3dddc05e38049c) **perf** · perf(worktree): 复用快照读取缓冲区减少关闭检查开销 (#879)
+- `2026-11-11` · [`df82af9f`](https://github.com/ybz21/Roami/commit/df82af9fe97a3758a387ca615ab0c7b7c0d2fac7) **feat** · feat(ui): 完善技能市场并统一返回按钮 (#870)
+- `2026-11-11` · [`5b8b1fc1`](https://github.com/ybz21/Roami/commit/5b8b1fc13d33e9507b42018d671a9a56b7896dc4) **fix** · fix(models): 首页支持选择网关中的 WorkBuddy 模型 (#884)
+- `2026-11-11` · [`f7cc24ed`](https://github.com/ybz21/Roami/commit/f7cc24ed5ed2d551d8a5bbb15d9f0ae0af116c28) **fix** · fix(settings): 整理智能体入口并规范返回按钮位置 (#883)
+- `2026-11-11` · [`d0ffac13`](https://github.com/ybz21/Roami/commit/d0ffac13d97fad08a3717271e56cf8743a8bffc8) **fix** · fix(swarm): 首次未启动的成员重试初始会话目标 (#882)
+- `2026-11-11` · [`f8137836`](https://github.com/ybz21/Roami/commit/f8137836ff870ae813ddf97e746cab7abe6ea62a) **fix** · fix(okr): 统一团队目录与协作场景成员 (#885)
+- `2026-11-11` · [`70a03244`](https://github.com/ybz21/Roami/commit/70a03244f7e45e6dd4a756c930eaec11644fe4de) **fix** · fix(sessions): 固定关闭检查与确认按钮位置 (#886)
+- `2026-11-11` · [`0a596ff7`](https://github.com/ybz21/Roami/commit/0a596ff79d4c82e3d15f03a43413325b7ef10867) **fix** · fix(session): 核验 Claude 首次 API 拒绝与输入变更收口 (#888)
+- `2026-11-11` · [`02b305ef`](https://github.com/ybz21/Roami/commit/02b305eff7e95cc4ec84ee5bb651db6986321421) **fix** · fix(terminal): 修复中文输入定位和重复提交 (#890)
+- `2026-11-11` · [`c3d15238`](https://github.com/ybz21/Roami/commit/c3d15238f82c914fd10e468fac409ddb1fc2f2ba) **fix** · fix(swarm): 保留排队取消轮次的未启动证明 (#889)
+- `2026-11-11` · [`af29ee9e`](https://github.com/ybz21/Roami/commit/af29ee9e38fb34e4db7aca709832b4e3686ff5ac) **fix** · fix(session): 收口 Claude 拒绝请求的取消与退出状态 (#891)
+- `2026-11-11` · [`a83a326a`](https://github.com/ybz21/Roami/commit/a83a326a654e4aa109a2a1d2cf6e58f2cc1b5730) **fix** · fix(session): 恢复成员时保留默认配置目录模式 (#893)
+- `2026-11-11` · [`ca586983`](https://github.com/ybz21/Roami/commit/ca586983be2c7852b7a996eeb6a0a971786b397e) **fix** · fix(gateway): 适配 WorkBuddy 非流式 Claude 请求 (#895)
+- `2026-11-11` · [`d1d445e4`](https://github.com/ybz21/Roami/commit/d1d445e433352a3abcc33ff37e28bb59bdfa8d52) **fix** · fix(agent): 以原生中断证据恢复 Claude 原实例 (#897)
+- `2026-11-11` · [`7e375c6f`](https://github.com/ybz21/Roami/commit/7e375c6f6fe236ccbf991a469c61b68c840e4e90) **fix** · fix(chat): 按消息锚点索引长期会话活动 (#896)
+- `2026-11-11` · [`8070ecb8`](https://github.com/ybz21/Roami/commit/8070ecb8f585d59401725495f76b0151961830bc) **fix** · fix(capabilities): 异步渲染技能详情并完善加载恢复 (#887)
+- `2026-11-11` · [`29ad2179`](https://github.com/ybz21/Roami/commit/29ad2179d076ce5cb1237c93f574a3598fb36776) **feat** · feat(models): 支持整仓库批量导入 Magpie 插件 (#881)
+- `2026-11-11` · [`0c10afbd`](https://github.com/ybz21/Roami/commit/0c10afbd3f5763d6c8734efab8b09f30a533285f) **fix** · fix(agent): 识别 Claude 文件增量的中断证据 (#899)
+- `2026-11-12` · [`bd6ea9c7`](https://github.com/ybz21/Roami/commit/bd6ea9c708a7e2c13f55ff8caf88ac5192943e47) **fix** · fix(agent): 分页读取旧会话而不扩大全轮上下文 (#900)
+- `2026-11-12` · [`a21835a6`](https://github.com/ybz21/Roami/commit/a21835a67300b36056b512b763b7ab74456773ee) **fix** · fix(agent): 统一任务提示词并精简回报指引 (#902)
+- `2026-11-12` · [`f095e8af`](https://github.com/ybz21/Roami/commit/f095e8afa9f118f5222c108cb6cbdcbd511304dc) **fix** · fix(agent): 保留 Claude 后台通知的原任务绑定 (#904)
+- `2026-11-12` · [`29739f55`](https://github.com/ybz21/Roami/commit/29739f557e12e2bb29fdd119d316e6759851262b) **fix** · fix(session): 补齐新建任务的 Git 提交与交付提示 (#905)
+- `2026-11-12` · [`86cdf7ad`](https://github.com/ybz21/Roami/commit/86cdf7ad43d9984b34c6bc4dc9cd0d0338fa5ca6) **fix** · fix(browser): 区分导航等待与渲染器卡死 (#906)
+- `2026-11-12` · [`b310552d`](https://github.com/ybz21/Roami/commit/b310552dda5c9b16e765f87b76f509081f3ab835) **fix** · fix(worktree): 关闭会话前刷新远端合入状态 (#907)
+- `2026-11-12` · [`b9bf9568`](https://github.com/ybz21/Roami/commit/b9bf956803394d578656e8316047bf0ab7847081) **fix** · fix(terminal): 释放隐藏会话的图形资源并处理失效快照 (#903)
+- `2026-11-12` · [`fd353edc`](https://github.com/ybz21/Roami/commit/fd353edcc946123dd152dd221472ee629dbaec7d) **fix** · fix(frontend): 精简首页委派过程并优化对话排版 (#908)
+- `2026-11-12` · [`932760e9`](https://github.com/ybz21/Roami/commit/932760e99ab3831c2b7996560abca65817bbe876) **perf** · perf(worktree): 缩短已合入会话的关闭预检 (#910)
+- `2026-11-12` · [`60bb32fd`](https://github.com/ybz21/Roami/commit/60bb32fd08a7fe0d45b9beddd6d167767980f16f) **fix** · fix(frontend): 稳定压缩状态并按需查看上下文 (#913)
+- `2026-11-13` · [`c2185f76`](https://github.com/ybz21/Roami/commit/c2185f7663bece4ef351922b4b28fb7ab1930e06) **feat** · feat(agent): 注册 DeepSeek Harness 并统一 Agent 入口 (#914)
+- `2026-11-13` · [`104e4e53`](https://github.com/ybz21/Roami/commit/104e4e533b184dd6390b86c94e68a97bc78cd790) **fix** · fix(models): 支持全部智能体的网关默认模型与目录切换 (#912)
+- `2026-11-13` · [`bf443989`](https://github.com/ybz21/Roami/commit/bf4439895fa74865f864f9c39865dcd5bdf3b4c4) **fix** · fix(cli): 统一帮助样式并补全逐级命令说明 (#917)
+- `2026-11-13` · [`8c886c64`](https://github.com/ybz21/Roami/commit/8c886c6419d1b4ea613a2173ef090a4cb03882a3) **fix** · fix(chat): 按批加载最新会话记录并恢复只读历史 (#918)
+- `2026-11-13` · [`c3543841`](https://github.com/ybz21/Roami/commit/c3543841ce21bb65edad06f1b90c6922a293263f) **feat** · feat(models): 接入用量审计、聚合路由与滚动监控 (#915)
+- `2026-11-13` · [`3c857c81`](https://github.com/ybz21/Roami/commit/3c857c81b7d48763eb59b80e0c14014ee0cca6ef) **feat** · feat(models): 接入用量分析、源内定价与插件多账号 (#922)
+- `2026-11-14` · [`01073396`](https://github.com/ybz21/Roami/commit/0107339639be4b82b14c2415d6e4aaad1cee2eaa) **fix** · fix(workspace): 统一跨页状态保存与资源生命周期 (#920)
+- `2026-11-14` · [`4a3fe2dd`](https://github.com/ybz21/Roami/commit/4a3fe2ddcada7124dd9fd258cf16987b281e1765) **feat** · feat(swarm): 支持一键暂停和恢复团队工作 (#916)
+- `2026-11-14` · [`ea9c1f1f`](https://github.com/ybz21/Roami/commit/ea9c1f1f3aa46329b54aa708fa6dc55ee768a11a) **fix** · fix(models): 自动使用设备时区展示用量与审计 (#923)
+- `2026-11-14` · [`cb50f515`](https://github.com/ybz21/Roami/commit/cb50f515e696a707b749a6e3aaed2749866b8d6c) **feat** · feat(chat): 滑到顶部自动加载更早的消息 (#924)
+- `2026-11-14` · [`c784ed2f`](https://github.com/ybz21/Roami/commit/c784ed2f8b206ff84e9b57e6163477bf08f7db15) **fix** · fix(models): 统一模型源卡片并收拢详情编辑入口 (#925)
+- `2026-11-14` · [`5874e60e`](https://github.com/ybz21/Roami/commit/5874e60e25aed36b56a239f68c332ba9502f7f26) **feat** · feat(models): 支持聚合拖拽排序与完整模型能力目录 (#926)
+- `2026-11-14` · [`bb96fdbf`](https://github.com/ybz21/Roami/commit/bb96fdbf61ccdd46e6fabb90e7675754536ae7a8) **fix** · fix(models): 将聚合调度详情收回卡片内部 (#928)
+- `2026-11-14` · [`a175e0d8`](https://github.com/ybz21/Roami/commit/a175e0d83da14bc2ea9cf0f95f8d8eb2727d72c6) **fix** · fix(worktree): 识别多提交 squash 的已合入状态 (#927)
+- `2026-11-14` · [`af4dc220`](https://github.com/ybz21/Roami/commit/af4dc220179ee85462741163a3008165e4ff2532) **fix** · fix(models): 统一聚合与模型源的卡片和配置交互 (#929)
+- `2026-11-14` · [`e0a4ed7b`](https://github.com/ybz21/Roami/commit/e0a4ed7befe521508f1be020ae189754b076fe13) **refactor** · refactor(agents): 移除独立 DeepSeek Harness 接入
+- `2026-11-14` · [`723cacdf`](https://github.com/ybz21/Roami/commit/723cacdf3cb788ecc5a06337f8c10d72fe2f6519) **fix** · fix(terminal): 保留中文候选词并消除输入转发吞字 (#930)
+- `2026-11-15` · [`7cb73943`](https://github.com/ybz21/Roami/commit/7cb739437aa643d563793f0acbd481a8faef01b7) **fix** · fix(market): 支持完整的大体积技能包 (#931)
+- `2026-11-15` · [`f47a05c3`](https://github.com/ybz21/Roami/commit/f47a05c30ec2f3300e5c2138da8d36af5f41208d) **fix** · fix(mobile): 恢复会话后保持页面内容可见 (#934)
+- `2026-11-15` · [`377c7560`](https://github.com/ybz21/Roami/commit/377c756015b446f849fcedb77fc0cf0010d53b6f) **feat** · feat(models): 简化模型编排交互并统一源内模型范围 (#933)
+- `2026-11-15` · [`c57765a8`](https://github.com/ybz21/Roami/commit/c57765a865c4a12fb4afb1b5e0d53811b18df497) **fix** · fix(terminal): 修复输入法标点误删前字与连续输入吞字 (#936)
+- `2026-11-15` · [`f6579d52`](https://github.com/ybz21/Roami/commit/f6579d52d190bc30823a5016991d6d184c0c3634) **fix** · fix(frontend): 修复消息空摘要导致页面崩溃 (#937)
+- `2026-11-16` · [`e7c0bcfc`](https://github.com/ybz21/Roami/commit/e7c0bcfc873a564c7f3f937b33c6fcea62042571) **feat** · feat(models): 落地大模型工作区交互设计 (#938)
+- `2026-11-16` · [`b45efaa2`](https://github.com/ybz21/Roami/commit/b45efaa2e8571a347b1c80f582605bbe78e9564a) **feat** · feat(navigation): 将会话文件收进智能体下拉导航 (#932)
+- `2026-11-16` · [`37282ca3`](https://github.com/ybz21/Roami/commit/37282ca3e77ca1a0b687365e72997c8a2126393c) **fix** · fix(frontend): 修正会话页签间距与长文件名菜单布局 (#940)
+- `2026-11-16` · [`7627bcae`](https://github.com/ybz21/Roami/commit/7627bcae16aa47072bbeef9de8c0350ba263d7be) **fix** · fix(frontend): 收紧会话标签行尾按钮间距 (#942)
+- `2026-11-16` · [`cdc44640`](https://github.com/ybz21/Roami/commit/cdc44640d8dec1586b4ad56e2d34d80a409f52f8) **feat** · feat(models): 统一网关目录并支持 Agent 选模委派
+- `2026-11-16` · [`2365b84d`](https://github.com/ybz21/Roami/commit/2365b84d0ce4e32468a0d684d1ca9e0174daa485) **fix** · fix(models): 区分模型名称调用 ID 与访问密钥
+- `2026-11-17` · [`af7e7697`](https://github.com/ybz21/Roami/commit/af7e76973b5d7c521835ae2ca0456976e5a4f63d) **fix** · fix(agent): 修复任务停止核对与确认入口 (#944)
+- `2026-11-17` · [`43a4973f`](https://github.com/ybz21/Roami/commit/43a4973f169574256fe4b92d15e5f78a3f34fc9b) **fix** · fix(agent): 按真实活动时间核对旧任务停止状态
+- `2026-11-17` · [`93c98833`](https://github.com/ybz21/Roami/commit/93c988331ef19c72a22707b3b0d5ea8d352c063a) **docs** · docs(context): 设计首页自动整理与分层历史检索 (#911)
+- `2026-11-17` · [`f11b5f19`](https://github.com/ybz21/Roami/commit/f11b5f19f452fb69a80c8fb05b04641c8c3a94de) **feat** · feat(models): 统一网关选模目录并优先展示聚合能力
+- `2026-11-17` · [`e7c9a8a5`](https://github.com/ybz21/Roami/commit/e7c9a8a5bde3db0a3c56719eb63a16a13eaeaef1) **fix** · fix(models): 统一网关选模目录与价格能力展示
+- `2026-11-17` · [`4e10eab1`](https://github.com/ybz21/Roami/commit/4e10eab19d0ad05f81548f46e27abbb6a7b0d38a) **fix** · fix(agent): 核对 Codex MCP 调用结束证据
+- `2026-11-18` · [`a6effc25`](https://github.com/ybz21/Roami/commit/a6effc25b8a066d44776a430e29a51dc874c35e6) **feat** · feat(context): 实现首页上下文整理与原文检索 (#952)
+- `2026-11-18` · [`04896ef0`](https://github.com/ybz21/Roami/commit/04896ef004dea578dadf84ed1cf05115dc10daad) **feat** · feat(agent): 支持 Main 在工作中平滑切换模型 (#949)
+- `2026-11-18` · [`108eb6b6`](https://github.com/ybz21/Roami/commit/108eb6b6f2c739fc6718f9f7239ec536e28bedf4) **fix** · fix(agent): 自动核对未知与停止中的执行 (#951)
+- `2026-11-18` · [`48c9e2e3`](https://github.com/ybz21/Roami/commit/48c9e2e349f87f778d6395cb19f958b31b09e251) **feat** · feat(okr): 接入项目内聊天搭建工作台 (#941)
+- `2026-11-18` · [`3ac00a66`](https://github.com/ybz21/Roami/commit/3ac00a6668b7555b0919a8473ec1ec31f5ce2fd1) **fix** · fix(models): 精简 Main 选模列表
+- `2026-11-18` · [`6d1a7fc7`](https://github.com/ybz21/Roami/commit/6d1a7fc7cbda8ead30ca3dbdbd751cf6c236ecba) **fix** · fix(agent): 验证 Claude 实例就绪并恢复压缩中断的执行 (#954)
+- `2026-11-18` · [`661a4ec1`](https://github.com/ybz21/Roami/commit/661a4ec156d6cf183644e8a78b540d9e64e10027) **feat** · feat(swarm): 原成员接续 Claude 实例并保留执行历史 (#955)
+- `2026-11-18` · [`9f78fe01`](https://github.com/ybz21/Roami/commit/9f78fe010e0e481a289ba352a28871d20fddafe6) **fix** · fix(execution): recognize Claude metadata after interruption and wrapped input (#957)
+- `2026-11-18` · [`fe464405`](https://github.com/ybz21/Roami/commit/fe4644050572cb8427017fdf011107a97b6f2157) **fix** · fix(execution): recover Claude completion after missing tool hooks (#958)
+- `2026-11-18` · [`180af763`](https://github.com/ybz21/Roami/commit/180af76332aacb64739c828f1cde6aff3b8dbde1) **feat** · feat(okr): 原项目 Main 接入持久原生执行器 (#956)
+- `2026-11-18` · [`c9061218`](https://github.com/ybz21/Roami/commit/c90612183252973d4a1c7449ef11b000f9b81c48) **fix** · fix(agent): accept full native Main execution prompts (#959)
+- `2026-11-18` · [`5419c5a1`](https://github.com/ybz21/Roami/commit/5419c5a12b03cda295ecb018e333f03c4f129cf7) **fix** · fix(agent): preserve long Claude submit hook evidence (#960)
+- `2026-11-18` · [`1fcb33ac`](https://github.com/ybz21/Roami/commit/1fcb33ac8456d051dbf1b0fe8e003b7aec9e408e) **fix** · fix(okr): 原生 Main 与长期成员按目录排队 (#961)
+- `2026-11-18` · [`7a3c7755`](https://github.com/ybz21/Roami/commit/7a3c775535df314c99ecf01d40906745559ccf72) **fix** · fix(agent): 支持无限时 Claude 工具停止对账 (#962)
+- `2026-11-18` · [`239ecc7c`](https://github.com/ybz21/Roami/commit/239ecc7c137345008eda94c4f9c4ea475ddf84a4) **fix** · fix(agent): 核验原项目子目录的 Claude 停止记录 (#963)
+- `2026-11-18` · [`e3556084`](https://github.com/ybz21/Roami/commit/e3556084825e92b54d4654d0b9297f3a5411da1b) **fix** · fix(agent): 对账长期 Claude 生成前额度拒绝 (#964)
+- `2026-11-19` · [`577a9704`](https://github.com/ybz21/Roami/commit/577a9704d3ff5e5cad40bf8fab83c31883c0fc39) **fix** · fix(agent): 为原生 Main 记录独立验收步骤 (#965)
+- `2026-11-19` · [`d36d8311`](https://github.com/ybz21/Roami/commit/d36d8311e9f6fd48d16e7632d032b5c0e6f7e3f8) **fix** · fix(okr): 核验共享调度器并返回真实工具引用 (#966)
+- `2026-11-19` · [`ecc8eb7f`](https://github.com/ybz21/Roami/commit/ecc8eb7f9f89678173d4d056478e2e2a5b3e2d05) **docs** · docs(okr): 记录原Claude团队恢复与接续验收 (#967)
+- `2026-11-19` · [`43787856`](https://github.com/ybz21/Roami/commit/43787856bc946e9a9db62ec7880f637862d76c11) **fix** · fix(agent): 恢复Claude压缩失败后的原实例接续 (#968)
+- `2026-11-19` · [`170ad04f`](https://github.com/ybz21/Roami/commit/170ad04f11199c5e42c355c11c4502ee6244faa3) **feat** · feat(models): 接入 OpenRouter 免费目录与来源搜索 (#969)
+- `2026-11-19` · [`7c63772c`](https://github.com/ybz21/Roami/commit/7c63772c0643c4a8f854cb76a4d4ecb012e23200) **fix** · fix(okr): 补全原生Main工具契约和群状态摘要 (#970)
+- `2026-11-19` · [`635d5e1a`](https://github.com/ybz21/Roami/commit/635d5e1aab80d1c595ed5e0f0859f7dcdc680ee2) **fix** · fix(models): 移除本机智能体配置导入入口 (#973)
+- `2026-11-19` · [`7a944bbc`](https://github.com/ybz21/Roami/commit/7a944bbc10a5e9640a35428b71418b017fd70b41) **fix** · fix(frontend): 统一所有 Agent 渲染对话全宽并靠左 (#971)
+- `2026-11-19` · [`fb4a8a91`](https://github.com/ybz21/Roami/commit/fb4a8a918059cb14ea8943f7ac7fcf73fd611ae2) **fix** · fix(workspace): 关闭会话时收起关联文件标签 (#972)
+- `2026-11-19` · [`6d394e3b`](https://github.com/ybz21/Roami/commit/6d394e3b0a0244cf6e7f4625818bd73f981cc8a6) **fix** · fix(models): 自动检测聚合调度成员状态 (#978)
+- `2026-11-19` · [`eadbcbd4`](https://github.com/ybz21/Roami/commit/eadbcbd4c32b88dff25ae04a58107ae3eac46a0a) **fix** · fix(frontend): 强化顶部工作区当前标签标识 (#976)
+- `2026-11-19` · [`0349facd`](https://github.com/ybz21/Roami/commit/0349facd6f0209017864e22e0f94413bdd86038b) **fix** · fix(okr): 对齐原成员执行与自主续跑判断 (#980)
+- `2026-11-19` · [`55acdb31`](https://github.com/ybz21/Roami/commit/55acdb31b11d523affc1da17e8ebdb75b24282fb) **fix** · fix(okr): 延后接入原Main启动前的忙闲交接 (#981)
+- `2026-11-19` · [`3f177746`](https://github.com/ybz21/Roami/commit/3f1777469818cb7562ae873da16a750b4cec32c2) **fix** · fix(okr): 记录原生工具前置检查失败 (#983)
+- `2026-11-19` · [`859dc690`](https://github.com/ybz21/Roami/commit/859dc690d2cd86aac62a8d56a28674c455a1955c) **feat** · feat(swarm): 让等待Main的原成员受管让出输入 (#984)
+- `2026-11-19` · [`c3491423`](https://github.com/ybz21/Roami/commit/c349142312f80a38ad0c492bfd0b07c9dc90da57) **fix** · fix(agent): 对账默认Skill与图片伴随记录的原生完成 (#986)
+- `2026-11-19` · [`ac7eefd0`](https://github.com/ybz21/Roami/commit/ac7eefd08129fe315737c20c54556d2777e8630c) **fix** · fix(okr): 为Main保留当前协作概览与真实状态 (#990)
+- `2026-11-19` · [`10414ce2`](https://github.com/ybz21/Roami/commit/10414ce2b497e508764d756518e3a381c7d4e2c0) **fix** · fix(agent): 留存有来源的原生工具诊断 (#991)
+- `2026-11-19` · [`d043eef9`](https://github.com/ybz21/Roami/commit/d043eef964c498bc07b61f31e0d5cb00837a255e) **fix** · fix(okr): 恢复Claude直接消息结束后的协作准入 (#993)
+- `2026-11-19` · [`d17aee07`](https://github.com/ybz21/Roami/commit/d17aee07644073940ffa1eb7684015bb126d38a8) **fix** · fix(okr): 对账免费路由耗尽的原生执行 (#995)
+- `2026-11-19` · [`51f80e87`](https://github.com/ybz21/Roami/commit/51f80e87ee81d9f785f28d2474e51b67208e86ac) **feat** · feat(okr): 记录原生工具活动以支持运行中监督 (#997)
+- `2026-11-19` · [`b6219b5f`](https://github.com/ybz21/Roami/commit/b6219b5faff0bad5f97d0a77bf3840bfbe802b1d) **fix** · fix(okr): 原生模型不可用时保留协作轮自动重试 (#999)
+- `2026-11-19` · [`52042570`](https://github.com/ybz21/Roami/commit/52042570d4138be2916bedae156636a27b9cc993) **fix** · fix(okr): 恢复升级前已中断的原协作轮 (#1000)
+- `2026-11-19` · [`0ca9074e`](https://github.com/ybz21/Roami/commit/0ca9074eed9c1c851e48b6ba7bac04774de4c94d) **docs** · docs(okr): 写明原智能体等待模型恢复的操作规范 (#1001)
+- `2026-11-19` · [`c9a3577c`](https://github.com/ybz21/Roami/commit/c9a3577ca2b91b25cbdb3331a1bf9282c34cc330) **docs** · docs(okr): 明确框架和项目智能体的职责边界 (#1003)
+- `2026-11-19` · [`f4e9f9e1`](https://github.com/ybz21/Roami/commit/f4e9f9e196bfcef55ee1f8283d43e82119f93e33) **fix** · fix(okr): 核验原生 Main 实际收到的工具输入 (#1005)
+- `2026-11-19` · [`b4396589`](https://github.com/ybz21/Roami/commit/b4396589d54a9925688bbf962e90364837b27911) **fix** · fix(okr): 保留跨日等待的原定时协作轮 (#1007)
+- `2026-11-20` · [`6598a036`](https://github.com/ybz21/Roami/commit/6598a0360b2b3593270388ad1404e83afaf36273) **feat** · feat(okr): 接通原生 Main 的冻结视频审核 (#1008)
+- `2026-11-20` · [`db20ed17`](https://github.com/ybz21/Roami/commit/db20ed17d7b08b569d67fbfb6c8ce86b80624060) **fix** · fix(okr): 重启后接续已有可信停止证明的原重试轮 (#1010)
+- `2026-11-20` · [`e92a45e3`](https://github.com/ybz21/Roami/commit/e92a45e39c9b26a70bd0e3e1609b0b3ad354ef6c) **fix** · fix(model-gateway): 支持公网 HTTP 和忽略 HTTPS 证书 (#1011)
+- `2026-11-20` · [`549dbb6a`](https://github.com/ybz21/Roami/commit/549dbb6a80cb3622f404dba12c335151cb82baa8) **fix** · fix(okr): 按需读取原生 Main 的项目 Skill 正文 (#1013)
+- `2026-11-20` · [`17cf9447`](https://github.com/ybz21/Roami/commit/17cf9447ea6897f859cb90fe3399a2460601b3eb) **fix** · fix(okr): 如实显示原生 Main 输入未确认状态 (#1012)
+- `2026-11-20` · [`6f3fea5b`](https://github.com/ybz21/Roami/commit/6f3fea5ba1b7bb61ef38cb47254ae3fbbb89c3fc) **fix** · fix(okr): 通过签名分页投递原生 Main 的长上下文 (#1014)
+- `2026-11-20` · [`3597a8bd`](https://github.com/ybz21/Roami/commit/3597a8bd2db0d695a7fa6b3c2c6d3d61d691efea) **docs** · docs(okr): 约定长期成员独立目录与团队交付区 (#1015)
+- `2026-11-20` · [`320d242b`](https://github.com/ybz21/Roami/commit/320d242b95e209a8013902542f60884e8433427a) **fix** · fix(okr): 创建时初始化成员目录和共享交付区 (#1017)
+- `2026-11-20` · [`e18c5aad`](https://github.com/ybz21/Roami/commit/e18c5aad22d0295f7c08d9b1d07a7e46a69ddac9) **fix** · fix(model-hub): 修复连接编辑并前置模型源名称 (#1016)
+- `2026-11-20` · [`f9d23abb`](https://github.com/ybz21/Roami/commit/f9d23abb45114e4c7186caa0676a2cece4df8b3e) **feat** · feat(swarm): 支持 Main 自动调整长期成员 (#1019)
+- `2026-11-20` · [`d7b58f66`](https://github.com/ybz21/Roami/commit/d7b58f660c2d0b58b7b2e9e7fdd872ca6abfdfcb) **fix** · fix(session): 修正会话最近活动时间 (#1018)
+- `2026-11-20` · [`6108a657`](https://github.com/ybz21/Roami/commit/6108a6579058c6b04c29627b8572c13a20eb7760) **feat** · feat(session): 开工时创建互审会话并支持多轮复审 (#1020)
+- `2026-11-20` · [`6f99ee60`](https://github.com/ybz21/Roami/commit/6f99ee60d4dd5b8bce2f4cc2d55af7707ccaa4b0) **fix** · fix(session): 修复互审启动和失败任务清理 (#1022)
+- `2026-11-20` · [`91e73470`](https://github.com/ybz21/Roami/commit/91e73470032474a83c3a72c51546a0c646dd77a5) **fix** · fix(okr): 跟随原生 Main 的实时输出 (#1021)
+- `2026-11-21` · [`ae23f54d`](https://github.com/ybz21/Roami/commit/ae23f54dc7ede74330ae6ea252de4f26014e9e03) **fix** · fix(projects): 统一手机项目的新建会话入口 (#1024)
+- `2026-11-21` · [`001649fb`](https://github.com/ybz21/Roami/commit/001649fbe30a980f5e6cd264efe861c481875263) **feat** · feat(models): 完善模型工作台的接入、调度与诊断 (#989)
+- `2026-11-21` · [`bcc7df5a`](https://github.com/ybz21/Roami/commit/bcc7df5aa751793adad1acb28020b25898d5e140) **perf** · perf(sessions): 减少会话探测、抓屏和转录请求 (#1026)
+- `2026-11-21` · [`cde2f033`](https://github.com/ybz21/Roami/commit/cde2f03356a2f5f9e8f103f96e9fd16833abec9c) **feat** · feat(okr): 显示主智能体的模型自动重试时间 (#1004)
+- `2026-11-21` · [`588bd08a`](https://github.com/ybz21/Roami/commit/588bd08a3a81cba4f7514cd4dc1ca5106a94be27) **fix** · fix(okr): 在项目首页显示关键结果进度 (#1029)
+- `2026-11-22` · [`4efc6b18`](https://github.com/ybz21/Roami/commit/4efc6b180c0100f1e6491620cba772b048b90937) **fix** · fix(session): 防止重绘误报会话最近活动时间 (#1030)
+- `2026-11-22` · [`e6c7ea82`](https://github.com/ybz21/Roami/commit/e6c7ea82ce716cf39eb465046ad715c3f4a84f67) **feat** · feat(model-hub): 完善聚合与网关请求监控 (#1028)
+- `2026-11-22` · [`bda45f6e`](https://github.com/ybz21/Roami/commit/bda45f6e3080013b005c25eee4c7dc2b75654531) **fix** · fix(session): 按工作区版本持续互审 (#1027)
+- `2026-11-23` · [`46696fa9`](https://github.com/ybz21/Roami/commit/46696fa9ab8e873aaa92dc16e24eafbbe9c86056) **fix** · fix(models): 增加网关路由测试与 503 诊断 (#1031)
+- `2026-11-23` · [`ef5114c0`](https://github.com/ybz21/Roami/commit/ef5114c07c58c095ea90c3f83e5ed66fb0912184) **feat** · feat(agent): 接入 Gemini CLI (#1033)
+- `2026-11-23` · [`693aacd6`](https://github.com/ybz21/Roami/commit/693aacd69d53c7b2c5c00c187ec62cc0d4e8322b) **fix** · fix(session): 按执行器记录更新会话活动时间 (#1032)
+- `2026-11-23` · [`0e136f2d`](https://github.com/ybz21/Roami/commit/0e136f2d220091383173ffc7de39564636bef66e) **fix** · fix(deploy): 部署时安装和验证 Gemini CLI (#1034)
+- `2026-11-23` · [`e1fcedb4`](https://github.com/ybz21/Roami/commit/e1fcedb41e786de4552d6e73f4179d5fabab4669) **feat** · feat(agent): 接入 Antigravity CLI (#1035)
+- `2026-11-23` · [`8adf657a`](https://github.com/ybz21/Roami/commit/8adf657abee04ee1aad36b23d54642bd480f77c9) **feat** · feat(models): 支持模型源请求头和模型标识
+- `2026-11-25` · [`9f164292`](https://github.com/ybz21/Roami/commit/9f164292e2dd66888b3c91490ba52437e648382e) **feat** · feat(terminal): 独立终端页复用主页工作台框架与样式 (#1037)
+- `2026-11-25` · [`3d30d3ff`](https://github.com/ybz21/Roami/commit/3d30d3ff9eb1b2239dfe99efbb0afd349d4a5300) **feat** · feat(terminal): 独立终端页补齐底部状态条与更新提示 (#1040)
+- `2026-11-25` · [`16781c68`](https://github.com/ybz21/Roami/commit/16781c68957fcf32cc8bb0c003aa1140097da03a) **fix** · fix(sessions): 使用会话 ID 初始化名称和工作区分支 (#1039)
+- `2026-11-25` · [`55fb9fd9`](https://github.com/ybz21/Roami/commit/55fb9fd931ccb1a6f1aeabdad23b4fef470c7f05) **fix** · fix(models): 补齐模型源和聚合删除入口 (#1038)
+- `2026-11-25` · [`00dda7c5`](https://github.com/ybz21/Roami/commit/00dda7c55c283391433ca2c0ee5ac34d3a4ad24b) **fix** · fix(models): 智能体直接选择网关模型 (#1041)
+- `2026-11-26` · [`eb1f9df1`](https://github.com/ybz21/Roami/commit/eb1f9df15270eea61992e77dfaef4ab54964b471) **fix** · fix(okr): 加快打开已有 Main 对话 (#1042)
