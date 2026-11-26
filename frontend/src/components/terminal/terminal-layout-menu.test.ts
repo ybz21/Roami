@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTerminalLayoutMenu, parseTerminalLayoutMenuKey } from './terminal-layout-menu'
+import { buildTerminalContextMenu, buildTerminalLayoutMenu, parseTerminalLayoutMenuKey } from './terminal-layout-menu'
 
 const t = (key: string, params?: Record<string, string | number>) => {
   if (!params) return key
@@ -49,5 +49,22 @@ describe('terminal-layout-menu', () => {
     expect(parseTerminalLayoutMenuKey('select-window:w-2')).toEqual({ action: 'select-window', windowId: 'w-2' })
     expect(parseTerminalLayoutMenuKey('focus-left')).toEqual({ action: 'focus-pane', direction: 'left' })
     expect(parseTerminalLayoutMenuKey('unknown')).toBeNull()
+  })
+
+  it('builds a concise flat right-click menu without nested submenus or redundant cancel', () => {
+    const items = buildTerminalContextMenu(t, {})
+    const keys = items.map((item: any) => item.key).filter(Boolean)
+    expect(keys).toEqual([
+      'paste',
+      'select-all',
+      'split-right',
+      'split-down',
+      'new-window',
+      'close-pane',
+      'redraw',
+      'reconnect',
+    ])
+    expect(items.some((item: any) => 'children' in item)).toBe(false)
+    expect(items.find((item: any) => item.key === 'close-pane')).toMatchObject({ danger: true })
   })
 })

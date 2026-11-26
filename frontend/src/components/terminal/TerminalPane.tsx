@@ -38,7 +38,7 @@ import { copyText } from '../chat/blocks'
 import RenameSessionModal from '../sessions/RenameSessionModal'
 import { type ClaudeInfo } from './claude-info'
 import { KEYS } from './tmux-keys'
-import { buildTerminalLayoutMenu, parseTerminalLayoutMenuKey, type SessionWindowsState, type TerminalLayoutAction } from './terminal-layout-menu'
+import { buildTerminalContextMenu, buildTerminalLayoutMenu, parseTerminalLayoutMenuKey, type SessionWindowsState, type TerminalLayoutAction } from './terminal-layout-menu'
 import { codexReconnectFailed, codexResumeCommand } from './codex-recovery'
 import { useI18n } from '../../i18n'
 import { SESSION_MIME, buildIntro, canDrop, readDrag } from '../shell/session-drop'
@@ -206,24 +206,25 @@ export default function TerminalPane(props: {
     if (!active || nativeSessionId(active) || preparingSession(active)) return
     void refreshLayoutMenuState(active)
   }, [active, node, refreshLayoutMenuState])
-  const openPaneCloseConfirm = async () => {
+  const openPaneCloseConfirm = async (targetPaneId?: string) => {
     if (!active) return
     try {
       const grid = termRefs.current[active]?.gridSize()
       const qs = grid ? `?cols=${grid.cols}&rows=${grid.rows}` : ''
       const r = await api('GET', `/sessions/${encodeURIComponent(active)}/panes/active${qs}`)
       const p = r.data
-      const rect = splitRefs.current[active]?.paneContainerRect(p.paneId) || termRefs.current[active]?.paneScreenRect(p)
+      const paneId = targetPaneId || p.paneId
+      const rect = splitRefs.current[active]?.paneContainerRect(paneId) || termRefs.current[active]?.paneScreenRect(p)
       if (!rect) { message.error(t('pane.close.locateFailed')); return }
       setPaneCloseError(undefined)
-      setPaneCloseTarget({ session: active, paneId: p.paneId, cwd: p.cwd, cmd: p.cmd, panesInWindow: p.panesInWindow, rect })
+      setPaneCloseTarget({ session: active, paneId, cwd: p.cwd, cmd: p.cmd, panesInWindow: p.panesInWindow, rect })
     } catch {
       message.error(t('pane.close.locateFailed'))
     }
   }
   const runTerminalAction = async (sessionName: string, action: TerminalLayoutAction) => {
     if (action.action === 'close-pane') {
-      await openPaneCloseConfirm()
+      await openPaneCloseConfirm(action.paneId)
       return
     }
     try {
@@ -590,7 +591,7 @@ export default function TerminalPane(props: {
     exitCopyMode()
     termRefs.current[active]?.send(mention + ' ', true)
   }
-  const [ctx, setCtx] = useState<{ x: number; y: number; session: string; selection: string } | null>(null)
+  const [ctx, setCtx] = useState<{ x: number; y: number; session: string; selection: string; paneId?: string } | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteSession, setPasteSession] = useState('')
   const [pasteText, setPasteText] = useState('')
@@ -702,58 +703,32 @@ export default function TerminalPane(props: {
   }
   const selText = ctx?.selection?.trim() || ''
   const selPreview = selText.replace(/\s+/g, ' ').slice(0, 28)
-  const ctxItems = ctx ? [
-    ...(selText ? [
-      {
-        key: 'copy',
-        label: (
-          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontWeight: 600 }}>{t('terminal.copySelected')}</span>
-            <span style={{ color: 'var(--text-dimmer)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              “{selPreview}{selText.length > selPreview.length ? '…' : ''}”
-            </span>
-          </span>
-        ),
-      },
-      { type: 'divider' as const },
-    ] : []),
-    { key: 'paste', label: t('terminal.pasteClipboard') },
-    { key: 'manual-paste', label: t('terminal.manualPaste') },
-    { key: 'select-all', label: t('terminal.selectAllPane') },
-    { type: 'divider' as const },
-    { key: 'scroll-up', label: t('terminal.scrollHistory') },
-    { key: 'bottom', label: t('terminal.toBottom') },
-    { key: 'redraw', label: t('terminal.redraw') },
-    { key: 'reconnect', label: t('terminal.reconnect') },
-    { type: 'divider' as const },
-    {
-      key: 'layout',
-      label: t('terminal.layoutMenu'),
-      children: [
-        { key: 'split-right', label: t('terminal.menu.splitRight') },
-        { key: 'split-down', label: t('terminal.menu.splitDown') },
-        { key: 'next-pane', label: t('terminal.menu.nextPane') },
-        { key: 'new-window', label: t('terminal.menu.newWindow') },
-      ],
-    },
-    { type: 'divider' as const },
-    { key: 'cancel', label: t('common.cancel') },
-  ] : []
+  const copyLabel = selText ? (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
+      <span style={{ fontWeight: 600 }}>{t('terminal.copySelected')}</span>
+      <span style={{ color: 'var(--text-dimmer)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        “{selPreview}{selText.length > selPreview.length ? '…' : ''}”
+      </span>
+    </span>
+  ) : undefined
+  const ctxItems = ctx ? buildTerminalContextMenu(t, { copyLabel }) : []
   const onCtxClick = ({ key }: { key: string }) => {
     if (!ctx) return
     const h = termRefs.current[ctx.session]
-    if (key === 'cancel') { /* 仅关闭菜单 */ }
-    else if (key === 'copy') { copyText(ctx.selection); message.success(t('common.copied')); h?.clearSelection() }
+    if (key === 'copy') { copyText(ctx.selection); message.success(t('common.copied')); h?.clearSelection() }
     else if (key === 'select-all') h?.selectAll()
     else if (key === 'paste') pasteClipboard(ctx.session)
-    else if (key === 'manual-paste') openManualPaste(ctx.session)
-    else if (key === 'scroll-up') h?.scroll(-12)
-    else if (key === 'bottom') h?.toBottom()
     else if (key === 'redraw') h?.redraw()
     else if (key === 'reconnect') h?.reconnect()
     else {
       const action = parseTerminalLayoutMenuKey(key)
-      if (action) void runTerminalAction(ctx.session, action)
+      if (action) {
+        if (ctx.paneId && (action.action === 'split-right' || action.action === 'split-down' || action.action === 'close-pane')) {
+          void runTerminalAction(ctx.session, { ...action, paneId: ctx.paneId })
+        } else {
+          void runTerminalAction(ctx.session, action)
+        }
+      }
     }
     setCtx(null)
   }
@@ -1243,7 +1218,7 @@ export default function TerminalPane(props: {
               onNewWindow={() => { void runTerminalAction(termName, { action: 'new-window' }) }}
               onStatus={(s) => setStatus(termName, s)}
               onRevived={onRename}
-              onContextMenu={({ x, y, selection }) => { setActive(termName); setCtx({ x, y, session: termName, selection }) }}
+              onContextMenu={({ x, y, selection, paneId }) => { setActive(termName); setCtx({ x, y, session: termName, selection, paneId }) }}
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}
               onImagePaste={(files) => { setActive(termName); pasteImage(termName, files) }} />}

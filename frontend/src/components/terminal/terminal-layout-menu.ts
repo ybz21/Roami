@@ -125,3 +125,27 @@ export function buildTerminalLayoutMenu(
     },
   ]
 }
+
+// Concise, flat right-click menu for an individual terminal pane: clipboard/selection,
+// direct split/window/close-pane actions (no nested submenus), and quick recovery.
+export function buildTerminalContextMenu(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  opts: { copyLabel?: any },
+) {
+  return [
+    ...(opts.copyLabel ? [
+      { key: 'copy', label: opts.copyLabel },
+      { type: 'divider' as const },
+    ] : []),
+    { key: 'paste', label: t('terminal.pasteAction') },
+    { key: 'select-all', label: t('terminal.selectAllPane') },
+    { type: 'divider' as const },
+    { key: 'split-right', label: t('terminal.menu.splitRight') },
+    { key: 'split-down', label: t('terminal.menu.splitDown') },
+    { key: 'new-window', label: t('terminal.menu.newWindow') },
+    { key: 'close-pane', label: t('terminal.menu.closePane'), danger: true },
+    { type: 'divider' as const },
+    { key: 'redraw', label: t('terminal.redrawShort') },
+    { key: 'reconnect', label: t('terminal.reconnectShort') },
+  ]
+}
