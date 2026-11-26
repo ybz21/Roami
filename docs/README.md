@@ -6,6 +6,7 @@
 |------|------|
 | [features.md](./features.md) ｜ [features.zh-CN.md](./features.zh-CN.md) | **完整功能列表** — 按能力分类 |
 | [Roadmap](../ROADMAP.md) ｜ [中文路线图](../ROADMAP.zh-CN.md) | **下一阶段** — RSI 自进化、接入 SuperWork 构建数字分身、OKR 自动执行 |
+| [product-evolution/](./product-evolution/) | **产品演进一页讲稿** — 六阶段主线、关键提交与版本依据 |
 | [deploy/mobile.md](./deploy/mobile.md) | **手机与 Android App** — 安装、签名、通知与构建 |
 | [install/](./install/) | **安装与部署** — CLI 一键/源码安装、Web 控制台启动、`.env` 配置、远程访问、故障排查 |
 | [design/](./design/) | **历史设计文档** — swarm / plugin / web / cluster；新设计按根 AGENTS.md 维护 |
