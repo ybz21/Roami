@@ -57,16 +57,22 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
       const status = await api('GET', '/agent/status')
       if (!current()) throw new Error('Conversation changed')
       contextSupported.current = status.data?.okrMessageContext === true
-      let id: string
-      if (reference && status.data?.conversationIdentity === true) {
-        const response = await api('GET', '/agent/conversations/' + encodeURIComponent(reference.conversationId) + '/identity')
-        const identity = response.data
-        if (identity?.kind !== 'project_main' || identity.projectId !== projectId || identity.conversationId !== reference.conversationId) throw new Error('Referenced conversation changed')
-        id = identity.conversationId
-      } else if (status.data?.projectOkrMain === true && !reference) {
+      let id: string | undefined
+      const knownCID = reference?.conversationId || expectedConversationId
+      if (knownCID && status.data?.conversationIdentity === true) {
+        const response = await api('GET', '/agent/conversations/' + encodeURIComponent(knownCID) + '/identity')
+        if (!current() || response.data?.conversationId !== knownCID) throw new Error('Project Main changed')
+        if (response.data.kind === 'project_main' && response.data.projectId === projectId) {
+          id = knownCID
+        } else if (reference || response.data.kind !== 'conversation') {
+          throw new Error('Project Main unavailable')
+        }
+      }
+      // Unbound legacy team conversations still go through the server's ownership checks.
+      if (!id && status.data?.projectOkrMain === true && !reference) {
         const response = await api('POST', '/agent/conversations', create.current)
         id = response.data?.id
-      } else if (workspace?.swarm.startsWith('sw-')) {
+      } else if (!id && workspace?.swarm.startsWith('sw-')) {
         const [team, home, directory] = await Promise.all([
           api('GET', '/agent/swarms/' + encodeURIComponent(workspace.swarm)),
           api('POST', '/agent/main-conversation'),
@@ -76,7 +82,7 @@ function OkrMainInstance({ embedded = false, expectedConversationId, reference: 
         if (reference && id !== reference.conversationId) throw new Error('Referenced conversation changed')
         if (!id || team.data.archived || team.data.target?.projectId !== projectId || id === home.data?.id
           || !Array.isArray(directory.data) || (directory.data as SwarmSnapshot[]).some(item => item.mainConversationId === id && item.target?.projectId !== projectId)) throw new Error('Project Main unavailable')
-      } else {
+      } else if (!id) {
         if (alive.current) setUpgradeRequired(true)
         throw new Error('Project Main upgrade required')
       }

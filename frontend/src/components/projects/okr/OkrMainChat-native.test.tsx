@@ -40,7 +40,28 @@ it('renders the existing native provider but sends through the original Main que
   fireEvent.click(await screen.findByText('native:claude:original-provider'))
   await waitFor(() => expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations/original-main/messages', expect.objectContaining({ text: 'Continue the original team', requestKey: expect.any(String), okrContext: expect.objectContaining({ version: 1, revision: 0 }) })))
   expect(state.api.mock.calls.some(call => call[1].includes('/sessions/') || call[1] === '/agent/main-conversation')).toBe(false)
-  expect(state.api.mock.calls.filter(call => call[1] === '/agent/conversations')).toHaveLength(1)
+  expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations')).toBe(false)
+})
+
+it.each(['home_main', 'member', 'foreign_project'])('refuses a %s identity from the team snapshot without trying to create a Main', async kind => {
+  const base = state.api.getMockImplementation()!
+  state.api.mockImplementation(async (method, path) => path.endsWith('/identity')
+    ? { data: { kind: kind === 'foreign_project' ? 'project_main' : kind, projectId: 'foreign', conversationId: 'original-main' } }
+    : base(method, path))
+  render(<OkrMainChat {...props()} />)
+  await screen.findByRole('alert')
+  expect(state.api.mock.calls.some(call => call[1] === '/agent/conversations' || call[1].endsWith('/execution'))).toBe(false)
+  expect(screen.queryByText(/^native:/)).toBeNull()
+})
+
+it('allows the server to bind a legacy team conversation with no explicit Main identity yet', async () => {
+  const base = state.api.getMockImplementation()!
+  state.api.mockImplementation(async (method, path) => path.endsWith('/identity')
+    ? { data: { kind: 'conversation', conversationId: 'original-main' } }
+    : base(method, path))
+  render(<OkrMainChat {...props()} />)
+  await screen.findByText('native:claude:original-provider')
+  expect(state.api).toHaveBeenCalledWith('POST', '/agent/conversations', expect.objectContaining({ projectId: 'project' }))
 })
 
 it.each(['project', 'conversation', 'executor', 'generation', 'session'])('rejects a changed %s in the binding before displaying a provider', async kind => {

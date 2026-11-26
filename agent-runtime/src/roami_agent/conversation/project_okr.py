@@ -35,10 +35,11 @@ async def request(settings, argv, body=None):
 
 
 async def registered_project(settings, value):
-    entry = await request(settings, ["project", "show", project_id(value)])
-    if not isinstance(entry, dict) or not isinstance(entry.get("key"), str):
+    pid = project_id(value)
+    entry = await request(settings, ["project", "show", pid, "--identity"])
+    if not isinstance(entry, dict) or entry.get("key") != pid:
         raise DomainError("PROJECT_OKR_UNAVAILABLE", 503)
-    return project_id(entry["key"])
+    return pid
 
 
 async def operation(settings, pid, action, payload=None):

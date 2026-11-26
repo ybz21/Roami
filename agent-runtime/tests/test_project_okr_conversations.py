@@ -81,7 +81,7 @@ async def test_goal_discussion_binds_registered_project_independently_and_idempo
     assert binding["project_id"] == "registered" and binding["owner_id"] == "alice"
     assert (await create_goal(runtime)).json()["data"]["id"] == cid
     assert (await create_goal(runtime, project="another-project")).status_code == 409
-    assert calls[0][0] == ["roami", "project", "show", "registered", "--json"]
+    assert calls[0][0] == ["roami", "project", "show", "registered", "--identity", "--json"]
 
 
 async def test_bound_goal_tools_read_empty_goal_and_save_only_its_project(project_runtime):
@@ -134,6 +134,20 @@ async def test_goal_binding_rejects_option_like_project_ids_before_cli(project_r
     with pytest.raises(DomainError, match="INVALID_OKR_PROJECT_ID"):
         await registered_project(runtime.settings, pid)
     assert not calls
+
+
+async def test_project_identity_cannot_redirect_to_a_different_project(
+    project_runtime, monkeypatch
+):
+    runtime, _, _ = project_runtime
+
+    async def execute(argv, **_):
+        assert argv[1:] == ["project", "show", "registered", "--identity", "--json"]
+        return {"exitCode": 0, "stdout": '{"data":{"key":"another-project"}}'}
+
+    monkeypatch.setattr("roami_agent.conversation.project_okr.execute", execute)
+    with pytest.raises(DomainError, match="PROJECT_OKR_UNAVAILABLE"):
+        await registered_project(runtime.settings, "registered")
 
 
 async def test_reopening_and_concurrent_windows_share_one_project_main(project_runtime, store):
