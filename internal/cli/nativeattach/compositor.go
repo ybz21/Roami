@@ -493,20 +493,38 @@ func pumpMultiPane(
 		return "", false, true, nil
 	}
 
+	controlLost := false
+	reclaimAllAndResize := func() {
+		c := int(curCols.Load())
+		pr := int(paneRowsFor(uint16(curRows.Load())))
+		cellLay = computeCellLayout(win.Layout, c, pr)
+		for _, r := range cellLay.Panes {
+			rectByPane[r.PaneID] = r
+			target := sessionbackend.Target{SessionID: sessionID, PaneID: r.PaneID}
+			if lease, cerr := backend.ClaimControl(subCtx, target, clientID); cerr == nil {
+				controlGens[r.PaneID] = lease.ControlGen
+				_ = backend.Resize(subCtx, target, lease.ControlGen, uint16(r.W), uint16(r.H))
+			}
+			if emu := emus[r.PaneID]; emu != nil {
+				emu.Resize(uint16(r.W), uint16(r.H))
+			}
+		}
+		controlLost = false
+	}
+
 	writeInput := func(pid string, data []byte) error {
 		if len(data) == 0 {
 			return nil
+		}
+		if controlLost {
+			reclaimAllAndResize()
 		}
 		target := sessionbackend.Target{SessionID: sessionID, PaneID: pid}
 		gen := controlGens[pid]
 		werr := backend.WriteInput(subCtx, target, gen, data)
 		if errors.Is(werr, sessionbackend.ErrStaleControl) {
-			lease, cerr := backend.ClaimControl(subCtx, target, clientID)
-			if cerr != nil {
-				return cerr
-			}
-			controlGens[pid] = lease.ControlGen
-			werr = backend.WriteInput(subCtx, target, lease.ControlGen, data)
+			reclaimAllAndResize()
+			werr = backend.WriteInput(subCtx, target, controlGens[pid], data)
 		}
 		return werr
 	}
@@ -555,6 +573,10 @@ func pumpMultiPane(
 	}
 
 	focusAtCell := func(col, row int) {
+		if controlLost {
+			reclaimAllAndResize()
+			dirty = true
+		}
 		for _, r := range cellLay.Panes {
 			if col >= r.X && col < r.X+r.W && row >= r.Y && row < r.Y+r.H {
 				focusPane(r.PaneID)
@@ -600,10 +622,16 @@ func pumpMultiPane(
 				if emu := emus[r.PaneID]; emu != nil {
 					emu.Resize(uint16(r.W), uint16(r.H))
 				}
-				if gen := controlGens[r.PaneID]; gen > 0 {
-					_ = backend.Resize(subCtx, sessionbackend.Target{SessionID: sessionID, PaneID: r.PaneID}, gen, uint16(r.W), uint16(r.H))
+				target := sessionbackend.Target{SessionID: sessionID, PaneID: r.PaneID}
+				gen := controlGens[r.PaneID]
+				if gen == 0 || errors.Is(backend.Resize(subCtx, target, gen, uint16(r.W), uint16(r.H)), sessionbackend.ErrStaleControl) {
+					if lease, cerr := backend.ClaimControl(subCtx, target, clientID); cerr == nil {
+						controlGens[r.PaneID] = lease.ControlGen
+						_ = backend.Resize(subCtx, target, lease.ControlGen, uint16(r.W), uint16(r.H))
+					}
 				}
 			}
+			controlLost = false
 			_ = writeOut([]byte(clearScreenHome))
 			if err := renderNow(); err != nil {
 				return "", false, false, err
@@ -631,6 +659,12 @@ func pumpMultiPane(
 				return next, false, false, nil
 			}
 			switch msg.ev.Kind {
+			case sessionbackend.EventControl:
+				if msg.ev.Controller != "" && msg.ev.Controller != clientID {
+					controlLost = true
+				} else if msg.ev.ControlGen > controlGens[msg.paneID] {
+					controlLost = true
+				}
 			case sessionbackend.EventSnapshot:
 				if r, ok := rectByPane[msg.paneID]; ok {
 					emu := sessionhost.NewEmulator(uint16(r.W), uint16(r.H), 1)

@@ -343,6 +343,98 @@ func TestMultiPaneCompositorSideBySideAndVertical(t *testing.T) {
 	_ = inW.Close()
 }
 
+func TestMultiClientPhoneDesktopResizeFollowsActiveController(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix shell integration test")
+	}
+	host := sessionhost.NewHost(sessionhost.Config{
+		HostID:  "resize-handoff-host",
+		LogsDir: t.TempDir(),
+	})
+	defer host.Shutdown(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ref, err := host.Create(ctx, sessionbackend.CreateSpec{
+		SessionID: "phone-desktop",
+		Exe:       "/bin/sh",
+		Cols:      120,
+		Rows:      30,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// 1. Desktop (120x30, status bar on -> pane 120x29) attaches.
+	showBar := true
+	deskInR, deskInW := io.Pipe()
+	deskSel := make(chan [2]int, 4)
+	deskOut := &syncBuffer{}
+	deskDone := make(chan error, 1)
+	go func() {
+		deskDone <- Attach(ctx, host, host, AttachOptions{
+			SessionID:     ref.SessionID,
+			ClientID:      "desktop-1",
+			In:            deskInR,
+			Out:           deskOut,
+			ShowStatusBar: &showBar,
+			SelectCellCh:  deskSel,
+			Cols:          120,
+			Rows:          30,
+		})
+	}()
+
+	checkCols := func(want string, desc string) {
+		t.Helper()
+		waitFor(t, 4*time.Second, func() bool {
+			capRes, err := host.Capture(ctx, sessionbackend.Target{SessionID: ref.SessionID, PaneID: ref.PaneID}, sessionbackend.CaptureOpts{Lines: 20})
+			return err == nil && strings.Contains(capRes.Text, want)
+		}, desc)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+	_, _ = deskInW.Write([]byte("stty size | awk '{print \"SZ_\" $2 \"x\" $1}'\n"))
+	checkCols("SZ_120x29", "initial desktop 120x29 size")
+
+	// 2. Phone (45x24 -> pane 45x23) connects to the same session -> host resizes to phone!
+	phoneInR, phoneInW := io.Pipe()
+	phoneOut := &syncBuffer{}
+	phoneDone := make(chan error, 1)
+	go func() {
+		phoneDone <- Attach(ctx, host, host, AttachOptions{
+			SessionID:     ref.SessionID,
+			ClientID:      "phone-1",
+			In:            phoneInR,
+			Out:           phoneOut,
+			ShowStatusBar: &showBar,
+			Cols:          45,
+			Rows:          24,
+		})
+	}()
+
+	time.Sleep(250 * time.Millisecond)
+	_, _ = phoneInW.Write([]byte("stty size | awk '{print \"PH_\" $2 \"x\" $1}'\n"))
+	checkCols("PH_45x23", "phone took control and resized to 45x23")
+
+	// 3. Switch back to Desktop (still open!): clicking immediately reclaims control and resizes BACK to 120x29!
+	deskSel <- [2]int{10, 5}
+	time.Sleep(200 * time.Millisecond)
+	_, _ = deskInW.Write([]byte("stty size | awk '{print \"BACK_\" $2 \"x\" $1}'\n"))
+	checkCols("BACK_120x29", "desktop click reclaimed control and resized back to 120x29")
+
+	// 4. Typing on Phone (still open!) reclaims control and resizes right back to 45x23!
+	_, _ = phoneInW.Write([]byte("stty size | awk '{print \"PH2_\" $2 \"x\" $1}'\n"))
+	checkCols("PH2_45x23", "phone input reclaimed control and resized back to 45x23")
+
+	_, _ = deskInW.Write([]byte{DefaultPrefix, 'd'})
+	_, _ = phoneInW.Write([]byte{DefaultPrefix, 'd'})
+	_ = deskInW.Close()
+	_ = phoneInW.Close()
+	<-deskDone
+	<-phoneDone
+}
+
 func TestFilterAutoReplies(t *testing.T) {
 	in := []byte("hi\x1b[?62;4c\x1b[12;34R\x1b[>0;276;0c\x1b[Aok")
 	got := FilterAutoReplies(in)

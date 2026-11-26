@@ -512,7 +512,14 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			_ = writeOut([]byte(applyScrollRegion(paneRowsFor(r))))
 		}
 		if t.SessionID != "" && gen > 0 {
-			_ = backend.Resize(attachCtx, t, gen, c, paneRowsFor(r))
+			if rerr := backend.Resize(attachCtx, t, gen, c, paneRowsFor(r)); errors.Is(rerr, sessionbackend.ErrStaleControl) {
+				if lease, cerr := backend.ClaimControl(attachCtx, t, opts.ClientID); cerr == nil {
+					resizeTargetMu.Lock()
+					activeGen = lease.ControlGen
+					resizeTargetMu.Unlock()
+					_ = backend.Resize(attachCtx, t, lease.ControlGen, c, paneRowsFor(r))
+				}
+			}
 		}
 		drawStatusBar(t.PaneID, false)
 	}
@@ -599,7 +606,8 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 
 			switchPane, detached, exited, runErr = pumpPane(
 				attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
-				stream, inCh, inErrCh, opts.MoveCursorCh, filter, writeOut, drawStatusBar, opts.OnMode, showStatus, c, pRows,
+				stream, inCh, inErrCh, opts.SelectCellCh, opts.MoveCursorCh, &curCols, &curRows, paneRowsFor,
+				filter, writeOut, drawStatusBar, opts.OnMode, showStatus,
 			)
 			_ = stream.Close()
 			_ = backend.ReleaseControl(context.Background(), target, opts.ClientID, controlGen)
@@ -646,28 +654,47 @@ func pumpPane(
 	stream sessionbackend.PaneStream,
 	inCh <-chan []byte,
 	inErrCh <-chan error,
+	selectCellCh <-chan [2]int,
 	moveCursorCh <-chan [2]int,
+	curCols, curRows *atomic.Uint32,
+	paneRowsFor func(uint16) uint16,
 	filter *PrefixFilter,
 	writeOut func([]byte) error,
 	drawStatusBar func(pane string, prefixPending bool),
 	onMode func(sessionbackend.TerminalMode),
 	showStatus bool,
-	cols, paneRows uint16,
 ) (switchPane string, detached bool, exited bool, err error) {
+	controlLost := false
+	reclaimAndResize := func() error {
+		lease, cerr := backend.ClaimControl(ctx, target, clientID)
+		if cerr != nil {
+			return cerr
+		}
+		*controlGen = lease.ControlGen
+		resizeMu.Lock()
+		*activeGen = lease.ControlGen
+		resizeMu.Unlock()
+		controlLost = false
+		c := uint16(curCols.Load())
+		pr := paneRowsFor(uint16(curRows.Load()))
+		_ = backend.Resize(ctx, target, *controlGen, c, pr)
+		return nil
+	}
+
 	writeInput := func(data []byte) error {
 		if len(data) == 0 {
 			return nil
 		}
-		werr := backend.WriteInput(ctx, target, *controlGen, data)
-		if errors.Is(werr, sessionbackend.ErrStaleControl) {
-			lease, cerr := backend.ClaimControl(ctx, target, clientID)
-			if cerr != nil {
+		if controlLost {
+			if cerr := reclaimAndResize(); cerr != nil {
 				return cerr
 			}
-			*controlGen = lease.ControlGen
-			resizeMu.Lock()
-			*activeGen = lease.ControlGen
-			resizeMu.Unlock()
+		}
+		werr := backend.WriteInput(ctx, target, *controlGen, data)
+		if errors.Is(werr, sessionbackend.ErrStaleControl) {
+			if cerr := reclaimAndResize(); cerr != nil {
+				return cerr
+			}
 			werr = backend.WriteInput(ctx, target, *controlGen, data)
 		}
 		return werr
@@ -678,9 +705,23 @@ func pumpPane(
 		case <-ctx.Done():
 			return "", true, false, nil
 
+		case _, ok := <-selectCellCh:
+			if !ok {
+				selectCellCh = nil
+				continue
+			}
+			// Returning to Desktop/Phone and clicking immediately reclaims control and restores this client's size.
+			if controlLost {
+				_ = reclaimAndResize()
+			}
+
 		case pt, ok := <-moveCursorCh:
 			if !ok {
 				moveCursorCh = nil
+				continue
+			}
+			if controlLost {
+				_ = reclaimAndResize()
 				continue
 			}
 			_ = backend.MoveCursor(ctx, target, *controlGen, pt[0], pt[1])
@@ -693,9 +734,16 @@ func pumpPane(
 				onMode(*ev.Mode)
 			}
 			switch ev.Kind {
+			case sessionbackend.EventControl:
+				if ev.Controller != "" && ev.Controller != clientID {
+					controlLost = true
+				} else if ev.ControlGen > *controlGen {
+					controlLost = true
+				}
 			case sessionbackend.EventSnapshot:
+				pr := paneRowsFor(uint16(curRows.Load()))
 				if showStatus {
-					if err := writeOut([]byte(applyScrollRegion(paneRows) + clearScreenHome)); err != nil {
+					if err := writeOut([]byte(applyScrollRegion(pr) + clearScreenHome)); err != nil {
 						return "", false, false, err
 					}
 				} else {
@@ -715,7 +763,8 @@ func pumpPane(
 						return "", false, false, err
 					}
 					if showStatus && outputMayResetStatusBar(ev.Data) {
-						_ = writeOut([]byte(applyScrollRegion(paneRows)))
+						pr := paneRowsFor(uint16(curRows.Load()))
+						_ = writeOut([]byte(applyScrollRegion(pr)))
 						drawStatusBar(target.PaneID, filter.Pending())
 					}
 				}
@@ -742,6 +791,8 @@ func pumpPane(
 				drawStatusBar(target.PaneID, nowPending)
 			}
 			for _, act := range actions {
+				c := uint16(curCols.Load())
+				pr := paneRowsFor(uint16(curRows.Load()))
 				switch act.Kind {
 				case ActionForward:
 					if err := writeInput(act.Data); err != nil {
@@ -754,7 +805,7 @@ func pumpPane(
 					if act.Kind == ActionSplitV {
 						dir = sessionbackend.SplitVertical
 					}
-					if newPaneID, ok := splitCurrentPane(ctx, layout, target.SessionID, target.PaneID, dir, cols, paneRows); ok {
+					if newPaneID, ok := splitCurrentPane(ctx, layout, target.SessionID, target.PaneID, dir, c, pr); ok {
 						return newPaneID, false, false, nil
 					}
 				case ActionNextPane:
@@ -770,7 +821,7 @@ func pumpPane(
 						return res.switchPane, false, false, nil
 					}
 				case ActionNewWindow:
-					if pane, ok := createAndSelectWindow(ctx, layout, target.SessionID, cols, paneRows); ok {
+					if pane, ok := createAndSelectWindow(ctx, layout, target.SessionID, c, pr); ok {
 						return pane, false, false, nil
 					}
 				case ActionNextWindow:
@@ -794,7 +845,7 @@ func pumpPane(
 						return res.switchPane, false, false, nil
 					}
 				case ActionOpenMenu:
-					res, oerr := runCommandMenu(ctx, backend, layout, target.SessionID, target.PaneID, inCh, inErrCh, writeOut, cols, paneRows)
+					res, oerr := runCommandMenu(ctx, backend, layout, target.SessionID, target.PaneID, inCh, inErrCh, writeOut, c, pr)
 					if oerr != nil {
 						return "", false, false, oerr
 					}
@@ -809,7 +860,7 @@ func pumpPane(
 					}
 					return target.PaneID, false, false, nil
 				case ActionOpenWindowSwitcher:
-					res, oerr := runWindowSwitcher(ctx, backend, layout, target.SessionID, target.PaneID, inCh, inErrCh, writeOut, cols, paneRows)
+					res, oerr := runWindowSwitcher(ctx, backend, layout, target.SessionID, target.PaneID, inCh, inErrCh, writeOut, c, pr)
 					if oerr != nil {
 						return "", false, false, oerr
 					}
