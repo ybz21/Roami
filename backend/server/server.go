@@ -279,8 +279,10 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/sessions/:name/opencode", h.OpenCodeStatus)
 		g.GET("/sessions/:name/opencode-transcript", h.OpenCodeTranscript)
 		g.GET("/sessions/:name/pi-transcript", h.PiTranscript)
-		g.GET("/sessions/:name/panes/active", h.ActivePane)        // 活动 pane 几何+cwd+前台进程（危险操作目标可视化）
-		g.POST("/sessions/:name/panes/:paneId/close", h.ClosePane) // 结构化关闭 pane（不走 confirm-before 按键路径）
+		g.GET("/sessions/:name/panes/active", h.ActivePane)                // 活动 pane 几何+cwd+前台进程（危险操作目标可视化）
+		g.POST("/sessions/:name/panes/:paneId/close", h.ClosePane)         // 结构化关闭 pane（不走 confirm-before 按键路径）
+		g.GET("/sessions/:name/windows", h.SessionWindows)                 // 会话窗口列表与活跃窗格摘要（原生 + tmux）
+		g.POST("/sessions/:name/terminal-action", h.SessionTerminalAction) // 结构化分屏/窗格/窗口动作（原生 + tmux）
 
 		g.GET("/tasks", h.Tasks)
 		g.POST("/tasks", h.Spawn)

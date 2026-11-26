@@ -36,7 +36,8 @@ import { VoiceInput } from '../chat/VoiceInput'
 import { copyText } from '../chat/blocks'
 import RenameSessionModal from '../sessions/RenameSessionModal'
 import { type ClaudeInfo } from './claude-info'
-import { KEYS, PFX, tmuxMenu } from './tmux-keys'
+import { KEYS } from './tmux-keys'
+import { buildTerminalLayoutMenu, parseTerminalLayoutMenuKey, type SessionWindowsState, type TerminalLayoutAction } from './terminal-layout-menu'
 import { codexReconnectFailed, codexResumeCommand } from './codex-recovery'
 import { useI18n } from '../../i18n'
 import { SESSION_MIME, buildIntro, canDrop, readDrag } from '../shell/session-drop'
@@ -196,6 +197,30 @@ export default function TerminalPane(props: {
       setPaneCloseTarget({ session: active, paneId: p.paneId, cwd: p.cwd, cmd: p.cmd, panesInWindow: p.panesInWindow, rect })
     } catch {
       message.error(t('pane.close.locateFailed'))
+    }
+  }
+  const [layoutMenuState, setLayoutMenuState] = useState<SessionWindowsState | null>(null)
+  useEffect(() => { setLayoutMenuState(null) }, [active])
+  const refreshLayoutMenuState = useCallback(async (sessionName?: string) => {
+    const target = sessionName || active
+    if (!target) return
+    try {
+      const r = await api('GET', `/sessions/${encodeURIComponent(target)}/windows`)
+      if (r?.data) setLayoutMenuState(r.data)
+    } catch {
+      // Ignore transient probe errors when opening menu; actions remain available.
+    }
+  }, [active])
+  const runTerminalAction = async (sessionName: string, action: TerminalLayoutAction) => {
+    if (action.action === 'close-pane') {
+      await openPaneCloseConfirm()
+      return
+    }
+    try {
+      const r = await api('POST', `/sessions/${encodeURIComponent(sessionName)}/terminal-action`, action)
+      if (r?.data?.windows) setLayoutMenuState(r.data)
+    } catch (e: any) {
+      message.error(e.message)
     }
   }
   const confirmPaneClose = async () => {
@@ -679,13 +704,13 @@ export default function TerminalPane(props: {
     { key: 'reconnect', label: t('terminal.reconnect') },
     { type: 'divider' as const },
     {
-      key: 'tmux',
-      label: 'tmux',
+      key: 'layout',
+      label: t('terminal.layoutMenu'),
       children: [
-        { key: PFX + '[', label: t('terminal.tmuxCopyMode') },
-        { key: PFX + 'w', label: t('terminal.tmuxWindowList') },
-        { key: PFX + '%', label: t('terminal.tmuxSplitVertical') },
-        { key: PFX + '"', label: t('terminal.tmuxSplitHorizontal') },
+        { key: 'split-right', label: t('terminal.menu.splitRight') },
+        { key: 'split-down', label: t('terminal.menu.splitDown') },
+        { key: 'next-pane', label: t('terminal.menu.nextPane') },
+        { key: 'new-window', label: t('terminal.menu.newWindow') },
       ],
     },
     { type: 'divider' as const },
@@ -702,7 +727,10 @@ export default function TerminalPane(props: {
     else if (key === 'bottom') h?.toBottom()
     else if (key === 'redraw') h?.redraw()
     else if (key === 'reconnect') h?.reconnect()
-    else h?.send(key)
+    else {
+      const action = parseTerminalLayoutMenuKey(key)
+      if (action) void runTerminalAction(ctx.session, action)
+    }
     setCtx(null)
   }
   if (terms.length === 0 && !pageTabs?.length && !fileTabs?.length) {
@@ -1062,8 +1090,20 @@ export default function TerminalPane(props: {
   const sessionToolbar = active && (nativeSessionId(active) || preparingSession(active)) ? null : (
     <div className="tt-tbar tt-session-toolbar">
       {sessionLead}<span className="tt-sep" />
-      <Dropdown trigger={['click']} menu={{ items: tmuxMenu(t) as any, onClick: ({ key }) => { if (key === PFX + 'x') openPaneCloseConfirm(); else sendKey(key) } }} placement="bottomLeft">
-        <button type="button" className="tt-tbtn">{TI.tmux}<span>tmux</span><span style={{ color: 'var(--text-dimmer)', display: 'inline-flex' }}><ChevronDown size={11} /></span></button>
+      <Dropdown
+        trigger={['click']}
+        onOpenChange={(open) => { if (open && active) void refreshLayoutMenuState(active) }}
+        menu={{
+          items: buildTerminalLayoutMenu(t, layoutMenuState) as any,
+          onClick: ({ key }) => {
+            if (!active) return
+            const action = parseTerminalLayoutMenuKey(key)
+            if (action) void runTerminalAction(active, action)
+          },
+        }}
+        placement="bottomLeft"
+      >
+        <button type="button" className="tt-tbtn">{TI.tmux}<span>{t('terminal.layoutMenu')}</span><span style={{ color: 'var(--text-dimmer)', display: 'inline-flex' }}><ChevronDown size={11} /></span></button>
       </Dropdown>
       {/* 「新标签」进了标签右键菜单（标签条上已有「新建」）；文件 / Git 归右栏活动条；
           语音归 composer——22 设计 §3.3 去掉的四枚。独立页（左停靠）没有右栏，文件 / Git 仍在这 */}

@@ -679,7 +679,13 @@ func pumpMultiPane(
 				}
 			case sessionbackend.EventLayoutChanged:
 				if msg.ev.Window != nil {
+					if msg.ev.Window.ID != win.ID && msg.ev.Window.ActivePaneID != "" {
+						return msg.ev.Window.ActivePaneID, false, false, nil
+					}
 					if !sameLayoutTree(win.Layout, msg.ev.Window.Layout) {
+						if msg.ev.Window.ActivePaneID != "" {
+							return msg.ev.Window.ActivePaneID, false, false, nil
+						}
 						return activePaneID, false, false, nil
 					}
 					win.Version = msg.ev.Window.Version

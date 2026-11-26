@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,10 +10,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/internal/sessionbackend"
+	"github.com/ybz21/Roami/internal/sessionhost"
 )
 
 func TestParsePanesGroupsByActiveWindowOnly(t *testing.T) {
@@ -181,5 +187,106 @@ func TestClosePaneOfLastPaneEndsSessionAndStillReportsSuccess(t *testing.T) {
 	code, closeBody := doJSON(t, r, http.MethodPost, "/sessions/"+name+"/panes/"+url.PathEscape(target)+"/close")
 	if code != http.StatusOK {
 		t.Fatalf("closing the last pane (killing the whole session) should still report success, got %d body=%v", code, closeBody)
+	}
+}
+
+func TestNativeTerminalActionAndWindowsAPI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix shell integration test")
+	}
+	gin.SetMode(gin.TestMode)
+	host := sessionhost.NewHost(sessionhost.Config{HostID: "api-pane-test", LogsDir: t.TempDir()})
+	defer host.Shutdown(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ref, err := host.Create(ctx, sessionbackend.CreateSpec{
+		SessionID: "native-api-demo",
+		Exe:       "/bin/sh",
+		Cols:      100,
+		Rows:      30,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	h := &API{NativeBackend: host}
+	r := gin.New()
+	r.GET("/sessions/:name/panes/active", h.ActivePane)
+	r.POST("/sessions/:name/panes/:paneId/close", h.ClosePane)
+	r.GET("/sessions/:name/windows", h.SessionWindows)
+	r.POST("/sessions/:name/terminal-action", h.SessionTerminalAction)
+
+	postJSON := func(path string, payload map[string]any) (int, map[string]any) {
+		raw, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+
+	// 1. Initial GET /windows & GET /panes/active.
+	code, winBody := doJSON(t, r, http.MethodGet, "/sessions/"+ref.SessionID+"/windows")
+	if code != http.StatusOK {
+		t.Fatalf("GET /windows = %d body=%v", code, winBody)
+	}
+	data := winBody["data"].(map[string]any)
+	if data["backend"] != "native" || int(data["panesInWindow"].(float64)) != 1 {
+		t.Fatalf("unexpected initial windows reply: %+v", data)
+	}
+
+	// 2. split-right -> panesInWindow becomes 2, next-pane cycles focus, ActivePane returns new pane.
+	code, splitBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "split-right"})
+	if code != http.StatusOK {
+		t.Fatalf("split-right = %d body=%v", code, splitBody)
+	}
+	splitData := splitBody["data"].(map[string]any)
+	if int(splitData["panesInWindow"].(float64)) != 2 {
+		t.Fatalf("expected 2 panes after split-right, got %+v", splitData)
+	}
+	secondPane := splitData["activePaneId"].(string)
+
+	code, nextBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "next-pane"})
+	if code != http.StatusOK {
+		t.Fatalf("next-pane = %d body=%v", code, nextBody)
+	}
+	if nextBody["data"].(map[string]any)["activePaneId"].(string) == secondPane {
+		t.Fatalf("next-pane did not move focus away from %s", secondPane)
+	}
+
+	// 3. ClosePane closes the split pane cleanly via REST API.
+	code, closeBody := doJSON(t, r, http.MethodPost, "/sessions/"+ref.SessionID+"/panes/"+url.PathEscape(secondPane)+"/close")
+	if code != http.StatusOK {
+		t.Fatalf("ClosePane(%s) = %d body=%v", secondPane, code, closeBody)
+	}
+
+	// 4. new-window -> 2 windows; prev-window -> back to window 1; close-window -> back to 1 window.
+	code, newWinBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "new-window"})
+	if code != http.StatusOK {
+		t.Fatalf("new-window = %d body=%v", code, newWinBody)
+	}
+	wins := newWinBody["data"].(map[string]any)["windows"].([]any)
+	if len(wins) != 2 {
+		t.Fatalf("expected 2 windows after new-window, got %d", len(wins))
+	}
+	win2ID := newWinBody["data"].(map[string]any)["activeWindowId"].(string)
+
+	code, prevBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "prev-window"})
+	if code != http.StatusOK || prevBody["data"].(map[string]any)["activeWindowId"].(string) == win2ID {
+		t.Fatalf("prev-window failed: code=%d body=%v", code, prevBody)
+	}
+
+	code, selectBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "select-window", "windowId": win2ID})
+	if code != http.StatusOK || selectBody["data"].(map[string]any)["activeWindowId"].(string) != win2ID {
+		t.Fatalf("select-window failed: code=%d body=%v", code, selectBody)
+	}
+
+	code, closeWinBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "close-window", "windowId": win2ID})
+	if code != http.StatusOK || len(closeWinBody["data"].(map[string]any)["windows"].([]any)) != 1 {
+		t.Fatalf("close-window failed: code=%d body=%v", code, closeWinBody)
 	}
 }

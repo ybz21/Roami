@@ -568,8 +568,16 @@ func (h *Host) NewWindow(ctx context.Context, sessionID string, spec sessionback
 	s.panes[paneID] = pane
 	s.windows = append(s.windows, win)
 	s.activeWindowID = winID
+	updated := win.Clone()
+	notify := make([]*managedPane, 0, len(s.panes))
+	for _, p := range s.panes {
+		notify = append(notify, p)
+	}
 	h.mu.Unlock()
-	return win.Clone(), nil
+	for _, p := range notify {
+		p.broadcastLayout(updated)
+	}
+	return updated, nil
 }
 
 func (h *Host) ListWindows(_ context.Context, sessionID string) ([]sessionbackend.Window, error) {
@@ -588,18 +596,34 @@ func (h *Host) ListWindows(_ context.Context, sessionID string) ([]sessionbacken
 
 func (h *Host) SelectWindow(_ context.Context, sessionID, windowID string) error {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	s, ok := h.sessions[sessionID]
 	if !ok {
+		h.mu.Unlock()
 		return sessionbackend.ErrSessionNotFound
 	}
+	var updated sessionbackend.Window
+	found := false
 	for i := range s.windows {
 		if s.windows[i].ID == windowID {
 			s.activeWindowID = windowID
-			return nil
+			updated = s.windows[i].Clone()
+			found = true
+			break
 		}
 	}
-	return sessionbackend.ErrWindowNotFound
+	if !found {
+		h.mu.Unlock()
+		return sessionbackend.ErrWindowNotFound
+	}
+	notify := make([]*managedPane, 0, len(s.panes))
+	for _, p := range s.panes {
+		notify = append(notify, p)
+	}
+	h.mu.Unlock()
+	for _, p := range notify {
+		p.broadcastLayout(updated)
+	}
+	return nil
 }
 
 func (h *Host) CloseWindow(ctx context.Context, sessionID, windowID string) error {
@@ -629,15 +653,34 @@ func (h *Host) CloseWindow(ctx context.Context, sessionID, windowID string) erro
 		}
 	}
 	s.windows = append(s.windows[:idx], s.windows[idx+1:]...)
+	var updated *sessionbackend.Window
+	var notify []*managedPane
 	if len(s.windows) == 0 {
 		delete(h.sessions, sessionID)
-	} else if s.activeWindowID == windowID {
-		s.activeWindowID = s.windows[0].ID
+	} else {
+		if s.activeWindowID == windowID {
+			s.activeWindowID = s.windows[0].ID
+		}
+		for i := range s.windows {
+			if s.windows[i].ID == s.activeWindowID {
+				cp := s.windows[i].Clone()
+				updated = &cp
+				break
+			}
+		}
+		for _, p := range s.panes {
+			notify = append(notify, p)
+		}
 	}
 	h.mu.Unlock()
 
 	for _, p := range toStop {
 		_ = p.terminate(ctx)
+	}
+	if updated != nil {
+		for _, p := range notify {
+			p.broadcastLayout(*updated)
+		}
 	}
 	return nil
 }

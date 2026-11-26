@@ -769,8 +769,16 @@ func pumpPane(
 					}
 				}
 			case sessionbackend.EventLayoutChanged:
-				if ev.Window != nil && ev.Window.Layout != nil && len(ev.Window.Layout.PaneIDs()) > 1 {
-					return target.PaneID, false, false, nil
+				if ev.Window != nil && ev.Window.Layout != nil {
+					if !ev.Window.Layout.ContainsPane(target.PaneID) && ev.Window.ActivePaneID != "" {
+						return ev.Window.ActivePaneID, false, false, nil
+					}
+					if len(ev.Window.Layout.PaneIDs()) > 1 {
+						if ev.Window.ActivePaneID != "" {
+							return ev.Window.ActivePaneID, false, false, nil
+						}
+						return target.PaneID, false, false, nil
+					}
 				}
 				drawStatusBar(target.PaneID, filter.Pending())
 			case sessionbackend.EventResyncNeeded:
