@@ -4,10 +4,8 @@ import asyncio
 import hashlib
 import hmac
 import json
-import os
 import re
 import shlex
-import tempfile
 
 from roami_agent.context.native_prompt import READ_CAPABILITY
 from roami_agent.protocol.errors import DomainError
@@ -73,19 +71,7 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             context["nativeLaunchKey"] = launch_key
         await self.db.call(lambda db: self.admitted(db, context, context["owner"]))
         context["signature"] = self.signature(context)
-        name = hashlib.sha256(encoded(context).encode()).hexdigest() + ".json"
-        path = self.private_directory() / name
-        descriptor, temporary = tempfile.mkstemp(prefix=".main-", dir=path.parent)
-        try:
-            with os.fdopen(descriptor, "w") as output:
-                os.fchmod(output.fileno(), 0o600)
-                output.write(encoded(context))
-                output.flush()
-                os.fsync(output.fileno())
-            os.replace(temporary, path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+        path = self.write_context(context)
         discover = shlex.quote(encoded({"query": "swarm", "limit": 20}))
         context_read = ""
         if prepared_context is not None:
