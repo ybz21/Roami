@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Terminal } from '@xterm/xterm'
-import { bindTerminalInput, clearTerminalDrop } from './terminal-ime'
+import { bindTerminalInput, clearTerminalInputContext } from './terminal-ime'
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 5))
 
@@ -98,6 +98,37 @@ describe('xterm IME compatibility', () => {
   it('keeps direct insertText input outside composition working', () => {
     term.textarea!.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'a', inputType: 'insertText' }))
     expect(output.join('')).toBe('a')
+  })
+
+  const edit = (textarea: HTMLTextAreaElement, value: string, inputType: string, data: string | null = null) => {
+    const event = { bubbles: true, composed: true, inputType, data }
+    textarea.dispatchEvent(new InputEvent('beforeinput', event))
+    textarea.value = value
+    textarea.dispatchEvent(new InputEvent('input', event))
+  }
+
+  it('replaces a partial dictation that was already forwarded', () => {
+    const textarea = term.textarea!
+    edit(textarea, '先写区域，再写单', 'insertText', '先写区域，再写单')
+    edit(textarea, '', 'deleteContentBackward')
+    edit(textarea, '先写区域，再写单元。', 'insertText', '先写区域，再写单元。')
+    expect(output.join('')).toBe('先写区域，再写单' + '\x7f'.repeat(8) + '先写区域，再写单元。')
+  })
+
+  it.each(['insertReplacementText', 'insertText'])('keeps only the changed tail for %s', (inputType) => {
+    const textarea = term.textarea!
+    edit(textarea, '先写区域，再写错字', 'insertText', '先写区域，再写错字')
+    textarea.setSelectionRange(7, 9)
+    edit(textarea, '先写区域，再写单元。', inputType, '单元。')
+    expect(output.join('')).toBe('先写区域，再写错字\x7f\x7f单元。')
+  })
+
+  it('never backspaces into old terminal text after a cursor key', () => {
+    const textarea = term.textarea!
+    edit(textarea, '旧草稿', 'insertText', '旧草稿')
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft', keyCode: 37 }))
+    edit(textarea, '新草稿', 'insertReplacementText', '新草稿')
+    expect(output.join('')).toBe('旧草稿\x1b[D')
   })
 
   const imeKey = (textarea: HTMLTextAreaElement, value: string, data: string | null, inputType = 'insertText') => {
@@ -234,14 +265,14 @@ describe('xterm IME compatibility', () => {
     const textarea = term.textarea!
     textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
     textarea.value = '合并'
-    clearTerminalDrop(term)
+    clearTerminalInputContext(term)
     expect(textarea.value).toBe('合并')
     textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '合并' }))
-    clearTerminalDrop(term)
+    clearTerminalInputContext(term)
     await tick()
     expect(output.join('')).toBe('合并')
     textarea.value = '/tmp/dropped.txt'
-    clearTerminalDrop(term)
+    clearTerminalInputContext(term)
     expect(textarea.value).toBe('')
   })
 })
