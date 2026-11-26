@@ -43,11 +43,14 @@ type paneInfo struct {
 }
 
 type windowSummary struct {
-	ID     string `json:"id"`
-	Index  int    `json:"index"`
-	Name   string `json:"name"`
-	Active bool   `json:"active"`
-	Panes  int    `json:"panes"`
+	ID           string                     `json:"id"`
+	Index        int                        `json:"index"`
+	Name         string                     `json:"name"`
+	Active       bool                       `json:"active"`
+	Panes        int                        `json:"panes"`
+	ActivePaneID string                     `json:"activePaneId,omitempty"`
+	Version      int64                      `json:"version,omitempty"`
+	Layout       *sessionbackend.LayoutNode `json:"layout,omitempty"`
 }
 
 type sessionWindowsReply struct {
@@ -158,11 +161,14 @@ func buildNativeWindowsReply(st sessionbackend.SessionState) sessionWindowsReply
 			name = w.ID
 		}
 		reply.Windows = append(reply.Windows, windowSummary{
-			ID:     w.ID,
-			Index:  i + 1,
-			Name:   name,
-			Active: active,
-			Panes:  panes,
+			ID:           w.ID,
+			Index:        i + 1,
+			Name:         name,
+			Active:       active,
+			Panes:        panes,
+			ActivePaneID: w.ActivePaneID,
+			Version:      w.Version,
+			Layout:       w.Layout.Clone(),
 		})
 	}
 	return reply
@@ -260,11 +266,13 @@ func (a *API) ClosePane(c *gin.Context) {
 			return
 		}
 		nextPane := ""
+		resp := gin.H{"closed": paneID}
 		if updated, ok := a.nativeSession(c.Request.Context(), rawName); ok {
 			nextPane = updated.ActivePaneID
+			resp["layout"] = buildNativeWindowsReply(updated)
 		}
 		pty.NotifyNativeLayout(rawName, nextPane)
-		c.JSON(http.StatusOK, gin.H{"data": gin.H{"closed": paneID}})
+		c.JSON(http.StatusOK, gin.H{"data": resp})
 		return
 	}
 
@@ -343,10 +351,13 @@ func listTmuxWindows(name string) (sessionWindowsReply, error) {
 func (a *API) SessionTerminalAction(c *gin.Context) {
 	rawName := c.Param("name")
 	var req struct {
-		Action    string `json:"action"`
-		Direction string `json:"direction"`
-		WindowID  string `json:"windowId"`
-		PaneID    string `json:"paneId"`
+		Action          string  `json:"action"`
+		Direction       string  `json:"direction"`
+		WindowID        string  `json:"windowId"`
+		PaneID          string  `json:"paneId"`
+		NodeID          string  `json:"nodeId"`
+		Ratio           float64 `json:"ratio"`
+		ExpectedVersion int64   `json:"expectedVersion"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Action) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "action required"}})
@@ -354,14 +365,14 @@ func (a *API) SessionTerminalAction(c *gin.Context) {
 	}
 
 	if st, ok := a.nativeSession(c.Request.Context(), rawName); ok {
-		a.runNativeTerminalAction(c, rawName, st, req.Action, req.Direction, req.WindowID, req.PaneID)
+		a.runNativeTerminalAction(c, rawName, st, req.Action, req.Direction, req.WindowID, req.PaneID, req.NodeID, req.Ratio, req.ExpectedVersion)
 		return
 	}
 	name := a.sessionTarget(c)
 	a.runTmuxTerminalAction(c, name, req.Action, req.Direction, req.WindowID)
 }
 
-func (a *API) runNativeTerminalAction(c *gin.Context, name string, st sessionbackend.SessionState, action, direction, windowID, paneID string) {
+func (a *API) runNativeTerminalAction(c *gin.Context, name string, st sessionbackend.SessionState, action, direction, windowID, paneID, nodeID string, ratio float64, expectedVersion int64) {
 	lb, ok := a.NativeBackend.(sessionbackend.LayoutBackend)
 	if !ok {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": gin.H{"code": "UNSUPPORTED"}})
@@ -397,6 +408,14 @@ func (a *API) runNativeTerminalAction(c *gin.Context, name string, st sessionbac
 			}
 		}
 	case "focus-pane":
+		if direction == "" && paneID != "" {
+			targetWin := windowID
+			if targetWin == "" && win != nil {
+				targetWin = win.ID
+			}
+			_, err = lb.FocusPane(ctx, name, targetWin, paneID)
+			break
+		}
 		var dir sessionbackend.FocusDir
 		switch direction {
 		case "up":
@@ -416,6 +435,16 @@ func (a *API) runNativeTerminalAction(c *gin.Context, name string, st sessionbac
 				_, err = lb.FocusPane(ctx, name, win.ID, nb)
 			}
 		}
+	case "resize-split":
+		targetWin := windowID
+		if targetWin == "" && win != nil {
+			targetWin = win.ID
+		}
+		if targetWin == "" || nodeID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST", "message": "windowId and nodeId required"}})
+			return
+		}
+		_, err = lb.ResizeSplit(ctx, name, targetWin, nodeID, ratio, expectedVersion)
 	case "new-window":
 		_, err = lb.NewWindow(ctx, name, sessionbackend.WindowSpec{LoginShell: true})
 	case "next-window", "prev-window":

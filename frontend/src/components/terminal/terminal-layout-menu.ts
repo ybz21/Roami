@@ -1,3 +1,5 @@
+import type { LayoutNode } from './native-protocol'
+
 // Structured terminal layout menu (split / pane / window) backed by REST APIs instead of
 // raw Ctrl+b keystroke injection, working identically across native roami-sessiond and tmux sessions.
 export interface SessionWindowItem {
@@ -6,6 +8,9 @@ export interface SessionWindowItem {
   name: string
   active: boolean
   panes: number
+  activePaneId?: string
+  version?: number
+  layout?: LayoutNode
 }
 
 export interface SessionWindowsState {
@@ -17,11 +22,12 @@ export interface SessionWindowsState {
 }
 
 export type TerminalLayoutAction =
-  | { action: 'split-right' }
-  | { action: 'split-down' }
+  | { action: 'split-right'; paneId?: string }
+  | { action: 'split-down'; paneId?: string }
   | { action: 'next-pane' }
-  | { action: 'focus-pane'; direction: 'up' | 'down' | 'left' | 'right' }
-  | { action: 'close-pane' }
+  | { action: 'focus-pane'; direction?: 'up' | 'down' | 'left' | 'right'; windowId?: string; paneId?: string }
+  | { action: 'resize-split'; windowId: string; nodeId: string; ratio: number; expectedVersion: number }
+  | { action: 'close-pane'; paneId?: string }
   | { action: 'new-window' }
   | { action: 'next-window' }
   | { action: 'prev-window' }

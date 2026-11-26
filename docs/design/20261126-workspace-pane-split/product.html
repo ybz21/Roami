@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>产品层独立窗格分屏 · 产品设计</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">设计总览</a>
+      <a href="product.html" aria-current="page">产品设计</a>
+      <a href="prototype.html">交互原型</a>
+      <a href="tech.html">技术设计</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>产品设计</h1>
+      <p class="lead">把每一个终端窗格当成独立的一等公民：独立选区、独立全选、独立复制、独立历史回看，由 Roami 产品工作区负责拼装分屏与窗口。</p>
+      <p><a href="prototype.html">打开可交互原型 →</a>（可直接在浏览器里试拖分屏、跨行选字、窗格全选、DOM 聚光灯关闭与手机端切换）</p>
+
+      <section aria-labelledby="principles">
+        <h2 id="principles">设计原则（对齐 Roami 极简工作区规范）</h2>
+        <ul>
+          <li><strong>独立个体，不套多余壳子：</strong>窗格直接铺满可用工作区，使用 <code>--bg-base</code> 与直角边界，不给每个窗格加圆角卡片、外边距或厚重标题栏。相邻窗格之间仅用一条 <code>1px solid var(--border-subtle)</code> 分隔线区分。</li>
+          <li><strong>单窗格零额外 Chrome：</strong>当会话只有 1 个窗口且 1 个窗格时，界面与普通单终端完全一致——不显示窗口条、不显示窗格边框高亮、不占任何额外像素。</li>
+          <li><strong>多窗格轻量化聚焦标识：</strong>仅在窗格数 &gt; 1 时，当前聚焦窗格边缘显示 <code>1px solid var(--accent-border)</code> 细强调框（沿用现有 <code>SplitTree.css</code>）；点击任意窗格即刻获得焦点与输入光标。</li>
+          <li><strong>多窗口按需显隐窗口条：</strong>仅当 <code>windows.length &gt; 1</code> 时，在终端工具栏下方出现一行紧凑窗口条（<code>1: main</code>、<code>2: logs</code>、<code>+</code>），随时直达切换；删回单窗口后自动收回。</li>
+          <li><strong>隐藏底部蓝色状态栏：</strong>
+            <ul>
+              <li><strong>Web 端彻底移除：</strong>不再在终端底行画那条蓝色/青色 ANSI 状态栏（<code>[demo] 1:main* ... F2:菜单</code>），窗口切换统一由 Roami 顶部工具栏「窗口菜单」与按需显隐的极简窗口条承担，100% 视口高度还给终端内容，彻底消除与全屏 TUI（Claude Code / Codex / vim）的滚动区冲突。</li>
+              <li><strong>CLI 端默认隐藏：</strong><code>roami session attach</code> 默认也不常驻底行蓝条，保持原生终端干净观感；需要查看或切换窗口/窗格时按 <code>F2</code> 呼出浮层菜单即可，仅在用户显式配置（如 <code>--status-bar</code> 或 <code>ROAMI_STATUS_BAR=1</code>）时才常驻显示。</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="stories">
+        <h2 id="stories">核心用户故事与交互</h2>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>1. 跨行拖选、全选与复制</h3>
+            <p>左侧跑编译/测试日志，右侧跑 Claude Code 或 shell。</p>
+            <ul>
+              <li>在左侧窗格鼠标跨 10 行拖选报错堆栈，选区严格锁在左窗格内部，绝不串到右窗格、不混入 <code>│</code> 字符。</li>
+              <li>长命令行自动折行时，按 xterm 原生逻辑行无缝复制。</li>
+              <li>右键菜单或快捷键支持<strong>「全选当前窗格」</strong>，一键复制整块输出。</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>2. 独立滚动回看</h3>
+            <p>鼠标悬停在哪个窗格上，滚轮就只滚那个窗格的历史缓冲（各 5000 行）。</p>
+            <ul>
+              <li>左窗格往上翻 200 行看历史报错时，右窗格依然停在底部正常打字和接收流式输出。</li>
+              <li>工具栏「上翻 / 回到底部」作用于当前聚焦窗格。</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>3. 拖拽分屏与窗口菜单</h3>
+            <p>两种入口协同工作，全部走结构化后端接口：</p>
+            <ul>
+              <li><strong>工具栏「窗口菜单」与右键菜单：</strong>左右分屏、上下分屏、切换窗格、关闭当前窗格、窗口列表直达、新建/切换/关闭窗口。</li>
+              <li><strong>1px 分隔线直接拖拽：</strong>鼠标拖（热区 ±4px）或触控拖（热区 ±22px），实时更新比例，松手落盘；也支持聚焦分隔线用方向键按 5% 步进微调。</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>4. 零误差关闭窗格确认</h3>
+            <p>点击「关闭当前窗格」时：</p>
+            <ul>
+              <li>直接读取该窗格 DOM 容器的 <code>getBoundingClientRect()</code> 绘制聚光灯红框与确认卡（不再靠后端估算行列或扣状态栏行）。</li>
+              <li>仅关闭目标窗格，其他窗格继续运行、连接不断、历史不丢；若为窗口最后一个窗格，明确提示将同时关闭窗口。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="responsive">
+        <h2 id="responsive">多端与断点策略</h2>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>终端形态</th>
+                <th>多窗格呈现方式</th>
+                <th>控制权与尺寸策略</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>桌面 Web</strong><br><span class="tag">1280 / 1920 / 2560 / 3440px</span></td>
+                <td><code>SplitTree</code> 递归渲染所有窗格，每个窗格按实际像素宽高独立 <code>fit()</code>。支持任意嵌套左右/上下分屏与最小窗格保护（20×6 字符）。</td>
+                <td>每个窗格独立持有 <code>controlGen</code>；只对当前有交互的窗格宣示控制权与同步尺寸。</td>
+              </tr>
+              <tr>
+                <td><strong>手机 Web / Android</strong><br><span class="tag">data-size="compact"</span></td>
+                <td>多窗格自动折叠为<strong>「顶部窗格切换条 + 全宽单窗格」</strong>（<code>窗格 1</code> / <code>窗格 2</code>，命中高度 ≥ 44px），彻底告别手机上左右挤成两细条。</td>
+                <td>手机仅连接并渲染当前激活窗格，不抢占后台未展示窗格的桌面宽度；切到桌面点按对应窗格即自动恢复宽屏尺寸。</td>
+              </tr>
+              <tr>
+                <td><strong>CLI（SSH / 本地终端）</strong><br><span class="tag">roami session attach</span></td>
+                <td>继续使用 <code>nativeattach</code> 字符合成器（<code>│</code> / <code>─</code> + 底部状态栏 + <code>F2</code>/<code>F3</code>），作为纯字符 TTY 场景兜底。</td>
+                <td>与 Web 共享同一份 <code>roami-sessiond</code> 布局树：在 CLI 分屏或切窗，Web 端 DOM 布局树实时同步更新。</td>
+              </tr>
+              <tr>
+                <td><strong>旧 tmux 会话</strong><br><span class="tag">legacy compat</span></td>
+                <td>保持现有单画布透传，不做破坏性改动；新会话默认原生后端即可享独立窗格体验。</td>
+                <td>沿用现有 <code>/api/term/:name</code> tmux PTY 通道。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="non-goals">
+        <h2 id="non-goals">本期明确不做</h2>
+        <ul>
+          <li>不做跨会话拖拽合并窗格（保持每个会话独立的 <code>Session → Window[] → LayoutNode</code> 模型，避免权限、工作目录与生命周期混淆）。</li>
+          <li>不把终端分屏和右侧文件编辑器/Git 面板揉成同一棵树（文件分栏由 <code>FileWorkspace</code> 管，终端内部窗格由 <code>SplitTree</code> 管，职责清晰）。</li>
+          <li>不给旧 tmux 会话强拆 DOM 窗格（tmux 控制模式 <code>-CC</code> 复杂度高且已属历史兼容路径，所有新能力只投向原生 <code>roami-sessiond</code>）。</li>
+        </ul>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

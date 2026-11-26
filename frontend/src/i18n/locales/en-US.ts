@@ -2173,6 +2173,8 @@ const enUS = {
   'terminal.redrawShort': 'Redraw',
   'terminal.reconnect': 'Reconnect & rebuild terminal (fixes blurred/missing glyphs)',
   'terminal.layoutMenu': 'Window menu',
+  'terminal.selectAllPane': 'Select all in pane',
+  'terminal.windowListLabel': 'Terminal windows',
   'terminal.menu.split': 'Split',
   'terminal.menu.splitRight': 'Split right',
   'terminal.menu.splitDown': 'Split down',

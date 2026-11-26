@@ -536,8 +536,11 @@ func resolveNativeWindow(wins []sessionbackend.Window, query string) (sessionbac
 
 func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, errOut io.Writer) (bool, int) {
 	var sessionQuery, windowQuery, paneID string
+	var showStatusBar bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--status-bar":
+			showStatusBar = true
 		case "--pane", "-p":
 			if i+1 >= len(args) {
 				fmt.Fprintln(errOut, "missing value for --pane")
@@ -658,14 +661,19 @@ func nativeCLIAttach(cli *sessionipc.Client, args []string, in io.Reader, out, e
 		}
 	}
 
-	if err := nativeattach.Attach(context.Background(), cli, cli, nativeattach.AttachOptions{
+	attachOpts := nativeattach.AttachOptions{
 		SessionID: sessionID,
 		WindowID:  windowID,
 		PaneID:    paneID,
 		In:        in,
 		Out:       out,
 		RawTTY:    true,
-	}); err != nil {
+	}
+	if showStatusBar {
+		yes := true
+		attachOpts.ShowStatusBar = &yes
+	}
+	if err := nativeattach.Attach(context.Background(), cli, cli, attachOpts); err != nil {
 		fmt.Fprintln(errOut, err)
 		return true, 1
 	}

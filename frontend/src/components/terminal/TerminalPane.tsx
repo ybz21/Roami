@@ -30,7 +30,8 @@ import { PaneCloseConfirm, type PaneCloseTarget } from './PaneCloseConfirm'
 import { TabContextMenu } from './TabContextMenu'
 import SessionResourceMenu from './SessionResourceMenu'
 import { taskKeyOf } from '../sessions/task-key'
-import Term, { TermHandle, TermStatus } from './Terminal'
+import { type TermHandle, type TermStatus } from './Terminal'
+import NativeSplitWorkspace, { type NativeSplitWorkspaceHandle } from './NativeSplitWorkspace'
 import { api, makeClipboardImageFile, upload, uploadedPathOf } from '../../api'
 import { VoiceInput } from '../chat/VoiceInput'
 import { copyText } from '../chat/blocks'
@@ -186,6 +187,25 @@ export default function TerminalPane(props: {
   const [paneCloseTarget, setPaneCloseTarget] = useState<PaneCloseTarget | null>(null)
   const [paneCloseBusy, setPaneCloseBusy] = useState(false)
   const [paneCloseError, setPaneCloseError] = useState<string>()
+  const splitRefs = useRef<Record<string, NativeSplitWorkspaceHandle | null>>({})
+  const [sessionLayouts, setSessionLayouts] = useState<Record<string, SessionWindowsState>>({})
+  const layoutMenuState = active ? sessionLayouts[active] ?? null : null
+  const refreshLayoutMenuState = useCallback(async (sessionName?: string) => {
+    const target = sessionName || active
+    if (!target || nativeSessionId(target) || preparingSession(target)) return
+    try {
+      const r = await api('GET', `/sessions/${encodeURIComponent(target)}/windows`)
+      if (r?.data) {
+        setSessionLayouts((prev) => ({ ...prev, [target]: r.data }))
+      }
+    } catch {
+      // Ignore transient probe errors when opening menu; actions remain available.
+    }
+  }, [active])
+  useEffect(() => {
+    if (!active || nativeSessionId(active) || preparingSession(active)) return
+    void refreshLayoutMenuState(active)
+  }, [active, node, refreshLayoutMenuState])
   const openPaneCloseConfirm = async () => {
     if (!active) return
     try {
@@ -193,7 +213,7 @@ export default function TerminalPane(props: {
       const qs = grid ? `?cols=${grid.cols}&rows=${grid.rows}` : ''
       const r = await api('GET', `/sessions/${encodeURIComponent(active)}/panes/active${qs}`)
       const p = r.data
-      const rect = termRefs.current[active]?.paneScreenRect(p)
+      const rect = splitRefs.current[active]?.paneContainerRect(p.paneId) || termRefs.current[active]?.paneScreenRect(p)
       if (!rect) { message.error(t('pane.close.locateFailed')); return }
       setPaneCloseError(undefined)
       setPaneCloseTarget({ session: active, paneId: p.paneId, cwd: p.cwd, cmd: p.cmd, panesInWindow: p.panesInWindow, rect })
@@ -201,18 +221,6 @@ export default function TerminalPane(props: {
       message.error(t('pane.close.locateFailed'))
     }
   }
-  const [layoutMenuState, setLayoutMenuState] = useState<SessionWindowsState | null>(null)
-  useEffect(() => { setLayoutMenuState(null) }, [active])
-  const refreshLayoutMenuState = useCallback(async (sessionName?: string) => {
-    const target = sessionName || active
-    if (!target) return
-    try {
-      const r = await api('GET', `/sessions/${encodeURIComponent(target)}/windows`)
-      if (r?.data) setLayoutMenuState(r.data)
-    } catch {
-      // Ignore transient probe errors when opening menu; actions remain available.
-    }
-  }, [active])
   const runTerminalAction = async (sessionName: string, action: TerminalLayoutAction) => {
     if (action.action === 'close-pane') {
       await openPaneCloseConfirm()
@@ -220,7 +228,9 @@ export default function TerminalPane(props: {
     }
     try {
       const r = await api('POST', `/sessions/${encodeURIComponent(sessionName)}/terminal-action`, action)
-      if (r?.data?.windows) setLayoutMenuState(r.data)
+      if (r?.data?.windows) {
+        setSessionLayouts((prev) => ({ ...prev, [sessionName]: r.data }))
+      }
     } catch (e: any) {
       message.error(e.message)
     }
@@ -229,10 +239,14 @@ export default function TerminalPane(props: {
     if (!paneCloseTarget) return
     setPaneCloseBusy(true)
     try {
-      await api('POST', `/sessions/${encodeURIComponent(paneCloseTarget.session)}/panes/${encodeURIComponent(paneCloseTarget.paneId)}/close`, {})
+      const r = await api('POST', `/sessions/${encodeURIComponent(paneCloseTarget.session)}/panes/${encodeURIComponent(paneCloseTarget.paneId)}/close`, {})
       const closedSession = paneCloseTarget.session
       setPaneCloseTarget(null)
-      void refreshLayoutMenuState(closedSession)
+      if (r?.data?.layout?.windows) {
+        setSessionLayouts((prev) => ({ ...prev, [closedSession]: r.data.layout }))
+      } else {
+        void refreshLayoutMenuState(closedSession)
+      }
     } catch (e: any) {
       setPaneCloseError(e?.message || t('pane.close.failed'))
     } finally {
@@ -567,6 +581,10 @@ export default function TerminalPane(props: {
     setDragOver(false)
     const mention = toMention(readDropPath(e))
     if (!mention || !active) return
+    const dropPaneId = (e.target as HTMLElement | null)?.closest?.('[data-pane-id]')?.getAttribute('data-pane-id') || undefined
+    if (dropPaneId && splitRefs.current[active]?.sendToPane(dropPaneId, mention + ' ', true)) {
+      return
+    }
     // 分窗(tmux split pane)时：先按落点坐标激活对应 pane，@路径才会注入到拖放的那个窗格。
     termRefs.current[active]?.selectPaneAt(e.clientX, e.clientY)
     exitCopyMode()
@@ -701,6 +719,7 @@ export default function TerminalPane(props: {
     ] : []),
     { key: 'paste', label: t('terminal.pasteClipboard') },
     { key: 'manual-paste', label: t('terminal.manualPaste') },
+    { key: 'select-all', label: t('terminal.selectAllPane') },
     { type: 'divider' as const },
     { key: 'scroll-up', label: t('terminal.scrollHistory') },
     { key: 'bottom', label: t('terminal.toBottom') },
@@ -725,6 +744,7 @@ export default function TerminalPane(props: {
     const h = termRefs.current[ctx.session]
     if (key === 'cancel') { /* 仅关闭菜单 */ }
     else if (key === 'copy') { copyText(ctx.selection); message.success(t('common.copied')); h?.clearSelection() }
+    else if (key === 'select-all') h?.selectAll()
     else if (key === 'paste') pasteClipboard(ctx.session)
     else if (key === 'manual-paste') openManualPaste(ctx.session)
     else if (key === 'scroll-up') h?.scroll(-12)
@@ -1205,12 +1225,24 @@ export default function TerminalPane(props: {
           // 下一张 WebGL 画布要经过“重新量尺寸 → 清画布 → 重画”，中间会露出 1~2 帧黑屏。
           // visibility:hidden 保留真实尺寸并让后台画布保持就绪；pointerEvents/zIndex 隔离交互与层叠。
           <div key={termName} style={{
-            position: 'absolute', inset: 0, padding: nativeSessionId(termName) ? 0 : 6,
+            position: 'absolute', inset: 0, padding: nativeSessionId(termName) || sessionLayouts[termName]?.backend === 'native' ? 0 : 6,
             visibility: termName === active && !curFile ? 'visible' : 'hidden',
             pointerEvents: termName === active && !curFile ? 'auto' : 'none',
             zIndex: termName === active && !curFile ? 1 : 0,
           }}>
-            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} onOpen={onOpenSession} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
+            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} onOpen={onOpenSession} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <NativeSplitWorkspace
+              ref={(h) => { termRefs.current[termName] = h; splitRefs.current[termName] = h }}
+              name={termName}
+              fontSize={fontSize}
+              active={termName === active}
+              layoutState={sessionLayouts[termName] ?? null}
+              onLayoutRefresh={() => { void refreshLayoutMenuState(termName) }}
+              onFocusPane={(windowId, paneId) => { void runTerminalAction(termName, { action: 'focus-pane', windowId, paneId }) }}
+              onResizeSplit={(windowId, nodeId, ratio, expectedVersion) => { void runTerminalAction(termName, { action: 'resize-split', windowId, nodeId, ratio, expectedVersion }) }}
+              onSelectWindow={(windowId) => { void runTerminalAction(termName, { action: 'select-window', windowId }) }}
+              onNewWindow={() => { void runTerminalAction(termName, { action: 'new-window' }) }}
+              onStatus={(s) => setStatus(termName, s)}
+              onRevived={onRename}
               onContextMenu={({ x, y, selection }) => { setActive(termName); setCtx({ x, y, session: termName, selection }) }}
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}

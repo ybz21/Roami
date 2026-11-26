@@ -4,6 +4,7 @@
 
 | 主题 | 设计入口 | 本次迁入记录 |
 | --- | --- | --- |
+| 产品层独立窗格分屏 | [20261126-workspace-pane-split](20261126-workspace-pane-split/README.md) | 独立 Terminal 个体、产品界面层 DOM 递归分屏（SplitTree）、原生跨行复制/全选/滚动与手机折叠原型 |
 | 三平台原生终端 | [20261120-native-pty](20261120-native-pty/README.md) | 跨平台 PTY 选型、Unix 宿主升级、tmux 能力迁移及 Windows 整包移植 |
 | 会话请求频率优化 | [20261121-session-request-budget](20261121-session-request-budget/README.md) | 请求来源、30 秒受控复现与分阶段降频方案 |
 | 创建任务时的互审会话 | [20261120-review-session](20261120-review-session/README.md) | 审查 Agent、双向会话消息、按版本持续复审设计 |

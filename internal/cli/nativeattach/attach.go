@@ -364,7 +364,8 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 		rows = 24
 	}
 
-	showStatus := opts.RawTTY && hasFD && rows >= 6
+	// Bottom status bar is hidden by default for a clean native terminal; opt in via ROAMI_STATUS_BAR=1 or explicit option.
+	showStatus := opts.RawTTY && hasFD && rows >= 6 && os.Getenv("ROAMI_STATUS_BAR") == "1"
 	if opts.ShowStatusBar != nil {
 		showStatus = *opts.ShowStatusBar && rows >= 6
 	}

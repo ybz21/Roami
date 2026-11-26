@@ -2173,6 +2173,8 @@ const zhCN = {
   'terminal.redrawShort': '重绘',
   'terminal.reconnect': '重连并重建终端（修复字糊/字丢失）',
   'terminal.layoutMenu': '窗口菜单',
+  'terminal.selectAllPane': '全选当前窗格',
+  'terminal.windowListLabel': '终端窗口',
   'terminal.menu.split': '分屏',
   'terminal.menu.splitRight': '左右分屏',
   'terminal.menu.splitDown': '上下分屏',

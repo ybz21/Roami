@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>产品层独立窗格分屏 · 设计总览</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html" aria-current="page">设计总览</a>
+      <a href="product.html">产品设计</a>
+      <a href="prototype.html">交互原型</a>
+      <a href="tech.html">技术设计</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>产品层独立窗格分屏（Workspace Pane Split）</h1>
+      <p class="lead">Terminal 不在单个终端画布内部做字符分屏；分屏与窗口编排提升到 Roami 产品界面层，让每一个窗格都是完全独立的 Terminal 个体。</p>
+      <p class="meta">日期：2026-11-26 · 关联基线：<a href="../20261120-native-pty/index.html">20261120-native-pty</a></p>
+
+      <div class="callout ok">
+        <strong>一句话核心原则：</strong>
+        在 Roami Web 端，<strong>1 个窗格（Pane）= 1 个独立 PTY = 1 个独立 xterm.js 实例 = 1 个独立 DOM 容器</strong>。
+        分屏树与窗口切换是 Roami 产品工作区的布局能力，而不是终端字符缓冲区里的 <code>│</code> / <code>─</code> 字符画。
+      </div>
+
+      <section aria-labelledby="why">
+        <h2 id="why">为什么必须跳出「单画布分屏」</h2>
+        <p>此前为了让 Web 端和 CLI 快速共享分屏，<code>backend/pty/compat_native.go</code> 把 Web 终端接进了 CLI 的 <code>nativeattach</code> 字符合成器（类似 tmux 在单个终端里画 ASCII 边框）。这种方式在浏览器里带来一连串结构性硬伤：</p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>高频操作</th>
+                <th>单画布字符分屏（现状 / tmux 模式）</th>
+                <th>Roami 产品层独立窗格（新方案）</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>跨行拖选与复制</strong></td>
+                <td>左右分屏时，鼠标向下拖选会横穿 <code>│</code> 分隔符并把隔壁窗格文字一并选中，复制出的命令/堆栈被截断污染。</td>
+                <td>每个窗格是独立 DOM + 独立 xterm 实例，拖选被浏览器/xterm 天然限制在当前窗格内，折行长命令、URL、报错堆栈原样复制。</td>
+              </tr>
+              <tr>
+                <td><strong>全选 / 窗格内搜索</strong></td>
+                <td><code>Ctrl+A</code> / <code>selectAll()</code> 会把同屏所有窗格混成一锅选中，无法只复制一个窗格的完整日志。</td>
+                <td>全选、复制、清空选区均严格作用于当前聚焦窗格。</td>
+              </tr>
+              <tr>
+                <td><strong>独立历史回看</strong></td>
+                <td>全屏合成器只渲染当前可视帧，无法一边翻左侧 5000 行构建日志、一边在右侧敲命令。</td>
+                <td>每个窗格保有独立 5000 行 xterm scrollback 与滚轮滚动，互不干扰。</td>
+              </tr>
+              <tr>
+                <td><strong>拖拽调整比例</strong></td>
+                <td>字符网格里无法平滑拖拽，调整比例必须靠快捷键或后端重算字符列。</td>
+                <td>DOM 1px <code>--border-subtle</code> 分隔线，鼠标/触控直接拖拽，实时 Flex 预览，松手提交版本号 <code>ResizeSplit</code>。</td>
+              </tr>
+              <tr>
+                <td><strong>焦点切换与关闭定位</strong></td>
+                <td>靠像素反推字符坐标再发 <code>select-pane</code>；关闭红框还需估算行列数、扣状态栏行与分隔列。</td>
+                <td>点击即聚焦真实 DOM 窗格；关闭确认聚光灯直接取该窗格 <code>getBoundingClientRect()</code>，零误差。</td>
+              </tr>
+              <tr>
+                <td><strong>全屏 TUI 与底栏</strong></td>
+                <td>终端底行常驻一条蓝色/青色 ANSI 状态栏（<code>[demo] 1:main* ... F2:菜单</code>），既占掉一行高度、视觉喧宾夺主，又和 Claude Code / Codex / vim 的滚动区打架。</td>
+                <td><strong>Web 端彻底移除</strong>底行蓝色状态栏，终端 100% 高度还给内容；<strong>CLI 端也默认隐藏</strong>（仅在用户按 <code>F2</code> 呼出菜单时显示当前窗口/窗格状态，或通过显式开关按需开启）。</td>
+              </tr>
+              <tr>
+                <td><strong>手机端自适应</strong></td>
+                <td>390px 宽度下左右两列各剩 ~20 列，字全部折断没法看。</td>
+                <td>紧凑视口（<code>data-size="compact"</code>）自动收起为「单窗格全宽 + 顶部窗格切换条」，手指点按即可切换。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="arch">
+        <h2 id="arch">架构对比一览</h2>
+        <figure class="figure">
+          <img src="architecture.svg" alt="单画布字符分屏与 Roami 产品层独立窗格架构对比">
+          <figcaption>图 1：左侧为旧的单画布字符合成路径；右侧为新方案——<code>roami-sessiond</code> 仍管同一棵 <code>Session → Window[] → LayoutNode → Pane</code> 布局树，但 Web 端由 <code>SplitTree</code> 按 DOM 树挂载多个独立 <code>Terminal</code>，每个窗格直连自身 PTY 流。</figcaption>
+        </figure>
+      </section>
+
+      <section aria-labelledby="reuse">
+        <h2 id="reuse">现有底座已具备 80% 能力</h2>
+        <p>这次重构不是推倒重来，而是把之前已经造好但尚未在主视图启用的产品级底座真正接通：</p>
+        <ul>
+          <li><strong>后端布局树与宿主（已就绪）：</strong><code>internal/sessionbackend</code> 的 <code>Window / LayoutNode / SplitPane / ResizeSplit / FocusPane / ClosePane</code> 与 <code>roami-sessiond</code> 已原生按 <code>paneId</code> 隔离每个 PTY 和 <code>control_gen</code>。</li>
+          <li><strong>单窗格直连通道（已就绪）：</strong><code>backend/pty/native.go</code>（<code>/api/term/native/:name?pane=:paneId</code>）已支持按 <code>paneId</code> 直接绑定单一 PTY，不经过 <code>nativeattach</code> 字符合成器。</li>
+          <li><strong>前端递归分屏容器（已就绪）：</strong><code>frontend/src/components/terminal/SplitTree.tsx</code> + <code>SplitTree.css</code> 已实现桌面端递归 Flex 树、1px 可拖拽分隔线、键盘调整比例与手机端单窗格切换条。</li>
+          <li><strong>结构化窗口菜单接口（已就绪）：</strong><code>GET /api/sessions/:name/windows</code> 与 <code>POST /api/sessions/:name/terminal-action</code> 已落地，只需补齐完整 <code>layout</code> 树返回与多端布局变更广播。</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="phases">
+        <h2 id="phases">分阶段落地路线</h2>
+        <ol>
+          <li><strong>Phase 1 — 原生会话 Web 端切换至独立窗格树（P0）：</strong>新增 <code>GET /sessions/:name/layout</code> + 轻量布局订阅；<code>Terminal.tsx</code> 支持 <code>paneId</code> 单窗格直连（去掉 Web 端 ANSI 合成与底行假状态栏）；新增 <code>NativeSplitWorkspace.tsx</code> 用 <code>SplitTree</code> 承载所有窗格；关闭确认红框改用真实 DOM 矩形。</li>
+          <li><strong>Phase 2 — 窗格级原生操作增强（P1）：</strong>右键菜单增加「全选当前窗格」「清空当前窗格」；多窗口时在工具栏下方显示极简窗口条（单窗口自动隐藏）；多端（CLI / 电脑 / 手机）布局变更实时同步；WebGL 上下文上限保护（超过阈值优雅降级 Canvas 渲染）。</li>
+          <li><strong>Phase 3 — 细节打磨与老通道收口（P2）：</strong>CLI <code>roami session attach</code> 继续保留 <code>compositor.go</code> 作为纯 TTY 兜底；旧 tmux 会话保持现有单画布兼容路径不动；清理不再被 Web 端依赖的 <code>ComputeCellLayout</code> 像素反推逻辑。</li>
+        </ol>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

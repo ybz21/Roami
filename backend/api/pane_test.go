@@ -265,8 +265,31 @@ func TestNativeTerminalActionAndWindowsAPI(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("next-pane = %d body=%v", code, nextBody)
 	}
-	if nextBody["data"].(map[string]any)["activePaneId"].(string) == secondPane {
+	firstPane := nextBody["data"].(map[string]any)["activePaneId"].(string)
+	if firstPane == secondPane {
 		t.Fatalf("next-pane did not move focus away from %s", secondPane)
+	}
+
+	// Verify direct focus-pane by paneId and resize-split on layout tree node.
+	code, focusBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "focus-pane", "paneId": secondPane})
+	if code != http.StatusOK || focusBody["data"].(map[string]any)["activePaneId"].(string) != secondPane {
+		t.Fatalf("focus-pane by paneId failed: code=%d body=%v", code, focusBody)
+	}
+	win0 := focusBody["data"].(map[string]any)["windows"].([]any)[0].(map[string]any)
+	splitNode := win0["layout"].(map[string]any)
+	code, resizeBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{
+		"action":          "resize-split",
+		"windowId":        win0["id"].(string),
+		"nodeId":          splitNode["id"].(string),
+		"ratio":           0.35,
+		"expectedVersion": int64(win0["version"].(float64)),
+	})
+	if code != http.StatusOK {
+		t.Fatalf("resize-split failed: code=%d body=%v", code, resizeBody)
+	}
+	resizedLayout := resizeBody["data"].(map[string]any)["windows"].([]any)[0].(map[string]any)["layout"].(map[string]any)
+	if r := resizedLayout["ratio"].(float64); r < 0.34 || r > 0.36 {
+		t.Fatalf("expected split ratio ~0.35, got %v", r)
 	}
 
 	// 3. ClosePane closes the split pane cleanly via REST API.

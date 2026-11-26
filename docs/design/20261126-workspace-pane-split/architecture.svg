@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 430" width="920" height="430" role="img" aria-label="单画布字符分屏与 Roami 产品层独立窗格分屏架构对比">
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .title { font-size: 15px; font-weight: 700; fill: #e6edf3; }
+    .sub { font-size: 12px; fill: #8b949e; }
+    .label { font-size: 13px; font-weight: 600; fill: #e6edf3; }
+    .small { font-size: 11.5px; fill: #c9d1d9; }
+    .bad { fill: #f85149; font-weight: 600; font-size: 12px; }
+    .good { fill: #3fb950; font-weight: 600; font-size: 12px; }
+    .accent { fill: #58a6ff; font-weight: 600; font-size: 12px; }
+  </style>
+
+  <rect width="920" height="430" rx="10" fill="#0d1117"/>
+
+  <!-- Left panel: Old Single-Canvas Compositor -->
+  <rect x="20" y="20" width="420" height="390" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="38" y="46" class="title">旧方案：单画布字符合成（tmux 模式）</text>
+  <text x="38" y="65" class="sub">N 个 PTY 被压进 1 个 xterm.js，用字符 │ ─ 拼边框</text>
+
+  <rect x="38" y="84" width="384" height="128" rx="6" fill="#0d1117" stroke="#f85149" stroke-dasharray="4 3"/>
+  <text x="50" y="104" class="bad">单个 xterm.js 画布（共享选区 / 共享滚动 / 共享缓冲）</text>
+  <text x="50" y="128" class="mono small">left$ git diff --stat │ right$ npm test</text>
+  <rect x="46" y="135" width="366" height="22" rx="3" fill="rgba(248,81,73,0.18)"/>
+  <text x="50" y="150" class="mono small">backend/api/pane.go   │ PASS 270 files  ← 拖选串列!</text>
+  <text x="50" y="172" class="mono small">frontend/src/App.tsx  │ 1993 passed</text>
+  <rect x="46" y="186" width="368" height="18" rx="2" fill="#1f6feb" opacity="0.35"/>
+  <text x="52" y="199" class="mono small">[demo] 1:main* 2:logs | 2/2窗格   F2:菜单</text>
+
+  <path d="M230 212 L230 242" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="38" y="244" width="384" height="54" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <text x="52" y="266" class="label">1 条 WS → nativeattach 字符合成器</text>
+  <text x="52" y="285" class="sub">后端双 VT 仿真器拼帧，重绘边框、拦截鼠标与状态栏</text>
+
+  <rect x="38" y="314" width="384" height="80" rx="6" fill="rgba(248,81,73,0.08)" stroke="rgba(248,81,73,0.35)"/>
+  <text x="52" y="336" class="bad">体验硬伤</text>
+  <text x="52" y="356" class="small">• 跨行拖选会选中 │ 分隔符和隔壁窗格文字</text>
+  <text x="52" y="374" class="small">• 全选 / 复制 / 滚动条无法隔离到单个窗格</text>
+  <text x="52" y="392" class="small">• 无法平滑拖分屏比例；手机端被迫挤压两列</text>
+
+  <!-- Right panel: New Product-Level Independent Panes -->
+  <rect x="460" y="20" width="440" height="390" rx="8" fill="#161b22" stroke="#58a6ff"/>
+  <text x="478" y="46" class="title">新方案：Roami 产品层分窗（独立终端个体）</text>
+  <text x="478" y="65" class="sub">SplitTree 管 DOM 布局，每个窗格 = 1 个独立 Terminal + 1 个 PTY</text>
+
+  <!-- Window strip + SplitTree container -->
+  <rect x="478" y="84" width="404" height="128" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <rect x="478" y="84" width="404" height="24" rx="6" fill="#1c2128"/>
+  <text x="490" y="100" class="accent">1: main</text>
+  <text x="550" y="100" class="sub">2: logs</text>
+  <text x="610" y="100" class="sub">+ 新建窗口</text>
+  <text x="790" y="100" class="sub">1px 可拖拽线</text>
+
+  <!-- Pane 1 -->
+  <rect x="486" y="114" width="188" height="90" rx="4" fill="#0d1117" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="494" y="130" class="accent">Pane p-1（独立 xterm）</text>
+  <rect x="492" y="136" width="174" height="34" rx="3" fill="rgba(88,166,255,0.22)"/>
+  <text x="496" y="150" class="mono small">backend/api/pane.go</text>
+  <text x="496" y="165" class="mono small">frontend/src/App.tsx</text>
+  <text x="496" y="192" class="good">纯窗格内跨行选字/全选</text>
+
+  <!-- 1px splitter -->
+  <line x1="680" y1="112" x2="680" y2="206" stroke="#58a6ff" stroke-width="2"/>
+
+  <!-- Pane 2 -->
+  <rect x="686" y="114" width="188" height="90" rx="4" fill="#0d1117" stroke="#30363d"/>
+  <text x="694" y="130" class="label">Pane p-2（独立 xterm）</text>
+  <text x="694" y="150" class="mono small">PASS 270 files</text>
+  <text x="694" y="166" class="mono small">1993 passed</text>
+  <text x="694" y="192" class="sub">独立滚轮回看 5000 行</text>
+
+  <!-- Parallel WS arrows -->
+  <path d="M580 212 L580 242" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrBlue)"/>
+  <path d="M780 212 L780 242" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrBlue)"/>
+
+  <rect x="478" y="244" width="194" height="54" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <text x="490" y="266" class="label">WS ?pane=p-1 直连</text>
+  <text x="490" y="285" class="sub">零合成 / 独立 controlGen</text>
+
+  <rect x="688" y="244" width="194" height="54" rx="6" fill="#0d1117" stroke="#30363d"/>
+  <text x="700" y="266" class="label">WS ?pane=p-2 直连</text>
+  <text x="700" y="285" class="sub">零合成 / 独立 Resize</text>
+
+  <rect x="478" y="314" width="404" height="80" rx="6" fill="rgba(63,185,80,0.08)" stroke="rgba(63,185,80,0.35)"/>
+  <text x="492" y="336" class="good">核心收益</text>
+  <text x="492" y="356" class="small">• 跨行选字、Ctrl+A 全选、复制、滚轮回看 100% 窗格原生隔离</text>
+  <text x="492" y="374" class="small">• 鼠标/触控平滑拖 1px 分隔线；关闭高亮直接取 DOM 矩形</text>
+  <text x="492" y="392" class="small">• 手机端自动折叠为「单窗格全宽 + 顶部切换条」，不挤两列</text>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8b949e"/>
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#58a6ff"/>
+    </marker>
+  </defs>
+</svg>
