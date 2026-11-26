@@ -3347,6 +3347,11 @@ html[data-pointer="coarse"] .tt-inbox-acts .tt-act { min-height: var(--tap); }
 /* 手机上弹窗里只要有一个撑宽的输入框，外层就能横向滚，聚焦时整张弹窗被滚到屏幕左边去 */
 html[data-size="compact"] .ant-modal-wrap { overflow-x: hidden; }
 html[data-size="compact"] .ant-modal { max-width: calc(100vw - 24px); margin-inline: auto; }
+.tt-mproj-remove .ant-modal-confirm-title { overflow-wrap: anywhere; }
+html[data-pointer="coarse"] .tt-mproj-remove .ant-modal-confirm-btns .ant-btn::after {
+  content: ''; position: absolute; top: 50%; inset-inline: calc(-1 * var(--sp-1));
+  height: var(--tap); transform: translateY(-50%);
+}
 /* 手机首页 */
 .tt-mhome { padding: var(--pad-page, 12px); padding-bottom: var(--sp-5); }
 .tt-mhome header { margin-bottom: var(--sp-4); }
