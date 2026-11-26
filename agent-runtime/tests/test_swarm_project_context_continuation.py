@@ -24,7 +24,7 @@ async def test_common_project_read_reuses_original_goal_scope(
         calls.append((pid, action, payload))
         return {"revision": 7, "projectFiles": {"teamMemorySha256": "a" * 64}}
 
-    monkeypatch.setattr("roami_agent.tools.project_okr.operation", operation)
+    monkeypatch.setattr("roami_okr.tools.operation", operation)
     args = (
         {}
         if alias == "project_okr_context"
@@ -58,7 +58,7 @@ async def test_project_binding_change_before_read_cannot_cross_the_goal(
         )
         return await original.handler(args, supplied)
 
-    monkeypatch.setattr("roami_agent.tools.project_okr.operation", operation)
+    monkeypatch.setattr("roami_okr.tools.operation", operation)
     runtime.tools.registry[original.name] = replace(original, handler=changed)
     with pytest.raises(DomainError, match="SWARM_COORDINATION_SCOPE_CONFLICT"):
         await invoke(runtime, binding, "project_okr_context", {})
@@ -75,7 +75,7 @@ async def test_model_cannot_select_project_or_broaden_read_into_writes(
         calls.append(args)
         raise AssertionError("forbidden operation")
 
-    monkeypatch.setattr("roami_agent.tools.project_okr.operation", operation)
+    monkeypatch.setattr("roami_okr.tools.operation", operation)
     with pytest.raises(DomainError):
         await invoke(runtime, binding, "project_okr_context", {"projectId": "project-b"})
     with pytest.raises(DomainError, match="SWARM_COORDINATION_OPERATION_UNAVAILABLE"):

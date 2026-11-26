@@ -12,13 +12,23 @@ from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.swarm_repository import dependency_ready
 from roami_agent.storage.transcript_repository import message
+from roami_okr.identity import home_exclusions
+from roami_okr.main import swarm_leader
+from roami_okr.swarm_memory import ProjectSwarmMemory
 
 
 @pytest.fixture
 async def collaboration(store):
-    conversations = Conversations(store)
+    conversations = Conversations(store, home_exclusions=home_exclusions)
     tasks = Tasks(store, conversations)
-    swarms = SwarmPlans(store, tasks, conversations, asyncio.Event())
+    swarms = SwarmPlans(
+        store,
+        tasks,
+        conversations,
+        asyncio.Event(),
+        open_leader=swarm_leader(conversations),
+        memory_backend=ProjectSwarmMemory(),
+    )
 
     class Intake:
         async def submit(self, owner, cid, key, text):
@@ -823,7 +833,7 @@ async def test_project_memory_uses_canonical_cli_and_never_falls_back(collaborat
             ),
         }
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
     await swarms.list("alice")
     assert not calls
     memory = await swarms.memory_read("alice", created["id"])
@@ -1140,8 +1150,10 @@ async def test_scoped_project_update_uses_current_bound_project_and_json(
         def add(self, tool):
             tools[tool.name] = tool
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
-    register_swarm_tools(Registry(), swarms)
+    from roami_okr.swarm_tools import register_swarm_project_tools
+
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
+    register_swarm_tools(Registry(), swarms, register_extensions=register_swarm_project_tools)
     args = {
         "swarmId": created["id"],
         "operation": "save",
@@ -1239,7 +1251,7 @@ async def test_project_cli_rejects_option_and_invalid_ids_before_execution(
     async def forbidden(*args, **kwargs):
         pytest.fail("invalid project ID reached the CLI")
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", forbidden)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", forbidden)
     memory = await swarms.memory_read("alice", created["id"])
     assert memory["available"] is False and memory["errorCode"] == "INVALID_SWARM_PROJECT_ID"
     with pytest.raises(DomainError, match="INVALID_SWARM_PROJECT_ID"):
@@ -1249,7 +1261,8 @@ async def test_project_cli_rejects_option_and_invalid_ids_before_execution(
 
 
 def test_canonical_empty_memory_omission_requires_matching_digest():
-    from roami_agent.storage.swarm_memory import digest, from_project
+    from roami_agent.storage.swarm_memory import digest
+    from roami_okr.swarm_memory import from_project
 
     value = from_project({"projectFiles": {"teamMemorySha256": digest("")}})
     assert value["available"] and value["content"] == ""

@@ -10,6 +10,7 @@ import pytest
 
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.workspace_queue import directory_key
+from roami_okr.native_workspace_queue import native_turn_binding, running_native_mains
 
 
 class QueueDatabase:
@@ -104,6 +105,8 @@ class Admission:
             asyncio.Event(),
             self.active,
             None,
+            native_turn_binding=native_turn_binding,
+            running_native_turns=running_native_mains,
         )
         self.scheduler._job = self.run
 

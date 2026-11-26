@@ -4,7 +4,7 @@ import copy
 import pytest
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.providers.native_main import NativeMain
+from roami_okr.native_main import NativeMain
 
 
 def fixture_binding():

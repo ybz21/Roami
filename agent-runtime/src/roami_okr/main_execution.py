@@ -5,17 +5,18 @@ import logging
 import sqlite3
 from copy import copy
 
-from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
+from roami_agent.conversation.idle import assert_main_idle
 from roami_agent.dispatch.swarm_provider_generations import validate_prepared_member
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.providers.native_main import NativeMain
 from roami_agent.storage.database import event, row
 from roami_agent.storage.swarm_repository import receipt
-from roami_agent.storage.swarm_settled_route_recovery import recover_route_wait, recovery_candidates
 from roami_agent.storage.transcript_repository import owned
+from roami_okr.intake import assert_project_main
+from roami_okr.native_main import NativeMain
+from roami_okr.settled_route_recovery import recover_route_wait, recovery_candidates
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +33,25 @@ def main_binding(db, owner, cid):
         "WHERE p.owner_id=? AND p.conversation_id=? ORDER BY p.generation DESC LIMIT 1",
         (owner, cid),
     )
+
+
+class NativeMainModelCommands:
+    def __init__(self, binding):
+        self.model = binding["model"]
+        self.executor = binding["executor"]
+        self.session_id = binding["session_id"]
+
+    def check_model(self, model):
+        if model and model not in {self.model, "roami-claude/" + self.model}:
+            raise DomainError("PROJECT_MAIN_MODEL_CONFLICT", 409)
+
+    def check_compact(self):
+        raise DomainError("PROJECT_MAIN_NATIVE_COMMAND_REQUIRED", 409)
+
+
+def conversation_model_binding(db, owner, cid):
+    binding = main_binding(db, owner, cid)
+    return NativeMainModelCommands(binding) if binding is not None else None
 
 
 def main_configuration(db, owner, cid):

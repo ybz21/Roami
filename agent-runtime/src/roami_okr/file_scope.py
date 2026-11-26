@@ -1,7 +1,7 @@
 """Bind project Main reads to its registered directory without granting shell access."""
 
-from roami_agent.conversation.project_okr import bound_project
 from roami_agent.protocol.errors import DomainError
+from roami_okr.project import bound_project
 
 
 class ProjectFileScope:

@@ -3,7 +3,6 @@
 import hashlib
 import json
 
-from roami_agent.conversation.main_execution import main_binding
 from roami_agent.conversation.model_commands import switch_model
 from roami_agent.protocol.commands import COMMANDS
 from roami_agent.protocol.errors import DomainError
@@ -15,7 +14,17 @@ from roami_agent.storage.transcript_repository import owned
 
 class ConversationService:
     def __init__(
-        self, database, conversations, context, tasks, model, wakeup, turn_tasks, preempt=None
+        self,
+        database,
+        conversations,
+        context,
+        tasks,
+        model,
+        wakeup,
+        turn_tasks,
+        preempt=None,
+        *,
+        model_binding=None,
     ):
         self.db, self.conversations, self.context, self.tasks = (
             database,
@@ -25,9 +34,15 @@ class ConversationService:
         )
         self.model, self.wakeup, self.turn_tasks = model, wakeup, turn_tasks
         self.preempt = preempt
+        self.model_binding = model_binding
         self.model_settings = None
 
-    async def submit(self, owner, cid, request_key, text, attachment_ids=None, *, okr_context=None):
+    async def _provider(self, owner, cid):
+        if self.model_binding is None:
+            return None
+        return await self.db.call(lambda db: self.model_binding(db, owner, cid))
+
+    async def submit(self, owner, cid, request_key, text, attachment_ids=None, *, admission=None):
         native = await self.db.call(
             lambda db: row(
                 db,
@@ -37,14 +52,14 @@ class ConversationService:
         )
         if native:
             raise DomainError("NATIVE_SESSION_USE_TASK_CHANNEL", 409)
-        provider = await self.db.call(lambda db: main_binding(db, owner, cid))
+        provider = await self._provider(owner, cid)
         parts = text.strip().split(maxsplit=1)
         command, arguments = (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
         if text.strip().startswith("/") and "\n" not in text.strip():
             if attachment_ids:
                 raise DomainError("ATTACHMENTS_WITH_COMMAND")
-            if okr_context is not None:
-                raise DomainError("INVALID_OKR_MESSAGE_CONTEXT")
+            if admission is not None:
+                raise DomainError("MESSAGE_METADATA_WITH_COMMAND")
             name = command[1:]
             if name not in {c["name"] for c in COMMANDS}:
                 raise DomainError("UNKNOWN_COMMAND")
@@ -54,15 +69,11 @@ class ConversationService:
             if name == "model":
                 if provider:
                     model = arguments.strip()
-                    if model and model not in {
-                        provider["model"],
-                        "roami-claude/" + provider["model"],
-                    }:
-                        raise DomainError("PROJECT_MAIN_MODEL_CONFLICT", 409)
+                    provider.check_model(model)
                     return {
                         "kind": "model",
-                        "model": provider["model"],
-                        "executor": provider["executor"],
+                        "model": provider.model,
+                        "executor": provider.executor,
                         "conversationId": cid,
                     }
                 self.model_settings.owner(owner)
@@ -73,7 +84,7 @@ class ConversationService:
                 )
             if name == "compact":
                 if provider:
-                    raise DomainError("PROJECT_MAIN_NATIVE_COMMAND_REQUIRED", 409)
+                    provider.check_compact()
                 job = await self.context.request(owner, cid, request_key, arguments.strip())
                 self.wakeup.set()
                 return {"kind": "compaction", "operationId": job["id"], "state": job["state"]}
@@ -87,7 +98,7 @@ class ConversationService:
         if not self.model.model and not provider:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         result = await self.conversations.accept(
-            owner, cid, request_key, text, attachment_ids, okr_context=okr_context
+            owner, cid, request_key, text, attachment_ids, admission=admission
         )
         if self.preempt and not result.get("reused"):
             running = await self.db.call(
@@ -103,24 +114,24 @@ class ConversationService:
         self.wakeup.set()
         return {"kind": "message", **result}
 
-    async def wake_project(self, owner, cid, project_id, request_key, text):
-        provider = await self.db.call(lambda db: main_binding(db, owner, cid))
+    async def submit_scheduled(self, owner, cid, request_key, text, *, admission):
+        provider = await self._provider(owner, cid)
         if not self.model.model and not provider:
             raise DomainError("MODEL_NOT_CONFIGURED", 503)
         result = await self.conversations.accept(
-            owner, cid, request_key, text, wake_project=project_id
+            owner, cid, request_key, text, admission=admission, scheduled=True
         )
         self.wakeup.set()
         return {"kind": "message", **result}
 
     async def status(self, owner, cid):
         plan = await self.context.project(owner, cid)
-        provider = await self.db.call(lambda db: main_binding(db, owner, cid))
+        provider = await self._provider(owner, cid)
         return {
             "kind": "status",
-            "model": provider["model"] if provider else self.model.model,
+            "model": provider.model if provider else self.model.model,
             **(
-                {"executor": provider["executor"], "sessionId": provider["session_id"]}
+                {"executor": provider.executor, "sessionId": provider.session_id}
                 if provider
                 else {}
             ),

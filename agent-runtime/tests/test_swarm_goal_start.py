@@ -6,6 +6,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_coordination import admitted_batch, evidence
 from roami_agent.storage.swarm_goal_start import advance
+from roami_okr.main import open_main
 
 delegated_team = delegated_team_fixture
 
@@ -58,7 +59,7 @@ async def test_snapshot_reports_real_coordination_turn_and_prefers_running_to_qu
     current = await runtime.mailbox.claim(job)
     assert (await runtime.swarms.snapshot("alice", team["id"]))["mainState"] == "running"
     await runtime.conversations.accept("alice", team["mainConversationId"], "next", "下一步")
-    other = await runtime.conversations.create("alice", project_id="project-b")
+    other = await open_main(runtime.conversations, "alice", "project-b")
     await runtime.conversations.accept("alice", other["id"], "other", "其他项目")
     assert (await runtime.swarms.snapshot("alice", team["id"]))["mainState"] == "running"
     await runtime.journal.fail(current, "failed", "MODEL_FAILED")

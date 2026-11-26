@@ -2,7 +2,7 @@
 
 import re
 
-from roami_agent.conversation.project_wakeup import assert_main_idle
+from roami_agent.conversation.idle import assert_main_idle
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination_admission import batch_context

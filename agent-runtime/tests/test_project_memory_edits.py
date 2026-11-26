@@ -14,7 +14,7 @@ from test_swarm_coordination_policy import invoke
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_memory import digest
-from roami_agent.tools.project_memory_edit import memory_edit_payload, memory_edit_receipt
+from roami_okr.memory_edit import memory_edit_payload, memory_edit_receipt
 
 project_runtime = project_runtime_fixture
 coordinated_tools = coordinated_tools_fixture
@@ -57,7 +57,7 @@ async def test_bound_main_discovers_and_executes_edit_cli_without_selecting_anot
         calls.append((pid, action, payload))
         return response(pid, payload["operationKey"])
 
-    monkeypatch.setattr("roami_agent.tools.project_memory_edit.operation", operation)
+    monkeypatch.setattr("roami_okr.memory_edit.operation", operation)
     tool = runtime.tools.registry["project_okr_memory_edit"]
     args = arguments()
     tool.validate(args)
@@ -92,7 +92,7 @@ async def test_older_host_is_rejected_before_any_memory_write(project_runtime, m
         calls.append(action)
         return {"projectFiles": {}}
 
-    monkeypatch.setattr("roami_agent.tools.project_memory_edit.operation", operation)
+    monkeypatch.setattr("roami_okr.memory_edit.operation", operation)
     with pytest.raises(DomainError, match="PROJECT_MEMORY_EDIT_UNAVAILABLE"):
         await runtime.tools.registry["project_okr_memory_edit"].handler(
             arguments(), {"owner": "alice", "conversation": cid}
@@ -159,7 +159,7 @@ async def test_coordinated_main_uses_pinned_edit_key_through_registered_cli(
             }
         return {"exitCode": 0, "stdout": json.dumps({"data": data})}
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
     batch = await runtime.db.call(
         lambda db: row(
             db, "SELECT id FROM swarm_coordination_batches WHERE turn_id=?", (binding["turnId"],)

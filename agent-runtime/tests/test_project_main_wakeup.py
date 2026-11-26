@@ -6,16 +6,18 @@ from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
-from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import message
+from roami_okr.http import create_app
+from roami_okr.intake import wake_project
+from roami_okr.main import open_main
 
 
 @pytest.fixture
 async def wake_runtime(store):
     runtime = Runtime(store, ConversationModel())
     try:
-        main = await runtime.conversations.create("alice", project_id="project")
+        main = await open_main(runtime.conversations, "alice", "project")
         yield runtime, main
     finally:
         await runtime.close()
@@ -27,8 +29,13 @@ async def test_concurrent_daily_wakes_reuse_original_main_and_one_request(wake_r
     runtime.chat.preempt = preempted.append
     replies = await asyncio.gather(
         *[
-            runtime.chat.wake_project(
-                "alice", main["id"], "project", "daily-slot", "Continue the original team"
+            wake_project(
+                runtime.chat,
+                "alice",
+                main["id"],
+                "project",
+                "daily-slot",
+                "Continue the original team",
             )
             for _ in range(8)
         ]
@@ -46,8 +53,8 @@ async def test_concurrent_daily_wakes_reuse_original_main_and_one_request(wake_r
     saved = await runtime.conversations.messages("alice", main["id"])
     assert saved["messages"][0]["content"]["scheduled"] == {"projectId": "project"}
     with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
-        await runtime.chat.wake_project(
-            "alice", main["id"], "project", "daily-slot", "Changed text"
+        await wake_project(
+            runtime.chat, "alice", main["id"], "project", "daily-slot", "Changed text"
         )
     with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):
         await runtime.chat.submit("alice", main["id"], "daily-slot", "Continue the original team")
@@ -59,7 +66,7 @@ async def test_daily_wake_does_not_preempt_a_new_user_request(wake_runtime, stor
     runtime.chat.preempt = preempted.append
     await runtime.chat.submit("alice", main["id"], "human", "My current work")
     with pytest.raises(DomainError, match="MAIN_BUSY"):
-        await runtime.chat.wake_project("alice", main["id"], "project", "daily", "Scheduled work")
+        await wake_project(runtime.chat, "alice", main["id"], "project", "daily", "Scheduled work")
     assert not preempted
     assert (
         await store.call(lambda db: db.execute("SELECT COUNT(*) FROM requests").fetchone()[0]) == 1
@@ -80,7 +87,7 @@ async def test_daily_wake_preserves_an_unanswered_question_in_a_fork(wake_runtim
     )
     await runtime.conversations.fork("alice", main["id"], mid)
     with pytest.raises(DomainError, match="MAIN_WAITING_USER"):
-        await runtime.chat.wake_project("alice", main["id"], "project", "daily", "Scheduled work")
+        await wake_project(runtime.chat, "alice", main["id"], "project", "daily", "Scheduled work")
     assert (
         await store.call(lambda db: db.execute("SELECT COUNT(*) FROM requests").fetchone()[0]) == 0
     )
@@ -134,8 +141,8 @@ async def test_wake_executes_on_original_main_and_replay_does_not_run_again(wake
 
     runtime, main = wake_runtime
     await runtime.start()
-    result = await runtime.chat.wake_project(
-        "alice", main["id"], "project", "daily", "Read the existing plan"
+    result = await wake_project(
+        runtime.chat, "alice", main["id"], "project", "daily", "Read the existing plan"
     )
     await until(
         store,
@@ -144,8 +151,8 @@ async def test_wake_executes_on_original_main_and_replay_does_not_run_again(wake
             == "completed"
         ),
     )
-    replay = await runtime.chat.wake_project(
-        "alice", main["id"], "project", "daily", "Read the existing plan"
+    replay = await wake_project(
+        runtime.chat, "alice", main["id"], "project", "daily", "Read the existing plan"
     )
     assert replay["turnId"] == result["turnId"] and replay["reused"] is True
     view = await runtime.conversations.messages("alice", main["id"])

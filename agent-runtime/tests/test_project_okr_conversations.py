@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 
 import httpx
@@ -6,12 +7,15 @@ import pytest
 from test_runtime import ConversationModel
 
 from roami_agent.app import Runtime
-from roami_agent.conversation.project_okr import registered_project
 from roami_agent.protocol.errors import DomainError
-from roami_agent.protocol.identity import identity
+from roami_agent.protocol.identity import identity, now_ms
+from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tool_arguments import ToolArgumentsError
-from roami_agent.server.http import create_app
+from roami_agent.server.http import create_app as create_agent_app
 from roami_agent.storage.database import row
+from roami_okr.http import create_app
+from roami_okr.main import open_main
+from roami_okr.project import registered_project
 
 
 @pytest.fixture
@@ -33,7 +37,7 @@ async def project_runtime(store, monkeypatch):
             state["workspace"] = data
         return {"exitCode": 0, "stdout": json.dumps({"data": data})}
 
-    monkeypatch.setattr("roami_agent.conversation.project_okr.execute", execute)
+    monkeypatch.setattr("roami_okr.project.execute", execute)
     runtime = Runtime(store, ConversationModel())
     try:
         yield runtime, calls, state
@@ -82,6 +86,48 @@ async def test_goal_discussion_binds_registered_project_independently_and_idempo
     assert (await create_goal(runtime)).json()["data"]["id"] == cid
     assert (await create_goal(runtime, project="another-project")).status_code == 409
     assert calls[0][0] == ["roami", "project", "show", "registered", "--identity", "--json"]
+
+
+async def test_base_http_intake_handles_chat_without_project_operations(project_runtime):
+    runtime, calls, _ = project_runtime
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_agent_app(runtime)),
+        base_url="http://agent",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        created = await client.post("/v1/conversations", json={"title": "Ordinary chat"})
+        assert created.status_code == 201
+        cid = created.json()["data"]["id"]
+        path = f"/v1/conversations/{cid}/messages"
+        accepted = await client.post(path, json={"text": "Hello", "requestKey": "hello"})
+        assert accepted.status_code == 202
+        assert (
+            await client.post("/v1/conversations", json={"projectId": "registered"})
+        ).status_code == 422
+        assert (
+            await client.post(path, json={"text": "Edit", "requestKey": "edit", "okrContext": {}})
+        ).status_code == 422
+        assert (await client.post(f"/v1/conversations/{cid}/wake", json={})).status_code == 404
+        assert not calls
+
+
+async def test_project_creation_replays_request_written_by_legacy_runtime(project_runtime, store):
+    runtime, _, _ = project_runtime
+    await runtime.conversations.main("alice")
+    previous = await open_main(runtime.conversations, "alice", "registered", "Goal discussion")
+    payload = ["create_conversation", "Goal discussion", {"projectId": "registered"}]
+    digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
+    await store.call(
+        lambda db: db.execute(
+            "INSERT INTO requests(id,owner_id,request_key,payload_sha256,conversation_id,accepted_ms) "
+            "VALUES(?,'alice','legacy-key',?,?,?)",
+            (identity(), digest, previous["id"], now_ms()),
+        ),
+        write=True,
+    )
+    reply = await create_goal(runtime, key="legacy-key")
+    assert reply.status_code == 201
+    assert reply.json()["data"]["id"] == previous["id"]
 
 
 async def test_bound_goal_tools_read_empty_goal_and_save_only_its_project(project_runtime):
@@ -145,7 +191,7 @@ async def test_project_identity_cannot_redirect_to_a_different_project(
         assert argv[1:] == ["project", "show", "registered", "--identity", "--json"]
         return {"exitCode": 0, "stdout": '{"data":{"key":"another-project"}}'}
 
-    monkeypatch.setattr("roami_agent.conversation.project_okr.execute", execute)
+    monkeypatch.setattr("roami_okr.project.execute", execute)
     with pytest.raises(DomainError, match="PROJECT_OKR_UNAVAILABLE"):
         await registered_project(runtime.settings, "registered")
 
@@ -170,7 +216,7 @@ async def test_project_main_isolated_from_home_other_projects_and_other_owners(p
     runtime, _, _ = project_runtime
     first = (await create_goal(runtime)).json()["data"]["id"]
     second = (await create_goal(runtime, project="another", key="another")).json()["data"]["id"]
-    bob = await runtime.conversations.create("bob", project_id="registered")
+    bob = await open_main(runtime.conversations, "bob", "registered")
     assert len({first, second, bob["id"], (await runtime.conversations.main("alice"))["id"]}) == 4
     assert (await runtime.conversations.main("bob"))["id"] != bob["id"]
 
@@ -342,7 +388,7 @@ async def test_memory_append_has_concrete_contract_and_preserves_project_scope(
         calls.append((pid, action, payload))
         return {"projectId": pid}
 
-    monkeypatch.setattr("roami_agent.tools.project_okr.operation", operation)
+    monkeypatch.setattr("roami_okr.tools.operation", operation)
     tool = runtime.tools.registry["project_okr_memory_append"]
     args = {"content": "Verified dated knowledge", "expectedSha256": "a" * 64}
     tool.validate(args)

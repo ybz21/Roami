@@ -2,7 +2,7 @@
 
 import json
 
-from roami_agent.conversation.project_wakeup import assert_main_idle
+from roami_agent.conversation.idle import assert_main_idle
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded

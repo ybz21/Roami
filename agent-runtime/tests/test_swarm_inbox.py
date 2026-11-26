@@ -17,6 +17,7 @@ from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.swarm_routes import mount_swarm_routes
 from roami_agent.storage.database import row
+from roami_okr.main import open_main
 
 collaboration = collaboration_fixture
 scoped_swarms = scoped_swarms_fixture
@@ -25,7 +26,7 @@ scoped_swarms = scoped_swarms_fixture
 @pytest.fixture
 async def main_admission(store):
     runtime = Runtime(store, ConversationModel())
-    main = await runtime.conversations.create("alice", project_id="project-a")
+    main = await open_main(runtime.conversations, "alice", "project-a")
     accepted = await runtime.conversations.accept("alice", main["id"], "goal", "协调原团队")
     job = await store.call(
         lambda db: row(

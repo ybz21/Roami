@@ -76,3 +76,30 @@ def project_main(db, owner, project_id, title, create, *, swarm_id=None):
 
     bind_project_scope(db, owner, project_id, candidate)
     return conversation
+
+
+async def open_main(
+    conversations, owner, project_id, title="New conversation", *, request_key=None, swarm_id=None
+):
+    def resolve(db, create, expected_id):
+        conversation = project_main(db, owner, project_id, title, create, swarm_id=swarm_id)
+        if expected_id is not None and conversation["id"] != expected_id:
+            raise DomainError("PROJECT_OKR_MAIN_CONFLICT", 409)
+        return conversation
+
+    return await conversations.create(
+        owner,
+        title,
+        request_key=request_key,
+        request_scope={"projectId": project_id},
+        resolve_binding=resolve,
+    )
+
+
+def swarm_leader(conversations):
+    async def open_leader(owner, name, target):
+        if target["kind"] == "project":
+            return await open_main(conversations, owner, target["projectId"], name)
+        return await conversations.main(owner)
+
+    return open_leader

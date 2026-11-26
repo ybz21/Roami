@@ -2,10 +2,22 @@
 
 from jsonschema import Draft202012Validator, ValidationError
 
-from roami_agent.conversation.project_okr import bound_project, operation
-from roami_agent.protocol.errors import DomainError, ProjectReviewInputError
+from roami_agent.protocol.errors import DomainError, ToolInputError
 from roami_agent.protocol.tools import Tool, object_schema
-from roami_agent.tools.swarm_coordination_writes import project_receipt
+from roami_okr.coordination_writes import project_receipt
+from roami_okr.project import bound_project, operation
+
+
+class ProjectReviewInputError(ToolInputError):
+    def __init__(self):
+        super().__init__(
+            "OKR_REVIEW_INPUT_INVALID",
+            schema=review_schema(),
+            recovery="Review requires the actual revision, a real nonblank summary and optional string actions. "
+            "Use project_okr_review or swarm_project_review with their exact schema. "
+            "No project write was started. Correct this request without testing fields by writing "
+            "placeholder content to production; preserve the original project and business identity.",
+        )
 
 
 def review_fields():

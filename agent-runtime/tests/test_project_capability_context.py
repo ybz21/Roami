@@ -5,7 +5,8 @@ from test_swarm_coordination import delegated_team as delegated_team_fixture
 from test_swarm_result_observations import report
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.storage.swarm_memory import digest, from_project
+from roami_agent.storage.swarm_memory import digest
+from roami_okr.swarm_memory import from_project
 
 coordination = coordination_fixture
 delegated_team = delegated_team_fixture

@@ -11,7 +11,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_coordination import admitted_batch, evidence, record_retrieval
 from roami_agent.storage.swarm_daily_goal import advance, queue
-from roami_agent.tools.swarm_coordination_policy import SwarmCoordinationPolicy
+from roami_okr.coordination_policy import SwarmCoordinationPolicy
 
 delegated_team = delegated_team_fixture
 DAY = None

@@ -10,13 +10,13 @@ from roami_agent.storage.swarm_coordination import admitted_batch
 from roami_agent.storage.swarm_coordination_admission import for_turn
 from roami_agent.storage.swarm_evidence import evidence
 from roami_agent.tools.foundations import is_help_argv
-from roami_agent.tools.swarm_coordination_artifacts import current_tool_artifact
-from roami_agent.tools.swarm_coordination_catalog import (
+from roami_okr.coordination_artifacts import current_tool_artifact
+from roami_okr.coordination_catalog import (
     COORDINATION_OPERATIONS,
     SWARM_READS,
     SWARM_WRITES,
 )
-from roami_agent.tools.swarm_coordination_writes import project_write
+from roami_okr.coordination_writes import project_write
 
 
 class SwarmCoordinationPolicy:

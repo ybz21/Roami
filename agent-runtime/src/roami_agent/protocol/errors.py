@@ -14,9 +14,10 @@ class TaskVerificationRecorded(DomainError):
         super().__init__("TASK_NOT_WAITING_VERIFICATION", 409)
 
 
-class ProjectReviewInputError(DomainError):
-    def __init__(self):
-        super().__init__("OKR_REVIEW_INPUT_INVALID", 400)
+class ToolInputError(DomainError):
+    def __init__(self, code, *, schema, recovery):
+        super().__init__(code)
+        self.schema, self.recovery = schema, recovery
 
 
 class ModelAdmissionRejected(DomainError):

@@ -13,6 +13,8 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage import database as database_module
 from roami_agent.storage import migrations
 from roami_agent.storage.database import row
+from roami_okr.identity import home_exclusions
+from roami_okr.main import open_main, swarm_leader
 
 
 def command(db, owner, key, payload, receipt):
@@ -211,10 +213,12 @@ async def test_schema22_upgrade_keeps_all_facts_and_old_unknown_message_receipt(
         # Historical facts are checked at v28; current services require the latest schema.
         monkeypatch.setattr(migrations, "SCHEMA_VERSION", current_schema)
         await upgraded.call(lambda db: migrations.upgrade_schema(db, 28))
-        conv = Conversations(upgraded)
-        swarms = SwarmPlans(upgraded, Tasks(upgraded, conv), conv, asyncio.Event())
+        conv = Conversations(upgraded, home_exclusions=home_exclusions)
+        swarms = SwarmPlans(
+            upgraded, Tasks(upgraded, conv), conv, asyncio.Event(), open_leader=swarm_leader(conv)
+        )
         assert await swarms.create("alice", groups[0]["spec"]) == groups[0]["receipt"]
-        restored = await conv.create("alice", project_id="project-b", swarm_id=groups[1]["id"])
+        restored = await open_main(conv, "alice", "project-b", swarm_id=groups[1]["id"])
         assert restored["id"] == groups[1]["main"]["id"]
         assert await swarms.create("alice", groups[1]["spec"]) == groups[1]["receipt"]
 
@@ -317,8 +321,10 @@ async def test_unmapped_old_create_key_cannot_create_a_replacement_team(tmp_path
             )
 
         await store.call(replacement, write=True)
-        conv = Conversations(store)
-        swarms = SwarmPlans(store, Tasks(store, conv), conv, asyncio.Event())
+        conv = Conversations(store, home_exclusions=home_exclusions)
+        swarms = SwarmPlans(
+            store, Tasks(store, conv), conv, asyncio.Event(), open_leader=swarm_leader(conv)
+        )
         from roami_agent.protocol.errors import DomainError
 
         with pytest.raises(DomainError, match="REQUEST_KEY_CONFLICT"):

@@ -12,7 +12,6 @@ class Payload(BaseModel):
 class CreateConversation(Payload):
     requestKey: str | None = Field(default=None, min_length=1, max_length=200)
     title: str = Field(default="New conversation", max_length=200)
-    projectId: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class CreateNativeSession(Payload):
@@ -33,18 +32,11 @@ class CancelTask(Payload):
 
 
 class SendMessage(Payload):
-    okrContext: dict | None = None
     requestKey: str = Field(min_length=1, max_length=200)
     text: str = Field(default="", max_length=100_000)
     attachmentIds: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
         default_factory=list, max_length=6
     )
-
-
-class WakeProject(Payload):
-    requestKey: str = Field(min_length=1, max_length=200)
-    projectId: str = Field(min_length=1, max_length=200)
-    text: str = Field(min_length=1, max_length=10_000)
 
 
 class Compact(Payload):

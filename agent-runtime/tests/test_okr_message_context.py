@@ -12,11 +12,12 @@ from test_project_okr_conversations import (
 )
 
 from roami_agent.context.projection import model_messages
-from roami_agent.conversation.okr_message_context import MARKER, human_text, validate_context
+from roami_agent.conversation.okr_message_context import MARKER, human_text
 from roami_agent.protocol.errors import DomainError
-from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
 from roami_agent.storage.request_quotes import source_quote
+from roami_okr.http import create_app
+from roami_okr.intake import draft_admission, submit, validate_context
 
 project_runtime = _project_runtime
 
@@ -118,8 +119,8 @@ async def test_metadata_preserves_attachments_and_rejects_command_and_foreign_ow
     cid = (await create_goal(runtime)).json()["data"]["id"]
     file = await runtime.attachments.upload("alice", "draft.txt", "draft-file", b"reference")
     context = {"version": 1, "revision": 0, "draft": {"objective": "Unconfirmed"}}
-    receipt = await runtime.chat.submit(
-        "alice", cid, "with-file", "Read this", [file["id"]], okr_context=context
+    receipt = await submit(
+        runtime.chat, "alice", cid, "with-file", "Read this", [file["id"]], okr_context=context
     )
     message = await runtime.db.call(
         lambda db: row(db, "SELECT content_json FROM messages WHERE id=?", (receipt["messageId"],))
@@ -128,9 +129,9 @@ async def test_metadata_preserves_attachments_and_rejects_command_and_foreign_ow
     assert content["text"] == "Read this" and content["okrContext"] == context
     assert content["attachments"][0]["id"] == file["id"]
     with pytest.raises(DomainError, match="INVALID_OKR_MESSAGE_CONTEXT"):
-        await runtime.chat.submit("alice", cid, "command", "/stop", okr_context=context)
+        await submit(runtime.chat, "alice", cid, "command", "/stop", okr_context=context)
     with pytest.raises(DomainError, match="CONVERSATION_NOT_FOUND"):
-        await runtime.chat.submit("other", cid, "foreign-owner", "Write", okr_context=context)
+        await submit(runtime.chat, "other", cid, "foreign-owner", "Write", okr_context=context)
 
 
 async def test_projection_does_not_reuse_summary_of_legacy_generated_instructions(project_runtime):
@@ -201,7 +202,9 @@ async def test_long_literal_marker_keeps_version_through_compact_and_full_views(
         cid,
         "long-literal",
         text,
-        okr_context={"version": 1, "revision": 0, "draft": {"objective": "Unconfirmed"}},
+        admission=draft_admission(
+            "alice", cid, {"version": 1, "revision": 0, "draft": {"objective": "Unconfirmed"}}
+        ),
     )
     page = await runtime.conversations.page("alice", cid)
     viewed = next(m for m in page["messages"] if m["id"] == receipt["messageId"])

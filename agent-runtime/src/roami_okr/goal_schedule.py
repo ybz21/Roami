@@ -21,10 +21,6 @@ def digest(body):
     return hashlib.sha256(body).hexdigest()
 
 
-def schedule_identity(proof):
-    return {key: value for key, value in proof.items() if key not in {"observedAtMs", "nextTickMs"}}
-
-
 class ProjectGoalSchedule:
     def __init__(self, settings, targets, files, registry):
         self.settings, self.targets, self.files, self.registry = settings, targets, files, registry

@@ -72,10 +72,9 @@ class ToolDirectory:
         self.registry, self.settings = registry, settings
 
     def operations(self, role, *, allowed=None):
-        from roami_agent.tools.swarm_coordination_catalog import operation
-
+        project = self.registry.scoped_operation if allowed is not None else None
         return [
-            operation(tool) if allowed is not None else tool
+            project(tool) if project is not None else tool
             for tool in self.registry.registry.values()
             if tool.name not in FOUNDATIONS
             and tool.name not in FILE_OPERATIONS

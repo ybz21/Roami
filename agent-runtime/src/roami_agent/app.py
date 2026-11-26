@@ -21,7 +21,6 @@ from roami_agent.context.vision_inputs import VisionInputs
 from roami_agent.context.workflow_instructions import workflow_instructions
 from roami_agent.conversation.attachments import Attachments
 from roami_agent.conversation.mailbox import TurnMailbox
-from roami_agent.conversation.main_execution import MainExecutions
 from roami_agent.conversation.service import ConversationService
 from roami_agent.conversation.session_dispatches import SessionDispatches
 from roami_agent.conversation.transcript import Conversations
@@ -42,7 +41,6 @@ from roami_agent.executors.browser_driver import BrowserDriver
 from roami_agent.executors.desktop_driver import DesktopDriver
 from roami_agent.executors.native import NativeExecutor
 from roami_agent.executors.native_reconciliation import NativeWorkspaceReconciliation
-from roami_agent.executors.project_goal_schedule import ProjectGoalSchedule
 from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.improvement.domain.policy import BOUNDS
@@ -84,19 +82,30 @@ from roami_agent.tools.main_catalog import register_main_tools
 from roami_agent.tools.market_commands import register_market_commands
 from roami_agent.tools.mcp import MCPConnections, validate_servers
 from roami_agent.tools.mcp_broker import MCPBroker, node_socket
-from roami_agent.tools.native_main_capabilities import NativeMainCapabilities
 from roami_agent.tools.professional_capabilities import ProfessionalCapabilities
-from roami_agent.tools.project_file_scope import ProjectFileScope
-from roami_agent.tools.project_okr import register_project_okr_tools
 from roami_agent.tools.publication_catalog import register_publication_tools
 from roami_agent.tools.registry import Tools
 from roami_agent.tools.reminders import register_reminder_tools
 from roami_agent.tools.swarm_catalog import register_swarm_tools
-from roami_agent.tools.swarm_coordination_policy import SwarmCoordinationPolicy
 from roami_agent.tools.swarm_goal_catalog import register_swarm_goal_tools
 from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 from roami_agent.tools.workspace_images import WorkspaceImageReads
+from roami_okr.authoring_skill import authoring_skill
+from roami_okr.coordination import daily_guidance
+from roami_okr.coordination_catalog import model_catalog
+from roami_okr.coordination_catalog import operation as coordination_operation
+from roami_okr.coordination_policy import SwarmCoordinationPolicy
+from roami_okr.file_scope import ProjectFileScope
+from roami_okr.goal_schedule import ProjectGoalSchedule
+from roami_okr.identity import home_exclusions, project_conversation_identity
+from roami_okr.main import swarm_leader
+from roami_okr.main_execution import MainExecutions, conversation_model_binding
+from roami_okr.native_main_capabilities import NativeMainCapabilities
+from roami_okr.native_workspace_queue import native_turn_binding, running_native_mains
+from roami_okr.swarm_memory import ProjectSwarmMemory
+from roami_okr.swarm_tools import register_swarm_project_tools
+from roami_okr.tools import register_project_okr_tools
 
 log = logging.getLogger(__name__)
 
@@ -125,7 +134,9 @@ class Runtime:
         self.memory_uses_worker = memory_model is None
         self.worker_model = worker_model or original_model
         self.executor, self.verifier = executor, verifier
-        self.conversations = Conversations(database)
+        self.conversations = Conversations(
+            database, identify=project_conversation_identity, home_exclusions=home_exclusions
+        )
         self.tasks = Tasks(
             database,
             self.conversations,
@@ -223,6 +234,8 @@ class Runtime:
         coordination = SwarmCoordinationPolicy(database, targets)
         self.tools.admission = ProjectFileScope(database, targets, coordination).admit
         self.tools.turn_scope = coordination.tool_names
+        self.tools.scoped_catalog = model_catalog
+        self.tools.scoped_operation = coordination_operation
         self.tasks.revisions.project_workspace = targets.project_workspace
         if isinstance(self.executor, CodingExecutor):
             self.executor.project_workspace = targets.project_workspace
@@ -248,7 +261,9 @@ class Runtime:
             self.notification_policy,
             self.briefs,
         )
-        add_worker_tools(self.tools, self.settings, self.artifacts)
+        add_worker_tools(
+            self.tools, self.settings, self.artifacts, builtin_skills=authoring_skill()
+        )
         register_file_tools(
             self.tools, self.files, images=WorkspaceImageReads(self.files, self.artifacts)
         )
@@ -270,13 +285,20 @@ class Runtime:
             register_computer_tools(self.tools, self.desktop)
 
         self.swarms = SwarmPlans(
-            database, self.tasks, self.conversations, self.wakeup, settings=self.settings
+            database,
+            self.tasks,
+            self.conversations,
+            self.wakeup,
+            settings=self.settings,
+            open_leader=swarm_leader(self.conversations),
+            memory_backend=ProjectSwarmMemory(),
         )
         register_swarm_tools(
             self.tools,
             self.swarms,
             confirm=lambda *args, **kwargs: self.dispatch.confirm(*args, **kwargs),
             artifacts=self.artifacts,
+            register_extensions=register_swarm_project_tools,
         )
         register_project_okr_tools(self.tools, database, self.settings)
         register_swarm_goal_tools(self.tools, database, self.wakeup, schedule=goal_schedule)
@@ -351,6 +373,7 @@ class Runtime:
                 workflow_reads=self.tools.loaded_workflow_metadata,
                 execution_deadline=execution_deadline,
                 swarms=self.swarms,
+                coordination_guidance=daily_guidance,
                 chat_images=ChatImages(database, self.artifacts, self.settings),
                 vision=VisionInputs(database, self.artifacts, self.settings)
                 if self.settings.route("worker").capabilities.get("images") is True
@@ -378,6 +401,8 @@ class Runtime:
             self.memory_jobs,
             task_sessions=self.task_sessions,
             swarms=self.swarms,
+            native_turn_binding=native_turn_binding,
+            running_native_turns=running_native_mains,
         )
         self.chat = ConversationService(
             database,
@@ -388,6 +413,7 @@ class Runtime:
             self.wakeup,
             self.turn_tasks,
             self.loop.preempt,
+            model_binding=conversation_model_binding,
         )
         self.swarms.chat = self.chat
         self.model_settings = ModelSettings(self, configured_provider)
@@ -402,6 +428,7 @@ class Runtime:
         register_market_commands(self.tools, self.capability_markets)
         self.professional_capabilities = ProfessionalCapabilities(self)
         self.main_capabilities = NativeMainCapabilities(self)
+        self.execution_capabilities = {"project_main": self.main_capabilities}
         self.main_executions = MainExecutions(
             self.db, self.settings, self.executor, capabilities=self.main_capabilities
         )
@@ -674,7 +701,7 @@ class Runtime:
 
 
 async def serve(args):
-    from roami_agent.server.http import create_app
+    from roami_okr.http import create_app
 
     settings = load_model_settings(Settings.load(args.config), args.data_root)
     validate_servers(settings.mcp_servers)

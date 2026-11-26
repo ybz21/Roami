@@ -6,13 +6,14 @@ from roami_agent.app import Runtime
 from roami_agent.protocol.errors import DomainError
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
+from roami_okr.main import open_main
 
 
 async def test_identity_distinguishes_home_and_a_fixed_project_main_without_a_team(store):
     runtime = Runtime(store, ConversationModel())
     try:
         home = await runtime.conversations.main("alice")
-        project = await runtime.conversations.create("alice", project_id="project")
+        project = await open_main(runtime.conversations, "alice", "project")
         before = await store.call(
             lambda db: db.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
         )
@@ -41,7 +42,7 @@ async def test_identity_distinguishes_home_and_a_fixed_project_main_without_a_te
 async def test_identity_never_promotes_a_worker_into_a_main(store):
     runtime = Runtime(store, ConversationModel())
     try:
-        project = await runtime.conversations.create("alice", project_id="project")
+        project = await open_main(runtime.conversations, "alice", "project")
         task = await runtime.tasks.create(
             "alice",
             project["id"],
@@ -68,7 +69,7 @@ async def test_identity_never_promotes_a_worker_into_a_main(store):
 async def test_identity_fails_closed_on_conflicting_main_bindings(store, corruption):
     runtime = Runtime(store, ConversationModel())
     try:
-        project = await runtime.conversations.create("alice", project_id="project")
+        project = await open_main(runtime.conversations, "alice", "project")
         if corruption == "home":
             await store.call(
                 lambda db: db.execute(
@@ -115,7 +116,7 @@ async def test_identity_fails_closed_on_conflicting_main_bindings(store, corrupt
 
 async def test_http_identity_is_owned_and_advertised_without_creating_a_conversation(store):
     runtime = Runtime(store, ConversationModel())
-    project = await runtime.conversations.create("alice", project_id="project")
+    project = await open_main(runtime.conversations, "alice", "project")
     app = create_app(runtime, manage_lifecycle=False)
     try:
         async with httpx.AsyncClient(

@@ -11,9 +11,9 @@ from test_swarm_coordination import coordination as coordination_fixture
 from test_swarm_coordination import delegated_team as delegated_team_fixture
 
 from roami_agent.app import Runtime
-from roami_agent.providers.native_main import NativeMain
 from roami_agent.storage.database import Database, row
 from roami_agent.storage.swarm_coordination import admitted_batch
+from roami_okr.native_main import NativeMain
 
 coordination = coordination_fixture
 delegated_team = delegated_team_fixture

@@ -9,17 +9,11 @@ from roami_agent.protocol.skill_names import SKILL_ALIASES, skill_location
 from roami_agent.protocol.tools import Tool, object_schema
 
 
-def register_skills(registry, settings):
+def register_skills(registry, settings, *, builtin_entries=()):
     skills = registry.skills
     builtin = Path(__file__).resolve().parents[1] / "skills"
     roots = [(builtin, tuple(builtin.glob("*/SKILL.md")), "builtin")]
-    if not (builtin / "okr-development/SKILL.md").is_file():
-        project = Path(__file__).resolve().parents[3]
-        for source in (project.parent / "skills", project / "skills"):
-            entry = source / "okr-development/SKILL.md"
-            if entry.is_file():
-                roots.append((source, (entry,), "builtin"))
-                break
+    roots.extend((entry.parent.parent, (entry,), "builtin") for entry in builtin_entries)
     roots.extend(
         (root, tuple(root.glob("*/SKILL.md")), "configured") for root in settings.skill_roots
     )

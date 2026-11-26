@@ -1,6 +1,6 @@
 import hashlib
 
-from roami_agent.storage.swarm_memory import from_project
+from roami_okr.swarm_memory import from_project
 
 
 def test_memory_capacity_counts_utf8_bytes_not_characters():
