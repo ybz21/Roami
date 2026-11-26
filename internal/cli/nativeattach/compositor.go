@@ -21,100 +21,12 @@ const (
 	disableMouseClickANSI = "\x1b[?1006l\x1b[?1000l"
 )
 
-// paneRect is a pane's exact 0-based cell rectangle inside the composited window viewport.
-type paneRect struct {
-	PaneID string
-	X, Y   int
-	W, H   int
-}
+type paneRect = sessionbackend.CellRect
+type dividerSegment = sessionbackend.CellDivider
+type cellLayout = sessionbackend.CellLayout
 
-type dividerSegment struct {
-	Horizontal bool
-	X, Y, Len  int
-}
-
-type cellLayout struct {
-	Panes    []paneRect
-	Dividers []dividerSegment
-}
-
-// computeCellLayout turns a binary LayoutNode tree into exact non-overlapping cell rectangles
-// separated by 1-cell box-drawing dividers (│ for horizontal splits, ─ for vertical splits).
 func computeCellLayout(root *sessionbackend.LayoutNode, cols, rows int) cellLayout {
-	var out cellLayout
-	if root == nil || cols < 1 || rows < 1 {
-		return out
-	}
-	layoutNodeCells(root, 0, 0, cols, rows, &out)
-	return out
-}
-
-func layoutNodeCells(n *sessionbackend.LayoutNode, x, y, w, h int, out *cellLayout) {
-	if n == nil || w < 1 || h < 1 {
-		return
-	}
-	if n.Kind == sessionbackend.NodePane {
-		out.Panes = append(out.Panes, paneRect{PaneID: n.PaneID, X: x, Y: y, W: w, H: h})
-		return
-	}
-	ratio := n.Ratio
-	if ratio <= 0 || math.IsNaN(ratio) || math.IsInf(ratio, 0) {
-		ratio = 0.5
-	}
-	if ratio < sessionbackend.MinSplitRatio {
-		ratio = sessionbackend.MinSplitRatio
-	}
-	if ratio > sessionbackend.MaxSplitRatio {
-		ratio = sessionbackend.MaxSplitRatio
-	}
-
-	if n.Dir == sessionbackend.SplitHorizontal {
-		if w >= 3 {
-			leftW := int(math.Round(float64(w-1) * ratio))
-			if leftW < 1 {
-				leftW = 1
-			}
-			if leftW > w-2 {
-				leftW = w - 2
-			}
-			out.Dividers = append(out.Dividers, dividerSegment{Horizontal: false, X: x + leftW, Y: y, Len: h})
-			layoutNodeCells(n.First, x, y, leftW, h, out)
-			layoutNodeCells(n.Second, x+leftW+1, y, w-leftW-1, h, out)
-			return
-		}
-		leftW := w / 2
-		if leftW < 1 {
-			leftW = 1
-		}
-		layoutNodeCells(n.First, x, y, leftW, h, out)
-		if w-leftW > 0 {
-			layoutNodeCells(n.Second, x+leftW, y, w-leftW, h, out)
-		}
-		return
-	}
-
-	// SplitVertical: top / bottom.
-	if h >= 3 {
-		topH := int(math.Round(float64(h-1) * ratio))
-		if topH < 1 {
-			topH = 1
-		}
-		if topH > h-2 {
-			topH = h - 2
-		}
-		out.Dividers = append(out.Dividers, dividerSegment{Horizontal: true, X: x, Y: y + topH, Len: w})
-		layoutNodeCells(n.First, x, y, w, topH, out)
-		layoutNodeCells(n.Second, x, y+topH+1, w, h-topH-1, out)
-		return
-	}
-	topH := h / 2
-	if topH < 1 {
-		topH = 1
-	}
-	layoutNodeCells(n.First, x, y, w, topH, out)
-	if h-topH > 0 {
-		layoutNodeCells(n.Second, x, y+topH, w, h-topH, out)
-	}
+	return sessionbackend.ComputeCellLayout(root, cols, rows)
 }
 
 type borderMask uint8
@@ -381,6 +293,7 @@ func pumpMultiPane(
 	resizeCh <-chan struct{},
 	selectCellCh <-chan [2]int,
 	moveCursorCh <-chan [2]int,
+	switchPaneCh <-chan string,
 	onActivePane func(string),
 	curCols, curRows *atomic.Uint32,
 	paneRowsFor func(uint16) uint16,
@@ -612,6 +525,38 @@ func pumpMultiPane(
 					_ = backend.MoveCursor(subCtx, target, controlGens[activePaneID], pt[0]-r.X, pt[1]-r.Y)
 				}
 			}
+
+		case nextPane, ok := <-switchPaneCh:
+			if !ok {
+				switchPaneCh = nil
+				continue
+			}
+			if nextPane != "" && !win.Layout.ContainsPane(nextPane) {
+				return nextPane, false, false, nil
+			}
+			if curSt, oerr := backend.Observe(subCtx, sessionID); oerr == nil && curSt.Status == sessionbackend.StatusAlive {
+				for _, w := range curSt.Windows {
+					if w.ID == curSt.ActiveWindowID {
+						if w.ID != win.ID || !sameLayoutTree(win.Layout, w.Layout) {
+							if w.ActivePaneID != "" {
+								return w.ActivePaneID, false, false, nil
+							}
+							if nextPane != "" {
+								return nextPane, false, false, nil
+							}
+							return activePaneID, false, false, nil
+						}
+						break
+					}
+				}
+			}
+			if nextPane != "" && nextPane != activePaneID && win.Layout.ContainsPane(nextPane) {
+				activePaneID = nextPane
+				if onActivePane != nil {
+					onActivePane(activePaneID)
+				}
+			}
+			dirty = true
 
 		case <-resizeCh:
 			c := int(curCols.Load())

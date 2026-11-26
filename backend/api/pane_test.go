@@ -250,6 +250,17 @@ func TestNativeTerminalActionAndWindowsAPI(t *testing.T) {
 	}
 	secondPane := splitData["activePaneId"].(string)
 
+	// Verify GET /panes/active?cols=160&rows=48 matches compositor 1-cell divider + status bar math:
+	// contentRows = 47, leftW = round(159*0.5) = 80, divider at col 80, right pane at x=81 w=79 h=47.
+	code, activePaneBody := doJSON(t, r, http.MethodGet, "/sessions/"+ref.SessionID+"/panes/active?cols=160&rows=48")
+	if code != http.StatusOK {
+		t.Fatalf("GET /panes/active = %d body=%v", code, activePaneBody)
+	}
+	ap := activePaneBody["data"].(map[string]any)
+	if ap["paneId"] != secondPane || int(ap["left"].(float64)) != 81 || int(ap["top"].(float64)) != 0 || int(ap["width"].(float64)) != 79 || int(ap["height"].(float64)) != 47 || int(ap["panesInWindow"].(float64)) != 2 {
+		t.Fatalf("unexpected active pane rect after split-right: %+v", ap)
+	}
+
 	code, nextBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "next-pane"})
 	if code != http.StatusOK {
 		t.Fatalf("next-pane = %d body=%v", code, nextBody)

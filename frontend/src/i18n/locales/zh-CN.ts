@@ -2172,7 +2172,7 @@ const zhCN = {
   'terminal.redraw': '重绘画面（修复花屏错位）',
   'terminal.redrawShort': '重绘',
   'terminal.reconnect': '重连并重建终端（修复字糊/字丢失）',
-  'terminal.layoutMenu': '分屏与窗口',
+  'terminal.layoutMenu': '窗口菜单',
   'terminal.menu.split': '分屏',
   'terminal.menu.splitRight': '左右分屏',
   'terminal.menu.splitDown': '上下分屏',

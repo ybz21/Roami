@@ -189,7 +189,9 @@ export default function TerminalPane(props: {
   const openPaneCloseConfirm = async () => {
     if (!active) return
     try {
-      const r = await api('GET', `/sessions/${encodeURIComponent(active)}/panes/active`)
+      const grid = termRefs.current[active]?.gridSize()
+      const qs = grid ? `?cols=${grid.cols}&rows=${grid.rows}` : ''
+      const r = await api('GET', `/sessions/${encodeURIComponent(active)}/panes/active${qs}`)
       const p = r.data
       const rect = termRefs.current[active]?.paneScreenRect(p)
       if (!rect) { message.error(t('pane.close.locateFailed')); return }
@@ -228,7 +230,9 @@ export default function TerminalPane(props: {
     setPaneCloseBusy(true)
     try {
       await api('POST', `/sessions/${encodeURIComponent(paneCloseTarget.session)}/panes/${encodeURIComponent(paneCloseTarget.paneId)}/close`, {})
+      const closedSession = paneCloseTarget.session
       setPaneCloseTarget(null)
+      void refreshLayoutMenuState(closedSession)
     } catch (e: any) {
       setPaneCloseError(e?.message || t('pane.close.failed'))
     } finally {

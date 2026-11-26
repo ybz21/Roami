@@ -15,6 +15,58 @@ import (
 	"github.com/ybz21/Roami/internal/sessionbackend"
 )
 
+var (
+	nativeLayoutMu   sync.RWMutex
+	nativeLayoutSubs = map[string]map[chan string]struct{}{}
+)
+
+func subscribeNativeLayout(sessionID string) (chan string, func()) {
+	ch := make(chan string, 4)
+	nativeLayoutMu.Lock()
+	if nativeLayoutSubs[sessionID] == nil {
+		nativeLayoutSubs[sessionID] = map[chan string]struct{}{}
+	}
+	nativeLayoutSubs[sessionID][ch] = struct{}{}
+	nativeLayoutMu.Unlock()
+	return ch, func() {
+		nativeLayoutMu.Lock()
+		if set := nativeLayoutSubs[sessionID]; set != nil {
+			delete(set, ch)
+			if len(set) == 0 {
+				delete(nativeLayoutSubs, sessionID)
+			}
+		}
+		nativeLayoutMu.Unlock()
+	}
+}
+
+// NotifyNativeLayout wakes all live WebSocket terminal attachments for sessionID after a
+// REST layout mutation (window switch/create/close, split, focus, close-pane) so screens
+// update immediately even if an older roami-sessiond does not broadcast window switch events.
+func NotifyNativeLayout(sessionID, activePaneID string) {
+	nativeLayoutMu.RLock()
+	set := nativeLayoutSubs[sessionID]
+	chans := make([]chan string, 0, len(set))
+	for ch := range set {
+		chans = append(chans, ch)
+	}
+	nativeLayoutMu.RUnlock()
+	for _, ch := range chans {
+		select {
+		case ch <- activePaneID:
+		default:
+			select {
+			case <-ch:
+			default:
+			}
+			select {
+			case ch <- activePaneID:
+			default:
+			}
+		}
+	}
+}
+
 // HandlerWithNative serves /api/term/:name, transparently bridging native roami-sessiond
 // sessions using the legacy xterm.js wire protocol (raw binary VT bytes + JSON control frames)
 // while delegating tmux sessions to the existing Handler unchanged.
@@ -109,6 +161,8 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 	resizeCh := make(chan [2]uint16, 4)
 	selectCellCh := make(chan [2]int, 4)
 	moveCursorCh := make(chan [2]int, 4)
+	switchPaneCh, unsubscribeLayout := subscribeNativeLayout(name)
+	defer unsubscribeLayout()
 	showBar := true
 	layoutBackend, _ := backend.(sessionbackend.LayoutBackend)
 
@@ -126,6 +180,7 @@ func serveNativeCompatWS(c *gin.Context, backend sessionbackend.SessionBackend, 
 			ResizeCh:      resizeCh,
 			SelectCellCh:  selectCellCh,
 			MoveCursorCh:  moveCursorCh,
+			SwitchPaneCh:  switchPaneCh,
 			OnActivePane:  setActivePane,
 			OnMode:        setMode,
 			Cols:          lastCols,

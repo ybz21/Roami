@@ -311,6 +311,7 @@ type AttachOptions struct {
 	ResizeCh      <-chan [2]uint16 // optional external resize feed (e.g. WebSocket resize frames)
 	SelectCellCh  <-chan [2]int    // optional 0-based (col, row) click-to-focus feed for multi-pane layouts
 	MoveCursorCh  <-chan [2]int    // optional 0-based (col, row) move-cursor feed (Web click-to-move-cursor)
+	SwitchPaneCh  <-chan string    // optional external layout/window switch notification (target pane ID)
 	OnActivePane  func(paneID string)
 	OnMode        func(mode sessionbackend.TerminalMode)
 	Cols          uint16
@@ -568,7 +569,7 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 			inComposite.Store(true)
 			switchPane, detached, exited, runErr = pumpMultiPane(
 				attachCtx, backend, layout, opts.SessionID, *multiWin, paneID, opts.ClientID,
-				inCh, inErrCh, resizeCh, opts.SelectCellCh, opts.MoveCursorCh, opts.OnActivePane,
+				inCh, inErrCh, resizeCh, opts.SelectCellCh, opts.MoveCursorCh, opts.SwitchPaneCh, opts.OnActivePane,
 				&curCols, &curRows, paneRowsFor, filter, writeOut, buildStatusSeq, opts.RawTTY && hasFD,
 			)
 			inComposite.Store(false)
@@ -606,7 +607,7 @@ func Attach(ctx context.Context, backend sessionbackend.SessionBackend, layout s
 
 			switchPane, detached, exited, runErr = pumpPane(
 				attachCtx, backend, layout, target, opts.ClientID, &controlGen, &resizeTargetMu, &activeGen,
-				stream, inCh, inErrCh, opts.SelectCellCh, opts.MoveCursorCh, &curCols, &curRows, paneRowsFor,
+				stream, inCh, inErrCh, opts.SelectCellCh, opts.MoveCursorCh, opts.SwitchPaneCh, &curCols, &curRows, paneRowsFor,
 				filter, writeOut, drawStatusBar, opts.OnMode, showStatus,
 			)
 			_ = stream.Close()
@@ -656,6 +657,7 @@ func pumpPane(
 	inErrCh <-chan error,
 	selectCellCh <-chan [2]int,
 	moveCursorCh <-chan [2]int,
+	switchPaneCh <-chan string,
 	curCols, curRows *atomic.Uint32,
 	paneRowsFor func(uint16) uint16,
 	filter *PrefixFilter,
@@ -725,6 +727,26 @@ func pumpPane(
 				continue
 			}
 			_ = backend.MoveCursor(ctx, target, *controlGen, pt[0], pt[1])
+
+		case nextPane, ok := <-switchPaneCh:
+			if !ok {
+				switchPaneCh = nil
+				continue
+			}
+			if nextPane != "" && nextPane != target.PaneID {
+				return nextPane, false, false, nil
+			}
+			if curSt, oerr := backend.Observe(ctx, target.SessionID); oerr == nil && curSt.Status == sessionbackend.StatusAlive {
+				if curSt.ActivePaneID != "" && curSt.ActivePaneID != target.PaneID {
+					return curSt.ActivePaneID, false, false, nil
+				}
+				for _, w := range curSt.Windows {
+					if w.Layout != nil && w.Layout.ContainsPane(target.PaneID) && len(w.Layout.PaneIDs()) > 1 {
+						return target.PaneID, false, false, nil
+					}
+				}
+			}
+			drawStatusBar(target.PaneID, filter.Pending())
 
 		case ev, ok := <-stream.Events():
 			if !ok {
@@ -898,6 +920,9 @@ func pickNextPane(ctx context.Context, backend sessionbackend.SessionBackend, se
 	st, err := backend.Observe(ctx, sessionID)
 	if err != nil || st.Status != sessionbackend.StatusAlive {
 		return "", false
+	}
+	if st.ActivePaneID != "" && st.ActivePaneID != currentPaneID {
+		return st.ActivePaneID, true
 	}
 	var panes []string
 	for _, w := range st.Windows {

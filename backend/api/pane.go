@@ -4,7 +4,6 @@ package api
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/backend/pty"
 	"github.com/ybz21/Roami/internal/sessionbackend"
 )
 
@@ -173,7 +173,14 @@ func (a *API) ActivePane(c *gin.Context) {
 	rawName := c.Param("name")
 	if st, ok := a.nativeSession(c.Request.Context(), rawName); ok {
 		win := nativeActiveWindow(st)
-		if win == nil || st.ActivePaneID == "" {
+		activePaneID := ""
+		if win != nil {
+			activePaneID = win.ActivePaneID
+		}
+		if activePaneID == "" {
+			activePaneID = st.ActivePaneID
+		}
+		if win == nil || activePaneID == "" {
 			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "PANE_NOT_FOUND"}})
 			return
 		}
@@ -181,19 +188,29 @@ func (a *API) ActivePane(c *gin.Context) {
 		if win.Layout != nil {
 			panesInWin = len(win.Layout.PaneIDs())
 		}
-		// Return approximate cell rect scaled to a 100x30 viewport so the confirmation highlight renders cleanly.
-		left, top, width, height := 0, 0, 100, 30
-		for _, r := range win.ComputeRects() {
-			if r.PaneID == st.ActivePaneID {
-				left = int(math.Round(r.X * 100))
-				top = int(math.Round(r.Y * 30))
-				width = max(1, int(math.Round(r.W*100)))
-				height = max(1, int(math.Round(r.H*30)))
+		cols, _ := strconv.Atoi(c.Query("cols"))
+		rows, _ := strconv.Atoi(c.Query("rows"))
+		if cols <= 0 {
+			cols = 80
+		}
+		if rows <= 0 {
+			rows = 24
+		}
+		// Match nativeattach status bar reservation (bottom 1 row when rows >= 6).
+		contentRows := rows
+		if rows >= 6 {
+			contentRows = rows - 1
+		}
+		left, top, width, height := 0, 0, cols, contentRows
+		layout := sessionbackend.ComputeCellLayout(win.Layout, cols, contentRows)
+		for _, r := range layout.Panes {
+			if r.PaneID == activePaneID {
+				left, top, width, height = r.X, r.Y, r.W, r.H
 				break
 			}
 		}
 		c.JSON(http.StatusOK, gin.H{"data": paneInfo{
-			PaneID:        st.ActivePaneID,
+			PaneID:        activePaneID,
 			Left:          left,
 			Top:           top,
 			Width:         width,
@@ -242,6 +259,11 @@ func (a *API) ClosePane(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "KILL_PANE_FAILED", "message": err.Error()}})
 			return
 		}
+		nextPane := ""
+		if updated, ok := a.nativeSession(c.Request.Context(), rawName); ok {
+			nextPane = updated.ActivePaneID
+		}
+		pty.NotifyNativeLayout(rawName, nextPane)
 		c.JSON(http.StatusOK, gin.H{"data": gin.H{"closed": paneID}})
 		return
 	}
@@ -433,9 +455,11 @@ func (a *API) runNativeTerminalAction(c *gin.Context, name string, st sessionbac
 		return
 	}
 	if updated, ok := a.nativeSession(c.Request.Context(), name); ok {
+		pty.NotifyNativeLayout(name, updated.ActivePaneID)
 		c.JSON(http.StatusOK, gin.H{"data": buildNativeWindowsReply(updated)})
 		return
 	}
+	pty.NotifyNativeLayout(name, "")
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true}})
 }
 

@@ -42,6 +42,8 @@ export interface TermHandle {
   selectPaneAt: (clientX: number, clientY: number) => void
   // 把后端返回的 pane 几何（tmux cell 坐标）换算成视口像素矩形，供目标高亮/就地确认卡定位
   paneScreenRect: (pane: { left: number; top: number; width: number; height: number }) => { x: number; y: number; width: number; height: number } | null
+  // 当前终端的字符网格尺寸（供原生后端按同一网格算出精确 pane 区域）
+  gridSize: () => { cols: number; rows: number } | null
   // 「重绘」把两层花屏一起修：先就地重建渲染器（画布/纹理图集坏了那类），再抖一次尺寸
   // (cols−1→cols，两次 SIGWINCH) 逼全屏 TUI 整屏重排（TUI 自己把版排坏了那类）。
   // 只修一层的话，用户按了没反应，只能去找「重连」——那等于让人自己去猜是哪一类。
@@ -350,7 +352,8 @@ const Term = forwardRef<TermHandle, {
   const cellSize = () => {
     const t = termRef.current, el = elRef.current
     if (!t || !el || t.cols <= 0 || t.rows <= 0) return null
-    const rect = el.getBoundingClientRect()
+    const screen = el.querySelector('.xterm-screen') as HTMLElement | null
+    const rect = (screen || el).getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return null
     const cell = (t as any)._core?._renderService?.dimensions?.css?.cell
     if (cell?.width > 0 && cell?.height > 0) return { rect, cw: cell.width as number, ch: cell.height as number }
@@ -626,6 +629,10 @@ const Term = forwardRef<TermHandle, {
     toBottom: () => sendScroll('bottom', 0),
     selectPaneAt: (clientX, clientY) => selectPaneAtClient(clientX, clientY),
     paneScreenRect: (pane) => paneScreenRect(pane),
+    gridSize: () => {
+      const t = termRef.current
+      return t && t.cols > 0 && t.rows > 0 ? { cols: t.cols, rows: t.rows } : null
+    },
     redraw: () => runResumeHeal('renderer+content'),
     beginVisualHandoff,
   }))

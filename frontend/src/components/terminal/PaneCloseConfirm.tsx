@@ -38,12 +38,21 @@ export function PaneCloseConfirm({ target, busy, error, onConfirm, onCancel }: {
   }, [busy, onConfirm, onCancel])
 
   const cardWidth = 320
+  const cardHeight = 168
   const below = rect.y + rect.height + 8
-  const flip = below + 168 > window.innerHeight
+  const above = rect.y - cardHeight - 8
+  const top = below + cardHeight <= window.innerHeight
+    ? below
+    : above >= 8
+      ? above
+      : Math.max(8, Math.min(window.innerHeight - cardHeight - 8, rect.y + Math.round((rect.height - cardHeight) / 2)))
+  const left = below + cardHeight <= window.innerHeight || above >= 8
+    ? Math.max(8, Math.min(rect.x, window.innerWidth - cardWidth - 8))
+    : Math.max(8, Math.min(window.innerWidth - cardWidth - 8, rect.x + Math.round((rect.width - cardWidth) / 2)))
   const cardStyle: CSSProperties = {
     position: 'fixed',
-    left: Math.max(8, Math.min(rect.x, window.innerWidth - cardWidth - 8)),
-    top: flip ? Math.max(8, rect.y - 168) : below,
+    left,
+    top,
     width: cardWidth,
     zIndex: 1001,
     background: 'var(--bg-elevated)',

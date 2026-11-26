@@ -2172,7 +2172,7 @@ const enUS = {
   'terminal.redraw': 'Redraw screen (fix garbled output)',
   'terminal.redrawShort': 'Redraw',
   'terminal.reconnect': 'Reconnect & rebuild terminal (fixes blurred/missing glyphs)',
-  'terminal.layoutMenu': 'Layout',
+  'terminal.layoutMenu': 'Window menu',
   'terminal.menu.split': 'Split',
   'terminal.menu.splitRight': 'Split right',
   'terminal.menu.splitDown': 'Split down',

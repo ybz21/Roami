@@ -659,7 +659,11 @@ func (h *Host) CloseWindow(ctx context.Context, sessionID, windowID string) erro
 		delete(h.sessions, sessionID)
 	} else {
 		if s.activeWindowID == windowID {
-			s.activeWindowID = s.windows[0].ID
+			nextIdx := idx
+			if nextIdx >= len(s.windows) {
+				nextIdx = len(s.windows) - 1
+			}
+			s.activeWindowID = s.windows[nextIdx].ID
 		}
 		for i := range s.windows {
 			if s.windows[i].ID == s.activeWindowID {
@@ -859,8 +863,24 @@ func (h *Host) ClosePane(ctx context.Context, sessionID, paneID string) (*sessio
 			s.windows = append(s.windows[:i], s.windows[i+1:]...)
 			if len(s.windows) == 0 {
 				delete(h.sessions, sessionID)
-			} else if s.activeWindowID == winID {
-				s.activeWindowID = s.windows[0].ID
+			} else {
+				if s.activeWindowID == winID {
+					nextIdx := i
+					if nextIdx >= len(s.windows) {
+						nextIdx = len(s.windows) - 1
+					}
+					s.activeWindowID = s.windows[nextIdx].ID
+				}
+				for j := range s.windows {
+					if s.windows[j].ID == s.activeWindowID {
+						cp := s.windows[j].Clone()
+						updated = &cp
+						break
+					}
+				}
+				for _, p := range s.panes {
+					notify = append(notify, p)
+				}
 			}
 		} else {
 			cp := s.windows[i].Clone()

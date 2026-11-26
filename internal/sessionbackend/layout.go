@@ -64,6 +64,93 @@ type Rect struct {
 	H      float64 `json:"h"`
 }
 
+// CellRect is a pane's exact 0-based cell rectangle inside a composited terminal viewport.
+type CellRect struct {
+	PaneID string
+	X, Y   int
+	W, H   int
+}
+
+// CellDivider is a 1-cell box-drawing divider between split panes.
+type CellDivider struct {
+	Horizontal bool
+	X, Y, Len  int
+}
+
+// CellLayout holds the exact pane cell rectangles and dividers for a viewport grid.
+type CellLayout struct {
+	Panes    []CellRect
+	Dividers []CellDivider
+}
+
+// ComputeCellLayout turns a binary LayoutNode tree into exact non-overlapping cell rectangles
+// separated by 1-cell dividers (│ for horizontal splits, ─ for vertical splits).
+func ComputeCellLayout(root *LayoutNode, cols, rows int) CellLayout {
+	var out CellLayout
+	if root == nil || cols < 1 || rows < 1 {
+		return out
+	}
+	layoutNodeCells(root, 0, 0, cols, rows, &out)
+	return out
+}
+
+func layoutNodeCells(n *LayoutNode, x, y, w, h int, out *CellLayout) {
+	if n == nil || w < 1 || h < 1 {
+		return
+	}
+	if n.Kind == NodePane {
+		out.Panes = append(out.Panes, CellRect{PaneID: n.PaneID, X: x, Y: y, W: w, H: h})
+		return
+	}
+	ratio := clampRatio(n.Ratio)
+	if n.Dir == SplitHorizontal {
+		if w >= 3 {
+			leftW := int(math.Round(float64(w-1) * ratio))
+			if leftW < 1 {
+				leftW = 1
+			}
+			if leftW > w-2 {
+				leftW = w - 2
+			}
+			out.Dividers = append(out.Dividers, CellDivider{Horizontal: false, X: x + leftW, Y: y, Len: h})
+			layoutNodeCells(n.First, x, y, leftW, h, out)
+			layoutNodeCells(n.Second, x+leftW+1, y, w-leftW-1, h, out)
+			return
+		}
+		leftW := w / 2
+		if leftW < 1 {
+			leftW = 1
+		}
+		layoutNodeCells(n.First, x, y, leftW, h, out)
+		if w-leftW > 0 {
+			layoutNodeCells(n.Second, x+leftW, y, w-leftW, h, out)
+		}
+		return
+	}
+
+	if h >= 3 {
+		topH := int(math.Round(float64(h-1) * ratio))
+		if topH < 1 {
+			topH = 1
+		}
+		if topH > h-2 {
+			topH = h - 2
+		}
+		out.Dividers = append(out.Dividers, CellDivider{Horizontal: true, X: x, Y: y + topH, Len: w})
+		layoutNodeCells(n.First, x, y, w, topH, out)
+		layoutNodeCells(n.Second, x, y+topH+1, w, h-topH-1, out)
+		return
+	}
+	topH := h / 2
+	if topH < 1 {
+		topH = 1
+	}
+	layoutNodeCells(n.First, x, y, w, topH, out)
+	if h-topH > 0 {
+		layoutNodeCells(n.Second, x, y+topH, w, h-topH, out)
+	}
+}
+
 // NewSinglePaneWindow constructs the default single-pane window (a 1-leaf tree).
 func NewSinglePaneWindow(windowID, name, nodeID, paneID string) Window {
 	return Window{
