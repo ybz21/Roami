@@ -71,6 +71,48 @@ func TestLedgerPriceSnapshotCacheAndDailyQuota(t *testing.T) {
 	}
 }
 
+func TestConfirmedFreeUsesCurrentPricingAndRecordsUsageAtSpendLimit(t *testing.T) {
+	l := newLedger(t)
+	limit := 0.0
+	config := testConfiguration(&limit)
+	config.Pricing.Models["billed-route"] = ModelPricing{InputPerMillion: 2}
+	if err := l.Configure(config); err != nil {
+		t.Fatal(err)
+	}
+	proof := CallAttribution{AgentKind: "claude", SourceID: "free-source", RouteID: "free", Free: true, PricingRevision: PricingRevision(config)}
+	for _, change := range []struct {
+		name string
+		edit func(*CallAttribution)
+		want string
+	}{
+		{"unproven", func(p *CallAttribution) { p.PricingRevision = "" }, ErrNotConfirmedFree.Error()},
+		{"billed alias", func(p *CallAttribution) { p.RouteID = "billed-route" }, ErrNotConfirmedFree.Error()},
+		{"stale quote", func(p *CallAttribution) { p.PricingRevision = "stale" }, "MODEL_GATEWAY_ROUTE_CHANGED"},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			bad := proof
+			change.edit(&bad)
+			if _, err := l.AdmitConfirmedFree("cli_claude", "free-model", "", change.name, bad); err == nil || err.Error() != change.want {
+				t.Fatalf("admission: got %v, want %s", err, change.want)
+			}
+		})
+	}
+	free, err := l.AdmitConfirmedFree("cli_claude", "free-model", "", "confirmed", proof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Admit("main", "fixture", "", "paid"); err == nil || err.Error() != "MODEL_PROXY_DAILY_LIMIT" {
+		t.Fatalf("zero price pending changed the paid limit: %v", err)
+	}
+	if err := l.Settle(free, &Usage{Input: 12, Output: 3}, 200, "", false); err != nil {
+		t.Fatal(err)
+	}
+	stats, err := l.Statistics(1)
+	if err != nil || len(stats.Recent) != 1 || stats.Today[0].Cost != "0.000000000" || stats.Recent[0].State != "known" {
+		t.Fatalf("free usage missing: %+v %v", stats, err)
+	}
+}
+
 func TestLedgerAdmissionIsAtomicAcrossConnections(t *testing.T) {
 	l := newLedger(t)
 	limit := 5.0
