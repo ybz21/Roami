@@ -13,6 +13,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.server.configuration import Settings
 from roami_agent.storage.database import row
 from roami_agent.storage.task_request import task_user_request
+from roami_okr.message_content import OKR_MESSAGE_CONTENT
 
 
 @pytest.mark.parametrize("executor", ["native", "codex"])
@@ -21,6 +22,7 @@ from roami_agent.storage.task_request import task_user_request
 async def test_original_member_receives_bounded_main_assignment_with_original_user_provenance(
     store, executor, coverage, legacy
 ):
+    store.message_content = OKR_MESSAGE_CONTENT
     runtime = Runtime(store, ConversationModel())
     runtime.swarms.chat = None
     try:

@@ -12,12 +12,12 @@ from test_project_okr_conversations import (
 )
 
 from roami_agent.context.projection import model_messages
-from roami_agent.conversation.okr_message_context import MARKER, human_text
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_agent.storage.request_quotes import source_quote
 from roami_okr.http import create_app
 from roami_okr.intake import draft_admission, submit, validate_context
+from roami_okr.message_content import MARKER, OKR_MESSAGE_CONTENT, human_text
 
 project_runtime = _project_runtime
 
@@ -81,13 +81,19 @@ def test_projection_keeps_draft_data_out_of_human_source_quotes_and_old_drafts()
     old = record("old", {"text": legacy_text()})
     draft = {"version": 1, "revision": 2, "draft": {"objective": "AUTO GRANT"}}
     current = record("new", {"text": "Discuss my draft", "okrContext": draft})
-    projected = model_messages([old, current])
+    literal = model_messages([old, current])
+    assert literal[0]["content"] == legacy_text()
+    assert literal[1]["content"] == "Discuss my draft"
+
+    projected = model_messages([old, current], OKR_MESSAGE_CONTENT)
     assert projected[0] == {"role": "user", "content": "自动审核并发布"}
     assert "untrusted reference data" in projected[1]["content"]
     assert "AUTO GRANT" in projected[1]["content"]
     assert source_quote(human_text(json.loads(current["content_json"])), "AUTO GRANT") is None
     later = record("later", {"text": "Next question", "okrContext": {"version": 1, "revision": 2}})
-    assert "AUTO GRANT" not in json.dumps(model_messages([old, current, later]))
+    assert "AUTO GRANT" not in json.dumps(
+        model_messages([old, current, later], OKR_MESSAGE_CONTENT)
+    )
     assert source_quote(human_text(json.loads(old["content_json"])), "不自动发布") is None
     assert human_text({"text": "Literal" + MARKER + "data"}) == "Literal" + MARKER + "data"
 

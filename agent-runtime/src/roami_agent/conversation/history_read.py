@@ -2,7 +2,7 @@
 
 import json
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.conversation.pages import lineage, position
 from roami_agent.memory.period_summaries import read_daily
 from roami_agent.protocol.errors import DomainError
@@ -33,7 +33,7 @@ def record_content(db, value):
         if key in {"text", "tool_calls", "tool_call_id", "taskStatus", "sessionReply", "question"}
     }
     if value["role"] == "user":
-        content["text"] = human_text(json.loads(value["content_json"]))
+        content["text"] = message_content(db).human_text(json.loads(value["content_json"]))
     return encoded(content), source["id"] != value["id"]
 
 

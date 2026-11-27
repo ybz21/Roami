@@ -7,7 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from roami_agent.context.projection import context_history
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.protocol.errors import DomainError, ToolPreflightError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.replies.answer_contract import reply_text
@@ -167,7 +167,10 @@ class SourceReplyReview:
                 raise DomainError("TURN_INTERRUPTED", 409)
             assert_context_admitted(db, {**turn, "owner_id": binding["owner"]})
             messages = [
-                {"id": m["id"], "text": human_text(json.loads(m["content_json"]))}
+                {
+                    "id": m["id"],
+                    "text": message_content(db).human_text(json.loads(m["content_json"])),
+                }
                 for m in context_history(db, turn["branch_id"], through_turn=turn["id"])
                 if m["role"] == "user"
                 and (context["source_ids"] is None or m["id"] in context["source_ids"])

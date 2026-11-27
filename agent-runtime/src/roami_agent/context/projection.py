@@ -16,7 +16,7 @@ from roami_agent.context.token_estimate import (
 )
 from roami_agent.context.working_brief import project as project_working_brief
 from roami_agent.conversation.attachments import context_attachments
-from roami_agent.conversation.okr_message_context import draft_reference, human_text
+from roami_agent.conversation.message_content import LITERAL_CONTENT, message_content
 from roami_agent.protocol.delivery_receipts import delivery_receipt
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -44,18 +44,20 @@ def fingerprint(messages):
     ).hexdigest()
 
 
-def projection_policy(messages):
+def projection_policy(messages, projection):
     for message in messages:
         if message["role"] != "user":
             continue
         content = json.loads(message["content_json"])
-        if content.get("okrContext") or human_text(content) != content.get("text", ""):
-            return "v2-okr-literal-sources"
+        version = projection.snapshot_version(content)
+        if version:
+            return version
     return "v1"
 
 
 def compaction_history(db, branch, source, epoch, focus):
-    complete = model_messages(source)
+    projection = message_content(db)
+    complete = model_messages(source, projection)
     if focus:
         return complete, None
     snapshot = row(
@@ -77,12 +79,12 @@ def compaction_history(db, branch, source, epoch, focus):
     if (
         [message["id"] for message in covered] != ids
         or fingerprint(covered) != snapshot["source_sha256"]
-        or projection_policy(covered) != snapshot["policy_version"]
+        or projection_policy(covered, projection) != snapshot["policy_version"]
     ):
         return complete, None
     return [
         {"role": "system", "content": "Previous conversation summary (historical data):\n" + text},
-        *model_messages(source[len(ids) :]),
+        *model_messages(source[len(ids) :], projection),
     ], snapshot["id"]
 
 
@@ -132,11 +134,11 @@ def context_history(db, branch_id, through_turn=None):
     return result
 
 
-def model_messages(messages):
-    return [entry["message"] for entry in model_entries(messages)]
+def model_messages(messages, projection=LITERAL_CONTENT):
+    return [entry["message"] for entry in model_entries(messages, projection)]
 
 
-def model_entries(messages):
+def model_entries(messages, projection=LITERAL_CONTENT):
     result, paired = [], set()
     operations = {}
     latest_user = next(
@@ -154,9 +156,11 @@ def model_entries(messages):
         content = json.loads(m["content_json"])
         entry = {
             "role": m["role"],
-            "content": human_text(content) if m["role"] == "user" else content.get("text", ""),
+            "content": projection.human_text(content)
+            if m["role"] == "user"
+            else content.get("text", ""),
         }
-        reference = draft_reference(content) if m["id"] == latest_user else None
+        reference = projection.latest_reference(content) if m["id"] == latest_user else None
         if reference:
             entry["content"] += "\n\n" + reference
         if m.get("agent_task_instruction"):
@@ -280,7 +284,8 @@ class Context:
                 if (
                     [m["id"] for m in source] == source_ids
                     and fingerprint(source) == snapshot["source_sha256"]
-                    and snapshot["policy_version"] == projection_policy(source)
+                    and snapshot["policy_version"]
+                    == projection_policy(source, self.db.message_content)
                 ):
                     prefix = [
                         {
@@ -298,7 +303,7 @@ class Context:
                 basis = request_basis(dict(configuration, workingBriefId=working[0]["id"]))
             else:
                 working = None
-            entries = model_entries(remaining)
+            entries = model_entries(remaining, self.db.message_content)
             pending = (
                 {
                     r["id"]
@@ -566,7 +571,7 @@ class Context:
             available = (
                 desired_tokens
                 if desired_tokens is not None
-                else messages_tokens(model_messages(messages))
+                else messages_tokens(model_messages(messages, self.db.message_content))
             )
             retained = min(
                 policy_value("keep_recent_tokens", self.keep_recent_tokens), available // 2
@@ -575,7 +580,10 @@ class Context:
             # Cut only complete rounds, with room for a summary and the current turn.
             for candidate in boundaries:
                 cut = candidate
-                if messages_tokens(model_messages(messages[cut:])) <= retained:
+                if (
+                    messages_tokens(model_messages(messages[cut:], self.db.message_content))
+                    <= retained
+                ):
                     break
             source = messages[:cut]
             if not source:
@@ -593,7 +601,13 @@ class Context:
                 db,
                 "SELECT id FROM context_snapshots WHERE branch_id=? AND source_sha256=? "
                 "AND state='ready' AND memory_epoch=? AND branch_epoch=? AND policy_version=?",
-                (b["id"], source_hash, epoch, b["epoch"], projection_policy(source)),
+                (
+                    b["id"],
+                    source_hash,
+                    epoch,
+                    b["epoch"],
+                    projection_policy(source, self.db.message_content),
+                ),
             )
             if existing and not p["focus"]:
                 p["state"] = "skipped"
@@ -650,7 +664,9 @@ class Context:
                 self.request_context(),
                 validate,
             )
-            if text_tokens(text) >= messages_tokens(model_messages(source)):
+            if text_tokens(text) >= messages_tokens(
+                model_messages(source, self.db.message_content)
+            ):
                 raise DomainError("SUMMARY_NOT_SMALLER", 502)
 
             def activate(db):
@@ -687,7 +703,7 @@ class Context:
                         fingerprint(source),
                         fingerprint(source),
                         branch["epoch"],
-                        projection_policy(source),
+                        projection_policy(source, self.db.message_content),
                         epoch,
                         encoded(summary),
                         now_ms(),

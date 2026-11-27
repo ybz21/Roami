@@ -3,7 +3,7 @@
 import hashlib
 import json
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.serialization import encoded
@@ -53,7 +53,7 @@ def source_evidence(db, owner, scope, channel, account):
             messages.append(
                 {
                     "id": source["id"],
-                    "text": human_text(json.loads(source["body"])),
+                    "text": message_content(db).human_text(json.loads(source["body"])),
                     "sha256": source_digest(source["body"]),
                 }
             )
@@ -64,7 +64,7 @@ def source_evidence(db, owner, scope, channel, account):
         "accountId": account,
         "goalUserMessage": {
             "id": source["id"],
-            "text": human_text(json.loads(source["body"])),
+            "text": message_content(db).human_text(json.loads(source["body"])),
             "sha256": goal["source_sha256"],
         },
         "realHumanMessages": messages,

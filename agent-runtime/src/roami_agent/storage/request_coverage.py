@@ -2,7 +2,7 @@
 
 import json
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.protocol.tools import object_schema
@@ -68,7 +68,7 @@ def check_coverage(db, binding, args, *, handoff=False):
     )
     if not source:
         raise DomainError("REQUEST_COVERAGE_SOURCE_REQUIRED")
-    text = human_text(json.loads(source["content_json"]))
+    text = message_content(db).human_text(json.loads(source["content_json"]))
     prior_quotes = [item["quote"] for item in previous]
     outcomes = [
         dict(item, quote=source_quote(text, item["quote"], prior_quotes)) for item in outcomes

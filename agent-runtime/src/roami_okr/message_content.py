@@ -2,6 +2,7 @@
 
 import json
 
+from roami_agent.conversation.message_content import MessageContent
 from roami_agent.protocol.serialization import encoded
 
 MARKER = "\n\n<roami-okr-context>\n"
@@ -41,3 +42,19 @@ def draft_reference(content):
         "Preserve the project's existing Main and members. Base revision and draft: "
         + encoded(context)
     )
+
+
+def public_metadata(content):
+    context = content.get("okrContext")
+    if isinstance(context, dict) and context.get("version") == 1 and "revision" in context:
+        return {"okrContext": {"version": 1, "revision": context["revision"]}}
+    return {}
+
+
+def snapshot_version(content):
+    if content.get("okrContext") or human_text(content) != content.get("text", ""):
+        return "v2-okr-literal-sources"
+    return None
+
+
+OKR_MESSAGE_CONTENT = MessageContent(human_text, draft_reference, public_metadata, snapshot_version)

@@ -4,6 +4,7 @@ import json
 
 from roami_agent.context.retention_policy import POLICY_VERSION, cold_cut, source_fingerprint
 from roami_agent.context.token_estimate import text_tokens
+from roami_agent.conversation.message_content import LITERAL_CONTENT, message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.retrieval.conversation_search import source_text, terms
@@ -46,7 +47,7 @@ def latest(db, branch, epoch, messages):
     return None
 
 
-def validate_candidate(candidate, previous, source, incremental, days):
+def validate_candidate(candidate, previous, source, incremental, days, projection=LITERAL_CONTENT):
     if not isinstance(candidate, dict) or set(candidate) != {
         "reviewedUserIds",
         "items",
@@ -83,10 +84,10 @@ def validate_candidate(candidate, previous, source, incremental, days):
             or new not in expected
             or not isinstance(previous_quote, str)
             or not previous_quote.strip()
-            or previous_quote not in source_text(users[old])
+            or previous_quote not in source_text(users[old], projection)
             or not isinstance(quote, str)
             or not quote.strip()
-            or quote not in source_text(users[new])
+            or quote not in source_text(users[new], projection)
             or source.index(users[new]) <= source.index(users[old])
         ):
             raise DomainError("INVALID_WORKING_BRIEF", 502)
@@ -107,7 +108,7 @@ def validate_candidate(candidate, previous, source, incremental, days):
             raise DomainError("INVALID_WORKING_BRIEF", 502)
         if kind != "reference" and (
             len(refs) != 1
-            or not any(ref in users and text in source_text(users[ref]) for ref in refs)
+            or not any(ref in users and text in source_text(users[ref], projection) for ref in refs)
         ):
             raise DomainError("WORKING_BRIEF_QUOTE_MISMATCH", 502)
         if kind != "reference" and any((ref, text) in replacements for ref in refs):
@@ -154,7 +155,10 @@ def project(db, branch, epoch, messages, configuration):
     if cut == 0:
         return None
     cold_ids = {m["id"] for m in messages[:cut]}
-    query = next((source_text(m) for m in reversed(messages) if m["role"] == "user"), "")
+    projection = message_content(db)
+    query = next(
+        (source_text(m, projection) for m in reversed(messages) if m["role"] == "user"), ""
+    )
     query_terms = {term for term in terms(query) if len(term) > 1}
     selected = []
     for item in json.loads(brief["items_json"]):
@@ -211,7 +215,7 @@ def unresolved_tasks(db, turn):
                     "revision": task["revision"],
                     "state": task["state"],
                     "sourceMessageId": source["id"],
-                    "userRequest": source_text(source),
+                    "userRequest": source_text(source, message_content(db)),
                 }
             )
     return result
