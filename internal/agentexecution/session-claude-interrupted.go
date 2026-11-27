@@ -62,10 +62,11 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 	digest := sha256.New()
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
 	matched, terminal, compact := false, false, false
+	companions := newClaudeCompanions(binding)
 	reachable, pending, completed := map[string]bool{}, map[string]bool{}, map[string]int64{}
 	finished := int64(0)
 	for {
-		var record claudeInterruptedRecord
+		var record claudeCompletionRecord
 		if err := decoder.Decode(&record); err == io.EOF {
 			break
 		} else if err != nil || record.Sidechain {
@@ -130,7 +131,11 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 					}
 					compact = true
 				}
-			case "attachment", "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "api-request-blob", "api-request", "api-request-shape", "file-history-snapshot", "file-history-delta", "cost-state", "ai-title":
+			case "attachment":
+				if linked {
+					companions.observe(record, nil)
+				}
+			case "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "api-request-blob", "api-request", "api-request-shape", "file-history-snapshot", "file-history-delta", "cost-state", "ai-title":
 			default:
 				return nil, "", nil
 			}
@@ -148,7 +153,7 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 				switch block.Type {
 				case "text", "thinking", "redacted_thinking":
 				case "tool_use":
-					if block.ID == "" || pending[block.ID] || completed[block.ID] != 0 {
+					if block.ID == "" || pending[block.ID] || completed[block.ID] != 0 || !companions.call(block) {
 						return nil, "", nil
 					}
 					pending[block.ID] = true
@@ -168,6 +173,9 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 			compact = false
 			continue
 		}
+		if companions.accept(record, turn) {
+			continue
+		}
 		if text == "[Request interrupted by user]" || text == "[Request interrupted by user for tool use]" {
 			if record.Meta || len(pending) != 0 || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
 				return nil, "", nil
@@ -185,6 +193,7 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 			delete(pending, block.ToolUseID)
 			completed[block.ToolUseID] = stamp.UnixMilli()
 		}
+		companions.observe(record, blocks)
 	}
 	after, err := file.Stat()
 	if !matched || !terminal || err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
