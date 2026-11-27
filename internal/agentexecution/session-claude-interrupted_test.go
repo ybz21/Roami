@@ -140,6 +140,50 @@ func TestClaudeInterruptedEvidenceRequiresCompleteScopedTerminalWindow(t *testin
 	}
 }
 
+func TestClaudeInterruptedEvidenceRecognizesBoundImageReadCompanion(t *testing.T) {
+	for _, mode := range []string{"bound image", "arbitrary metadata", "no image result", "wrong tool", "foreign parent", "other prompt", "pending tool"} {
+		t.Run(mode, func(t *testing.T) {
+			binding, path, _, prompt := reportFixture(t)
+			since := time.Now().UnixMilli()
+			records := interruptedClaudeRecords(binding, prompt, "turn", since, false)
+			records[2]["toolUseResult"] = map[string]any{"type": "image", "file": map[string]any{"filePath": "receipt.png"}}
+			attachment := map[string]any{"type": "attachment", "uuid": "image-hook", "parentUuid": "read-result"}
+			companion := map[string]any{
+				"type": "user", "uuid": "image-meta", "parentUuid": "image-hook",
+				"sessionId": binding.ProviderID, "promptId": "turn", "cwd": binding.Directory,
+				"timestamp": records[2]["timestamp"], "isMeta": true, "turnCompanion": true,
+				"message": map[string]any{"content": "[Image: original 1080x2340, displayed at 923x2000. Multiply coordinates by 1.17 to map to original image.]"},
+			}
+			records[3]["parentUuid"] = "image-meta"
+			switch mode {
+			case "arbitrary metadata":
+				companion["message"] = map[string]any{"content": "An unrelated instruction"}
+			case "no image result":
+				delete(records[2], "toolUseResult")
+			case "wrong tool":
+				records[1]["message"].(map[string]any)["content"].([]any)[0].(map[string]any)["name"] = "Grep"
+			case "foreign parent":
+				attachment["parentUuid"] = "root"
+			case "other prompt":
+				companion["promptId"] = "other"
+			case "pending tool":
+				records[4]["parentUuid"] = "image-meta"
+				records = append(records[:3], records[4:]...)
+			}
+			records = append(records[:3], append([]map[string]any{attachment, companion}, records[3:]...)...)
+			writeReportRecords(t, path, records)
+			result, digest, completed := claudeInterruptedEvidence(binding, "turn", workspaceHash(prompt), since)
+			if mode == "bound image" {
+				if result == nil || result.ErrorCode != "CLAUDE_SESSION_INTERRUPTED" || len(digest) != 64 || len(completed) != 2 {
+					t.Fatalf("missing interruption proof: %+v %q %+v", result, digest, completed)
+				}
+			} else if result != nil {
+				t.Fatalf("unproved %s accepted: %+v", mode, result)
+			}
+		})
+	}
+}
+
 func interruptedClaudeTask(t *testing.T) (Service, SessionBinding, Spec, string, []map[string]any) {
 	t.Helper()
 	s, binding := sessionFixture(t)
