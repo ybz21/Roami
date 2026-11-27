@@ -32,17 +32,7 @@ func displacedClaudeRefusal(r claudeFailureRecord) bool {
 		*usage.Input != 0 || *usage.Output != 0 {
 		return false
 	}
-	if claudeCompactionRefusal(r) {
-		return true
-	}
-	var blocks []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	return r.Failure == "invalid_request" && r.APIStatus == 0 &&
-		json.Unmarshal(r.Message.Content, &blocks) == nil && len(blocks) == 1 &&
-		blocks[0].Type == "text" &&
-		strings.HasPrefix(blocks[0].Text, "Prompt is too long · automatic compaction failed: API Error: 400 MODEL_HTTP_400")
+	return claudeCompactionFailureCode(r) != ""
 }
 
 func displacedClaudeStopEvidence(binding SessionBinding, marker, expected string, since, cancelledAt int64) (*Result, string) {

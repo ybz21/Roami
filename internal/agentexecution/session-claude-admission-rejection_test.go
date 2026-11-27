@@ -12,7 +12,7 @@ import (
 )
 
 func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
-	for _, scenario := range []string{"complete", "compaction refusal", "route exhausted", "untyped 503", "wrong route code", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
+	for _, scenario := range []string{"complete", "compaction refusal", "compaction input rejected", "unowned attachment", "route exhausted", "untyped 503", "wrong route code", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
 		t.Run(scenario, func(t *testing.T) {
 			s, binding, spec, transcript, _ := rejectedClaudeTask(t)
 			dir, _ := s.directory(spec.Key)
@@ -69,6 +69,19 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			message := records[1]["message"].(map[string]any)
 			message["content"] = []any{map[string]any{"type": "text", "text": "API Error: 402 {\"error\":{\"code\":\"MODEL_PROXY_DAILY_LIMIT\"}}"}}
 			switch scenario {
+			case "compaction input rejected", "unowned attachment":
+				delete(records[1], "apiErrorStatus")
+				delete(records[1], "failedResponseHadNoToolCall")
+				records[1]["error"] = "invalid_request"
+				message["content"] = []any{map[string]any{"type": "text", "text": "Prompt is too long · automatic compaction failed: API Error: 400 MODEL_HTTP_400"}}
+				parent := "quota-user"
+				if scenario == "unowned attachment" {
+					parent = "unrelated"
+				}
+				attachment := map[string]any{"type": "attachment", "uuid": "date", "parentUuid": parent,
+					"sessionId": binding.ProviderID, "cwd": binding.Directory, "attachment": map[string]string{"type": "date"}}
+				records[1]["parentUuid"] = "date"
+				records = []map[string]any{records[0], attachment, records[1]}
 			case "compaction refusal":
 				delete(records[1], "apiErrorStatus")
 				delete(records[1], "failedResponseHadNoToolCall")
@@ -160,7 +173,7 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 			}
 			result, err := s.ReconcileSession(context.Background(), spec.Key)
-			good := scenario == "complete" || scenario == "compaction refusal" || scenario == "route exhausted" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
+			good := scenario == "complete" || scenario == "compaction refusal" || scenario == "compaction input rejected" || scenario == "route exhausted" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
 			if !good {
 				if err == nil || result.Result != nil {
 					t.Fatalf("accepted %s: %+v %v", scenario, result, err)
@@ -178,6 +191,8 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			switch scenario {
 			case "compaction refusal":
 				code = "CLAUDE_COMPACTION_FAILED"
+			case "compaction input rejected":
+				code = "CLAUDE_COMPACTION_INPUT_REJECTED"
 			case "route exhausted":
 				code = "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
 			}

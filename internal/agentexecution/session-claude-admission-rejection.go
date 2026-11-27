@@ -33,12 +33,13 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
 	root := ""
 	var promptTime time.Time
+	parent := ""
 	var result *Result
 	for {
 		var r claudeFailureRecord
 		if err := decoder.Decode(&r); err == io.EOF {
 			break
-		} else if err != nil || r.Sidechain {
+		} else if err != nil {
 			return nil, "", nil
 		}
 		if root == "" {
@@ -47,13 +48,13 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 			}
 			_, owned := reportDirectory(binding.Directory, r.Cwd)
 			stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
-			if r.Meta || r.Compact || r.UUID == "" || r.SessionID != binding.ProviderID || !filepath.IsAbs(r.Cwd) || !owned || claudeInputHash(claudeReportText(r.Message.Content), hash) != hash || problem != nil || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
+			if r.Sidechain || r.Meta || r.Compact || r.UUID == "" || r.SessionID != binding.ProviderID || !filepath.IsAbs(r.Cwd) || !owned || claudeInputHash(claudeReportText(r.Message.Content), hash) != hash || problem != nil || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
 				return nil, "", nil
 			}
-			root, promptTime = r.UUID, stamp
+			root, parent, promptTime = r.UUID, r.UUID, stamp
 			continue
 		}
-		if r.SessionID != "" && r.SessionID != binding.ProviderID {
+		if r.Sidechain || (r.SessionID != "" && r.SessionID != binding.ProviderID) {
 			return nil, "", nil
 		}
 		if r.Cwd != "" {
@@ -64,8 +65,9 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 		switch r.Type {
 		case "assistant":
 			usage := r.Message.Usage
-			compaction := claudeCompactionRefusal(r)
-			if result != nil || r.ParentUUID != root || r.UUID == "" || r.SessionID != binding.ProviderID || (!compaction && !r.NoToolCall) || !r.APIError || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
+			code := claudeCompactionFailureCode(r)
+			compaction := code != ""
+			if result != nil || r.ParentUUID != parent || r.UUID == "" || r.SessionID != binding.ProviderID || (!compaction && !r.NoToolCall) || !r.APIError || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
 				return nil, "", nil
 			}
 			var blocks []struct {
@@ -75,7 +77,6 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 			if json.Unmarshal(r.Message.Content, &blocks) != nil || len(blocks) != 1 || blocks[0].Type != "text" {
 				return nil, "", nil
 			}
-			code := "CLAUDE_COMPACTION_FAILED"
 			if !compaction {
 				code = claudeGatewayAdmissionCode(r.APIStatus, r.Failure, blocks[0].Text)
 				if code == "" {
@@ -87,6 +88,13 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 				return nil, "", nil
 			}
 			result = &Result{State: "failed", ErrorCode: code, Summary: code, ExitCode: -1, FinishedMS: stamp.UnixMilli()}
+		case "attachment":
+			if result != nil || r.UUID == "" || r.ParentUUID != parent ||
+				r.SessionID != binding.ProviderID || r.Cwd == "" ||
+				(r.Attachment.Type != "date" && r.Attachment.Type != "model") {
+				return nil, "", nil
+			}
+			parent = r.UUID
 		case "api-request", "api-request-blob", "api-request-shape", "file-history-snapshot":
 			if result != nil {
 				return nil, "", nil
@@ -153,6 +161,26 @@ func (s Service) reconcileClaudeAdmissionRejection(ctx context.Context, key, dir
 	}
 	result, err := s.settleClaudeObservedOutcome(ctx, key, dir, path, receipt, state, state.TurnID, state.PromptHash, observe)
 	return result, true, err
+}
+
+func claudeCompactionFailureCode(r claudeFailureRecord) string {
+	if claudeCompactionRefusal(r) {
+		return "CLAUDE_COMPACTION_FAILED"
+	}
+	if r.APIStatus != 0 || r.Failure != "invalid_request" {
+		return ""
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(r.Message.Content, &blocks) != nil || len(blocks) != 1 || blocks[0].Type != "text" {
+		return ""
+	}
+	if blocks[0].Text == "Prompt is too long · automatic compaction failed: API Error: 400 MODEL_HTTP_400" {
+		return "CLAUDE_COMPACTION_INPUT_REJECTED"
+	}
+	return ""
 }
 
 func claudeCompactionRefusal(r claudeFailureRecord) bool {
