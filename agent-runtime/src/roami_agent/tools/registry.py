@@ -20,6 +20,8 @@ class Tools:
         self.directory = None
         self.admission = None
         self.turn_scope = None
+        self.scoped_catalog = None
+        self.scoped_operation = None
 
     async def binding_scope(self, binding):
         if not self.turn_scope or not binding.get("turnId"):
@@ -38,9 +40,9 @@ class Tools:
         allowed = await self.turn_scope(turn, role) if self.turn_scope else None
         if allowed is None:
             return catalog
-        from roami_agent.tools.swarm_coordination_catalog import model_catalog
-
-        return model_catalog(catalog, allowed, foundations=self.directory is not None)
+        if self.scoped_catalog is not None:
+            return self.scoped_catalog(catalog, allowed, foundations=self.directory is not None)
+        return [tool for tool in catalog if tool["function"]["name"] in allowed]
 
     def add(self, tool):
         if tool.name in self.registry:

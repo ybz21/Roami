@@ -3,10 +3,10 @@
 import hashlib
 import re
 
-from roami_agent.conversation.project_okr import bound_project, operation
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_okr.project import bound_project, operation
 
 
 def memory_edit_fields():

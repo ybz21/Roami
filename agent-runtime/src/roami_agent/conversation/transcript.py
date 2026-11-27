@@ -5,9 +5,8 @@ import json
 
 from roami_agent.conversation.activity import conversation_activity
 from roami_agent.conversation.attachments import Attachments
-from roami_agent.conversation.okr_message_context import assert_context_binding, validate_context
-from roami_agent.conversation.project_main import project_main
-from roami_agent.conversation.project_wakeup import assert_main_idle, assert_project_main
+from roami_agent.conversation.conversation_identity import conversation_identity
+from roami_agent.conversation.idle import assert_main_idle
 from roami_agent.memory.intake import remember_request
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
@@ -23,8 +22,10 @@ from roami_agent.storage.transcript_repository import history, message, owned
 
 
 class Conversations:
-    def __init__(self, database: Database):
+    def __init__(self, database: Database, *, identify=conversation_identity, home_exclusions=None):
         self.db = database
+        self.identify = identify
+        self.home_exclusions = home_exclusions
 
     @staticmethod
     def _new(db, owner, title):
@@ -55,14 +56,15 @@ class Conversations:
             )
             if existing:
                 return existing
+            excluded = self.home_exclusions(db, owner) if self.home_exclusions else []
             legacy = row(
                 db,
                 "SELECT c.* FROM conversations c WHERE c.owner_id=? AND c.deleted_ms IS NULL "
                 "AND NOT EXISTS (SELECT 1 FROM task_attempts a JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=c.id) "
-                "AND NOT EXISTS (SELECT 1 FROM project_okr_conversations p WHERE p.conversation_id=c.id) "
+                "AND NOT EXISTS (SELECT 1 FROM json_each(?) reserved WHERE reserved.value=c.id) "
                 "AND NOT EXISTS (SELECT 1 FROM swarm_member_instances i WHERE i.conversation_id=c.id) "
                 "AND NOT EXISTS (SELECT 1 FROM swarm_groups g WHERE g.conversation_id=c.id) ORDER BY c.created_ms,c.id LIMIT 1",
-                (owner,),
+                (owner, encoded(excluded)),
             )
             conversation = legacy or self._new(db, owner, "New conversation")
             db.execute(
@@ -79,14 +81,14 @@ class Conversations:
         title="New conversation",
         *,
         request_key=None,
-        project_id=None,
-        swarm_id=None,
+        request_scope=None,
+        resolve_binding=None,
     ):
         if request_key is not None and (not request_key or len(request_key) > 200):
             raise DomainError("INVALID_REQUEST_KEY")
         payload = ["create_conversation", title]
-        if project_id is not None:
-            payload.append({"projectId": project_id})
+        if request_scope is not None:
+            payload.append(request_scope)
         digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
 
         def write(db):
@@ -99,16 +101,12 @@ class Conversations:
                 if prior:
                     if prior["payload_sha256"] != digest:
                         raise DomainError("REQUEST_KEY_CONFLICT", 409)
-                    if project_id is not None:
-                        main = project_main(
-                            db, owner, project_id, title, self._new, swarm_id=swarm_id
-                        )
-                        if main["id"] != prior["conversation_id"]:
-                            raise DomainError("PROJECT_OKR_MAIN_CONFLICT", 409)
+                    if resolve_binding is not None:
+                        resolve_binding(db, self._new, prior["conversation_id"])
                     return owned(db, owner, prior["conversation_id"])
             conversation = (
-                project_main(db, owner, project_id, title, self._new, swarm_id=swarm_id)
-                if project_id is not None
+                resolve_binding(db, self._new, None)
+                if resolve_binding is not None
                 else self._new(db, owner, title)
             )
             cid = conversation["id"]
@@ -137,9 +135,7 @@ class Conversations:
         return await self.db.call(lambda db: owned(db, owner, cid))
 
     async def identity(self, owner, cid):
-        from roami_agent.conversation.conversation_identity import conversation_identity
-
-        return await self.db.call(lambda db: conversation_identity(db, owner, cid))
+        return await self.db.call(lambda db: self.identify(db, owner, cid))
 
     async def activity_detail(self, owner, cid, aid, branch_id=None):
         from roami_agent.conversation.activity_payloads import activity_payload
@@ -237,11 +233,10 @@ class Conversations:
         text,
         attachment_ids=None,
         *,
-        wake_project=None,
-        okr_context=None,
+        admission=None,
+        scheduled=False,
     ):
         attachment_ids = attachment_ids or []
-        okr_context = validate_context(okr_context)
         if (
             not request_key
             or (not text.strip() and not attachment_ids)
@@ -250,27 +245,19 @@ class Conversations:
             or len(set(attachment_ids)) != len(attachment_ids)
         ):
             raise DomainError("INVALID_MESSAGE")
-        if wake_project is not None and (
-            not isinstance(wake_project, str) or not wake_project.strip() or attachment_ids
-        ):
+        if scheduled and attachment_ids:
             raise DomainError("INVALID_MESSAGE")
         payload = {"conversation": cid, "text": text}
-        if okr_context is not None:
-            if wake_project is not None:
-                raise DomainError("INVALID_OKR_MESSAGE_CONTEXT")
-            payload["okrContext"] = okr_context
-        if wake_project is not None:
-            payload["wakeProject"] = wake_project
+        if admission is not None:
+            payload.update(admission.request_fields)
         if attachment_ids:
             payload["attachmentIds"] = attachment_ids
         digest = hashlib.sha256(encoded(payload).encode()).hexdigest()
 
         def write(db):
             c = owned(db, owner, cid)
-            if okr_context is not None:
-                assert_context_binding(db, owner, cid)
-            if wake_project is not None:
-                assert_project_main(db, owner, cid, wake_project)
+            if admission is not None:
+                admission.check_binding(db)
             old = row(
                 db,
                 "SELECT * FROM requests WHERE owner_id=? AND request_key=?",
@@ -292,7 +279,7 @@ class Conversations:
                     "cursor": receipt["id"] if receipt else None,
                     "reused": True,
                 }
-            if wake_project is not None:
+            if scheduled:
                 assert_main_idle(db, c)
             rid, tid = identity(), identity()
             db.execute(
@@ -307,10 +294,8 @@ class Conversations:
             )
             db.execute("UPDATE requests SET turn_id=? WHERE id=?", (tid, rid))
             content = {"text": text}
-            if okr_context is not None:
-                content["okrContext"] = okr_context
-            if wake_project is not None:
-                content["scheduled"] = {"projectId": wake_project}
+            if admission is not None:
+                content.update(admission.message_fields)
             mid = message(db, cid, c["active_branch_id"], "user", content, turn_id=tid)
             if attachment_ids:
                 references = Attachments.bind(db, owner, mid, attachment_ids)
@@ -318,7 +303,7 @@ class Conversations:
                     "UPDATE messages SET content_json=? WHERE id=?",
                     (encoded({**content, "attachments": references}), mid),
                 )
-            if wake_project is None:
+            if not scheduled:
                 remember_request(db, owner, cid, mid, text)
             db.execute(
                 "INSERT INTO jobs(id,kind,aggregate_id,dedupe_key,payload_json,state,available_ms)"

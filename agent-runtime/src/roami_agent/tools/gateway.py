@@ -13,10 +13,10 @@ from roami_agent.conversation.activity_events import activity_event as event
 from roami_agent.protocol.delivery_receipts import delivery_receipt
 from roami_agent.protocol.errors import (
     DomainError,
-    ProjectReviewInputError,
     TaskVerificationRecorded,
     ToolCancellation,
     ToolFinalizationRequired,
+    ToolInputError,
     ToolPreflightError,
 )
 from roami_agent.protocol.identity import identity, now_ms
@@ -464,17 +464,12 @@ class ToolGateway:
                     "repeat the review, or steer another check merely because this call was refused. "
                     "Task verification does not approve new material or prove platform publication.",
                 )
-            if isinstance(exc, ProjectReviewInputError):
-                from roami_agent.tools.project_review import review_schema
-
+            if isinstance(exc, ToolInputError):
                 value.update(
                     executionStarted=False,
                     failurePhase="validation",
-                    expectedInputSchema=review_schema(),
-                    recovery="Review requires the actual revision, a real nonblank summary and optional string actions. "
-                    "Use project_okr_review or swarm_project_review with their exact schema. "
-                    "No project write was started. Correct this request without testing fields by writing "
-                    "placeholder content to production; preserve the original project and business identity.",
+                    expectedInputSchema=exc.schema,
+                    recovery=exc.recovery,
                 )
             if value["error"] == "TASK_ALREADY_HANDED_OFF":
                 value.update(

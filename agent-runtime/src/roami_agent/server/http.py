@@ -35,10 +35,8 @@ from roami_agent.protocol.http import (
     SendMessage,
     SessionReport,
     SteerTask,
-    WakeProject,
 )
 from roami_agent.server.installation import Installation
-from roami_agent.server.main_execution_routes import mount_main_execution_routes
 from roami_agent.server.market_preview_stream import preview_stream
 from roami_agent.server.model_settings import ModelSettings
 from roami_agent.server.skill_package import MAX_PACKAGE_PAYLOAD_BYTES
@@ -48,7 +46,7 @@ Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=20
 EVENT_HEARTBEAT_SECONDS = 10
 
 
-def create_app(runtime, *, manage_lifecycle=True):
+def create_app(runtime, *, manage_lifecycle=True, mount_conversation_intake=None):
     @asynccontextmanager
     async def lifespan(app):
         if manage_lifecycle:
@@ -62,7 +60,6 @@ def create_app(runtime, *, manage_lifecycle=True):
     )
 
     mount_swarm_routes(app, runtime)
-    mount_main_execution_routes(app, runtime)
     installation = Installation(runtime)
 
     @app.middleware("http")
@@ -519,10 +516,9 @@ def create_app(runtime, *, manage_lifecycle=True):
             raise DomainError("INVALID_TOOL_ARGUMENTS") from None
         if isinstance(payload, dict) and "executionContext" in payload:
             context = payload["executionContext"]
-            capabilities = (
-                runtime.main_capabilities
-                if isinstance(context, dict) and context.get("kind") == "project_main"
-                else runtime.professional_capabilities
+            kind = context.get("kind") if isinstance(context, dict) else None
+            capabilities = runtime.execution_capabilities.get(
+                kind if isinstance(kind, str) else None, runtime.professional_capabilities
             )
             return {"data": await capabilities.call(name, payload, owner)}
         return {"data": await runtime.cli_commands.call(name, payload, owner)}
@@ -773,26 +769,25 @@ def create_app(runtime, *, manage_lifecycle=True):
     async def main_conversation(owner: Owner):
         return {"data": await runtime.conversations.main(owner)}
 
-    @app.post("/v1/conversations", status_code=201)
-    async def create_conversation(body: CreateConversation, owner: Owner):
-        project_id = None
-        swarm_id = None
-        if body.projectId is not None:
-            from roami_agent.conversation.project_okr import operation, registered_project
+    if mount_conversation_intake is not None:
+        mount_conversation_intake(app, runtime)
+    else:
 
-            project_id = await registered_project(runtime.settings, body.projectId)
-            workspace = await operation(runtime.settings, project_id, "show")
-            swarm_id = workspace.get("swarm") if workspace else None
-            await runtime.conversations.main(owner)
-        return {
-            "data": await runtime.conversations.create(
-                owner,
-                body.title,
-                request_key=body.requestKey,
-                project_id=project_id,
-                swarm_id=swarm_id,
-            )
-        }
+        @app.post("/v1/conversations", status_code=201)
+        async def create_conversation(body: CreateConversation, owner: Owner):
+            return {
+                "data": await runtime.conversations.create(
+                    owner, body.title, request_key=body.requestKey
+                )
+            }
+
+        @app.post("/v1/conversations/{cid}/messages", status_code=202)
+        async def send(cid: str, body: SendMessage, owner: Owner):
+            return {
+                "data": await runtime.chat.submit(
+                    owner, cid, body.requestKey, body.text, body.attachmentIds
+                )
+            }
 
     @app.get("/v1/conversations/{cid}/activities/{aid}")
     async def activity_detail(cid: str, aid: str, owner: Owner, branchId: str | None = None):
@@ -822,27 +817,6 @@ def create_app(runtime, *, manage_lifecycle=True):
     @app.get("/v1/conversations/{cid}/messages/{mid}")
     async def full_message(cid: str, mid: str, owner: Owner, branch: str | None = None):
         return {"data": await runtime.conversations.message_detail(owner, cid, mid, branch)}
-
-    @app.post("/v1/conversations/{cid}/messages", status_code=202)
-    async def send(cid: str, body: SendMessage, owner: Owner):
-        return {
-            "data": await runtime.chat.submit(
-                owner,
-                cid,
-                body.requestKey,
-                body.text,
-                body.attachmentIds,
-                okr_context=body.okrContext,
-            )
-        }
-
-    @app.post("/v1/conversations/{cid}/wake", status_code=202)
-    async def wake_project(cid: str, body: WakeProject, owner: Owner):
-        return {
-            "data": await runtime.chat.wake_project(
-                owner, cid, body.projectId, body.requestKey, body.text
-            )
-        }
 
     @app.post("/v1/conversations/{cid}/fork")
     async def fork(cid: str, body: Fork, owner: Owner):

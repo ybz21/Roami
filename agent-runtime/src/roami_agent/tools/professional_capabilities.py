@@ -79,6 +79,23 @@ class ProfessionalCapabilities:
     def signature(self, context):
         return hmac.new(self.signing_key(), encoded(context).encode(), hashlib.sha256).hexdigest()
 
+    def write_context(self, context, *, file_key=None):
+        body = encoded(context)
+        digest = hashlib.sha256((body if file_key is None else file_key).encode()).hexdigest()
+        path = self.private_directory() / (digest + ".json")
+        descriptor, temporary = tempfile.mkstemp(prefix=".context-", dir=path.parent)
+        try:
+            with os.fdopen(descriptor, "w") as output:
+                os.fchmod(output.fileno(), 0o600)
+                output.write(body)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return path
+
     async def brief(self, task, run):
         context = {
             "taskId": task["id"],
@@ -88,18 +105,7 @@ class ProfessionalCapabilities:
         }
         await self.db.call(lambda db: self.admitted(db, context, task["owner_id"], preparing=True))
         context["signature"] = self.signature(context)
-        path = self.private_directory() / (hashlib.sha256(run["id"].encode()).hexdigest() + ".json")
-        descriptor, temporary = tempfile.mkstemp(prefix=".context-", dir=path.parent)
-        try:
-            with os.fdopen(descriptor, "w") as output:
-                os.fchmod(output.fileno(), 0o600)
-                output.write(encoded(context))
-                output.flush()
-                os.fsync(output.fileno())
-            os.replace(temporary, path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+        path = self.write_context(context, file_key=run["id"])
         return (
             "\n\n"
             + execution_prompt("agent-capabilities.md")

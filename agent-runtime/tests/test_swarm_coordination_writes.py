@@ -64,7 +64,7 @@ async def project_transport(coordinated_tools, monkeypatch):
             ]
         return {"exitCode": 0, "stdout": json.dumps({"data": workspace})}
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
     batch = await runtime.db.call(
         lambda db: row(
             db, "SELECT id FROM swarm_coordination_batches WHERE turn_id=?", (binding["turnId"],)
@@ -214,7 +214,7 @@ async def test_plain_main_memory_keeps_original_replace_body(delegated_team, mon
             ),
         }
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
     args = {"swarmId": team["id"], "content": "Full authorized content", "expectedSha256": "a" * 64}
     await invoke(
         runtime,
@@ -331,7 +331,7 @@ async def test_tool_result_metadata_without_a_successful_current_call_is_not_aut
     ],
 )
 def test_wrong_project_receipt_is_not_success(change):
-    from roami_agent.tools.swarm_coordination_writes import project_receipt
+    from roami_okr.coordination_writes import project_receipt
 
     receipt = {
         "key": "original",
@@ -475,7 +475,7 @@ async def test_gateway_connector_replay_pins_original_batch_and_revision(
 async def test_old_project_host_is_rejected_before_any_keyed_write(
     project_transport, monkeypatch, name
 ):
-    from roami_agent.storage import swarm_memory
+    from roami_okr import swarm_memory
 
     runtime, team, binding, _, calls = project_transport
     original = swarm_memory.execute

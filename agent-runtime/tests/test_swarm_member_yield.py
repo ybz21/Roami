@@ -358,12 +358,7 @@ async def test_scheduler_keeps_original_main_behind_member_until_known_yield(
     directory = json.dumps(
         {"directory": str(tmp_path), "providerConversationId": "original-provider-fixture"}
     )
-    monkeypatch.setattr(
-        scheduling,
-        "native_job_binding",
-        lambda db, job: directory if job["kind"] in {"turn.run", "task.run"} else None,
-    )
-    monkeypatch.setattr(scheduling, "running_native_mains", lambda db: [])
+    monkeypatch.setattr(scheduling, "native_member_binding", lambda db, task_id: directory)
     started = []
 
     async def run_main(turn, *args, **kwargs):
@@ -380,6 +375,7 @@ async def test_scheduler_keeps_original_main_behind_member_until_known_yield(
         asyncio.Event(),
         {},
         None,
+        native_turn_binding=lambda db, turn_id: directory,
     )
 
     async def scan():

@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 
-from roami_agent.dispatch.native_workspace_queue import native_job_binding, running_native_mains
+from roami_agent.dispatch.native_workspace_queue import native_member_binding
 from roami_agent.dispatch.workspace_queue import directory_key, occupied_directories
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -28,6 +28,8 @@ class Scheduler:
         *,
         task_sessions=None,
         swarms=None,
+        native_turn_binding=None,
+        running_native_turns=None,
     ):
         self.db, self.settings, self.context, self.dispatch = database, settings, context, dispatch
         self.mailbox, self.run_turn, self.wakeup, self.active = mailbox, run_turn, wakeup, active
@@ -36,6 +38,8 @@ class Scheduler:
         self.memory_jobs = memory_jobs
         self.task_sessions = task_sessions
         self.swarms = swarms
+        self.native_turn_binding = native_turn_binding
+        self.running_native_turns = running_native_turns
 
     async def run(self):
         while not self.stopping:
@@ -80,14 +84,18 @@ class Scheduler:
 
         def native_directories(db):
             for job in queued:
-                binding = native_job_binding(db, job)
+                binding = None
+                if job["kind"] == "task.run":
+                    binding = native_member_binding(db, job["aggregate_id"])
+                elif job["kind"] == "turn.run" and self.native_turn_binding is not None:
+                    binding = self.native_turn_binding(db, job["aggregate_id"])
                 if binding is not None:
                     job["native_binding_json"] = binding
             for task in running:
-                binding = native_job_binding(db, {"kind": "task.run", "aggregate_id": task["id"]})
+                binding = native_member_binding(db, task["id"])
                 if binding is not None:
                     task["native_binding_json"] = binding
-            return running_native_mains(db)
+            return self.running_native_turns(db) if self.running_native_turns is not None else []
 
         native_mains = await self.db.call(native_directories)
         external_running = sum(task["executor_kind"] == "cli" for task in running)

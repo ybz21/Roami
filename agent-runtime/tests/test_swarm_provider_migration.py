@@ -6,6 +6,7 @@ from roami_agent.conversation.transcript import Conversations
 from roami_agent.storage import database as database_module
 from roami_agent.storage import migrations
 from roami_agent.storage.database import Database, row
+from roami_okr.main import open_main
 
 
 async def test_schema30_provider_upgrade_preserves_existing_generation(tmp_path, monkeypatch):
@@ -15,7 +16,7 @@ async def test_schema30_provider_upgrade_preserves_existing_generation(tmp_path,
         old.setattr(database_module, "SCHEMA_VERSION", 30)
         database = Database(path, tmp_path, managed=False)
         await database.open()
-        main = await Conversations(database).create("alice", project_id="project-a")
+        main = await open_main(Conversations(database), "alice", "project-a")
 
         def seed(db):
             db.execute(

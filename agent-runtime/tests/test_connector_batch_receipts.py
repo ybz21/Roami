@@ -9,7 +9,7 @@ from test_swarm_coordination_policy import delegated_team as delegated_team_fixt
 from test_swarm_coordination_policy import invoke
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.tools.connector_batch_receipts import connector_batch_receipt
+from roami_okr.connector_batch_receipts import connector_batch_receipt
 
 coordinated_tools = coordinated_tools_fixture
 coordination = coordination_fixture
@@ -83,7 +83,7 @@ async def test_original_main_reads_receipt_through_actual_coordinated_cli(
         calls.append(kwargs)
         return current
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.project_context", context)
+    monkeypatch.setattr("roami_okr.swarm_memory.project_context", context)
     args = {"swarmId": team["id"], "batchId": BATCH}
     result = await invoke(
         runtime,
@@ -132,7 +132,7 @@ async def test_record_conflict_explains_existing_confirmation_without_retry(
             raise DomainError("OKR_CONFLICT", 409)
         return current
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.project_context", context)
+    monkeypatch.setattr("roami_okr.swarm_memory.project_context", context)
     args = {
         "swarmId": team["id"],
         "operation": "record",
@@ -160,7 +160,7 @@ async def test_failed_receipt_read_preserves_original_conflict(coordinated_tools
             raise DomainError("SWARM_PROJECT_MEMORY_UNAVAILABLE", 503)
         return workspace()
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.project_context", context)
+    monkeypatch.setattr("roami_okr.swarm_memory.project_context", context)
     with pytest.raises(DomainError, match="^OKR_CONFLICT$"):
         await invoke(
             runtime,
@@ -185,7 +185,7 @@ async def test_host_workspace_cannot_return_another_projects_confirmation(
     async def context(*args, **kwargs):
         return current
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.project_context", context)
+    monkeypatch.setattr("roami_okr.swarm_memory.project_context", context)
     with pytest.raises(DomainError, match="SWARM_PROJECT_SCOPE_CONFLICT"):
         await invoke(
             runtime, binding, "swarm_connector_batch", {"swarmId": team["id"], "batchId": BATCH}

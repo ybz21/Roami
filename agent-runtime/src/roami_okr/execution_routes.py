@@ -5,8 +5,8 @@ from typing import Annotated, Literal
 from fastapi import Header
 from pydantic import Field
 
-from roami_agent.conversation.main_execution import main_configuration
 from roami_agent.protocol.http import Payload
+from roami_okr.main_execution import main_configuration
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
 

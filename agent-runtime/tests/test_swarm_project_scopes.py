@@ -9,12 +9,20 @@ from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.tasks import Tasks
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
+from roami_okr.identity import home_exclusions
+from roami_okr.main import open_main, swarm_leader
 
 
 @pytest.fixture
 async def scoped_swarms(store):
-    conversations = Conversations(store)
-    swarms = SwarmPlans(store, Tasks(store, conversations), conversations, asyncio.Event())
+    conversations = Conversations(store, home_exclusions=home_exclusions)
+    swarms = SwarmPlans(
+        store,
+        Tasks(store, conversations),
+        conversations,
+        asyncio.Event(),
+        open_leader=swarm_leader(conversations),
+    )
 
     class Intake:
         async def submit(self, owner, cid, key, text):
@@ -95,7 +103,7 @@ async def test_project_team_cannot_bind_home_or_another_project_main(scoped_swar
     main = (
         await swarms.conversations.main("alice")
         if foreign == "home"
-        else await swarms.conversations.create("alice", project_id=foreign)
+        else await open_main(swarms.conversations, "alice", foreign)
     )
     with pytest.raises(
         DomainError,
@@ -250,7 +258,7 @@ async def test_unbound_legacy_project_waits_for_trusted_main_restore(scoped_swar
         )
     )
     assert blocked == {"task_id": None, "dispatch_error": "SWARM_PROJECT_SCOPE_REQUIRED"}
-    assert (await swarms.conversations.create("alice", project_id="legacy-project", swarm_id=sid))[
+    assert (await open_main(swarms.conversations, "alice", "legacy-project", swarm_id=sid))[
         "id"
     ] == main["id"]
     assert (await swarms.snapshot("alice", sid))["scope"] == {
@@ -267,7 +275,7 @@ async def test_unbound_legacy_project_waits_for_trusted_main_restore(scoped_swar
             "SELECT count(*) FROM jobs WHERE kind='swarm.advance' AND aggregate_id=?", (sid,)
         ).fetchone()[0]
     )
-    await swarms.conversations.create("alice", project_id="legacy-project", swarm_id=sid)
+    await open_main(swarms.conversations, "alice", "legacy-project", swarm_id=sid)
     assert (
         await swarms.db.call(
             lambda db: db.execute(
@@ -292,7 +300,7 @@ async def test_ambiguous_legacy_mains_are_not_resolved_by_latest_message(scoped_
 
     await swarms.db.call(legacy, write=True)
     with pytest.raises(DomainError, match="PROJECT_OKR_MAIN_CONFLICT"):
-        await swarms.conversations.create("alice", project_id="ambiguous")
+        await open_main(swarms.conversations, "alice", "ambiguous")
     assert (
         await swarms.db.call(
             lambda db: db.execute("SELECT count(*) FROM conversations").fetchone()[0]

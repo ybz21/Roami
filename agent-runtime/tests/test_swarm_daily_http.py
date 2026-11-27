@@ -5,8 +5,8 @@ import httpx
 import pytest
 from test_swarm_delegations import delegated_team as delegated_team_fixture
 
-from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
+from roami_okr.http import create_app
 
 delegated_team = delegated_team_fixture
 

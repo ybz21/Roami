@@ -1,7 +1,8 @@
 import pytest
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.storage.swarm_memory import digest, from_project
+from roami_agent.storage.swarm_memory import digest
+from roami_okr.swarm_memory import from_project
 
 
 def project_workspace(project_count=1, connector_count=1):

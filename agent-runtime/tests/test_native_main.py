@@ -4,7 +4,8 @@ import copy
 import pytest
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.providers.native_main import NativeMain
+from roami_agent.providers.native_conversation import NativeConversation
+from roami_okr.native_main import NativeMain
 
 
 def fixture_binding():
@@ -43,6 +44,25 @@ def stopped(binding, *, state="succeeded", known=True):
     }
 
 
+async def test_native_conversation_uses_a_prepared_provider_without_project_fields():
+    binding = fixture_binding()
+    del binding["project_id"]
+
+    async def command(sub, *args, spec):
+        assert sub == "launch" and args == ("--file", "-")
+        assert spec["key"].startswith("native-conversation:turn-one:")
+        assert spec["sessionId"] == binding["session_id"]
+        assert spec["preparedFrom"] == binding["launch_key"]
+        assert "Continue this conversation" in spec["prompt"]
+        return stopped(binding)
+
+    model = NativeConversation(binding, fixture_turn(), command)
+    result = await anext(
+        model.stream([{"role": "user", "content": "Continue this conversation"}], [])
+    )
+    assert result.value == "Actual native answer"
+
+
 async def test_native_main_reuses_same_provider_and_never_reexecutes_native_tools():
     binding = fixture_binding()
     calls = []
@@ -63,6 +83,7 @@ async def test_native_main_reuses_same_provider_and_never_reexecutes_native_tool
     assert [(p.kind, p.value) for p in parts] == [("text", "Actual native answer")]
     spec = calls[0][2]["spec"]
     assert spec["sessionId"] == "native-session" and spec["preparedFrom"] == "prepared-main"
+    assert spec["key"].startswith("project-main:turn-one:")
     assert spec["executor"] == "claude" and "model" not in spec
     assert "original-main" in spec["prompt"] and "project-a" in spec["prompt"]
     assert len(calls) == 1

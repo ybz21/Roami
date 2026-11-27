@@ -10,7 +10,13 @@ from roami_agent.protocol.models import ModelEvent
 from roami_agent.protocol.serialization import encoded
 
 
-class NativeMain:
+class NativeConversation:
+    launch_namespace = "native-conversation"
+    model_conflict = "NATIVE_CONVERSATION_MODEL_CONFLICT"
+    identity_mismatch = "NATIVE_CONVERSATION_IDENTITY_MISMATCH"
+    execution_failed = "NATIVE_CONVERSATION_EXECUTION_FAILED"
+    empty_result = "NATIVE_CONVERSATION_EMPTY_RESULT"
+
     def __init__(
         self, binding, turn, command, *, sleep=asyncio.sleep, capabilities=None, delivery=None
     ):
@@ -24,9 +30,9 @@ class NativeMain:
 
     def with_model(self, model, *, free_only=False):
         if model not in {None, "auto", self.model, "roami-claude/" + self.model}:
-            raise DomainError("PROJECT_MAIN_MODEL_CONFLICT", 409)
+            raise DomainError(self.model_conflict, 409)
         if free_only and self.model != "free":
-            raise DomainError("PROJECT_MAIN_MODEL_CONFLICT", 409)
+            raise DomainError(self.model_conflict, 409)
         return self
 
     def verify(self, receipt):
@@ -52,37 +58,27 @@ class NativeMain:
         ):
             raise DomainError("SESSION_PROVIDER_BINDING_CHANGED", 409)
 
+    def prompt_intro(self):
+        return (
+            "Continue the bound conversation. Use the native tools for actual work and return "
+            "the final human-readable answer to this conversation. Reconcile unknown outcomes "
+            "by their original identity before resending."
+        )
+
     async def stream(self, messages, tools):
         if (
             self.turn["conversation_id"] != self.binding["conversation_id"]
             or self.turn["owner_id"] != self.binding["owner_id"]
         ):
-            raise DomainError("PROJECT_MAIN_IDENTITY_MISMATCH", 409)
+            raise DomainError(self.identity_mismatch, 409)
         payload = encoded(messages)
         payload_bytes = payload.encode()
         self.stream_count += 1
-        key = (
-            "project-main:" + self.turn["id"] + ":" + hashlib.sha256(payload_bytes).hexdigest()[:24]
-        )
+        key = f"{self.launch_namespace}:{self.turn['id']}:{hashlib.sha256(payload_bytes).hexdigest()[:24]}"
         retry = self.turn.get("native_route_retry", 0)
         if retry:
             key += ":retry-" + str(retry)
-        prompt = (
-            "You are the existing project's Main, using its bound persistent native CLI. "
-            "Preserve the original Main, team, tasks, memory and recorded external action identities. "
-            "Use native tools and the public roami CLI for actual work; host tool definitions are "
-            "context, not native callable tools. Do not impersonate a worker or invent run IDs. "
-            "Return your actual final human-readable answer; the host delivers it to the same "
-            "original Main conversation. Native tool results must not be executed twice. "
-            "Reconcile unknown external outcomes by their original identity before resending.\n"
-            + encoded(
-                {
-                    "projectId": self.binding["project_id"],
-                    "mainConversationId": self.binding["conversation_id"],
-                    "turnId": self.turn["id"],
-                }
-            )
-        )
+        prompt = self.prompt_intro()
         prepared = None
         launch_turn = {**self.turn, "native_launch_key": key}
         if (
@@ -178,10 +174,10 @@ class NativeMain:
                             raise NativeRouteUnavailable(
                                 result["errorCode"], result["stopEvidenceSha256"]
                             )
-                        raise DomainError("PROJECT_MAIN_EXECUTION_FAILED", 409)
+                        raise DomainError(self.execution_failed, 409)
                     text = result.get("summary")
                     if not isinstance(text, str) or not text.strip():
-                        raise DomainError("PROJECT_MAIN_EMPTY_RESULT", 409)
+                        raise DomainError(self.empty_result, 409)
                     yield ModelEvent("text", text)
                     return
                 if receipt.get("state") in {"failed", "cancelled"}:

@@ -1,16 +1,16 @@
 """Project-scoped OKR tools for the goal's persistent coordinator."""
 
-from roami_agent.conversation.project_main import project_team
-from roami_agent.conversation.project_okr import bound_project, operation
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.tools import Tool, object_schema
+from roami_okr.main import project_team
+from roami_okr.project import bound_project, operation
 
 
 def register_project_okr_tools(registry, database, settings):
-    from roami_agent.tools.project_memory_edit import register_project_memory_edit
+    from roami_okr.memory_edit import register_project_memory_edit
 
     register_project_memory_edit(registry, database, settings)
-    from roami_agent.tools.project_review import checked_review, register_project_review
+    from roami_okr.review import checked_review, register_project_review
 
     register_project_review(registry, database, settings)
 

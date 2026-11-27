@@ -13,8 +13,9 @@ from test_runtime import ConversationModel, until
 
 from roami_agent.app import Runtime
 from roami_agent.dispatch.swarm_delegations import SwarmDelegations
-from roami_agent.server.http import create_app
 from roami_agent.storage.database import Database, row
+from roami_okr.http import create_app
+from roami_okr.main import open_main
 
 
 async def run(binary, home, data, socket):
@@ -25,7 +26,7 @@ async def run(binary, home, data, socket):
     server = None
     running = None
     try:
-        main = await runtime.conversations.create("local", project_id="daily-project")
+        main = await open_main(runtime.conversations, "local", "daily-project")
         literal = "Continue this original team daily with drafts and data; no external publication in this fixture."
         accepted = await runtime.conversations.accept(
             "local", main["id"], "daily-goal-source", literal

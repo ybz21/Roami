@@ -11,13 +11,13 @@ from test_project_main_execution import setup_main
 
 from roami_agent.context.native_prompt import INLINE_LIMIT, PAGE_BYTES, READ_CAPABILITY
 from roami_agent.context.swarm_coordination import CURRENT_BATCH_PREFIX
-from roami_agent.conversation.main_execution import main_binding
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.protocol.tools import Tool, object_schema
-from roami_agent.providers.native_main import NativeMain
 from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
+from roami_okr.main_execution import main_binding
+from roami_okr.native_main import NativeMain
 
 pytest_plugins = ["test_project_main_wakeup"]
 

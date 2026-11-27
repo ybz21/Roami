@@ -4,7 +4,7 @@ import json
 
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.publication_media_reads import media_tool_artifact
-from roami_agent.tools.swarm_coordination_catalog import COORDINATION_OPERATIONS
+from roami_okr.coordination_catalog import COORDINATION_OPERATIONS
 
 
 def current_tool_artifact(db, value, artifact_id):

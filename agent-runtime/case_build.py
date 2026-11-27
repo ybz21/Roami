@@ -31,7 +31,7 @@ class CaseBuildHook(BuildHookInterface):
         if not (skill / "SKILL.md").is_file():
             raise FileNotFoundError("Canonical skills/okr-development is required for packaging")
         destination = (
-            "roami_agent/skills/okr-development"
+            "roami_okr/skills/okr-development"
             if self.target_name == "wheel"
             else "skills/okr-development"
         )

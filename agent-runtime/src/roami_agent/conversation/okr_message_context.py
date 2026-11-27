@@ -2,57 +2,9 @@
 
 import json
 
-from roami_agent.conversation.conversation_identity import conversation_identity
-from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 
-MAX_CONTEXT_BYTES = 65536
 MARKER = "\n\n<roami-okr-context>\n"
-CONFIGURATION_KEYS = {
-    "objective",
-    "startDate",
-    "endDate",
-    "keyResults",
-    "metrics",
-    "swarm",
-    "autoCollect",
-    "initiatives",
-    "dashboard",
-    "team",
-    "connectors",
-}
-
-
-def validate_context(value):
-    if value is None:
-        return None
-    if (
-        not isinstance(value, dict)
-        or set(value) - {"version", "revision", "draft"}
-        or type(value.get("version")) is not int
-        or value["version"] != 1
-        or type(value.get("revision")) is not int
-        or value["revision"] < 0
-        or "draft" in value
-        and (not isinstance(value["draft"], dict) or set(value["draft"]) - CONFIGURATION_KEYS)
-    ):
-        raise DomainError("INVALID_OKR_MESSAGE_CONTEXT")
-    try:
-        size = len(
-            json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode(
-                "utf-8"
-            )
-        )
-    except (ValueError, TypeError, RecursionError) as exc:
-        raise DomainError("INVALID_OKR_MESSAGE_CONTEXT") from exc
-    if size > MAX_CONTEXT_BYTES:
-        raise DomainError("OKR_MESSAGE_CONTEXT_TOO_LARGE")
-    return value
-
-
-def assert_context_binding(db, owner, cid):
-    if conversation_identity(db, owner, cid)["kind"] != "project_main":
-        raise DomainError("PROJECT_MAIN_IDENTITY_MISMATCH", 409)
 
 
 def human_text(content):

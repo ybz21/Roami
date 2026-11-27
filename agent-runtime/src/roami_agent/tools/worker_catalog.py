@@ -10,7 +10,7 @@ from roami_agent.tools.shell import register_shell
 from roami_agent.tools.skills import register_skills
 
 
-def add_worker_tools(registry, settings, artifacts=None):
+def add_worker_tools(registry, settings, artifacts=None, *, builtin_skills=()):
     register_shell(registry, settings, artifacts)
     register_host_processes(registry)
 
@@ -85,4 +85,4 @@ def add_worker_tools(registry, settings, artifacts=None):
             )
         )
 
-    register_skills(registry, settings)
+    register_skills(registry, settings, builtin_entries=builtin_skills)

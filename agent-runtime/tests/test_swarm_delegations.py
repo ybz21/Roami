@@ -9,6 +9,8 @@ from roami_agent.app import Runtime
 from roami_agent.dispatch.swarm_delegations import SwarmDelegations
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
+from roami_okr.intake import scheduled_admission
+from roami_okr.main import open_main
 
 GOAL = "每天整理X和B站草稿、采集数据并复盘；发布仍需用户具体确认。"
 
@@ -16,7 +18,7 @@ GOAL = "每天整理X和B站草稿、采集数据并复盘；发布仍需用户�
 @pytest.fixture
 async def delegated_team(store, request):
     runtime = Runtime(store, ConversationModel())
-    main = await runtime.conversations.create("alice", project_id="project-a")
+    main = await open_main(runtime.conversations, "alice", "project-a")
     accepted = await runtime.conversations.accept("alice", main["id"], "goal", GOAL)
     job = await store.call(
         lambda db: row(
@@ -161,7 +163,12 @@ async def test_scheduled_user_row_is_not_a_new_human_goal(delegated_team):
     runtime, service, team, _, turn, _, spec = delegated_team
     await finish(runtime, turn)
     scheduled = await runtime.conversations.accept(
-        "alice", team["mainConversationId"], "scheduled", GOAL, wake_project="project-a"
+        "alice",
+        team["mainConversationId"],
+        "scheduled",
+        GOAL,
+        admission=scheduled_admission("alice", team["mainConversationId"], "project-a"),
+        scheduled=True,
     )
     job = await runtime.db.call(
         lambda db: row(

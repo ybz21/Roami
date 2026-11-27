@@ -1,8 +1,11 @@
 """Verify existing node schedules before accepting a Main's explicit waiting decision."""
 
-from roami_agent.executors.project_goal_schedule import schedule_identity
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.swarm_goal_schedule import check_wait, proposal, save_wait, wait_context
+
+
+def schedule_identity(proof):
+    return {key: value for key, value in proof.items() if key not in {"observedAtMs", "nextTickMs"}}
 
 
 class GoalSchedule:

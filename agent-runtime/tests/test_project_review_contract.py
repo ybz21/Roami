@@ -11,11 +11,11 @@ from test_swarm_coordination_policy import coordination as coordination_fixture
 from test_swarm_coordination_policy import delegated_team as delegated_team_fixture
 from test_swarm_coordination_policy import invoke
 
-from roami_agent.protocol.errors import DomainError, ProjectReviewInputError
+from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity
 from roami_agent.storage.database import row
 from roami_agent.storage.swarm_memory import digest
-from roami_agent.tools.project_review import checked_review, review_payload, review_receipt
+from roami_okr.review import ProjectReviewInputError, checked_review, review_payload, review_receipt
 
 project_runtime = project_runtime_fixture
 coordinated_tools = coordinated_tools_fixture
@@ -108,8 +108,8 @@ async def test_actual_gateway_returns_public_contract_and_corrected_alias_writes
         writes.append((pid, action, payload))
         return saved(pid, payload)
 
-    monkeypatch.setattr("roami_agent.tools.project_okr.operation", operation)
-    monkeypatch.setattr("roami_agent.tools.project_review.operation", operation)
+    monkeypatch.setattr("roami_okr.tools.operation", operation)
+    monkeypatch.setattr("roami_okr.review.operation", operation)
 
     async def call(name, body):
         mid = await runtime.journal.start(turn)
@@ -154,7 +154,7 @@ async def test_typed_project_review_checks_scope_and_receipt_support_before_writ
         calls.append(action)
         return {"projectId": pid, "projectFiles": {}}
 
-    monkeypatch.setattr("roami_agent.tools.project_review.operation", operation)
+    monkeypatch.setattr("roami_okr.review.operation", operation)
     tool = runtime.tools.registry["project_okr_review"]
     with pytest.raises(DomainError, match="PROJECT_REVIEW_RECEIPTS_UNAVAILABLE"):
         await tool.handler(args(), binding)
@@ -230,7 +230,7 @@ async def test_coordination_review_reuses_existing_batch_identity_and_minimal_re
             }
         return {"exitCode": 0, "stdout": json.dumps({"data": data})}
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
     batch = await runtime.db.call(
         lambda db: row(
             db, "SELECT id FROM swarm_coordination_batches WHERE turn_id=?", (binding["turnId"],)
@@ -279,7 +279,7 @@ async def test_legacy_swarm_review_guesses_are_rejected_before_node_write(
             ),
         }
 
-    monkeypatch.setattr("roami_agent.storage.swarm_memory.execute", execute)
+    monkeypatch.setattr("roami_okr.swarm_memory.execute", execute)
     with pytest.raises(ProjectReviewInputError):
         await invoke(
             runtime,

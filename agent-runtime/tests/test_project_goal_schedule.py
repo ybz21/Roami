@@ -10,9 +10,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from roami_agent.executors.project_goal_schedule import DRIVER, ProjectGoalSchedule
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.workspace_files import WorkspaceFiles
+from roami_okr.goal_schedule import DRIVER, ProjectGoalSchedule
 
 
 @pytest.fixture

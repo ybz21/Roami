@@ -8,11 +8,13 @@ from test_native_main import fixture_binding, stopped
 from test_runtime import until
 from test_swarm_provider_generations import prepared
 
-from roami_agent.conversation.main_execution import main_binding
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.protocol.errors import DomainError
-from roami_agent.server.http import create_app
 from roami_agent.storage.database import row
+from roami_okr.http import create_app
+from roami_okr.intake import wake_project
+from roami_okr.main import open_main
+from roami_okr.main_execution import main_binding
 
 pytest_plugins = ["test_project_main_wakeup"]
 
@@ -276,7 +278,7 @@ async def test_group_chat_reaches_same_bound_main_and_native_provider(
 async def test_native_provider_cannot_be_reused_by_another_project(wake_runtime, monkeypatch):
     runtime, main, spec, _, _ = await setup_main(wake_runtime, monkeypatch)
     await runtime.main_executions.configure("alice", main["id"], spec)
-    other = await runtime.conversations.create("alice", project_id="other-project")
+    other = await open_main(runtime.conversations, "alice", "other-project")
 
     async def workspace(self, project):
         return {"directory": "/project"}
@@ -331,7 +333,9 @@ async def test_bound_main_admission_does_not_require_home_model(
     await runtime.main_executions.configure("alice", main["id"], spec)
     runtime.chat.model.model = ""
     result = (
-        await runtime.chat.wake_project("alice", main["id"], "project", "wake", "Continue the team")
+        await wake_project(
+            runtime.chat, "alice", main["id"], "project", "wake", "Continue the team"
+        )
         if scheduled
         else await runtime.chat.submit("alice", main["id"], "direct", "Continue the team")
     )

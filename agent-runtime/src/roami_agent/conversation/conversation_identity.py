@@ -1,11 +1,11 @@
 """Read coordinator and member identity without creating or rebinding conversations."""
 
 from roami_agent.protocol.errors import DomainError
-from roami_agent.storage.database import row, rows
+from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import owned
 
 
-def conversation_identity(db, owner, cid):
+def conversation_identity(db, owner, cid, *, reserved=False):
     conversation = owned(db, owner, cid)
     result = {
         "conversationId": cid,
@@ -15,11 +15,6 @@ def conversation_identity(db, owner, cid):
     home = row(
         db,
         "SELECT conversation_id FROM main_conversations WHERE owner_id=? AND conversation_id=?",
-        (owner, cid),
-    )
-    project = row(
-        db,
-        "SELECT project_id FROM project_okr_mains WHERE owner_id=? AND conversation_id=?",
         (owner, cid),
     )
     native = row(
@@ -37,7 +32,7 @@ def conversation_identity(db, owner, cid):
         "SELECT DISTINCT t.id FROM task_attempts a JOIN tasks t ON t.id=a.task_id JOIN branches b ON b.id=a.native_branch_id WHERE b.conversation_id=? AND t.owner_id=? LIMIT 1",
         (cid, owner),
     )
-    if project and (home or native or worker or instance):
+    if reserved and (home or native or worker or instance):
         raise DomainError("CONVERSATION_IDENTITY_CONFLICT", 409)
     if native or worker or instance:
         if home:
@@ -69,22 +64,4 @@ def conversation_identity(db, owner, cid):
         }
     if home:
         return {**result, "kind": "home_main"}
-    if project:
-        binding = row(
-            db,
-            "SELECT project_id FROM project_okr_conversations WHERE owner_id=? AND conversation_id=?",
-            (owner, cid),
-        )
-        groups = rows(
-            db,
-            "SELECT json_extract(target_json,'$.projectId') AS project_id FROM swarm_groups WHERE owner_id=? AND conversation_id=?",
-            (owner, cid),
-        )
-        if (
-            not binding
-            or binding["project_id"] != project["project_id"]
-            or any(group["project_id"] != project["project_id"] for group in groups)
-        ):
-            raise DomainError("CONVERSATION_IDENTITY_CONFLICT", 409)
-        return {**result, "kind": "project_main", "projectId": project["project_id"]}
     return result

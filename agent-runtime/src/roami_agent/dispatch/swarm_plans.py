@@ -12,7 +12,6 @@ from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.context_admission import assert_context_admitted
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.swarm_coordination_admission import for_turn
-from roami_agent.storage.swarm_memory import project_guidance_references
 from roami_agent.storage.swarm_repository import (
     changed,
     dependency_ready,
@@ -26,7 +25,17 @@ from roami_agent.storage.transcript_repository import owned
 
 
 class SwarmPlans:
-    def __init__(self, database, tasks, conversations, wakeup, *, settings=None):
+    def __init__(
+        self,
+        database,
+        tasks,
+        conversations,
+        wakeup,
+        *,
+        settings=None,
+        open_leader=None,
+        memory_backend=None,
+    ):
         self.db, self.tasks, self.conversations, self.wakeup = (
             database,
             tasks,
@@ -34,6 +43,8 @@ class SwarmPlans:
             wakeup,
         )
         self.settings = settings
+        self.open_leader = open_leader
+        self.memory_backend = memory_backend
         self.chat = None
         self.locks = {}
 
@@ -89,9 +100,11 @@ class SwarmPlans:
             source = await self.db.call(origin)
             cid = source["conversation_id"]
         if not cid:
+            if self.open_leader is None and target["kind"] == "project":
+                raise DomainError("SWARM_MAIN_REQUIRED", 409)
             cid = (
-                await self.conversations.create(owner, name, project_id=target["projectId"])
-                if target["kind"] == "project"
+                await self.open_leader(owner, name, target)
+                if self.open_leader is not None
                 else await self.conversations.main(owner)
             )["id"]
         payload = {**spec, "mainConversationId": cid, "target": target}
@@ -339,8 +352,8 @@ class SwarmPlans:
             memory = await self.memory_read(turn["owner_id"], value["id"])
             if isinstance(memory.get("content"), str) and len(memory["content"]) > 8000:
                 memory = {**memory, "content": memory["content"][:8000], "truncated": True}
-            if batch:
-                memory = project_guidance_references(memory)
+            if batch and self.memory_backend is not None:
+                memory = self.memory_backend.references(memory)
             values.append({"swarmId": value["id"], "teamMemory": memory})
         return values
 
