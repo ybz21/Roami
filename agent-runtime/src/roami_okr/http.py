@@ -81,4 +81,12 @@ def create_app(runtime, *, manage_lifecycle=True):
         runtime,
         manage_lifecycle=manage_lifecycle,
         mount_conversation_intake=mount_project_conversations,
+        status_capabilities={
+            "projectOkr": True,
+            "projectOkrMain": True,
+            "projectMainExecution": True,
+            "okrMessageContext": True,
+            "projectMainWake": True,
+            "projectGoalDailyWake": True,
+        },
     )

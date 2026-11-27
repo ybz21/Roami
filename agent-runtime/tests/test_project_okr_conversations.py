@@ -111,6 +111,31 @@ async def test_base_http_intake_handles_chat_without_project_operations(project_
         assert not calls
 
 
+async def test_only_project_http_advertises_mounted_project_features(project_runtime):
+    runtime, _, _ = project_runtime
+    project_features = {
+        "projectOkr",
+        "projectOkrMain",
+        "projectMainExecution",
+        "okrMessageContext",
+        "projectMainWake",
+        "projectGoalDailyWake",
+    }
+    for factory, expected in ((create_agent_app, set()), (create_app, project_features)):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=factory(runtime)),
+            base_url="http://agent",
+            headers={"X-Roami-Owner": "alice"},
+        ) as client:
+            response = await client.get("/v1/status")
+            assert response.status_code == 200
+            status = response.json()["data"]
+            assert project_features & status.keys() == expected
+            assert all(status[key] is True for key in expected)
+            assert status["conversationIdentity"] is True
+            assert status["commands"]
+
+
 async def test_project_creation_replays_request_written_by_legacy_runtime(project_runtime, store):
     runtime, _, _ = project_runtime
     await runtime.conversations.main("alice")
