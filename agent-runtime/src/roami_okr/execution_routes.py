@@ -18,6 +18,7 @@ class MainExecution(Payload):
     executor: Literal["claude", "codex"]
     model: str = Field(min_length=1, max_length=300)
     preparedLaunchKey: str = Field(min_length=1, max_length=200)
+    recoverFromLaunchKey: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 def mount_main_execution_routes(app, runtime):
@@ -27,4 +28,8 @@ def mount_main_execution_routes(app, runtime):
 
     @app.put("/v1/conversations/{cid}/execution")
     async def configure(cid: str, body: MainExecution, owner: Owner):
-        return {"data": await runtime.main_executions.configure(owner, cid, body.model_dump())}
+        return {
+            "data": await runtime.main_executions.configure(
+                owner, cid, body.model_dump(exclude_unset=True)
+            )
+        }

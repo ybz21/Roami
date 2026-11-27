@@ -227,6 +227,124 @@ async def test_main_execution_http_keeps_owner_and_project_boundaries(wake_runti
         assert (await client.get(url, headers={"X-Roami-Owner": "bob"})).status_code == 404
 
 
+@pytest.mark.parametrize("proof_change", [None, "unrelated", "route", "digest", "provider", "time"])
+async def test_project_main_recovers_only_its_proven_context_rejection(
+    wake_runtime, store, monkeypatch, proof_change
+):
+    runtime, main, spec, original, _ = await setup_main(wake_runtime, monkeypatch)
+    cid = main["id"]
+    await runtime.main_executions.configure("alice", cid, spec)
+    replacement = prepared("fresh-main", session="fresh-session")
+    launches = []
+    refusal = {"code": "CLAUDE_COMPACTION_INPUT_REJECTED", "stopEvidenceSha256": "c" * 64}
+
+    async def command(sub, *args, **kwargs):
+        if sub == "prepared" and args == ("--key", original["launchKey"]):
+            proof = {**copy.deepcopy(original), "contextRejection": refusal}
+            if proof_change == "provider":
+                proof["sessionBinding"]["providerConversationId"] = "different"
+            return proof
+        if sub == "prepared" and args == ("--key", replacement["launchKey"]):
+            return copy.deepcopy(replacement)
+        assert sub == "launch"
+        sent = kwargs["spec"]
+        launches.append(sent)
+        old = sent["sessionId"] == original["sessionId"]
+        proof = original if old else replacement
+        result = stopped(
+            {"session_id": proof["sessionId"], "binding": proof["sessionBinding"]},
+            state="failed" if old else "succeeded",
+        )
+        if old:
+            result["result"]["errorCode"] = refusal["code"]
+            refusal["launchKey"] = sent["key"]
+        return result
+
+    runtime.main_executions.executor.command = command
+    await runtime.start()
+    first = await runtime.chat.submit("alice", cid, "context-too-large", "Keep coordinating")
+
+    def failed_turn(db):
+        return row(
+            db, "SELECT finished_ms FROM turns WHERE id=? AND state='failed'", (first["turnId"],)
+        )
+
+    await until(store, failed_turn)
+    failed = await store.call(failed_turn)
+    request = {
+        **spec,
+        "commandKey": "recover-main",
+        "expectedGeneration": 1,
+        "preparedLaunchKey": replacement["launchKey"],
+        "recoverFromLaunchKey": refusal["launchKey"],
+    }
+    refusal["finishedMs"] = failed["finished_ms"]
+    if proof_change == "time":
+        refusal["finishedMs"] += 1
+    elif proof_change == "unrelated":
+        refusal["launchKey"] = f"project-main:{'a' * 32}:{'b' * 24}"
+    elif proof_change == "route":
+        refusal["code"] = "CLAUDE_COMPACTION_FAILED"
+    elif proof_change == "digest":
+        refusal["stopEvidenceSha256"] = "invalid"
+
+    if proof_change is None:
+        runtime.settings.updating = True
+        following = await runtime.chat.submit(
+            "alice", cid, "resume-main", "Continue the original team"
+        )
+        assert await store.call(
+            lambda db: row(db, "SELECT state FROM turns WHERE id=?", (following["turnId"],))
+        ) == {"state": "queued"}
+    before = (await runtime.conversations.messages("alice", cid))["messages"]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime)),
+        base_url="http://agent",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        url = f"/v1/conversations/{cid}/execution"
+        response = await client.put(url, json=request)
+        if proof_change is not None:
+            assert response.status_code == 409, response.text
+            assert (await client.get(url)).json()["data"]["generation"] == 1
+            assert len(launches) == 1
+            return
+        assert response.status_code == 200, response.text
+        assert response.json()["data"] == {
+            "conversationId": cid,
+            "projectId": "project",
+            "generation": 2,
+            "executor": "claude",
+            "model": "free",
+            "sessionId": replacement["sessionId"],
+        }
+        assert (await client.put(url, json=request)).json() == response.json()
+    assert (await runtime.conversations.messages("alice", cid))["messages"] == before
+    assert await store.call(
+        lambda db: [
+            tuple(record)
+            for record in db.execute(
+                "SELECT generation,session_id FROM project_okr_main_providers "
+                "WHERE conversation_id=? ORDER BY generation",
+                (cid,),
+            )
+        ]
+    ) == [(1, original["sessionId"]), (2, replacement["sessionId"])]
+    assert len(launches) == 1
+    runtime.settings.updating = False
+    runtime.wakeup.set()
+    await until(
+        store,
+        lambda db: row(
+            db, "SELECT id FROM turns WHERE id=? AND state='completed'", (following["turnId"],)
+        ),
+    )
+    assert [sent["sessionId"] for sent in launches] == [
+        original["sessionId"],
+        replacement["sessionId"],
+    ]
+
+
 async def test_group_chat_reaches_same_bound_main_and_native_provider(
     wake_runtime, store, monkeypatch
 ):

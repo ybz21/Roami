@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import sqlite3
 from copy import copy
 
@@ -19,6 +20,9 @@ from roami_okr.native_main import NativeMain
 from roami_okr.settled_route_recovery import recover_route_wait, recovery_candidates
 
 log = logging.getLogger(__name__)
+MAIN_LAUNCH_KEY = re.compile(
+    r"project-main:([a-f0-9]{32}):[a-f0-9]{24}(?::retry-[1-9][0-9]{0,18})?"
+)
 
 
 class NeedMainPreparation(Exception):
@@ -107,13 +111,18 @@ class MainExecutions:
         workspace = await TargetDirectory(self.settings).project_workspace(project)
         proof = await self.executor.command("prepared", "--key", spec["preparedLaunchKey"])
         validate_prepared_member(spec, proof, workspace["directory"])
+        original = recovery = None
+        if spec.get("recoverFromLaunchKey"):
+            original = await self.db.call(lambda db: main_binding(db, owner, cid))
+            recovery = await self.context_rejection(original, spec, workspace["directory"])
 
         def write(db):
             assert_project_main(db, owner, cid, project)
 
             def apply():
                 conversation = owned(db, owner, cid)
-                assert_main_idle(db, conversation)
+                # Queued turns resolve the provider after admission; running turns already own it.
+                assert_main_idle(db, conversation, allow_queued=recovery is not None)
                 if row(
                     db,
                     "SELECT id FROM swarm_groups WHERE owner_id=? AND conversation_id=? AND archived=0 AND paused=0",
@@ -124,9 +133,17 @@ class MainExecutions:
                 generation = current["generation"] if current else 0
                 if generation != spec["expectedGeneration"]:
                     raise DomainError("PROJECT_MAIN_GENERATION_CHANGED", 409)
-                if current:
-                    # Retiring a live native provider needs its own stopped proof.
+                if current and (recovery is None or original != current):
                     raise DomainError("PROJECT_MAIN_REPLACEMENT_REQUIRES_STOP", 409)
+                if recovery is not None:
+                    turn_id, refusal = recovery
+                    if not row(
+                        db,
+                        "SELECT id FROM turns WHERE id=? AND conversation_id=? AND branch_id=? "
+                        "AND state='failed' AND finished_ms>=?",
+                        (turn_id, cid, conversation["active_branch_id"], refusal["finishedMs"]),
+                    ):
+                        raise DomainError("PROJECT_MAIN_CONTEXT_REJECTION_UNCONFIRMED", 409)
                 binding = proof["sessionBinding"]
                 if row(
                     db,
@@ -155,7 +172,12 @@ class MainExecutions:
                     ),
                 )
                 result = main_configuration(db, owner, cid)
-                event(db, cid, "project.main.execution.changed", result)
+                event(
+                    db,
+                    cid,
+                    "project.main.execution.changed",
+                    {**result, "previousContextRejection": recovery[1]} if recovery else result,
+                )
                 return result
 
             return receipt(
@@ -168,6 +190,40 @@ class MainExecutions:
             )
 
         return await self.db.call(write, write=True)
+
+    async def context_rejection(self, original, spec, directory):
+        key = spec["recoverFromLaunchKey"]
+        launch = MAIN_LAUNCH_KEY.fullmatch(key)
+        if (
+            not launch
+            or not original
+            or original["generation"] != spec["expectedGeneration"]
+            or original["executor"] != "claude"
+            or original["executor"] != spec["executor"]
+            or original["model"] != spec["model"]
+        ):
+            raise DomainError("PROJECT_MAIN_CONTEXT_REJECTION_UNCONFIRMED", 409)
+        proof = await self.executor.command("prepared", "--key", original["launch_key"])
+        validate_prepared_member(
+            {**spec, "preparedLaunchKey": original["launch_key"]}, proof, directory
+        )
+        native = {**original, "binding": json.loads(original["binding_json"])}
+        NativeMain(native, {}, self.executor.command).verify(
+            {"session": proof["sessionId"], "sessionBinding": proof["sessionBinding"]}
+        )
+        refusal = proof.get("contextRejection")
+        digest = refusal.get("stopEvidenceSha256") if isinstance(refusal, dict) else None
+        if (
+            not isinstance(refusal, dict)
+            or refusal.get("launchKey") != key
+            or refusal.get("code") != "CLAUDE_COMPACTION_INPUT_REJECTED"
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", digest)
+            or type(refusal.get("finishedMs")) is not int
+            or refusal["finishedMs"] <= 0
+        ):
+            raise DomainError("PROJECT_MAIN_CONTEXT_REJECTION_UNCONFIRMED", 409)
+        return launch[1], refusal
 
     async def loop_for(self, loop, turn):
         binding = await self.db.call(

@@ -8,17 +8,18 @@ import (
 )
 
 type PreparedSession struct {
-	LaunchKey       string                `json:"launchKey"`
-	SessionID       string                `json:"sessionId"`
-	Executor        string                `json:"executor"`
-	ConfiguredModel string                `json:"configuredModel"`
-	Binding         SessionBinding        `json:"sessionBinding"`
-	Workspace       Workspace             `json:"workspace"`
-	Ready           bool                  `json:"ready"`
-	RouteRefusal    *PreparedRouteRefusal `json:"routeRefusal,omitempty"`
+	LaunchKey        string           `json:"launchKey"`
+	SessionID        string           `json:"sessionId"`
+	Executor         string           `json:"executor"`
+	ConfiguredModel  string           `json:"configuredModel"`
+	Binding          SessionBinding   `json:"sessionBinding"`
+	Workspace        Workspace        `json:"workspace"`
+	Ready            bool             `json:"ready"`
+	RouteRefusal     *PreparedRefusal `json:"routeRefusal,omitempty"`
+	ContextRejection *PreparedRefusal `json:"contextRejection,omitempty"`
 }
 
-type PreparedRouteRefusal struct {
+type PreparedRefusal struct {
 	LaunchKey    string `json:"launchKey"`
 	Code         string `json:"code"`
 	StopEvidence string `json:"stopEvidenceSha256"`
@@ -63,11 +64,18 @@ func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLife
 	}
 	selected := PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.Model, Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true}
 	if spec.Executor == "claude" && settledKey != key && settledKey != "" && later[0].Spec.Persistent &&
-		later[0].Spec.PreparedFrom == key && projectMainLaunchKey.MatchString(settledKey) {
+		later[0].Spec.PreparedFrom == key {
 		r := later[0].Result
-		if r.State == "failed" && r.FinishedMS > 0 && routeRefusalDigest.MatchString(r.StopEvidence) &&
-			(r.ErrorCode == "MODEL_ROUTE_NO_AVAILABLE_MEMBER" || r.ErrorCode == "CLAUDE_COMPACTION_FAILED") {
-			selected.RouteRefusal = &PreparedRouteRefusal{LaunchKey: settledKey, Code: r.ErrorCode, FinishedMS: r.FinishedMS, StopEvidence: r.StopEvidence}
+		if r.State == "failed" && r.FinishedMS > 0 && routeRefusalDigest.MatchString(r.StopEvidence) {
+			proof := &PreparedRefusal{LaunchKey: settledKey, Code: r.ErrorCode, FinishedMS: r.FinishedMS, StopEvidence: r.StopEvidence}
+			switch r.ErrorCode {
+			case "MODEL_ROUTE_NO_AVAILABLE_MEMBER", "CLAUDE_COMPACTION_FAILED":
+				if projectMainLaunchKey.MatchString(settledKey) {
+					selected.RouteRefusal = proof
+				}
+			case "CLAUDE_COMPACTION_INPUT_REJECTED":
+				selected.ContextRejection = proof
+			}
 		}
 	}
 	return selected, nil
