@@ -245,13 +245,16 @@ func ownedClaudePromptTurn(binding SessionBinding, promptHash string, since int6
 
 func (s Service) reconcileClaudePastedCompletion(ctx context.Context, key, dir, path string, spec Spec, receipt Receipt, state *sessionLifecycle) (Status, error) {
 	empty := Status{}
-	if spec.PreparedFrom == "" || spec.TimeoutSeconds <= 0 || receipt.Binding == nil || receipt.Workspace == nil || state.Executor != "claude" || state.State != "unknown" || state.UnknownReason != "SESSION_PROMPT_MISMATCH" || state.LaunchKey != key || state.ProviderConflict != nil || !reflect.DeepEqual(state.Binding, *receipt.Binding) || state.EndedIdle || len(state.Tools) != 0 {
+	if spec.PreparedFrom == "" || spec.SessionID == "" || receipt.Binding == nil || receipt.Workspace == nil || state.Executor != "claude" || state.Structured || state.State != "unknown" || state.UnknownReason != "SESSION_PROMPT_MISMATCH" || state.LaunchKey != key || state.ProviderConflict != nil || !reflect.DeepEqual(state.Binding, *receipt.Binding) || state.EndedIdle || len(state.Tools) != 0 {
 		return empty, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
 	}
 	if err := s.preparedContinuation(spec, *state); err != nil {
 		return empty, err
 	}
-	since := receipt.DeadlineMS - int64(spec.TimeoutSeconds)*1000
+	since, err := storedClaudeSubmissionTime(dir, spec, receipt)
+	if err != nil {
+		return empty, err
+	}
 	hash := workspaceHash(sessionPrompt(dir, spec))
 	turn := ownedClaudePastedTurn(state.Binding, hash, since)
 	if turn == "" {

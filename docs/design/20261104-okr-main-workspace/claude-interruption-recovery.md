@@ -38,3 +38,9 @@ PR #897 合入 `d1d445e433352a3abcc33ff37e28bb59bdfa8d52`，正常 full、最终
 r5 在原实例内实际写出一个探针文本，原生历史新增 `file-history-delta`（字段为 messageId/snapshotMessageId/trackingPath/backup/timestamp）。这是原生文件追踪元数据，和已支持的 file-history-snapshot 一样，不代表新工具调用。停止证明需要识别它；否则合法写入之后的取消会被未知元数据挡住。两种记录都仍受整个原轮次完整工具配对、正式中断、稳定 SHA、实际进程与 workspace 归属证明约束，不据此推断写入成功。
 
 本轮另外发现自动审核仍有 `Request was aborted`，原生错误转储明确为 classifier unavailable/timed out；不能把传输修复或探针文本存在当 Python/Connector 已可执行。保留 auto 模式和原模型路由，继续定位原生审核延迟。
+
+## 无截止时间的原生输入
+
+Claude 把长输入包装成粘贴块时，宿主可能把开始回调归为 `SESSION_PROMPT_MISMATCH`。原生会话允许无任务截止时间。显式对账在这种情况下用本次已保存的 `spec.json` 修改时间限定证据范围。带截止时间的执行继续使用回执确定提交下界。
+
+验证仍要求原准备会话、同一写入租约、匹配完整输入的唯一原生记录和后续完成证明。早于提交的记录、与规格矛盾的回执或缺少原生证明会拒绝收口。隔离回归覆盖无截止时间的正常粘贴、陈旧输入和矛盾回执。
