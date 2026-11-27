@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/ybz21/Roami/internal/modelgateway/accounting"
 )
 
 func awaitAdmissionQueue(t *testing.T, handler *Handler, count int) {
@@ -100,6 +102,64 @@ func TestAdmissionServesOlderWaiterBeforeLaterArrival(t *testing.T) {
 	if err != nil || len(stats.Recent) != 3 || len(stats.Today) != 1 || stats.Today[0].Requests != 3 || stats.Today[0].Pending != 0 || stats.Today[0].Unknown != 0 {
 		t.Fatalf("queued accounting changed: %+v %v", stats, err)
 	}
+}
+
+func TestConfirmedFreeAdmissionDoesNotBlockPaidQueue(t *testing.T) {
+	ledger := newLedger(t)
+	config := testConfiguration(floatPointer(100))
+	if err := ledger.accounting.Configure(config); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHandler(ledger)
+	validate := func() error { return nil }
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	first, err := handler.admit(ctx, "main", "fixture", "", "first", validate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type result struct {
+		call Call
+		err  error
+	}
+	queued := make(chan result, 1)
+	go func() {
+		call, err := handler.admit(ctx, "main", "fixture", "", "queued", validate)
+		queued <- result{call, err}
+	}()
+	awaitAdmissionQueue(t, handler, 1)
+
+	proof := accounting.CallAttribution{AgentKind: "claude", SourceID: "free-source", RouteID: "free", Free: true, PricingRevision: accounting.PricingRevision(config)}
+	free, err := handler.admit(ctx, "cli_claude", "free-model", "", "free", validate, proof)
+	if err != nil || free.Price != (ModelPricing{}) || free.PriceStatus != "priced" {
+		t.Fatalf("free request waited or changed price: %+v %v", free, err)
+	}
+	select {
+	case second := <-queued:
+		t.Fatalf("paid request admitted before settlement: %+v", second)
+	default:
+	}
+	if err := ledger.accounting.Settle(first, &Usage{}, 200, "", false); err != nil {
+		t.Fatal(err)
+	}
+	handler.releaseAdmission()
+
+	select {
+	case second := <-queued:
+		if second.err != nil || second.call.Request != "queued" {
+			t.Fatalf("pending zero price held paid request: %+v", second)
+		}
+		if err := ledger.accounting.Settle(second.call, &Usage{}, 200, "", false); err != nil {
+			t.Fatal(err)
+		}
+		handler.releaseAdmission()
+	case <-ctx.Done():
+		t.Fatal("paid request did not resume")
+	}
+	if err := ledger.accounting.Settle(free, &Usage{Input: 12, Output: 3}, 200, "", false); err != nil {
+		t.Fatal(err)
+	}
+	handler.releaseAdmission()
 }
 
 func TestAdmissionRevalidatesNonHeadWhileUsageIsPending(t *testing.T) {

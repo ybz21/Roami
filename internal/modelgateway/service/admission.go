@@ -13,20 +13,33 @@ type admissionWaiter struct {
 
 func (h *Handler) admit(ctx context.Context, role, model, session, request string, validate func() error, attribution ...accounting.CallAttribution) (accounting.Call, error) {
 	h.mu.Lock()
-	waiter := &admissionWaiter{}
-	h.admissionQueue = append(h.admissionQueue, waiter)
-	defer func() {
-		h.dequeueAdmission(waiter)
-		h.mu.Unlock()
-	}()
-	for {
+	defer h.mu.Unlock()
+	check := func() error {
 		if err := ctx.Err(); err != nil {
-			return accounting.Call{}, err
+			return err
 		}
 		if h.closing {
-			return accounting.Call{}, errors.New("MODEL_GATEWAY_UNAVAILABLE")
+			return errors.New("MODEL_GATEWAY_UNAVAILABLE")
 		}
-		if err := validate(); err != nil {
+		return validate()
+	}
+	if len(attribution) > 0 && attribution[0].Free && attribution[0].PricingRevision != "" {
+		if err := check(); err != nil {
+			return accounting.Call{}, err
+		}
+		call, err := h.state.accounting.AdmitConfirmedFree(role, model, session, request, attribution[0])
+		if !errors.Is(err, accounting.ErrNotConfirmedFree) {
+			if err == nil {
+				h.activeForwards++
+			}
+			return call, err
+		}
+	}
+	waiter := &admissionWaiter{}
+	h.admissionQueue = append(h.admissionQueue, waiter)
+	defer h.dequeueAdmission(waiter)
+	for {
+		if err := check(); err != nil {
 			return accounting.Call{}, err
 		}
 		if h.admissionQueue[0] == waiter {

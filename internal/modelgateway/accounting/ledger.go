@@ -3,6 +3,7 @@ package accounting
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -117,7 +118,17 @@ type CallAttribution struct {
 	PricingRevision                                           string
 }
 
+var ErrNotConfirmedFree = errors.New("MODEL_GATEWAY_NOT_CONFIRMED_FREE")
+
 func (l *Ledger) Admit(role, model, session, request string, attribution ...CallAttribution) (Call, error) {
+	return l.admit(role, model, session, request, false, attribution...)
+}
+
+func (l *Ledger) AdmitConfirmedFree(role, model, session, request string, attribution CallAttribution) (Call, error) {
+	return l.admit(role, model, session, request, true, attribution)
+}
+
+func (l *Ledger) admit(role, model, session, request string, requireFree bool, attribution ...CallAttribution) (Call, error) {
 	call := Call{ID: uuid.NewString(), Role: role, Model: model, Session: session, Request: request, Started: l.now().UnixMilli(), State: "pending"}
 	call.AgentKind = "roami"
 	var observationID string
@@ -151,9 +162,20 @@ func (l *Ledger) Admit(role, model, session, request string, attribution ...Call
 		if !priced {
 			call.PriceStatus = "unpriced"
 		}
-		if c.DailyLimit != nil {
+		confirmedFree := len(attribution) > 0 && attribution[0].Free && attribution[0].PricingRevision != "" &&
+			priced && call.Price == (ModelPricing{})
+		if requireFree && !confirmedFree {
+			return ErrNotConfirmedFree
+		}
+		price, err := json.Marshal(call.Price)
+		if err != nil {
+			return err
+		}
+		if c.DailyLimit != nil && !confirmedFree {
 			var spent, pending int64
-			err := tx.QueryRow(`SELECT COALESCE(SUM(cost_nano),0),COALESCE(SUM(state='pending'),0) FROM gateway_calls WHERE day=?`, call.Day).Scan(&spent, &pending)
+			zero, _ := json.Marshal(ModelPricing{})
+			err := tx.QueryRow(`SELECT COALESCE(SUM(cost_nano),0),COALESCE(SUM(state='pending' AND
+				(price_status!='priced' OR price_json IS NOT ?)),0) FROM gateway_calls WHERE day=?`, string(zero), call.Day).Scan(&spent, &pending)
 			if err != nil {
 				return err
 			}
@@ -163,10 +185,6 @@ func (l *Ledger) Admit(role, model, session, request string, attribution ...Call
 			if spent >= nanoAmount(*c.DailyLimit) {
 				return fmt.Errorf("MODEL_PROXY_DAILY_LIMIT")
 			}
-		}
-		price, err := json.Marshal(call.Price)
-		if err != nil {
-			return err
 		}
 		_, err = tx.Exec(`INSERT INTO gateway_calls(id,day,timezone,role,model,session_id,request_id,started_ms,state,currency,price_json,agent_kind,key_id,source_id,route_id,price_status,observation_request_id) VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?)`, call.ID, call.Day, call.Timezone, role, model, session, request, call.Started, call.Currency, string(price), call.AgentKind, call.KeyID, call.SourceID, call.RouteID, call.PriceStatus, observationID)
 		return err
