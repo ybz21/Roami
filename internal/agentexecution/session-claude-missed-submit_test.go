@@ -31,7 +31,7 @@ func TestLongClaudeSubmitPreservesPromptAndBoundsOtherMetadata(t *testing.T) {
 }
 
 func TestMissedLongSubmitRequiresOwnedInputCompleteStopAndOriginalProvider(t *testing.T) {
-	for _, scenario := range []string{"complete", "wrapped trailing newline", "cancelled", "missing hook failure", "wrong hook parent", "wrong hook error", "missing result", "wrong input", "wrong provider", "blocked stop", "later input", "async tool", "live process", "other writer", "unseen tool", "changed reason", "changed model"} {
+	for _, scenario := range []string{"complete", "wrapped trailing newline", "pasted mismatch", "pasted old input", "pasted invalid deadline", "cancelled", "missing hook failure", "wrong hook parent", "wrong hook error", "missing result", "wrong input", "wrong provider", "blocked stop", "later input", "async tool", "live process", "other writer", "unseen tool", "changed reason", "changed model"} {
 		t.Run(scenario, func(t *testing.T) {
 			s, binding, spec, transcript, _ := rejectedClaudeTask(t)
 			dir, _ := s.directory(spec.Key)
@@ -68,11 +68,25 @@ func TestMissedLongSubmitRequiresOwnedInputCompleteStopAndOriginalProvider(t *te
 				t.Fatal(err)
 			}
 			state.State, state.UnknownReason = "unknown", "SESSION_TOOL_EVENT_MISMATCH"
+			if strings.HasPrefix(scenario, "pasted ") {
+				state.UnknownReason = "SESSION_PROMPT_MISMATCH"
+				if scenario != "pasted invalid deadline" {
+					receipt.DeadlineMS = 0
+				}
+				if err := writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
+					t.Fatal(err)
+				}
+			}
 			state.TurnID, state.PromptHash = "previous-turn", workspaceHash("previous input")
 			state.Tools = map[string]bool{}
 			records := claudeDeniedCompletionTrace(binding, sessionPrompt(dir, spec), since)
 			failure := map[string]any{"type": "attachment", "uuid": "submit-error", "parentUuid": "owned-user", "sessionId": binding.ProviderID, "cwd": binding.Directory, "timestamp": time.UnixMilli(since + 1).UTC().Format(time.RFC3339Nano), "attachment": map[string]any{"type": "hook_non_blocking_error", "hookName": "UserPromptSubmit", "hookEvent": "UserPromptSubmit", "exitCode": 1, "stderr": "Failed with non-blocking status code: INVALID_SESSION_EVENT"}}
 			switch scenario {
+			case "pasted mismatch", "pasted old input", "pasted invalid deadline":
+				records[0]["message"] = map[string]any{"content": "\n\n<pasted_content id=\"transport\">\n" + sessionPrompt(dir, spec) + "\n</pasted_content id=\"transport\">\n"}
+				if scenario == "pasted old input" {
+					records[0]["timestamp"] = time.UnixMilli(since - 1).UTC().Format(time.RFC3339Nano)
+				}
 			case "wrapped trailing newline":
 				records[0]["message"] = map[string]any{"content": "\n\n<pasted_content id=\"transport\">\n" + strings.TrimSuffix(sessionPrompt(dir, spec), "\n") + "\n</pasted_content id=\"transport\">\n"}
 			case "cancelled":
@@ -112,7 +126,7 @@ func TestMissedLongSubmitRequiresOwnedInputCompleteStopAndOriginalProvider(t *te
 					t.Fatal(err)
 				}
 			}
-			if scenario != "missing hook failure" {
+			if scenario != "missing hook failure" && !strings.HasPrefix(scenario, "pasted ") {
 				records = append(records[:1], append([]map[string]any{failure}, records[1:]...)...)
 			}
 			writeReportRecords(t, transcript, records)
@@ -127,7 +141,7 @@ func TestMissedLongSubmitRequiresOwnedInputCompleteStopAndOriginalProvider(t *te
 				defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 			}
 			result, err := s.ReconcileSession(context.Background(), spec.Key)
-			if scenario != "complete" && scenario != "wrapped trailing newline" && scenario != "cancelled" {
+			if scenario != "complete" && scenario != "wrapped trailing newline" && scenario != "pasted mismatch" && scenario != "cancelled" {
 				if err == nil || result.Result != nil {
 					t.Fatalf("unconfirmed %s accepted: %+v %v", scenario, result, err)
 				}
