@@ -5,13 +5,14 @@ import { api } from '../../api'
 export type ModelSource = { connector?: 'openrouter-free'; pluginDesktop?: boolean; pluginDesktopUnavailable?: boolean; pluginSourceId?: string; accountRoutingAvailable?: boolean; id: string; name: string; sourceKey?: string; baseUrl: string; protocol: string; authMode: string; skipTlsVerification?: boolean; hasKey?: boolean; apiKey?: string; headerNames?: string[]; headers?: Record<string, string> }
 export type ModelCandidate = { sourceId: string; model: string }
 export type CatalogModel = { id: string; aliases?: string[]; gatewayAlias?: string; gatewayHidden?: boolean; hideMembers?: boolean; name: string; protocol: string; strategy: 'fixed' | 'failover' | RoutingStrategy; aggregate?: boolean; enabled?: boolean; freeOnly?: boolean; allowPlan?: boolean; requireTools?: boolean; minContext?: number; cooldownSeconds?: number; onLimit?: boolean; onExhausted?: boolean; weights?: Record<string, number>; candidates: ModelCandidate[] }
-export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string>; defaultModel?: string }
+export type ModelCatalog = { revision: string; sources: ModelSource[]; models: CatalogModel[]; drafts: CatalogModel[]; baseUrl: string; uses: Record<string, string[]>; canRestoreRoami?: boolean; roamiModels?: Record<string, string>; defaultModel?: string; qualifiedModelIds?: Record<string, string> }
 export type ModelDirectoryEntry = { id: string; name: string; kind: string; protocol: string; gatewayAlias?: string; gatewayHidden?: boolean; configured: boolean; enabled: boolean; freeOnly: boolean; pricing?: string; capabilities: Record<string, { support: string; evidence: string; delivery: string }>; candidates?: ModelCandidate[]; contextWindow?: number; maxOutputTokens?: number; inputPrice?: number; outputPrice?: number; inputModalities?: string[]; outputModalities?: string[] }
 const normalizeCatalog = (data: ModelCatalog): ModelCatalog => ({ ...data, sources: data.sources || [], models: data.models || [], drafts: data.drafts || [], uses: data.uses || {} })
 export const MODEL_CATALOG_CHANGED = 'roami:model-catalog-changed'
 export const modelProtocols = ['openai-completions', 'openai-responses', 'anthropic-messages']
 export const openRouterConnection = { connector: 'openrouter-free', baseUrl: 'https://openrouter.ai/api/v1', protocol: 'openai-completions', authMode: 'bearer' } as const
 export const sourceModelName = (source: Pick<ModelSource, 'sourceKey' | 'id'>, model: string) => (source.sourceKey?.trim() || source.id) + '/' + model
+export const gatewayModelName = (model: Pick<CatalogModel, 'id' | 'gatewayAlias'>, catalog?: ModelCatalog | null) => model.gatewayAlias || catalog?.qualifiedModelIds?.[model.id] || model.id
 export function gatewayModelNameTaken(name: string, current: string | null, models: CatalogModel[]) {
   return models.some(row => row.id !== current && (row.id === name || row.gatewayAlias === name || row.aliases?.includes(name)))
 }

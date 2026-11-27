@@ -200,7 +200,7 @@ func TestCatalogApplyUsesNativeBackupAndNeverCopiesUpstreamKey(t *testing.T) {
 		t.Fatalf("apply: %d %s", w.Code, w.Body.String())
 	}
 	raw, _ := os.ReadFile(path)
-	if strings.Contains(string(raw), "upstream-secret") || !strings.Contains(string(raw), "keep-command") || !strings.Contains(string(raw), "coding-main") {
+	if strings.Contains(string(raw), "upstream-secret") || !strings.Contains(string(raw), "keep-command") || !strings.Contains(string(raw), "work/fixture") {
 		t.Fatalf("native config damaged or leaked")
 	}
 	applied, _ := s.agents.View(context.Background(), "codex")
@@ -320,7 +320,7 @@ func TestFactoryModeHidesInactiveConsumerButKeepsPresetReferences(t *testing.T) 
 				t.Fatal("factory mode still reported as using custom model")
 			}
 			refs, _ := s.references(context.Background())
-			if len(refs["coding-main"]) != 1 {
+			if len(refs["work/fixture"]) != 1 {
 				t.Fatal("factory mode discarded saved custom preset references")
 			}
 		})
@@ -405,7 +405,7 @@ func TestSourceOnlyModelSelectionCreatesReusableRouteOnApply(t *testing.T) {
 		t.Fatal("reapplying the same source model created a duplicate")
 	}
 	raw, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
-	if strings.Contains(string(raw), "upstream-secret") || !strings.Contains(string(raw), routeID) {
+	if strings.Contains(string(raw), "upstream-secret") || !strings.Contains(string(raw), claudeModelPrefix+"work/vendor/new-model") {
 		t.Fatal("source credential leaked into CLI or route missing")
 	}
 	w := httptest.NewRecorder()
@@ -442,7 +442,7 @@ func TestNativeModelChangesRemainProtectedAfterCliSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile(path, []byte(strings.Replace(string(raw), "coding-main", "coding-other", 1)), 0600); err != nil {
+	if err = os.WriteFile(path, []byte(strings.Replace(string(raw), "work/fixture", "coding-other", 1)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if len(s.uses(context.Background())["coding-other"]) != 1 {

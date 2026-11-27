@@ -141,7 +141,7 @@ func readSourceModelDetails(ctx context.Context, profile Profile, client *http.C
 		}
 		for _, item := range result.Data {
 			id := strings.TrimSpace(item.ID)
-			if id != "" && len(id) <= 256 && !strings.ContainsAny(id, "\r\n\x00") && !strings.Contains(id, "{env:") && !strings.Contains(id, "{file:") && id != profile.APIKey {
+			if id != "" && len(id) <= maxProviderModelIDLength && !strings.ContainsAny(id, "\r\n\x00") && !strings.Contains(id, "{env:") && !strings.Contains(id, "{file:") && id != profile.APIKey {
 				models[id] = item.detail(id, profile.APIKey)
 			}
 		}
@@ -160,7 +160,7 @@ func readSourceModelDetails(ctx context.Context, profile Profile, client *http.C
 			}
 			return rows, nil
 		}
-		if !anthropic || result.LastID == "" || len(result.LastID) > 256 || cursors[result.LastID] {
+		if !anthropic || result.LastID == "" || len(result.LastID) > maxProviderModelIDLength || cursors[result.LastID] {
 			return nil, fmt.Errorf("MODEL_LIST_FAILED")
 		}
 		cursors[result.LastID] = true

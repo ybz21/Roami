@@ -6,13 +6,6 @@ func (m CatalogModel) MatchesGatewayName(id string) bool {
 	return m.ID == id || (id != "" && m.GatewayAlias == id) || slices.Contains(m.Aliases, id)
 }
 
-func (m CatalogModel) PublicGatewayName() string {
-	if m.GatewayAlias != "" {
-		return m.GatewayAlias
-	}
-	return m.ID
-}
-
 func (m CatalogModel) AdditionalGatewayNames() []string {
 	if m.GatewayAlias == "" {
 		return m.Aliases

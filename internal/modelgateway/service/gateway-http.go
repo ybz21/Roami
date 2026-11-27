@@ -50,11 +50,12 @@ func (h *Handler) servePublicModels(w http.ResponseWriter, r *http.Request, exte
 			data = append(data, map[string]any{"id": gatewayDefaultModel, "type": "model", "object": "model", "display_name": "Roami Default", "owned_by": "roami"})
 		}
 		hidden := modelcatalog.HiddenGatewayMembers(snapshot.Models)
+		names := snapshot.gatewayNames()
 		for _, m := range snapshot.Models {
 			if (m.Aggregate && !m.IsEnabled()) || m.HiddenAtGateway(hidden) {
 				continue
 			}
-			id := m.PublicGatewayName()
+			id := names.publicName(m)
 			if kind == "claude" {
 				id = claudeModelPrefix + id
 			}

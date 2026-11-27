@@ -83,15 +83,9 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 			err = errors.New("MODEL_CATALOG_CHANGED")
 			break
 		}
-		var model *CatalogModel
+		model := s.value.findGatewayModel(input.Model)
 		if input.Model == gatewayDefaultModel && catalogProtocol(input.Kind, "openai-completions") && input.SourceID == "" && input.UpstreamModel == "" {
 			model = s.defaultModel(s.value)
-		}
-		for _, m := range s.value.Models {
-			if m.MatchesGatewayName(input.Model) {
-				copy := m
-				model = &copy
-			}
 		}
 		created := false
 		if input.UpstreamModel != "" {
@@ -172,9 +166,9 @@ func (h *Handler) catalogManagement(w http.ResponseWriter, r *http.Request) bool
 		if input.Kind == "claude" {
 			authMode = "bearer"
 		}
-		selectedModel := model.ID
+		selectedModel := s.value.gatewayNames().publicName(*model)
 		if input.Kind == "claude" {
-			selectedModel = agentproviders.ClaudeGatewayModelID(selectedModel)
+			selectedModel = claudeModelPrefix + selectedModel
 		}
 		if input.Model == gatewayDefaultModel {
 			selectedModel = gatewayDefaultModel

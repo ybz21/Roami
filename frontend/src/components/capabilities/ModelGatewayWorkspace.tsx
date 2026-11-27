@@ -5,7 +5,7 @@ import { CopyIcon, LinkIcon, ChevronDown, ChevronRight } from '../../icons'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
-import type { ModelCatalog } from './model-hub-api'
+import { gatewayModelName, type ModelCatalog } from './model-hub-api'
 import { gatewayBaseURL, gatewayCallableModels, gatewayCallExample, type GatewayProtocol } from './gateway-call-example'
 import GatewayAccessKeys from './GatewayAccessKeys'
 import GatewayModelDirectory from './GatewayModelDirectory'
@@ -46,7 +46,11 @@ export default function ModelGatewayWorkspace({ active, catalog, onChanged, onSo
   const host = hosts.includes(selectedHost) ? selectedHost : network?.urls[0] || localHost
   const endpoint = gatewayBaseURL(host, protocol)
   const models = gatewayCallableModels(catalog), selected = models.find(model => model.id === modelId) || models[0]
-  const code = selected && endpoint ? gatewayCallExample(endpoint, selected.gatewayAlias || selected.id, language, protocol) : ''
+  const code = selected && endpoint ? gatewayCallExample(endpoint, gatewayModelName(selected, catalog), language, protocol) : ''
+  const modelOptions = models.map(model => {
+    const name = gatewayModelName(model, catalog)
+    return { value: model.id, label: model.name === name ? name : model.name + ' · ' + name }
+  })
   const copy = async (value: string) => { try { await navigator.clipboard.writeText(value); message.success(t('common.copied')) } catch { message.error(t('gatewayWorkspace.copyFailed')) } }
   const selectTab = (value: string) => {
     setTab(value)
@@ -68,7 +72,7 @@ export default function ModelGatewayWorkspace({ active, catalog, onChanged, onSo
       <Button type="link" icon={<ChevronRight />} onClick={() => selectTab('directory')}>{t('gatewayWorkspace.chooseModel')}</Button>
     </section>
     <section className="tt-gateway-sample" aria-label={t('gatewayWorkspace.sample')}><div className="tt-gateway-section-head"><h3>{phone ? <Button type="text" icon={<ChevronDown />} aria-expanded={sampleOpen} onClick={() => setSampleOpen(previous => !previous)}>{t('gatewayWorkspace.sample')}</Button> : t('gatewayWorkspace.sample')}</h3>{(!phone || sampleOpen) && <><TabBar className="tt-gateway-example-tabs" label={t('gatewayWorkspace.language')} activeKey={language} onChange={setLanguage} items={[{ key: 'curl', label: 'curl' }, { key: 'python', label: 'Python' }]} /><Button type="text" icon={<CopyIcon />} disabled={!code} aria-label={t('gatewayWorkspace.copyExample')} onClick={() => void copy(code)} /></>}</div>
-      {(!phone || sampleOpen) && (models.length ? <><label className="agent-settings-field tt-gateway-sample-model"><span>{t('gatewayWorkspace.sampleModel')}</span><Select<string> aria-label={t('gatewayWorkspace.sampleModel')} value={selected?.id} options={models.map(model => ({ value: model.id, label: model.name === (model.gatewayAlias || model.id) ? model.name : model.name + ' · ' + (model.gatewayAlias || model.id) }))} onChange={setModelId} /></label>{selected && onConfigure && <Button type="link" onClick={() => onConfigure(selected.id)}>{t('gatewayWorkspace.configureModel')}</Button>}<pre tabIndex={0}>{code}</pre><p className="agent-settings-hint">{t('gatewayWorkspace.environmentHint')}</p></> : <p className="tt-gateway-empty">{t('gatewayWorkspace.noCallable')}</p>)}
+      {(!phone || sampleOpen) && (models.length ? <><label className="agent-settings-field tt-gateway-sample-model"><span>{t('gatewayWorkspace.sampleModel')}</span><Select<string> aria-label={t('gatewayWorkspace.sampleModel')} value={selected?.id} options={modelOptions} onChange={setModelId} /></label>{selected && onConfigure && <Button type="link" onClick={() => onConfigure(selected.id)}>{t('gatewayWorkspace.configureModel')}</Button>}<pre tabIndex={0}>{code}</pre><p className="agent-settings-hint">{t('gatewayWorkspace.environmentHint')}</p></> : <p className="tt-gateway-empty">{t('gatewayWorkspace.noCallable')}</p>)}
     </section>
   </div>
   return <section className="tt-model-gateway" hidden={!active} aria-label={t('hub.tab.gateway')}>
