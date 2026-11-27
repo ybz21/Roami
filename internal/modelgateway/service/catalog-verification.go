@@ -23,6 +23,7 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 	}
 	fingerprints := map[string]string{}
 	hidden := modelcatalog.HiddenGatewayMembers(catalog.Models)
+	names := catalog.gatewayNames()
 	for _, model := range catalog.Models {
 		if model.HiddenAtGateway(hidden) {
 			continue
@@ -42,7 +43,7 @@ func writeCatalogVerificationRevision(root string, catalog ModelCatalog) error {
 		digest := sha256.Sum256(raw)
 		fingerprint := hex.EncodeToString(digest[:])
 		fingerprints[model.ID] = fingerprint
-		for _, alias := range model.AdditionalGatewayNames() {
+		for _, alias := range names.additionalNames(model) {
 			fingerprints[alias] = fingerprint
 		}
 	}

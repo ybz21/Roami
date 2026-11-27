@@ -103,6 +103,9 @@ type catalog struct {
 var validID = regexp.MustCompile(`^[a-f0-9]{32}$`)
 var validEnvironment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,127}$`)
 
+// Gateway model IDs can include a 160-byte source key, a 200-byte upstream ID and a Claude prefix.
+const maxProviderModelIDLength = 384
+
 func newID() (string, error) {
 	var data [16]byte
 	if _, err := rand.Read(data[:]); err != nil {
@@ -136,7 +139,7 @@ func profileFromInput(kind, id string, input ProfileInput, previous *Profile) (P
 	u, err := url.Parse(p.BaseURL)
 	if p.Name == "" || utf8.RuneCountInString(p.Name) > 64 || len(p.BaseURL) > 2048 || err != nil ||
 		(u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
-		p.Model == "" || len(p.Model) > 256 || len(p.ModelName) > 256 || strings.ContainsAny(p.Model+p.Name+p.ModelName, "\r\n\x00") || strings.Contains(p.Model+p.Name+p.ModelName+p.BaseURL, "{env:") || strings.Contains(p.Model+p.Name+p.ModelName+p.BaseURL, "{file:") {
+		p.Model == "" || len(p.Model) > maxProviderModelIDLength || len(p.ModelName) > 256 || strings.ContainsAny(p.Model+p.Name+p.ModelName, "\r\n\x00") || strings.Contains(p.Model+p.Name+p.ModelName+p.BaseURL, "{env:") || strings.Contains(p.Model+p.Name+p.ModelName+p.BaseURL, "{file:") {
 		return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
 	}
 	p.BaseURL = u.String()
@@ -168,7 +171,7 @@ func profileFromInput(kind, id string, input ProfileInput, previous *Profile) (P
 	}
 	seen := map[string]bool{}
 	for _, model := range p.Models {
-		if model.ID == "" || len(model.ID) > 256 || len(model.Name) > 256 || seen[model.ID] || strings.ContainsAny(model.ID+model.Name, "\r\n\x00") || strings.Contains(model.ID+model.Name, "{env:") || strings.Contains(model.ID+model.Name, "{file:") {
+		if model.ID == "" || len(model.ID) > maxProviderModelIDLength || len(model.Name) > 256 || seen[model.ID] || strings.ContainsAny(model.ID+model.Name, "\r\n\x00") || strings.Contains(model.ID+model.Name, "{env:") || strings.Contains(model.ID+model.Name, "{file:") {
 			return Profile{}, fmt.Errorf("INVALID_MODEL_PROFILE")
 		}
 		seen[model.ID] = true

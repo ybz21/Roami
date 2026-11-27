@@ -6,7 +6,7 @@ import type { AgentModelView } from '../../agent-registry'
 import { useI18n } from '../../i18n'
 import { useLayout } from '../../layout'
 import { selectableGatewayModels } from './gateway-model-catalog'
-import { catalogFailure, useModelCatalog } from './model-hub-api'
+import { catalogFailure, gatewayModelName, useModelCatalog } from './model-hub-api'
 import { getHashParams } from '../../route-hash'
 import './model-hub.css'
 
@@ -24,7 +24,7 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const currentID = kind === 'claude' ? view.current.model?.replace(/^roami-claude\//, '').replace(/\[1m\]$/, '') : view.current.model
   const usesDefault = throughGateway && currentID === gatewayDefault
   const currentModel = throughGateway
-    ? models.find(model => model.id === currentID || !!currentID && (model.gatewayAlias === currentID || model.aliases?.includes(currentID)))
+    ? models.find(model => model.id === currentID || !!currentID && (model.gatewayAlias === currentID || catalog.value?.qualifiedModelIds?.[model.id] === currentID || model.aliases?.includes(currentID)))
     : models.find(model => {
       const candidate = model.candidates[0]
       if (!profile || model.aggregate || !candidate || candidate.model !== view.current.model) return false
@@ -35,14 +35,14 @@ export default function GatewayModelBinding({ kind, view, onChanged, onModelLabe
   const selectedMode = mode || currentMode
   const available = selectableGatewayModels(catalog.value)
   const hasDefault = available.some(model => model.id === catalog.value?.defaultModel)
-  const options = available.map(model => ({ value: model.id, label: model.name, title: model.name, callId: model.gatewayAlias || model.id }))
+  const options = available.map(model => ({ value: model.id, label: model.name, title: model.name, callId: gatewayModelName(model, catalog.value) }))
   if (hasDefault) options.unshift({ value: gatewayDefault, label: t('hub.gatewayDefault'), title: t('hub.gatewayDefault'), callId: gatewayDefault })
   const currentSelection = usesDefault ? gatewayDefault : currentModel?.id
   const choice = model || currentSelection || (!throughGateway && hasDefault ? gatewayDefault : undefined)
   const selected = options.find(option => option.value === choice)?.value
   const currentLabel = usesDefault ? t('hub.gatewayDefault') : currentModel?.name || view.current.model || t('agent.models.notConfigured')
   const gatewayApplied = throughGateway && !!profile?.applied && !view.changed
-  const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.filter(model => !model.gatewayHidden && (!model.aggregate || model.enabled !== false)).map(model => ({ id: model.gatewayAlias || model.id, name: model.name }))]
+  const expectedModels = [...(catalog.value?.defaultModel ? [{ id: gatewayDefault, name: 'Roami Default' }] : []), ...models.filter(model => !model.gatewayHidden && (!model.aggregate || model.enabled !== false)).map(model => ({ id: gatewayModelName(model, catalog.value), name: model.name }))]
   const catalogCurrent = kind !== 'pi' && kind !== 'opencode' || !!profile?.models && JSON.stringify(profile.models) === JSON.stringify(expectedModels)
   const applied = !view.changed && selectedMode === currentMode && (selectedMode === 'official' || gatewayApplied && catalogCurrent && !!selected && selected === currentSelection)
   const valid = installed && (selectedMode === 'official' || !!selected && !!catalog.value && !catalog.error)

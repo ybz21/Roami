@@ -175,7 +175,7 @@ func TestSharedSourceAppliesNativeProtocolsAndListsModelsForEveryAgent(t *testin
 			r := httptest.NewRequest("GET", "/v1/models", nil)
 			r.Header.Set("Authorization", "Bearer "+h.Catalog.credential(kind))
 			h.publicModels(w, r)
-			if w.Code != 200 || !strings.Contains(w.Body.String(), "coding-main") {
+			if w.Code != 200 || !strings.Contains(w.Body.String(), "work/fixture") {
 				t.Fatal("shared model hidden from agent")
 			}
 		})

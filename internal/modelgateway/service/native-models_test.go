@@ -127,7 +127,7 @@ func TestGatewayDefaultAndNativeCatalogRespectAggregateState(t *testing.T) {
 		t.Fatal("enabled group cannot be the gateway default")
 	}
 	options := s.modelOptions(s.value)
-	if len(options) != 3 || options[0].ID != gatewayDefaultModel || options[1].ID != active.ID || options[2].ID != native.ID {
+	if len(options) != 3 || options[0].ID != gatewayDefaultModel || options[1].ID != active.ID || options[2].ID != "work/fixture" {
 		t.Fatalf("disabled group leaked into native catalog: %+v", options)
 	}
 	for _, kind := range []string{"claude", "codex"} {

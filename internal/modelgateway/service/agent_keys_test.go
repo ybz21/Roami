@@ -75,7 +75,7 @@ func TestAgentKeyRotationNativeConfigAndImmutableBilling(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider, modelID, ok := strings.Cut(nativeConfig["model"].(string), "/")
-	if !ok || modelID != "coding-main" {
+	if !ok || modelID != "work/fixture" {
 		t.Fatal("display name changed the routed model ID")
 	}
 	models := nativeConfig["providers"].(map[string]any)[provider].(map[string]any)["models"].(map[string]any)

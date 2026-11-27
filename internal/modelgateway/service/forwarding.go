@@ -32,11 +32,11 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	var alias string
 	_ = json.Unmarshal(payload["model"], &alias)
 	var model *CatalogModel
-	resolvedID := catalogModelID(kind, alias)
+	resolvedID := catalog.catalogModelID(kind, alias)
 	if resolvedID == gatewayDefaultModel && catalogProtocol(kind, protocol) {
 		model = h.Catalog.defaultModel(catalog)
 	}
-	if configured := modelcatalog.FindModel(catalog.Models, resolvedID); configured != nil {
+	if configured := catalog.findGatewayModel(resolvedID); configured != nil {
 		copy := *configured
 		model = &copy
 	}

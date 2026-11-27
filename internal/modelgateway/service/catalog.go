@@ -25,22 +25,23 @@ type ModelCandidate = modelcatalog.ModelCandidate
 type CatalogModel = modelcatalog.CatalogModel
 
 type ModelCatalog struct {
-	Revision        string                   `json:"revision"`
-	Sources         []ModelSource            `json:"sources"`
-	Models          []CatalogModel           `json:"models"`
-	Drafts          []CatalogModel           `json:"drafts"`
-	BaseURL         string                   `json:"baseUrl,omitempty"`
-	Uses            map[string][]string      `json:"uses"`
-	Port            int                      `json:"-"`
-	LANEnabled      bool                     `json:"-"`
-	Token           string                   `json:"-"`
-	AccessKey       gatewayAccessKey         `json:"-"`
-	AccessKeys      []gatewayAccessKey       `json:"-"`
-	RolesBackup     map[string]any           `json:"-"`
-	AgentKeys       map[string]agentKeyState `json:"-"`
-	CanRestoreRoami bool                     `json:"canRestoreRoami"`
-	RoamiModels     map[string]string        `json:"roamiModels"`
-	DefaultModel    string                   `json:"defaultModel,omitempty"`
+	Revision          string                   `json:"revision"`
+	Sources           []ModelSource            `json:"sources"`
+	Models            []CatalogModel           `json:"models"`
+	Drafts            []CatalogModel           `json:"drafts"`
+	BaseURL           string                   `json:"baseUrl,omitempty"`
+	Uses              map[string][]string      `json:"uses"`
+	Port              int                      `json:"-"`
+	LANEnabled        bool                     `json:"-"`
+	Token             string                   `json:"-"`
+	AccessKey         gatewayAccessKey         `json:"-"`
+	AccessKeys        []gatewayAccessKey       `json:"-"`
+	RolesBackup       map[string]any           `json:"-"`
+	AgentKeys         map[string]agentKeyState `json:"-"`
+	CanRestoreRoami   bool                     `json:"canRestoreRoami"`
+	RoamiModels       map[string]string        `json:"roamiModels"`
+	DefaultModel      string                   `json:"defaultModel,omitempty"`
+	QualifiedModelIDs map[string]string        `json:"qualifiedModelIds,omitempty"`
 }
 type catalogDisk struct {
 	Catalog     ModelCatalog             `json:"catalog"`
@@ -75,6 +76,17 @@ func randomCatalogID() (string, error) {
 }
 func (s *CatalogStore) uses(ctx context.Context) map[string][]string {
 	uses, _ := s.modelReferences(ctx, true)
+	names := s.value.gatewayNames()
+	for _, model := range s.value.Models {
+		for _, alias := range names.additionalNames(model) {
+			for _, use := range uses[alias] {
+				if !slices.Contains(uses[model.ID], use) {
+					uses[model.ID] = append(uses[model.ID], use)
+				}
+			}
+			delete(uses, alias)
+		}
+	}
 	return uses
 }
 func (s *CatalogStore) references(ctx context.Context) (map[string][]string, bool) {
@@ -98,7 +110,7 @@ func (s *CatalogStore) modelReferences(ctx context.Context, activeOnly bool) (ma
 			continue
 		}
 		add := func(model string) {
-			model = catalogModelID(kind, model)
+			model = s.value.catalogModelID(kind, model)
 			if model == gatewayDefaultModel {
 				if resolved := s.defaultModel(s.value); resolved != nil {
 					model = resolved.ID
@@ -129,16 +141,10 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	v.BaseURL = s.baseURL
 	v.Uses = s.uses(ctx)
 	hidden := modelcatalog.HiddenGatewayMembers(v.Models)
+	names := v.gatewayNames()
+	v.QualifiedModelIDs = names.qualified
 	for i, model := range v.Models {
 		v.Models[i].GatewayHidden = model.HiddenAtGateway(hidden)
-		for _, alias := range model.AdditionalGatewayNames() {
-			for _, use := range v.Uses[alias] {
-				if !slices.Contains(v.Uses[model.ID], use) {
-					v.Uses[model.ID] = append(v.Uses[model.ID], use)
-				}
-			}
-			delete(v.Uses, alias)
-		}
 	}
 	v.CanRestoreRoami = s.value.RolesBackup != nil
 	v.RoamiModels = map[string]string{}
@@ -148,8 +154,10 @@ func (s *CatalogStore) view(ctx context.Context) ModelCatalog {
 	for _, role := range []string{"main", "worker"} {
 		if route, err := hostroute.Read(s.state.paths, role); err == nil {
 			v.RoamiModels[role] = route.Model
-			if model := modelcatalog.FindModel(v.Models, route.Model); model != nil && strings.TrimRight(route.Endpoint, "/") == s.baseURL+"/v1" {
-				v.RoamiModels[role] = model.ID
+			if strings.TrimRight(route.Endpoint, "/") == s.baseURL+"/v1" {
+				if model := v.findGatewayModel(route.Model); model != nil {
+					v.RoamiModels[role] = model.ID
+				}
 			}
 		}
 	}
@@ -252,9 +260,15 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 		return err
 	}
 	uses, known := s.references(ctx)
+	previousNames, nextNames := s.value.gatewayNames(), v.gatewayNames()
 	for _, old := range s.value.Models {
 		for _, id := range append([]string{old.ID}, old.AdditionalGatewayNames()...) {
 			if modelcatalog.FindModel(v.Models, id) == nil && (!known || len(uses[id]) > 0) {
+				return errors.New("MODEL_CATALOG_IN_USE")
+			}
+		}
+		if name := previousNames.qualified[old.ID]; name != "" && (!known || len(uses[name]) > 0) {
+			if i, ok := nextNames.owners[name]; !ok || !v.Models[i].MatchesGatewayName(old.ID) {
 				return errors.New("MODEL_CATALOG_IN_USE")
 			}
 		}
@@ -272,6 +286,7 @@ func (s *CatalogStore) update(ctx context.Context, v ModelCatalog) error {
 	v.BaseURL = ""
 	v.Uses = nil
 	v.DefaultModel = ""
+	v.QualifiedModelIDs = nil
 	if err := s.persist(v); err != nil {
 		return err
 	}

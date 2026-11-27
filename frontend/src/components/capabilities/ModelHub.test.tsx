@@ -42,6 +42,7 @@ it('enables a LAN address, switches the sample to Anthropic and opens model conf
   const networkPath = '/agent/model-gateway/network'
   let enabled = false
   vi.mocked(api).mockImplementation(async (method, path, body, options) => {
+    if (path === '/agent/model-gateway/catalog') return { data: { ...catalog, qualifiedModelIds: { coding: 'bladeai/priced-model' } } }
     if (path !== networkPath) return fallback(method, path, body, options)
     if (method === 'PUT') enabled = body.enabled
     return { data: { enabled, urls: enabled ? ['http://192.168.1.4:19000'] : [] } }
@@ -57,7 +58,9 @@ it('enables a LAN address, switches the sample to Anthropic and opens model conf
   fireEvent.keyDown(screen.getByRole('combobox', { name: 'gatewayWorkspace.protocol' }), { key: 'ArrowDown' })
   fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
   expect(screen.getByText('http://192.168.1.4:19000')).toBeTruthy()
-  expect(screen.getByRole('region', { name: 'gatewayWorkspace.sample' }).querySelector('pre')?.textContent).toContain('/v1/messages')
+  const example = screen.getByRole('region', { name: 'gatewayWorkspace.sample' }).querySelector('pre')?.textContent
+  expect(example).toContain('/v1/messages')
+  expect(example).toContain('"model": "bladeai/priced-model"')
   fireEvent.click(screen.getByRole('button', { name: 'gatewayWorkspace.configureModel' }))
   expect(navigate).toHaveBeenCalledWith('capabilities/models/catalog/model/coding')
 })
