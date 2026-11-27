@@ -80,7 +80,11 @@ def register_swarm_tools(
         )
 
     async def inbox(args, binding):
-        return await swarms.inbox(binding["owner"], args["swarmId"], args, binding=binding)
+        result = await swarms.inbox(binding["owner"], args["swarmId"], args, binding=binding)
+        if (post_ids := binding.get("coordinationInboxPostIds")) is not None:
+            for item in result["items"]:
+                item["inCurrentBatch"] = item["postId"] in post_ids
+        return result
 
     async def control(args, binding):
         await main(binding, args["swarmId"])
