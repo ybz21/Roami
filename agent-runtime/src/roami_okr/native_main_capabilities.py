@@ -129,9 +129,14 @@ class NativeMainCapabilities(ProfessionalCapabilities):
             f"ROAMI_MAIN_CONTEXT={shlex.quote(str(path))}\n"
             '"$ROAMI_BIN" agent capability call tool_list --context "$ROAMI_MAIN_CONTEXT" '
             f"--call discover-swarm --input {discover}\n"
+            '"$ROAMI_BIN" agent capability call read --context "$ROAMI_MAIN_CONTEXT" '
+            "--call STABLE_READ_ID --input "
+            """'{"path":"artifact://RETAINED_ID","offset":0,"limit":8000}'\n"""
             '"$ROAMI_BIN" agent capability call CAPABILITY_NAME --context "$ROAMI_MAIN_CONTEXT" '
             "--call STABLE_REQUEST_ID --input 'EXACT_JSON_ARGUMENTS'\n"
             "```\n"
+            "For Swarm verification, get retained IDs from task_status reviewEvidence. "
+            "Read them with the signed read form above and follow nextRead until the full text is available. "
             "Use discovered capability names, never placeholders. Keep the same request ID and "
             "arguments when recovering an uncertain response; unknown outcomes cannot be replayed. "
             "Each response includes toolCallId: use that registered ID, not requestId, when a "

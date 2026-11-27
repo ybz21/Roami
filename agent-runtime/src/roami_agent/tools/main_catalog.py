@@ -16,6 +16,7 @@ from roami_agent.storage.native_tool_observations import tool_diagnostic
 from roami_agent.storage.request_coverage import check_coverage, coverage_schema, record_coverage
 from roami_agent.storage.request_quotes import quote_text
 from roami_agent.storage.swarm_coordination_tasks import request_context as coordination_request
+from roami_agent.storage.swarm_evidence import current_review_evidence
 from roami_agent.storage.task_continuation import (
     continuation_candidates,
     unresolved_repeated_requests,
@@ -532,6 +533,10 @@ def register_main_tools(
                 intent = json.loads(item["intent_json"])
                 item["executor"] = intent["executor"]
                 attempt = item.get("latestAttempt") or {}
+                if args.get("taskId") and item["state"] == "waiting_user" and attempt.get("runId"):
+                    review = current_review_evidence(db, item, attempt["runId"])
+                    if review is not None:
+                        item["reviewEvidence"] = review
                 if args.get("includeResult") is True and attempt.get("runId"):
                     report = row(
                         db,
@@ -590,6 +595,7 @@ def register_main_tools(
                             "origin_message_id",
                             "contextExcluded",
                             "latestAttempt",
+                            "reviewEvidence",
                         }
                     }
                     for item in items
@@ -929,6 +935,7 @@ def register_main_tools(
         Tool(
             "task_status",
             "Read delegated progress in this conversation. A progress question needs only state and essential blockers, not a repeated report. "
+            "For Swarm acceptance, filter by exact taskId and use reviewEvidence for retained current-run artifact IDs. Full executor results are unnecessary for discovering this evidence. "
             "Use includeResult=true only when the user asks for prior detailed/full results; the stored executor report is not fresh retrieval. Tool diagnostics are timestamped historical observations, not proof of a current blocker, stopped input or business result. Optionally filter by exact taskId.",
             object_schema(
                 {

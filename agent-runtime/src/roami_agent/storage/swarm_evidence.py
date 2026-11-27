@@ -31,7 +31,7 @@ def requirements(db, task_id):
     return json.loads(work["deliverables_json"]) if work else []
 
 
-def evidence(db, task, run):
+def evidence(db, task, run, *, limit=-1):
     artifacts = rows(
         db,
         "SELECT a.id,a.name,a.mime_type AS mimeType,a.size_bytes AS sizeBytes,a.sha256 FROM artifacts a "
@@ -40,12 +40,46 @@ def evidence(db, task, run):
         "WHERE m.id=a.message_id AND e.task_id=a.task_id AND e.kind IN ('task.started','task.preparing') "
         "AND json_extract(e.payload_json,'$.runId')=?)) "
         "AND COALESCE(json_extract(metadata_json,'$.source'),'')!='native_result' "
-        "AND deleted_ms IS NULL AND purged_ms IS NULL ORDER BY created_ms",
-        (task["owner_id"], task["id"], run["id"], run["id"]),
+        "AND deleted_ms IS NULL AND purged_ms IS NULL ORDER BY created_ms LIMIT ?",
+        (task["owner_id"], task["id"], run["id"], run["id"], limit),
     )
     for item in artifacts:
         item["downloadUrl"] = "/api/agent/artifacts/" + item["id"] + "/content"
     return artifacts
+
+
+def current_review_evidence(db, task, run_id):
+    work = row(
+        db,
+        "SELECT w.swarm_id,w.deliverables_json FROM tasks t "
+        "JOIN swarm_work_items w ON w.task_id=t.id "
+        "JOIN swarm_groups g ON g.id=w.swarm_id AND g.owner_id=t.owner_id "
+        "AND g.conversation_id=t.origin_conversation_id "
+        "WHERE t.id=? AND t.owner_id=? AND t.revision=? AND t.state='waiting_user' "
+        "AND g.archived=0 AND ?=(SELECT a.id FROM task_attempts a WHERE a.task_id=t.id "
+        "AND a.task_revision=t.revision ORDER BY a.attempt_no DESC LIMIT 1)",
+        (task["id"], task["owner_id"], task["revision"], run_id),
+    )
+    if not work:
+        return None
+    limit = 8
+    available = evidence(db, task, {"id": run_id}, limit=limit + 1)
+    return {
+        "swarmId": work["swarm_id"],
+        "externalActionRequiresUser": any(
+            item["kind"] == "external_action" for item in json.loads(work["deliverables_json"])
+        ),
+        "artifacts": [
+            {
+                "id": item["id"],
+                "name": item["name"][:120],
+                "mimeType": item["mimeType"],
+                "sizeBytes": item["sizeBytes"],
+            }
+            for item in available[:limit]
+        ],
+        "hasMore": len(available) > limit,
+    }
 
 
 async def validate_evidence(database, task, run, *, acceptance=None):
