@@ -223,6 +223,11 @@ class SwarmCoordinationPolicy:
                 **binding,
                 "coordinationMemberIds": json.loads(value["delegation"]["member_ids_json"]),
             }
+        if tool.name == "swarm_inbox_read":
+            binding = {
+                **binding,
+                "coordinationInboxPostIds": tuple(item["postId"] for item in value["inputs"]),
+            }
         if tool.name == "project_okr_context":
             binding = {**binding, "coordinationProjectId": value["delegation"]["projectId"]}
         if tool.name == "file_read":

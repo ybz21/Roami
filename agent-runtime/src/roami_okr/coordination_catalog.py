@@ -92,12 +92,19 @@ def operation(tool):
             "artifacts in this turn. Use includeResult=true only when the full executor report "
             "or execution receipt is needed. Neither response establishes publication."
         )
+    elif tool.name == "swarm_inbox_read":
+        description = (
+            "Read pending group messages. A coordinated reply may use replyTo only for an entry "
+            "with inCurrentBatch=true. Other entries may inform planning. An inbox read does not "
+            "handle a delivery or change its batch."
+        )
     elif tool.name == "swarm_post":
         fields["kind"]["enum"] = ["progress", "question", "reply"]
         description = (
             "Post as the original Main in this batch's group. progress is discussion only. "
-            "question requires a selected recipientMemberId; reply must address a frozen input's "
-            "replyTo. Preserve messageKey through retries. This does not inject terminal input, "
+            "question requires a selected recipientMemberId. For a reply, use replyTo from an "
+            "inCurrentBatch=true entry in swarm_inbox_read. Preserve messageKey through retries. "
+            "This does not inject terminal input, "
             "dispatch tasks or create another Main wake."
         )
     return replace(tool, description=description, model_schema=schema)

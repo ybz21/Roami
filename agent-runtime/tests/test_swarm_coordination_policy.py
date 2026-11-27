@@ -59,6 +59,39 @@ async def test_large_status_overview_uses_admitted_original_members(coordinated_
     assert actor["taskId"] in {item["task_id"] for item in overview["work"]["items"]}
 
 
+async def test_coordination_inbox_distinguishes_late_handoffs_from_frozen_inputs(coordinated_tools):
+    runtime, team, _, question, actor, binding = coordinated_tools
+    late = await runtime.swarms.post(
+        "alice",
+        team["id"],
+        {"commandKey": "late-handoff", "text": "New evidence is ready", "kind": "handoff"},
+        binding=actor,
+    )
+    before = await runtime.swarms.inbox("alice", team["id"], {})
+    assert all("inCurrentBatch" not in item for item in before["items"])
+
+    inbox = await invoke(runtime, binding, "swarm_inbox_read", {"swarmId": team["id"]})
+    scope = {item["postId"]: item["inCurrentBatch"] for item in inbox["items"]}
+    assert scope == {question["id"]: True, late["id"]: False}
+    with pytest.raises(DomainError, match="SWARM_COORDINATION_SCOPE_CONFLICT"):
+        await invoke(
+            runtime,
+            binding,
+            "swarm_post",
+            {"swarmId": team["id"], "kind": "reply", "replyTo": late["id"], "text": "Checked"},
+        )
+    pending = await runtime.db.call(
+        lambda db: row(
+            db,
+            "SELECT j.state,i.handled_post_id FROM swarm_inbox i JOIN jobs j "
+            "ON json_extract(j.payload_json,'$.inboxId')=i.id AND j.kind='swarm.inbox.wakeup' "
+            "WHERE i.post_id=?",
+            (late["id"],),
+        )
+    )
+    assert pending == {"state": "queued", "handled_post_id": None}
+
+
 async def test_original_main_can_reply_once_via_actual_registered_cli_alias(coordinated_tools):
     runtime, team, _, question, actor, binding = coordinated_tools
     args = {
