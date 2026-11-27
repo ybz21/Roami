@@ -46,7 +46,11 @@ Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=20
 EVENT_HEARTBEAT_SECONDS = 10
 
 
-def create_app(runtime, *, manage_lifecycle=True, mount_conversation_intake=None):
+def create_app(
+    runtime, *, manage_lifecycle=True, mount_conversation_intake=None, status_capabilities=None
+):
+    extension_capabilities = dict(status_capabilities or {})
+
     @asynccontextmanager
     async def lifespan(app):
         if manage_lifecycle:
@@ -685,18 +689,13 @@ def create_app(runtime, *, manage_lifecycle=True, mount_conversation_intake=None
     async def status(owner: Owner):
         return {
             "data": {
+                **extension_capabilities,
                 "managed": getattr(runtime, "managed_parent", False),
                 "pid": os.getpid(),
                 "version": os.environ.get("ROAMI_AGENT_VERSION", ""),
                 "model": runtime.model.model,
                 "configured": bool(runtime.model.model),
-                "projectOkr": True,
-                "projectOkrMain": True,
-                "projectMainExecution": True,
-                "okrMessageContext": True,
                 "conversationIdentity": True,
-                "projectMainWake": True,
-                "projectGoalDailyWake": True,
                 "memoryTimezone": runtime.memory.daily.timezone,
                 "developmentRsi": runtime.improvement is not None,
                 "commands": COMMANDS,
