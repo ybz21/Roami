@@ -87,9 +87,10 @@ def operation(tool):
         )
     elif tool.name == "task_status":
         description = (
-            "Read one selected original member's current task/revision/run. Use includeResult=true "
-            "to read the actual current execution report and host receipt for independent review. "
-            "A report is not proof of artifact quality or publication."
+            "Read one selected original member's current task/revision/run. For verification, "
+            "use its compact reviewEvidence to select retained artifact IDs and fully read those "
+            "artifacts in this turn. Use includeResult=true only when the full executor report "
+            "or execution receipt is needed. Neither response establishes publication."
         )
     elif tool.name == "swarm_post":
         fields["kind"]["enum"] = ["progress", "question", "reply"]

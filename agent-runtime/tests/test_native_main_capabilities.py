@@ -111,6 +111,8 @@ async def test_large_coordination_uses_bound_read_only_context_without_changing_
             assert len(spec["prompt"].encode()) < INLINE_LIMIT
             assert READ_CAPABILITY in spec["prompt"] and "历史证据" not in spec["prompt"]
             assert "original goal are at index 2" in spec["prompt"]
+            assert "agent capability call read --context" in spec["prompt"]
+            assert '{"path":"artifact://RETAINED_ID","offset":0,"limit":8000}' in spec["prompt"]
             assert (
                 encoded({"messageCount": 4, "systemIndices": [0, 2, 3], "coordinationIndex": 2})
                 in spec["prompt"]

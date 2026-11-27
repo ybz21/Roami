@@ -128,6 +128,90 @@ async def test_native_review_requires_prior_read_and_replay_creates_no_step(nati
     assert (await runtime.tasks.get("alice", args["taskId"]))["task"]["state"] == "succeeded"
 
 
+async def test_native_task_status_finds_only_current_run_review_artifacts(native_review):
+    runtime, _, context, args, artifact = native_review
+    task_id, run_id = args["taskId"], args["runId"]
+    recover = await runtime.main_capabilities.call(
+        "swarm_verify",
+        request(context, {**args, "artifactIds": []}, "missing-artifact-ids"),
+        "alice",
+    )
+    assert recover["result"]["error"] == "SWARM_DELIVERABLE_EVIDENCE_REQUIRED"
+    assert "task_status" in recover["result"]["recovery"]
+    for source, associated_run in [("workspace_output", "old-run"), ("native_result", run_id)]:
+        await runtime.artifacts.put(
+            "alice",
+            b"Not a current deliverable",
+            name=source + ".txt",
+            mime_type="text/plain",
+            task_id=task_id,
+            metadata={"source": source, "runId": associated_run},
+        )
+    old_status = await runtime.main_capabilities.call(
+        "task_status", request(context, {}, "list-status"), "alice"
+    )
+    assert all("reviewEvidence" not in item for item in old_status["result"])
+    status = await runtime.main_capabilities.call(
+        "task_status", request(context, {"taskId": task_id}, "status-evidence"), "alice"
+    )
+    assert status["state"] == "succeeded"
+    detail = status["result"][0]
+    assert detail["revision"] == args["revision"] and detail["latestAttempt"]["runId"] == run_id
+    assert "executorResult" not in detail
+    assert detail["reviewEvidence"] == {
+        "swarmId": args["swarmId"],
+        "externalActionRequiresUser": False,
+        "artifacts": [
+            {
+                "id": artifact["id"],
+                "name": "report.json",
+                "mimeType": "application/json",
+                "sizeBytes": 16,
+            }
+        ],
+        "hasMore": False,
+    }
+
+    for num in range(8):
+        await runtime.artifacts.put(
+            "alice",
+            b"Supplemental evidence",
+            name=f"support-{num}.txt",
+            mime_type="text/plain",
+            task_id=task_id,
+            metadata={"source": "workspace_output", "runId": run_id},
+        )
+    bounded = await runtime.main_capabilities.call(
+        "task_status", request(context, {"taskId": task_id}, "status-evidence-bounded"), "alice"
+    )
+    evidence = bounded["result"][0]["reviewEvidence"]
+    assert len(evidence["artifacts"]) == 8 and evidence["hasMore"]
+    assert artifact["id"] in {item["id"] for item in evidence["artifacts"]}
+
+    # An admitted identity and visible metadata still cannot satisfy the acceptance gate.
+    before_read = await runtime.main_capabilities.call(
+        "swarm_verify", request(context, args, "visible-artifact-unread"), "alice"
+    )
+    assert before_read["result"]["error"] == "SWARM_ARTIFACT_REVIEW_REQUIRED"
+    shown = next(item for item in evidence["artifacts"] if item["name"] == "report.json")
+    read = await runtime.main_capabilities.call(
+        "read",
+        request(
+            context,
+            {"path": "artifact://" + shown["id"], "offset": 0, "limit": 8000},
+            "read-evidence",
+        ),
+        "alice",
+    )
+    assert read["result"]["text"] == '{"observed": 3}\n' and read["result"]["nextRead"] is None
+    done = await runtime.main_capabilities.call(
+        "swarm_verify",
+        request(context, {**args, "artifactIds": [shown["id"]]}, "verify-retained-evidence"),
+        "alice",
+    )
+    assert done["state"] == "succeeded"
+
+
 async def test_native_parallel_read_cannot_satisfy_verification(native_review, monkeypatch):
     runtime, _, context, args, artifact = native_review
     entered, release = asyncio.Event(), asyncio.Event()

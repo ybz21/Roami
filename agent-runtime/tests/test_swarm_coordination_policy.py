@@ -216,6 +216,14 @@ async def test_artifact_alias_rejects_other_owner_scoped_files_before_reading(co
     )
     result = await invoke(runtime, binding, "read", {"path": "artifact://" + current["id"]})
     assert result["text"] == "CURRENT_RUN_EVIDENCE"
+    await runtime.db.call(
+        lambda db: db.execute(
+            "UPDATE tasks SET state='waiting_user' WHERE id=?", (actor["taskId"],)
+        ),
+        write=True,
+    )
+    status = await invoke(runtime, binding, "task_status", {"taskId": actor["taskId"]})
+    assert [item["id"] for item in status[0]["reviewEvidence"]["artifacts"]] == [current["id"]]
 
 
 async def test_file_read_uses_host_project_root_and_ignores_supplied_workspace(

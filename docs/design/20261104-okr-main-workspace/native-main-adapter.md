@@ -212,3 +212,13 @@ Go continueSession 在创建 spec.json、提交新输入之前拒绝 busy；既�
 22项原生 Main 专项通过，新增两次 busy 后保持完全相同输入接入、等待中取消不误杀前一轮，以及未知或身份变化错误不重放；原有未知执行、原生停止与回执校验回归保留。完整检查与实际部署尚待后续验证，本条不声明平台发布或自动运营目标完成。
 
 本项完整检查已通过：Go全套、Python 5128 passed / 48 skipped / 6 subtests passed（2062秒）、前端typecheck/i18n/hover/构建及扫描。完整检查后仅追加本段文档；冻结树比较确认运行时代码不变后执行 quick 与提交钩子。本项尚未部署，不声称 Main 或成员已完成平台发布。
+
+### 当前轮留存产物发现
+
+11 月 28 日，原宣传 Main 独立回读 X 第 9 轮的真实公开结果后，对同一轮调用了 task_status。详细结果记录约 114 KB，缺少宿主留存的交付产物 ID。随后的 swarm_verify 使用空 artifactIds，被拒绝为 SWARM_DELIVERABLE_EVIDENCE_REQUIRED。
+
+Main 按 taskId 查看待验收的 Swarm 工作时，task_status 补充 reviewEvidence，提供团队 ID、当前 run 的至多八条留存产物引用及是否有更多。引用沿用正式验收的产物查询，按账号、团队、会话、任务、修订和最新 run 核对。需要人工确认的外部动作明确标出。
+
+大上下文使用启动提示与签名分页，内置 read 不会出现在查找额外能力的 tool_list 中。启动提示增加签名 read 的 artifact:// 参数和分页用法，协调任务目录也指向简要的 reviewEvidence。产物引用供选择，接受仍依赖同一 Main 回合内先完成全文读取，再走原验收门禁。
+
+97 项专项通过。覆盖原生 Main 从 task_status 取得当前留存 ID、全文读取后正式验收、缺少读取仍拒绝，以及协调批次隔离、旧 run 和原生进度附件过滤、八条上限与大上下文启动提示。生产 X 本轮的正式任务验收仍待验证。
