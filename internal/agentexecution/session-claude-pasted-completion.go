@@ -258,7 +258,7 @@ func (s Service) reconcileClaudePastedCompletion(ctx context.Context, key, dir, 
 	hash := workspaceHash(sessionPrompt(dir, spec))
 	turn := ownedClaudePastedTurn(state.Binding, hash, since)
 	if turn == "" {
-		return empty, fmt.Errorf("SESSION_RECONCILIATION_SCOPE_REQUIRED")
+		return s.reconcileDisplacedClaudeWriter(ctx, key, dir, path, spec, receipt, state, since, hash)
 	}
 	return s.settleClaudeRecordedCompletion(ctx, key, dir, path, receipt, state, turn, hash, since)
 }
@@ -307,7 +307,10 @@ func (s Service) settleClaudeObservedOutcome(ctx context.Context, key, dir, path
 		result.State = "cancelled"
 	}
 	yes := true
-	result.InputStopped, result.OutcomeKnown, result.StopEvidence = &yes, &yes, digest
+	result.InputStopped, result.StopEvidence = &yes, digest
+	if result.OutcomeKnown == nil {
+		result.OutcomeKnown = &yes
+	}
 	if err = writeJSON(filepath.Join(dir, "result.json"), result); err != nil {
 		return empty, err
 	}
