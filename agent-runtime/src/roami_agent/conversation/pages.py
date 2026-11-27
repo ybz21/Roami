@@ -2,7 +2,7 @@
 
 import json
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row, rows
 from roami_agent.storage.reply_previews import public_preview_message
@@ -38,14 +38,15 @@ def position(db, cid, segments, mid):
     raise DomainError("INVALID_MESSAGE_CURSOR")
 
 
-def message_view(value, completed=None, *, compact=True):
+def message_view(db, value, completed=None, *, compact=True):
     content = json.loads(value["content_json"])
     offset = len(content.get("text", ""))
     truncated = False
     if compact:
-        context = content.get("okrContext")
+        projection = message_content(db)
+        metadata = projection.public_metadata(content)
         if value["role"] == "user":
-            content["text"] = human_text(content)
+            content["text"] = projection.human_text(content)
             offset = len(content["text"])
         content = {
             k: v
@@ -61,8 +62,7 @@ def message_view(value, completed=None, *, compact=True):
                 "replyPreview",
             }
         }
-        if isinstance(context, dict) and context.get("version") == 1:
-            content["okrContext"] = {"version": 1, "revision": context["revision"]}
+        content.update(metadata)
         if len(content.get("text", "")) > 2000:
             content["text"] = content["text"][:2000]
             truncated = True
@@ -73,7 +73,7 @@ def message_view(value, completed=None, *, compact=True):
         ):
             content = {
                 "text": str(content.get("text") or "")[:2000],
-                **({"okrContext": content["okrContext"]} if "okrContext" in content else {}),
+                **metadata,
             }
             truncated = True
     return {
@@ -189,7 +189,7 @@ def conversation_page(db, owner, cid, branch=None, *, before=None, anchor=None, 
                     continue
         visible.append(entry)
     messages = [
-        message_view(public_preview_message(db, m), completed.get(m["id"])) for m in visible
+        message_view(db, public_preview_message(db, m), completed.get(m["id"])) for m in visible
     ]
     while len(json.dumps(messages, ensure_ascii=False).encode()) > 220000 and len(messages) > 1:
         messages.pop(0)
@@ -253,4 +253,4 @@ def message_detail(db, owner, cid, mid, branch=None):
     )
     if not value:
         raise DomainError("MESSAGE_NOT_FOUND", 404)
-    return message_view(public_preview_message(db, value), compact=False)
+    return message_view(db, public_preview_message(db, value), compact=False)

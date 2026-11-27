@@ -9,6 +9,7 @@ from roami_okr.daily_routes import mount_daily_routes
 from roami_okr.execution_routes import mount_main_execution_routes
 from roami_okr.intake import submit, wake_project
 from roami_okr.main import open_main
+from roami_okr.message_content import OKR_MESSAGE_CONTENT
 from roami_okr.project import operation, registered_project
 
 
@@ -75,6 +76,7 @@ def mount_project_conversations(app, runtime):
 
 
 def create_app(runtime, *, manage_lifecycle=True):
+    runtime.db.message_content = OKR_MESSAGE_CONTENT
     return create_agent_app(
         runtime,
         manage_lifecycle=manage_lifecycle,

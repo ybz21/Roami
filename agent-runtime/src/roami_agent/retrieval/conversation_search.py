@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import LITERAL_CONTENT, message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
@@ -13,9 +13,9 @@ from roami_agent.storage.task_request import task_user_request
 STABLE_STATUSES = {"completed", "interrupted", "failed"}
 
 
-def source_text(value):
+def source_text(value, projection=LITERAL_CONTENT):
     content = json.loads(value["content_json"])
-    return human_text(content) if value["role"] == "user" else content.get("text", "")
+    return projection.human_text(content) if value["role"] == "user" else content.get("text", "")
 
 
 def source_hash(value):
@@ -67,7 +67,7 @@ def index_pending(db, limit=32):
         ):
             db.execute(
                 "INSERT INTO conversation_search_fts(message_id,terms) VALUES(?,?)",
-                (mid, " ".join(terms(source_text(value)))),
+                (mid, " ".join(terms(source_text(value, message_content(db))))),
             )
             db.execute(
                 "INSERT INTO conversation_search_documents(message_id,source_sha256) VALUES(?,?)",

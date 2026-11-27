@@ -199,7 +199,7 @@ class ContextMaintenance:
                         "role": "external" if m.get("agent_task_instruction") else m["role"],
                         "status": m["status"],
                         "day": event_day(m["created_ms"], payload["timezone"]),
-                        "text": source_text(m),
+                        "text": source_text(m, self.db.message_content),
                     }
                     for m in incremental
                 ],
@@ -259,7 +259,7 @@ class ContextMaintenance:
             async with asyncio.timeout(timeout or None):
                 text = await read_summary(self.context.model, prompt)
             items, archives = validate_candidate(
-                json.loads(text), previous_items, source, incremental, days
+                json.loads(text), previous_items, source, incremental, days, self.db.message_content
             )
 
             def activate(db):

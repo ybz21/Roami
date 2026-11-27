@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TypeVar
 
+from roami_agent.conversation.message_content import LITERAL_CONTENT
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
@@ -22,6 +23,7 @@ T = TypeVar("T")
 class NativeConnection(sqlite3.Connection):
     native_payloads = None
     event_conversations = None
+    message_content = LITERAL_CONTENT
 
 
 class Database:
@@ -34,6 +36,7 @@ class Database:
         self.pending = 0
         self.instance_paths = None
         self.conversation_events = ConversationEvents()
+        self.message_content = LITERAL_CONTENT
 
     async def open(self):
         try:
@@ -129,6 +132,8 @@ class Database:
 
         def execute():
             try:
+                if self.connection is not None:
+                    self.connection.message_content = self.message_content
                 if write:
                     self.connection.execute("BEGIN IMMEDIATE")
                     self.connection.event_conversations = set()

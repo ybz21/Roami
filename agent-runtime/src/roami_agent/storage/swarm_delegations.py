@@ -3,7 +3,7 @@
 import hashlib
 import json
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row
@@ -91,7 +91,12 @@ def current_delegation(db, owner, swarm_id, delegation_id=None, *, allow_paused=
         (source["turn_id"],),
     ):
         raise DomainError("SWARM_DELEGATION_SOURCE_STOPPED", 409)
-    if source_quote(human_text(json.loads(source["body"])), value["source_quote"]) is None:
+    if (
+        source_quote(
+            message_content(db).human_text(json.loads(source["body"])), value["source_quote"]
+        )
+        is None
+    ):
         raise DomainError("SWARM_DELEGATION_SOURCE_REQUIRED", 409)
     for message_id in json.loads(value["source_messages_json"]):
         actual = user_source(db, owner, team["conversation_id"], message_id)

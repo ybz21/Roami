@@ -11,12 +11,14 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
 from roami_okr.intake import scheduled_admission
 from roami_okr.main import open_main
+from roami_okr.message_content import OKR_MESSAGE_CONTENT
 
 GOAL = "每天整理X和B站草稿、采集数据并复盘；发布仍需用户具体确认。"
 
 
 @pytest.fixture
 async def delegated_team(store, request):
+    store.message_content = OKR_MESSAGE_CONTENT
     runtime = Runtime(store, ConversationModel())
     main = await open_main(runtime.conversations, "alice", "project-a")
     accepted = await runtime.conversations.accept("alice", main["id"], "goal", GOAL)
@@ -333,8 +335,8 @@ async def test_current_branch_must_actually_include_the_latest_goal_source(
 
 
 async def test_legacy_browser_context_cannot_create_or_restore_authority(delegated_team):
-    from roami_agent.conversation.okr_message_context import MARKER
     from roami_agent.storage.swarm_delegations import source_digest
+    from roami_okr.message_content import MARKER
 
     runtime, service, team, accepted, _, binding, spec = delegated_team
     raw = (

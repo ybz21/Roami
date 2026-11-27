@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from roami_agent.conversation.okr_message_context import human_text
+from roami_agent.conversation.message_content import message_content
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
@@ -84,7 +84,7 @@ def continuity_payload(db, binding, timezone_name):
                 "id": source["id"],
                 "createdMs": source["created_ms"],
                 "sha256": source_digest(source["body"]),
-                "text": human_text(json.loads(source["body"])),
+                "text": message_content(db).human_text(json.loads(source["body"])),
             }
         )
     tasks = rows(
