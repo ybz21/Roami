@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import shlex
 from pathlib import Path
 
 import httpx
@@ -68,14 +69,23 @@ async def signed_native_launch(runtime, main, turn, retry_suffix=""):
     return binding, key, signed
 
 
-async def test_large_coordination_uses_bound_read_only_context_without_changing_launch(native_main):
+@pytest.mark.parametrize("batch_fits", [True, False])
+async def test_large_coordination_uses_bound_read_only_context_without_changing_launch(
+    native_main, batch_fits
+):
     runtime, main, turn, original_context = native_main
     binding = await runtime.db.call(lambda db: main_binding(db, "alice", main["id"]))
     binding["binding"] = json.loads(binding.pop("binding_json"))
+    batch = {
+        "role": "system",
+        "content": CURRENT_BATCH_PREFIX
+        + "Frozen original goal and evidence"
+        + ("" if batch_fits else "另" * PAGE_BYTES),
+    }
     messages = [
         {"role": "system", "content": "Current team rules"},
         {"role": "user", "content": "历史证据🙂" * 30000},
-        {"role": "system", "content": CURRENT_BATCH_PREFIX + "Frozen original goal and evidence"},
+        batch,
         {"role": "system", "content": "Current resume policy"},
     ]
     key = (
@@ -100,6 +110,19 @@ async def test_large_coordination_uses_bound_read_only_context_without_changing_
             assert spec["sessionId"] == binding["session_id"] and spec["persistent"]
             assert len(spec["prompt"].encode()) < INLINE_LIMIT
             assert READ_CAPABILITY in spec["prompt"] and "历史证据" not in spec["prompt"]
+            assert "original goal are at index 2" in spec["prompt"]
+            assert (
+                encoded({"messageCount": 4, "systemIndices": [0, 2, 3], "coordinationIndex": 2})
+                in spec["prompt"]
+            )
+            assert "--call context-index" not in spec["prompt"]
+            if batch_fits:
+                assert encoded(batch) in spec["prompt"]
+                assert "--call context-batch" not in spec["prompt"]
+            else:
+                assert CURRENT_BATCH_PREFIX not in spec["prompt"]
+                command = "--call context-batch --input " + shlex.quote(encoded({"index": 2}))
+                assert command in spec["prompt"]
             context = next(
                 signed
                 for path in (runtime.db.data_root / "agents/capability-contexts").glob("*.json")
