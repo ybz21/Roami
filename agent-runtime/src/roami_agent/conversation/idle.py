@@ -7,13 +7,13 @@ from roami_agent.storage.database import row
 from roami_agent.storage.transcript_repository import history
 
 
-def assert_main_idle(db, conversation, *, ignore_turn_id=None):
+def assert_main_idle(db, conversation, *, ignore_turn_id=None, allow_queued=False):
     branch = conversation["active_branch_id"]
     if row(
         db,
-        "SELECT id FROM turns WHERE branch_id=? AND state IN ('queued','running') "
+        "SELECT id FROM turns WHERE branch_id=? AND (state='running' OR (NOT ? AND state='queued')) "
         "AND (? IS NULL OR id!=?) LIMIT 1",
-        (branch, ignore_turn_id, ignore_turn_id),
+        (branch, allow_queued, ignore_turn_id, ignore_turn_id),
     ):
         raise DomainError("MAIN_BUSY", 409)
     messages = history(db, branch)

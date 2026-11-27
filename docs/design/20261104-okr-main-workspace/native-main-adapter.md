@@ -32,7 +32,9 @@
 - `app.Runtime.run_turn`：浅复制当前 AgentLoop，只替换本轮 Main model；共享原 `turn_tasks` 和 `preemptible`，保留原队列、群聊入口、抢占、日志与 reply 交付链，不修改全局模型或其他项目。
 - `server/main_execution_routes.py` 与 Go 代理：`GET/PUT /api/agent/conversations/:cid/execution`。PUT 接收 projectId、commandKey、expectedGeneration、executor、model、preparedLaunchKey；客户端不得提供自报 ready/stopped 的字段。
 
-当前只允许从原 Roami Main 初次绑定已就绪原生 provider；再次更换已有原生 Main 明确拒绝，需后续补齐原 provider 的正式停止/退休协议，不能直接覆盖。默认执行器与首页 Main 不受此配置影响。
+初次绑定可以从原 Roami Main 接入已就绪的原生 provider。Claude 原生压缩得到确定的输入拒绝后，可以用同一 Main 的配置接口接入同执行器、同网关模型的新原生实例。请求带 `recoverFromLaunchKey`，指向已对账的失败轮次；在原 Main 没有正在执行的轮次且 Swarm 暂停时生效。已排队的消息保留原执行顺序，开始执行时读取新 generation。
+
+宿主只认可原初始化凭据下最新的已知结果。Go 从原会话、项目目录、主进程及对应轮次的停止回执取证，输出 `contextRejection`。Python 复核当前 generation、原会话身份、失败执行键及其在同一 Main 的失败记录，再追加 generation。旧会话、历史和 Swarm 成员身份保留，恢复请求留审计事件，同一请求键重复提交返回同一回执。旧失败轮次不会自动重发。路由临时耗尽仍走原模型接续机制。
 
 ## 本轮隔离证据与待验
 
