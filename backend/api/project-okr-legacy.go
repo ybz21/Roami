@@ -18,7 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ybz21/Roami/backend/okr"
-	"golang.org/x/sys/unix"
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 var legacySwarmID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
@@ -311,7 +311,7 @@ func legacyRegular(root *os.Root, name string) (*os.File, error) {
 	if !info.Mode().IsRegular() {
 		return nil, errors.New("unsafe legacy source")
 	}
-	file, err := root.OpenFile(name, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	file, err := fsguard.OpenRootReadNoFollow(root, name)
 	if err != nil {
 		return nil, err
 	}

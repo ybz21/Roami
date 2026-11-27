@@ -71,15 +71,18 @@ type Row struct {
 	CreatedAt  string `json:"created_at,omitempty"`
 	InitialCwd string `json:"initial_cwd,omitempty"`
 	// 以下几列只在读历史时有意义，Put 不吃。
-	Status     string `json:"status,omitempty"`      // live | dead
-	DiedAt     string `json:"died_at,omitempty"`     //
-	DiedReason string `json:"died_reason,omitempty"` // killed | host-restart
-	Label      string `json:"label,omitempty"`       // 展示名快照（会话死后 @roam_name 就没了）
-	Home       string `json:"home,omitempty"`        // 归属目录
-	RepoRoot   string `json:"repo_root,omitempty"`   // 所属仓库根（建会话时算好的）
-	AgentUUID  string `json:"agent_uuid,omitempty"`  // agent 那一侧的对话 id
-	AgentKind  string `json:"agent_kind,omitempty"`  // claude | codex：恢复时敲哪个命令
-	LastSeen   string `json:"last_seen,omitempty"`   // 最后一次被 Reconcile 看见（host-restart 的 died_at 取它）
+	Status         string `json:"status,omitempty"`           // live | dead
+	DiedAt         string `json:"died_at,omitempty"`          //
+	DiedReason     string `json:"died_reason,omitempty"`      // killed | host-restart
+	Label          string `json:"label,omitempty"`            // 展示名快照（会话死后 @roam_name 就没了）
+	Home           string `json:"home,omitempty"`             // 归属目录
+	RepoRoot       string `json:"repo_root,omitempty"`        // 所属仓库根（建会话时算好的）
+	AgentUUID      string `json:"agent_uuid,omitempty"`       // agent 那一侧的对话 id
+	AgentKind      string `json:"agent_kind,omitempty"`       // claude | codex：恢复时敲哪个命令
+	LastSeen       string `json:"last_seen,omitempty"`        // 最后一次被 Reconcile 看见（host-restart 的 died_at 取它）
+	Backend        string `json:"backend,omitempty"`          // tmux | native（空值按 tmux 兼容）
+	HostInstanceID string `json:"host_instance_id,omitempty"` // 原生宿主实例 ID（用于分宿主对账）
+	BootID         string `json:"boot_id,omitempty"`          // 机器启动批次（多宿主重启休眠聚合）
 }
 
 // DisplayLabel 这一行该显示成什么名字。
@@ -205,18 +208,29 @@ func (s *Store) Put(r Row) error {
 	// 显式列 upsert，**不能用 INSERT OR REPLACE**：那是 DELETE + INSERT，整行重置。
 	// sessions 上还有 home_dir / repo_root / label 这些别处写的列，用 REPLACE 的话
 	// 之后任何一次 Put（fork、plugin 建会话、adopt）都会把它们静默抹成 NULL。
+	backend := r.Backend
+	if backend == "" {
+		backend = "tmux"
+	}
+	tmuxID := ""
+	epoch := ""
+	if backend == "tmux" {
+		tmuxID = s.nameToID()[r.Session]
+		epoch = s.epoch()
+	}
 	_, err = db.Exec(`INSERT INTO sessions
-		(id,parent_id,created_by,created_at,initial_cwd,status,died_at,died_reason,tmux_id,tmux_epoch)
-		VALUES(?,?,?,?,?,'live',NULL,NULL,NULLIF(?,''),NULLIF(?,''))
+		(id,parent_id,created_by,created_at,initial_cwd,status,died_at,died_reason,tmux_id,tmux_epoch,backend,host_instance_id,boot_id)
+		VALUES(?,?,?,?,?,'live',NULL,NULL,NULLIF(?,''),NULLIF(?,''),?,NULLIF(?,''),NULLIF(?,''))
 		ON CONFLICT(id) DO UPDATE SET
 			parent_id=excluded.parent_id,
 			created_by=excluded.created_by,
 			created_at=excluded.created_at,
 			initial_cwd=excluded.initial_cwd,
 			status='live', died_at=NULL, died_reason=NULL,
-			tmux_id=excluded.tmux_id, tmux_epoch=excluded.tmux_epoch`,
+			tmux_id=excluded.tmux_id, tmux_epoch=excluded.tmux_epoch,
+			backend=excluded.backend, host_instance_id=excluded.host_instance_id, boot_id=excluded.boot_id`,
 		r.Session, nullable(r.Parent), r.CreatedBy, r.CreatedAt, r.InitialCwd,
-		s.nameToID()[r.Session], s.epoch())
+		tmuxID, epoch, backend, r.HostInstanceID, r.BootID)
 	return err
 }
 
@@ -269,10 +283,14 @@ func (s *Store) Get(session string) (Row, bool) {
 	err = db.QueryRow(`SELECT IFNULL(parent_id,''), IFNULL(created_by,''), IFNULL(created_at,''),
 		IFNULL(initial_cwd,''), status, IFNULL(died_at,''), IFNULL(died_reason,''),
 		IFNULL(label,''), IFNULL(home_dir,''), IFNULL(repo_root,''), IFNULL(agent_session_uuid,''),
-		IFNULL(agent_kind,'')
+		IFNULL(agent_kind,''), IFNULL(backend,'tmux'), IFNULL(host_instance_id,''), IFNULL(boot_id,'')
 		FROM sessions WHERE id=?`, session).
 		Scan(&r.Parent, &r.CreatedBy, &r.CreatedAt, &r.InitialCwd, &r.Status,
-			&r.DiedAt, &r.DiedReason, &r.Label, &r.Home, &r.RepoRoot, &r.AgentUUID, &r.AgentKind)
+			&r.DiedAt, &r.DiedReason, &r.Label, &r.Home, &r.RepoRoot, &r.AgentUUID, &r.AgentKind,
+			&r.Backend, &r.HostInstanceID, &r.BootID)
+	if r.Backend == "" {
+		r.Backend = "tmux"
+	}
 	return r, err == nil
 }
 
@@ -473,19 +491,40 @@ func (s *Store) Dormant() []Row {
 	if err != nil {
 		return nil
 	}
-	rows, err := db.Query(`SELECT d.id, IFNULL(d.created_at,''), IFNULL(d.initial_cwd,''),
-		IFNULL(d.died_at,''), IFNULL(d.label,''), IFNULL(d.home_dir,''),
-		IFNULL(d.repo_root,''), IFNULL(d.agent_session_uuid,''), IFNULL(d.agent_kind,'')
-		FROM sessions d
-		WHERE d.status='dead' AND d.died_reason='host-restart'
-		  AND IFNULL(d.tmux_epoch,'') <> ''
-		  AND d.tmux_epoch = (SELECT tmux_epoch FROM sessions
-		        WHERE status='dead' AND died_reason='host-restart' AND IFNULL(tmux_epoch,'') <> ''
-		        ORDER BY IFNULL(died_at,created_at) DESC LIMIT 1)
-		  AND IFNULL(d.home_dir,IFNULL(d.initial_cwd,'')) <> ''
-		  AND NOT EXISTS (SELECT 1 FROM sessions r WHERE r.restored_from = d.id)
-		ORDER BY IFNULL(d.died_at,d.created_at) DESC
-		LIMIT ?`, dormantCap)
+	// Prefer boot_id batch aggregation when multi-host reboot records exist; fall back to legacy tmux_epoch.
+	var latestBoot string
+	_ = db.QueryRow(`SELECT IFNULL(boot_id,'') FROM sessions
+		WHERE status='dead' AND died_reason='host-restart' AND IFNULL(boot_id,'') <> ''
+		ORDER BY IFNULL(died_at,created_at) DESC LIMIT 1`).Scan(&latestBoot)
+	var rows *sql.Rows
+	if latestBoot != "" {
+		rows, err = db.Query(`SELECT d.id, IFNULL(d.created_at,''), IFNULL(d.initial_cwd,''),
+			IFNULL(d.died_at,''), IFNULL(d.label,''), IFNULL(d.home_dir,''),
+			IFNULL(d.repo_root,''), IFNULL(d.agent_session_uuid,''), IFNULL(d.agent_kind,''),
+			IFNULL(d.backend,'tmux'), IFNULL(d.host_instance_id,'')
+			FROM sessions d
+			WHERE d.status='dead' AND d.died_reason='host-restart'
+			  AND d.boot_id = ?
+			  AND IFNULL(d.home_dir,IFNULL(d.initial_cwd,'')) <> ''
+			  AND NOT EXISTS (SELECT 1 FROM sessions r WHERE r.restored_from = d.id)
+			ORDER BY IFNULL(d.died_at,d.created_at) DESC
+			LIMIT ?`, latestBoot, dormantCap)
+	} else {
+		rows, err = db.Query(`SELECT d.id, IFNULL(d.created_at,''), IFNULL(d.initial_cwd,''),
+			IFNULL(d.died_at,''), IFNULL(d.label,''), IFNULL(d.home_dir,''),
+			IFNULL(d.repo_root,''), IFNULL(d.agent_session_uuid,''), IFNULL(d.agent_kind,''),
+			IFNULL(d.backend,'tmux'), IFNULL(d.host_instance_id,'')
+			FROM sessions d
+			WHERE d.status='dead' AND d.died_reason='host-restart'
+			  AND IFNULL(d.tmux_epoch,'') <> ''
+			  AND d.tmux_epoch = (SELECT tmux_epoch FROM sessions
+			        WHERE status='dead' AND died_reason='host-restart' AND IFNULL(tmux_epoch,'') <> ''
+			        ORDER BY IFNULL(died_at,created_at) DESC LIMIT 1)
+			  AND IFNULL(d.home_dir,IFNULL(d.initial_cwd,'')) <> ''
+			  AND NOT EXISTS (SELECT 1 FROM sessions r WHERE r.restored_from = d.id)
+			ORDER BY IFNULL(d.died_at,d.created_at) DESC
+			LIMIT ?`, dormantCap)
+	}
 	if err != nil {
 		return nil
 	}
@@ -494,7 +533,8 @@ func (s *Store) Dormant() []Row {
 	for rows.Next() {
 		r := Row{Status: "dead", DiedReason: "host-restart"}
 		if rows.Scan(&r.Session, &r.CreatedAt, &r.InitialCwd, &r.DiedAt,
-			&r.Label, &r.Home, &r.RepoRoot, &r.AgentUUID, &r.AgentKind) != nil {
+			&r.Label, &r.Home, &r.RepoRoot, &r.AgentUUID, &r.AgentKind,
+			&r.Backend, &r.HostInstanceID) != nil {
 			continue
 		}
 		dir := r.Home
@@ -652,7 +692,7 @@ func (s *Store) Reconcile(alive map[string]bool) {
 	// 这一条会退回记成 killed。主场景（失控的 agent 被杀、shell 和会话都还活着）
 	// 采得到，因为会话还在，下一轮照常遍历它。
 	rows, err := db.Query(`SELECT id, IFNULL(tmux_epoch,''), IFNULL(last_seen,''), IFNULL(oom_kills,0)
-		FROM sessions WHERE status='live'`)
+		FROM sessions WHERE status='live' AND IFNULL(backend,'tmux')='tmux'`)
 	if err != nil {
 		return
 	}
@@ -705,7 +745,60 @@ func (s *Store) ReconcileServerGone() {
 	now := s.Now().Format(time.RFC3339)
 	_, _ = db.Exec(`UPDATE sessions SET status='dead', died_reason='host-restart', tmux_id=NULL,
 		died_at=CASE WHEN IFNULL(last_seen,'')<>'' THEN last_seen ELSE ? END
-		WHERE status='live'`, now)
+		WHERE status='live' AND IFNULL(backend,'tmux')='tmux'`, now)
+	s.prune(db, deadKeep)
+}
+
+// ReconcileHost reconciles only the (backend, hostInstanceID) shard so an unreachable or
+// draining host never marks live sessions on another backend or host as dead.
+func (s *Store) ReconcileHost(backend, hostInstanceID string, alive map[string]bool) {
+	if backend == "" {
+		backend = "tmux"
+	}
+	db, err := s.db()
+	if err != nil {
+		return
+	}
+	now := s.Now().Format(time.RFC3339)
+	for id := range alive {
+		_, _ = db.Exec(`UPDATE sessions SET last_seen=? WHERE id=? AND status='live' AND IFNULL(backend,'tmux')=? AND IFNULL(host_instance_id,'')=?`,
+			now, id, backend, hostInstanceID)
+	}
+	rows, err := db.Query(`SELECT id FROM sessions WHERE status='live' AND IFNULL(backend,'tmux')=? AND IFNULL(host_instance_id,'')=?`,
+		backend, hostInstanceID)
+	if err != nil {
+		return
+	}
+	var dead []string
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil && !alive[id] {
+			dead = append(dead, id)
+		}
+	}
+	rows.Close()
+	for _, id := range dead {
+		_, _ = db.Exec(`UPDATE sessions SET status='dead', died_at=?, died_reason='killed' WHERE id=?`, now, id)
+	}
+	s.prune(db, deadKeep)
+}
+
+// ReconcileHostGone marks all live sessions owned by one confirmed-gone host shard as host-restart,
+// tagging them with bootID so Dormant() aggregates multi-host reboot batches together.
+func (s *Store) ReconcileHostGone(backend, hostInstanceID, bootID string) {
+	if backend == "" {
+		backend = "tmux"
+	}
+	db, err := s.db()
+	if err != nil {
+		return
+	}
+	now := s.Now().Format(time.RFC3339)
+	_, _ = db.Exec(`UPDATE sessions SET status='dead', died_reason='host-restart', tmux_id=NULL,
+		boot_id=CASE WHEN ?<>'' THEN ? ELSE boot_id END,
+		died_at=CASE WHEN IFNULL(last_seen,'')<>'' THEN last_seen ELSE ? END
+		WHERE status='live' AND IFNULL(backend,'tmux')=? AND IFNULL(host_instance_id,'')=?`,
+		bootID, bootID, now, backend, hostInstanceID)
 	s.prune(db, deadKeep)
 }
 

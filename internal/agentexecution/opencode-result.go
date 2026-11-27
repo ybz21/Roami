@@ -9,10 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ybz21/Roami/internal/gitcontext"
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 type boundedExport struct{ bytes.Buffer }
@@ -107,12 +107,12 @@ func exportOpenCodeResult(ctx context.Context, bin, provider, directory, prompt 
 	cmd := exec.CommandContext(readCtx, bin, "session", "export", "--standalone", provider)
 	cmd.Dir = directory
 	cmd.Env = gitcontext.ForDirectory(os.Environ())
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	procctl.SetProcessGroup(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return procctl.KillGroupErr(cmd.Process.Pid, true)
 	}
 	cmd.WaitDelay = 2 * time.Second
 	output := &boundedExport{}
@@ -120,7 +120,7 @@ func exportOpenCodeResult(ctx context.Context, bin, provider, directory, prompt 
 	cmd.Stderr = &tail{limit: 8000}
 	err := cmd.Run()
 	if cmd.Process != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		procctl.SignalGroup(cmd.Process.Pid, true)
 	}
 	if err != nil {
 		return "", fmt.Errorf("EXECUTOR_TRANSCRIPT_UNAVAILABLE")

@@ -100,6 +100,9 @@ func runSession(args []string) int {
 	if nativeSessionNewRequested(args) {
 		return runNativeSessionNew(args[1:])
 	}
+	if handled, code := maybeRunNativeSessionCLI(args); handled {
+		return code
+	}
 	return runSessionEngine(args)
 }
 
@@ -125,10 +128,6 @@ func runSwarm(args []string) int {
 }
 
 func runSessionEngine(args []string) int {
-	explicitHelp := len(args) > 1 && args[0] == "help"
-	if len(args) > 1 && args[0] == "help" {
-		args = append(args[1:], "--help")
-	}
 	if len(args) > 0 && args[0] == "plugin" {
 		if handled, code := showCLIHelp(args); handled {
 			return code
@@ -139,6 +138,13 @@ func runSessionEngine(args []string) int {
 			return 0
 		}
 		return runSwarm(args[1:])
+	}
+	if app.ShowHelp(args, os.Stdout) {
+		return 0
+	}
+	explicitHelp := len(args) > 1 && args[0] == "help"
+	if len(args) > 1 && args[0] == "help" {
+		args = append(args[1:], "--help")
 	}
 	if app.ShowHelp(args, os.Stdout) {
 		return 0

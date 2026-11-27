@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/ybz21/Roami/internal/filelock"
 	"github.com/ybz21/Roami/internal/memguard"
 	"github.com/ybz21/Roami/internal/memrelief"
 )
@@ -70,11 +70,12 @@ func (r Runtime) LockSessionMemory(name string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(f, false, false)
+	if err != nil {
 		_ = f.Close()
 		return nil, err
 	}
-	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = unlock(); _ = f.Close() }, nil
 }
 
 func (r Runtime) ReclaimSession(name string, automatic bool) (memrelief.State, error) {

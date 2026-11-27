@@ -17,8 +17,9 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 // sdkRoot 定位 Android SDK：环境变量优先，再试各平台默认位置。
@@ -264,7 +265,7 @@ func startAVD(name string, wipe bool) (string, error) {
 	spawnBin, spawnArgs := kvmSpawn(kvm, bin, args)
 	cmd := exec.Command(spawnBin, spawnArgs...)
 	// Setsid：脱离 ttmux 的会话与进程组。后端重启/退出不能把用户的模拟器一起带走。
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	procctl.SetDetached(cmd)
 	cmd.Stdout, cmd.Stderr = lf, lf
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("启动模拟器失败: %w", err)
@@ -284,12 +285,7 @@ func startAVD(name string, wipe bool) (string, error) {
 // killProcessGroup 收掉整棵进程树。emulator 会再 fork 出 qemu-system 与 crashpad，
 // 只 kill 首进程会留下一堆孤儿，AVD 的锁也还在它们手上；进程已 setsid，pgid 就是它自己。
 func killProcessGroup(p *os.Process) {
-	if p == nil {
-		return
-	}
-	_ = syscall.Kill(-p.Pid, syscall.SIGTERM)
-	time.Sleep(500 * time.Millisecond)
-	_ = syscall.Kill(-p.Pid, syscall.SIGKILL)
+	procctl.TerminateGroup(p, 500*time.Millisecond)
 }
 
 // waitAVDBoot 等 serial 出现并等到 sys.boot_completed=1。

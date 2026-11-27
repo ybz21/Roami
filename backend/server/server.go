@@ -32,6 +32,7 @@ import (
 	"github.com/ybz21/Roami/backend/pty"
 	"github.com/ybz21/Roami/backend/stream"
 	"github.com/ybz21/Roami/backend/ttmux"
+	"github.com/ybz21/Roami/internal/sessionbackend"
 )
 
 //go:embed fallback.html
@@ -72,6 +73,9 @@ type Config struct {
 	NodeClient *node.Client
 	Bind       string
 	TLSEnabled bool
+
+	// NativeSessionBackend mounts the native roami-sessiond WebSocket bridge when configured.
+	NativeSessionBackend sessionbackend.SessionBackend
 }
 
 func New(cfg Config) *gin.Engine {
@@ -83,6 +87,7 @@ func New(cfg Config) *gin.Engine {
 	tt := ttmux.New(cfg.TTmuxBin)
 	a := auth.New(cfg.Password, cfg.TOTPSecret, cfg.TOTPState, cfg.LockAfter, cfg.LockSecs, cfg.SavePassword)
 	h := api.New(tt, cfg.BrowserHome, cfg.DataDir, cfg.EmbeddedBin)
+	h.NativeBackend = cfg.NativeSessionBackend
 	startProjectOKRCollector(r, h, cfg.Lifecycle)
 	go h.SyncLoop()                 // 后台兜底远端同步（10 §3 第三档），失败静默
 	go h.AgentLinkLoop()            // 会话 ↔ claude 对话 id 对账、归属跟着 worktree 走（api/session-home-sync.go）
@@ -274,8 +279,10 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/sessions/:name/opencode", h.OpenCodeStatus)
 		g.GET("/sessions/:name/opencode-transcript", h.OpenCodeTranscript)
 		g.GET("/sessions/:name/pi-transcript", h.PiTranscript)
-		g.GET("/sessions/:name/panes/active", h.ActivePane)        // 活动 pane 几何+cwd+前台进程（危险操作目标可视化）
-		g.POST("/sessions/:name/panes/:paneId/close", h.ClosePane) // 结构化关闭 pane（不走 confirm-before 按键路径）
+		g.GET("/sessions/:name/panes/active", h.ActivePane)                // 活动 pane 几何+cwd+前台进程（危险操作目标可视化）
+		g.POST("/sessions/:name/panes/:paneId/close", h.ClosePane)         // 结构化关闭 pane（不走 confirm-before 按键路径）
+		g.GET("/sessions/:name/windows", h.SessionWindows)                 // 会话窗口列表与活跃窗格摘要（原生 + tmux）
+		g.POST("/sessions/:name/terminal-action", h.SessionTerminalAction) // 结构化分屏/窗格/窗口动作（原生 + tmux）
 
 		g.GET("/tasks", h.Tasks)
 		g.POST("/tasks", h.Spawn)
@@ -363,7 +370,8 @@ func New(cfg Config) *gin.Engine {
 		g.POST("/2fa/disable", a.TOTPDisable) // 关闭
 
 		// 实时通道
-		g.GET("/term/:name", pty.Handler)
+		g.GET("/term/:name", pty.HandlerWithNative(cfg.NativeSessionBackend))
+		mountNativeTerminal(g, cfg.NativeSessionBackend)
 		g.GET("/browser/stream", browser.Handler) // 镜像全局 Chrome 画面
 		g.GET("/browser/tabs", browser.Tabs)      // 标签页：列出
 		g.POST("/browser/tabs", browser.NewTab)   // 标签页：新建

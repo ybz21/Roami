@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"time"
 
-	"golang.org/x/sys/unix"
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 type Policy struct {
@@ -112,10 +112,11 @@ func Apply(root string, e Event) (Result, error) {
 		return result, err
 	}
 	defer lock.Close()
-	if err = unix.Flock(int(lock.Fd()), unix.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(lock, false, false)
+	if err != nil {
 		return result, err
 	}
-	defer unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+	defer func() { _ = unlock() }()
 	path := filepath.Join(root, "browser-tabs.json")
 	catalog := map[string]map[string]Entry{}
 	b, err := os.ReadFile(path)
@@ -285,9 +286,10 @@ func CreationLock(root string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(f, false, false)
+	if err != nil {
 		f.Close()
 		return nil, err
 	}
-	return func() { _ = unix.Flock(int(f.Fd()), unix.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = unlock(); _ = f.Close() }, nil
 }

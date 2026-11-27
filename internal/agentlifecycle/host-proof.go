@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 // Local process evidence cannot travel with a copied database or another boot/namespace.
@@ -24,11 +25,11 @@ func HostProof() string {
 		if err != nil {
 			return ""
 		}
-		stat, ok := info.Sys().(*syscall.Stat_t)
+		dev, ino, ok := fsguard.FileIdentity(info)
 		if !ok {
 			return ""
 		}
-		parts = append(parts, fmt.Sprintf("%s:%d:%d", namespace, stat.Dev, stat.Ino))
+		parts = append(parts, fmt.Sprintf("%s:%d:%d", namespace, dev, ino))
 	}
 	return identityHash(strings.Join(parts, "\x00"))
 }
@@ -38,11 +39,11 @@ func DirectoryProof(directory string) string {
 	if err != nil || !info.IsDir() {
 		return ""
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
+	dev, ino, ok := fsguard.FileIdentity(info)
 	if !ok {
 		return ""
 	}
-	return identityHash(fmt.Sprintf("%s\x00%d:%d", directory, stat.Dev, stat.Ino))
+	return identityHash(fmt.Sprintf("%s\x00%d:%d", directory, dev, ino))
 }
 
 func identityHash(value string) string {

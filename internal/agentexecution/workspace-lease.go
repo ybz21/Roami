@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 // WorkspaceClaimFailure describes the blocked new execution, not the prior writer's outcome.
@@ -84,14 +84,15 @@ func (s Service) lockWorkspaceWriter(ctx context.Context, directory string) (str
 	if err != nil {
 		return "", nil, err
 	}
-	if err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	unlock, err := filelock.Lock(file, false, true)
+	if err != nil {
 		file.Close()
-		if errors.Is(err, syscall.EWOULDBLOCK) {
+		if errors.Is(err, filelock.ErrWouldBlock) {
 			return root, nil, fmt.Errorf("WORKSPACE_BUSY")
 		}
 		return "", nil, err
 	}
-	release := func() { _ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN); _ = file.Close() }
+	release := func() { _ = unlock(); _ = file.Close() }
 	return root, release, nil
 }
 

@@ -11,7 +11,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"syscall"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 var (
@@ -94,11 +95,10 @@ func readClaudeCapabilityInput(binding SessionBinding, turn, hash, capability, r
 	if info == nil {
 		return nil
 	}
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	file, err := fsguard.OpenReadNoFollow(path)
 	if err != nil {
 		return nil
 	}
-	file := os.NewFile(uintptr(fd), path)
 	defer file.Close()
 	if opened, err := file.Stat(); err != nil || !sameClaudeInputFile(info, opened) {
 		return nil

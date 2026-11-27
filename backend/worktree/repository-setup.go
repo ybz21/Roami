@@ -7,7 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
+
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 type RepositoryState struct {
@@ -72,10 +73,11 @@ func (s *Service) InitializeRepository(ctx context.Context, dir string) (Reposit
 		return RepositoryState{}, errf("BAD_PATH", "%v", err)
 	}
 	defer f.Close()
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	dirUnlock, err := filelock.Lock(f, false, true)
+	if err != nil {
 		return RepositoryState{}, errf("LOCK_FAILED", "%v", err)
 	}
-	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	defer func() { _ = dirUnlock() }()
 	state, err = s.RepositoryState(ctx, dir)
 	if err != nil {
 		return RepositoryState{}, err

@@ -15,8 +15,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ybz21/Roami/internal/filelock"
 	"github.com/ybz21/Roami/internal/id"
-	"golang.org/x/sys/unix"
 )
 
 const bundleRoot = ".roami/okr"
@@ -123,7 +123,7 @@ func readFile(root *os.Root, name string, limit int64) ([]byte, error) {
 	if err := safeFile(root, name); err != nil {
 		return nil, err
 	}
-	f, err := root.OpenFile(name, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	f, err := openNoFollowRead(root, name)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func atomicFile(root *os.Root, name string, body []byte) error {
 		return err
 	}
 	tmp := ".pending-" + id.New()
-	f, err := directory.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|unix.O_NOFOLLOW, 0600)
+	f, err := openNoFollowCreateExcl(directory, tmp)
 	if err != nil {
 		return err
 	}
@@ -180,22 +180,14 @@ func atomicFile(root *os.Root, name string, body []byte) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	dir, err := directory.Open(".")
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	if err = unix.Renameat(int(dir.Fd()), tmp, int(dir.Fd()), leaf); err != nil {
-		return err
-	}
-	return dir.Sync()
+	return renameInDir(directory, tmp, leaf)
 }
 
 func writeReference(root *os.Root, name string, body []byte, previousDigest string) error {
 	if err := mkdir(root, path.Dir(name)); err != nil {
 		return err
 	}
-	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL|unix.O_NOFOLLOW, 0600)
+	f, err := openNoFollowCreateExcl(root, name)
 	if errors.Is(err, fs.ErrExist) {
 		existing, err := readFile(root, name, 1<<20)
 		if err != nil {
@@ -288,15 +280,16 @@ func lockBundle(root *os.Root) (func(), error) {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	f, err := root.OpenFile(".lock", os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW, 0600)
+	f, err := openNoFollowLock(root, ".lock")
 	if err != nil {
 		return nil, err
 	}
-	if err = unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(f, false, false)
+	if err != nil {
 		f.Close()
 		return nil, err
 	}
-	return func() { _ = unix.Flock(int(f.Fd()), unix.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = unlock(); _ = f.Close() }, nil
 }
 
 func loadSnapshot(root *os.Root) (*confirmedSnapshot, error) {

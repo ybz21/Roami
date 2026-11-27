@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
+	"github.com/ybz21/Roami/internal/filelock"
 	metadb "github.com/ybz21/Roami/internal/storage"
-	"golang.org/x/sys/unix"
 )
 
 func runAgentUpgrade(args []string) int {
@@ -37,11 +37,12 @@ func runAgentUpgrade(args []string) int {
 			return 1
 		}
 		defer lock.Close()
-		if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		unlock, err := filelock.Lock(lock, false, true)
+		if err != nil {
 			fmt.Fprintln(os.Stderr, "AGENT_UPGRADE_RUNTIME_UNKNOWN")
 			return 1
 		}
-		defer unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+		defer func() { _ = unlock() }()
 		return 0
 	}
 	raw, err := agentRequest(paths.Socket, "GET", "/v1/status", nil)

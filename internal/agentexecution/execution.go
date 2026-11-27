@@ -16,12 +16,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/application"
+	"github.com/ybz21/Roami/internal/filelock"
 	"github.com/ybz21/Roami/internal/gitcontext"
+	"github.com/ybz21/Roami/internal/procctl"
 	sessmeta "github.com/ybz21/Roami/internal/sessionstore"
 	runtime "github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -99,11 +100,12 @@ func lock(path string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(f, false, false)
+	if err != nil {
 		f.Close()
 		return nil, err
 	}
-	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+	return func() { _ = unlock(); _ = f.Close() }, nil
 }
 
 func writeJSON(path string, value any) error {
@@ -440,12 +442,12 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	cmd.Dir = directory
 	cmd.Env = gitcontext.ForDirectory(os.Environ())
 	cmd.Stdin = strings.NewReader(spec.Prompt)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	procctl.SetProcessGroup(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return procctl.KillGroupErr(cmd.Process.Pid, true)
 	}
 	cmd.WaitDelay = 2 * time.Second
 	output, diagnostics := &tail{limit: 32000}, &tail{limit: 8000}
@@ -473,7 +475,7 @@ func (s Service) Run(ctx context.Context, key string, stdout, stderr io.Writer) 
 	close(done)
 	// Descendants may survive their original wrapper even after a clean exit.
 	if cmd.Process != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		procctl.SignalGroup(cmd.Process.Pid, true)
 	}
 	result := Result{State: "succeeded", Summary: output.String(), Stderr: diagnostics.String(), ExitCode: 0, FinishedMS: time.Now().UnixMilli()}
 	if err != nil {

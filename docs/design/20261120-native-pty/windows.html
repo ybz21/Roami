@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三平台原生终端 · Windows 整包移植</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">调研与选型</a>
+      <a href="product.html">产品设计</a>
+      <a href="tech.html">技术设计</a>
+      <a href="capabilities.html">迁移清单</a>
+      <a href="windows.html" aria-current="page">Windows</a>
+      <a href="tech.html#acceptance">验证记录</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>Windows 整包移植</h1>
+      <p class="lead">首发验 Windows 11 24H2+ x64：不只要接 ConPTY，还得先填平 7 个 Unix 系统调用编译卡点。</p>
+
+      <section aria-labelledby="pty">
+        <h2 id="pty">ConPTY：<code>crosspty</code> 与直接调系统 API 并行探针</h2>
+        <ul>
+          <li><strong><code>crosspty v1.2.0</code> 首选但有 3 个风险：</strong><code>Close()</code> 直接杀进程；Job 句柄藏在内部；<code>Wait() == -1</code> 分不清“未退出”和“查退出码失败”（此时保留待确认和围栏）。</li>
+          <li><strong>直接调 ConPTY 并行对照：</strong>用现有 <code>x/sys/windows</code> 跑同套用例（暂停启动 → 绑 Job → 恢复运行），<code>crosspty</code> 过不了就直接切换。<code>go-pty</code>（需 Go 1.25）仅作参考。</li>
+          <li><strong>两个必踩坑：</strong>① ConPTY 内置虚拟终端，会发 <code>ESC[6n</code> 光标查询，服务端 VT 必须秒回，否则 PowerShell/PSReadLine 卡死；② 24H2 上 <code>ClosePseudoConsole</code> 立即返回，必须等管道 EOF + 进程退出码都齐了才算结束。只走公开 API（含 <code>ReleasePseudoConsole</code>）。</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="port">
+        <h2 id="port">整包适配清单</h2>
+        <div class="table" role="region" aria-label="Windows 适配清单" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">卡点</th><th scope="col">Windows 做法</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">文件锁（存储/围栏/注册/标签）</th><td><code>Flock</code> → <code>LockFileEx</code>（验共享/独占、非阻塞、崩后释放、大小写路径）。</td></tr>
+              <tr><th scope="row">磁盘与内存</th><td><code>Statfs</code> → <code>GetDiskFreeSpaceExW</code>；内存与进程树用 Job Object；压缩/暂停按不支持。</td></tr>
+              <tr><th scope="row">进程、目录与环境</th><td><code>/proc</code> → <code>GetProcessTimes</code>；目录用初始 cwd + OSC 7；环境走 <code>CreateProcessW</code> 不敲 <code>export</code>。</td></tr>
+              <tr><th scope="row">监控与手机模拟器</th><td><code>Setsid/Setpgid/Kill</code> 隔进 Unix 文件，Windows 禁用但不拦启动。</td></tr>
+              <tr><th scope="row">托管与 IPC</th><td>支持按需拉起（<code>DETACHED_PROCESS</code>）或登录计划任务；<code>go-winio</code> 命名管道拒远端（或走 <code>127.0.0.1:0</code> + 私有 Token）。</td></tr>
+              <tr><th scope="row">打包与升级</th><td>试点发带校验和 ZIP，正式看签名 MSI；测空格路径、中文用户名、最小权限与回滚。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="source"><a href="acceptance.md#windows-整包编译回执">7 个包编译报错回执</a></p>
+      </section>
+
+      <section aria-labelledby="shell">
+        <h2 id="shell">PowerShell 与 Agent 启动</h2>
+        <p><strong>Shell：</strong>默认探测 PowerShell 7（<code>pwsh.exe</code>），5.1 验过后可选；缺失给安装提示不改用户配置。</p>
+        <p><strong>Agent：</strong>原生 <code>.exe</code> 走 <code>CreateProcessW</code>；npm 装的 <code>.cmd</code> 批处理优先找原生/Node 入口，确需走 <code>.cmd</code> 时验证受信任路径并经转义过的 <code>cmd.exe</code> 启动。</p>
+      </section>
+
+      <section aria-labelledby="go-no-go">
+        <h2 id="go-no-go">放行条件</h2>
+        <ol>
+          <li><strong>PTY：</strong>真机 x64 跑通启动失败、输出阻塞、<code>ESC[6n</code>、Ctrl+C、收尾排空、Job 清理和双会话隔离（arm64 另验）。</li>
+          <li><strong>交互：</strong>PowerShell 7/5.1（PSReadLine/中文/粘贴/缩放）与 Codex/Claude Code 全屏交互和清理正常。</li>
+          <li><strong>整包：</strong>干净机器上安装、重连、重启 Web、升级宿主、回滚全通，异常不误放围栏。</li>
+        </ol>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

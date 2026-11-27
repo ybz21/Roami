@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"unicode/utf8"
 
 	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 type ProvisionReceipt struct {
@@ -123,10 +123,11 @@ func (s *Store) Provision(ctx context.Context, key, name, baseDir, directory str
 		return ProvisionReceipt{}, err
 	}
 	defer guard.Close()
-	if err = syscall.Flock(int(guard.Fd()), syscall.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(guard, false, false)
+	if err != nil {
 		return ProvisionReceipt{}, err
 	}
-	defer syscall.Flock(int(guard.Fd()), syscall.LOCK_UN)
+	defer func() { _ = unlock() }()
 	if err = ctx.Err(); err != nil {
 		return ProvisionReceipt{}, err
 	}

@@ -131,6 +131,10 @@ func (a App) Run(args []string) error {
 		return session.Keys(a.rt, rest, out)
 
 	// ── windows / panes (native) ──
+	case "window":
+		return session.WindowCmd(a.rt, rest, out)
+	case "pane":
+		return session.PaneCmd(a.rt, rest, out)
 	case "nw":
 		return session.NewWindow(a.rt, rest, out)
 	case "lw":
@@ -175,6 +179,14 @@ func (a App) Run(args []string) error {
 // ShowHelp runs before storage migration or acquiring an instance lease.
 func ShowHelp(args []string, out io.Writer) bool {
 	args = stripQuiet(args)
+	if len(args) == 2 && help.IsHelp(args[0]) && (args[1] == "--all" || args[1] == "-a") {
+		help.ShowAll(version, out)
+		return true
+	}
+	if len(args) == 2 && (args[0] == "--all" || args[0] == "-a") && help.IsHelp(args[1]) {
+		help.ShowAll(version, out)
+		return true
+	}
 	topic, requested := help.Request(args)
 	if !requested || len(args) == 0 {
 		return false
@@ -272,7 +284,7 @@ func sessionCommand(command string) bool {
 	switch command {
 	case "__autoconfirm", "_plugin-host", "help", "-h", "--help", "-i", "--interactive", "completion", "-v", "--version",
 		"ls", "new", "fork", "children", "parent", "a", "attach", "d", "detach", "kill", "rename", "processes", "process-stop", "pause", "resume", "reclaim", "compact", "memory-status", "memory-setup-script", "resolve", "send", "keys",
-		"nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm", "db", "plugin":
+		"window", "pane", "nw", "lw", "kw", "sp", "split", "kp", "capture", "status", "env", "info", "swarm", "db", "plugin":
 		return true
 	}
 	return false

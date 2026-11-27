@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 func untrackedCodexLaunch(state *sessionLifecycle, spec Spec, key string) bool {
@@ -59,8 +60,7 @@ func codexUntrackedStop(binding SessionBinding, promptHash string, sinceMS int64
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > maxCodexTranscriptBytes {
 		return nil, "", nil
 	}
-	owner, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || owner.Uid != uint32(os.Geteuid()) {
+	if !fsguard.OwnedByCurrentUser(info) {
 		return nil, "", nil
 	}
 	file, err := os.Open(path)

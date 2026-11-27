@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/sys/unix"
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 type Store struct {
@@ -33,10 +33,11 @@ func (s *Store) locked(run func(*catalog) error) error {
 		return fmt.Errorf("MODEL_STORE_WRITE_FAILED")
 	}
 	defer file.Close()
-	if unix.Flock(int(file.Fd()), unix.LOCK_EX) != nil {
+	unlock, err := filelock.Lock(file, false, false)
+	if err != nil {
 		return fmt.Errorf("MODEL_STORE_WRITE_FAILED")
 	}
-	defer unix.Flock(int(file.Fd()), unix.LOCK_UN)
+	defer func() { _ = unlock() }()
 	state := &catalog{Kinds: map[string]*kindState{}}
 	data, err := os.ReadFile(filepath.Join(s.root, "provider-presets.json"))
 	if err != nil && !os.IsNotExist(err) {

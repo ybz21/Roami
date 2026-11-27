@@ -15,7 +15,9 @@ package worktree
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/ybz21/Roami/internal/filelock"
 	"github.com/ybz21/Roami/internal/gitcontext"
 	"github.com/ybz21/Roami/internal/metadb"
 	"github.com/ybz21/Roami/internal/sessionlifecycle"
@@ -28,7 +30,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -178,12 +179,13 @@ func (s *Service) lock(ctx context.Context, repo Repo) (func(), error) {
 	}
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
+	var unlock func() error
 	for {
-		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		unlock, err = filelock.Lock(f, false, true)
 		if err == nil {
 			break
 		}
-		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
+		if !errors.Is(err, filelock.ErrWouldBlock) {
 			f.Close()
 			return nil, errf("LOCK_FAILED", "%v", err)
 		}
@@ -194,7 +196,7 @@ func (s *Service) lock(ctx context.Context, repo Repo) (func(), error) {
 		case <-ticker.C:
 		}
 	}
-	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+	return func() { _ = unlock(); f.Close() }, nil
 }
 
 func (s *Service) invalidate(repo Repo) {

@@ -194,6 +194,9 @@ func main() {
 			}
 		}
 		cfg.NodeClient = cl
+		nativeBackend, stopNative := maybeConnectNativeTerminal(bin, dataDir())
+		cfg.NativeSessionBackend = nativeBackend
+		defer stopNative()
 		stopAgent, err = startAgentSupervisor()
 		if err != nil {
 			log.Printf("智能体服务不可用: %v", err)

@@ -3,12 +3,12 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/sys/unix"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/ybz21/Roami/internal/filelock"
 	"github.com/ybz21/Roami/internal/plugin/rpc"
 	"github.com/ybz21/Roami/internal/tmuxruntime"
 )
@@ -281,10 +281,11 @@ func EnsureDaemon(env Env) error {
 		return err
 	}
 	defer lock.Close()
-	if err = unix.Flock(int(lock.Fd()), unix.LOCK_EX); err != nil {
+	unlock, err := filelock.Lock(lock, false, false)
+	if err != nil {
 		return err
 	}
-	defer unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+	defer func() { _ = unlock() }()
 	name := env.HostSession(DaemonSession)
 	if pingSock(env.SockPath()) {
 		return nil

@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/sys/unix"
+	"github.com/ybz21/Roami/internal/filelock"
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 func Socket(agentSocket string) string {
@@ -19,17 +20,22 @@ func ListenManagement(socket string) (net.Listener, func(), error) {
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		return nil, nil, err
 	}
-	fd, err := unix.Open(socket+".lock", unix.O_CREAT|unix.O_RDWR|unix.O_NOFOLLOW, 0600)
+	lockFile, err := fsguard.OpenNoFollow(socket+".lock", true, false, 0600)
 	if err != nil {
 		return nil, nil, err
 	}
+	var unlockLock func() error
 	locked := false
 	defer func() {
 		if !locked {
-			unix.Close(fd)
+			if unlockLock != nil {
+				_ = unlockLock()
+			}
+			_ = lockFile.Close()
 		}
 	}()
-	if err = unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
+	unlockLock, err = filelock.Lock(lockFile, false, true)
+	if err != nil {
 		return nil, nil, fmt.Errorf("MODEL_GATEWAY_ALREADY_RUNNING: %w", err)
 	}
 	if info, err := os.Lstat(socket); err == nil {
@@ -52,8 +58,8 @@ func ListenManagement(socket string) (net.Listener, func(), error) {
 	}
 	locked = true
 	return listener, func() {
-		_ = unix.Flock(fd, unix.LOCK_UN)
-		_ = unix.Close(fd)
+		_ = unlockLock()
+		_ = lockFile.Close()
 	}, nil
 }
 

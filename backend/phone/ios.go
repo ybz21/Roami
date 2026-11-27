@@ -20,8 +20,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 type iosDevice struct{}
@@ -44,7 +45,7 @@ func haveIDB() bool { _, err := exec.LookPath("idb"); return err == nil }
 // 导致下次安装撞锁失败（“已被另一个 brew install 进程锁定”）。
 func runCmd(timeout time.Duration, name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // 自成进程组，pgid = pid
+	procctl.SetProcessGroup(cmd) // 自成进程组，pgid = pid
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errb
@@ -66,8 +67,8 @@ func runCmd(timeout time.Duration, name string, args ...string) ([]byte, error) 
 	case <-time.After(timeout):
 		// 负 pid = 向整个进程组发信号；先 TERM 给子进程善后机会，再兜底 KILL。
 		pgid := cmd.Process.Pid
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
-		go func() { time.Sleep(2 * time.Second); _ = syscall.Kill(-pgid, syscall.SIGKILL) }()
+		procctl.SignalGroup(pgid, false)
+		go func() { time.Sleep(2 * time.Second); procctl.SignalGroup(pgid, true) }()
 		_ = cmd.Process.Kill()
 		return nil, fmt.Errorf("%s 超时", name)
 	}

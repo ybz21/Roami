@@ -29,13 +29,15 @@ import { PaneCloseConfirm, type PaneCloseTarget } from './PaneCloseConfirm'
 import { TabContextMenu } from './TabContextMenu'
 import SessionResourceMenu from './SessionResourceMenu'
 import { taskKeyOf } from '../sessions/task-key'
-import Term, { TermHandle, TermStatus } from './Terminal'
+import { type TermHandle, type TermStatus } from './Terminal'
+import NativeSplitWorkspace, { type NativeSplitWorkspaceHandle } from './NativeSplitWorkspace'
 import { api, makeClipboardImageFile, upload, uploadedPathOf } from '../../api'
 import { VoiceInput } from '../chat/VoiceInput'
 import { copyText } from '../chat/blocks'
 import RenameSessionModal from '../sessions/RenameSessionModal'
 import { type ClaudeInfo } from './claude-info'
-import { KEYS, PFX, tmuxMenu } from './tmux-keys'
+import { KEYS } from './tmux-keys'
+import { buildTerminalContextMenu, buildTerminalLayoutMenu, parseTerminalLayoutMenuKey, type SessionWindowsState, type TerminalLayoutAction } from './terminal-layout-menu'
 import { codexReconnectFailed, codexResumeCommand } from './codex-recovery'
 import { useI18n } from '../../i18n'
 import { SESSION_MIME, buildIntro, canDrop, readDrag } from '../shell/session-drop'
@@ -183,25 +185,67 @@ export default function TerminalPane(props: {
   const [paneCloseTarget, setPaneCloseTarget] = useState<PaneCloseTarget | null>(null)
   const [paneCloseBusy, setPaneCloseBusy] = useState(false)
   const [paneCloseError, setPaneCloseError] = useState<string>()
-  const openPaneCloseConfirm = async () => {
+  const splitRefs = useRef<Record<string, NativeSplitWorkspaceHandle | null>>({})
+  const [sessionLayouts, setSessionLayouts] = useState<Record<string, SessionWindowsState>>({})
+  const layoutMenuState = active ? sessionLayouts[active] ?? null : null
+  const refreshLayoutMenuState = useCallback(async (sessionName?: string) => {
+    const target = sessionName || active
+    if (!target || nativeSessionId(target) || preparingSession(target)) return
+    try {
+      const r = await api('GET', `/sessions/${encodeURIComponent(target)}/windows`)
+      if (r?.data) {
+        setSessionLayouts((prev) => ({ ...prev, [target]: r.data }))
+      }
+    } catch {
+      // Ignore transient probe errors when opening menu; actions remain available.
+    }
+  }, [active])
+  useEffect(() => {
+    if (!active || nativeSessionId(active) || preparingSession(active)) return
+    void refreshLayoutMenuState(active)
+  }, [active, node, refreshLayoutMenuState])
+  const openPaneCloseConfirm = async (targetPaneId?: string) => {
     if (!active) return
     try {
-      const r = await api('GET', `/sessions/${encodeURIComponent(active)}/panes/active`)
+      const grid = termRefs.current[active]?.gridSize()
+      const qs = grid ? `?cols=${grid.cols}&rows=${grid.rows}` : ''
+      const r = await api('GET', `/sessions/${encodeURIComponent(active)}/panes/active${qs}`)
       const p = r.data
-      const rect = termRefs.current[active]?.paneScreenRect(p)
+      const paneId = targetPaneId || p.paneId
+      const rect = splitRefs.current[active]?.paneContainerRect(paneId) || termRefs.current[active]?.paneScreenRect(p)
       if (!rect) { message.error(t('pane.close.locateFailed')); return }
       setPaneCloseError(undefined)
-      setPaneCloseTarget({ session: active, paneId: p.paneId, cwd: p.cwd, cmd: p.cmd, panesInWindow: p.panesInWindow, rect })
+      setPaneCloseTarget({ session: active, paneId, cwd: p.cwd, cmd: p.cmd, panesInWindow: p.panesInWindow, rect })
     } catch {
       message.error(t('pane.close.locateFailed'))
+    }
+  }
+  const runTerminalAction = async (sessionName: string, action: TerminalLayoutAction) => {
+    if (action.action === 'close-pane') {
+      await openPaneCloseConfirm(action.paneId)
+      return
+    }
+    try {
+      const r = await api('POST', `/sessions/${encodeURIComponent(sessionName)}/terminal-action`, action)
+      if (r?.data?.windows) {
+        setSessionLayouts((prev) => ({ ...prev, [sessionName]: r.data }))
+      }
+    } catch (e: any) {
+      message.error(e.message)
     }
   }
   const confirmPaneClose = async () => {
     if (!paneCloseTarget) return
     setPaneCloseBusy(true)
     try {
-      await api('POST', `/sessions/${encodeURIComponent(paneCloseTarget.session)}/panes/${encodeURIComponent(paneCloseTarget.paneId)}/close`, {})
+      const r = await api('POST', `/sessions/${encodeURIComponent(paneCloseTarget.session)}/panes/${encodeURIComponent(paneCloseTarget.paneId)}/close`, {})
+      const closedSession = paneCloseTarget.session
       setPaneCloseTarget(null)
+      if (r?.data?.layout?.windows) {
+        setSessionLayouts((prev) => ({ ...prev, [closedSession]: r.data.layout }))
+      } else {
+        void refreshLayoutMenuState(closedSession)
+      }
     } catch (e: any) {
       setPaneCloseError(e?.message || t('pane.close.failed'))
     } finally {
@@ -529,12 +573,16 @@ export default function TerminalPane(props: {
     setDragOver(false)
     const mention = toMention(readDropPath(e))
     if (!mention || !active) return
+    const dropPaneId = (e.target as HTMLElement | null)?.closest?.('[data-pane-id]')?.getAttribute('data-pane-id') || undefined
+    if (dropPaneId && splitRefs.current[active]?.sendToPane(dropPaneId, mention + ' ', true)) {
+      return
+    }
     // 分窗(tmux split pane)时：先按落点坐标激活对应 pane，@路径才会注入到拖放的那个窗格。
     termRefs.current[active]?.selectPaneAt(e.clientX, e.clientY)
     exitCopyMode()
     termRefs.current[active]?.send(mention + ' ', true)
   }
-  const [ctx, setCtx] = useState<{ x: number; y: number; session: string; selection: string } | null>(null)
+  const [ctx, setCtx] = useState<{ x: number; y: number; session: string; selection: string; paneId?: string } | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteSession, setPasteSession] = useState('')
   const [pasteText, setPasteText] = useState('')
@@ -646,54 +694,33 @@ export default function TerminalPane(props: {
   }
   const selText = ctx?.selection?.trim() || ''
   const selPreview = selText.replace(/\s+/g, ' ').slice(0, 28)
-  const ctxItems = ctx ? [
-    ...(selText ? [
-      {
-        key: 'copy',
-        label: (
-          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontWeight: 600 }}>{t('terminal.copySelected')}</span>
-            <span style={{ color: 'var(--text-dimmer)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              “{selPreview}{selText.length > selPreview.length ? '…' : ''}”
-            </span>
-          </span>
-        ),
-      },
-      { type: 'divider' as const },
-    ] : []),
-    { key: 'paste', label: t('terminal.pasteClipboard') },
-    { key: 'manual-paste', label: t('terminal.manualPaste') },
-    { type: 'divider' as const },
-    { key: 'scroll-up', label: t('terminal.scrollHistory') },
-    { key: 'bottom', label: t('terminal.toBottom') },
-    { key: 'redraw', label: t('terminal.redraw') },
-    { key: 'reconnect', label: t('terminal.reconnect') },
-    { type: 'divider' as const },
-    {
-      key: 'tmux',
-      label: 'tmux',
-      children: [
-        { key: PFX + '[', label: t('terminal.tmuxCopyMode') },
-        { key: PFX + 'w', label: t('terminal.tmuxWindowList') },
-        { key: PFX + '%', label: t('terminal.tmuxSplitVertical') },
-        { key: PFX + '"', label: t('terminal.tmuxSplitHorizontal') },
-      ],
-    },
-    { type: 'divider' as const },
-    { key: 'cancel', label: t('common.cancel') },
-  ] : []
+  const copyLabel = selText ? (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
+      <span style={{ fontWeight: 600 }}>{t('terminal.copySelected')}</span>
+      <span style={{ color: 'var(--text-dimmer)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        “{selPreview}{selText.length > selPreview.length ? '…' : ''}”
+      </span>
+    </span>
+  ) : undefined
+  const ctxItems = ctx ? buildTerminalContextMenu(t, { copyLabel }) : []
   const onCtxClick = ({ key }: { key: string }) => {
     if (!ctx) return
     const h = termRefs.current[ctx.session]
-    if (key === 'cancel') { /* 仅关闭菜单 */ }
-    else if (key === 'copy') { copyText(ctx.selection); message.success(t('common.copied')); h?.clearSelection() }
+    if (key === 'copy') { copyText(ctx.selection); message.success(t('common.copied')); h?.clearSelection() }
+    else if (key === 'select-all') h?.selectAll()
     else if (key === 'paste') pasteClipboard(ctx.session)
-    else if (key === 'manual-paste') openManualPaste(ctx.session)
-    else if (key === 'scroll-up') h?.scroll(-12)
-    else if (key === 'bottom') h?.toBottom()
     else if (key === 'redraw') h?.redraw()
     else if (key === 'reconnect') h?.reconnect()
-    else h?.send(key)
+    else {
+      const action = parseTerminalLayoutMenuKey(key)
+      if (action) {
+        if (ctx.paneId && (action.action === 'split-right' || action.action === 'split-down' || action.action === 'close-pane')) {
+          void runTerminalAction(ctx.session, { ...action, paneId: ctx.paneId })
+        } else {
+          void runTerminalAction(ctx.session, action)
+        }
+      }
+    }
     setCtx(null)
   }
   if (terms.length === 0 && !pageTabs?.length && !fileTabs?.length) {
@@ -1050,8 +1077,20 @@ export default function TerminalPane(props: {
   const sessionToolbar = active && (nativeSessionId(active) || preparingSession(active)) ? null : (
     <div className="tt-tbar tt-session-toolbar">
       {sessionLead}<span className="tt-sep" />
-      <Dropdown trigger={['click']} menu={{ items: tmuxMenu(t) as any, onClick: ({ key }) => { if (key === PFX + 'x') openPaneCloseConfirm(); else sendKey(key) } }} placement="bottomLeft">
-        <button type="button" className="tt-tbtn">{TI.tmux}<span>tmux</span><span style={{ color: 'var(--text-dimmer)', display: 'inline-flex' }}><ChevronDown size={11} /></span></button>
+      <Dropdown
+        trigger={['click']}
+        onOpenChange={(open) => { if (open && active) void refreshLayoutMenuState(active) }}
+        menu={{
+          items: buildTerminalLayoutMenu(t, layoutMenuState) as any,
+          onClick: ({ key }) => {
+            if (!active) return
+            const action = parseTerminalLayoutMenuKey(key)
+            if (action) void runTerminalAction(active, action)
+          },
+        }}
+        placement="bottomLeft"
+      >
+        <button type="button" className="tt-tbtn">{TI.tmux}<span>{t('terminal.layoutMenu')}</span><span style={{ color: 'var(--text-dimmer)', display: 'inline-flex' }}><ChevronDown size={11} /></span></button>
       </Dropdown>
       {/* 「新标签」进了标签右键菜单（标签条上已有「新建」）；文件 / Git 归右栏活动条；
           语音归 composer——22 设计 §3.3 去掉的四枚。独立页（左停靠）没有右栏，文件 / Git 仍在这 */}
@@ -1147,13 +1186,25 @@ export default function TerminalPane(props: {
           // 下一张 WebGL 画布要经过“重新量尺寸 → 清画布 → 重画”，中间会露出 1~2 帧黑屏。
           // visibility:hidden 保留真实尺寸并让后台画布保持就绪；pointerEvents/zIndex 隔离交互与层叠。
           <div key={termName} style={{
-            position: 'absolute', inset: 0, padding: nativeSessionId(termName) ? 0 : 6,
+            position: 'absolute', inset: 0, padding: nativeSessionId(termName) || sessionLayouts[termName]?.backend === 'native' ? 0 : 6,
             visibility: termName === active && !curFile ? 'visible' : 'hidden',
             pointerEvents: termName === active && !curFile ? 'auto' : 'none',
             zIndex: termName === active && !curFile ? 1 : 0,
           }}>
-            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} onOpen={onOpenSession} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <Term ref={(h) => { termRefs.current[termName] = h }} name={termName} fontSize={fontSize} active={termName === active} onStatus={(s) => setStatus(termName, s)} onRevived={onRename}
-              onContextMenu={({ x, y, selection }) => { setActive(termName); setCtx({ x, y, session: termName, selection }) }}
+            {preparingSession(termName) ? <PendingSessionLifecycle name={termName} onOpen={onOpenSession} /> : nativeSessionId(termName) ? (termName === active && !curFile && <NativeSession embedded id={nativeSessionId(termName)!} node={currentNodeId()} projects={[]} onChanged={refreshSessionLists} onSession={onOpenSession} />) : <NativeSplitWorkspace
+              ref={(h) => { termRefs.current[termName] = h; splitRefs.current[termName] = h }}
+              name={termName}
+              fontSize={fontSize}
+              active={termName === active}
+              layoutState={sessionLayouts[termName] ?? null}
+              onLayoutRefresh={() => { void refreshLayoutMenuState(termName) }}
+              onFocusPane={(windowId, paneId) => { void runTerminalAction(termName, { action: 'focus-pane', windowId, paneId }) }}
+              onResizeSplit={(windowId, nodeId, ratio, expectedVersion) => { void runTerminalAction(termName, { action: 'resize-split', windowId, nodeId, ratio, expectedVersion }) }}
+              onSelectWindow={(windowId) => { void runTerminalAction(termName, { action: 'select-window', windowId }) }}
+              onNewWindow={() => { void runTerminalAction(termName, { action: 'new-window' }) }}
+              onStatus={(s) => setStatus(termName, s)}
+              onRevived={onRename}
+              onContextMenu={({ x, y, selection, paneId }) => { setActive(termName); setCtx({ x, y, session: termName, selection, paneId }) }}
               onSelectionMenu={({ selection }) => { setActive(termName); setCtx(null); if (selection.trim()) { copyText(selection); message.success(t('common.copied')) } }}
               onPaste={() => { setActive(termName); pasteClipboard(termName) }}
               onImagePaste={(files) => { setActive(termName); pasteImage(termName, files) }} />}

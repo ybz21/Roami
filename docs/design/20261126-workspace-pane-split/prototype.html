@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>产品层独立窗格分屏 · 交互原型</title>
+  <link rel="stylesheet" href="design.css">
+  <style>
+    .proto-shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: var(--sp-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-3);
+      height: calc(100vh - 52px);
+    }
+    .proto-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--sp-2);
+    }
+    .proto-controls .group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+    .btn {
+      height: 30px;
+      padding: 0 10px;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-container);
+      color: var(--text-bright);
+      font-size: var(--fs-meta);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { border-color: var(--accent-border); color: var(--accent); }
+    .btn.on { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+    .btn.danger { color: var(--danger); }
+    .btn.danger:hover { border-color: var(--danger); }
+
+    .stage-wrap {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .stage {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-base);
+      min-height: 0;
+      transition: width .15s ease;
+      position: relative;
+    }
+    .stage.phone { width: 390px; max-width: 100%; }
+
+    .tbar {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-base);
+      font-size: var(--fs-meta);
+      position: relative;
+      flex-shrink: 0;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+    .menu-wrap { position: relative; }
+    .dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 180px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-sm);
+      padding: 6px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+      z-index: 30;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .dropdown.open { display: flex; }
+    .dropdown .sec {
+      font-size: 11px;
+      color: var(--text-dim);
+      padding: 4px 8px 2px;
+    }
+    .dropdown button {
+      border: 0;
+      background: transparent;
+      color: var(--text-bright);
+      text-align: left;
+      padding: 6px 8px;
+      border-radius: var(--r-xs);
+      font-size: var(--fs-sm);
+      cursor: pointer;
+    }
+    .dropdown button:hover { background: var(--accent-soft); color: var(--accent); }
+    .dropdown button.danger { color: var(--danger); }
+    .dropdown .div { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+
+    .win-strip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-base);
+      font-size: var(--fs-meta);
+      flex-shrink: 0;
+    }
+    .win-tab {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-dim);
+      padding: 3px 8px;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      font-size: var(--fs-meta);
+    }
+    .win-tab.on {
+      color: var(--text-bright);
+      background: var(--bg-container);
+      border-color: var(--border-subtle);
+      font-weight: 600;
+    }
+
+    .mobile-pane-bar {
+      display: flex;
+      gap: 6px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+    .mobile-pane-tab {
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--border-subtle);
+      background: transparent;
+      color: var(--text-dim);
+      font-size: var(--fs-meta);
+      cursor: pointer;
+    }
+    .mobile-pane-tab.on {
+      border-color: var(--accent-border);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .split-root { flex: 1; min-height: 0; display: flex; }
+    .split-branch { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; }
+    .split-branch.horizontal { flex-direction: row; }
+    .split-branch.vertical { flex-direction: column; }
+    .split-slot { min-width: 0; min-height: 0; display: flex; overflow: hidden; }
+    .split-divider {
+      flex: 0 0 1px;
+      background: var(--border-subtle);
+      position: relative;
+      touch-action: none;
+    }
+    .split-divider.horizontal { cursor: col-resize; }
+    .split-divider.vertical { cursor: row-resize; }
+    .split-divider::before { content: ''; position: absolute; z-index: 4; }
+    .split-divider.horizontal::before { inset: 0 -4px; }
+    .split-divider.vertical::before { inset: -4px 0; }
+    .split-divider:hover, .split-divider.dragging { background: var(--accent); }
+
+    .pane {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: #0d1117;
+      color: #c9d1d9;
+      overflow: hidden;
+    }
+    .pane.active::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(88, 166, 255, .55);
+      pointer-events: none;
+    }
+    .pane-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 10px 12px;
+      font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      user-select: text;
+      outline: none;
+    }
+    .pane-body::selection, .pane-body *::selection {
+      background: rgba(88, 166, 255, 0.35);
+    }
+    .prompt { color: #3fb950; }
+    .dim { color: #8b949e; }
+    .err { color: #f85149; }
+
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-border);
+      color: var(--text-bright);
+      padding: 8px 12px;
+      border-radius: var(--r-sm);
+      font-size: var(--fs-meta);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .25);
+      z-index: 60;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s;
+    }
+    .toast.show { opacity: 1; }
+
+    .spotlight {
+      position: fixed;
+      z-index: 40;
+      pointer-events: none;
+      border-radius: 4px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,.48), 0 0 0 2px #f85149;
+    }
+    .confirm-card {
+      position: fixed;
+      z-index: 41;
+      width: 300px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-card);
+      padding: 14px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.35);
+      font-size: var(--fs-sm);
+    }
+  </style>
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">设计总览</a>
+      <a href="product.html">产品设计</a>
+      <a href="prototype.html" aria-current="page">交互原型</a>
+      <a href="tech.html">技术设计</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="proto-shell">
+      <div class="proto-controls">
+        <div class="group">
+          <span class="tag accent">可交互原型</span>
+          <span style="font-size: 13px; color: var(--text-dim);">试着在左侧跨行拖选文字、点「全选当前窗格」、拖动中间 1px 分隔线，或切换手机视图。</span>
+        </div>
+        <div class="group">
+          <button type="button" class="btn on" id="modeDesktop">桌面视图</button>
+          <button type="button" class="btn" id="modePhone">手机视图 (390px)</button>
+          <button type="button" class="btn" id="btnSelectAll">全选当前窗格</button>
+          <button type="button" class="btn" id="btnCopy">复制选中</button>
+        </div>
+      </div>
+
+      <div class="stage-wrap">
+        <div class="stage" id="stage">
+          <div class="tbar">
+            <span class="dot"></span>
+            <span style="font-weight: 600;">dev</span>
+            <div class="menu-wrap">
+              <button type="button" class="btn" id="menuBtn">窗口菜单 ▾</button>
+              <div class="dropdown" id="dropdown"></div>
+            </div>
+            <span style="margin-left: auto; color: var(--text-dim);" id="focusHint"></span>
+          </div>
+          <div class="win-strip" id="winStrip" style="display:none"></div>
+          <div class="mobile-pane-bar" id="mobileBar" style="display:none"></div>
+          <div class="split-root" id="splitRoot"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <div id="confirmHost"></div>
+
+  <script>
+    const SAMPLES = [
+      `<span class="prompt">ai@roami:~/project$</span> git diff --stat\n backend/api/pane.go              | 124 <span class="prompt">++++++++++</span><span class="err">---</span>\n frontend/src/components/SplitTree |  88 <span class="prompt">++++++++</span>\n 2 files changed, 196 insertions(+), 16 deletions(-)\n\n<span class="prompt">ai@roami:~/project$</span> <span class="dim"># 在此窗格跨行拖选：绝不会串选到右侧窗格，也不含 │ 字符</span>\n<span class="err">ERROR</span>: failed to bind unix socket /run/user/1000/roami-sessiond.sock:\n  permission denied (uid=1000, mode=0700)\n  hint: run "roami session doctor" to inspect stale host locks`,
+      `<span class="prompt">ai@roami:~/project$</span> npm test\n ✓ src/components/terminal/SplitTree.test.tsx (6)\n ✓ src/components/terminal/native-protocol.test.ts (4)\n ✓ src/components/terminal/terminal-layout-menu.test.ts (3)\n\n Test Files  270 passed (270)\n      Tests  1993 passed (1993)\n   Duration  14.2s\n\n<span class="prompt">ai@roami:~/project$</span> <span class="dim"># 此窗格拥有独立滚动条、独立选区与独立 PTY 连接</span>`,
+      `<span class="prompt">ai@roami:~/logs$</span> tail -f server.log\n18:10:01 [INFO] native pane p-3 attached (cols=92 rows=38)\n18:10:02 [INFO] layout version=4 synced to 2 web clients\n18:10:05 [INFO] control lease claimed by desktop-chrome (gen=12)`
+    ];
+
+    let idSeq = 3;
+    let mobileMode = false;
+    let state = {
+      activeWindowId: 'w-1',
+      windows: [
+        {
+          id: 'w-1',
+          name: 'main',
+          activePaneId: 'p-1',
+          layout: {
+            id: 's-1', kind: 'split', dir: 'horizontal', ratio: 0.52,
+            first: { id: 'n-1', kind: 'pane', paneId: 'p-1' },
+            second: { id: 'n-2', kind: 'pane', paneId: 'p-2' },
+          },
+        },
+        {
+          id: 'w-2',
+          name: 'logs',
+          activePaneId: 'p-3',
+          layout: { id: 'n-3', kind: 'pane', paneId: 'p-3' },
+        },
+      ],
+      paneContent: { 'p-1': SAMPLES[0], 'p-2': SAMPLES[1], 'p-3': SAMPLES[2] },
+    };
+
+    const $ = (id) => document.getElementById(id);
+    function toast(msg) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove('show'), 2000);
+    }
+
+    function activeWin() {
+      return state.windows.find((w) => w.id === state.activeWindowId) || state.windows[0];
+    }
+    function collectPanes(node, out = []) {
+      if (!node) return out;
+      if (node.kind === 'pane') out.push(node.paneId);
+      else { collectPanes(node.first, out); collectPanes(node.second, out); }
+      return out;
+    }
+    function splitNode(node, targetId, dir, newPaneId) {
+      if (node.kind === 'pane') {
+        if (node.paneId !== targetId) return false;
+        const orig = { id: node.id, kind: 'pane', paneId: node.paneId };
+        node.id = 's-' + (++idSeq);
+        node.kind = 'split';
+        delete node.paneId;
+        node.dir = dir;
+        node.ratio = 0.5;
+        node.first = orig;
+        node.second = { id: 'n-' + (++idSeq), kind: 'pane', paneId: newPaneId };
+        return true;
+      }
+      return splitNode(node.first, targetId, dir, newPaneId) || splitNode(node.second, targetId, dir, newPaneId);
+    }
+    function removePane(node, targetId) {
+      if (!node) return null;
+      if (node.kind === 'pane') return node.paneId === targetId ? null : node;
+      const f = removePane(node.first, targetId);
+      const s = removePane(node.second, targetId);
+      if (!f) return s;
+      if (!s) return f;
+      node.first = f;
+      node.second = s;
+      return node;
+    }
+
+    function renderNode(node, win, paneCount) {
+      if (node.kind === 'pane') {
+        const wrap = document.createElement('div');
+        const active = node.paneId === win.activePaneId;
+        wrap.className = 'pane' + (active && paneCount > 1 ? ' active' : '');
+        wrap.dataset.paneId = node.paneId;
+        wrap.addEventListener('pointerdown', () => {
+          if (win.activePaneId !== node.paneId) {
+            win.activePaneId = node.paneId;
+            render();
+          }
+        });
+        const body = document.createElement('div');
+        body.className = 'pane-body';
+        body.tabIndex = 0;
+        body.innerHTML = state.paneContent[node.paneId] || SAMPLES[0];
+        wrap.appendChild(body);
+        return wrap;
+      }
+
+      const branch = document.createElement('div');
+      branch.className = 'split-branch ' + node.dir;
+      const slot1 = document.createElement('div');
+      slot1.className = 'split-slot';
+      slot1.style.flex = `${node.ratio} 1 0`;
+      slot1.appendChild(renderNode(node.first, win, paneCount));
+
+      const div = document.createElement('div');
+      div.className = 'split-divider ' + node.dir;
+      div.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        div.classList.add('dragging');
+        const rect = branch.getBoundingClientRect();
+        const onMove = (ev) => {
+          const span = node.dir === 'horizontal' ? rect.width : rect.height;
+          const off = node.dir === 'horizontal' ? ev.clientX - rect.left : ev.clientY - rect.top;
+          node.ratio = Math.max(0.15, Math.min(0.85, off / span));
+          slot1.style.flex = `${node.ratio} 1 0`;
+          slot2.style.flex = `${1 - node.ratio} 1 0`;
+        };
+        const onUp = () => {
+          div.classList.remove('dragging');
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          toast(`已保存分屏比例：${Math.round(node.ratio * 100)}% / ${Math.round((1 - node.ratio) * 100)}%`);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+
+      const slot2 = document.createElement('div');
+      slot2.className = 'split-slot';
+      slot2.style.flex = `${1 - node.ratio} 1 0`;
+      slot2.appendChild(renderNode(node.second, win, paneCount));
+
+      branch.append(slot1, div, slot2);
+      return branch;
+    }
+
+    function openCloseConfirm() {
+      const win = activeWin();
+      const panes = collectPanes(win.layout);
+      const targetEl = document.querySelector(`[data-pane-id="${win.activePaneId}"]`);
+      if (!targetEl) return;
+      const r = targetEl.getBoundingClientRect();
+      const host = $('confirmHost');
+      host.innerHTML = '';
+
+      const spot = document.createElement('div');
+      spot.className = 'spotlight';
+      Object.assign(spot.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+
+      const card = document.createElement('div');
+      card.className = 'confirm-card';
+      const top = Math.max(12, Math.min(window.innerHeight - 160, r.top + (r.height - 130) / 2));
+      const left = Math.max(12, Math.min(window.innerWidth - 312, r.left + (r.width - 300) / 2));
+      Object.assign(card.style, { left: left + 'px', top: top + 'px' });
+      card.innerHTML = `
+        <div style="font-weight:700;margin-bottom:6px">关闭此窗格？</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">
+          目标：<code>${win.activePaneId}</code>（直接取 DOM 矩形定位，零误差）<br>
+          ${panes.length <= 1 ? '这是当前窗口最后一个窗格，关闭后窗口也会消失。' : '仅关闭此窗格，其他窗格保持运行与连接。'}
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button type="button" class="btn" id="cCancel">取消</button>
+          <button type="button" class="btn danger" id="cOk">关闭此窗格</button>
+        </div>`;
+      host.append(spot, card);
+      $('cCancel').onclick = () => { host.innerHTML = ''; };
+      $('cOk').onclick = () => {
+        host.innerHTML = '';
+        const next = removePane(win.layout, win.activePaneId);
+        if (!next) {
+          if (state.windows.length <= 1) { toast('已保留最后一个示范窗格'); return; }
+          state.windows = state.windows.filter((w) => w.id !== win.id);
+          state.activeWindowId = state.windows[0].id;
+        } else {
+          win.layout = next;
+          win.activePaneId = collectPanes(next)[0];
+        }
+        render();
+        toast('已关闭窗格');
+      };
+    }
+
+    function renderDropdown() {
+      const win = activeWin();
+      const panes = collectPanes(win.layout);
+      const dd = $('dropdown');
+      dd.innerHTML = '';
+      const addSec = (txt) => { const d = document.createElement('div'); d.className = 'sec'; d.textContent = txt; dd.appendChild(d); };
+      const addBtn = (txt, fn, danger = false) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = txt;
+        if (danger) b.className = 'danger';
+        b.onclick = () => { dd.classList.remove('open'); fn(); };
+        dd.appendChild(b);
+      };
+
+      addSec('分屏');
+      addBtn('左右分屏', () => {
+        const pid = 'p-' + (++idSeq);
+        state.paneContent[pid] = SAMPLES[idSeq % SAMPLES.length];
+        splitNode(win.layout, win.activePaneId, 'horizontal', pid);
+        win.activePaneId = pid;
+        render();
+      });
+      addBtn('上下分屏', () => {
+        const pid = 'p-' + (++idSeq);
+        state.paneContent[pid] = SAMPLES[idSeq % SAMPLES.length];
+        splitNode(win.layout, win.activePaneId, 'vertical', pid);
+        win.activePaneId = pid;
+        render();
+      });
+
+      addSec('窗格');
+      if (panes.length > 1) {
+        addBtn('切换窗格', () => {
+          const i = panes.indexOf(win.activePaneId);
+          win.activePaneId = panes[(i + 1) % panes.length];
+          render();
+        });
+      }
+      addBtn('关闭当前窗格', openCloseConfirm, true);
+
+      addSec('窗口');
+      state.windows.forEach((w, idx) => {
+        addBtn(`${idx + 1}: ${w.name}${w.id === win.id ? '（当前）' : ''}`, () => {
+          state.activeWindowId = w.id;
+          render();
+        });
+      });
+      const sep = document.createElement('div'); sep.className = 'div'; dd.appendChild(sep);
+      addBtn('新建窗口', () => {
+        const wid = 'w-' + (++idSeq);
+        const pid = 'p-' + (++idSeq);
+        state.paneContent[pid] = SAMPLES[idSeq % SAMPLES.length];
+        state.windows.push({ id: wid, name: 'win-' + state.windows.length, activePaneId: pid, layout: { id: 'n-' + (++idSeq), kind: 'pane', paneId: pid } });
+        state.activeWindowId = wid;
+        render();
+      });
+    }
+
+    function render() {
+      const win = activeWin();
+      const panes = collectPanes(win.layout);
+      $('stage').classList.toggle('phone', mobileMode);
+      $('focusHint').textContent = `当前窗格：${win.activePaneId}（共 ${panes.length} 个独立实例）`;
+
+      const winStrip = $('winStrip');
+      if (state.windows.length > 1) {
+        winStrip.style.display = 'flex';
+        winStrip.innerHTML = '';
+        state.windows.forEach((w, i) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'win-tab' + (w.id === win.id ? ' on' : '');
+          b.textContent = `${i + 1}: ${w.name}`;
+          b.onclick = () => { state.activeWindowId = w.id; render(); };
+          winStrip.appendChild(b);
+        });
+      } else {
+        winStrip.style.display = 'none';
+      }
+
+      const mobileBar = $('mobileBar');
+      const root = $('splitRoot');
+      root.innerHTML = '';
+
+      if (mobileMode && panes.length > 1) {
+        mobileBar.style.display = 'flex';
+        mobileBar.innerHTML = '';
+        panes.forEach((pid, i) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'mobile-pane-tab' + (pid === win.activePaneId ? ' on' : '');
+          b.textContent = `窗格 ${i + 1}`;
+          b.onclick = () => { win.activePaneId = pid; render(); };
+          mobileBar.appendChild(b);
+        });
+        root.appendChild(renderNode({ kind: 'pane', paneId: win.activePaneId }, win, 1));
+      } else {
+        mobileBar.style.display = 'none';
+        root.appendChild(renderNode(win.layout, win, panes.length));
+      }
+      renderDropdown();
+    }
+
+    $('menuBtn').onclick = (e) => { e.stopPropagation(); $('dropdown').classList.toggle('open'); };
+    document.addEventListener('click', () => $('dropdown').classList.remove('open'));
+    $('modeDesktop').onclick = () => { mobileMode = false; $('modeDesktop').classList.add('on'); $('modePhone').classList.remove('on'); render(); };
+    $('modePhone').onclick = () => { mobileMode = true; $('modePhone').classList.add('on'); $('modeDesktop').classList.remove('on'); render(); };
+    $('btnSelectAll').onclick = () => {
+      const el = document.querySelector(`[data-pane-id="${activeWin().activePaneId}"] .pane-body`);
+      if (!el) return;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      toast(`已仅全选 ${activeWin().activePaneId}，未触及隔壁窗格`);
+    };
+    $('btnCopy').onclick = async () => {
+      const text = window.getSelection()?.toString() || '';
+      if (!text) { toast('请先在任意窗格内拖选文字或点击「全选当前窗格」'); return; }
+      try { await navigator.clipboard.writeText(text); toast(`已复制 ${text.length} 个字符（纯净无分隔符污染）`); }
+      catch { toast(`已选中 ${text.length} 个字符`); }
+    };
+
+    render();
+  </script>
+</body>
+</html>

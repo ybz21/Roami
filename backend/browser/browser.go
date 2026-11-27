@@ -22,11 +22,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/ybz21/Roami/internal/browsertabs"
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 // CDPBase 是 Chrome 远程调试根地址。默认 127.0.0.1:9222；端口被占时会自动换一个空闲端口并记录复用。
@@ -241,7 +241,7 @@ func ensureChromeLocked() error {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	// 自成进程组：回收时可整组 kill（含 zygote/gpu/renderer/crashpad 等子进程）
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	procctl.SetProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		e := fmt.Errorf("拉起 Chrome 失败(可执行路径 %s): %w", exe, err)
 		setLastErr(e.Error())
@@ -295,11 +295,7 @@ func Shutdown() {
 	if chrome == nil || chrome.Process == nil {
 		return
 	}
-	if pgid, err := syscall.Getpgid(chrome.Process.Pid); err == nil {
-		_ = syscall.Kill(-pgid, syscall.SIGKILL) // 负 pgid = 杀整组
-	} else {
-		_ = chrome.Process.Kill()
-	}
+	procctl.KillProcessGroupOf(chrome.Process)
 	chrome = nil
 }
 

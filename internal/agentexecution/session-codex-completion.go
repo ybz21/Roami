@@ -12,8 +12,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 const maxCodexTranscriptBytes = 256 << 20
@@ -108,8 +109,7 @@ func codexObservedTerminal(binding SessionBinding, turn, promptHash string, canc
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0002 != 0 || info.Size() > maxCodexTranscriptBytes {
 		return nil, "", nil
 	}
-	owner, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || owner.Uid != uint32(os.Geteuid()) {
+	if !fsguard.OwnedByCurrentUser(info) {
 		return nil, "", nil
 	}
 	file, err := os.Open(path)

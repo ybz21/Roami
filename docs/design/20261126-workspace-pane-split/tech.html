@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>产品层独立窗格分屏 · 技术设计</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">设计总览</a>
+      <a href="product.html">产品设计</a>
+      <a href="prototype.html">交互原型</a>
+      <a href="tech.html" aria-current="page">技术设计</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>技术设计</h1>
+      <p class="lead">复用已有 <code>roami-sessiond</code> 布局树与前端 <code>SplitTree.tsx</code>，把 Web 端原生会话从「单 WS 字符合成」切换为「每窗格独立 WS + DOM 独立 Terminal」。</p>
+
+      <section aria-labelledby="modules">
+        <h2 id="modules">1. 模块职责与边界</h2>
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>层次 / 文件</th>
+                <th>职责</th>
+                <th>改动方式</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>internal/sessionhost/host.go</code><br><code>internal/sessionbackend/layout.go</code></td>
+                <td>单点维护 <code>Session → Window[] → LayoutNode → Pane</code>、每 pane 独立 PTY、独立 <code>control_gen</code>、独立 5000 行 VT 状态机。</td>
+                <td>基本不动；确保 <code>SplitPane / ResizeSplit / FocusPane / ClosePane / NewWindow / SelectWindow / CloseWindow</code> 均发 <code>EventLayoutChanged</code>。</td>
+              </tr>
+              <tr>
+                <td><code>backend/pty/compat_native.go</code></td>
+                <td>Web 端 <code>/api/term/:name</code> 透明桥接。支持 <code>?pane=:paneId</code> <strong>单窗格直连模式</strong>：跳过 <code>nativeattach</code> 多窗格字符合成与底部假状态栏，直接把单一 pane 的字节流与 <code>resize / move-cursor / scroll / control</code> 透传到 <code>SessionBackend</code>。</td>
+                <td>新增 <code>serveNativeSinglePaneWS</code> 分支（当带 <code>?pane=</code> 参数，或 Web 端统一走单窗格模式时启用）；保留旧路径只给未传 <code>pane</code> 的兼容调用方。</td>
+              </tr>
+              <tr>
+                <td><code>backend/api/pane.go</code><br><code>backend/server/server.go</code></td>
+                <td>提供 <code>GET /api/sessions/:name/layout</code>（返回完整 <code>windows[]</code> 含每个窗口的递归 <code>layout</code> 树、<code>version</code>、<code>activeWindowId</code>、<code>activePaneId</code>），以及 <code>POST /api/sessions/:name/terminal-action</code>（补齐 <code>resize-split</code> 动作，与现有 <code>split-right / split-down / focus-pane / new-window / select-window / close-window</code> 收口在同一入口）。</td>
+                <td>扩展 <code>SessionWindows</code> 或新增 <code>SessionLayout</code>；执行动作后直接返回最新完整 <code>layout</code> 快照，并向订阅者推送布局变更事件。</td>
+              </tr>
+              <tr>
+                <td><code>frontend/src/components/terminal/Terminal.tsx</code></td>
+                <td>新增可选 <code>paneId?: string</code> 属性：传入后 WS URL 附带 <code>&amp;pane=${paneId}</code>，专注管理单个 PTY；暴露 <code>selectAll()</code>、<code>containerRect()</code>（直接返回 DOM 矩形）与 <code>focus()</code>。</td>
+                <td>小幅扩展，现有 IME、粘贴图片、拖拽 <code>@path</code>、重绘自愈、断线重连 100% 自动继承到每个独立窗格。</td>
+              </tr>
+              <tr>
+                <td><code>frontend/src/components/terminal/NativeSplitWorkspace.tsx</code>（新）</td>
+                <td>管理原生会话的窗口列表与当前窗口的 <code>SplitTree</code>，用 <code>renderPane={(paneId, active) =&gt; &lt;Terminal key={paneId} name={session} paneId={paneId} ... /&gt;}</code> 挂载独立终端个体；多窗口时渲染极简窗口条；通过 <code>ref</code> 映射把工具栏「滚动 / 重绘 / 重连 / 关闭聚光灯 / 拖拽注入」路由到当前激活窗格。</td>
+                <td>新增独立领域组件（与 <code>SplitTree.tsx</code> 组合，不把分屏状态塞进臃肿的 <code>TerminalPane.tsx</code>）。</td>
+              </tr>
+              <tr>
+                <td><code>frontend/src/components/terminal/TerminalPane.tsx</code><br><code>PaneCloseConfirm.tsx</code></td>
+                <td>原生会话渲染 <code>&lt;NativeSplitWorkspace /&gt;</code>，旧 tmux 会话保持原单 <code>&lt;Terminal /&gt;</code>；右键菜单新增「全选当前窗格」；关闭窗格确认优先取 <code>termRefs.current[active].paneContainerRect(paneId)</code>（DOM 真实矩形），不再走 <code>100×30</code> 或字符坐标反推。</td>
+                <td>按后端类型透明分流；统一接入「窗口菜单」。</td>
+              </tr>
+              <tr>
+                <td><code>internal/cli/nativeattach/attach.go</code><br><code>internal/cli/nativeattach/compositor.go</code></td>
+                <td>CLI（<code>roami session attach</code>）纯字符 TTY 场景下的多窗格合成器。</td>
+                <td>保留给 CLI 使用，Web 端彻底解绑；CLI 端 <code>ShowStatusBar</code> 默认改为 <code>false</code>（默认隐藏底部蓝色状态栏，仅支持 <code>--status-bar</code> / <code>ROAMI_STATUS_BAR=1</code> 按需显式开启）。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="protocol">
+        <h2 id="protocol">2. 布局数据契约与实时同步</h2>
+        <h3>2.1 布局快照接口：<code>GET /api/sessions/:name/layout</code></h3>
+        <pre><code>{
+  "data": {
+    "backend": "native",
+    "activeWindowId": "w-1",
+    "activePaneId": "p-2",
+    "windows": [
+      {
+        "id": "w-1",
+        "index": 1,
+        "name": "main",
+        "active": true,
+        "version": 4,
+        "activePaneId": "p-2",
+        "layout": {
+          "id": "s-1",
+          "kind": "split",
+          "dir": "horizontal",
+          "ratio": 0.52,
+          "first":  { "id": "n-1", "kind": "pane", "paneId": "p-1" },
+          "second": { "id": "n-2", "kind": "pane", "paneId": "p-2" }
+        }
+      }
+    ]
+  }
+}</code></pre>
+
+        <h3>2.2 布局变更实时推送（零轮询）</h3>
+        <ul>
+          <li><strong>同端操作零延迟：</strong>前端调用 <code>POST /terminal-action</code>（分屏、切窗、关窗、拖拽比例）或 <code>POST /panes/:paneId/close</code> 后，HTTP 响应直接返回最新完整 <code>layout</code>，前端原地更新 <code>SplitTree</code>。</li>
+          <li><strong>跨端操作实时同步：</strong>单窗格 WS 在收到 <code>roami-sessiond</code> 的 <code>EventLayoutChanged</code> 时，通过控制文本帧 <code>{"type":"layout","sessionId":"...","version":5}</code> 通知前端；<code>NativeSplitWorkspace</code> 收到后按防抖（50ms）拉取一次 <code>GET /layout</code> 同步整棵树（支持 CLI 分屏、另一台设备切窗、后台进程自动退出关窗格）。</li>
+          <li><strong>防闪断与状态保留：</strong><code>SplitTree</code> 以 <code>key={paneId}</code> 稳定挂载 <code>&lt;Terminal /&gt;</code>。新增或关闭兄弟窗格时，React 不会卸载原有窗格——已连接的 WS、5000 行本地历史、正在跑的命令与未提交输入 100% 无损保留。</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="perf">
+        <h2 id="perf">3. 关键工程边界与风险防控</h2>
+        <ul>
+          <li><strong>浏览器 WebGL 上下文上限：</strong>Chrome/Safari 单页通常上限 8–16 个 WebGL 上下文。同一会话开启 ≥ 4 个分屏窗格时，<code>Terminal.tsx</code> 仅对当前活跃窗格（及最近使用的至多 3 个窗格）启用 WebGL，其余自动回退 xterm Canvas/DOM 渲染器，杜绝 <code>webglcontextlost</code> 黑屏。</li>
+          <li><strong>每窗格独立控制权（<code>control_gen</code>）与手机兼容：</strong>
+            <ul>
+              <li>每个独立 <code>Terminal</code> 只对自己绑定的 <code>paneId</code> 执行 <code>ClaimControl / Resize</code>。</li>
+              <li>手机端（<code>compact</code>）只挂载当前激活窗格的 <code>Terminal</code>，后台窗格不抢桌面控制权、不把桌面隔壁窗格压窄。</li>
+              <li>电脑端 <code>SplitTree</code> 拖拽分隔线期间，仅在指针 <code>pointerup</code> 落盘后触发各子窗格的 <code>FitAddon.fit()</code> 与 <code>Resize</code>，拖拽过程中只做纯 CSS Flex 重排，60fps 无抖动且避免给远端 TUI 狂发 <code>SIGWINCH</code>。</li>
+            </ul>
+          </li>
+          <li><strong>每窗格独立拖放与粘贴：</strong>文件/图片拖放到任意窗格时，事件由该窗格自己的 <code>Terminal</code> 容器接住，直接向该窗格的 <code>paneId</code> 注入 <code>@路径</code>，不再需要先猜测像素坐标调用 <code>select-pane</code>。</li>
+          <li><strong>每窗格独立复制与全选：</strong>
+            <ul>
+              <li>鼠标拖选直接由该窗格的 xterm.js 处理，跨行/折行原生连贯。</li>
+              <li>新增 <code>TermHandle.selectAll()</code>（调用 <code>term.selectAll()</code>），右键菜单「全选当前窗格」与快捷复制仅针对当前聚焦窗格。</li>
+            </ul>
+          </li>
+          <li><strong>导航状态归属：</strong>遵循 <code>view-state.tsx</code> 规范，仅缓存纯数据布局快照（<code>cache</code> 策略），不把 xterm / WebSocket 实例放进全局 store；页面隐藏或切换会话时按活动生命周期清理连接。</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="verify">
+        <h2 id="verify">4. 验收清单</h2>
+        <ol>
+          <li><strong>复制与全选验收：</strong>左右分屏（左输出多行代码/堆栈，右运行交互命令）→ 左侧跨 10 行拖选复制，粘贴内容不含任何边框字符或右侧文字；在左侧点「全选当前窗格」并复制，仅包含左侧输出。</li>
+          <li><strong>独立滚动验收：</strong>左侧输出 500 行后上滚到顶部查看，同时在右侧持续输入命令，左侧视口不被拉回底部。</li>
+          <li><strong>拖拽比例与稳定性验收：</strong>拖 1px 分隔线调整为 30/70，刷新页面比例持久化保留；新建/关闭兄弟窗格时，存活窗格的 WS 不断线、历史不清空。</li>
+          <li><strong>关闭窗格聚光灯验收：</strong>在 2×2 四分屏下任选一格点「关闭当前窗格」，红框与确认卡像素级贴合目标窗格 DOM 边界。</li>
+          <li><strong>跨端同步验收：</strong>桌面开 1280 / 1920 / 2560 / 3440px，手机真机开 390px（<code>compact</code> 折叠为顶部切换条 + 单窗格全宽）；在 CLI 执行 <code>roami session pane split</code>，桌面与手机 Web 布局树实时同步。</li>
+          <li><strong>三平台与旧会话回归：</strong>Linux / macOS / Windows（ConPTY）原生会话均正常分屏；旧 tmux 会话仍按单画布正常工作。</li>
+        </ol>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

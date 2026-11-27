@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/google/uuid"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
+	"github.com/ybz21/Roami/internal/fsguard"
 	"github.com/ybz21/Roami/internal/modelgateway"
 )
 
@@ -102,8 +102,7 @@ func printAgentGatewayBinding(paths agentruntime.Paths) int {
 		fmt.Fprintln(os.Stderr, "MODEL_GATEWAY_UNAVAILABLE")
 		return 1
 	}
-	owner, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || int(owner.Uid) != os.Geteuid() {
+	if !fsguard.OwnedByCurrentUser(info) {
 		fmt.Fprintln(os.Stderr, "MODEL_GATEWAY_UNAVAILABLE")
 		return 1
 	}

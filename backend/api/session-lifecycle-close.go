@@ -44,16 +44,24 @@ func (a *API) lifecycleCloseSteps() []life.Step {
 
 func (a *API) lifecycleInspectClose(ctx context.Context, o life.Operation) (any, error) {
 	rt := lifecycleRuntime(ctx)
-	actual, err := rt.SessionIdentity(o.ResourceID)
-	if err != nil {
-		return nil, err
-	}
-	if actual == "" || actual != o.Intent.SessionIdentity {
-		return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
-	}
-	proof, err := memguard.CapturePaneStopProof(rt.PanePIDs(o.ResourceID))
-	if err != nil {
-		return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_STOP_UNCONFIRMED: %w", err))
+	var proof memguard.PaneStopProof
+	if isNativeIdentity(o.Intent.SessionIdentity) {
+		st, ok := a.nativeSession(ctx, o.ResourceID)
+		if !ok || nativeSessionIdentity(st.HostInstanceID, st.SessionID) != o.Intent.SessionIdentity {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
+		}
+	} else {
+		actual, err := rt.SessionIdentity(o.ResourceID)
+		if err != nil {
+			return nil, err
+		}
+		if actual == "" || actual != o.Intent.SessionIdentity {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
+		}
+		proof, err = memguard.CapturePaneStopProof(rt.PanePIDs(o.ResourceID))
+		if err != nil {
+			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_STOP_UNCONFIRMED: %w", err))
+		}
 	}
 	plan := lifecycleClosePlan{Proof: proof}
 	if o.Intent.Mode != "keep" {
@@ -99,6 +107,22 @@ func (a *API) lifecycleStop(ctx context.Context, o life.Operation) (any, error) 
 		return nil, err
 	}
 	rt := lifecycleRuntime(ctx)
+	if isNativeIdentity(o.Intent.SessionIdentity) {
+		if st, ok := a.nativeSession(ctx, o.ResourceID); ok {
+			if nativeSessionIdentity(st.HostInstanceID, st.SessionID) != o.Intent.SessionIdentity {
+				return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_IDENTITY_CHANGED"))
+			}
+			if cerr := a.NativeBackend.Close(ctx, o.ResourceID); cerr != nil {
+				return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_STOP_UNCONFIRMED: %w", cerr))
+			}
+		}
+		meta := sessmeta.New(rt.HomeDir)
+		meta.DataDir = rt.DataDir
+		if err = meta.OnKill(o.ResourceID); err != nil {
+			return nil, err
+		}
+		return true, nil
+	}
 	actual, err := rt.SessionIdentity(o.ResourceID)
 	if err != nil {
 		return nil, err

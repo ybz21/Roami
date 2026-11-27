@@ -10,9 +10,9 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"syscall"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
+	"github.com/ybz21/Roami/internal/fsguard"
 )
 
 func runAgentCapability(args []string) int {
@@ -151,11 +151,10 @@ func runAgentCapability(args []string) int {
 }
 
 func readCapabilityContext(path string) (map[string]any, error) {
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, err := fsguard.OpenReadNoFollow(path)
 	if err != nil {
 		return nil, fmt.Errorf("CAPABILITY_CONTEXT_UNAVAILABLE")
 	}
-	f := os.NewFile(uintptr(fd), path)
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || info.Size() > 4096 {

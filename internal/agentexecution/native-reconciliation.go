@@ -7,8 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"syscall"
 	"time"
+
+	"github.com/ybz21/Roami/internal/filelock"
 )
 
 type NativeStopConfirmation struct {
@@ -45,10 +46,11 @@ func (s Service) ReconcileNative(ctx context.Context, key string, proof NativeSt
 		return empty, err
 	}
 	defer launchLock.Close()
-	if err = syscall.Flock(int(launchLock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	unlock, err := filelock.Lock(launchLock, false, true)
+	if err != nil {
 		return empty, fmt.Errorf("NATIVE_RECONCILIATION_BUSY")
 	}
-	defer syscall.Flock(int(launchLock.Fd()), syscall.LOCK_UN)
+	defer func() { _ = unlock() }()
 	var spec Spec
 	var receipt Receipt
 	if readJSON(filepath.Join(dir, "spec.json"), &spec) != nil || spec.Key != key || spec.Executor != "native" || readJSON(filepath.Join(dir, "receipt.json"), &receipt) != nil || receipt.State != "native_running" || receipt.Workspace == nil || receipt.Workspace.ID == "" {

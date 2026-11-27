@@ -24,6 +24,15 @@ var mainSteps = []Step{
 	{Version: 9, Name: "session-oom", Fn: addSessionOOM},
 	{Version: 10, Name: "session-mem-alert", Fn: addSessionMemAlert},
 	{Version: 11, Name: "session-lifecycle", SQL: sessionLifecycleTables},
+	{Version: 12, Name: "session-backend", Fn: addSessionBackendColumns},
+}
+
+func addSessionBackendColumns(tx *sql.Tx, _ Options) error {
+	return addColumns(tx, "sessions", map[string]string{
+		"backend":          "TEXT",
+		"host_instance_id": "TEXT",
+		"boot_id":          "TEXT",
+	})
 }
 
 const sessionLifecycleTables = `

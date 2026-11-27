@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三平台原生终端 · 调研与选型</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html" aria-current="page">调研与选型</a>
+      <a href="product.html">产品设计</a>
+      <a href="tech.html">技术设计</a>
+      <a href="capabilities.html">迁移清单</a>
+      <a href="windows.html">Windows</a>
+      <a href="tech.html#acceptance">验证记录</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>原生终端选型</h1>
+
+      <section aria-labelledby="recommended-stack">
+        <h2 id="recommended-stack">选什么</h2>
+        <p class="lead">会话交给 Roami 自有独立 Go 宿主 <code>roami-sessiond</code>。macOS / Linux 用现有 <code>creack/pty v1.1.24</code>；Windows 首选 <code>crosspty v1.2.0</code>（ConPTY + PowerShell 7），真机探针并行用现有 <code>x/sys/windows</code> 直接调 ConPTY 对照，不达标直接切原生。</p>
+        <p><a href="tech.html#layers">看架构图</a> · <a href="#options">看方案对比</a></p>
+      </section>
+
+      <section aria-labelledby="decision">
+        <h2 id="decision">先干什么</h2>
+        <ol>
+          <li>抽出 <code>SessionBackend</code> 接上现有 tmux，收口台账、归属和直调旁路。</li>
+          <li>Linux 跑通单窗格（重连 + Web 重启），再验 macOS；Windows 并行验 PowerShell 7。</li>
+          <li>新会话切默认，老 tmux 会话照常连。</li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="options">
+        <h2 id="options">方案对比</h2>
+        <div class="table" role="region" aria-label="主要方案对比" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">方案</th><th scope="col">好处</th><th scope="col">麻烦</th><th scope="col">结论</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">自研 Go 宿主 + <code>creack/pty</code> + <code>crosspty</code></th><td>Unix 复用老库，兼容 Go 1.24.0，会话与重连全自主。</td><td>要写宿主与快照；<code>crosspty</code> 关闭/Job/退出码需真机过关。</td><td><strong>首选</strong></td></tr>
+              <tr><th scope="row">自研 Go 宿主 + 直接调 ConPTY</th><td>进程、管道、Job、退出码全可控。</td><td>自维护几百行 Win32 启动回收。</td><td>Windows 备选</td></tr>
+              <tr><th scope="row"><code>go-pty v0.2.3</code></th><td>单库覆三平台。</td><td>要求 Go 1.25；仍需宿主与补 Job。</td><td>只做对照</td></tr>
+              <tr><th scope="row">Zellij</th><td>自带分屏、重连、Windows。</td><td>难嵌 Roami 会话身份、围栏与防重投。</td><td>不采用</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details>
+          <summary>其它未采用方案</summary>
+          <div class="table" role="region" aria-label="其它候选" tabindex="0">
+            <table>
+              <thead><tr><th scope="col">方案</th><th scope="col">不用的原因</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Charm <code>x/conpty</code></th><td>启动后直接关主线程句柄，没法先绑 Job 再放行。</td></tr>
+                <tr><th scope="row"><code>node-pty</code></th><td>得塞 Node 进程和分平台原生二进制，太重。</td></tr>
+                <tr><th scope="row">WezTerm <code>portable-pty</code></th><td>Go 调 Rust 需额外进程或 FFI，宿主还得自己写。</td></tr>
+                <tr><th scope="row">tmux + WSL</th><td>仍是 Linux 终端，不是原生 Windows PowerShell。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <details class="technical-detail">
+        <summary>三平台支持范围与为什么不改 <code>creack/pty</code></summary>
+        <section aria-labelledby="platform">
+          <h2 id="platform">平台范围</h2>
+          <div class="table" role="region" aria-label="平台支持范围" tabindex="0">
+            <table>
+              <thead><tr><th scope="col">平台</th><th scope="col">PTY</th><th scope="col">默认 Shell</th><th scope="col">首轮真机</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">macOS</th><td><code>creack/pty</code></td><td>登录 shell（通常 zsh）</td><td>arm64（保留 amd64）</td></tr>
+                <tr><th scope="row">Linux</th><td><code>creack/pty</code></td><td>登录 shell（通常 bash）</td><td>amd64（保留 arm64）</td></tr>
+                <tr><th scope="row">Windows</th><td>ConPTY（<code>crosspty</code> / 原生）</td><td>PowerShell 7（5.1 验后可选）</td><td>Win11 24H2+ x64（再 arm64）</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section aria-labelledby="adapter">
+          <h2 id="adapter">为什么不扩展 <code>creack/pty</code></h2>
+          <p>Unix PTY 只有一个 <code>*os.File</code>；Windows ConPTY 是双管道 + 控制台句柄 + 进程句柄，<code>creack/pty</code> 在 Windows 直接报错不支持。在 Roami 内部定 <code>TerminalBackend</code> 接口各自实现更干净。</p>
+        </section>
+      </details>
+    </article>
+  </main>
+</body>
+</html>

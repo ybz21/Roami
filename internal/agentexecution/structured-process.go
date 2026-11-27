@@ -9,12 +9,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/ybz21/Roami/internal/agent"
 	"github.com/ybz21/Roami/internal/gitcontext"
+	"github.com/ybz21/Roami/internal/procctl"
 )
 
 func structuredArgs(spec Spec, provider string) []string {
@@ -81,12 +81,12 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 		prompt, _ := json.Marshal(spec.Prompt)
 		cmd.Stdin = strings.NewReader(`{"event":"user","message":{"content":` + string(prompt) + "}}\n")
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	procctl.SetProcessGroup(cmd)
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return procctl.KillGroupErr(cmd.Process.Pid, true)
 	}
 	cmd.WaitDelay = 2 * time.Second
 	// Keep structured evidence separate from the human handoff.
@@ -117,7 +117,7 @@ func (s Service) structuredProcess(ctx context.Context, dir string, spec Spec, r
 	err = cmd.Run()
 	close(done)
 	if cmd.Process != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		procctl.SignalGroup(cmd.Process.Pid, true)
 	}
 	parsed.finish()
 	result.Stderr = diagnostics.String()

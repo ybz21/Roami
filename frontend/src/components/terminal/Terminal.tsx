@@ -34,7 +34,9 @@ export interface TermHandle {
   fit: () => void
   copy: () => boolean
   selection: () => string
+  selectAll: () => void
   clearSelection: () => void
+  focus: () => void
   reconnect: () => void
   scroll: (lines: number) => void
   toBottom: () => void
@@ -42,6 +44,10 @@ export interface TermHandle {
   selectPaneAt: (clientX: number, clientY: number) => void
   // 把后端返回的 pane 几何（tmux cell 坐标）换算成视口像素矩形，供目标高亮/就地确认卡定位
   paneScreenRect: (pane: { left: number; top: number; width: number; height: number }) => { x: number; y: number; width: number; height: number } | null
+  // 当前终端 DOM 容器的真实视口像素矩形（独立窗格模式直接定位关闭确认红框）
+  containerRect: () => { x: number; y: number; width: number; height: number } | null
+  // 当前终端的字符网格尺寸（供原生后端按同一网格算出精确 pane 区域）
+  gridSize: () => { cols: number; rows: number } | null
   // 「重绘」把两层花屏一起修：先就地重建渲染器（画布/纹理图集坏了那类），再抖一次尺寸
   // (cols−1→cols，两次 SIGWINCH) 逼全屏 TUI 整屏重排（TUI 自己把版排坏了那类）。
   // 只修一层的话，用户按了没反应，只能去找「重连」——那等于让人自己去猜是哪一类。
@@ -203,22 +209,27 @@ function copyTextLegacy(s: string) {
 // 断线自动重连 / 字号调节 / 复制 / 父组件注入按键 / 可见时自动重排。
 const Term = forwardRef<TermHandle, {
   name: string
+  paneId?: string
   fontSize: number
   active: boolean
+  focused?: boolean
+  preferWebgl?: boolean
   restore?: boolean
   onStatus?: (s: TermStatus) => void
+  onLayoutChange?: () => void
   // 后端懒恢复了一个被机器重启带走的会话：它换了新 id，标签/URL/后续请求都得跟着换。
   onRevived?: (from: string, to: string) => void
   onContextMenu?: (e: { x: number; y: number; selection: string }) => void
   onSelectionMenu?: (e: { x: number; y: number; selection: string }) => void
   onPaste?: () => void // Ctrl+Shift+V / Cmd+V：交父组件走应用粘贴（读剪贴板→失败弹手动框）
   onImagePaste?: (files: File[]) => void // 粘贴事件含图片时回调（绕过键盘拦截时的兜底）
-}>(function Term({ name, fontSize, active, restore = true, onStatus, onRevived, onContextMenu, onSelectionMenu, onPaste, onImagePaste }, ref) {
+}>(function Term({ name, paneId, fontSize, active, focused, preferWebgl = true, restore = true, onStatus, onLayoutChange, onRevived, onContextMenu, onSelectionMenu, onPaste, onImagePaste }, ref) {
   const { coarse } = useLayout()
   const elRef = useRef<HTMLDivElement>(null)
   const handoffCanvasRef = useRef<HTMLCanvasElement>(null)
   const restoredFrameRef = useRef<HTMLImageElement>(null)
-  const [restoredFrame] = useState(() => loadStoredTerminalFrame(name))
+  const frameKey = paneId ? `${name}:${paneId}` : name
+  const [restoredFrame] = useState(() => loadStoredTerminalFrame(frameKey))
   const termRef = useRef<Terminal>()
   const fitRef = useRef<FitAddon>()
   const wsRef = useRef<WebSocket>()
@@ -228,8 +239,15 @@ const Term = forwardRef<TermHandle, {
   // 永远好不了的情况下就是一个每秒一次的死循环——绿点闪、屏上刷满报错，还一直占着后端。
   const retryDelay = useRef(RETRY_BASE_MS)
   const webglRef = useRef<WebglAddon>()
+  const isFocused = focused ?? active
   const activeRef = useRef(active)
   activeRef.current = active
+  const focusedRef = useRef(isFocused)
+  focusedRef.current = isFocused
+  const preferWebglRef = useRef(preferWebgl)
+  preferWebglRef.current = preferWebgl
+  const onLayoutChangeRef = useRef(onLayoutChange)
+  onLayoutChangeRef.current = onLayoutChange
   const hasServerFrame = useRef(false)
   const handoffVisible = useRef(false)
   const handoffAwaitingServer = useRef(false)
@@ -323,9 +341,15 @@ const Term = forwardRef<TermHandle, {
     resizeTimer.current = setTimeout(applyResize, delay)
   }
 
-  // 滚动会话历史：attach 是全屏、xterm 本地缓冲为空，统一交后端处理——
-  // 普通屏走 tmux copy-mode，备用屏(全屏 TUI)由后端合成滚轮序列喂给应用滚自己的缓冲。
+  // 滚动会话历史：独立原生窗格普通屏直接滚本地 xterm 5000 行缓冲；tmux / 备用屏 TUI 交后端处理。
   const sendScroll = (dir: string, lines: number) => {
+    if (paneId && !mouseMode.current.on) {
+      const t = termRef.current
+      if (!t) return
+      if (dir === 'bottom') t.scrollToBottom()
+      else t.scrollLines(dir === 'up' ? -lines : lines)
+      return
+    }
     const ws = wsRef.current
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'scroll', dir, lines }))
   }
@@ -350,7 +374,8 @@ const Term = forwardRef<TermHandle, {
   const cellSize = () => {
     const t = termRef.current, el = elRef.current
     if (!t || !el || t.cols <= 0 || t.rows <= 0) return null
-    const rect = el.getBoundingClientRect()
+    const screen = el.querySelector('.xterm-screen') as HTMLElement | null
+    const rect = (screen || el).getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return null
     const cell = (t as any)._core?._renderService?.dimensions?.css?.cell
     if (cell?.width > 0 && cell?.height > 0) return { rect, cw: cell.width as number, ch: cell.height as number }
@@ -514,6 +539,7 @@ const Term = forwardRef<TermHandle, {
     const t0 = termRef.current
     const requested = t0 && t0.cols > 1 && t0.rows > 1 ? { cols: t0.cols, rows: t0.rows } : null
     const query = new URLSearchParams(requested ? { cols: String(requested.cols), rows: String(requested.rows) } : {})
+    if (paneId) query.set('pane', paneId)
     if (!restore) query.set('restore', '0')
     const q = query.size ? '?' + query.toString() : ''
     const ws = new WebSocket(nodeWs(`/term/${encodeURIComponent(name)}${q}`))
@@ -524,7 +550,7 @@ const Term = forwardRef<TermHandle, {
       silentReconnect.current = false
       retryDelay.current = RETRY_BASE_MS
       onStatus?.('connected')
-      if (!coarse) termRef.current?.focus()
+      if (!coarse && focusedRef.current) termRef.current?.focus()
       // query 已经决定了新 pty 的尺寸，把它记为“已同步”。若连接建立期间布局又变了，
       // applyResize 会只补发最终的新尺寸；没有变化则不再发送一次重复 resize。
       lastSent.current = requested || { cols: 0, rows: 0 }
@@ -558,6 +584,16 @@ const Term = forwardRef<TermHandle, {
           acknowledgeConnection()
           onRevived?.(revived.from, revived.to)
           return
+        }
+        if (e.data.startsWith('{')) {
+          try {
+            const ctrl = JSON.parse(e.data)
+            if (ctrl?.type === 'layout') {
+              acknowledgeConnection()
+              onLayoutChangeRef.current?.()
+              return
+            }
+          } catch {}
         }
       }
       // 收到任何 PTY 数据都足以证明连接存活；写入解析完成后再让新帧接管旧帧。
@@ -624,7 +660,9 @@ const Term = forwardRef<TermHandle, {
       return !!sel
     },
     selection: () => termRef.current?.getSelection() || '',
+    selectAll: () => { termRef.current?.selectAll() },
     clearSelection: () => termRef.current?.clearSelection(),
+    focus: () => { termRef.current?.focus() },
     // 「重连」= 把这个标签整个重建：拆掉 xterm 实例（渲染器/纹理图集一并丢弃）再重新 open +
     // 重新 attach。等价于刷新整页，但只重建这一个会话。渲染器坏掉导致的「字糊/字没了」
     // 只有这一招能救——重绘(SIGWINCH)和单纯重连 WebSocket 都改不了本地图集。
@@ -633,6 +671,17 @@ const Term = forwardRef<TermHandle, {
     toBottom: () => sendScroll('bottom', 0),
     selectPaneAt: (clientX, clientY) => selectPaneAtClient(clientX, clientY),
     paneScreenRect: (pane) => paneScreenRect(pane),
+    containerRect: () => {
+      const el = elRef.current
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      if (r.width <= 0 || r.height <= 0) return null
+      return { x: r.left, y: r.top, width: r.width, height: r.height }
+    },
+    gridSize: () => {
+      const t = termRef.current
+      return t && t.cols > 0 && t.rows > 0 ? { cols: t.cols, rows: t.rows } : null
+    },
     redraw: () => runResumeHeal('renderer+content'),
     beginVisualHandoff,
   }))
@@ -696,7 +745,7 @@ const Term = forwardRef<TermHandle, {
       }
     }, () => { try { term.refresh(0, term.rows - 1) } catch {} })
     rendererActivationRef.current = renderer.setActive
-    renderer.setActive(activeRef.current)
+    renderer.setActive(activeRef.current && preferWebglRef.current)
 
     // 渲染器就地重建：拆掉 WebGL addon 再挂一个新的，纹理图集/画布随之重建，然后整屏重画。
     // 不重连、不动后端，只修「本地画丢了」这一类故障。
@@ -770,7 +819,7 @@ const Term = forwardRef<TermHandle, {
       if (!copyTerminalFrame(elRef.current, frame)) return
       try {
         const stored: StoredTerminalFrame = { savedAt: Date.now(), dataUrl: frame.toDataURL('image/webp', 0.92) }
-        sessionStorage.setItem(FRAME_STORAGE_PREFIX + name, JSON.stringify(stored))
+        sessionStorage.setItem(FRAME_STORAGE_PREFIX + frameKey, JSON.stringify(stored))
       } catch { /* storage quota / WebGL 读取失败时继续走普通首屏 */ }
     }
     window.addEventListener('pagehide', onPageHide)
@@ -1128,7 +1177,7 @@ const Term = forwardRef<TermHandle, {
     }
     // gen 变化 = 整机重建（见 TermHandle.reconnect）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, gen])
+  }, [name, paneId, gen])
 
   useEffect(() => {
     const t = termRef.current
@@ -1136,20 +1185,20 @@ const Term = forwardRef<TermHandle, {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fontSize])
 
-  // 隐藏标签保留布局与终端缓冲，切回时恢复 GPU 渲染并聚焦。
+  // 隐藏标签保留布局与终端缓冲，切回时恢复 GPU 渲染并按 focused 决定是否抢键盘焦点。
   useEffect(() => {
-    rendererActivationRef.current?.(active)
+    rendererActivationRef.current?.(active && preferWebgl)
     if (!active) return
     if (resumeHealPending.current !== 'none') {
       const heal = resumeHealPending.current
       resumeHealPending.current = 'none'
       runResumeHeal(heal)
     }
-    if (coarse) return
+    if (coarse || !isFocused) return
     const raf = requestAnimationFrame(() => termRef.current?.focus())
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, coarse])
+  }, [active, isFocused, preferWebgl, coarse])
 
   // 触摸选区手柄（Android 风格泪滴）：start 挂在选区首字符左下、end 挂在末字符右下，可拖动微调
   const handleStyle = (which: 'start' | 'end'): CSSProperties => ({

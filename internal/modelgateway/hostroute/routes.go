@@ -14,10 +14,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"unicode"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/ybz21/Roami/internal/fsguard"
 	metadb "github.com/ybz21/Roami/internal/storage"
 )
 
@@ -236,8 +236,7 @@ func readSavedNodeModels(path string) (map[string]any, error) {
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || info.Size() > 32000 {
 		return nil, invalidNodeRoute()
 	}
-	owner, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || int(owner.Uid) != os.Geteuid() {
+	if !fsguard.OwnedByCurrentUser(info) {
 		return nil, invalidNodeRoute()
 	}
 	raw, err := os.ReadFile(path)

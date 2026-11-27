@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三平台原生终端 · tmux 迁移清单</title>
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <header class="tt-pagehead">
+    <nav aria-label="设计文档">
+      <a href="index.html">调研与选型</a>
+      <a href="product.html">产品设计</a>
+      <a href="tech.html">技术设计</a>
+      <a href="capabilities.html" aria-current="page">迁移清单</a>
+      <a href="windows.html">Windows</a>
+      <a href="tech.html#acceptance">验证记录</a>
+    </nav>
+  </header>
+  <main>
+    <article>
+      <h1>tmux 迁移清单</h1>
+      <p class="lead">先收口到 <code>SessionBackend</code>，再按验收进度逐项开放给原生会话。</p>
+
+      <section aria-labelledby="capabilities">
+        <h2 id="capabilities">能力替换表</h2>
+        <div class="table" role="region" aria-label="能力迁移对照" tabindex="0">
+          <table>
+            <thead><tr><th scope="col">能力</th><th scope="col">原生做法</th><th scope="col">何时开放</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">身份、对账与归属</th><td>稳定 ID + 运行代次；<code>sessmeta</code> 按宿主分片对账，休眠按重启批次汇总；<code>session_homes</code> 脱离 <code>$N</code>。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">附着与改尺寸</th><td>每窗格一条流，断开不杀进程；<a href="product.html#control">控制代次</a>管尺寸，窄屏只看左右滑。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">活跃时间</th><td>只记真实打字和输出时间（替代 <code>window_activity</code>），探测不刷新。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">抓屏 Capture</th><td>从服务端 VT 取可见屏或含历史纯文本，内部可取行样式。</td><td>首轮供 <code>capture</code>；自动确认/互审比对后开</td></tr>
+              <tr><th scope="row">滚动、点选、移光标</th><td>宿主下发权威模式并唯一答查询；保留 <code>move-cursor</code>（识别暗/灰建议）。</td><td>首轮单窗格</td></tr>
+              <tr><th scope="row">环境变量</th><td>启动时经 <code>spec.Env</code> 传入，废弃敲 <code>export</code> 的 <code>InjectEnv</code>。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">终端日志</th><td>宿主按序号写可轮转日志，替代 <code>pipe-pane</code>。</td><td>首轮必做</td></tr>
+              <tr><th scope="row">打字与受管输入</th><td>打字走轻量帧；受管任务走带 <code>request_id</code> 的 <code>submit</code>（括号粘贴 + 独立回车）。</td><td>打字首轮；受管验完开</td></tr>
+              <tr><th scope="row">内存限额</th><td>Linux 用 cgroup scope；Windows 用 Job Object（不等价于压缩交换）。</td><td>按平台能力</td></tr>
+              <tr><th scope="row">进程/目录与恢复</th><td>跨平台启动身份与 cwd 观测替代 <code>/proc</code> 与 <code>pane_current_path</code>。</td><td>按平台能力</td></tr>
+              <tr><th scope="row">窗口、分屏与蜂群</th><td>三层布局树 + 预留 <code>LayoutBackend</code>，Web 直接 CSS 排布各窗格。</td><td>接口先落，入口分批开</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="work">
+        <h2 id="work">代码收口顺序</h2>
+        <ol>
+          <li>收口 <code>ttmux</code>、<code>application</code>、<code>session</code>、<code>revive</code>、<code>sessmeta</code>、<code>worktree/sessionhome</code> 的 60+ 处调用：先新建/列表/对账/退出，再抓屏/移光标/输入/窗口。</li>
+          <li>清掉所有 tmux 旁路：30 行字面量 <code>"tmux"</code> 直调 + <code>tmuxBin()</code>/<code>tmuxBinary()</code> 包装直调（<code>sessmeta</code>、<code>worktree</code>、<code>api/pane.go</code>），只留兼容适配器碰 tmux。</li>
+          <li>按会话能力位开放入口，停止与恢复全程保留真实证据。</li>
+        </ol>
+      </section>
+    </article>
+  </main>
+</body>
+</html>
