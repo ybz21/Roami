@@ -1,13 +1,17 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
 	"github.com/ybz21/Roami/internal/filelock"
+	"github.com/ybz21/Roami/internal/modelgateway/httpapi"
 	metadb "github.com/ybz21/Roami/internal/storage"
 )
 
@@ -55,10 +59,84 @@ func runAgentUpgrade(args []string) int {
 		fmt.Fprintln(os.Stderr, "AGENT_UPGRADE_UNMANAGED_RUNTIME: stop the manually started runtime first")
 		return 1
 	}
-	_, err = agentRequest(paths.Socket, "POST", "/internal/installation/quiesce", map[string]bool{"resume": args[0] == "resume-upgrade"})
+	err = prepareAgentUpgrade(paths.Socket, args[0] == "resume-upgrade")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	return 0
+}
+
+func setAgentUpgrade(socket string, resume bool) error {
+	_, err := agentRequest(socket, "POST", "/internal/installation/quiesce", map[string]bool{"resume": resume})
+	return err
+}
+
+func prepareAgentUpgrade(agentSocket string, resume bool) error {
+	gatewaySocket := httpapi.Socket(agentSocket)
+	if resume {
+		_, gatewayErr := changeGatewayUpgrade(gatewaySocket, "resume", "")
+		return errors.Join(gatewayErr, setAgentUpgrade(agentSocket, true))
+	}
+
+	deadline := time.Now().Add(time.Minute)
+	lease := rand.Text()
+	state, err := changeGatewayUpgrade(gatewaySocket, "begin", lease)
+	if err != nil {
+		return err
+	}
+	if state == nil {
+		return setAgentUpgrade(agentSocket, false)
+	}
+	ready := false
+	defer func() {
+		if !ready {
+			_, _ = changeGatewayUpgrade(gatewaySocket, "resume", lease)
+			_ = setAgentUpgrade(agentSocket, true)
+		}
+	}()
+	if err := setAgentUpgrade(agentSocket, false); err != nil {
+		return err
+	}
+
+	for {
+		state, err = changeGatewayUpgrade(gatewaySocket, "status", lease)
+		if err != nil {
+			return err
+		}
+		if state == nil || time.Now().After(deadline) {
+			return errors.New("MODEL_GATEWAY_UPGRADE_NOT_READY")
+		}
+		if state.Active == 0 {
+			ready = true
+			return nil
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func changeGatewayUpgrade(socket, action, lease string) (*httpapi.UpgradeState, error) {
+	raw, err := agentRequest(socket, "POST", httpapi.UpgradePath, httpapi.UpgradeRequest{Action: action, Lease: lease})
+	var response struct {
+		Data struct {
+			Active *int `json:"active"`
+		} `json:"data"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	parseErr := json.Unmarshal(raw, &response)
+	if err != nil {
+		if response.Error.Code == "MODEL_GATEWAY_ROUTE_NOT_FOUND" && action != "status" {
+			return nil, nil
+		}
+		if response.Error.Code != "" {
+			return nil, errors.New(response.Error.Code)
+		}
+		return nil, fmt.Errorf("MODEL_GATEWAY_UPGRADE_UNAVAILABLE: %w", err)
+	}
+	if parseErr != nil || response.Data.Active == nil || *response.Data.Active < 0 {
+		return nil, errors.New("MODEL_GATEWAY_UPGRADE_INVALID_RECEIPT")
+	}
+	return &httpapi.UpgradeState{Active: *response.Data.Active}, nil
 }

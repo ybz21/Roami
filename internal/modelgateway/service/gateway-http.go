@@ -81,6 +81,10 @@ func (h *Handler) servePublicModels(w http.ResponseWriter, r *http.Request, exte
 		httpapi.Reject(w, 400, "INVALID_MODEL_PROTOCOL")
 		return
 	}
+	if !h.beginModelRequest(w) {
+		return
+	}
+	defer h.finishModelRequest()
 	r = r.WithContext(context.WithValue(r.Context(), gatewayKeyContext{}, keyID))
 	h.forwardCatalog(w, r, snapshot, kind, protocol)
 }

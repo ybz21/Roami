@@ -36,6 +36,7 @@ type Handler struct {
 	wait           sync.WaitGroup
 	mu             sync.Mutex
 	closing        bool
+	upgrade        upgradeAdmission
 	activeForwards int
 	admissionQueue []*admissionWaiter
 }
@@ -63,10 +64,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.wait.Add(1)
 	h.mu.Unlock()
 	defer h.wait.Done()
+	if r.URL.Path == httpapi.UpgradePath {
+		h.upgradeManagement(w, r)
+		return
+	}
 	if h.gatewayNetworkManagement(w, r) || h.modelDirectoryManagement(w, r) || h.sourcePricingManagement(w, r) || h.monitorManagement(w, r) || h.pluginsManagement(w, r) || h.accessKeysManagement(w, r) || h.accessKeyManagement(w, r) || h.agentKeysManagement(w, r) || h.catalogManagement(w, r) {
 		return
 	}
 	if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
+		if !h.beginModelRequest(w) {
+			return
+		}
+		defer h.finishModelRequest()
 		h.forward(w, r)
 		return
 	}
