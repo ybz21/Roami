@@ -3,13 +3,14 @@ import { useRegisteredAgents } from '../../agent-registry'
 // 手机上一个项目的 worktree 视图（从项目分组标题进入）：
 // 每张卡 = 分支 + 收尾状态 + 挂着的会话 + 在这个目录开 Claude / Codex / 终端；顶上「开任务」。
 // 桌面项目页那套问候 / 行动卡 / 筛选 chips / 路径在手机上是硬缩，这里不复用。
-import { lazy, Suspense, useMemo, useState } from 'react'
-import { Spin } from 'antd'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { App as AntApp, Spin } from 'antd'
 import { getHashParams } from '../../route-hash'
 import { projectPath } from '../projects/okr/okr-workspace'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, DiffIcon, FolderIcon, TargetIcon, TerminalIcon } from '../../icons'
+import { AgentLogo, ChevronRight, DiffIcon, FolderIcon, TargetIcon, TerminalIcon, TrashIcon } from '../../icons'
+import { currentNodeId, useCurrentNodeId } from '../cluster/node-url'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useNativeSessionList } from '../sessions/native-session-list'
 import { nativeSessionRecord } from '../sessions/session-record'
@@ -23,7 +24,9 @@ const GitPanel = lazy(() => import('../git/GitPanel'))
 import { BranchIcon } from '../git/parts'
 import type { OverviewItem } from './MobileSessions'
 
-type Wt = { path: string; branch: string; isMain: boolean; directoryOnly?: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; pushed?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
+type Wt = { path: string; branch: string; isMain: boolean; directoryOnly?: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; locked?: boolean; prunable?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
+
+const canRemove = (w: Wt) => !!w.branch && !w.isMain && !w.directoryOnly && !w.locked && !w.prunable && !w.sessions?.length
 
 export default function MobileProjectDetail({ projectId, dir, onOpenSession, onNewInWorktree }: {
   projectId?: string
@@ -33,7 +36,12 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
 }) {
   const agents = useRegisteredAgents()
   const { t } = useI18n()
-  const [wts, setWts] = useState<Wt[] | null>(null)
+  const { message, modal } = AntApp.useApp()
+  const node = useCurrentNodeId()
+  const [loaded, setLoaded] = useState<{ dir: string; node: typeof node; worktrees: Wt[] } | null>(null)
+  const wts = loaded?.dir === dir && loaded.node === node ? loaded.worktrees : null
+  const [revision, setRevision] = useState(0)
+  const confirmation = useRef<ReturnType<typeof modal.confirm>>()
   // worktree 接口只给会话名；名字 / agent / 活状态从 overview 补，和会话页同一份
   const overview = useSessionOverview(), native = useNativeSessionList()
   const owned = useMemo(() => native.value.filter(session => (projectId ? session.projectId === projectId : session.directory === dir)).map(nativeSessionRecord), [native.value, projectId, dir])
@@ -42,16 +50,51 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   const [gitAt, setGitAt] = useState<string | null>(null)
   const [showQuiet, setShowQuiet] = useState(false)
 
+  useEffect(() => () => confirmation.current?.destroy(), [dir, node])
+
   usePageEffect(() => {
-    let stop = false
-    setWts(null)
-    // 后端 nil slice 序列化成 null，这里统一成空数组
-    const loadWt = () => api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`)
-      .then((r) => { if (!stop) setWts((r.data || []).map((w: Wt) => ({ ...w, sessions: w.sessions || [] }))) })
-      .catch(() => { if (!stop) setWts([]) })
+    const loadWt = async (signal: AbortSignal) => {
+      try {
+        const { data } = await api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`, undefined, { signal })
+        if (!signal.aborted) setLoaded({ dir, node, worktrees: data ?? [] })
+      } catch (error) {
+        if (!signal.aborted) setLoaded(current => current?.dir === dir && current.node === node ? current : { dir, node, worktrees: [] })
+        throw error
+      }
+    }
     const poll = pollWhileVisible(loadWt, 5000)
-    return () => { stop = true; poll.stop() }
-  }, [dir])
+    return () => poll.stop()
+  }, [dir, node, revision])
+
+  const removeWorktree = (w: Wt) => {
+    const forceWorktree = w.dirty + w.untracked > 0
+    confirmation.current = modal.confirm({
+      wrapClassName: 'tt-mproj-remove',
+      title: t('mobile.wt.deleteTitle', { branch: w.branch }),
+      content: t(forceWorktree ? 'mobile.wt.deleteDirtyDesc' : 'mobile.wt.deleteDesc'),
+      okText: t('project.wt.delete'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      autoFocusButton: 'cancel',
+      onOk: async () => {
+        if (currentNodeId() !== node) return
+        try {
+          await api('POST', '/git/worktree/remove', { path: w.path, forceWorktree })
+          setLoaded(current => current?.dir === dir && current.node === node ? { ...current, worktrees: current.worktrees.filter(item => item.path !== w.path) } : current)
+          message.success(t('project.wt.deleted'))
+        } catch (error) {
+          const detail = (error as { apiError?: { code?: string; sessions?: string[] } })?.apiError
+          if (detail?.code === 'SESSIONS_INSIDE') {
+            message.error(t('worktree.sessionsInsideDesc', { sessions: detail.sessions?.join(', ') || '' }))
+          } else {
+            message.error(t(detail?.code === 'WORKTREE_DIRTY' ? 'mobile.wt.deleteChanged' : 'mobile.wt.deleteFailed'))
+          }
+        } finally {
+          setRevision(value => value + 1)
+        }
+      },
+    })
+  }
 
   const wtStatus = (w: Wt) => {
     const parts: string[] = []
@@ -104,6 +147,7 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
             {agents.map(agent => <button key={agent.kind} type="button" className="tt-act" disabled={!agent.interactive} onClick={() => onNewInWorktree(agent.kind, w.path)}><AgentLogo kind={agent.kind} size={13} />{agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName })}</button>)}
             <button type="button" className="tt-act" onClick={() => onNewInWorktree('shell', w.path)}><TerminalIcon size={13} />{t('tabs.newTerminal')}</button>
             {(w.dirty + w.untracked > 0 || w.committedAhead > 0) && <button type="button" className="tt-act" onClick={() => setGitAt(w.path)}><DiffIcon size={13} />{t('git.changes')}</button>}
+            {canRemove(w) && <button type="button" className="tt-act danger" onClick={() => removeWorktree(w)}><TrashIcon size={13} />{t('project.wt.delete')}</button>}
           </div>}
         </div>
       ))}
