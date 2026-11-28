@@ -75,26 +75,31 @@ def validate_prepared_member(item, proof, directory):
         raise DomainError("SWARM_PREPARATION_UNCONFIRMED", 409)
 
 
-def bind_prepared_member(db, value, member, generation, proof):
+def require_member_provider_available(
+    db, session_id, provider_id, *, member_id=None, launch_key=None
+):
+    if row(
+        db,
+        "SELECT 1 FROM swarm_member_provider_generations WHERE session_id=? OR launch_key=? "
+        "OR (provider_id=? AND member_id IS NOT ?)",
+        (session_id, launch_key, provider_id, member_id),
+    ):
+        raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
+
+
+def bind_prepared_member(db, value, member, generation, proof, *, check_reserved_provider=None):
     if not proof:
         return
-    if row(
+    provider_id = proof["sessionBinding"]["providerConversationId"]
+    if check_reserved_provider is not None:
+        check_reserved_provider(db, proof["sessionId"], provider_id)
+    require_member_provider_available(
         db,
-        "SELECT conversation_id FROM project_okr_main_providers WHERE session_id=? OR provider_id=?",
-        (proof["sessionId"], proof["sessionBinding"]["providerConversationId"]),
-    ):
-        raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
-    if row(
-        db,
-        "SELECT member_id FROM swarm_member_provider_generations WHERE session_id=? OR launch_key=? OR (provider_id=? AND member_id!=?)",
-        (
-            proof["sessionId"],
-            proof["launchKey"],
-            proof["sessionBinding"]["providerConversationId"],
-            member["id"],
-        ),
-    ):
-        raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
+        proof["sessionId"],
+        provider_id,
+        member_id=member["id"],
+        launch_key=proof["launchKey"],
+    )
     db.execute(
         "INSERT INTO swarm_member_provider_generations(member_id,generation,owner_id,swarm_id,launch_key,session_id,provider_id,executor,model,binding_json,workspace_json,created_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (
@@ -104,7 +109,7 @@ def bind_prepared_member(db, value, member, generation, proof):
             value["id"],
             proof["launchKey"],
             proof["sessionId"],
-            proof["sessionBinding"]["providerConversationId"],
+            provider_id,
             proof["executor"],
             proof["configuredModel"],
             encoded(proof["sessionBinding"]),

@@ -35,6 +35,7 @@ class SwarmPlans:
         settings=None,
         open_leader=None,
         memory_backend=None,
+        check_reserved_provider=None,
     ):
         self.db, self.tasks, self.conversations, self.wakeup = (
             database,
@@ -45,6 +46,7 @@ class SwarmPlans:
         self.settings = settings
         self.open_leader = open_leader
         self.memory_backend = memory_backend
+        self.check_reserved_provider = check_reserved_provider
         self.chat = None
         self.locks = {}
 
@@ -272,7 +274,15 @@ class SwarmPlans:
                 raise DomainError("SWARM_MIGRATION_REQUIRES_PAUSE", 409)
             proofs = await prepared_members(self.db, self.settings, value, spec)
             return await self.db.call(
-                lambda db: migrate_members(db, owner, sid, spec, prepared=proofs), write=True
+                lambda db: migrate_members(
+                    db,
+                    owner,
+                    sid,
+                    spec,
+                    prepared=proofs,
+                    check_reserved_provider=self.check_reserved_provider,
+                ),
+                write=True,
             )
 
     async def member(self, owner, sid, member_id, *, before=None, limit=20):

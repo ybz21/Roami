@@ -100,7 +100,11 @@ from roami_okr.file_scope import ProjectFileScope
 from roami_okr.goal_schedule import ProjectGoalSchedule
 from roami_okr.identity import home_exclusions, project_conversation_identity
 from roami_okr.main import swarm_leader
-from roami_okr.main_execution import MainExecutions, conversation_model_binding
+from roami_okr.main_execution import (
+    MainExecutions,
+    conversation_model_binding,
+    require_project_provider_available,
+)
 from roami_okr.native_main_capabilities import NativeMainCapabilities
 from roami_okr.native_workspace_queue import native_turn_binding, running_native_mains
 from roami_okr.swarm_memory import ProjectSwarmMemory
@@ -292,6 +296,7 @@ class Runtime:
             settings=self.settings,
             open_leader=swarm_leader(self.conversations),
             memory_backend=ProjectSwarmMemory(),
+            check_reserved_provider=require_project_provider_available,
         )
         register_swarm_tools(
             self.tools,

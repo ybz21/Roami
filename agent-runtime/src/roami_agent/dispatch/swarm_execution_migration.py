@@ -7,7 +7,7 @@ from roami_agent.storage.database import row
 from roami_agent.storage.swarm_repository import changed, group, receipt
 
 
-def migrate_members(db, owner, sid, spec, *, prepared=None):
+def migrate_members(db, owner, sid, spec, *, prepared=None, check_reserved_provider=None):
     from roami_agent.dispatch.swarm_provider_generations import bind_prepared_member
 
     prepared = prepared or {}
@@ -81,7 +81,14 @@ def migrate_members(db, owner, sid, spec, *, prepared=None):
                 "UPDATE swarm_members SET executor=?,model=?,execution_generation=? WHERE id=?",
                 (executor, model, generation, ident),
             )
-            bind_prepared_member(db, value, member, generation, proof)
+            bind_prepared_member(
+                db,
+                value,
+                member,
+                generation,
+                proof,
+                check_reserved_provider=check_reserved_provider,
+            )
             result.append(
                 {
                     **old,
