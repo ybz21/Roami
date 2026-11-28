@@ -17,6 +17,7 @@ type PreparedSession struct {
 	Ready            bool             `json:"ready"`
 	RouteRefusal     *PreparedRefusal `json:"routeRefusal,omitempty"`
 	ContextRejection *PreparedRefusal `json:"contextRejection,omitempty"`
+	RecoveredFrom    string           `json:"recoveredFrom,omitempty"`
 }
 
 type PreparedRefusal struct {
@@ -50,6 +51,18 @@ func preparedTurnMatches(state sessionLifecycle, proof preparedTurnProof) bool {
 	return state.CompletedKey != "" && proof.Spec.Key == state.CompletedKey && proof.Spec.SessionID == state.Binding.ID && proof.Spec.Executor == state.Executor && proof.Spec.Model == "" && proof.Receipt.Session == state.Binding.ID && proof.Receipt.Binding != nil && reflect.DeepEqual(*proof.Receipt.Binding, state.Binding) && proof.Receipt.Workspace != nil && proof.Receipt.Workspace.Directory == state.Binding.Directory && (r.State == "succeeded" || r.State == "failed" || r.State == "cancelled") && r.InputStopped != nil && *r.InputStopped && r.OutcomeKnown != nil && *r.OutcomeKnown
 }
 
+func preparedModelOrigin(spec Spec, receipt Receipt) bool {
+	if spec.Model == "" {
+		return false
+	}
+	if spec.SessionID == "" {
+		return spec.ResumeFrom == "" && receipt.RecoveredFrom == ""
+	}
+	return spec.Executor == "claude" && spec.ResumeFrom != "" && spec.ResumeFrom == receipt.RecoveredFrom &&
+		receipt.ConfiguredModel == spec.Model && receipt.Binding != nil &&
+		spec.ResumeProvider == receipt.Binding.ProviderID && spec.SessionID != receipt.Session
+}
+
 func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLifecycle, result Result, later ...preparedTurnProof) (PreparedSession, error) {
 	settledKey := key
 	if state.CompletedKey != key {
@@ -59,10 +72,10 @@ func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLife
 		settledKey = state.CompletedKey
 	}
 
-	if spec.Key != key || !spec.Persistent || spec.SessionID != "" || spec.Executor == "" || spec.Model == "" || receipt.Binding == nil || receipt.Workspace == nil || receipt.Session != state.Binding.ID || state.State != "idle" || state.LaunchKey != "" || state.CompletedKey != settledKey || state.UnknownReason != "" || state.ProviderConflict != nil || state.EndedIdle || len(state.Tools) != 0 || state.Executor != spec.Executor || state.Model != spec.Model || !samePreparedProvider(*receipt.Binding, state.Binding) || receipt.Workspace.Directory != state.Binding.Directory || result.State != "succeeded" || result.InputStopped == nil || !*result.InputStopped || result.OutcomeKnown == nil || !*result.OutcomeKnown {
+	if spec.Key != key || !spec.Persistent || !preparedModelOrigin(spec, receipt) || spec.Executor == "" || receipt.Binding == nil || receipt.Workspace == nil || receipt.Session != state.Binding.ID || state.State != "idle" || state.LaunchKey != "" || state.CompletedKey != settledKey || state.UnknownReason != "" || state.ProviderConflict != nil || state.EndedIdle || len(state.Tools) != 0 || state.Executor != spec.Executor || state.Model != spec.Model || !samePreparedProvider(*receipt.Binding, state.Binding) || receipt.Workspace.Directory != state.Binding.Directory || result.State != "succeeded" || result.InputStopped == nil || !*result.InputStopped || result.OutcomeKnown == nil || !*result.OutcomeKnown {
 		return PreparedSession{}, fmt.Errorf("SESSION_PREPARATION_UNCONFIRMED")
 	}
-	selected := PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.Model, Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true}
+	selected := PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.Model, Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true, RecoveredFrom: receipt.RecoveredFrom}
 	if spec.Executor == "claude" && settledKey != key && settledKey != "" && later[0].Spec.Persistent &&
 		later[0].Spec.PreparedFrom == key {
 		r := later[0].Result
@@ -143,7 +156,7 @@ func (s Service) PreparedSession(key string) (PreparedSession, error) {
 }
 
 func preparedOriginMatches(current Spec, state sessionLifecycle, initial Spec, receipt Receipt, result Result) bool {
-	return current.PreparedFrom != "" && initial.Key == current.PreparedFrom && initial.Persistent && initial.SessionID == "" && initial.Model != "" && initial.Executor == current.Executor && state.Executor == initial.Executor && state.Model == initial.Model && receipt.Binding != nil && receipt.Workspace != nil && receipt.Session == current.SessionID && samePreparedProvider(*receipt.Binding, state.Binding) && receipt.Workspace.Directory == state.Binding.Directory && result.State == "succeeded" && result.InputStopped != nil && *result.InputStopped && result.OutcomeKnown != nil && *result.OutcomeKnown
+	return current.PreparedFrom != "" && initial.Key == current.PreparedFrom && initial.Persistent && preparedModelOrigin(initial, receipt) && initial.Executor == current.Executor && state.Executor == initial.Executor && state.Model == initial.Model && receipt.Binding != nil && receipt.Workspace != nil && receipt.Session == current.SessionID && samePreparedProvider(*receipt.Binding, state.Binding) && receipt.Workspace.Directory == state.Binding.Directory && result.State == "succeeded" && result.InputStopped != nil && *result.InputStopped && result.OutcomeKnown != nil && *result.OutcomeKnown
 }
 
 // A later task must not silently attach to a restarted provider under the same label.

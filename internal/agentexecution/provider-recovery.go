@@ -78,6 +78,11 @@ func (s Service) restoreProviderSession(ctx context.Context, dir string, spec Sp
 	if err != nil {
 		return Status{}, err
 	}
+	if spec.Model != "" {
+		if _, err = s.claudeRecoveryGateway(ctx, spec.Model); err != nil {
+			return Status{}, err
+		}
+	}
 	claim := filepath.Join(filepath.Dir(path), "recovery-claim.json")
 	previous, err := s.availableRecoveryClaim(claim, spec)
 	if err != nil {
@@ -111,7 +116,10 @@ func (s Service) restoreProviderSession(ctx context.Context, dir string, spec Sp
 	if err := writeJSON(claim, spec); err != nil {
 		return Status{}, err
 	}
-	receipt := Receipt{State: "starting", Workspace: &workspace, DeadlineMS: executionDeadline(spec.TimeoutSeconds)}
+	receipt := Receipt{
+		State: "starting", Workspace: &workspace, DeadlineMS: executionDeadline(spec.TimeoutSeconds),
+		RecoveredFrom: spec.ResumeFrom,
+	}
 	if err := writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return Status{}, err
 	}

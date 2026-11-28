@@ -144,6 +144,35 @@ func TestPreparedContinuationPinsOriginalProviderAndModelAcrossRounds(t *testing
 	}
 }
 
+func TestPreparedRecoveryPinsSourceAndConfiguredModelAcrossRounds(t *testing.T) {
+	yes := true
+	binding := SessionBinding{ID: "recovered", ProviderID: "provider", Directory: "/project", PID: 11, Processes: map[int]string{11: "root"}}
+	spec := Spec{Key: "recovery", Executor: "claude", Model: "gateway-vision", Persistent: true, SessionID: "old", ResumeFrom: "old-turn", ResumeProvider: binding.ProviderID}
+	receipt := Receipt{Session: binding.ID, Binding: &binding, Workspace: &Workspace{Directory: "/project"}, RecoveredFrom: spec.ResumeFrom, ConfiguredModel: spec.Model}
+	state := sessionLifecycle{Executor: "claude", Model: spec.Model, Binding: binding, State: "idle", CompletedKey: spec.Key}
+	done := Result{State: "succeeded", InputStopped: &yes, OutcomeKnown: &yes}
+	current := Spec{Key: "following", Executor: spec.Executor, SessionID: binding.ID, PreparedFrom: spec.Key}
+	prepared, err := preparedSelection(spec.Key, spec, receipt, state, done)
+	if err != nil || prepared.RecoveredFrom != spec.ResumeFrom || prepared.ConfiguredModel != spec.Model || !prepared.Ready {
+		t.Fatalf("recovered readiness: %+v %v", prepared, err)
+	}
+	if !preparedOriginMatches(current, state, spec, receipt, done) {
+		t.Fatal("verified recovery could not continue")
+	}
+	for _, mutation := range []func(*Spec, *Receipt){
+		func(spec *Spec, _ *Receipt) { spec.ResumeProvider = "other-provider" },
+		func(spec *Spec, _ *Receipt) { spec.SessionID = receipt.Session },
+		func(_ *Spec, receipt *Receipt) { receipt.ConfiguredModel = "other-model" },
+		func(_ *Spec, receipt *Receipt) { receipt.RecoveredFrom = "other-turn" },
+	} {
+		candidate, proof := spec, receipt
+		mutation(&candidate, &proof)
+		if _, err := preparedSelection(spec.Key, candidate, proof, state, done); err == nil || preparedOriginMatches(current, state, candidate, proof, done) {
+			t.Fatal("changed recovery evidence accepted")
+		}
+	}
+}
+
 func TestPreparedSelectionAcceptsSettledHandoffWithoutReplacingOriginalInstance(t *testing.T) {
 	yes := true
 	b := SessionBinding{ID: "session", ProviderID: "provider", Directory: "/project", PID: 11, Processes: map[int]string{11: "root"}}

@@ -395,7 +395,8 @@ func (s Service) applySessionEvent(executor string, binding SessionBinding, even
 }
 
 func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error) {
-	if (spec.Executor != "codex" && spec.Executor != "claude" && !structuredExecutor(spec.Executor)) || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || spec.Model != "" || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
+	modelOverride := spec.Model != "" && (spec.Executor != "claude" || spec.ResumeFrom == "" || spec.ResumeProvider == "")
+	if (spec.Executor != "codex" && spec.Executor != "claude" && !structuredExecutor(spec.Executor)) || spec.Directory != "" || spec.ProjectID != "" || spec.WorkspaceID != "" || spec.Base != "" || spec.Remote != "" || modelOverride || spec.Permission != "" || strings.TrimSpace(spec.Prompt) == "" || !validExecutionTimeout(spec.TimeoutSeconds) {
 		return Status{}, fmt.Errorf("INVALID_SESSION_EXECUTION_SPEC")
 	}
 	dir, err := s.directory(spec.Key)
