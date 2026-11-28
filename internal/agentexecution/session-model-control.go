@@ -146,10 +146,11 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 	knownBinding := state.Binding
 	stateUnlock()
 
-	var actionErr error
-	if start {
-		actionErr = s.operateClaudePicker(ctx, knownBinding, intent.Target)
+	var resume *claudeModelAnchor
+	if !start {
+		resume = &intent.Anchor
 	}
+	actionErr := s.operateClaudePicker(ctx, knownBinding, intent.Target, resume)
 	if actionErr == nil {
 		wait, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()

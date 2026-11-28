@@ -120,8 +120,15 @@ func TestClaudePickerRequiresAnExactGatewayLabelAndSessionOnlyAction(t *testing.
 	if got, ok := claudePickerScreen(screen, want.Display); !ok || got != (claudeModelPicker{selected: 8, destination: 10, moreBelow: true}) {
 		t.Fatalf("menu = %#v, %v", got, ok)
 	}
+	withEffort := strings.Replace(screen, claudeModelSessionOnlyHint, claudeModelEffortHint+claudeModelSessionOnlyHint, 1)
+	if got, ok := claudePickerScreen(withEffort, want.Display); !ok || got.destination != 10 || got.selected != 8 {
+		t.Fatalf("effort menu = %#v, %v", got, ok)
+	}
 	if _, ok := claudePickerScreen(strings.ReplaceAll(screen, claudeModelSessionOnlyHint, "Enter to save"), want.Display); ok {
 		t.Fatal("default-only chooser accepted")
+	}
+	if _, ok := claudePickerScreen(strings.Replace(withEffort, claudeModelSessionOnlyHint, "Enter to save", 1), want.Display); ok {
+		t.Fatal("effort footer without a session-only action accepted")
 	}
 	prompt := "Switch model?\n  ❯ 1. Yes, switch to openrouter/free\n    2. Cancel\n"
 	if !claudePickerConfirmation(prompt, want.Display) || claudePickerConfirmation(prompt, "openrouter/free-plus") || claudePickerConfirmation(screen, want.Display) {

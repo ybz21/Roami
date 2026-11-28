@@ -67,6 +67,7 @@ func claudePickerCatalogModel(gateway claudeGatewayCatalog, id string) (claudePi
 }
 
 const claudeModelSessionOnlyHint = "s to use this session only · Enter to save · Esc to cancel"
+const claudeModelEffortHint = "←/→ to adjust · "
 
 type claudeModelPicker struct {
 	selected    int
@@ -89,7 +90,7 @@ func claudePickerScreen(screen, model string) (claudeModelPicker, bool) {
 		if start < 0 {
 			continue
 		}
-		if line == claudeModelSessionOnlyHint {
+		if strings.TrimPrefix(line, claudeModelEffortHint) == claudeModelSessionOnlyHint {
 			return menu, menu.selected > 0 && strings.TrimSpace(strings.Join(lines[index+1:], "\n")) == ""
 		}
 		if row := claudePickerActiveRow.FindStringSubmatch(line); row != nil {
@@ -117,7 +118,7 @@ func claudePickerConfirmation(screen, model string) bool {
 	return false
 }
 
-func (s Service) operateClaudePicker(ctx context.Context, binding SessionBinding, model claudePickerModel) error {
+func (s Service) operateClaudePicker(ctx context.Context, binding SessionBinding, model claudePickerModel, resume *claudeModelAnchor) error {
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 	s.Runtime.Context = ctx
@@ -125,15 +126,15 @@ func (s Service) operateClaudePicker(ctx context.Context, binding SessionBinding
 	err := s.Runtime.WithExclusivePaneInput(binding.Name, binding.Pane, func(scoped runtime.Runtime) error {
 		entered = true
 		s.Runtime = scoped
-		return s.runClaudePicker(ctx, binding, model)
+		return s.runClaudePicker(ctx, binding, model, resume)
 	})
-	if !entered {
+	if !entered && resume == nil {
 		return claudePickerNotOpened
 	}
 	return err
 }
 
-func (s Service) runClaudePicker(ctx context.Context, binding SessionBinding, model claudePickerModel) error {
+func (s Service) runClaudePicker(ctx context.Context, binding SessionBinding, model claudePickerModel, resume *claudeModelAnchor) error {
 	capture := func() (string, error) {
 		return s.Runtime.TmuxOutput("capture-pane", "-p", "-t", binding.Pane)
 	}
@@ -153,15 +154,24 @@ func (s Service) runClaudePicker(ctx context.Context, binding SessionBinding, mo
 		return s.Runtime.Tmux(append([]string{"send-keys", "-t", binding.Pane}, keys...)...)
 	}
 	screen, err := capture()
-	if err != nil || !claudeEmptyPrompt(screen) || !safePane() {
-		return claudePickerNotOpened
-	}
-	if err = s.Runtime.PasteInput(binding.Pane, "/model"); err != nil {
-		return err
-	}
-	// A second Enter on the chooser saves a profile-wide default.
-	if err = send("Enter"); err != nil {
-		return err
+	if resume != nil {
+		// A retry may use the reserved chooser, but cannot open another one.
+		current, anchored := claudeModelCheckpoint(binding)
+		_, visible := claudePickerScreen(screen, model.Display)
+		if err != nil || !anchored || current != *resume || !visible || !safePane() {
+			return claudePickerUnavailable
+		}
+	} else {
+		if err != nil || !claudeEmptyPrompt(screen) || !safePane() {
+			return claudePickerNotOpened
+		}
+		if err = s.Runtime.PasteInput(binding.Pane, "/model"); err != nil {
+			return err
+		}
+		// A second Enter on the chooser saves a profile-wide default.
+		if err = send("Enter"); err != nil {
+			return err
+		}
 	}
 	selected, direction := 0, "Down"
 	confirmationSent, choosing := false, true
