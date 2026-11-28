@@ -61,6 +61,7 @@ import { BranchIcon } from '../git/parts'
 import { getHashParams } from '../../route-hash'
 import { projectPath } from './okr/okr-workspace'
 import { lazyRetry } from '../lazy-retry'
+import { canCleanupMergedWorktree, MergedWorktreeCleanupButton, useMergedWorktreeCleanup } from './merged-worktree-cleanup'
 
 const WorktreePanel = lazyRetry(() => import('../git/WorktreePanel'))
 const GitPanel = lazyRetry(() => import('../git/GitPanel'))
@@ -827,6 +828,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [tab, setTab] = useState<'tasks' | 'wt' | 'race' | 'act' | 'files'>('tasks')
   const native = useNativeSessionList()
   const [rawWorktrees, setWtsAll] = useState<any[]>([])
+  const [worktreeRevision, setWorktreeRevision] = useState(0)
   const wtsAll = useMemo(() => mergeWorktreeSessions(rawWorktrees, native.value), [rawWorktrees, native.value])
   const [defBranch, setDefBranch] = useState('')
   const [sessions, setSessions] = useState<any[]>([])
@@ -861,19 +863,20 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const [compareRace, setCompareRace] = useState<any>(null)
   const dir = proj?.dir || ''
   const isGit = !!proj?.git
+  const confirmMergedCleanup = useMergedWorktreeCleanup(dir, removed => {
+    setWtsAll(current => current.filter(w => !removed.has(w.path)))
+    setWorktreeRevision(revision => revision + 1)
+    refresh()
+  })
 
   // worktree 清单（含 main，用于 HEAD 展示；「已有(N)」与任务流用非 main 子集）
   usePageEffect(() => {
     if (!dir || !isGit) { setWtsAll([]); return }
-    let stop = false
-    const loadWts = () => api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`).then((r) => {
-      if (stop) return
-      setWtsAll(Array.isArray(r?.data) ? r.data : [])
-    }).catch(() => {})
-    loadWts()
-    const i = setInterval(loadWts, 5000)
-    return () => { stop = true; clearInterval(i) }
-  }, [dir, isGit])
+    return pollWhileVisible(async signal => {
+      const r = await api('GET', `/git/worktrees?dir=${encodeURIComponent(dir)}`, undefined, { signal })
+      if (!signal.aborted) setWtsAll(Array.isArray(r?.data) ? r.data : [])
+    }, 5000).stop
+  }, [dir, isGit, worktreeRevision])
   useEffect(() => {
     if (!dir || !isGit) return
     api('GET', `/git/branches?dir=${encodeURIComponent(dir)}`).then((r) => {
@@ -985,6 +988,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const wtStage = (w: any): 'merged' | 'pushed' | 'committed' | 'clean' =>
     w?.mergedInto ? 'merged' : w?.committedAhead > 0 ? (w?.pushed ? 'pushed' : 'committed') : 'clean'
   const cleanable = orphans.filter((w: any) => w.mergedInto && !wtDirty(w))
+  const cleanupCandidates = cleanable.filter(canCleanupMergedWorktree)
   const unfinished = orphans.filter((w: any) => (w.committedAhead > 0 || wtDirty(w)) && !(w.mergedInto && !wtDirty(w)))
   const clean = orphans.filter((w: any) => !w.mergedInto && !(w.committedAhead > 0 || wtDirty(w)))
   const wtOf = (s: any) => wts.find((w: any) => w.path === (ann[s.name]?.primary?.worktree || s.cwd))
@@ -1057,9 +1061,9 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
     )
   }
 
-  const sect = (label: string, count: number, tone?: 'warn' | 'ok') => (
+  const sect = (label: string, count: number, tone?: 'warn' | 'ok', action?: ReactNode) => (
     <div className={`prj-sect${tone ? ' ' + tone : ''}`}>
-      <b>{label}</b><span className="n">{count}</span><span className="ln" />
+      <b>{label}</b><span className="n">{count}</span>{action}<span className="ln" />
     </div>
   )
   // ── Worktree 分叉图的就地操作（设计 11 §8.3：三个动作都在行内做完，不再跳面板）──
@@ -1134,22 +1138,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       else if (key === 'delete') removeWt(w)
     },
   })
-
-  // 已合入·待清理的一键清（10 §5）：零损失确认后删 worktree + 本地分支（留痕 cleaned）
-  const cleanupMerged = (w: any) => {
-    Modal.confirm({
-      title: t('project.cleanupConfirm', { branch: w.branch }),
-      content: t('project.cleanupConfirmDesc', { target: w.mergedInto }),
-      okText: t('project.cleanup'),
-      onOk: async () => {
-        try {
-          await api('POST', '/git/worktree/remove', { path: w.path, deleteBranch: !w.adopted, forceDeleteBranch: !w.adopted })
-          message.success(t('project.cleaned'))
-          refresh()
-        } catch (e: any) { message.error(e.message) }
-      },
-    })
-  }
 
   // 任务行：生命周期导轨 = 建(必亮)→干(agent 跑)→审(待输入/有未合并)→并(merged)
   // 状态点语义（设计 W2）：绿 = agent 正在干活，黄 = 待输入，其余一律灰。
@@ -1378,7 +1366,9 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
           {mine.length === 0 && !native.failed && <div className="prj-empty">{t('session.empty')}</div>}
 
           {cleanable.length > 0 && (<>
-            {sect(t('project.section.cleanable'), cleanable.length, 'ok')}
+            {sect(t('project.section.cleanable'), cleanable.length, 'ok',
+              cleanupCandidates.length > 0 && <MergedWorktreeCleanupButton onClick={() => confirmMergedCleanup(cleanupCandidates)} />
+            )}
             {cleanable.map((w: any) => (
               <div key={w.path} className="prj-row">
                 <span style={{ marginTop: 7, display: 'inline-flex' }}>{dot(false, 'var(--ok)')}</span>
@@ -1396,7 +1386,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                   </div>
                 </div>
                 <span className="acts">
-                  <ActBtn icon={<TrashIcon size={14} />} label={t('project.cleanup')} tone="ok" onClick={() => cleanupMerged(w)} />
+                  {canCleanupMergedWorktree(w) && <ActBtn icon={<TrashIcon size={14} />} label={t('project.cleanup')} tone="ok" onClick={() => confirmMergedCleanup([w])} />}
                   <ActBtn icon={<PlayIcon size={13} />} label={t('project.revive')} onClick={() => newCli(w, 'shell')} />
                   <ActBtn icon={<DiffIcon size={14} />} label={t('project.compare')} onClick={() => setGitOpen(true)} />
                 </span>
@@ -1592,7 +1582,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
                           {cleanable ? t('project.wt.viewMerged') : t('project.wt.compareWith', { base: w.base })}
                         </Button>
                       )}
-                      {cleanable && <Button size="small" onClick={() => cleanupMerged(w)}>{t('project.cleanup')}</Button>}
+                      {canCleanupMergedWorktree(w) && <Button size="small" onClick={() => confirmMergedCleanup([w])}>{t('project.cleanup')}</Button>}
                       {!cleanable && !w.external && !!w.base && (
                         live === 0 && w.committedAhead === 0 && dirty === 0
                           ? <Dropdown menu={{ items: cliKinds.map((k) => ({ key: k, label: k === 'shell' ? 'shell' : agents.find(agent => agent.kind === k)?.interactive === false ? t('capabilities.agents.taskOnly', { name: agentName(k) }) : agentName(k), disabled: agents.find(agent => agent.kind === k)?.interactive === false })), onClick: ({ key }) => newCli(w, key as 'shell' | AgentKind) }}>
@@ -1704,7 +1694,6 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
         <CloseWorktreeModal info={closing} onClose={() => setClosing(null)} onDone={(name) => { closeTerm(name); setClosing(null); refresh() }} />
         <FinishModal w={finishing} base={defBranch} onClose={() => setFinishing(null)}
           onDone={() => { setFinishing(null); refresh() }} onRevive={(w) => newCli(w, 'shell')} />
-
       </div>
     </div>
   )

@@ -90,6 +90,14 @@ func TestRouterDualBackendAndPartialHostFailure(t *testing.T) {
 	if err != nil || len(rows) != 2 {
 		t.Fatalf("List = %+v err=%v", rows, err)
 	}
+	if _, err := router.ListByKind(ctx, BackendNative); err == nil {
+		t.Fatal("ListByKind accepted a partial native snapshot")
+	}
+	drainingDown.failList = false
+	oldTmux.failList = true
+	if rows, err := router.ListByKind(ctx, BackendNative); err != nil || len(rows) != 1 {
+		t.Fatalf("complete native snapshot = %+v, %v", rows, err)
+	}
 
 	// Switching default back to tmux keeps existing native session routed to native-v2!
 	if err := router.SetDefault("tmux"); err != nil {

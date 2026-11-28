@@ -4,8 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api'
 import MobileProjectDetail from './MobileProjectDetail'
 
-const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn() }))
-vi.mock('antd', () => ({ App: { useApp: () => ({ message: ui, modal: { confirm: ui.confirm } }) }, Spin: () => null }))
+const ui = vi.hoisted(() => ({ confirm: vi.fn(), error: vi.fn(), success: vi.fn(), warning: vi.fn() }))
+vi.mock('antd', () => ({ App: { useApp: () => ({ message: ui, modal: { confirm: ui.confirm, warning: ui.warning } }) }, Spin: () => null }))
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('../shell/AdaptivePanel', () => ({ default: () => null }))
 vi.mock('../../api', () => ({ api: vi.fn() }))
@@ -21,6 +21,7 @@ const mount = (open = vi.fn()) => render(<MobileProjectDetail projectId="project
 
 beforeEach(() => {
   vi.resetAllMocks()
+  ui.confirm.mockReturnValue({ destroy: vi.fn(), update: vi.fn() })
   vi.mocked(api).mockResolvedValue({ data: [main] })
 })
 afterEach(cleanup)
@@ -87,4 +88,31 @@ it.each([['WORKTREE_DIRTY', 'mobile.wt.deleteChanged'], ['SESSIONS_INSIDE', 'wor
   await act(async () => { await ui.confirm.mock.calls[0][0].onOk() })
   expect(ui.error).toHaveBeenCalledWith(message)
   expect(screen.getByText('topic')).toBeTruthy()
+})
+
+it('cleans only the confirmed merged worktrees and continues after an item changes', async () => {
+  const changed = { ...worktree, head: 'old-head', mergedInto: 'main' }
+  const landed = { ...changed, path: '/repo/.worktrees/landed', branch: 'landed', head: 'landed-head' }
+  const external = { ...changed, path: '/repo/.worktrees/external', branch: 'external', external: true }
+  let current = [main, changed, landed, external]
+  vi.mocked(api).mockImplementation(async (method, _url, body) => {
+    if (method === 'GET') return { data: current }
+    if (body.path === changed.path) {
+      current = current.map(w => w.path === changed.path ? { ...w, untracked: 1 } : w)
+      throw Object.assign(new Error('dirty'), { apiError: { code: 'WORKTREE_DIRTY' } })
+    }
+    current = current.filter(w => w.path !== body.path)
+    return { data: { ok: true } }
+  })
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'project.cleanupAll' }))
+  expect(api).not.toHaveBeenCalledWith('POST', expect.any(String), expect.anything())
+  await act(async () => { await ui.confirm.mock.calls[0][0].onOk() })
+  expect(vi.mocked(api).mock.calls.filter(([method]) => method === 'POST')).toEqual([
+    ['POST', '/git/worktree/cleanup-merged', { path: changed.path, branch: changed.branch, head: changed.head }],
+    ['POST', '/git/worktree/cleanup-merged', { path: landed.path, branch: landed.branch, head: landed.head }],
+  ])
+  expect(ui.warning).toHaveBeenCalledWith(expect.objectContaining({ title: 'project.cleanupIncomplete' }))
+  await waitFor(() => expect(screen.getByText('topic')).toBeTruthy())
+  expect(screen.queryByRole('button', { name: 'project.cleanupAll' })).toBeNull()
 })

@@ -3308,6 +3308,8 @@ html[data-pointer="coarse"] .tt-inbox-acts .tt-act { min-height: var(--tap); }
 .tt-mproj { padding: var(--pad-page, 12px); padding-bottom: var(--sp-5); }
 .tt-mproj-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .tt-mproj-head b { flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-lg); }
+.tt-mproj-cleanup { display: flex; align-items: center; gap: var(--sp-2); margin-block: var(--sp-3); font-size: var(--fs-sm); color: var(--ok); }
+.tt-mproj-cleanup span { color: var(--text-dim); font-size: var(--fs-meta); }
 .tt-mproj-wt { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); background: var(--bg-container); margin-bottom: 10px; padding: 8px 0 8px; }
 .tt-mproj-wt .wn { display: flex; align-items: center; gap: 6px; padding: 2px 12px 6px; min-width: 0; }
 .tt-mproj-wt .wn b { font-size: var(--fs-body); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3347,8 +3349,9 @@ html[data-pointer="coarse"] .tt-inbox-acts .tt-act { min-height: var(--tap); }
 /* 手机上弹窗里只要有一个撑宽的输入框，外层就能横向滚，聚焦时整张弹窗被滚到屏幕左边去 */
 html[data-size="compact"] .ant-modal-wrap { overflow-x: hidden; }
 html[data-size="compact"] .ant-modal { max-width: calc(100vw - 24px); margin-inline: auto; }
-.tt-mproj-remove .ant-modal-confirm-title { overflow-wrap: anywhere; }
-html[data-pointer="coarse"] .tt-mproj-remove .ant-modal-confirm-btns .ant-btn::after {
+:is(.tt-mproj-remove, .tt-worktree-cleanup) .ant-modal-confirm-title,
+.tt-worktree-cleanup details { overflow-wrap: anywhere; }
+html[data-pointer="coarse"] :is(.tt-mproj-remove, .tt-worktree-cleanup) .ant-modal-confirm-btns .ant-btn::after {
   content: ''; position: absolute; top: 50%; inset-inline: calc(-1 * var(--sp-1));
   height: var(--tap); transform: translateY(-50%);
 }

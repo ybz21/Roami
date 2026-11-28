@@ -208,6 +208,7 @@ func New(cfg Config) *gin.Engine {
 		g.GET("/git/worktree/diff", h.WorktreeDiff)      // 对比 base（committed 与 workingTree 分开）
 		g.POST("/git/worktree/merge", h.WorktreeMerge)   // 合并回 base（执行位/冲突 abort/expected-head）
 		g.POST("/git/worktree/remove", h.WorktreeRemove) // 删除（占用检查 + 脏保护）
+		g.POST("/git/worktree/cleanup-merged", h.WorktreeCleanupMerged)
 		g.POST("/git/worktree/prune", h.WorktreePrune)   // 显式清理残留
 		g.POST("/git/worktree/finish", h.WorktreeFinish) // P3 孤儿收尾：冻结→wip→merge→remove→留痕
 		g.POST("/git/worktree/sync", h.WorktreeSync)     // 远端轻量同步：ls-remote+fetch 合并目标，只动 refs/remotes（10 §3）

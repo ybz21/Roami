@@ -130,6 +130,15 @@ func (r *Router) Observe(ctx context.Context, sessionID string) (SessionState, e
 }
 
 func (r *Router) List(ctx context.Context) ([]SessionSummary, error) {
+	return r.list(ctx, "")
+}
+
+// ListByKind requires a complete snapshot of the selected backend kind.
+func (r *Router) ListByKind(ctx context.Context, kind BackendKind) ([]SessionSummary, error) {
+	return r.list(ctx, kind)
+}
+
+func (r *Router) list(ctx context.Context, kind BackendKind) ([]SessionSummary, error) {
 	r.mu.RLock()
 	entries := make(map[string]SessionBackend, len(r.backends))
 	for k, v := range r.backends {
@@ -141,6 +150,9 @@ func (r *Router) List(ctx context.Context) ([]SessionSummary, error) {
 	var firstErr error
 	succeeded := 0
 	for k, b := range entries {
+		if kind != "" && b.Kind() != kind {
+			continue
+		}
 		rows, err := b.List(ctx)
 		if err != nil {
 			if firstErr == nil {
@@ -154,7 +166,7 @@ func (r *Router) List(ctx context.Context) ([]SessionSummary, error) {
 			all = append(all, row)
 		}
 	}
-	if succeeded == 0 && firstErr != nil {
+	if firstErr != nil && (kind != "" || succeeded == 0) {
 		return nil, firstErr
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
