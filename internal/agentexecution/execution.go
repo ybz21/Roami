@@ -50,11 +50,13 @@ type Spec struct {
 }
 
 type Receipt struct {
-	Session    string          `json:"session,omitempty"`
-	State      string          `json:"state"`
-	Workspace  *Workspace      `json:"workspace,omitempty"`
-	DeadlineMS int64           `json:"deadlineMs,omitempty"`
-	Binding    *SessionBinding `json:"sessionBinding,omitempty"`
+	Session         string          `json:"session,omitempty"`
+	State           string          `json:"state"`
+	Workspace       *Workspace      `json:"workspace,omitempty"`
+	DeadlineMS      int64           `json:"deadlineMs,omitempty"`
+	Binding         *SessionBinding `json:"sessionBinding,omitempty"`
+	ConfiguredModel string          `json:"configuredModel,omitempty"`
+	RecoveredFrom   string          `json:"recoveredFrom,omitempty"`
 }
 
 type Result struct {

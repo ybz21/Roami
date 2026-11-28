@@ -28,6 +28,7 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	}
 	ac := spawn.DefaultAgentConfig(receipt.Workspace.Directory)
 	ac.Kind, ac.Interactive, ac.Model, ac.Permission = spec.Executor, true, spec.Model, spec.Permission
+	var recoveryModel string
 	if spec.ResumeFrom != "" {
 		source, problem := s.recheckProviderRecovery(ctx, dir, spec)
 		if problem != nil {
@@ -41,6 +42,13 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 		// Run is a dedicated process that becomes this provider; retain its original profile.
 		if err := restoreProviderHome(spec.Executor, binding); err != nil {
 			return s.failPersistent(dir, err)
+		}
+		if spec.Model != "" {
+			recoveryModel, err = s.claudeRecoveryModel(ctx, spec.Model)
+			if err != nil {
+				return s.failPersistent(dir, err)
+			}
+			ac.Model = spec.Model
 		}
 	}
 	ac, err = ac.PrepareInteractive(s.Runtime)
@@ -78,7 +86,11 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 	spawn.RecordAgentSession(s.Runtime, receipt.Session, ac)
 	lease()
 	// The TUI owns the pane and remains alive after each completion callback.
-	ac.Model = s.nativeModelID(ctx, spec.Executor, ac.Model)
+	if recoveryModel != "" {
+		ac.Model = recoveryModel
+	} else {
+		ac.Model = s.nativeModelID(ctx, spec.Executor, ac.Model)
+	}
 	command := ac.InteractiveFromPromptFile(promptFile)
 	if state.Resuming {
 		command = ac.ResumeInteractiveFromPromptFile(spec.ResumeProvider, promptFile)
@@ -131,6 +143,9 @@ func (s Service) bindInitialSession(dir string, state *sessionLifecycle, binding
 		return fmt.Errorf("SESSION_BINDING_CONFLICT")
 	}
 	receipt.Binding, receipt.State = &binding, "running"
+	if state.Resuming {
+		receipt.ConfiguredModel = state.Model
+	}
 	if err = writeJSON(filepath.Join(dir, "receipt.json"), receipt); err != nil {
 		return err
 	}

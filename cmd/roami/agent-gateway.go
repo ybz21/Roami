@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ybz21/Roami/internal/agentruntime"
-	"github.com/ybz21/Roami/internal/fsguard"
 	"github.com/ybz21/Roami/internal/modelgateway"
+	"github.com/ybz21/Roami/internal/modelgateway/httpapi"
 )
 
 func runAgentGateway(args []string) int {
@@ -96,14 +96,9 @@ func runAgentGateway(args []string) int {
 }
 
 func printAgentGatewayBinding(paths agentruntime.Paths) int {
-	socket := modelgateway.Socket(paths.Socket)
-	info, err := os.Lstat(socket)
-	if err != nil || info.Mode()&os.ModeSocket == 0 || info.Mode().Perm() != 0600 {
-		fmt.Fprintln(os.Stderr, "MODEL_GATEWAY_UNAVAILABLE")
-		return 1
-	}
-	if !fsguard.OwnedByCurrentUser(info) {
-		fmt.Fprintln(os.Stderr, "MODEL_GATEWAY_UNAVAILABLE")
+	socket, err := httpapi.PrivateSocket(paths.Socket)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	if err := json.NewEncoder(os.Stdout).Encode(map[string]any{"data": map[string]string{
