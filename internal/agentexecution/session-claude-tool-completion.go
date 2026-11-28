@@ -17,7 +17,17 @@ func (s Service) reconcileClaudeToolCompletion(ctx context.Context, key, dir, pa
 	if err != nil {
 		return Status{}, err
 	}
-	return s.settleClaudeRecordedCompletion(ctx, key, dir, path, receipt, state, state.TurnID, state.PromptHash, since)
+	return s.settleClaudeObservedOutcome(ctx, key, dir, path, receipt, state, state.TurnID, state.PromptHash, func() (*Result, string, map[string]int64) {
+		return claudeTerminalEvidence(state.Binding, state.TurnID, state.PromptHash, since, "", true)
+	})
+}
+
+func claudeFinalGatewayRefusal(record claudeCompletionRecord, blocks []claudeInterruptedBlock, text string) string {
+	usage := record.Message.Usage
+	if record.APIStatus != 503 || !record.NoToolCall || record.Meta || record.Compact || record.Message.Role != "assistant" || record.Message.Model != "<synthetic>" || record.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 || len(blocks) != 1 || blocks[0].Type != "text" {
+		return ""
+	}
+	return claudeGatewayAdmissionCode(claudeFailureRecord{APIStatus: record.APIStatus, Failure: record.APIFailure}, text)
 }
 
 func storedClaudeSubmissionTime(dir string, spec Spec, receipt Receipt) (int64, error) {

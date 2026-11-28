@@ -65,3 +65,61 @@ func TestWrappedClaudeCompletionRequiresUnblockedStopAndAllToolResults(t *testin
 		})
 	}
 }
+
+func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T) {
+	for _, scenario := range []string{"settled tools", "pending tool", "foreign provider", "new request", "untyped refusal"} {
+		t.Run(scenario, func(t *testing.T) {
+			binding, path, _, _ := reportFixture(t)
+			since := time.Now().Add(-10 * time.Second).UnixMilli()
+			row := func(kind, id, parent string, ms int64) map[string]any {
+				return map[string]any{
+					"type": kind, "uuid": id, "parentUuid": parent, "sessionId": binding.ProviderID, "cwd": binding.Directory,
+					"timestamp": time.UnixMilli(since + ms).UTC().Format(time.RFC3339Nano),
+				}
+			}
+			user := row("user", "input", "", 1000)
+			user["promptId"], user["message"] = "owned", map[string]any{"content": "owned task"}
+			tool := row("assistant", "call", "input", 2000)
+			tool["message"] = map[string]any{"content": []any{map[string]any{"type": "tool_use", "id": "bash-1", "name": "Bash"}}}
+			output := row("user", "output", "call", 3000)
+			output["promptId"] = "owned"
+			output["message"] = map[string]any{"content": []any{map[string]any{"type": "tool_result", "tool_use_id": "bash-1", "is_error": true}}}
+			failure := row("assistant", "refusal", "output", 4000)
+			failure["isApiErrorMessage"], failure["failedResponseHadNoToolCall"] = true, true
+			failure["apiErrorStatus"], failure["error"] = 503, "server_error"
+			failure["message"] = map[string]any{
+				"model": "<synthetic>", "role": "assistant", "stop_reason": "stop_sequence",
+				"usage":   map[string]int{"input_tokens": 0, "output_tokens": 0},
+				"content": []any{map[string]any{"type": "text", "text": `API Error: 503 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}`}},
+			}
+			rows := []map[string]any{user, tool, output, failure}
+			switch scenario {
+			case "pending tool":
+				failure["parentUuid"] = "call"
+				rows = []map[string]any{user, tool, failure}
+			case "foreign provider":
+				failure["sessionId"] = "foreign"
+			case "new request":
+				later := row("user", "next", "refusal", 5000)
+				later["promptId"], later["message"] = "later", map[string]any{"content": "new work"}
+				rows = append(rows, later)
+			case "untyped refusal":
+				failure["failedResponseHadNoToolCall"] = false
+			}
+			writeReportRecords(t, path, rows)
+			result, digest, completed := claudeTerminalEvidence(binding, "owned", workspaceHash("owned task"), since, "", true)
+			if scenario != "settled tools" {
+				if result != nil {
+					t.Fatalf("unsafe partial outcome accepted: %+v", result)
+				}
+				return
+			}
+			if result == nil || result.State != "failed" || result.ErrorCode != "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS" || result.Summary != "MODEL_ROUTE_NO_AVAILABLE_MEMBER" || len(digest) != 64 || completed["bash-1"] == 0 {
+				t.Fatalf("missing partial failure and tool proof: %+v", result)
+			}
+			if result, _, _ := claudeCompletedEvidence(binding, "owned", workspaceHash("owned task"), since); result != nil {
+				t.Fatal("partial failure treated as success")
+			}
+		})
+	}
+}

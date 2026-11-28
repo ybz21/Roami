@@ -25,6 +25,10 @@ type claudeCompletionRecord struct {
 	HookErrors            *[]json.RawMessage `json:"hookErrors"`
 	FailedHooks           *[]json.RawMessage `json:"failedHookErrorIndexes"`
 	AddedContext          *[]json.RawMessage `json:"hookAdditionalContext"`
+	APIError              bool               `json:"isApiErrorMessage"`
+	APIStatus             int                `json:"apiErrorStatus"`
+	APIFailure            string             `json:"error"`
+	NoToolCall            bool               `json:"failedResponseHadNoToolCall"`
 }
 
 func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, since int64) (*Result, string, map[string]int64) {
@@ -32,6 +36,10 @@ func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, si
 }
 
 func claudeCompletedEvidenceForModel(binding SessionBinding, turn, promptHash string, since int64, model string) (*Result, string, map[string]int64) {
+	return claudeTerminalEvidence(binding, turn, promptHash, since, model, false)
+}
+
+func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, since int64, model string, allowFailureAfterTools bool) (*Result, string, map[string]int64) {
 	path, info := claudeTranscriptPath(binding)
 	if info == nil || turn == "" || promptHash == "" || since <= 0 {
 		return nil, "", nil
@@ -51,7 +59,7 @@ func claudeCompletedEvidenceForModel(binding SessionBinding, turn, promptHash st
 	companions := newClaudeCompanions(binding)
 	reachable, pending, completed := map[string]bool{}, map[string]bool{}, map[string]int64{}
 	finished := int64(0)
-	finalText := ""
+	finalText, refusal := "", ""
 	for {
 		var record claudeCompletionRecord
 		if err := decoder.Decode(&record); err == io.EOF {
@@ -150,6 +158,17 @@ func claudeCompletedEvidenceForModel(binding SessionBinding, turn, promptHash st
 			return nil, "", nil
 		}
 		if record.Type == "assistant" {
+			if allowFailureAfterTools && record.APIError {
+				if finalText != "" || compact || len(pending) != 0 || len(completed) == 0 || !companions.settled() || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
+					return nil, "", nil
+				}
+				refusal = claudeFinalGatewayRefusal(record, blocks, text)
+				if refusal == "" {
+					return nil, "", nil
+				}
+				terminal, finished = true, stamp.UnixMilli()
+				continue
+			}
 			if finalText != "" || model != "" && strings.TrimPrefix(record.Message.Model, "roami-claude/") != strings.TrimPrefix(model, "roami-claude/") {
 				return nil, "", nil
 			}
@@ -204,7 +223,12 @@ func claudeCompletedEvidenceForModel(binding SessionBinding, turn, promptHash st
 			return nil, "", nil
 		}
 	}
-	return &Result{State: "succeeded", Summary: finalText, ExitCode: 0, FinishedMS: finished}, hex.EncodeToString(digest.Sum(nil)), completed
+	result := &Result{State: "succeeded", Summary: finalText, ExitCode: 0, FinishedMS: finished}
+	if refusal != "" {
+		// This is a partial execution and must not trigger a no-work retry.
+		result.State, result.ErrorCode, result.Summary, result.ExitCode = "failed", "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS", refusal, -1
+	}
+	return result, hex.EncodeToString(digest.Sum(nil)), completed
 }
 
 func ownedClaudePastedTurn(binding SessionBinding, promptHash string, since int64) string {

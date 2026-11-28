@@ -43,6 +43,11 @@ type claudeReportRecord struct {
 		Content    json.RawMessage `json:"content"`
 		StopReason string          `json:"stop_reason"`
 		Model      string          `json:"model"`
+		Role       string          `json:"role"`
+		Usage      *struct {
+			Input  *int64 `json:"input_tokens"`
+			Output *int64 `json:"output_tokens"`
+		} `json:"usage"`
 	} `json:"message"`
 }
 
