@@ -1,13 +1,13 @@
 import { usePageEffect } from '../../../page-activity'
 import { useRef, useState } from 'react'
 import { Button, Input, Modal, Select, Spin } from 'antd'
-import { api } from '../../../api'
 import { useI18n } from '../../../i18n'
 import { useLayout } from '../../../layout'
 import { PlusIcon, ChevronRight } from '../../../icons'
 import { getHashParams } from '../../../route-hash'
 import { pollWhileVisible } from '../../../visible-poll'
 import OkrResult from './OkrResult'
+import { loadOkrDirectory } from './okr-directory'
 import { type OkrOverview } from './okr-workspace'
 import './project-okr.css'
 import './okr-dashboard.css'
@@ -30,9 +30,8 @@ export default function OkrProjects({ projects, loaded, error, retry }: {
   usePageEffect(() => {
     const loader = pollWhileVisible(async signal => {
       try {
-        const response = await api('GET', '/okr', undefined, { signal })
+        const next = await loadOkrDirectory()
         if (signal.aborted) return
-        const next: OkrOverview[] = response.data || []
         setItems(current => current.length === next.length && current.every((item, i) => item.projectId === next[i].projectId && item.revision === next[i].revision && item.projectName === next[i].projectName) ? current : next)
         setReady(true); setFailed(false)
       } catch (e) { if (!signal.aborted) setFailed(true); throw e }

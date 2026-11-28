@@ -29,7 +29,7 @@ function navigate(path: string) {
   location.hash = '#/' + path + (query ? '?' + query : '')
 }
 
-export default function ProjectOkr({ projectId, projectName, projectDir, fromOverview = false, onSession = () => {} }: { projectId: string; projectName?: string; projectDir?: string; fromOverview?: boolean; onSession?: (id: string) => void }) {
+export default function ProjectOkr({ projectId, projectName, projectDir, fromOverview = false, openSwarm = false, onSession = () => {} }: { projectId: string; projectName?: string; projectDir?: string; fromOverview?: boolean; openSwarm?: boolean; onSession?: (id: string) => void }) {
   const { t, locale } = useI18n()
   const { phone, size } = useLayout()
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
@@ -38,7 +38,7 @@ export default function ProjectOkr({ projectId, projectName, projectDir, fromOve
   const [editing, setEditing] = useState(false)
   const [building, setBuilding] = useState(false)
   const [manual, setManual] = useState(false)
-  const { mainPanel, setMainPanel } = useOkrView(projectId)
+  const { mainPanel, setMainPanel } = useOkrView(projectId, openSwarm ? 'activities' : undefined)
   const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number }>()
   const reference = readOkrMessageReference()
   const [chatting, setChatting] = useState(!!reference)

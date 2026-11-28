@@ -5,9 +5,12 @@ import { useAgentInbox } from '../components/agent/useAgentInbox'
 import { lazyRetry } from '../components/lazy-retry'
 import MobileSubPage from '../components/MobileSubPage'
 import Projects from '../components/projects/Projects'
+import type { ProjectSwarm } from '../components/projects/okr/okr-directory'
+import { projectSwarmPath } from '../components/projects/okr/okr-workspace'
 import { type TreeSrc } from '../components/shell/task-tree-snapshot'
 import { useI18n } from '../i18n'
 import ViewBoundary from './ViewBoundary'
+import { getHashParams } from '../route-hash'
 import { WorkspaceStateProvider, useWorkspaceStateStore } from '../view-state'
 import { definePage } from './page-definition'
 import type { AppRoute } from './useAppRoute'
@@ -50,7 +53,7 @@ type AppRoutesProps = {
   isMobile: boolean
   active: string | null
   projects: TreeSrc['projects']
-  projectDirectory?: { loaded: boolean; error: boolean; retry: () => void }
+  projectDirectory?: { loaded: boolean; error: boolean; retry: () => void; projectSwarms?: ProjectSwarm[] | null }
   actions: RouteActions
   mobileProject: MobileProject
   mobileSearchNonce: number
@@ -81,23 +84,30 @@ function RetainedRoutes(props: AppRoutesProps) {
 function AppRouteContent({ foreground, routing, isMobile, hasDock, active, projects, projectDirectory, actions, mobileProject, mobileSearchNonce, mobileActionsHost, fullscreen, agent }: AppRoutesProps & { foreground: boolean }) {
   const store = useWorkspaceStateStore()
   const scope = useMemo(() => store.node(agent.node).child('page', routing.tab), [store, agent.node, routing.tab])
-  const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, pluginSub, settingsSub } = routing
+  const { route, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, projectSwarm, pluginSub, settingsSub } = routing
   const { openTerm, closeTerm, newTerminalAt, logout } = actions
   const { node: curNodeId, inbox: agentInbox, open: agentInboxOpen } = agent
   const { t } = useI18n()
   const okrProject = tab === 'okr' && route.includes('/') ? decodeURIComponent(route.split('/')[1]) : ''
+  const projectSwarms = projectDirectory?.projectSwarms
+  const linkedProject = swarmSub ? projectSwarms?.find(swarm => swarm.id === swarmSub)?.projectId : undefined
+  useEffect(() => {
+    if (!foreground || !linkedProject) return
+    const query = getHashParams().toString()
+    location.replace('#/' + projectSwarmPath(linkedProject) + (query ? '?' + query : ''))
+  }, [foreground, linkedProject])
   const mobileSessions = (
-    <MobileSessions initialProjectKey={projectSub || undefined} onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
+    <MobileSessions initialProjectKey={projectSub || undefined} projectSwarms={projectSwarms} onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
       onNewTask={actions.newTask}
       onNewInWorktree={(kind, path) => { void newTerminalAt(kind, path) }} />
   )
   const pages = {
     okr: definePage(okrProject ? <ProjectOkr key={`${curNodeId || 'local'}:${okrProject}`} projectId={okrProject} projectName={projects.find(p => p.key === okrProject)?.name} projectDir={projects.find(p => p.key === okrProject)?.dir} onSession={openTerm} fromOverview />
       : <OkrProjects projects={projects} loaded={projectDirectory?.loaded ?? true} error={projectDirectory?.error ?? false} retry={projectDirectory?.retry || (() => {})} />, { lifetime: 'retain' }),
-    swarm: definePage(<Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => { location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm' }} />, { lifetime: 'retain' }),
-    projects: definePage(projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} projectName={projects.find(p => p.key === projectSub)?.name} projectDir={projects.find(p => p.key === projectSub)?.dir} onSession={openTerm} /> : isMobile
+    swarm: definePage(swarmSub && (projectSwarms === null || linkedProject) ? <Spin /> : <Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => { location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm' }} />, { lifetime: 'retain' }),
+    projects: definePage(projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} projectName={projects.find(p => p.key === projectSub)?.name} projectDir={projects.find(p => p.key === projectSub)?.dir} openSwarm={projectSwarm} onSession={openTerm} /> : isMobile
       ? mobileSessions
-      : <Projects openTerm={openTerm} closeTerm={closeTerm} initialKey={projectSub || undefined} activeTerm={active} />, { lifetime: 'retain' }),
+      : <Projects openTerm={openTerm} closeTerm={closeTerm} initialKey={projectSub || undefined} activeTerm={active} projectSwarms={projectSwarms} />, { lifetime: 'retain' }),
     sessions: definePage(isMobile
       ? mobileSessions
       : <Sessions openTerm={openTerm} closeTerm={closeTerm} activeTerm={active} />, { lifetime: 'retain' }),

@@ -15,7 +15,7 @@ from roami_agent.executors.targets import TargetDirectory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
 from roami_agent.protocol.serialization import encoded
-from roami_agent.storage.database import event, row
+from roami_agent.storage.database import event, row, rows
 from roami_agent.storage.swarm_repository import receipt
 from roami_agent.storage.transcript_repository import owned
 from roami_okr.intake import assert_project_main
@@ -42,6 +42,20 @@ def main_binding(db, owner, cid):
         "WHERE p.owner_id=? AND p.conversation_id=? ORDER BY p.generation DESC LIMIT 1",
         (owner, cid),
     )
+
+
+def project_main_session_ids(db, owner, swarm):
+    return [
+        item["session_id"]
+        for item in rows(
+            db,
+            "SELECT p.session_id FROM project_okr_main_providers p JOIN project_okr_mains m "
+            "ON m.owner_id=p.owner_id AND m.project_id=p.project_id "
+            "AND m.conversation_id=p.conversation_id "
+            "WHERE m.owner_id=? AND m.project_id=? AND m.conversation_id=?",
+            (owner, swarm["target"].get("projectId"), swarm["mainConversationId"]),
+        )
+    ]
 
 
 def require_project_provider_available(db, session_id, provider_id):

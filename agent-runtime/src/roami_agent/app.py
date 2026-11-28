@@ -106,6 +106,7 @@ from roami_okr.main import swarm_leader
 from roami_okr.main_execution import (
     MainExecutions,
     conversation_model_binding,
+    project_main_session_ids,
     require_project_provider_available,
 )
 from roami_okr.main_model_selection import JOB_KIND, MainModelSelections, pending_model_selection
@@ -301,6 +302,7 @@ class Runtime:
             open_leader=swarm_leader(self.conversations),
             memory_backend=ProjectSwarmMemory(),
             check_reserved_provider=require_project_provider_available,
+            coordinator_sessions=project_main_session_ids,
         )
         register_swarm_tools(
             self.tools,

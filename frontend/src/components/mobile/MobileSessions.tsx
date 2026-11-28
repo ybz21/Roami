@@ -25,14 +25,16 @@ import { SessionActivity, SESSION_ACTIVITY_CSS } from '../projects/project-list/
 import { readMobileOverview, writeMobileOverview, type OverviewItem } from './mobile-overview-cache'
 import { readMobileProjects, writeMobileProjects, type MobileProject } from './mobile-project-cache'
 import { projectPath } from '../projects/okr/okr-workspace'
+import type { ProjectSwarm } from '../projects/okr/okr-directory'
 import { getHashParams, setHashParams } from '../../route-hash'
 import { useSessionOverview } from '../../session-overview'
 import { SessionPauseButton } from '../sessions/SessionMemoryControl'
 import { MemBar } from '../sessions/session-memory'
 export type { OverviewItem } from './mobile-overview-cache'
 
-export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject, searchNonce = 0, initialProjectKey }: {
+export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, openProject, searchNonce = 0, initialProjectKey, projectSwarms }: {
   initialProjectKey?: string
+  projectSwarms?: ProjectSwarm[] | null
   onOpen: (name: string) => void
   /** 首页点项目进来：at 每次都变，同一个项目点两次也能再开 */
   openProject?: { name: string; dir: string; at: number } | null
@@ -194,17 +196,19 @@ export default function MobileSessions({ onOpen, onNewTask, onNewInWorktree, ope
     }} />
   }
 
+  const openedProjectId = initialProjectKey || projects?.find(project => project.dir === cur?.dir)?.key
+  const projectSwarm = projectSwarms?.find(team => team.projectId === openedProjectId)
   if (initialProjectKey) {
     const project = projects?.find(project => project.key === initialProjectKey)
     return <MobileSubPage title={project?.name || t('nav.projects')} manageHistory={false} onBack={() => { const query = getHashParams().toString(); location.hash = '#/projects' + (query ? '?' + query : '') }} keepBottomNav
       action={project ? { label: t('mobile.proj.newTask'), icon: <PlusIcon size={20} />, onClick: () => onNewTask(project.dir) } : undefined}>
-      {project ? <MobileProjectDetail projectId={project.key} dir={project.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} /> : <p role="status">{projects === null ? t('common.loading') : t('agent.activity.detailsUnavailable')}</p>}
+      {project ? <MobileProjectDetail projectId={project.key} dir={project.dir} swarm={projectSwarm} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} /> : <p role="status">{projects === null ? t('common.loading') : t('agent.activity.detailsUnavailable')}</p>}
     </MobileSubPage>
   }
   if (items === null) return <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}><Spin /></div>
   if (cur) return <MobileSubPage title={cur.name} onBack={() => setCur(null)} keepBottomNav
     action={{ label: t('mobile.proj.newTask'), icon: <PlusIcon size={20} />, onClick: () => onNewTask(cur.dir) }}>
-    <MobileProjectDetail projectId={projects?.find(project => project.dir === cur.dir)?.key} dir={cur.dir} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} />
+    <MobileProjectDetail projectId={openedProjectId} dir={cur.dir} swarm={projectSwarm} onOpenSession={onOpen} onNewInWorktree={onNewInWorktree} />
   </MobileSubPage>
   return (
     <div className="tt-msess">

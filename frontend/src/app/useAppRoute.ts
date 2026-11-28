@@ -13,6 +13,7 @@ export function useAppRoute() {
   const swarmSub = tab === 'swarm' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的蜂群
   const projectSub = tab === 'projects' && route.includes('/') ? decodeURIComponent(route.split('/')[1]) : '' // 深链选中的项目
   const projectView = tab === 'projects' ? route.split('/')[2] || '' : ''
+  const projectSwarm = projectView === 'okr' && route.split('/')[3] === 'swarm'
   const pluginSub = tab === 'capabilities' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 深链选中的插件（状态条点进来）
   const inboxSub = tab === 'inbox' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : '' // 从推送通知点进来要开的会话
   const settingsSub = tab === 'settings' && route.includes('/') ? route.slice(route.indexOf('/') + 1) : '' // 设置的哪一类（node/browser）
@@ -35,6 +36,6 @@ export function useAppRoute() {
   }, [])
 
   const soloName = tab === 'term' && route.includes('/') ? decodeURIComponent(route.slice(route.indexOf('/') + 1)) : ''
-  return { route, setRoute, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, pluginSub, inboxSub, settingsSub, soloName }
+  return { route, setRoute, tab, go, selectAgent, agentPage, agentParts, agentCID, agentBranch, agentMessage, swarmSub, projectSub, projectView, projectSwarm, pluginSub, inboxSub, settingsSub, soloName }
 }
 export type AppRoute = ReturnType<typeof useAppRoute>

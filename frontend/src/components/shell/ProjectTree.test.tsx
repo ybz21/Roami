@@ -78,6 +78,28 @@ it('keeps unrelated sessions in one directory at the same level without a direct
   expect(document.querySelector('.tt-tree-children')).toBeNull()
 })
 
+it('opens the bound Swarm separately from an independent session in the same directory', () => {
+  const openSwarm = vi.fn(), openSession = vi.fn()
+  const worktree = task('/project', 'Project workspace', [
+    { name: 'main-generation-2', label: 'Team Main' },
+    { name: 'member', label: 'Team member' },
+    { name: 'independent', label: 'Independent review', parent: 'member' },
+  ])
+  render(<I18nProvider><ProjectTree tree={{ projects: [{ key: 'promo', name: 'Promotion', dir: '/project', needs: 0, tasks: [worktree] }], loose: [{ name: 'main-generation-1', label: 'Retained Main' }] }}
+    projectSwarms={[{ projectId: 'promo', id: 'swarm-id', name: 'Production team', sessionIds: ['main-generation-1', 'main-generation-2', 'member'] }]}
+    activeSwarmProject="promo" activeTask={null} activeSession={null} onProject={vi.fn()} onSession={openSession} onSwarm={openSwarm} /></I18nProvider>)
+  const entry = screen.getByRole('button', { name: /蜂群|Swarm/ })
+  expect(entry.getAttribute('aria-current')).toBe('page')
+  expect(screen.queryByText('Team Main')).toBeNull()
+  expect(screen.queryByText('Team member')).toBeNull()
+  expect(screen.queryByText('Retained Main')).toBeNull()
+  fireEvent.click(entry)
+  expect(openSwarm).toHaveBeenCalledWith('promo')
+  expect(openSession).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Independent review' }))
+  expect(openSession).toHaveBeenCalledWith('wt:/project', 'independent')
+})
+
 it('ages session labels when the session directory is unchanged', () => {
   vi.useFakeTimers()
   try {

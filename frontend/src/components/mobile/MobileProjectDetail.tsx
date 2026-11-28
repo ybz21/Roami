@@ -6,10 +6,11 @@ import { useRegisteredAgents } from '../../agent-registry'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { App as AntApp, Spin } from 'antd'
 import { getHashParams } from '../../route-hash'
-import { projectPath } from '../projects/okr/okr-workspace'
+import { projectPath, projectSwarmPath } from '../projects/okr/okr-workspace'
+import type { ProjectSwarm } from '../projects/okr/okr-directory'
 import { api } from '../../api'
 import { useI18n } from '../../i18n'
-import { AgentLogo, ChevronRight, DiffIcon, FolderIcon, TargetIcon, TerminalIcon, TrashIcon } from '../../icons'
+import { AgentLogo, ChevronRight, DiffIcon, FolderIcon, SwarmIcon, TargetIcon, TerminalIcon, TrashIcon } from '../../icons'
 import { currentNodeId, useCurrentNodeId } from '../cluster/node-url'
 import AdaptivePanel from '../shell/AdaptivePanel'
 import { useNativeSessionList } from '../sessions/native-session-list'
@@ -28,8 +29,9 @@ type Wt = { path: string; branch: string; isMain: boolean; directoryOnly?: boole
 
 const canRemove = (w: Wt) => !!w.branch && !w.isMain && !w.directoryOnly && !w.locked && !w.prunable && !w.sessions?.length
 
-export default function MobileProjectDetail({ projectId, dir, onOpenSession, onNewInWorktree }: {
+export default function MobileProjectDetail({ projectId, dir, swarm, onOpenSession, onNewInWorktree }: {
   projectId?: string
+  swarm?: ProjectSwarm
   dir: string
   onOpenSession: (name: string) => void
   onNewInWorktree: (kind: string, path: string) => void
@@ -125,15 +127,17 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   const quiet = all.filter((w) => !busy(w) && !w.isMain)
   const rank = (w: Wt) => ((w.sessions || []).length ? 0 : busy(w) ? 1 : 2)
   const shown = [...all.filter((w) => busy(w) || w.isMain).sort((a, b) => rank(a) - rank(b)), ...(showQuiet ? quiet : [])]
+  const query = getHashParams().toString()
   return (
     <div className="tt-mproj">
-      {projectId && <a className="tt-msess-row" href={'#/' + projectPath(projectId, true) + (getHashParams().toString() ? '?' + getHashParams().toString() : '')}><span className="ic"><TargetIcon /></span><span className="t"><b>{t('okr.title')}</b></span><ChevronRight /></a>}
+      {projectId && <a className="tt-msess-row" href={'#/' + projectPath(projectId, true) + (query ? '?' + query : '')}><span className="ic"><TargetIcon /></span><span className="t"><b>{t('okr.title')}</b></span><ChevronRight /></a>}
+      {swarm && <a className="tt-msess-row" href={'#/' + projectSwarmPath(swarm.projectId) + (query ? '?' + query : '')}><span className="ic"><SwarmIcon /></span><span className="t"><b>{t('nav.swarm')}</b></span><ChevronRight /></a>}
       {wts === null && <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}><Spin /></div>}
       {shown.map((w) => (
         <div key={w.path} className="tt-mproj-wt">
           <div className="wn">{w.directoryOnly ? <FolderIcon size={12} /> : <BranchIcon size={12} />}<b>{w.isMain ? t('session.wt.mainRepo') : w.branch || w.path.split('/').pop() || t('tree.loose')}</b>{w.isMain && w.branch && <span>{w.branch}</span>}{!w.directoryOnly && <span>{wtStatus(w)}</span>}</div>
           {w.path && <SessionLocation cwd={w.path} />}
-          <SessionHierarchy sessions={(w.sessions || []).map(s => ({ ...s, name: s.session, label: live.get(s.session)?.label, parent: live.get(s.session)?.parent }))} allSessions={[...live.values()]} renderRow={s => {
+          <SessionHierarchy sessions={(w.sessions || []).filter(s => !swarm?.sessionIds.includes(s.session)).map(s => ({ ...s, name: s.session, label: live.get(s.session)?.label, parent: live.get(s.session)?.parent }))} allSessions={[...live.values()]} renderRow={s => {
             const o = live.get(s.name)
             return (
               <button key={s.session} type="button" className={`tt-msess-row sub${o?.waiting ? ' wait' : ''}${s.dormant || o?.dormant ? ' dormant' : ''}`} onClick={() => onOpenSession(s.session)}>

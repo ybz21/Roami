@@ -12,7 +12,7 @@ export type Review = { id: string; summary: string; actions: string; date: strin
 export type Workspace = Configuration & { revision: number; projectId: string; observations: Observation[]; reviews: Review[]; updatedAt: string; projectFiles?: { root: string; schemaVersion: 1; revision: number; teamRoleBindings?: boolean; connectorSkillBatches?: boolean; connectorBatchProtocol?: string; htmlDashboardSupported?: boolean; dashboardDigest?: string; mainInstructionsFile?: string; teamMemoryFile?: string; mainInstructions?: string; teamMemory?: string; teamMemorySha256?: string; pendingChanges?: boolean; skills?: { id: string; path: string; content: string; sha256: string }[] } }
 export type EvidencePoint = { date: string; value: number }
 export type ResultOverview = KeyResult & { unit: string; baseline: EvidencePoint | null; latest: EvidencePoint | null; delta: number | null }
-export type OkrOverview = Pick<Workspace, 'projectId' | 'objective' | 'startDate' | 'endDate' | 'updatedAt' | 'revision'> & { projectName: string; keyResults: ResultOverview[] }
+export type OkrOverview = Pick<Workspace, 'projectId' | 'objective' | 'startDate' | 'endDate' | 'updatedAt' | 'revision'> & { projectName: string; keyResults: ResultOverview[]; swarm?: string }
 
 export function workspaceUpdated(current: Workspace | null, next: Workspace | null): next is Workspace {
   return !!next && (!current || next.revision > current.revision || next.revision === current.revision && JSON.stringify(next.projectFiles) !== JSON.stringify(current.projectFiles))
@@ -88,6 +88,10 @@ export function keyResultEvidence(workspace: Workspace, kr: KeyResult) {
 }
 export function projectPath(projectId: string, okr = false): string {
   return 'projects/' + encodeURIComponent(projectId) + (okr ? '/okr' : '')
+}
+
+export function projectSwarmPath(projectId: string): string {
+  return projectPath(projectId, true) + '/swarm'
 }
 
 export function metricConnector(configuration: Configuration, metricId: string) { return configuration.connectors?.find(source => source.bindings.some(binding => binding.metricId === metricId)) }

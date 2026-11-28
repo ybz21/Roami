@@ -18,6 +18,7 @@ export type SwarmSnapshot = {
   workPause?: { state: 'stopping' | 'paused' | 'blocked'; errorCode?: string } | null
   mainModelWait?: { retryAtMs: number } | null
   mainState?: string; paused: boolean; archived: boolean; state: SwarmState; target: { projectId?: string; directory?: string }
+  sessionIds?: string[]
   teamMemory?: { available: boolean; content?: string; sha256?: string; source: string; updatedMs?: number | null; author?: string | null; errorCode?: string }
   memberProtocol?: number; members?: SwarmMember[]
   work: SwarmWork[]; posts: { id: number; author: string; text: string; taskId?: string | null; createdMs: number; deliveryState?: 'accepted' | 'pending'; mainTurn?: { id: string; conversationId: string; state: string } }[]

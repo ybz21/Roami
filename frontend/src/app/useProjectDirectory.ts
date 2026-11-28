@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNativeSessionList } from '../components/sessions/native-session-list'
 import { api } from '../api'
+import { useCurrentNodeId } from '../components/cluster/node-url'
+import { loadOkrDirectory, projectSwarmDirectory, type ProjectSwarm } from '../components/projects/okr/okr-directory'
 import { loadSwarmDirectory } from '../components/swarm/swarm-directory'
 import { buildSessionProjects, setSessionProjects } from '../components/sessions/session-project'
 import { loadTreeSrc, saveTreeSrc, type TreeSrc } from '../components/shell/task-tree-snapshot'
 
 export function useProjectDirectory(hasSider: boolean, gitDir: string) {
+  const node = useCurrentNodeId()
   const native = useNativeSessionList()
   const nativeRef = useRef(native.value), annotations = useRef<Record<string, any>>({})
   nativeRef.current = native.value
@@ -22,6 +25,8 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
   const treeReload = useRef<(() => void) | null>(null)
   const [unfinished, setUnfinished] = useState(0)
   const [swarmCount, setSwarmCount] = useState(0)
+  const [swarmIndex, setSwarmIndex] = useState<{ node: string | null; teams: ProjectSwarm[] }>()
+  const projectSwarms = swarmIndex?.node === node ? swarmIndex.teams : null
   const [git, setGit] = useState<{ branch: string; ahead: number; behind: number; files: number; state: string; conflicts: number } | null>(null)
   const gitDirRef = useRef(gitDir)
   gitDirRef.current = gitDir
@@ -46,14 +51,20 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
       try {
         const prP = api('GET', '/projects')
         const anP = api('GET', '/sessions/annotations').catch(() => null)
-        const swP = loadSwarmDirectory().catch(() => null)
+        void Promise.all([loadSwarmDirectory().catch(() => null), loadOkrDirectory().catch(() => null)]).then(([sw, okrs]) => {
+          if (stop) return
+          if (sw) setSwarmCount(sw.filter(group => !group.archived).length)
+          const linked = sw && okrs ? projectSwarmDirectory(okrs, sw) : null
+          setSwarmIndex(prior => prior?.node === node && (!linked || JSON.stringify(prior.teams) === JSON.stringify(linked))
+            ? prior : { node, teams: linked || [] })
+        })
         void anP.then((an) => {
           if (stop || !an?.data) return
           const known = treeSrcRef.current.projects
           annotations.current = an.data
           if (known.length) setSessionProjects(buildSessionProjects(known, an.data, nativeRef.current))
         })
-        const [pr, an, sw] = await Promise.all([prP, anP, swP])
+        const [pr, an] = await Promise.all([prP, anP])
         if (stop) return
         const projects = pr?.data?.projects || []
         setProjectsLoaded(true)
@@ -62,7 +73,6 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
         annotations.current = an?.data || {}
         const placement = buildSessionProjects(projects, annotations.current, nativeRef.current)
         setSessionProjects(placement)
-        if (sw) setSwarmCount(sw.filter(group => !group.archived).length)
         void loadGit()
         setTreeSrc((cur) => ({ ...cur, projects }))
         // Worktree scans are expensive: serialize them and keep the slower cadence.
@@ -87,8 +97,8 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
     load()
     const i = setInterval(load, 15000)
     return () => { stop = true; clearInterval(i); treeReload.current = null }
-  }, [hasSider])
+  }, [hasSider, node])
 
-  return { treeSrc, setTreeSrc, treeSrcRef, projectsLoaded, projectsError, unfinished, swarmCount, git, refresh: () => treeReload.current?.() }
+  return { treeSrc, setTreeSrc, treeSrcRef, projectsLoaded, projectsError, unfinished, swarmCount, projectSwarms, git, refresh: () => treeReload.current?.() }
 }
 export type ProjectDirectory = ReturnType<typeof useProjectDirectory>
