@@ -34,6 +34,7 @@ from roami_agent.dispatch.runner import TaskDispatcher
 from roami_agent.dispatch.scheduler import Scheduler
 from roami_agent.dispatch.swarm_goal_continuation import GoalContinuation
 from roami_agent.dispatch.swarm_goal_schedule import GoalSchedule
+from roami_agent.dispatch.swarm_member_model_selection import MemberModelSelections
 from roami_agent.dispatch.swarm_plans import SwarmPlans
 from roami_agent.dispatch.task_sessions import TaskSessions
 from roami_agent.dispatch.tasks import Tasks
@@ -68,6 +69,7 @@ from roami_agent.storage.artifact_retention import ArtifactRetention
 from roami_agent.storage.artifact_store import ArtifactStore
 from roami_agent.storage.database import Database
 from roami_agent.storage.native_sessions import NativeSessions
+from roami_agent.storage.swarm_members import MEMBER_MODEL_JOB
 from roami_agent.storage.task_deliverables import TaskDeliverables
 from roami_agent.storage.turn_journal import TurnJournal
 from roami_agent.storage.workspace_files import WorkspaceFiles
@@ -441,6 +443,8 @@ class Runtime:
         )
         self.main_model_selections = MainModelSelections(self.main_executions, self.wakeup)
         self.scheduler.control_jobs[JOB_KIND] = self.main_model_selections.advance
+        self.member_model_selections = MemberModelSelections(database, self.executor, self.wakeup)
+        self.scheduler.control_jobs[MEMBER_MODEL_JOB] = self.member_model_selections.advance
         if isinstance(self.executor, CodingExecutor):
             self.executor.capabilities = self.professional_capabilities
 

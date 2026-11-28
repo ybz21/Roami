@@ -8,6 +8,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import row, rows
+from roami_agent.storage.swarm_members import require_member_model_settled
 
 STABLE = {"succeeded", "failed", "cancelled", "interrupted", "waiting_user"}
 
@@ -44,6 +45,7 @@ class TaskSessions:
             )
             if task["revision"] != revision or not run or run["id"] != run_id:
                 raise DomainError("TASK_REVISION_CHANGED", 409)
+            require_member_model_settled(db, task_id)
             prior = session_closure(db, task_id)
             if prior and prior["state"] in {"closing", "closed"}:
                 return {"taskId": task_id, "state": prior["state"]}
