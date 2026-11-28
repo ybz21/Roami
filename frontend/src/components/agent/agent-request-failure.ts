@@ -8,5 +8,6 @@ export function agentFailure(error: any, t: (key: string) => string) {
   if (code === 'OKR_MESSAGE_CONTEXT_TOO_LARGE') return t('okr.chatDraftTooLarge')
   if (code === 'PROJECT_MAIN_MODEL_CONFLICT') return t('okr.mainModelBound')
   if (code === 'PROJECT_MAIN_NATIVE_COMMAND_REQUIRED') return t('okr.nativeCommand')
+  if (code === 'MESSAGE_HAS_ACTIVE_TASK') return t('agent.deleteMessageActiveTask')
   return t(code === 'MODEL_NOT_CONFIGURED' ? 'agent.modelMissing' : code === 'BRANCH_BUSY' || code === 'COMPACTION_IN_PROGRESS' ? 'agent.busy' : code === 'NOT_ENOUGH_HISTORY' ? 'agent.compactSkipped' : 'agent.requestFailed')
 }

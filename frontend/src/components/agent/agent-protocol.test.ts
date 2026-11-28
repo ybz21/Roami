@@ -113,3 +113,21 @@ it('discards an unadmitted empty response without settling the active turn', () 
   expect(discarded.view.turns).toEqual([{ id: 'active', state: 'running' }])
   expect(discarded.reload).toBe(false)
 })
+
+it('removes deleted messages and their anchored activities without touching other branches', () => {
+  const base = snapshot()
+  base.messages = [
+    { id: 'keep', branch_id: 'b', role: 'user', status: 'completed', seq: 1, content: { text: 'Keep' } },
+    { id: 'drop', branch_id: 'parent', role: 'assistant', status: 'completed', seq: 2, content: { text: 'Drop' } },
+  ]
+  base.activities = [
+    { id: 'tool:drop', kind: 'tool', name: 'shell', anchorMessageId: 'drop', state: 'succeeded', startedMs: 1, updatedMs: 1 },
+    { id: 'tool:keep', kind: 'tool', name: 'shell', anchorMessageId: 'keep', state: 'succeeded', startedMs: 2, updatedMs: 2 },
+  ]
+  const other = projectAgentEvent(base, { id: 2, kind: 'message.deleted', branchId: 'other', payload: { messageId: 'drop', branchId: 'other' } })
+  expect(other.view.messages.map(m => m.id)).toEqual(['keep', 'drop'])
+  const deleted = projectAgentEvent(other.view, { id: 3, kind: 'message.deleted', branchId: 'parent', payload: { messageId: 'drop', branchId: 'b' } })
+  expect(deleted.reload).toBe(false)
+  expect(deleted.view.messages.map(m => m.id)).toEqual(['keep'])
+  expect(deleted.view.activities?.map(a => a.id)).toEqual(['tool:keep'])
+})

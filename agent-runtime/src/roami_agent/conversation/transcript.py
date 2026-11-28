@@ -156,6 +156,75 @@ class Conversations:
 
         return await self.db.call(lambda db: message_detail(db, owner, cid, mid, branch))
 
+    async def delete_message(self, owner, cid, mid):
+        from roami_agent.conversation.pages import lineage
+
+        def write(db):
+            c = owned(db, owner, cid)
+            native = row(
+                db,
+                "SELECT task_id FROM native_sessions WHERE conversation_id=? AND owner_id=? "
+                "UNION ALL SELECT task_id FROM swarm_member_instances WHERE conversation_id=? AND owner_id=?",
+                (cid, owner, cid, owner),
+            )
+            if native:
+                raise DomainError("NATIVE_SESSION_USE_TASK_CHANNEL", 409)
+            active_branch = c["active_branch_id"]
+            segments = lineage(db, cid, active_branch)
+            target = row(
+                db,
+                "SELECT * FROM messages WHERE id=? AND conversation_id=?",
+                (mid, cid),
+            )
+            if not target or not any(
+                target["branch_id"] == bid and target["seq"] <= upper for bid, upper in segments
+            ):
+                raise DomainError("MESSAGE_NOT_FOUND", 404)
+            if target["role"] not in {"user", "assistant"}:
+                raise DomainError("INVALID_MESSAGE")
+            if target["deleted_ms"] is not None or target["status"] == "deleted":
+                return {"messageId": mid, "deleted": True}
+            if target["status"] in {"pending", "streaming"} or row(
+                db,
+                "SELECT id FROM turns WHERE branch_id=? AND state IN ('queued','running') LIMIT 1",
+                (active_branch,),
+            ):
+                raise DomainError("BRANCH_BUSY", 409)
+            if row(
+                db,
+                "SELECT id FROM tasks WHERE owner_id=? AND origin_message_id=? "
+                "AND state IN ('preparing','queued','running','waiting_user','verifying','cancelling') LIMIT 1",
+                (owner, mid),
+            ):
+                raise DomainError("MESSAGE_HAS_ACTIVE_TASK", 409)
+            ts = now_ms()
+            db.execute(
+                "UPDATE messages SET status='deleted',deleted_ms=? WHERE id=?",
+                (ts, mid),
+            )
+            affected_branches = list(dict.fromkeys([active_branch, target["branch_id"]]))
+            placeholders = ",".join("?" for _ in affected_branches)
+            db.execute(
+                f"UPDATE branches SET epoch=epoch+1 WHERE id IN ({placeholders})",
+                tuple(affected_branches),
+            )
+            db.execute(
+                f"UPDATE context_snapshots SET state='invalid' WHERE branch_id IN ({placeholders})",
+                tuple(affected_branches),
+            )
+            db.execute("UPDATE conversations SET updated_ms=? WHERE id=?", (ts, cid))
+            event(
+                db,
+                cid,
+                "message.deleted",
+                {"messageId": mid, "branchId": active_branch},
+                turn_id=target["turn_id"],
+                message_id=mid,
+            )
+            return {"messageId": mid, "deleted": True}
+
+        return await self.db.call(write, write=True)
+
     async def messages(self, owner, cid, branch_id=None):
         def read(db):
             c = owned(db, owner, cid)

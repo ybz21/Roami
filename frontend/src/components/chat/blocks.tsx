@@ -24,13 +24,18 @@ export function fmtTs(ts?: string): string {
 }
 
 // 跨 http（局域网非安全上下文）也能用的复制
-export function copyText(s: string) {
-  if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(s).catch(() => {}); return }
+export async function copyText(s: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(s); return true } catch {}
+  }
   try {
     const ta = document.createElement('textarea')
     ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0'
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
-  } catch {}
+    document.body.appendChild(ta); ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch { return false }
 }
 
 // text 始终用于复制；children(可选)是已高亮的节点，传入时渲染它而非纯文本。

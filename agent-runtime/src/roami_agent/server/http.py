@@ -817,6 +817,10 @@ def create_app(
     async def full_message(cid: str, mid: str, owner: Owner, branch: str | None = None):
         return {"data": await runtime.conversations.message_detail(owner, cid, mid, branch)}
 
+    @app.delete("/v1/conversations/{cid}/messages/{mid}")
+    async def delete_message(cid: str, mid: str, owner: Owner):
+        return {"data": await runtime.conversations.delete_message(owner, cid, mid)}
+
     @app.post("/v1/conversations/{cid}/fork")
     async def fork(cid: str, body: Fork, owner: Owner):
         return {"data": await runtime.conversations.fork(owner, cid, body.messageId)}
