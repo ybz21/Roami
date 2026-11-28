@@ -12,6 +12,7 @@ from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import rows
 from roami_agent.storage.transcript_repository import message
 from roami_agent.tools.command_families import COMMANDS
+from roami_agent.tools.foundations import ToolDirectory
 
 
 def bash(command):
@@ -145,5 +146,25 @@ async def test_native_flags_retain_disabled_capability_checks(store):
         runtime.tools.disabled_tools.add("reminder_list")
         with pytest.raises(DomainError, match="TOOL_DISABLED|TOOL_UNAVAILABLE"):
             await runtime.tools.invoke(bash("roami agent reminder ls"), "main", {})
+    finally:
+        await runtime.close()
+
+
+async def test_project_command_paths_share_discovery_and_managed_resolution(store):
+    runtime = Runtime(store, ConversationModel())
+    try:
+        directory = runtime.tools.directory
+        base = ToolDirectory(runtime.tools, runtime.settings)
+        path = ["project", "okr", "context"]
+        assert base.operation(["roami", *path]) is None
+        query = "project_okr_context"
+        entry = directory.command_entries("main", query=query)[0]
+        assert entry["argv"] == ["roami", *path]
+        tool, args = runtime.tools.validate(bash("roami project okr context"), "main")
+        assert (tool.name, args) == (query, {})
+        listing = await runtime.tools.invoke(bash("roami project okr --help"), "main", {})
+        assert entry["argv"] == shlex.split(listing["commands"][0]["command"])
+        with pytest.raises(DomainError, match="INVALID_CLI_ARGUMENTS"):
+            runtime.tools.validate(bash("cd /tmp && roami project okr context"), "main")
     finally:
         await runtime.close()

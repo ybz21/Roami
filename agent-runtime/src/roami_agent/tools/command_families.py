@@ -117,8 +117,8 @@ def command_arguments(rest, schema):
     return args
 
 
-def public_operation(argv, schemas):
-    for name, path in COMMANDS.items():
+def public_operation(argv, schemas, command_paths):
+    for name, path in command_paths.items():
         if argv[: len(path)] == path:
             return name, command_arguments(argv[len(path) :], schemas.get(name, {}))
     if argv[:1] == ["chrome"]:

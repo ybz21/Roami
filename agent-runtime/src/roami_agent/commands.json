@@ -145,39 +145,5 @@
     "swarm",
     "memory",
     "put"
-  ],
-  "swarm_memory_edit": [
-    "swarm",
-    "memory",
-    "edit"
-  ],
-  "swarm_project_context": [
-    "swarm",
-    "project",
-    "show"
-  ],
-  "swarm_project_review": ["swarm", "project", "review"],
-  "swarm_project_update": [
-    "swarm",
-    "project",
-    "update"
-  ],
-  "project_okr_context": [
-    "project",
-    "okr",
-    "context"
-  ],
-  "swarm_connector_batch": ["swarm", "connector", "batch"],
-  "project_okr_review": ["project", "okr", "review"],
-  "project_okr_update": [
-    "project",
-    "okr",
-    "update"
-  ],
-  "project_okr_memory_edit": [
-    "project",
-    "okr",
-    "memory",
-    "edit"
   ]
 }
