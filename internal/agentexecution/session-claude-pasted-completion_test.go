@@ -68,7 +68,7 @@ func TestWrappedClaudeCompletionRequiresUnblockedStopAndAllToolResults(t *testin
 }
 
 func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T) {
-	for _, scenario := range []string{"settled tools", "pending tool", "foreign provider", "new request", "untyped refusal"} {
+	for _, scenario := range []string{"settled tools", "pending tool", "foreign provider", "new request", "untyped refusal", "settled HTTP 400", "HTTP 400 reported new tools", "HTTP 400 untyped", "HTTP 400 pending tool"} {
 		t.Run(scenario, func(t *testing.T) {
 			binding, path, launch, _ := reportFixture(t)
 			since := time.Now().Add(-10 * time.Second).UnixMilli()
@@ -94,8 +94,15 @@ func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T
 				"content": []any{map[string]any{"type": "text", "text": `API Error: 503 {"error":{"code":"MODEL_ROUTE_NO_AVAILABLE_MEMBER"}}`}},
 			}
 			rows := []map[string]any{user, tool, output, failure}
+			expected := "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
+			if strings.Contains(scenario, "HTTP 400") {
+				expected = "MODEL_HTTP_400"
+				failure["apiErrorStatus"], failure["apiErrorType"], failure["error"] = 400, "api_error", "unknown"
+				failure["message"].(map[string]any)["content"] = []any{map[string]any{"type": "text", "text": "API Error: 400 MODEL_HTTP_400"}}
+				delete(failure, "failedResponseHadNoToolCall")
+			}
 			switch scenario {
-			case "pending tool":
+			case "pending tool", "HTTP 400 pending tool":
 				failure["parentUuid"] = "call"
 				rows = []map[string]any{user, tool, failure}
 			case "foreign provider":
@@ -104,18 +111,20 @@ func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T
 				later := row("user", "next", "refusal", 5000)
 				later["promptId"], later["message"] = "later", map[string]any{"content": "new work"}
 				rows = append(rows, later)
-			case "untyped refusal":
+			case "untyped refusal", "HTTP 400 reported new tools":
 				failure["failedResponseHadNoToolCall"] = false
+			case "HTTP 400 untyped":
+				delete(failure, "apiErrorType")
 			}
 			writeReportRecords(t, path, rows)
 			result, digest, completed := claudeTerminalEvidence(binding, "owned", workspaceHash("owned task"), since, "", true)
-			if scenario != "settled tools" {
+			if scenario != "settled tools" && scenario != "settled HTTP 400" {
 				if result != nil {
 					t.Fatalf("unsafe partial outcome accepted: %+v", result)
 				}
 				return
 			}
-			if result == nil || result.State != "failed" || result.ErrorCode != "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS" || result.Summary != "MODEL_ROUTE_NO_AVAILABLE_MEMBER" || len(digest) != 64 || completed["bash-1"] == 0 {
+			if result == nil || result.State != "failed" || result.ErrorCode != "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS" || result.Summary != expected || len(digest) != 64 || completed["bash-1"] == 0 {
 				t.Fatalf("missing partial failure and tool proof: %+v", result)
 			}
 			if result, _, _ := claudeCompletedEvidence(binding, "owned", workspaceHash("owned task"), since); result != nil {

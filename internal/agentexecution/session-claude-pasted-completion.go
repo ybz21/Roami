@@ -27,8 +27,9 @@ type claudeCompletionRecord struct {
 	AddedContext          *[]json.RawMessage `json:"hookAdditionalContext"`
 	APIError              bool               `json:"isApiErrorMessage"`
 	APIStatus             int                `json:"apiErrorStatus"`
+	APIType               string             `json:"apiErrorType"`
 	APIFailure            string             `json:"error"`
-	NoToolCall            bool               `json:"failedResponseHadNoToolCall"`
+	NoToolCall            *bool              `json:"failedResponseHadNoToolCall"`
 }
 
 func claudeCompletedEvidence(binding SessionBinding, turn, promptHash string, since int64) (*Result, string, map[string]int64) {
