@@ -1,4 +1,4 @@
-import { Alert, Button, Spin } from 'antd'
+import { Spin } from 'antd'
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { type AgentKind } from '../agent-kind'
 import { useAgentInbox } from '../components/agent/useAgentInbox'
@@ -101,7 +101,7 @@ function AppRouteContent({ foreground, routing, isMobile, hasDock, active, proje
   }} />
   if (swarmSub && (projectSwarms === null || linkedProject)) {
     swarmPage = projectDirectory?.projectSwarmsError
-      ? <Alert type="error" role="alert" message={t('okr.swarmLoadFailed')} action={<Button onClick={projectDirectory.retry}>{t('agent.retry')}</Button>} />
+      ? <div className="tt-data-error" role="alert">{t('okr.swarmLoadFailed')} <button type="button" className="tt-act" onClick={projectDirectory.retry}>{t('agent.retry')}</button></div>
       : <Spin />
   }
   const mobileSessions = (
