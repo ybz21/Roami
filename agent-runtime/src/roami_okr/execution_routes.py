@@ -3,7 +3,7 @@
 from typing import Annotated, Literal
 
 from fastapi import Header
-from pydantic import Field
+from pydantic import Field, StrictBool
 
 from roami_agent.protocol.http import Payload
 from roami_okr.main_execution import main_configuration
@@ -28,6 +28,7 @@ class MainModelSelection(Payload):
     expectedGeneration: int = Field(ge=1)
     expectedModel: str = Field(min_length=1, max_length=300)
     model: str = Field(min_length=1, max_length=200)
+    allowMetered: StrictBool = False
 
 
 def mount_main_execution_routes(app, runtime):
@@ -45,4 +46,8 @@ def mount_main_execution_routes(app, runtime):
 
     @app.post("/v1/conversations/{cid}/execution/model", status_code=202)
     async def select_model(cid: str, body: MainModelSelection, owner: Owner):
-        return {"data": await runtime.main_model_selections.request(owner, cid, body.model_dump())}
+        return {
+            "data": await runtime.main_model_selections.request(
+                owner, cid, body.model_dump(exclude_defaults=True)
+            )
+        }

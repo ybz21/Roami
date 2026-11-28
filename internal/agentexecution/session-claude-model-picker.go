@@ -25,10 +25,10 @@ var claudePickerMoreBelow = regexp.MustCompile(`^\s*↓\s+[0-9]+\s+more\s*$`)
 var claudePickerUnavailable = errors.New("SESSION_MODEL_PICKER_UNCONFIRMED")
 var claudePickerNotOpened = errors.New("SESSION_MODEL_PICKER_NOT_OPENED")
 
-func (s Service) claudePickerTarget(ctx context.Context, id string, settings []byte) (claudePickerModel, error) {
+func (s Service) claudePickerTarget(ctx context.Context, id string, settings []byte, allowMetered bool) (claudePickerModel, error) {
 	ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
 	defer cancel()
-	gateway, err := s.claudeFreeGateway(ctx, id)
+	gateway, err := s.claudeGateway(ctx, id, allowMetered)
 	var profile struct {
 		Environment map[string]string `json:"env"`
 	}

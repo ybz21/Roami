@@ -50,13 +50,10 @@ func TestClaudeRecoveryUsesSavedFreeModelWithoutWritingProviderSettings(t *testi
 		}
 		switch req.URL.Path {
 		case "/v1/model-gateway/models":
-			if req.URL.Query().Get("free") != "true" {
-				http.Error(w, "free filter is required", http.StatusBadRequest)
-				return
-			}
 			rows := []directory.Row{
 				{ID: selected, Configured: true, Enabled: true, Pricing: "confirmed-free"},
 				{ID: "metered", Configured: true, Enabled: true, Pricing: "metered"},
+				{ID: "quota-model", Configured: true, Enabled: true, Pricing: "unknown"},
 				{ID: "unconfigured", Enabled: true, Pricing: "confirmed-free"},
 				{ID: "hidden", Configured: true, Enabled: true, GatewayHidden: true, Pricing: "confirmed-free"},
 				{ID: "disabled", Configured: true, Pricing: "free-only", FreeOnly: true},
@@ -71,9 +68,19 @@ func TestClaudeRecoveryUsesSavedFreeModelWithoutWritingProviderSettings(t *testi
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(func() { server.Close() })
 	ctx := context.Background()
-	for _, model := range []string{"metered", "unknown", "unconfigured", "hidden", "disabled", "roami-claude/" + selected} {
+	for _, model := range []string{"metered", "quota-model", "unknown", "unconfigured", "hidden", "disabled", "roami-claude/" + selected} {
 		if _, err := service.claudeRecoveryGateway(ctx, model); err == nil || err.Error() != "SESSION_RECOVERY_MODEL_NOT_AVAILABLE" {
 			t.Fatalf("%s: %v", model, err)
+		}
+	}
+	for _, model := range []string{"metered", "quota-model", selected} {
+		if config, err := service.claudeGateway(ctx, model, true); err != nil || config.BaseURL != gateway {
+			t.Fatalf("explicit selection of %s: %+v %v", model, config, err)
+		}
+	}
+	for _, model := range []string{"unknown", "unconfigured", "hidden", "disabled"} {
+		if _, err := service.claudeGateway(ctx, model, true); err == nil || err.Error() != "SESSION_RECOVERY_MODEL_NOT_AVAILABLE" {
+			t.Fatalf("unauthorized selection of %s: %v", model, err)
 		}
 	}
 	profileHome := t.TempDir()

@@ -20,6 +20,7 @@ type ModelSelectionSpec struct {
 	PreparedFrom  string `json:"preparedFrom"`
 	ExpectedModel string `json:"expectedModel"`
 	Model         string `json:"model"`
+	AllowMetered  bool   `json:"allowMetered,omitempty"`
 }
 
 type ClaudeModelSelection struct {
@@ -127,7 +128,7 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 		}
 		anchor, anchorOK := claudeModelCheckpoint(state.Binding)
 		settings := readClaudeModelSettings(state.Binding)
-		target, resolveErr := s.claudePickerTarget(ctx, spec.Model, settings)
+		target, resolveErr := s.claudePickerTarget(ctx, spec.Model, settings, spec.AllowMetered)
 		if resolveErr != nil || !anchorOK || settings == nil {
 			stateUnlock()
 			return ClaudeModelSelection{}, fmt.Errorf("SESSION_MODEL_SELECTION_TARGET_UNCONFIRMED")

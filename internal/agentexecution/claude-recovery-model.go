@@ -24,11 +24,11 @@ type claudeGatewayCatalog struct {
 }
 
 func (s Service) claudeRecoveryGateway(ctx context.Context, model string) (string, error) {
-	gateway, err := s.claudeFreeGateway(ctx, model)
+	gateway, err := s.claudeGateway(ctx, model, false)
 	return strings.TrimRight(gateway.BaseURL, "/"), err
 }
 
-func (s Service) claudeFreeGateway(ctx context.Context, model string) (claudeGatewayCatalog, error) {
+func (s Service) claudeGateway(ctx context.Context, model string, allowMetered bool) (claudeGatewayCatalog, error) {
 	if !catalog.ValidID(model) {
 		return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
 	}
@@ -49,11 +49,15 @@ func (s Service) claudeFreeGateway(ctx context.Context, model string) (claudeGat
 			Revision string          `json:"revision"`
 		} `json:"data"`
 	}
-	if err := recoveryGatewayRead(ctx, client, "/v1/model-gateway/models?free=true", &models); err != nil {
+	path := "/v1/model-gateway/models"
+	if !allowMetered {
+		path += "?free=true"
+	}
+	if err := recoveryGatewayRead(ctx, client, path, &models); err != nil {
 		return claudeGatewayCatalog{}, err
 	}
 	for _, row := range models.Data.Models {
-		if row.ID != model || !configuredFreeModel(row) {
+		if row.ID != model || !configuredGatewayModel(row, allowMetered) {
 			continue
 		}
 		var gateway struct {
@@ -70,8 +74,9 @@ func (s Service) claudeFreeGateway(ctx context.Context, model string) (claudeGat
 	return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
 }
 
-func configuredFreeModel(row directory.Row) bool {
-	return row.Configured && row.Enabled && !row.GatewayHidden && (row.FreeOnly || row.Pricing == "confirmed-free")
+func configuredGatewayModel(row directory.Row, allowMetered bool) bool {
+	return row.Configured && row.Enabled && !row.GatewayHidden &&
+		(allowMetered || row.FreeOnly || row.Pricing == "confirmed-free")
 }
 
 func recoveryGatewayRead(ctx context.Context, client *http.Client, path string, output any) error {

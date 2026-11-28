@@ -34,6 +34,8 @@ def main_model_selection_status(job):
         "model": value["request"]["model"],
         "state": {"queued": "pending", "done": "applied", "failed": "rejected"}[job["state"]],
     }
+    if value["request"].get("allowMetered"):
+        result["allowMetered"] = True
     if value.get("reason"):
         result["reason"] = value["reason"]
     return result
@@ -115,6 +117,8 @@ class MainModelSelections:
             "expectedModel": spec["expectedModel"],
             "model": spec["model"],
         }
+        if spec.get("allowMetered"):
+            request["allowMetered"] = True
         try:
             previous = await self.db.call(lambda db: self.binding(db, operation, value))
             command = self.executions.executor.command
@@ -153,6 +157,7 @@ class MainModelSelections:
         digest = proof.get("sourceSha256") if isinstance(proof, dict) else None
         if (
             any(selected.get(field) != expected for field, expected in request.items())
+            or selected.get("allowMetered", False) is not request.get("allowMetered", False)
             or selected.get("sessionId") != binding["session_id"]
             or selected.get("providerConversationId") != binding["provider_id"]
             or not isinstance(digest, str)
