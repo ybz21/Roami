@@ -26,7 +26,7 @@ def provider_binding(db, task, source_id, through_attempt):
         return None
     for attempt in rows(
         db,
-        "SELECT state,result_json,agent_conversation_id FROM task_attempts "
+        "SELECT id,launch_id,state,result_json,agent_conversation_id FROM task_attempts "
         "WHERE task_id=? AND attempt_no>? AND attempt_no<=?",
         (task["id"], source["attempt_no"], through_attempt),
     ):
@@ -34,9 +34,21 @@ def provider_binding(db, task, source_id, through_attempt):
         if (
             attempt["state"] == "unknown"
             or attempt["agent_conversation_id"]
-            or result.get("executionStarted") is not False
-            or result.get("outcomeKnown") is not True
-            or result.get("inputStopped") is not True
+            or not (
+                result.get("executionStarted") is False
+                and result.get("outcomeKnown") is True
+                and result.get("inputStopped") is True
+                or row(
+                    db,
+                    "SELECT 1 FROM events WHERE kind='task.execution_not_started_confirmed' "
+                    "AND task_id=? AND event_key=? AND json_extract(payload_json,'$.launchId')=?",
+                    (
+                        task["id"],
+                        "execution-not-started:" + attempt["id"],
+                        attempt["launch_id"],
+                    ),
+                )
+            )
         ):
             return None
     return source

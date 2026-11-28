@@ -2,6 +2,7 @@ import copy
 import json
 
 import httpx
+import pytest
 from test_swarm_member_model_selection import member_with_review
 from test_swarm_provider_generations import prepared
 
@@ -12,8 +13,9 @@ from roami_okr.http import create_app
 pytest_plugins = ["test_swarm_delegations"]
 
 
+@pytest.mark.parametrize("unsubmitted", [False, True])
 async def test_original_member_recovery_preserves_a_stopped_run_and_continues_its_task(
-    delegated_team, monkeypatch
+    delegated_team, monkeypatch, unsubmitted
 ):
     runtime, team, member, selection = await member_with_review(delegated_team, monkeypatch)
     spec = {**selection, "commandKey": "recover-role", "preparedLaunchKey": "recovered-role"}
@@ -30,9 +32,28 @@ async def test_original_member_recovery_preserves_a_stopped_run_and_continues_it
             "UPDATE swarm_member_provider_generations SET binding_json=?", (json.dumps(binding),)
         )
         run = row(db, "SELECT * FROM task_attempts WHERE id=?", (rid,))
+        if unsubmitted:
+            db.execute(
+                "UPDATE tasks SET revision=2,state='failed',"
+                "intent_json=json_set(intent_json,'$.continuation.providerRunId',?) WHERE id=?",
+                (rid, tid),
+            )
+            db.execute(
+                "INSERT INTO task_attempts(id,task_id,task_revision,attempt_no,executor_kind,"
+                "launch_id,state,result_json,lease_epoch,finished_ms) "
+                "VALUES('unsubmitted',?,2,?,'cli','unsubmitted-launch','failed',?,1,2)",
+                (
+                    tid,
+                    run["attempt_no"] + 1,
+                    json.dumps({"state": "failed", "summary": "CODING_EXECUTOR_NOT_STARTED"}),
+                ),
+            )
         return binding, run
 
     old_binding, old_run = await runtime.db.call(original, write=True)
+    if unsubmitted:
+        spec.update(expectedRunId="unsubmitted", expectedTaskRevision=2)
+    later = {"state": "not_started"}
     recovery = prepared("recovered-role", session="replacement-session", model=spec["model"])
     recovery.update(recoveredFrom=old_run["launch_id"])
     recovery["sessionBinding"].update(
@@ -51,6 +72,8 @@ async def test_original_member_recovery_preserves_a_stopped_run_and_continues_it
         if verb == "prepared":
             assert args == ("--key", recovery["launchKey"])
             return copy.deepcopy(recovery)
+        if unsubmitted and verb == "status" and args == ("--key", "unsubmitted-launch"):
+            return copy.deepcopy(later)
         assert verb == "status" and args == ("--key", old_run["launch_id"])
         return copy.deepcopy(status)
 
@@ -73,6 +96,10 @@ async def test_original_member_recovery_preserves_a_stopped_run_and_continues_it
         status["result"]["outcomeKnown"] = False
         assert (await client.put(path, json=spec)).status_code == 409
         status["result"]["outcomeKnown"] = True
+        if unsubmitted:
+            later["state"] = "running"
+            assert (await client.put(path, json=spec)).status_code == 409
+            later["state"] = "not_started"
         updated = await client.put(path, json=spec)
         assert updated.status_code == 200, updated.text
         assert updated.json()["data"]["sessionId"] == "replacement-session"
@@ -89,10 +116,13 @@ async def test_original_member_recovery_preserves_a_stopped_run_and_continues_it
         await runtime.db.call(lambda db: row(db, "SELECT * FROM task_attempts WHERE id=?", (rid,)))
         == old_run
     )
-    await runtime.tasks.revisions.request("alice", tid, "Finish existing work", 1, "continue")
+    revision = spec["expectedTaskRevision"]
+    await runtime.tasks.revisions.request(
+        "alice", tid, "Finish existing work", revision, "continue"
+    )
     await runtime.tasks.revisions.advance()
     next_task = await runtime.db.call(lambda db: row(db, "SELECT * FROM tasks WHERE id=?", (tid,)))
-    assert next_task["revision"] == 2
+    assert next_task["revision"] == revision + 1
     intent = json.loads(next_task["intent_json"])
     assert intent["target"] == {
         "kind": "session",
