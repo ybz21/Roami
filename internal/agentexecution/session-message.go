@@ -74,7 +74,7 @@ func (s Service) SendMessage(spec MessageSpec) (MessageReceipt, error) {
 	var state sessionLifecycle
 	if err = readJSON(lifecycle, &state); err == nil {
 		// Also fence the interval before the Python attempt records this session.
-		if state.LaunchKey != "" || state.CompletedKey != "" || state.InitialLaunch {
+		if state.LaunchKey != "" || state.CompletedKey != "" || state.InitialLaunch || state.ModelSelection != nil {
 			return MessageReceipt{}, fmt.Errorf("TASK_SESSION_BINDING_REQUIRED")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {

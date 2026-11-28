@@ -41,6 +41,8 @@ type SessionBinding struct {
 type sessionLifecycle struct {
 	Structured       bool                     `json:"structured,omitempty"`
 	Model            string                   `json:"model,omitempty"`
+	ModelSelection   *claudeModelSelection    `json:"modelSelection,omitempty"`
+	SelectedModel    *ClaudeModelSelection    `json:"selectedModel,omitempty"`
 	Permission       string                   `json:"permission,omitempty"`
 	InitialLaunch    bool                     `json:"initialLaunch,omitempty"`
 	Binding          SessionBinding           `json:"binding"`
@@ -442,6 +444,9 @@ func (s Service) continueSession(ctx context.Context, spec Spec) (Status, error)
 	var state sessionLifecycle
 	if readJSON(path, &state) != nil || state.Executor != spec.Executor || state.Binding.ProviderID == "" {
 		return Status{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
+	}
+	if state.ModelSelection != nil {
+		return Status{}, fmt.Errorf("SESSION_MODEL_SELECTION_PENDING")
 	}
 	if spec.PreparedFrom != "" {
 		if normalized, _, ok := s.provenClaudeModelIdle(state); ok {

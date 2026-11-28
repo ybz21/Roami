@@ -13,13 +13,13 @@ func directClaudeCompletion(binding SessionBinding, state sessionLifecycle) (com
 	if state.Executor != "claude" || state.Structured || state.InitialLaunch ||
 		state.UnknownReason != "" || state.ProviderConflict != nil || state.EndedIdle ||
 		state.LaunchKey != "" || state.CompletedKey != "" ||
-		state.Binding.ProviderID == "" || state.Model == "" ||
+		state.Binding.ProviderID == "" || state.claudeTranscriptModel() == "" ||
 		binding.resourceID() != state.Binding.resourceID() || binding.PID != state.Binding.PID ||
 		binding.Directory != state.Binding.Directory {
 		return completionSource{}, false
 	}
 	// The direct input has no launch timestamp. Its exact hook prompt ID and hash select the root.
-	result, digest, tools := claudeCompletedEvidenceForModel(state.Binding, state.TurnID, state.PromptHash, 1, state.Model)
+	result, digest, tools := claudeCompletedEvidenceForModel(state.Binding, state.TurnID, state.PromptHash, 1, state.claudeTranscriptModel())
 	if result == nil || !sessionProcessesStopped(state.Binding) {
 		return completionSource{}, false
 	}

@@ -16,17 +16,29 @@ import (
 	"github.com/ybz21/Roami/internal/modelgateway/httpapi"
 )
 
+type claudeGatewayCatalog struct {
+	BaseURL           string                 `json:"baseUrl"`
+	Revision          string                 `json:"revision"`
+	Models            []catalog.CatalogModel `json:"models"`
+	QualifiedModelIDs map[string]string      `json:"qualifiedModelIds"`
+}
+
 func (s Service) claudeRecoveryGateway(ctx context.Context, model string) (string, error) {
+	gateway, err := s.claudeFreeGateway(ctx, model)
+	return strings.TrimRight(gateway.BaseURL, "/"), err
+}
+
+func (s Service) claudeFreeGateway(ctx context.Context, model string) (claudeGatewayCatalog, error) {
 	if !catalog.ValidID(model) {
-		return "", errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
+		return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
 	}
 	paths, err := agentruntime.Resolve(s.Runtime.HomeDir, s.Runtime.DataDir)
 	if err != nil {
-		return "", errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
+		return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
 	}
 	socket, err := httpapi.PrivateSocket(paths.Socket)
 	if err != nil {
-		return "", errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
+		return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
 	}
 	transport := agentruntime.Transport(socket)
 	defer transport.CloseIdleConnections()
@@ -38,27 +50,28 @@ func (s Service) claudeRecoveryGateway(ctx context.Context, model string) (strin
 		} `json:"data"`
 	}
 	if err := recoveryGatewayRead(ctx, client, "/v1/model-gateway/models?free=true", &models); err != nil {
-		return "", err
+		return claudeGatewayCatalog{}, err
 	}
 	for _, row := range models.Data.Models {
-		if row.ID != model || !row.Configured || !row.Enabled || row.GatewayHidden || (!row.FreeOnly && row.Pricing != "confirmed-free") {
+		if row.ID != model || !configuredFreeModel(row) {
 			continue
 		}
 		var gateway struct {
-			Data struct {
-				BaseURL  string `json:"baseUrl"`
-				Revision string `json:"revision"`
-			} `json:"data"`
+			Data claudeGatewayCatalog `json:"data"`
 		}
 		if err := recoveryGatewayRead(ctx, client, "/v1/model-gateway/catalog", &gateway); err != nil {
-			return "", err
+			return claudeGatewayCatalog{}, err
 		}
 		if gateway.Data.BaseURL == "" || models.Data.Revision == "" || models.Data.Revision != gateway.Data.Revision {
-			return "", errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
+			return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
 		}
-		return strings.TrimRight(gateway.Data.BaseURL, "/"), nil
+		return gateway.Data, nil
 	}
-	return "", errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
+	return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
+}
+
+func configuredFreeModel(row directory.Row) bool {
+	return row.Configured && row.Enabled && !row.GatewayHidden && (row.FreeOnly || row.Pricing == "confirmed-free")
 }
 
 func recoveryGatewayRead(ctx context.Context, client *http.Client, path string, output any) error {

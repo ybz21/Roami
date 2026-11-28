@@ -49,11 +49,18 @@ func (r Runtime) CheckLifecycle(resource, directory string) error {
 }
 
 func (r Runtime) InputLease(target string) (func(), error) {
+	return r.inputLease(target, true)
+}
+
+func (r Runtime) inputLease(target string, shared bool) (func(), error) {
 	if r.HomeDir == "" {
 		return func() {}, nil
 	}
 	resource := strings.TrimPrefix(target, "=")
 	resource, _, _ = strings.Cut(resource, ":")
+	if r.inputFence[resource] {
+		return func() {}, nil
+	}
 	if err := r.CheckLifecycle(resource, ""); err != nil {
 		return nil, err
 	}
@@ -65,7 +72,7 @@ func (r Runtime) InputLease(target string) (func(), error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	unlock, err := store.Acquire(ctx, "resource:"+resource, true)
+	unlock, err := store.Acquire(ctx, "resource:"+resource, shared)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +81,22 @@ func (r Runtime) InputLease(target string) (func(), error) {
 		return nil, err
 	}
 	return unlock, nil
+}
+
+// WithExclusivePaneInput keeps session-targeted and pane-targeted submissions out of modal controls.
+func (r Runtime) WithExclusivePaneInput(session, pane string, operation func(Runtime) error) error {
+	releaseSession, err := r.inputLease("="+session+":", false)
+	if err != nil {
+		return err
+	}
+	defer releaseSession()
+	releasePane, err := r.inputLease(pane, false)
+	if err != nil {
+		return err
+	}
+	defer releasePane()
+	r.inputFence = map[string]bool{session: true, pane: true}
+	return operation(r)
 }
 
 func (r Runtime) WorkspaceLease(directory string) (func(), error) {
