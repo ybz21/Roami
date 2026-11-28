@@ -78,7 +78,7 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 				return nil, "", nil
 			}
 			if !compaction {
-				code = claudeGatewayAdmissionCode(r.APIStatus, r.Failure, blocks[0].Text)
+				code = claudeGatewayAdmissionCode(r, blocks[0].Text)
 				if code == "" {
 					return nil, "", nil
 				}
@@ -112,8 +112,13 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 	return result, hex.EncodeToString(digest.Sum(nil)), map[string]int64{}
 }
 
-func claudeGatewayAdmissionCode(status int, failure, text string) string {
-	if status != 402 && (status != 503 || failure != "server_error") {
+func claudeGatewayAdmissionCode(record claudeFailureRecord, text string) string {
+	status := record.APIStatus
+	if status == 400 && record.APIType == "api_error" && record.Failure == "unknown" &&
+		text == "API Error: 400 MODEL_HTTP_400" {
+		return "MODEL_HTTP_400"
+	}
+	if status != 402 && (status != 503 || record.Failure != "server_error") {
 		return ""
 	}
 	body, ok := strings.CutPrefix(text, "API Error: "+strconv.Itoa(status)+" ")
