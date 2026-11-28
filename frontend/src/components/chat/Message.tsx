@@ -3,13 +3,13 @@
 //
 // 排版要点：助手消息按「正文段 / 工具段」分开——正文进气泡，**工具段平铺全宽不套气泡**。
 // 工具本来就不是「说的话」，塞进气泡里等于给每次 Read 描一道框，一屏十几次就全是框。
-import { memo, type ReactNode, type ComponentProps } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode, type ComponentProps } from 'react'
 import Markdown from '../markdown/Markdown'
 import { Collapsible, copyText, fmtTs, localizeSentinels, MONO } from './blocks'
 import { useI18n } from '../../i18n'
 import type { Block, Msg } from './types'
 import { LooseResult, ToolView } from './tool-render'
-import { CopyIcon, TerminalIcon } from '../../icons'
+import { CheckIcon, CopyIcon, TerminalIcon } from '../../icons'
 import { splitAtPaths } from '../../agent-paths'
 import { noticePrefixOf } from '../shell/session-drop'
 import { IMG_EXT } from '../files/file-utils'
@@ -62,12 +62,23 @@ function messageText(m: Msg): string {
 }
 
 // 消息尾巴：时间 + 复制。工具段不给尾巴——那不是「谁说的话」。
-function Footer({ m, actions, compact = false }: { m: Msg; actions?: ReactNode; compact?: boolean }) {
+function Footer({ m, actions, compact = false, onCopy }: { m: Msg; actions?: ReactNode; compact?: boolean; onCopy?: () => Promise<boolean> | boolean }) {
   const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  const handleCopy = async () => {
+    const ok = onCopy ? await onCopy() : await copyText(messageText(m))
+    if (!ok) return
+    setCopied(true)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setCopied(false), 1500)
+  }
+  const copyLabel = copied ? t('common.copied') : t('common.copy')
   return (
     <span className="conversation-message-footer" style={{ display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 'var(--sp-2)', fontSize: 'var(--fs-meta)', color: 'var(--text-dimmer)', padding: '0 var(--sp-1)' }}>
       {m.ts && <time dateTime={m.ts}>{fmtTs(m.ts)}</time>}
-      <button type="button" className={'cc-msg-copy' + (compact ? ' conversation-copy-icon' : '')} aria-label={t('common.copy')} onClick={() => copyText(messageText(m))}>{compact ? <CopyIcon size={16} /> : t('common.copy')}</button>{actions}
+      <button type="button" className={'cc-msg-copy' + (compact ? ' conversation-copy-icon' : '') + (copied ? ' is-copied' : '')} aria-label={copyLabel} title={copyLabel} onClick={() => { void handleCopy() }}>{compact ? (copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />) : copyLabel}</button>{actions}
     </span>
   )
 }
@@ -128,7 +139,7 @@ function RoamNotice({ m }: { m: Msg }) {
   )
 }
 
-function UserMessage({ m, accent, compactActions = false }: { m: Msg; accent: string; compactActions?: boolean }) {
+function UserMessage({ m, accent, compactActions = false, footerActions, onCopy }: { m: Msg; accent: string; compactActions?: boolean; footerActions?: ReactNode; onCopy?: () => Promise<boolean> | boolean }) {
   const { t } = useI18n()
   const parsed = m.blocks.map((b) => (b.kind === 'text' ? parseUserText(b.text || '') : null))
   const extras = parsed.filter(Boolean) as UserText[]
@@ -158,12 +169,12 @@ function UserMessage({ m, accent, compactActions = false }: { m: Msg; accent: st
       )}
       {stdout.map((sOut, i) => <Collapsible key={`o${i}`} label={t('chat.commandOutput')} text={sOut} color="var(--text-dim)" />)}
       {reminders.map((r, i) => <Collapsible key={`r${i}`} label={t('chat.systemReminder')} text={r} color="var(--text-dimmer)" />)}
-      <Footer m={m} compact={compactActions} />
+      <Footer m={m} actions={footerActions} compact={compactActions} onCopy={onCopy} />
     </div>
   )
 }
 
-export const ChatMessage = memo(function ChatMessage({ m, results, side, resolveHref, footerActions, allowImages }: { allowImages?: boolean; m: Msg; results: Record<string, Block>; side: Side; resolveHref?: ResolveHref; footerActions?: ReactNode }) {
+export const ChatMessage = memo(function ChatMessage({ m, results, side, resolveHref, footerActions, onCopy, allowImages }: { allowImages?: boolean; m: Msg; results: Record<string, Block>; side: Side; resolveHref?: ResolveHref; footerActions?: ReactNode; onCopy?: () => Promise<boolean> | boolean }) {
   const accent = 'var(--accent)'
   const solid = 'var(--accent-solid)'
 
@@ -171,7 +182,7 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side, resolve
   // SendPromptSubmit 投进输入框并回车的，转录里就记成一个 user turn——可它不是
   // 你说的话，画成实心蓝气泡会把对话搅浑。收成一条可展开的通知。
   if (m.role === 'user' && isRoamNotice(m)) return <RoamNotice m={m} />
-  if (m.role === 'user') return <UserMessage m={m} accent={solid} compactActions={side === 'native'} />
+  if (m.role === 'user') return <UserMessage m={m} accent={solid} compactActions={side === 'native'} footerActions={footerActions} onCopy={onCopy} />
 
   const segs = segments(m.blocks)
   const hasProse = segs.some((sg) => !sg.tool)
@@ -190,7 +201,7 @@ export const ChatMessage = memo(function ChatMessage({ m, results, side, resolve
           <Prose blocks={sg.blocks} accent={accent} side={side} resolveHref={resolveHref} allowImages={allowImages} />
         </div>
       )))}
-      {hasProse && <Footer m={m} actions={footerActions} compact={side === 'native'} />}
+      {hasProse && <Footer m={m} actions={footerActions} compact={side === 'native'} onCopy={onCopy} />}
     </div>
   )
 })

@@ -66,7 +66,7 @@ type Props = Omit<Partial<HomeConversationProps>, 'cid' | 'node'> & {
 const noop = () => {}
 export default function AgentConversation({ cid, branch = '', focusMessage = '', inactive = false, node, inbox, inboxOpen = false, select = noop, notifications = noop, projects = [], onSession = noop, mobileActionsHost, project }: Props) {
   const pageActive = usePageActive()
-  const { t } = useI18n(), { phone, size } = useLayout(), { message } = App.useApp()
+  const { t } = useI18n(), { phone, size } = useLayout(), { message, modal } = App.useApp()
   const thread = useAgentThread(cid, branch, node, focusMessage)
   const rsi = useAgentData<{ developmentRsi: boolean }>(project ? null : '/agent/status', 60_000)
   const workspace = useAgentWorkspace(node), wide = !project && size === 'large'
@@ -252,6 +252,29 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     try { await api('POST', path, body); thread.refresh(); inbox?.refresh() } catch (reason) { message.error(agentFailure(reason, t)) }
   }
   const beginMemory = useCallback((m: AgentMessage) => { setSource(m); setMemoryTitle((m.content.text || '').slice(0, 80)); setMemoryBody(m.content.text || '') }, [])
+  const deleteMessage = (item: AgentMessage) => {
+    if (project || readOnly || !cid) return
+    modal.confirm({
+      title: t('agent.deleteMessageTitle'),
+      content: t('agent.deleteMessageConfirm'),
+      okText: t('agent.deleteMessageAction'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await api('DELETE', `/agent/conversations/${encodeURIComponent(cid)}/messages/${encodeURIComponent(item.id)}`)
+          thread.remove(item.id)
+          thread.refresh()
+          inbox?.refresh()
+          message.success(t('agent.messageDeleted'))
+        } catch (reason) {
+          message.error(agentFailure(reason, t))
+        }
+      },
+    })
+  }
+  const deleteRef = useRef(deleteMessage); deleteRef.current = deleteMessage
+  const confirmDelete = useCallback((item: AgentMessage) => deleteRef.current(item), [])
   const submitRef = useRef(submit); submitRef.current = submit
   const answer = useCallback(async (text: string) => await submitRef.current(text, false, true) === true, [])
   const saveMemory = async () => {
@@ -328,7 +351,7 @@ export default function AgentConversation({ cid, branch = '', focusMessage = '',
     {historical && <div className="agent-feedback"><span>{t('agent.historicalBranch')}</span><button type="button" className="tt-act" onClick={() => project ? project.onCurrentBranch?.() : select(mainCID || cid)}>{t('agent.currentConversation')}</button></div>}
     <div className="agent-reading">
       <div className="agent-messages" role="region" aria-label={t('agent.title')} tabIndex={0} data-pagination-edge="start" ref={scroll} onScroll={() => { const element = scroll.current; if (element) { stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; setJumpLatest(!stick.current) } }}>
-        <div className="agent-thread conversation-transcript"><AgentPageBoundary earlier more={!!thread.view?.page?.hasMore} loading={!!thread.loadingOlder} failed={!!thread.olderFailed} load={older} />{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} conversationId={cid} branchId={thread.view?.branchId} transformText={project?.displayText} item={entry.message} node={node} focused={entry.id === focusMessage} remember={beginMemory} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <div key={entry.id} className="agent-execution-steps">{groupExecutionSteps(entry.activities).map(group => group[0].kind === 'tool' ? <AgentActivity key={group[0].id} items={group} onSession={onSession} conversationId={cid} branchId={thread.view?.branchId} /> : <AgentTaskActivity key={group[0].id} items={group} onTask={id => { if (project) { setWorkspaceTask(id); setPanel('tasks') } else if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>)}</div>
+        <div className="agent-thread conversation-transcript"><AgentPageBoundary earlier more={!!thread.view?.page?.hasMore} loading={!!thread.loadingOlder} failed={!!thread.olderFailed} load={older} />{thread.loading && <Spin />}{history.entries.map(entry => entry.message ? <AgentMessageView key={entry.id} conversationId={cid} branchId={thread.view?.branchId} transformText={project?.displayText} item={entry.message} node={node} focused={entry.id === focusMessage} readOnly={readOnly} remember={beginMemory} onDelete={!project && !readOnly ? confirmDelete : undefined} canAnswer={!readOnly && !sending && entry.message.seq > latestUserSeq && !settledDispatches.has(entry.message.content.sessionReply?.dispatchId || '')} answer={answer} /> : <div key={entry.id} className="agent-execution-steps">{groupExecutionSteps(entry.activities).map(group => group[0].kind === 'tool' ? <AgentActivity key={group[0].id} items={group} onSession={onSession} conversationId={cid} branchId={thread.view?.branchId} /> : <AgentTaskActivity key={group[0].id} items={group} onTask={id => { if (project) { setWorkspaceTask(id); setPanel('tasks') } else if (phone || !wide) openAgentPage('tasks', id); else openWorkspaceTask(id) }} />)}</div>)}</div>
       </div>
       {jumpLatest && <button type="button" className="agent-jump-latest" aria-label={t('agent.composer.latest')} onClick={() => { stick.current = true; scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' }); setJumpLatest(false) }}><ArrowDown size={18} /></button>}
     </div>

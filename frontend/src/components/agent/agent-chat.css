@@ -81,6 +81,8 @@
 .agent-compose-options { display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-2); }
 .agent-compose-options .ant-select { min-width:calc(var(--sp-5) * 5); max-width:100%; }
 :where(html[data-pointer="fine"]) .agent-history-row:hover,:where(html[data-pointer="fine"]) .agent-panel-row:hover,:where(html[data-pointer="fine"]) .agent-notice:hover,:where(html[data-pointer="fine"]) .agent-slash button:hover,:where(html[data-pointer="fine"]) .agent-plus-row:hover,:where(html[data-pointer="fine"]) .agent-message-action:hover,:where(html[data-pointer="fine"]) .agent-file-card button:hover { background:var(--list-hover); }
+:where(html[data-pointer="fine"]) .agent-message-action:hover { color:var(--text-bright); }
+:where(html[data-pointer="fine"]) .agent-message-action.danger:hover { background:var(--danger-soft); color:var(--danger); }
 html[data-pointer="coarse"] .agent-chat .tt-act,html[data-pointer="coarse"] .agent-history .tt-act { min-height:var(--tap); min-width:var(--tap); position:relative; }
 html[data-pointer="coarse"] .agent-message-action { width:calc(var(--tap) - var(--sp-2)); height:calc(var(--tap) - var(--sp-2)); }
 html[data-pointer="coarse"] .agent-message-action::after { content:''; position:absolute; inset:calc(-1 * var(--sp-1)); }

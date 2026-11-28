@@ -19,8 +19,14 @@ export type AgentTask = { origin_conversation_id?: string; projectId?: string | 
 export function projectAgentEvent(view: AgentSnapshot, event: AgentEvent): { view: AgentSnapshot; reload: boolean } {
   if (event.id <= view.snapshotCursor) return { view, reload: false }
   const next = { ...view, snapshotCursor: event.id }
-  if (event.branchId && event.branchId !== view.branchId) return { view: next, reload: false }
   const data = event.payload
+  if (event.kind === 'message.deleted') {
+    if (event.branchId && event.branchId !== view.branchId && data.branchId !== view.branchId) return { view: next, reload: false }
+    next.messages = view.messages.filter(message => message.id !== data.messageId)
+    if (view.activities) next.activities = view.activities.filter(activity => activity.anchorMessageId !== data.messageId)
+    return { view: next, reload: false }
+  }
+  if (event.branchId && event.branchId !== view.branchId) return { view: next, reload: false }
   if (event.kind === 'message.discarded') { next.messages = view.messages.filter(message => message.id !== data.messageId); return { view: next, reload: false } }
   if ((event.kind.startsWith('tool.') || event.kind.startsWith('task.')) && data.activity) {
     const item = data.activity as AgentActivityItem

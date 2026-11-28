@@ -16,13 +16,14 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
   const [state, setState] = useState<{ scope: string; view: AgentSnapshot | null; loading: boolean; connected: boolean; failed: boolean; loadingOlder?: boolean; olderFailed?: boolean }>(() => ({ scope, view: cached(), loading: !!cid && !cached(), connected: false, failed: false }))
   const retained = useRef(state); retained.current = state
   const refreshRef = useRef<() => void>(() => {})
+  const removeRef = useRef<(messageId: string) => void>(() => {})
   const olderRef = useRef<() => Promise<void>>(async () => {})
   const acceptedRef = useRef<(receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => void>(() => {})
   usePageEffect(() => {
     if (scope !== agentDataKey(messages)) return
     const previous = retained.current.scope === scope ? retained.current.view : cached()
     setState({ scope, view: previous, loading: !!cid && !previous, connected: false, failed: false })
-    if (!cid) { refreshRef.current = () => {}; acceptedRef.current = () => {}; return }
+    if (!cid) { refreshRef.current = () => {}; removeRef.current = () => {}; acceptedRef.current = () => {}; return }
     const abort = new AbortController()
     const owner = agentCacheEpoch()
     let stopped = false, view: AgentSnapshot | null = previous, connected = false
@@ -69,6 +70,16 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
       timer = setTimeout(() => { timer = undefined; void snapshot().catch(() => {}) }, 60)
     }
     refreshRef.current = () => { invalidateAgentData(scope); schedule() }
+    removeRef.current = (messageId: string) => {
+      if (!view) return
+      view = {
+        ...view,
+        messages: view.messages.filter(item => item.id !== messageId),
+        activities: view.activities?.filter(item => item.anchorMessageId !== messageId),
+      }
+      storeAgentData(scope, view, owner)
+      publish()
+    }
     acceptedRef.current = (receipt, text, context) => {
       if (receipt.kind === 'compaction' && receipt.operationId) {
         if (!view) { schedule(); return }
@@ -150,5 +161,5 @@ export function useAgentThread(cid: string, branch = '', node: string | null = n
     void connect()
     return () => { olderRef.current = async () => {}; if (view) storeAgentData(scope, view, owner); stopped = true; abort.abort(); olderAbort?.abort(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pageshow', visibility); clearTimeout(timer); clearTimeout(retryTimer) }
   }, [cid, branch, node, scope, focus])
-  return { ...(state.scope === scope ? state : { view: cached(), loading: !!cid && !cached(), connected: false, failed: false, loadingOlder: false, olderFailed: false }), loadOlder: useCallback(() => olderRef.current(), []), refresh: useCallback(() => refreshRef.current(), []), accepted: useCallback((receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => acceptedRef.current(receipt, text, context), []) }
+  return { ...(state.scope === scope ? state : { view: cached(), loading: !!cid && !cached(), connected: false, failed: false, loadingOlder: false, olderFailed: false }), loadOlder: useCallback(() => olderRef.current(), []), refresh: useCallback(() => refreshRef.current(), []), remove: useCallback((messageId: string) => removeRef.current(messageId), []), accepted: useCallback((receipt: any, text: string, context?: AgentMessage['content']['okrContext']) => acceptedRef.current(receipt, text, context), []) }
 }
