@@ -8,7 +8,7 @@ import (
 	"github.com/ybz21/Roami/internal/modelgateway/storage"
 )
 
-func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, model CatalogModel, protocol string, inspect bool) (*routing.Choice, error) {
+func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, model CatalogModel, request routing.Requirements, inspect bool) (*routing.Choice, error) {
 	var inspectSource func(context.Context, ModelSource, string) routing.DirectoryEvidence
 	if h.Catalog != nil {
 		inspectSource = func(ctx context.Context, source ModelSource, revision string) routing.DirectoryEvidence {
@@ -17,7 +17,7 @@ func (h *Handler) newRoutingChoice(ctx context.Context, catalog ModelCatalog, mo
 		}
 	}
 	return h.routing.Choose(ctx, routing.Snapshot{Models: catalog.Models, Sources: catalog.Sources, Revision: catalog.Revision},
-		model, protocol, inspect, routing.Dependencies{
+		model, request, inspect, routing.Dependencies{
 			Configuration: h.state.accounting.Configuration, Now: h.state.now, Plugins: h.Plugins,
 			Anchors: storage.RouteAnchors{DB: h.state.db}, InspectSource: inspectSource,
 		})

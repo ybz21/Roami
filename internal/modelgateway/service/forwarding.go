@@ -82,9 +82,9 @@ func (h *Handler) forwardCatalog(w http.ResponseWriter, r *http.Request, catalog
 	}
 	var choice *routing.Choice
 	if model.Aggregate {
-		required := ""
+		required := routing.Requirements{Images: wireprotocol.RequestUsesImages(payload, protocol)}
 		if r.URL.Path == "/v1/responses/compact" {
-			required = protocol
+			required.Protocol = protocol
 		}
 		choice, err = h.newRoutingChoice(r.Context(), catalog, *model, required, false)
 		if err != nil {
