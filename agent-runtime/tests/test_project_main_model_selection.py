@@ -3,6 +3,7 @@ import copy
 from types import SimpleNamespace
 
 import httpx
+import pytest
 from test_native_main import stopped
 from test_project_main_execution import setup_main
 from test_runtime import until
@@ -34,11 +35,13 @@ def selected(spec, provider="native-provider"):
     }
 
 
+@pytest.mark.parametrize("allow_metered", [False, True])
 async def test_daily_turn_waits_for_model_receipt_on_the_same_main(
-    wake_runtime, store, monkeypatch
+    wake_runtime, store, monkeypatch, allow_metered
 ):
     runtime, main, initial, proof, _ = await setup_main(wake_runtime, monkeypatch)
     owner, cid = "alice", main["id"]
+    request = {**REQUEST, **({"allowMetered": True} if allow_metered else {})}
     await runtime.main_executions.configure(owner, cid, initial)
     home = await runtime.conversations.main(owner)
     daily = await wake_project(runtime.chat, owner, cid, "project", "today", "Review the board")
@@ -63,10 +66,10 @@ async def test_daily_turn_waits_for_model_receipt_on_the_same_main(
             await release.wait()
             return selected(kwargs["spec"])
         if sub == "prepared":
-            return {**copy.deepcopy(proof), "configuredModel": REQUEST["model"]}
+            return {**copy.deepcopy(proof), "configuredModel": request["model"]}
         if sub == "launch":
             current = await store.call(lambda db: main_binding(db, owner, cid))
-            assert current["model"] == REQUEST["model"]
+            assert current["model"] == request["model"]
             launches.append(kwargs["spec"])
             return stopped({**current, "binding": proof["sessionBinding"]})
         raise AssertionError(sub)
@@ -79,19 +82,26 @@ async def test_daily_turn_waits_for_model_receipt_on_the_same_main(
         headers={"X-Roami-Owner": owner},
     ) as client:
         assert (
-            await client.post(path + "/model", json=REQUEST, headers={"X-Roami-Owner": "bob"})
+            await client.post(path + "/model", json=request, headers={"X-Roami-Owner": "bob"})
         ).status_code == 404
         assert (
-            await client.post(f"/v1/conversations/{home['id']}/execution/model", json=REQUEST)
+            await client.post(f"/v1/conversations/{home['id']}/execution/model", json=request)
         ).status_code == 409
         assert (
-            await client.post(path + "/model", json={**REQUEST, "expectedGeneration": 2})
+            await client.post(path + "/model", json={**request, "expectedGeneration": 2})
         ).status_code == 409
-        first = await client.post(path + "/model", json=REQUEST)
+        first = await client.post(path + "/model", json=request)
         assert first.status_code == 202 and first.json()["data"]["state"] == "pending"
-        assert (await client.post(path + "/model", json=REQUEST)).json() == first.json()
+        assert (await client.post(path + "/model", json=request)).json() == first.json()
+        assert first.json()["data"].get("allowMetered", False) is allow_metered
         assert (
-            await client.post(path + "/model", json={**REQUEST, "model": "a-different-route"})
+            await client.post(path + "/model", json={**request, "allowMetered": "true"})
+        ).status_code == 422
+        assert (
+            await client.post(path + "/model", json={**request, "allowMetered": not allow_metered})
+        ).status_code == 409
+        assert (
+            await client.post(path + "/model", json={**request, "model": "a-different-route"})
         ).status_code == 409
         await runtime.start()
         await asyncio.wait_for(entered.wait(), timeout=5)
@@ -106,11 +116,12 @@ async def test_daily_turn_waits_for_model_receipt_on_the_same_main(
         await until(store, lambda db: state(db, daily) == "completed")
         config = (await client.get(path)).json()["data"]
         assert config["generation"] == 1 and config["sessionId"] == "native-session"
-        assert config["model"] == REQUEST["model"] and "modelSelection" not in config
-        assert (await client.post(path + "/model", json=REQUEST)).json()["data"][
+        assert config["model"] == request["model"] and "modelSelection" not in config
+        assert (await client.post(path + "/model", json=request)).json()["data"][
             "state"
         ] == "applied"
         assert len(control_calls) == len(launches) == 1
+        assert control_calls[0].get("allowMetered", False) is allow_metered
         assert launches[0]["sessionId"] == "native-session"
         assert launches[0]["preparedFrom"] == "prepared-main"
         snapshot = await runtime.swarms.snapshot(owner, original["id"], include_memory=False)
@@ -138,10 +149,12 @@ async def test_timeout_and_wrong_native_identity_keep_original_queued_scope(
         calls.append(kwargs["spec"])
         if len(calls) == 1:
             raise TimeoutError
+        if len(calls) == 3:
+            return selected({**kwargs["spec"], "allowMetered": True})
         return selected(kwargs["spec"], "other" if len(calls) == 2 else "native-provider")
 
     runtime.main_executions.executor = SimpleNamespace(command=command)
-    for _ in range(2):
+    for _ in range(3):
         job = await store.call(lambda db: pending_model_selection(db, cid))
         await runtime.main_model_selections.advance(job)
         turn_job = await store.call(
@@ -158,7 +171,7 @@ async def test_timeout_and_wrong_native_identity_keep_original_queued_scope(
             write=True,
         )
     await runtime.main_model_selections.advance(job)
-    assert calls[0] == calls[1] == calls[2]
+    assert len(calls) == 4 and all(call == calls[0] for call in calls)
     assert (await runtime.main_model_selections.request(owner, cid, REQUEST))["state"] == "applied"
     assert await store.call(lambda db: state(db, daily)) == "queued"
 
