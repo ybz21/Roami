@@ -7,7 +7,15 @@ from roami_agent.storage.database import row, rows
 
 
 def require_stopped_member_task(
-    db, owner, team, task, *, allow_settled_native=False, allow_waiting_review=False, own_job=None
+    db,
+    owner,
+    team,
+    task,
+    *,
+    allow_settled_native=False,
+    allow_waiting_review=False,
+    own_job=None,
+    unsubmitted_run=None,
 ):
     if task["owner_id"] != owner or task["origin_conversation_id"] != team["conversation_id"]:
         raise DomainError("SWARM_MEMBER_BINDING_CONFLICT", 409)
@@ -53,6 +61,7 @@ def require_stopped_member_task(
         )
         if latest["state"] not in {"succeeded", "failed", "cancelled", "interrupted"} or (
             not settled_native
+            and latest["id"] != unsubmitted_run
             and (outcome.get("inputStopped") is not True or outcome.get("outcomeKnown") is not True)
         ):
             raise DomainError("SWARM_MEMBER_STOP_UNCONFIRMED", 409)

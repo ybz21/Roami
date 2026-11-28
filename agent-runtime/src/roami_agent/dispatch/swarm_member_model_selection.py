@@ -80,7 +80,7 @@ class MemberModelSelections:
         return result
 
     @staticmethod
-    def binding(db, owner, sid, member_id, spec, own_job=None):
+    def binding(db, owner, sid, member_id, spec, own_job=None, *, unsubmitted_run=None):
         team = group(db, owner, sid)
         require_scope(team)
         member = row(db, "SELECT * FROM swarm_members WHERE id=? AND swarm_id=?", (member_id, sid))
@@ -112,13 +112,19 @@ class MemberModelSelections:
             raise DomainError("SWARM_MEMBER_MODEL_BINDING_CHANGED", 409)
         assert_session_open(db, task["id"])
         require_stopped_member_task(
-            db, owner, team, task, allow_waiting_review=True, own_job=own_job
+            db,
+            owner,
+            team,
+            task,
+            allow_waiting_review=True,
+            own_job=own_job,
+            unsubmitted_run=unsubmitted_run,
         )
         provider = row(
             db,
             "SELECT p.* FROM swarm_member_provider_generations p "
             "JOIN task_attempts a ON a.task_id=? AND a.task_revision=? AND a.id=? "
-            "AND a.session_id=p.session_id AND a.agent_conversation_id=p.provider_id "
+            "AND (a.session_id=p.session_id AND a.agent_conversation_id=p.provider_id OR a.id=?) "
             "WHERE p.member_id=? AND p.generation=? AND p.owner_id=? AND p.swarm_id=? "
             "AND p.executor='claude' AND p.model=? AND a.executor_kind='cli' "
             "AND NOT EXISTS(SELECT 1 FROM task_attempts n WHERE n.task_id=a.task_id AND n.attempt_no>a.attempt_no)",
@@ -126,6 +132,7 @@ class MemberModelSelections:
                 task["id"],
                 task["revision"],
                 spec["expectedRunId"],
+                unsubmitted_run,
                 member_id,
                 spec["expectedGeneration"],
                 owner,
