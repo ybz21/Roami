@@ -11,6 +11,8 @@ from roami_agent.executors.roami_cli import CodingExecutor
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
+from roami_okr.main import open_main
+from roami_okr.main_execution import main_configuration
 
 pytest_plugins = ["test_swarm_delegations"]
 
@@ -238,6 +240,61 @@ async def test_provider_context_cannot_be_shared_by_different_members(delegated_
     assert current["executor"] == "codex" and current["execution_generation"] == 1
     snapshot = await runtime.swarms.snapshot("alice", group["id"], include_memory=False)
     assert snapshot["revision"] == 4 and snapshot["paused"] is True
+
+
+@pytest.mark.parametrize("first", ["project-main", "member"])
+@pytest.mark.parametrize("conflict", ["session", "provider"])
+async def test_prepared_binding_cannot_cross_main_and_member(
+    delegated_team, monkeypatch, first, conflict
+):
+    runtime, group, member, member_spec, _ = await setup_generation(delegated_team, monkeypatch)
+    main = await open_main(runtime.conversations, "bob", "other-project")
+    main_spec = {
+        "commandKey": "bind-project-main",
+        "projectId": "other-project",
+        "expectedGeneration": 0,
+        "executor": "claude",
+        "model": "free",
+        "preparedLaunchKey": "prepared-project-main",
+    }
+    proof = prepared(
+        "prepared-project-main",
+        session="session-claude" if conflict == "session" else "main-session",
+    )
+    if conflict == "session":
+        proof["sessionBinding"]["providerConversationId"] = "main-provider"
+
+    async def workspace(self, project):
+        assert project in ("project-a", "other-project")
+        return {"projectId": project, "directory": "/project"}
+
+    async def prepare_main(command, *args, **kwargs):
+        assert (command, args) == ("prepared", ("--key", "prepared-project-main"))
+        return proof
+
+    monkeypatch.setattr(TargetDirectory, "project_workspace", workspace)
+    runtime.main_executions.executor = SimpleNamespace(command=prepare_main)
+
+    async def bind_main():
+        return await runtime.main_executions.configure("bob", main["id"], main_spec)
+
+    async def bind_member():
+        return await runtime.swarms.migrate_execution("alice", group["id"], member_spec)
+
+    accepted, rejected = (
+        (bind_main, bind_member) if first == "project-main" else (bind_member, bind_main)
+    )
+    receipt = await accepted()
+    with pytest.raises(DomainError, match="SWARM_PROVIDER_ALREADY_BOUND"):
+        await rejected()
+    assert await accepted() == receipt
+    team = await runtime.swarms.snapshot("alice", group["id"], include_memory=False)
+    current = next(value for value in team["members"] if value["id"] == member["id"])
+    assert (team["revision"], current["executor"]) == (
+        (3, "codex") if first == "project-main" else (4, "claude")
+    )
+    stored = await runtime.db.call(lambda db: main_configuration(db, "bob", main["id"]))
+    assert stored["generation"] == (1 if first == "project-main" else 0)
 
 
 async def test_http_migration_accepts_only_host_verified_preparation(delegated_team, monkeypatch):

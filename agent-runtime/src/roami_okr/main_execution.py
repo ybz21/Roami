@@ -7,7 +7,10 @@ import sqlite3
 from copy import copy
 
 from roami_agent.conversation.idle import assert_main_idle
-from roami_agent.dispatch.swarm_provider_generations import validate_prepared_member
+from roami_agent.dispatch.swarm_provider_generations import (
+    require_member_provider_available,
+    validate_prepared_member,
+)
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import now_ms
@@ -37,6 +40,15 @@ def main_binding(db, owner, cid):
         "WHERE p.owner_id=? AND p.conversation_id=? ORDER BY p.generation DESC LIMIT 1",
         (owner, cid),
     )
+
+
+def require_project_provider_available(db, session_id, provider_id):
+    if row(
+        db,
+        "SELECT 1 FROM project_okr_main_providers WHERE session_id=? OR provider_id=?",
+        (session_id, provider_id),
+    ):
+        raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
 
 
 class NativeMainModelCommands:
@@ -145,16 +157,12 @@ class MainExecutions:
                     ):
                         raise DomainError("PROJECT_MAIN_CONTEXT_REJECTION_UNCONFIRMED", 409)
                 binding = proof["sessionBinding"]
-                if row(
-                    db,
-                    "SELECT member_id FROM swarm_member_provider_generations WHERE session_id=? OR provider_id=?",
-                    (proof["sessionId"], binding["providerConversationId"]),
-                ) or row(
-                    db,
-                    "SELECT conversation_id FROM project_okr_main_providers WHERE session_id=? OR provider_id=?",
-                    (proof["sessionId"], binding["providerConversationId"]),
-                ):
-                    raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
+                require_member_provider_available(
+                    db, proof["sessionId"], binding["providerConversationId"]
+                )
+                require_project_provider_available(
+                    db, proof["sessionId"], binding["providerConversationId"]
+                )
                 db.execute(
                     "INSERT INTO project_okr_main_providers VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (
