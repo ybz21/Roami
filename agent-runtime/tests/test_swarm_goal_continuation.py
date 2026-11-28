@@ -11,6 +11,8 @@ from test_swarm_goal_continuity import delivery as delivery_fixture
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
+from roami_agent.storage.swarm_goal_checkpoint import validate_final_checkpoint
+from roami_agent.storage.task_result_receipts import record_execution_result
 
 coordination = coordination_fixture
 delegated_team = delegated_team_fixture
@@ -175,6 +177,95 @@ async def test_blocker_needs_a_real_allowed_current_turn_failure(idle_delivery):
     proposal = await invoke(runtime, binding, "swarm_goal_checkpoint", args)
     assert proposal["goalComplete"] is False
     assert "reply" in await reply(runtime, binding)
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "confirmed",
+        "wrong_member",
+        "stale",
+        "foreign_run",
+        "unknown",
+        "running",
+        "no_receipt",
+        "both",
+    ],
+)
+async def test_member_model_blocker_preserves_the_failure_and_goal(idle_delivery, variant):
+    runtime, binding, actor = idle_delivery
+    result = {
+        "state": "failed",
+        "errorCode": "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS",
+        "summary": "MODEL_ROUTE_NO_AVAILABLE_MEMBER",
+        "inputStopped": variant != "running",
+        "outcomeKnown": variant != "unknown",
+        "stopEvidenceSha256": "a" * 64,
+    }
+
+    def fail_task(db):
+        db.execute("UPDATE tasks SET state='failed' WHERE id=?", (actor["taskId"],))
+        db.execute(
+            "UPDATE task_attempts SET state='failed',result_json=? WHERE id=?",
+            (json.dumps(result), actor["runId"]),
+        )
+        receipt = None
+        if variant != "no_receipt":
+            receipt = record_execution_result(db, actor["taskId"], actor["runId"])
+        member = row(
+            db,
+            "SELECT m.id,m.swarm_id FROM swarm_members m JOIN swarm_work_items w "
+            "ON w.id=m.current_work_id WHERE w.task_id=?",
+            (actor["taskId"],),
+        )
+        return member, receipt
+
+    member, execution = await runtime.db.call(fail_task, write=True)
+    evidence = {
+        "memberId": member["id"] if variant != "wrong_member" else "elsewhere",
+        "taskId": actor["taskId"],
+        "revision": actor["taskRevision"] + (variant == "stale"),
+        "runId": actor["runId"] if variant != "foreign_run" else "foreign",
+    }
+    args = {
+        "swarmId": member["swarm_id"],
+        "reason": "已确认本轮没有可用的模型线路，保留原任务。",
+        "failedMemberAttempt": evidence,
+    }
+    if variant == "both":
+        args["failedToolCallId"] = "other"
+    if variant != "confirmed":
+        with pytest.raises(DomainError, match="SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED"):
+            await invoke(runtime, binding, "swarm_goal_checkpoint", args)
+        return
+    proposal = await invoke(runtime, binding, "swarm_goal_checkpoint", args)
+    assert proposal["goalComplete"] is False
+    assert proposal["failure"]["receiptId"] == execution["receiptId"]
+    assert proposal["failure"]["resultSha256"] == execution["resultSha256"]
+    result = await invoke(
+        runtime, binding, "reply", {"text": "本批遇到模型线路不可用，保留原任务和日程。"}
+    )
+    assert "reply" in result
+    states = await runtime.db.call(
+        lambda db: row(db, "SELECT state,revision FROM tasks WHERE id=?", (actor["taskId"],))
+    )
+    assert states == {"state": "failed", "revision": actor["taskRevision"]}
+
+    turn = {
+        "id": binding["turnId"],
+        "owner_id": binding["owner"],
+        "conversation_id": binding["conversation"],
+        "lease_epoch": binding["leaseEpoch"],
+    }
+    await runtime.db.call(lambda db: validate_final_checkpoint(db, turn))
+    await runtime.db.call(
+        lambda db: db.execute(
+            "UPDATE tasks SET revision=revision+1 WHERE id=?", (actor["taskId"],)
+        ),
+        write=True,
+    )
+    with pytest.raises(DomainError, match="SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED"):
+        await runtime.db.call(lambda db: validate_final_checkpoint(db, turn))
 
 
 @pytest.mark.parametrize("direct", [False, True])

@@ -244,8 +244,9 @@ class ToolGateway:
                     "remaining work, or wait for real admitted original work. When today's work is settled, "
                     "use registered swarm_goal_wait to verify the existing project schedule and runner; "
                     "do not create housekeeping tasks just to keep busy. For a genuine capability "
-                    "blocker, call swarm_goal_checkpoint with the actual failed current-turn tool ID "
-                    "and a concrete reason. Do not ask the user to say continue, invent permission "
+                    "blocker, call swarm_goal_checkpoint with the failed current-turn tool ID or "
+                    "a selected member's confirmed model failure and a concrete reason. "
+                    "Do not ask the user to say continue, invent permission "
                     "problems, repeat published content, create replacements or claim the goal finished."
                 )
             if value["error"] == "SWARM_GOAL_WORK_UNSETTLED":

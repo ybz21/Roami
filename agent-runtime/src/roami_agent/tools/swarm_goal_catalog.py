@@ -117,8 +117,10 @@ def register_swarm_goal_tools(registry, database, wakeup, *, schedule=None):
                 "Record a concrete blocker in this original Main's current ongoing-goal batch. "
                 "First prefer bounded continuation of a selected original task or actual running work. "
                 "failedToolCallId is the real current-turn tool call ID with a capability, login, resource "
-                "or unknown-outcome failure; malformed calls, guessed tools and prohibited operations "
-                "do not establish blockers. Preserve that error and explain the needed recovery briefly. "
+                "or unknown-outcome failure. For a current member's confirmed model unavailability, "
+                "use failedMemberAttempt with memberId, taskId, revision and runId from the latest task "
+                "status and execution receipt. Supply exactly one form of evidence. Preserve that error "
+                "and explain the needed recovery briefly. "
                 "This does not complete the goal, grant publication permissions or create another Main."
             ),
             object_schema(
@@ -126,8 +128,17 @@ def register_swarm_goal_tools(registry, database, wakeup, *, schedule=None):
                     "swarmId": string,
                     "reason": {**string, "maxLength": 1200},
                     "failedToolCallId": {**string, "maxLength": 200},
+                    "failedMemberAttempt": object_schema(
+                        {
+                            "memberId": {**string, "maxLength": 200},
+                            "taskId": {**string, "maxLength": 200},
+                            "revision": {"type": "integer", "minimum": 1},
+                            "runId": {**string, "maxLength": 200},
+                        },
+                        ["memberId", "taskId", "revision", "runId"],
+                    ),
                 },
-                ["swarmId", "reason", "failedToolCallId"],
+                ["swarmId", "reason"],
             ),
             checkpoint,
             "write",

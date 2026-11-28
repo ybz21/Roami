@@ -1,6 +1,7 @@
 """Read real next-step evidence from an original Main's current goal scope."""
 
 import json
+import re
 
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row, rows
@@ -8,6 +9,7 @@ from roami_agent.storage.swarm_coordination_results import (
     _source_available as task_source_available,
 )
 from roami_agent.storage.swarm_coordination_tasks import request_context
+from roami_agent.storage.task_result_receipts import receipt_for_run
 
 
 def checkpoint_context(db, binding):
@@ -160,6 +162,67 @@ def failed_step(db, binding, call_id):
     return {"toolCallId": found["id"], "tool": found["tool_name"], "error": error}
 
 
+def failed_member_attempt(db, binding, value, attempt):
+    task = row(
+        db,
+        "SELECT t.* FROM swarm_members m JOIN swarm_work_items w ON w.id=m.current_work_id "
+        "JOIN tasks t ON t.id=w.task_id WHERE m.swarm_id=? AND m.retired_ms IS NULL "
+        "AND m.id=? AND m.id IN (SELECT value FROM json_each(?)) "
+        "AND t.owner_id=? AND t.origin_conversation_id=? AND t.id=? AND t.revision=?",
+        (
+            value["swarm_id"],
+            attempt.get("memberId"),
+            value["delegation"]["member_ids_json"],
+            binding["owner"],
+            binding["conversation"],
+            attempt.get("taskId"),
+            attempt.get("revision"),
+        ),
+    )
+    if not task or task["state"] != "failed" or not task_source_available(db, task):
+        raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
+    run = row(
+        db,
+        "SELECT id,state,finished_ms,result_json FROM task_attempts WHERE task_id=? AND task_revision=? "
+        "ORDER BY attempt_no DESC LIMIT 1",
+        (task["id"], task["revision"]),
+    )
+    if (
+        not run
+        or run["id"] != attempt.get("runId")
+        or run["state"] != "failed"
+        or run["finished_ms"] is None
+    ):
+        raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
+    result = json.loads(run["result_json"] or "null")
+    if not isinstance(result, dict) or result.get("state") != "failed":
+        raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
+    code = result.get("errorCode")
+    error = result.get("summary") if code == "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS" else code
+    digest = result.get("stopEvidenceSha256")
+    if (
+        error not in ("MODEL_ROUTE_NO_AVAILABLE_MEMBER", "MODEL_HTTP_429")
+        or result.get("inputStopped") is not True
+        or result.get("outcomeKnown") is not True
+        or not isinstance(digest, str)
+        or not re.fullmatch(r"[a-f0-9]{64}", digest)
+    ):
+        raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
+    receipt = receipt_for_run(db, task["id"], run["id"], expected_result_json=run["result_json"])
+    if receipt is None:
+        raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
+    return {
+        "memberId": attempt["memberId"],
+        "taskId": task["id"],
+        "revision": task["revision"],
+        "runId": run["id"],
+        "error": error,
+        "stopEvidenceSha256": digest,
+        "receiptId": receipt["receiptId"],
+        "resultSha256": receipt["resultSha256"],
+    }
+
+
 def record_blocker(db, binding, args):
     from roami_agent.storage.swarm_repository import receipt
 
@@ -169,7 +232,14 @@ def record_blocker(db, binding, args):
     reason = args["reason"].strip()
     if not reason:
         raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
-    failure = failed_step(db, binding, args["failedToolCallId"])
+    tool, attempt = args.get("failedToolCallId"), args.get("failedMemberAttempt")
+    if (tool is None) == (attempt is None):
+        raise DomainError("SWARM_GOAL_BLOCKER_EVIDENCE_REQUIRED", 409)
+    failure = (
+        failed_step(db, binding, tool)
+        if tool is not None
+        else failed_member_attempt(db, binding, value, attempt)
+    )
     payload = {
         "batchId": value["id"],
         "delegationId": value["delegation"]["id"],
@@ -193,11 +263,17 @@ def current_blocker(db, binding, value):
     proposal = stored_checkpoint(db, binding, value, "goal-blocker:")
     if proposal is None:
         return None
+    failure = proposal["failure"]
+    current_failure = (
+        failed_step(db, binding, failure["toolCallId"])
+        if "toolCallId" in failure
+        else failed_member_attempt(db, binding, value, failure)
+    )
     if (
         proposal.get("delegationId") != value["delegation"]["id"]
         or proposal.get("delegationRevision") != value["delegation"]["revision"]
         or proposal.get("sourceSha256") != value["delegation"]["source_sha256"]
-        or failed_step(db, binding, proposal["failure"]["toolCallId"]) != proposal["failure"]
+        or current_failure != failure
     ):
         raise DomainError("SWARM_GOAL_CHECKPOINT_CHANGED", 409)
     return proposal
@@ -256,7 +332,13 @@ def validate_final_checkpoint(db, turn):
     if value is not None:
         # Later completion does not erase the accepted handoff; its callback remains independent.
         proof = accepted_checkpoint(db, binding, value)
-        if proof and proof["decision"]["kind"] == "waiting_for_registered_schedule":
+        if not proof:
+            return
+        decision = proof["decision"]
+        if decision["kind"] == "waiting_for_registered_schedule":
             from roami_agent.storage.swarm_goal_schedule import check_wait
 
-            check_wait(db, binding, proof["decision"]["wait"])
+            check_wait(db, binding, decision["wait"])
+        elif decision["kind"] == "blocked" and "memberId" in decision["blocker"]["failure"]:
+            if current_blocker(db, binding, value) != decision["blocker"]:
+                raise DomainError("SWARM_GOAL_CHECKPOINT_CHANGED", 409)
