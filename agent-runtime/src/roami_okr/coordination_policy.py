@@ -10,6 +10,7 @@ from roami_agent.storage.swarm_coordination import admitted_batch
 from roami_agent.storage.swarm_coordination_admission import for_turn
 from roami_agent.storage.swarm_evidence import evidence
 from roami_agent.tools.foundations import is_help_argv
+from roami_okr.command_paths import PROJECT_COMMAND_PATHS
 from roami_okr.coordination_artifacts import current_tool_artifact
 from roami_okr.coordination_catalog import (
     COORDINATION_OPERATIONS,
@@ -131,7 +132,7 @@ class SwarmCoordinationPolicy:
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
             if args.get("memberId") is not None and args["memberId"] not in members:
                 raise DomainError("SWARM_COORDINATION_SCOPE_CONFLICT", 403)
-        elif name == "bash" and is_help_argv(args.get("argv", [])):
+        elif name == "bash" and is_help_argv(args.get("argv", []), PROJECT_COMMAND_PATHS):
             pass
         elif name not in COORDINATION_OPERATIONS:
             raise DomainError("SWARM_COORDINATION_OPERATION_UNAVAILABLE", 403)

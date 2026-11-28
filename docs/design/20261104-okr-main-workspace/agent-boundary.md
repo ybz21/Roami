@@ -20,6 +20,8 @@
 
 历史读取、搜索、摘要、任务引用和授权校验共用 Agent 的消息内容投影。在 OKR 产品入口装配 `roami_okr.message_content`，由它解释旧文本标记，保留草稿的版本与修订号，并只在当前模型输入里附加不可信的草稿参考。原消息字节、消息 ID、授权来源哈希和现有有效摘要继续兼容。普通 Agent 入口按原文读取消息。
 
+项目命令路径由 `roami_okr.command_paths` 登记。Agent 的工具目录在发现、帮助、参数校验和拦截复合 shell 命令时使用同一份路径集合。Go CLI 和 Python 产品入口共享项目命令定义。原生 Main 和普通工具使用同样的解析器，并保留原命令、工具名及授权。
+
 ## 仍需迁出的依赖
 
 | 位置 | 现状与迁出边界 |
@@ -28,7 +30,7 @@
 | `dispatch/swarm_plans.py`、`storage/swarm_repository.py` | 旧团队存储仍识别项目绑定。原生提交状态复用已通过的团队范围校验，从当前活跃分支和租约读取通用事件。后续需让团队接口接收已核验的通用资源范围，并沿用旧项目、团队和回执映射。 |
 | `app.py` | 宿主装配仍直接导入 OKR 服务。由产品宿主注册工具、身份策略和调度回调，Agent 提供运行器及其通用接口。 |
 | `publication/`、`tools/publication_catalog.py`、`storage/publication_versions.py` | 发布流程含 X、B 站的账号格式、域名和回执。Agent 提供来源核验、审批与持久回执，平台规则由预先登记的产品适配处理，执行步骤由项目 Skill 定义。 |
-| `commands.json`、`skills/roami`、`storage/migrations.py` 及 SQL | 旧命令名、文档资源和已装实例的迁移入口仍在当前发布物。产品命令与资源待独立注册，旧迁移编号与已安装库保留可升级性。 |
+| `skills/roami`、`storage/migrations.py` 及 SQL | 项目文档资源和已装实例的迁移入口仍在当前发布物。产品资源待独立注册，旧迁移编号与已安装库保留可升级性。 |
 
 本阶段代码可在原运行时包内随产品一起交付。通用 Agent 对端到端的产品依赖仍需完成上表迁移。
 

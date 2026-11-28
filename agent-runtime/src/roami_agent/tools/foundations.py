@@ -46,14 +46,14 @@ WORKER_FOUNDATIONS = set(FOUNDATIONS) - {
 FILE_OPERATIONS = {"file_read", "file_write", "file_patch", "shell", "skill_read"}
 
 
-def is_help_argv(argv):
+def is_help_argv(argv, command_paths):
     return (
         len(argv) >= 2
         and argv[0] == "roami"
         and argv[-1] in {"help", "--help"}
         and (
             argv[1:-1] in ([], ["chrome"])
-            or any(path[: len(argv) - 2] == argv[1:-1] for path in COMMANDS.values())
+            or any(path[: len(argv) - 2] == argv[1:-1] for path in command_paths.values())
         )
     )
 
@@ -68,8 +68,9 @@ def command_strings(entry):
 
 
 class ToolDirectory:
-    def __init__(self, registry, settings):
+    def __init__(self, registry, settings, *, command_paths=COMMANDS):
         self.registry, self.settings = registry, settings
+        self.command_paths = dict(command_paths)
 
     def operations(self, role, *, allowed=None):
         project = self.registry.scoped_operation if allowed is not None else None
@@ -109,7 +110,7 @@ class ToolDirectory:
                     tool.name in self.registry.disabled_tools
                     or tool.source == "builtin"
                     and (
-                        tool.name in COMMANDS
+                        tool.name in self.command_paths
                         or tool.name in INTERNAL
                         or tool.name.startswith("browser_")
                     )
@@ -141,7 +142,7 @@ class ToolDirectory:
         version = hashlib.sha256(encoded(entries).encode()).hexdigest()
         if query and "bash" not in self.registry.disabled_tools:
             commands = self.command_entries(role, query=query, allowed=allowed)
-            if commands and commands[0]["name"] in COMMANDS:
+            if commands and commands[0]["name"] in self.command_paths:
                 entries = [item for item in entries if item["id"] != "cli:roami"] + commands
         normalize = lambda value: re.sub(r"[-_\s]+", " ", value.casefold()).strip()
         words = normalize(query).split()
@@ -275,7 +276,7 @@ class ToolDirectory:
                 "enabled": True,
                 "searchTerms": [name, " ".join(["roami", *path])],
             }
-            for name, path in COMMANDS.items()
+            for name, path in self.command_paths.items()
             if name in available
             and normalized in {name.replace("_", " "), " ".join(["roami", *path])}
         ]
@@ -294,7 +295,7 @@ class ToolDirectory:
                 },
                 "effect": available[name].effect,
             }
-            for name, path in COMMANDS.items()
+            for name, path in self.command_paths.items()
             if name in available
         ]
         if commands:
@@ -312,9 +313,9 @@ class ToolDirectory:
                     ),
                     "argv": ["roami", "help"],
                     "commands": commands,
-                    "searchTerms": list(COMMANDS)
+                    "searchTerms": list(self.command_paths)
                     if allowed is None
-                    else [name for name in COMMANDS if name in available],
+                    else [name for name in self.command_paths if name in available],
                     "effect": "mixed",
                     "source": "builtin",
                     "mutable": False,
@@ -459,6 +460,7 @@ class ToolDirectory:
                     name: tool.model_schema or tool.schema
                     for name, tool in self.registry.registry.items()
                 },
+                self.command_paths,
             )
         return None
 
@@ -472,7 +474,9 @@ class ToolDirectory:
             return {}
         if not argv or argv[0] not in {"roami", self.settings.cli_bin}:
             return {}
-        path = next((path for path in COMMANDS.values() if argv[1 : len(path) + 1] == path), None)
+        path = next(
+            (path for path in self.command_paths.values() if argv[1 : len(path) + 1] == path), None
+        )
         if path is None:
             return {}
         for entry in self.command_entries(role):
@@ -484,7 +488,7 @@ class ToolDirectory:
     def wrapped_command(self, args, depth=0):
         if "command" not in args or depth > 3:
             return None
-        paths = [*COMMANDS.values(), ["agent", "capability", "call"]]
+        paths = [*self.command_paths.values(), ["agent", "capability", "call"]]
         try:
             if self.operation(self.argv(args)) is not None:
                 return None
@@ -615,7 +619,7 @@ class ToolDirectory:
             if (
                 argv
                 and argv[0] in {"roami", self.settings.cli_bin}
-                and is_help_argv(["roami", *argv[1:]])
+                and is_help_argv(["roami", *argv[1:]], self.command_paths)
             ):
                 return self.help_command(argv, role)
             operation = self.operation(argv)
@@ -659,8 +663,8 @@ class ToolDirectory:
         return original, args
 
 
-def register_foundations(registry, settings):
-    directory = ToolDirectory(registry, settings)
+def register_foundations(registry, settings, *, command_paths=COMMANDS):
+    directory = ToolDirectory(registry, settings, command_paths=command_paths)
     registry.directory = directory
 
     async def list_tools(args, binding):

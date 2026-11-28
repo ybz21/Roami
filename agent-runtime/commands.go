@@ -9,10 +9,15 @@ import (
 //go:embed src/roami_agent/commands.json
 var definition []byte
 
+//go:embed src/roami_okr/commands.json
+var projectDefinition []byte
+
 func Paths() map[string][]string {
 	var paths map[string][]string
-	if err := json.Unmarshal(definition, &paths); err != nil {
-		panic(err)
+	for _, entry := range [][]byte{definition, projectDefinition} {
+		if err := json.Unmarshal(entry, &paths); err != nil {
+			panic(err)
+		}
 	}
 	return paths
 }

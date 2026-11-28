@@ -92,6 +92,7 @@ from roami_agent.tools.web_research import register_research_tools
 from roami_agent.tools.worker_catalog import add_worker_tools
 from roami_agent.tools.workspace_images import WorkspaceImageReads
 from roami_okr.authoring_skill import authoring_skill
+from roami_okr.command_paths import PROJECT_COMMAND_PATHS
 from roami_okr.coordination import daily_guidance
 from roami_okr.coordination_catalog import model_catalog
 from roami_okr.coordination_catalog import operation as coordination_operation
@@ -318,7 +319,7 @@ class Runtime:
             ),
         )
         register_research_tools(self.tools, self.tasks)
-        register_foundations(self.tools, self.settings)
+        register_foundations(self.tools, self.settings, command_paths=PROJECT_COMMAND_PATHS)
 
         def main_context():
             configuration = request_context(
