@@ -61,3 +61,24 @@ func TestInstalledClaudeReadOnlyHelpContract(t *testing.T) {
 		t.Fatalf("installed Claude rejected help contract: %v", err)
 	}
 }
+
+func TestClaudeLaunchKeepsHooksWhenSelectingGatewayClassifier(t *testing.T) {
+	options := fixtureOptions(t, map[string]any{})
+	options.ClaudeClassifierModel = "roami-claude/configured-approval"
+	args, err := PrepareClaude(context.Background(), options)
+	if err != nil || len(args) != 2 || args[0] != "--settings" {
+		t.Fatalf("claude arguments: %v %v", args, err)
+	}
+	var config struct {
+		Hooks map[string]json.RawMessage `json:"hooks"`
+		Env   map[string]string          `json:"env"`
+	}
+	if err := json.Unmarshal([]byte(args[1]), &config); err != nil {
+		t.Fatal(err)
+	}
+	if len(config.Hooks) != 11 || len(config.Env) != 2 ||
+		config.Env["CLAUDE_CODE_AUTO_MODE_MODEL"] != options.ClaudeClassifierModel ||
+		config.Env["CLAUDE_CODE_AUTO_MODE_SERVER"] != "0" {
+		t.Fatalf("scoped Claude settings = %s", args[1])
+	}
+}

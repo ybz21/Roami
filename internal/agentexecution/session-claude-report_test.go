@@ -117,3 +117,40 @@ func TestClaudeReportCacheIsInvalidatedByNewUserInput(t *testing.T) {
 		t.Fatal("cached report leaked into a later user request")
 	}
 }
+
+func TestClaudeRecoveryAcceptsOnlyVerifiedIdleExit(t *testing.T) {
+	for _, mode := range []string{"exit", "partial", "wrong prompt", "foreign directory", "later work"} {
+		t.Run(mode, func(t *testing.T) {
+			binding, path, launch, prompt := reportFixture(t)
+			records := reportRecords(binding, prompt)
+			exit := func(content string, meta bool) map[string]any {
+				return map[string]any{
+					"type": "user", "sessionId": binding.ProviderID, "promptId": "exit",
+					"isMeta": meta, "cwd": filepath.Join(binding.Directory, "page"),
+					"message": map[string]string{"content": content},
+				}
+			}
+			records = append(records, exit(claudeLocalCommandCaveat, true),
+				exit("<command-name>/exit</command-name>\n <command-message>exit</command-message>\n <command-args></command-args>", false),
+				exit("<local-command-stdout>Bye!</local-command-stdout>", false))
+			switch mode {
+			case "partial":
+				records = records[:len(records)-1]
+			case "wrong prompt":
+				records[len(records)-1]["promptId"] = "different"
+			case "foreign directory":
+				records[len(records)-1]["cwd"] = t.TempDir()
+			case "later work":
+				records = append(records, exit("Separate request", false))
+			}
+			writeReportRecords(t, path, records)
+			progress, _, _ := claudeReportWithExit(binding, "prompt", workspaceHash(prompt), launch, true)
+			if (progress != nil) != (mode == "exit") {
+				t.Fatalf("recovery progress = %+v", progress)
+			}
+			if claudeReportedProgress(binding, "prompt", workspaceHash(prompt), launch) != nil {
+				t.Fatal("recovery report affected ordinary activity")
+			}
+		})
+	}
+}

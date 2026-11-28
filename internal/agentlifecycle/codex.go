@@ -13,14 +13,15 @@ import (
 )
 
 type SessionOptions struct {
-	Binary      string
-	Executable  string
-	Directory   string
-	DataDir     string
-	HomeDir     string
-	DatabaseDir string
-	BackupDir   string
-	TmuxBin     string
+	Binary                string
+	Executable            string
+	Directory             string
+	DataDir               string
+	HomeDir               string
+	DatabaseDir           string
+	BackupDir             string
+	TmuxBin               string
+	ClaudeClassifierModel string
 }
 
 type codexConfiguration struct {

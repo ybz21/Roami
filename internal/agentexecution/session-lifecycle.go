@@ -41,6 +41,7 @@ type SessionBinding struct {
 type sessionLifecycle struct {
 	Structured       bool                     `json:"structured,omitempty"`
 	Model            string                   `json:"model,omitempty"`
+	ClassifierModel  string                   `json:"classifierModel,omitempty"`
 	ModelSelection   *claudeModelSelection    `json:"modelSelection,omitempty"`
 	SelectedModel    *ClaudeModelSelection    `json:"selectedModel,omitempty"`
 	Permission       string                   `json:"permission,omitempty"`

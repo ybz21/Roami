@@ -45,6 +45,8 @@ type Spec struct {
 	ShortExecutionLabel bool   `json:"shortExecutionLabel,omitempty"`
 	Title               string `json:"title,omitempty"`
 	Model               string `json:"model,omitempty"`
+	ClassifierModel     string `json:"classifierModel,omitempty"`
+	AllowMetered        bool   `json:"allowMetered,omitempty"`
 	Permission          string `json:"permission,omitempty"`
 	TimeoutSeconds      int    `json:"timeoutSeconds"`
 }
@@ -56,6 +58,7 @@ type Receipt struct {
 	DeadlineMS      int64           `json:"deadlineMs,omitempty"`
 	Binding         *SessionBinding `json:"sessionBinding,omitempty"`
 	ConfiguredModel string          `json:"configuredModel,omitempty"`
+	ClassifierModel string          `json:"classifierModel,omitempty"`
 	RecoveredFrom   string          `json:"recoveredFrom,omitempty"`
 }
 
@@ -154,6 +157,9 @@ func readJSON(path string, value any) error {
 
 // Launch journals intent before starting tmux. An uncertain launch is reconciled, never replayed.
 func (s Service) Launch(ctx context.Context, spec Spec) (Status, error) {
+	if err := validateClassifierLaunch(spec); err != nil {
+		return Status{}, err
+	}
 	if spec.PromptFormat != "" && spec.PromptFormat != "markdown" && spec.PromptFormat != "markdown-session" {
 		return Status{}, fmt.Errorf("INVALID_EXECUTION_SPEC")
 	}

@@ -29,8 +29,15 @@ func (s Service) claudeRecoveryGateway(ctx context.Context, model string) (strin
 }
 
 func (s Service) claudeGateway(ctx context.Context, model string, allowMetered bool) (claudeGatewayCatalog, error) {
-	if !catalog.ValidID(model) {
-		return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
+	return s.claudeGatewayRoutes(ctx, allowMetered, model)
+}
+
+func (s Service) claudeGatewayRoutes(ctx context.Context, allowMetered bool, requested ...string) (claudeGatewayCatalog, error) {
+	unavailable := errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
+	for _, model := range requested {
+		if !catalog.ValidID(model) {
+			return claudeGatewayCatalog{}, unavailable
+		}
 	}
 	paths, err := agentruntime.Resolve(s.Runtime.HomeDir, s.Runtime.DataDir)
 	if err != nil {
@@ -56,27 +63,67 @@ func (s Service) claudeGateway(ctx context.Context, model string, allowMetered b
 	if err := recoveryGatewayRead(ctx, client, path, &models); err != nil {
 		return claudeGatewayCatalog{}, err
 	}
+	eligible := make(map[string]bool, len(models.Data.Models))
 	for _, row := range models.Data.Models {
-		if row.ID != model || !configuredGatewayModel(row, allowMetered) {
-			continue
-		}
-		var gateway struct {
-			Data claudeGatewayCatalog `json:"data"`
-		}
-		if err := recoveryGatewayRead(ctx, client, "/v1/model-gateway/catalog", &gateway); err != nil {
-			return claudeGatewayCatalog{}, err
-		}
-		if gateway.Data.BaseURL == "" || models.Data.Revision == "" || models.Data.Revision != gateway.Data.Revision {
-			return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
-		}
-		return gateway.Data, nil
+		eligible[row.ID] = configuredGatewayModel(row, allowMetered)
 	}
-	return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_MODEL_NOT_AVAILABLE")
+	for _, model := range requested {
+		if !eligible[model] {
+			return claudeGatewayCatalog{}, unavailable
+		}
+	}
+	var gateway struct {
+		Data claudeGatewayCatalog `json:"data"`
+	}
+	if err := recoveryGatewayRead(ctx, client, "/v1/model-gateway/catalog", &gateway); err != nil {
+		return claudeGatewayCatalog{}, err
+	}
+	if gateway.Data.BaseURL == "" || models.Data.Revision == "" || models.Data.Revision != gateway.Data.Revision {
+		return claudeGatewayCatalog{}, errors.New("SESSION_RECOVERY_GATEWAY_UNAVAILABLE")
+	}
+	return gateway.Data, nil
 }
 
 func configuredGatewayModel(row directory.Row, allowMetered bool) bool {
 	return row.Configured && row.Enabled && !row.GatewayHidden &&
 		(allowMetered || row.FreeOnly || row.Pricing == "confirmed-free")
+}
+
+func validateClassifierLaunch(spec Spec) error {
+	if spec.ClassifierModel == "" && !spec.AllowMetered {
+		return nil
+	}
+	if spec.Executor != "claude" || !spec.Persistent || !catalog.ValidID(spec.Model) ||
+		!catalog.ValidID(spec.ClassifierModel) || spec.SessionID != "" && (spec.ResumeFrom == "" || spec.ResumeProvider == "") {
+		return errors.New("INVALID_CLAUDE_CLASSIFIER_LAUNCH")
+	}
+	return nil
+}
+
+func (s Service) claudeLaunchRoutes(ctx context.Context, spec Spec, binding SessionBinding) (primary, classifier string, err error) {
+	gateway, err := s.claudeGatewayRoutes(ctx, spec.AllowMetered, spec.Model, spec.ClassifierModel)
+	if err != nil {
+		return "", "", err
+	}
+	var profile struct {
+		Environment map[string]string `json:"env"`
+	}
+	base := strings.TrimRight(gateway.BaseURL, "/")
+	envBase := strings.TrimRight(os.Getenv("ANTHROPIC_BASE_URL"), "/")
+	if json.Unmarshal(readClaudeModelSettings(binding), &profile) != nil ||
+		strings.TrimRight(profile.Environment["ANTHROPIC_BASE_URL"], "/") != base ||
+		envBase != "" && envBase != base {
+		return "", "", errors.New("SESSION_RECOVERY_GATEWAY_PROFILE_REQUIRED")
+	}
+	inference, err := claudePickerCatalogModel(gateway, spec.Model)
+	if err != nil {
+		return "", "", err
+	}
+	approval, err := claudePickerCatalogModel(gateway, spec.ClassifierModel)
+	if err != nil {
+		return "", "", err
+	}
+	return inference.NativeID, approval.NativeID, nil
 }
 
 func recoveryGatewayRead(ctx context.Context, client *http.Client, path string, output any) error {
