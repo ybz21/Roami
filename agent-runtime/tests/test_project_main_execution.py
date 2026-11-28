@@ -121,6 +121,7 @@ async def test_bound_main_reports_pending_native_submission_until_provider_ackno
 ):
     runtime, main, spec, proof, calls = await setup_main(wake_runtime, monkeypatch)
     await runtime.main_executions.configure("alice", main["id"], spec)
+    reply = await runtime.chat.submit("alice", main["id"], "typed-once", "Perform existing work")
     team = await runtime.swarms.create(
         "alice",
         {
@@ -130,6 +131,7 @@ async def test_bound_main_reports_pending_native_submission_until_provider_ackno
             "mainConversationId": main["id"],
             "target": {"kind": "project", "projectId": "project"},
         },
+        binding={"conversation": main["id"], "turnId": reply["turnId"]},
     )
     acknowledgement = asyncio.Event()
     finish = asyncio.Event()
@@ -159,7 +161,6 @@ async def test_bound_main_reports_pending_native_submission_until_provider_ackno
 
     runtime.main_executions.executor.command = command
     await runtime.start()
-    reply = await runtime.chat.submit("alice", main["id"], "typed-once", "Perform existing work")
 
     def delivery(db, state):
         return row(

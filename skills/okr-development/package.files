@@ -23,7 +23,7 @@ b5361a481d3a5dce41e740cfd3d92b0c1f66e9bf0744517dd84c70670f7e2020  assets/.roami/
 1518dfddc48dca60599019334dd0b1d4411f9794ee1c1cdf8edaf429f5c60a2d  assets/.roami/okr/manuals/dashboard.md
 544a260e86d3943849e988354f00d4d4d970aa2ee59c36d65e3bab81020f86ba  assets/.roami/okr/manuals/data.md
 aab5985273c9111e7b03f9e8a1cd5156f0419cc29cab29ba2c68a06b634c9836  assets/.roami/okr/manuals/memory.md
-cb81737335982951d578ebd5dcb9977043c3070188f43459f5e303ae2389b141  assets/.roami/okr/manuals/publishing.md
+496c3a34071094c90b69984414b19a05c566546723bf2aef9765e511e4bc37ac  assets/.roami/okr/manuals/publishing.md
 4ad10b9ecf80654540ca91a58945b9c92453071b88f69d281af93d60ca7114be  assets/.roami/okr/manuals/skills.md
 5fb8f535f6fb251f7055b0f9680a80103de925a95c9510a685e37e6098b1cbb3  assets/.roami/okr/manuals/team.md
 0ea065ee26b7bc9ea460a09b706bd3c12e746f8d715d10fffc594df4ffbcd3b5  assets/.roami/okr/memory/decisions.md
@@ -43,7 +43,7 @@ dc26c98342033ba7ad2a768792a5ea3b7eb39fd49b91dcb26167790d8d3a89bc  assets/.roami/
 d92c62d3b31885163368e3f412bb49f5d1bec00ecbcda35cd01d55d56df46e5e  assets/.roami/okr/skills/okr-planning/SKILL.md
 32ad3c6463704fe5814c48d26cac96b1b6e094535123812380169a7d81a93e08  assets/.roami/okr/skills/swarm-execution/SKILL.md
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  assets/.roami/okr/state/.gitkeep
-f800b49daa1aec62d425608b67c7e7b756c4aa8fe8b7a316dba73ac7692d223f  assets/AGENTS.md
+203f67f8ebc781c9267d7959ac04856f5dc462cebdf5d29dbb5379294bbf42ef  assets/AGENTS.md
 14bb51f7de76234119614601c7382d153e8c8875abfbf7f13b493a3958ccb2f5  assets/README.md
 fb76b25b9cbeb2337cca8e47c9bc2034c7be5810e0238b1091b931e1283c753e  assets/materials/README.md
 7dc2e6cfa94b85ebbab5e25d3afe175419dec6dcb7b1ec206e85b00055683251  assets/workspaces/README.md
