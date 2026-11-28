@@ -234,7 +234,7 @@ func (s Service) providerRecovery(ctx context.Context, spec Spec, source provide
 		if !ok || terminal == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != evidence || result.FinishedMS != terminal.FinishedMS {
 			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
 		}
-	} else if progress, _, _ := claudeReportWithExit(binding, state.TurnID, state.PromptHash, dir, state.EndedIdle); progress == nil {
+	} else if progress, _, _ := claudeReportWithExit(binding, state.TurnID, state.PromptHash, dir, state.EndedIdle); progress == nil && !claudeAdmissionRecoveryProven(state, dir, result) {
 		observed, digest := claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
 		if result.ErrorCode != "CLAUDE_API_REQUEST_FAILED" || observed == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != digest {
 			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")

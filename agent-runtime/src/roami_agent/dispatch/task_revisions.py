@@ -582,10 +582,16 @@ class TaskRevisions:
                     if (
                         binding
                         and binding["model"]
-                        and binding["session_id"] == session["session_id"]
                         and binding["provider_id"] == session["agent_conversation_id"]
                     ):
                         intent["model"] = binding["model"]
+                        if binding["session_id"] != session["session_id"]:
+                            intent["target"] = {
+                                "kind": "session",
+                                "sessionId": binding["session_id"],
+                                "nodeId": "local",
+                                "providerLaunchKey": binding["launch_key"],
+                            }
 
                 elif (
                     intent["target"]["kind"] != "session"
