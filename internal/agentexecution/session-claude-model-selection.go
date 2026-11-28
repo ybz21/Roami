@@ -68,32 +68,70 @@ func claudeModelSnapshot(file *os.File, info os.FileInfo, offset int64) (claudeM
 	return claudeModelAnchor{Device: device, Inode: inode, Offset: offset, Digest: hex.EncodeToString(digest[:])}, true
 }
 
-func claudeSessionModelProof(binding SessionBinding, anchor claudeModelAnchor, models []string) (claudeModelProof, bool) {
+func claudeModelAppend(binding SessionBinding, anchor claudeModelAnchor) []byte {
 	path, info := claudeTranscriptPath(binding)
 	if info == nil || anchor.Offset <= 0 || info.Size() <= anchor.Offset || info.Size()-anchor.Offset > claudeModelSelectionLimit {
-		return claudeModelProof{}, false
+		return nil
 	}
 	file, err := fsguard.OpenReadNoFollow(path)
 	if err != nil {
-		return claudeModelProof{}, false
+		return nil
 	}
 	defer file.Close()
 	if actual, ok := claudeModelSnapshot(file, info, anchor.Offset); !ok || actual != anchor {
-		return claudeModelProof{}, false
+		return nil
 	}
 	data, err := io.ReadAll(io.NewSectionReader(file, anchor.Offset, info.Size()-anchor.Offset))
 	if err != nil || int64(len(data)) != info.Size()-anchor.Offset {
-		return claudeModelProof{}, false
+		return nil
 	}
 	if after, err := os.Lstat(path); err != nil || !sameClaudeInputFile(info, after) {
-		return claudeModelProof{}, false
+		return nil
 	}
+	return data
+}
+
+func claudeSessionModelProof(binding SessionBinding, anchor claudeModelAnchor, models []string) (claudeModelProof, bool) {
+	data := claudeModelAppend(binding, anchor)
 	prompt, ok := claudeSessionModelSuffix(data, binding, models)
 	if !ok {
 		return claudeModelProof{}, false
 	}
 	digest := sha256.Sum256(data)
 	return claudeModelProof{PromptID: prompt, Digest: hex.EncodeToString(digest[:])}, true
+}
+
+func claudeUnchangedModelProof(data []byte, binding SessionBinding, model string) (string, bool) {
+	if len(data) == 0 || data[len(data)-1] != '\n' || model == "" || binding.ProviderID == "" || binding.Directory == "" {
+		return "", false
+	}
+	lines := bytes.Split(data[:len(data)-1], []byte("\n"))
+	if len(lines) != 2 {
+		return "", false
+	}
+	type localCommand struct {
+		claudeInterruptedRecord
+		Content string `json:"content"`
+		Level   string `json:"level"`
+		Run     *struct {
+			Name string  `json:"command"`
+			Args *string `json:"args"`
+		} `json:"commandRun"`
+	}
+	var command, output localCommand
+	for index, record := range []*localCommand{&command, &output} {
+		if json.Unmarshal(lines[index], record) != nil || record.Type != "system" || record.Subtype != "local_command" ||
+			record.Level != "info" || record.Meta || record.Sidechain || record.SessionID != binding.ProviderID || record.Cwd == "" ||
+			!codexThreadID.MatchString(record.UUID) || !claudeInputDirectory(binding, record.Cwd) {
+			return "", false
+		}
+	}
+	if command.Cwd != output.Cwd || command.UUID != output.Parent || command.UUID == output.UUID || command.Run != nil ||
+		!claudeModelPickerCommand.MatchString(command.Content) || output.Run == nil || output.Run.Name != "model" || output.Run.Args == nil || *output.Run.Args != "" ||
+		output.Content != "<local-command-stdout>Kept model as `"+model+"`</local-command-stdout>" {
+		return "", false
+	}
+	return command.UUID, true
 }
 
 func claudeSessionModelSuffix(data []byte, binding SessionBinding, models []string) (string, bool) {
