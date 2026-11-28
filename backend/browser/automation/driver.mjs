@@ -11,7 +11,7 @@
 // handleConnection）——防的是 CDP 连接在 Chrome 被内存压力杀掉/重启期间可能陷入不带退避的
 // 忙等死循环（不依赖出问题的那段代码自己配合退出，直接从外面强杀更可靠）。
 import { readFile, writeFile, mkdir, mkdtemp, rm, copyFile, rename } from 'node:fs/promises'
-import { existsSync, unlinkSync, writeFileSync, openSync, realpathSync } from 'node:fs'
+import { existsSync, unlinkSync, writeFileSync, readFileSync, openSync, closeSync, realpathSync } from 'node:fs'
 import { spawn, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { randomUUID } from 'node:crypto'
@@ -878,19 +878,36 @@ async function daemonMain() {
 
 // ── 客户端：一次性冷启动进程，把命令转发给 daemon（连不上就现拉起） ─────────────────────
 
+function daemonCommand(cgroups, node, driver) {
+  const command = [node, driver, '_daemon']
+  if (!/^0::[^\n]*\/tmux-spawn-[^/\n]+\.scope$/m.test(cgroups)) return command
+  // A detached child still belongs to its pane's cgroup until systemd moves it.
+  return ['systemd-run', '--user', '--scope', '--quiet', '--collect', '--unit',
+    `roami-chrome-driver-${randomUUID()}.scope`, '--', ...command]
+}
+
 function spawnDaemon() {
   return new Promise((resolve) => {
+    let cgroups = ''
+    if (process.platform === 'linux') {
+      try { cgroups = readFileSync('/proc/self/cgroup', 'utf8') } catch {}
+    }
+    const [program, ...args] = daemonCommand(cgroups, process.execPath, SELF_PATH)
     let logFd
     try { logFd = openSync(DAEMON_LOG, 'a') } catch { resolve(false); return }
     let child
     try {
-      child = spawn(process.execPath, [SELF_PATH, '_daemon'], {
+      child = spawn(program, args, {
         detached: true, stdio: ['ignore', logFd, logFd],
       })
     } catch { resolve(false); return }
+    finally { closeSync(logFd) }
+    let failed = false
+    child.once('error', () => { failed = true })
+    child.once('exit', code => { if (code !== 0) failed = true })
     child.unref()
     ;(async () => {
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 100 && !failed; i++) {
         if (existsSync(SOCK_PATH) && await probeAlive(SOCK_PATH)) { resolve(true); return }
         await sleep(50)
       }
@@ -1024,7 +1041,7 @@ async function main() {
   process.exitCode = resp.code || 0
 }
 
-export { executeVerb, parseArgs, pickPage, targetIdentity, daemonRequestWithRetry, Session, navigationWait, handleConnection, cdpScreenshot, withInsecureTLS }
+export { executeVerb, parseArgs, pickPage, targetIdentity, daemonCommand, daemonRequestWithRetry, Session, navigationWait, handleConnection, cdpScreenshot, withInsecureTLS }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === SELF_PATH) {
   main().catch((e) => { console.error('chrome: ' + (e?.message || String(e))); process.exitCode = 1 })
