@@ -1,4 +1,4 @@
-// Package terminal provides the cross-platform PTY and process boundary used by roami-sessiond.
+// Package terminal provides the cross-platform PTY and process boundary used by roami-term.
 package terminal
 
 import (

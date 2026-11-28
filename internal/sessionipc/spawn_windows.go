@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// SpawnDetached launches roami-sessiond detached from the caller's console/process group.
+// SpawnDetached launches roami-term detached from the caller's console/process group.
 func SpawnDetached(binary string, args ...string) (int, error) {
 	cmd := exec.Command(binary, args...)
 	cmd.Stdin = nil

@@ -18,10 +18,10 @@ func TestManagerOnDemandSpawnAndRouter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	bin := filepath.Join(t.TempDir(), "roami-sessiond")
-	build := exec.CommandContext(ctx, "go", "build", "-o", bin, "../../cmd/roami-sessiond")
+	bin := filepath.Join(t.TempDir(), "roami-term")
+	build := exec.CommandContext(ctx, "go", "build", "-o", bin, "../../cmd/roami-term")
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build roami-sessiond failed: %v\n%s", err, string(out))
+		t.Fatalf("build roami-term failed: %v\n%s", err, string(out))
 	}
 
 	root := t.TempDir()

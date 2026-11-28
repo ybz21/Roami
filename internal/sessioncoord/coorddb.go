@@ -1,5 +1,5 @@
 // Package sessioncoord owns the minimal, schema-frozen SQLite coordination database
-// (session-host.db) shared by roami-sessiond hosts and control-plane clients,
+// (session-host.db) shared by roami-term hosts and control-plane clients,
 // completely isolated from main meta.db schema migrations and storage locks.
 package sessioncoord
 

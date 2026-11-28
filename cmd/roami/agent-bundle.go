@@ -145,7 +145,7 @@ func installAgentBundle(archive, destination string, expectedVersion ...string) 
 	if err != nil {
 		return err
 	}
-	for _, required := range []string{"bin/roami", "runtime/python/bin/python3", "runtime/requirements.txt", "runtime/pyproject.toml", "install/retire-session-entries.sh"} {
+	for _, required := range []string{"bin/roami", "bin/roami-term", "runtime/python/bin/python3", "runtime/requirements.txt", "runtime/pyproject.toml", "install/retire-session-entries.sh"} {
 		if manifest.Files[required] == "" {
 			return fmt.Errorf("BUNDLE_MISSING_FILE: %s", required)
 		}
@@ -308,16 +308,27 @@ func activateAgentBundle(destination, binDir string) error {
 			return err
 		}
 	}
-	if err := replaceAgentLink(destination, current); err != nil {
-		return err
-	}
-	if err := replaceAgentLink(filepath.Join(root, "current", "bin", "roami"), entry); err != nil {
+	rollbackCurrent := func() {
 		if oldCurrentErr == nil {
 			_ = replaceAgentLink(oldCurrent, current)
 		} else if os.IsNotExist(oldCurrentErr) {
 			_ = os.Remove(current)
 		}
+	}
+	if err := replaceAgentLink(destination, current); err != nil {
 		return err
+	}
+	if err := replaceAgentLink(filepath.Join(root, "current", "bin", "roami"), entry); err != nil {
+		rollbackCurrent()
+		return err
+	}
+	termDest := filepath.Join(destination, "bin", "roami-term")
+	if _, err := os.Stat(termDest); err == nil {
+		termEntry := filepath.Join(binDir, "roami-term")
+		if err := replaceAgentLink(filepath.Join(root, "current", "bin", "roami-term"), termEntry); err != nil {
+			rollbackCurrent()
+			return err
+		}
 	}
 	return nil
 }

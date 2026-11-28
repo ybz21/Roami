@@ -1,4 +1,4 @@
-// Package nativeattach implements the tmux-compatible CLI attach loop for native roami-sessiond panes.
+// Package nativeattach implements the tmux-compatible CLI attach loop for native roami-term panes.
 package nativeattach
 
 import (

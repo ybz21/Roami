@@ -44,7 +44,7 @@ func subscribeNativeLayout(sessionID string) (chan string, func()) {
 
 // NotifyNativeLayout wakes all live WebSocket terminal attachments for sessionID after a
 // REST layout mutation (window switch/create/close, split, focus, close-pane) so screens
-// update immediately even if an older roami-sessiond does not broadcast window switch events.
+// update immediately even if an older roami-term does not broadcast window switch events.
 func NotifyNativeLayout(sessionID, activePaneID string) {
 	nativeLayoutMu.RLock()
 	set := nativeLayoutSubs[sessionID]
@@ -69,7 +69,7 @@ func NotifyNativeLayout(sessionID, activePaneID string) {
 	}
 }
 
-// HandlerWithNative serves /api/term/:name, transparently bridging native roami-sessiond
+// HandlerWithNative serves /api/term/:name, transparently bridging native roami-term
 // sessions using the legacy xterm.js wire protocol (raw binary VT bytes + JSON control frames)
 // while delegating tmux sessions to the existing Handler unchanged.
 func HandlerWithNative(nativeBackend sessionbackend.SessionBackend) gin.HandlerFunc {

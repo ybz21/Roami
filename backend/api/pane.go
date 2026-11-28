@@ -1,4 +1,4 @@
-// Pane & window structured API: supports both native roami-sessiond sessions and legacy tmux
+// Pane & window structured API: supports both native roami-term sessions and legacy tmux
 // sessions so Web UI actions call real backend APIs instead of injecting raw Ctrl-b keystrokes.
 package api
 

@@ -34,7 +34,7 @@ type nativeControlMsg struct {
 	LastSeq         uint64                  `json:"lastSeq,omitempty"`
 }
 
-// NativeHandler bridges WebSocket clients to a native SessionBackend (roami-sessiond) using
+// NativeHandler bridges WebSocket clients to a native SessionBackend (roami-term) using
 // 8-byte big-endian sequenced binary output frames and JSON control/layout frames.
 func NativeHandler(backend sessionbackend.SessionBackend) gin.HandlerFunc {
 	return func(c *gin.Context) {

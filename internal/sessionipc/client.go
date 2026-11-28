@@ -13,7 +13,7 @@ import (
 	"github.com/ybz21/Roami/internal/sessionbackend"
 )
 
-// Client connects to a roami-sessiond instance over yamux and implements both
+// Client connects to a roami-term instance over yamux and implements both
 // SessionBackend and LayoutBackend transparently.
 type Client struct {
 	desc EndpointDescriptor

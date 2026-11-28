@@ -12,26 +12,26 @@ import (
 	"github.com/ybz21/Roami/internal/sessioncoord"
 )
 
-// Manager connects to the active and draining roami-sessiond hosts for an instance root,
+// Manager connects to the active and draining roami-term hosts for an instance root,
 // optionally spawning a detached host on demand when none is running.
 type Manager struct {
 	instanceRoot string
-	sessiondBin  string
+	termBin      string
 
 	mu      sync.Mutex
 	clients map[string]*Client
 }
 
-func NewManager(instanceRoot, sessiondBin string) *Manager {
+func NewManager(instanceRoot, termBin string) *Manager {
 	return &Manager{
 		instanceRoot: instanceRoot,
-		sessiondBin:  sessiondBin,
+		termBin:      termBin,
 		clients:      make(map[string]*Client),
 	}
 }
 
 // ConnectExisting connects to an already-running active host without creating
-// session-host.db or spawning a new roami-sessiond process.
+// session-host.db or spawning a new roami-term process.
 func (m *Manager) ConnectExisting(ctx context.Context) (*Client, sessioncoord.HostPointer, error) {
 	dbPath := filepath.Join(m.instanceRoot, "session-host.db")
 	if _, err := os.Stat(dbPath); err != nil {
@@ -55,7 +55,7 @@ func (m *Manager) ConnectExisting(ctx context.Context) (*Client, sessioncoord.Ho
 }
 
 // ConnectActive returns a live IPC client to the current active host, spawning one on demand
-// when sessiondBin is configured and no active host is reachable.
+// when termBin is configured and no active host is reachable.
 func (m *Manager) ConnectActive(ctx context.Context) (*Client, sessioncoord.HostPointer, error) {
 	coord, err := sessioncoord.Open(filepath.Join(m.instanceRoot, "session-host.db"))
 	if err != nil {
@@ -72,12 +72,12 @@ func (m *Manager) ConnectActive(ctx context.Context) (*Client, sessioncoord.Host
 			return cli, ptr, nil
 		}
 	}
-	if m.sessiondBin == "" {
-		return nil, ptr, fmt.Errorf("sessionipc: no active roami-sessiond for %s", m.instanceRoot)
+	if m.termBin == "" {
+		return nil, ptr, fmt.Errorf("sessionipc: no active roami-term for %s", m.instanceRoot)
 	}
 
 	hostID := fmt.Sprintf("host-%d-%d", os.Getpid(), time.Now().UnixMilli())
-	if _, err := SpawnDetached(m.sessiondBin, "--instance-root", m.instanceRoot, "--host-id", hostID, "--activate=false"); err != nil {
+	if _, err := SpawnDetached(m.termBin, "--instance-root", m.instanceRoot, "--host-id", hostID, "--activate=false"); err != nil {
 		return nil, ptr, err
 	}
 	descPath := filepath.Join(m.instanceRoot, "hosts", hostID+".json")
