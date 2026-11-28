@@ -125,14 +125,24 @@ class CodingExecutor:
         return receipt
 
     async def command(self, sub, *args, spec=None):
+        timeouts = {"launch": None, "select-model": 40}
         response = await execute(
             [self.settings.cli_bin, "agent", "execution", sub, *args],
-            timeout=None if sub == "launch" else 15,
+            timeout=timeouts.get(sub, 15),
             excluded_env=self.settings.provider_key_environments(),
             input_data=encoded(spec).encode() if spec is not None else None,
         )
         if response["exitCode"]:
             # CLI diagnostics may contain paths or account details; keep them out of model context.
+            if sub == "select-model" and response["stderr"].strip() in {
+                "SESSION_MODEL_SELECTION_TARGET_UNCONFIRMED",
+                "SESSION_MODEL_PICKER_NOT_OPENED",
+                "SESSION_MODEL_SELECTION_ORIGIN_UNCONFIRMED",
+                "SESSION_MODEL_SELECTION_UNCONFIRMED",
+                "SESSION_MODEL_SELECTION_PENDING",
+                "SESSION_BINDING_UNAVAILABLE",
+            }:
+                raise DomainError(response["stderr"].strip(), 409)
             if sub in {"launch", "close", "cleanup"} and response[
                 "stderr"
             ].strip() in SESSION_REJECTIONS | {

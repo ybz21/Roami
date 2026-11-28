@@ -19,6 +19,7 @@ from roami_agent.storage.database import event, row
 from roami_agent.storage.swarm_repository import receipt
 from roami_agent.storage.transcript_repository import owned
 from roami_okr.intake import assert_project_main
+from roami_okr.main_model_selection import main_model_selection_status, pending_model_selection
 from roami_okr.native_main import NativeMain
 from roami_okr.settled_route_recovery import recover_route_wait, recovery_candidates
 
@@ -79,7 +80,7 @@ def main_configuration(db, owner, cid):
     ):
         raise DomainError("PROJECT_MAIN_IDENTITY_MISMATCH", 409)
     value = main_binding(db, owner, cid)
-    return (
+    config = (
         {"generation": 0, "executor": "roami", "conversationId": cid}
         if value is None
         else {
@@ -91,6 +92,9 @@ def main_configuration(db, owner, cid):
             "projectId": value["project_id"],
         }
     )
+    if selection := pending_model_selection(db, cid):
+        config["modelSelection"] = main_model_selection_status(selection)
+    return config
 
 
 class MainExecutions:
@@ -141,6 +145,8 @@ class MainExecutions:
 
             def apply():
                 conversation = owned(db, owner, cid)
+                if pending_model_selection(db, cid):
+                    raise DomainError("PROJECT_MAIN_MODEL_SELECTION_PENDING", 409)
                 # Queued turns resolve the provider after admission; running turns already own it.
                 assert_main_idle(db, conversation, allow_queued=bool(recovery or provider_source))
                 if not provider_source and row(

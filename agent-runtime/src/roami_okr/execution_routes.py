@@ -22,6 +22,14 @@ class MainExecution(Payload):
     recoverProviderFromLaunchKey: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class MainModelSelection(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    projectId: str = Field(min_length=1, max_length=200)
+    expectedGeneration: int = Field(ge=1)
+    expectedModel: str = Field(min_length=1, max_length=300)
+    model: str = Field(min_length=1, max_length=200)
+
+
 def mount_main_execution_routes(app, runtime):
     @app.get("/v1/conversations/{cid}/execution")
     async def configuration(cid: str, owner: Owner):
@@ -34,3 +42,7 @@ def mount_main_execution_routes(app, runtime):
                 owner, cid, body.model_dump(exclude_unset=True)
             )
         }
+
+    @app.post("/v1/conversations/{cid}/execution/model", status_code=202)
+    async def select_model(cid: str, body: MainModelSelection, owner: Owner):
+        return {"data": await runtime.main_model_selections.request(owner, cid, body.model_dump())}

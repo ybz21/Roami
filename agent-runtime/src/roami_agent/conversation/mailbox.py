@@ -10,8 +10,9 @@ from roami_agent.storage.swarm_coordination import admitted_batch
 
 
 class TurnMailbox:
-    def __init__(self, database):
+    def __init__(self, database, *, hold_turn=None):
         self.db = database
+        self.hold_turn = hold_turn
 
     async def claim(self, job):
         def write(db):
@@ -31,7 +32,9 @@ class TurnMailbox:
                 return None
             from roami_agent.storage.swarm_work_pause import conversation_paused
 
-            if conversation_paused(db, turn["conversation_id"]):
+            if conversation_paused(db, turn["conversation_id"]) or (
+                self.hold_turn and self.hold_turn(db, turn["conversation_id"])
+            ):
                 db.execute(
                     "UPDATE jobs SET available_ms=? WHERE id=?", (now_ms() + 1000, job["id"])
                 )

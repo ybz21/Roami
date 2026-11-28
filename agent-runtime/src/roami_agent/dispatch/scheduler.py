@@ -30,6 +30,7 @@ class Scheduler:
         swarms=None,
         native_turn_binding=None,
         running_native_turns=None,
+        control_jobs=None,
     ):
         self.db, self.settings, self.context, self.dispatch = database, settings, context, dispatch
         self.mailbox, self.run_turn, self.wakeup, self.active = mailbox, run_turn, wakeup, active
@@ -40,6 +41,7 @@ class Scheduler:
         self.swarms = swarms
         self.native_turn_binding = native_turn_binding
         self.running_native_turns = running_native_turns
+        self.control_jobs = control_jobs or {}
 
     async def run(self):
         while not self.stopping:
@@ -67,10 +69,11 @@ class Scheduler:
                 "LEFT JOIN task_attempts a ON j.kind='task.run' AND a.id=json_extract(j.payload_json,'$.runId') "
                 "LEFT JOIN tasks k ON k.id=a.task_id "
                 "LEFT JOIN branches b ON b.id=a.native_branch_id "
-                "WHERE j.state='queued' AND j.kind IN ('turn.run','context.compact','context.maintain','task.run','task.verify','task.close_session','task.yield','swarm.advance','swarm.coordinate','swarm.goal.start','swarm.goal.daily','swarm.inbox.wakeup','memory.daily','memory.extract') "
+                "WHERE j.state='queued' AND (j.kind IN ('turn.run','context.compact','context.maintain','task.run','task.verify','task.close_session','task.yield','swarm.advance','swarm.coordinate','swarm.goal.start','swarm.goal.daily','swarm.inbox.wakeup','memory.daily','memory.extract') "
+                "OR j.kind IN (SELECT value FROM json_each(?))) "
                 "AND j.available_ms<=? ORDER BY CASE j.kind WHEN 'task.verify' THEN 0 WHEN 'task.close_session' THEN 1 WHEN 'task.yield' THEN 1 WHEN 'turn.run' THEN 2 WHEN 'swarm.coordinate' THEN 2 WHEN 'swarm.goal.start' THEN 2 WHEN 'swarm.goal.daily' THEN 2 WHEN 'swarm.inbox.wakeup' THEN 2 WHEN 'task.run' THEN 3 WHEN 'context.compact' THEN 4 WHEN 'memory.daily' THEN 5 ELSE 6 END,"
                 "CASE WHEN j.kind='turn.run' AND t.trigger_kind='user' AND COALESCE(json_extract(j.payload_json,'$.deferred'),0)=0 THEN 0 ELSE 1 END,j.rowid LIMIT 100",
-                (now_ms(),),
+                (json.dumps(list(self.control_jobs)), now_ms()),
             )
         )
         running = await self.db.call(
@@ -109,7 +112,9 @@ class Scheduler:
             if memory_job and any(item.get("memory") for item in self.active.values()):
                 continue
             group = (
-                "control"
+                job["kind"]
+                if job["kind"] in self.control_jobs
+                else "control"
                 if job["kind"]
                 in {
                     "task.close_session",
@@ -125,7 +130,7 @@ class Scheduler:
             )
             capacity = (
                 1
-                if group == "control"
+                if group == "control" or group in self.control_jobs
                 else self.settings.main_concurrency
                 if group == "main"
                 else self.settings.workers
@@ -174,6 +179,12 @@ class Scheduler:
         self.wakeup.set()
 
     async def _job(self, job):
+        if handler := self.control_jobs.get(job["kind"]):
+            try:
+                await handler(job)
+            except Exception:
+                log.exception("Registered control job could not be reconciled: %s", job["id"])
+            return
         try:
             if job["kind"] == "task.yield":
                 from roami_agent.storage.swarm_member_yield import advance
