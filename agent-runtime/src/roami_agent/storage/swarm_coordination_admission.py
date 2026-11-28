@@ -38,10 +38,19 @@ def batch_context(db, owner, turn_id, *, lease_epoch=None, allow_paused=False):
         job = row(
             db,
             "SELECT json_extract(payload_json,'$.dailySlot') AS slot,"
-            "json_extract(payload_json,'$.nativeRouteRetry') AS retry_generation FROM jobs "
+            "json_extract(payload_json,'$.nativeRouteRetry') AS retry_generation,"
+            "json_extract(payload_json,'$.contextThroughTurn') AS context_end FROM jobs "
             "WHERE kind='turn.run' AND aggregate_id=?",
             (turn_id,),
         )
+        if job and job["context_end"]:
+            latest = row(
+                db,
+                "SELECT id FROM turns WHERE branch_id=? ORDER BY created_ms DESC,rowid DESC LIMIT 1",
+                (value["branch_id"],),
+            )
+            if not latest or latest["id"] != job["context_end"]:
+                raise DomainError("SWARM_COORDINATION_CONTEXT_CHANGED", 409)
         if job and job["slot"]:
             try:
                 slot = json.loads(job["slot"])

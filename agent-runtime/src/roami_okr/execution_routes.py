@@ -6,6 +6,7 @@ from fastapi import Header
 from pydantic import Field, StrictBool
 
 from roami_agent.protocol.http import Payload
+from roami_okr.daily_model_recovery import retry_daily_after_model_change
 from roami_okr.main_execution import main_configuration
 
 Owner = Annotated[str, Header(alias="X-Roami-Owner", min_length=1, max_length=200)]
@@ -31,6 +32,13 @@ class MainModelSelection(Payload):
     allowMetered: StrictBool = False
 
 
+class RetryDaily(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    projectId: str = Field(min_length=1, max_length=200)
+    turnId: str = Field(min_length=1, max_length=200)
+    modelCommandKey: str = Field(min_length=1, max_length=200)
+
+
 def mount_main_execution_routes(app, runtime):
     @app.get("/v1/conversations/{cid}/execution")
     async def configuration(cid: str, owner: Owner):
@@ -51,3 +59,11 @@ def mount_main_execution_routes(app, runtime):
                 owner, cid, body.model_dump(exclude_defaults=True)
             )
         }
+
+    @app.post("/v1/conversations/{cid}/execution/retry-daily", status_code=202)
+    async def retry_daily(cid: str, body: RetryDaily, owner: Owner):
+        result = await retry_daily_after_model_change(
+            runtime.main_executions, owner, cid, body.model_dump()
+        )
+        runtime.wakeup.set()
+        return {"data": result}

@@ -110,6 +110,11 @@ class TurnMailbox:
                 lease_epoch=turn["lease_epoch"] + 1,
                 resumed=bool(payload.get("deferred")),
                 native_route_retry=payload.get("nativeRouteRetry", 0),
+                **(
+                    {"context_through_turn": payload["contextThroughTurn"]}
+                    if payload.get("contextThroughTurn")
+                    else {}
+                ),
             )
 
         return await self.db.call(write, write=True)

@@ -103,7 +103,7 @@ class PromptBuilder:
                 turn["owner_id"],
                 turn["conversation_id"],
                 branch_id=turn["branch_id"],
-                through_turn=turn["id"],
+                through_turn=turn.get("context_through_turn", turn["id"]),
                 request_context=self._configuration(turn, instructions, catalog),
             )
             threshold = plan["compactionThreshold"]
@@ -213,7 +213,7 @@ class PromptBuilder:
                 turn["owner_id"],
                 turn["conversation_id"],
                 branch_id=turn["branch_id"],
-                through_turn=turn["id"],
+                through_turn=turn.get("context_through_turn", turn["id"]),
                 request_context=configuration,
             )
             status_call = None

@@ -57,6 +57,7 @@ func TestAgentRoutesUseExistingAuthAndDoNotExposeLocalCallbacks(t *testing.T) {
 		{"GET", "/api/agent/conversations/probe/execution"},
 		{"PUT", "/api/agent/conversations/probe/execution"},
 		{"POST", "/api/agent/conversations/probe/execution/model"},
+		{"POST", "/api/agent/conversations/probe/execution/retry-daily"},
 		{"GET", "/api/agent/swarms/probe/members/member"},
 		{"POST", "/api/agent/swarms/probe/members/member/model"},
 		{"POST", "/api/agent/swarms/probe/plan"},
