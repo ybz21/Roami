@@ -68,7 +68,7 @@ func TestWrappedClaudeCompletionRequiresUnblockedStopAndAllToolResults(t *testin
 }
 
 func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T) {
-	for _, scenario := range []string{"settled tools", "pending tool", "foreign provider", "new request", "untyped refusal", "settled HTTP 400", "HTTP 400 reported new tools", "HTTP 400 untyped", "HTTP 400 pending tool"} {
+	for _, scenario := range []string{"settled tools", "pending tool", "foreign provider", "new request", "untyped refusal", "settled HTTP 400", "HTTP 400 without tool marker", "HTTP 400 reported new tools", "HTTP 400 untyped", "HTTP 400 pending tool"} {
 		t.Run(scenario, func(t *testing.T) {
 			binding, path, launch, _ := reportFixture(t)
 			since := time.Now().Add(-10 * time.Second).UnixMilli()
@@ -99,7 +99,6 @@ func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T
 				expected = "MODEL_HTTP_400"
 				failure["apiErrorStatus"], failure["apiErrorType"], failure["error"] = 400, "api_error", "unknown"
 				failure["message"].(map[string]any)["content"] = []any{map[string]any{"type": "text", "text": "API Error: 400 MODEL_HTTP_400"}}
-				delete(failure, "failedResponseHadNoToolCall")
 			}
 			switch scenario {
 			case "pending tool", "HTTP 400 pending tool":
@@ -113,6 +112,8 @@ func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T
 				rows = append(rows, later)
 			case "untyped refusal", "HTTP 400 reported new tools":
 				failure["failedResponseHadNoToolCall"] = false
+			case "HTTP 400 without tool marker":
+				delete(failure, "failedResponseHadNoToolCall")
 			case "HTTP 400 untyped":
 				delete(failure, "apiErrorType")
 			}
