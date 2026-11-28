@@ -1,6 +1,7 @@
 package agentexecution
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -69,7 +70,7 @@ func TestWrappedClaudeCompletionRequiresUnblockedStopAndAllToolResults(t *testin
 func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T) {
 	for _, scenario := range []string{"settled tools", "pending tool", "foreign provider", "new request", "untyped refusal"} {
 		t.Run(scenario, func(t *testing.T) {
-			binding, path, _, _ := reportFixture(t)
+			binding, path, launch, _ := reportFixture(t)
 			since := time.Now().Add(-10 * time.Second).UnixMilli()
 			row := func(kind, id, parent string, ms int64) map[string]any {
 				return map[string]any{
@@ -119,6 +120,33 @@ func TestClaudeGatewayRefusalAfterToolsPreservesKnownPartialOutcome(t *testing.T
 			}
 			if result, _, _ := claudeCompletedEvidence(binding, "owned", workspaceHash("owned task"), since); result != nil {
 				t.Fatal("partial failure treated as success")
+			}
+			result.StopEvidence = digest
+			state := sessionLifecycle{Binding: binding, TurnID: "owned", PromptHash: workspaceHash("owned task"), EndedIdle: true}
+			script := Spec{TimeoutSeconds: 90}
+			receipt := Receipt{DeadlineMS: since + 90000}
+			rows = append(rows, map[string]any{"type": "last-prompt"})
+			for _, recovery := range []string{"passive exit history", "no idle proof", "changed digest", "changed refusal", "changed time", "new work"} {
+				t.Run(recovery, func(t *testing.T) {
+					current, saved := state, *result
+					history := rows
+					switch recovery {
+					case "no idle proof":
+						current.EndedIdle = false
+					case "changed digest":
+						saved.StopEvidence = strings.Repeat("a", 64)
+					case "changed refusal":
+						saved.Summary = "another refusal"
+					case "changed time":
+						saved.FinishedMS++
+					case "new work":
+						history = append(history, row("user", "late-request", "refusal", 5000))
+					}
+					writeReportRecords(t, path, history)
+					if got := claudeToolFailureRecoveryProven(current, launch, script, receipt, saved); got != (recovery == "passive exit history") {
+						t.Fatalf("partial recovery accepted=%v", got)
+					}
+				})
 			}
 		})
 	}

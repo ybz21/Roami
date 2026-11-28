@@ -16,13 +16,32 @@ import (
 
 const claudeAdmissionRecoverySuffixLimit = 64 << 10
 
-// A settled gateway refusal records the digest before local model and exit receipts.
 func claudeAdmissionRecoveryProven(state sessionLifecycle, dir string, result Result) bool {
-	if result.State != "failed" || !nativeEvidenceDigest.MatchString(result.StopEvidence) {
-		return false
-	}
 	spec, err := os.Stat(filepath.Join(dir, "spec.json"))
 	if err != nil {
+		return false
+	}
+	return verifyClaudeRecoveryPrefix(state, result, func(input io.Reader) bool {
+		refusal := readClaudeAdmissionRejection(state.Binding, state.TurnID, state.PromptHash, spec.ModTime().UnixMilli(), input)
+		return refusal != nil && refusal.ErrorCode == result.ErrorCode && refusal.FinishedMS == result.FinishedMS
+	})
+}
+
+func claudeToolFailureRecoveryProven(state sessionLifecycle, dir string, spec Spec, receipt Receipt, result Result) bool {
+	since, err := storedClaudeSubmissionTime(dir, spec, receipt)
+	if err != nil {
+		return false
+	}
+	return verifyClaudeRecoveryPrefix(state, result, func(input io.Reader) bool {
+		refusal, _ := readClaudeTerminalOutcome(state.Binding, state.TurnID, state.PromptHash, since, "", true, input)
+		return refusal != nil && refusal.State == result.State && refusal.ErrorCode == result.ErrorCode &&
+			refusal.Summary == result.Summary && refusal.FinishedMS == result.FinishedMS
+	})
+}
+
+// A settled gateway refusal records the digest before local model and exit receipts.
+func verifyClaudeRecoveryPrefix(state sessionLifecycle, result Result, verify func(io.Reader) bool) bool {
+	if result.State != "failed" || !nativeEvidenceDigest.MatchString(result.StopEvidence) {
 		return false
 	}
 	binding := state.Binding
@@ -43,11 +62,12 @@ func claudeAdmissionRecoveryProven(state sessionLifecycle, dir string, result Re
 	if offset == 0 || !validClaudeAdmissionSuffix(suffix, binding, state) {
 		return false
 	}
-	refusal := readClaudeAdmissionRejection(binding, state.TurnID, state.PromptHash, spec.ModTime().UnixMilli(), io.NewSectionReader(file, 0, offset))
+	if !verify(io.NewSectionReader(file, 0, offset)) {
+		return false
+	}
 	after, err := file.Stat()
 	current, problem := os.Lstat(path)
-	return refusal != nil && refusal.ErrorCode == result.ErrorCode && refusal.FinishedMS == result.FinishedMS &&
-		err == nil && problem == nil && sameClaudeInputFile(info, after) && sameClaudeInputFile(info, current)
+	return err == nil && problem == nil && sameClaudeInputFile(info, after) && sameClaudeInputFile(info, current)
 }
 
 func claudeRecoveryPrefix(file *os.File, size int64, evidence string) (int64, []byte) {
