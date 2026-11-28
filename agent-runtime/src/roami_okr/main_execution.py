@@ -100,6 +100,9 @@ class MainExecutions:
 
     async def configure(self, owner, cid, spec):
         project = spec["projectId"]
+        provider_source = spec.get("recoverProviderFromLaunchKey")
+        if provider_source and spec.get("recoverFromLaunchKey"):
+            raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
 
         def prior(db):
             assert_project_main(db, owner, cid, project)
@@ -123,9 +126,14 @@ class MainExecutions:
         workspace = await TargetDirectory(self.settings).project_workspace(project)
         proof = await self.executor.command("prepared", "--key", spec["preparedLaunchKey"])
         validate_prepared_member(spec, proof, workspace["directory"])
-        original = recovery = None
-        if spec.get("recoverFromLaunchKey"):
+        original = recovery = source_turn = None
+        if provider_source or spec.get("recoverFromLaunchKey"):
             original = await self.db.call(lambda db: main_binding(db, owner, cid))
+        if provider_source:
+            source_turn = await self.provider_recovery(original, spec, proof)
+        elif proof.get("recoveredFrom"):
+            raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
+        elif spec.get("recoverFromLaunchKey"):
             recovery = await self.context_rejection(original, spec, workspace["directory"])
 
         def write(db):
@@ -134,8 +142,8 @@ class MainExecutions:
             def apply():
                 conversation = owned(db, owner, cid)
                 # Queued turns resolve the provider after admission; running turns already own it.
-                assert_main_idle(db, conversation, allow_queued=recovery is not None)
-                if row(
+                assert_main_idle(db, conversation, allow_queued=bool(recovery or provider_source))
+                if not provider_source and row(
                     db,
                     "SELECT id FROM swarm_groups WHERE owner_id=? AND conversation_id=? AND archived=0 AND paused=0",
                     (owner, cid),
@@ -145,8 +153,15 @@ class MainExecutions:
                 generation = current["generation"] if current else 0
                 if generation != spec["expectedGeneration"]:
                     raise DomainError("PROJECT_MAIN_GENERATION_CHANGED", 409)
-                if current and (recovery is None or original != current):
+                if current and (not (recovery or provider_source) or original != current):
                     raise DomainError("PROJECT_MAIN_REPLACEMENT_REQUIRES_STOP", 409)
+                if source_turn and not row(
+                    db,
+                    "SELECT id FROM turns WHERE id=? AND conversation_id=? AND branch_id=? "
+                    "AND state IN ('completed','failed','interrupted','cancelled')",
+                    (source_turn, cid, conversation["active_branch_id"]),
+                ):
+                    raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
                 if recovery is not None:
                     turn_id, refusal = recovery
                     if not row(
@@ -158,11 +173,22 @@ class MainExecutions:
                         raise DomainError("PROJECT_MAIN_CONTEXT_REJECTION_UNCONFIRMED", 409)
                 binding = proof["sessionBinding"]
                 require_member_provider_available(
-                    db, proof["sessionId"], binding["providerConversationId"]
+                    db,
+                    proof["sessionId"],
+                    binding["providerConversationId"],
+                    launch_key=proof["launchKey"],
                 )
-                require_project_provider_available(
-                    db, proof["sessionId"], binding["providerConversationId"]
-                )
+                if provider_source:
+                    if row(
+                        db,
+                        "SELECT 1 FROM project_okr_main_providers WHERE session_id=? OR launch_key=?",
+                        (proof["sessionId"], proof["launchKey"]),
+                    ):
+                        raise DomainError("SWARM_PROVIDER_ALREADY_BOUND", 409)
+                else:
+                    require_project_provider_available(
+                        db, proof["sessionId"], binding["providerConversationId"]
+                    )
                 db.execute(
                     "INSERT INTO project_okr_main_providers VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (
@@ -180,11 +206,16 @@ class MainExecutions:
                     ),
                 )
                 result = main_configuration(db, owner, cid)
+                details = {**result}
+                if recovery:
+                    details["previousContextRejection"] = recovery[1]
+                if provider_source:
+                    details["recoveredFrom"] = provider_source
                 event(
                     db,
                     cid,
                     "project.main.execution.changed",
-                    {**result, "previousContextRejection": recovery[1]} if recovery else result,
+                    details,
                 )
                 return result
 
@@ -198,6 +229,47 @@ class MainExecutions:
             )
 
         return await self.db.call(write, write=True)
+
+    async def provider_recovery(self, original, spec, proof):
+        source_key = spec["recoverProviderFromLaunchKey"]
+        if (
+            not original
+            or original["generation"] != spec["expectedGeneration"]
+            or original["executor"] != "claude"
+            or spec["executor"] != "claude"
+            or proof.get("recoveredFrom") != source_key
+            or proof["sessionId"] == original["session_id"]
+        ):
+            raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
+        launch = MAIN_LAUNCH_KEY.fullmatch(source_key)
+        if not launch and source_key != original["launch_key"]:
+            raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
+        existing = json.loads(original["binding_json"])
+        rebinding = proof["sessionBinding"]
+        if any(
+            not existing.get(field) or rebinding.get(field) != existing[field]
+            for field in (
+                "providerConversationId",
+                "hostProof",
+                "directory",
+                "directoryProof",
+                "providerHome",
+                "providerHomeProof",
+            )
+        ) or rebinding.get("providerHomeExplicit") != existing.get("providerHomeExplicit"):
+            raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
+        terminal = await self.executor.command("status", "--key", source_key)
+        NativeMain({**original, "binding": existing}, {}, self.executor.command).verify(terminal)
+        result = terminal.get("result")
+        if (
+            not isinstance(result, dict)
+            or result.get("state") not in {"succeeded", "failed", "cancelled"}
+            or result.get("state") != terminal.get("state")
+            or result.get("inputStopped") is not True
+            or result.get("outcomeKnown") is not True
+        ):
+            raise DomainError("PROJECT_MAIN_PROVIDER_RECOVERY_UNCONFIRMED", 409)
+        return launch[1] if launch else None
 
     async def context_rejection(self, original, spec, directory):
         key = spec["recoverFromLaunchKey"]
