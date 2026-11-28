@@ -21,9 +21,10 @@ backend_build() {
     fi
     step "构建前端 (vite build) → frontend/dist..."
     (cd "${SCRIPT_DIR}/frontend" && npx vite build)
-    # 后端：go build → backend/ttmux-web
-    step "构建后端 (go build) → backend/ttmux-web..."
-    (cd "${SCRIPT_DIR}" && go build -o backend/ttmux-web ./cmd/roami)
+    # 后端：go build → backend/ttmux-web + backend/roami-sessiond
+    step "构建后端 (go build) → backend/ttmux-web + backend/roami-sessiond..."
+    (cd "${SCRIPT_DIR}" && go build -o backend/ttmux-web.next ./cmd/roami && mv -f backend/ttmux-web.next backend/ttmux-web)
+    (cd "${SCRIPT_DIR}" && go build -o backend/roami-sessiond.next ./cmd/roami-sessiond && mv -f backend/roami-sessiond.next backend/roami-sessiond)
 }
 
 module_backend() {

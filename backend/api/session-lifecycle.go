@@ -71,7 +71,7 @@ func (a *API) LifecycleAccept(c *gin.Context) {
 				return
 			}
 			if _, err := a.Lifecycle.ByKey(b.RequestKey); errors.Is(err, sql.ErrNoRows) {
-				identity, e := lifecycleRuntime(c.Request.Context()).SessionIdentity(b.Intent.Parent)
+				identity, e := a.resolveSessionIdentity(c.Request.Context(), b.Intent.Parent)
 				if e != nil || identity == "" {
 					lifecycleError(c, fmt.Errorf("LIFECYCLE_PARENT_UNAVAILABLE"))
 					return

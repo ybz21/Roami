@@ -4,6 +4,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strings"
@@ -26,6 +27,10 @@ func (a *API) killContestant(ct *race.Contestant) {
 		}
 	}
 	if name == "" {
+		return
+	}
+	if _, ok := a.nativeSession(context.Background(), name); ok {
+		_ = a.NativeBackend.Close(context.Background(), name)
 		return
 	}
 	_, _ = a.TT.Run("kill", name, "--yes")
@@ -94,7 +99,11 @@ func (a *API) RaceCreate(c *gin.Context) {
 		ct.SessionID = a.WT.SessionID(ct.Session)
 		wt, err := a.WT.CreateFromBase(ctx, worktree.CreateReq{Dir: b.Dir, Branch: autoBranch(b.Name) + "-" + letter, Base: b.Base, Dirname: sess}, prepared)
 		if err != nil {
-			_, _ = a.TT.Run("kill", ct.Session, "--yes")
+			if _, ok := a.nativeSession(ctx, ct.Session); ok {
+				_ = a.NativeBackend.Close(ctx, ct.Session)
+			} else {
+				_, _ = a.TT.Run("kill", ct.Session, "--yes")
+			}
 			fail("worktree: " + err.Error())
 			continue
 		}
@@ -113,7 +122,13 @@ func (a *API) RaceCreate(c *gin.Context) {
 					cmd += " " + flag
 				}
 			}
-			if _, err = a.TT.Run("send", ct.Session, cmd+" "+shellQuote(b.Prompt)); err != nil {
+			payload := cmd + " " + shellQuote(b.Prompt)
+			if _, ok := a.nativeSession(ctx, ct.Session); ok {
+				err = a.submitNativeText(ctx, ct.Session, payload, true)
+			} else {
+				_, err = a.TT.Run("send", ct.Session, payload)
+			}
+			if err != nil {
 				a.rollbackPreparedSession(ct.Session, wt, true)
 				fail("launch: " + err.Error())
 				continue

@@ -252,7 +252,7 @@ func (a *API) SessionWorktreeStatus(c *gin.Context) {
 	}
 	ctx, cancel := wtCtx(c)
 	defer cancel()
-	identity, identityErr := lifecycleRuntime(ctx).SessionIdentity(name)
+	identity, identityErr := a.resolveSessionIdentity(ctx, name)
 	if identityErr != nil {
 		wtErr(c, identityErr)
 		return
@@ -319,6 +319,13 @@ func (a *API) cdInto(session, path string) error {
 	// 归属钉死后不再随用户在终端里的 cd 漂移。
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if _, ok := a.nativeSession(ctx, session); ok {
+		if err := a.submitNativeText(ctx, session, "cd "+shellQuote(path), true); err != nil {
+			return err
+		}
+		a.WT.BindSessionHome(session, path)
+		return nil
+	}
 	if _, err := a.TT.RunCtx(ctx, "send-keys", "-t", "="+session+":", "-l", "cd "+shellQuote(path)); err != nil {
 		return err
 	}
@@ -372,8 +379,17 @@ func (a *API) SessionFork(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "BAD_REQUEST"}})
 		return
 	}
-	// child 是展示名：子会话本身叫 id，由 CLI 生成后随 --json 回传。
+	// child 是展示名：子会话本身叫 id，由 CLI 或原生宿主生成后回传。
 	label := strings.TrimSpace(b.Child)
+	if a.NativeBackend != nil {
+		child, err := a.forkNativeSession(c.Request.Context(), parent, label, b.Dir)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "FORK_FAILED", "message": err.Error()}})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"session": child, "label": label, "parent": parent}, "name": child})
+		return
+	}
 	args := []string{"fork", parent, label, "--detach", "--json"}
 	if d := strings.TrimSpace(b.Dir); d != "" {
 		args = append(args, "--dir", d)
@@ -450,7 +466,7 @@ func (a *API) SessionCloseWithWorktree(c *gin.Context) {
 	ctx, cancel := wtCtx(c)
 	defer cancel()
 	name := a.sessionTarget(c)
-	identity, err := lifecycleRuntime(ctx).SessionIdentity(name)
+	identity, err := a.resolveSessionIdentity(ctx, name)
 	if err != nil {
 		lifecycleError(c, err)
 		return
@@ -572,8 +588,12 @@ func otherSessions(w worktree.Worktree, name string) []string {
 }
 
 func (a *API) rollbackPreparedSession(name string, wt worktree.CreateResp, newBranch bool) {
-	_, _ = a.TT.Run("kill", name, "--yes")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if _, ok := a.nativeSession(ctx, name); ok {
+		_ = a.NativeBackend.Close(ctx, name)
+	} else {
+		_, _ = a.TT.Run("kill", name, "--yes")
+	}
 	_ = a.WT.Remove(ctx, worktree.RemoveReq{Path: wt.Path, ForceWorktree: true, DeleteBranch: newBranch, ForceDeleteBranch: newBranch, IgnoreSessions: true})
 }

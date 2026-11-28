@@ -7,9 +7,21 @@ source "${SCRIPT_DIR}/scripts/install/retire-session-entries.sh"
 roami_bin() {
     mkdir -p "$INSTALL_DIR"
     if [[ -f "${GO_SRC}/go.mod" ]]; then
-        (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami" ./cmd/roami)
-    elif [[ ! -x "${INSTALL_DIR}/roami" ]]; then
-        download_asset roami "roami-$(release_target)" || die "Roami download failed"
+        (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami.next" ./cmd/roami && mv -f "${INSTALL_DIR}/roami.next" "${INSTALL_DIR}/roami")
+        (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami-sessiond.next" ./cmd/roami-sessiond && mv -f "${INSTALL_DIR}/roami-sessiond.next" "${INSTALL_DIR}/roami-sessiond")
+    else
+        if [[ ! -x "${INSTALL_DIR}/roami" ]]; then
+            download_asset roami "roami-$(release_target)" || die "Roami download failed"
+            chmod +x "${INSTALL_DIR}/roami"
+        fi
+        if [[ ! -x "${INSTALL_DIR}/roami-sessiond" ]]; then
+            if download_asset roami-sessiond "roami-sessiond-$(release_target)"; then
+                chmod +x "${INSTALL_DIR}/roami-sessiond"
+            else
+                rm -f "${INSTALL_DIR}/roami-sessiond"
+                warn "未能下载 roami-sessiond，将回退到 tmux"
+            fi
+        fi
     fi
     retire_roami_session_entries "$INSTALL_DIR"
     ln -sf roami "${INSTALL_DIR}/roam"

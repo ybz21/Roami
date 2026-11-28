@@ -54,7 +54,7 @@ func (a *API) lifecyclePrepareWorkspace(ctx context.Context, o life.Operation) (
 		return nil, lifecycleFailure(err)
 	}
 	if o.Intent.Parent != "" {
-		identity, err := rt.SessionIdentity(o.Intent.Parent)
+		identity, err := a.resolveSessionIdentity(ctx, o.Intent.Parent)
 		if err != nil || identity == "" || (o.Intent.ParentIdentity != "" && identity != o.Intent.ParentIdentity) {
 			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_PARENT_UNAVAILABLE"))
 		}
@@ -117,12 +117,14 @@ func (a *API) lifecyclePrepareSession(ctx context.Context, o life.Operation) (an
 	}
 	rt := lifecycleRuntime(ctx)
 	if o.Intent.Parent != "" {
-		release, e := rt.InputLease("=" + o.Intent.Parent)
-		if e != nil {
-			return nil, lifecycleFailure(e)
+		if !isNativeIdentity(o.Intent.ParentIdentity) {
+			release, e := rt.InputLease("=" + o.Intent.Parent)
+			if e != nil {
+				return nil, lifecycleFailure(e)
+			}
+			defer release()
 		}
-		defer release()
-		identity, e := rt.SessionIdentity(o.Intent.Parent)
+		identity, e := a.resolveSessionIdentity(ctx, o.Intent.Parent)
 		if e != nil || identity == "" || (o.Intent.ParentIdentity != "" && identity != o.Intent.ParentIdentity) {
 			return nil, lifecycleFailure(fmt.Errorf("LIFECYCLE_PARENT_UNAVAILABLE"))
 		}

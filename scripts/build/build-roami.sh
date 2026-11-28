@@ -14,6 +14,7 @@ cd "$ROOT"
 GOOS="${GOOS:-$(go env GOOS)}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
 OUT="${OUT:-backend/dist/roami-$GOOS-$GOARCH}"
+SESSIOND_OUT="${SESSIOND_OUT:-backend/dist/roami-sessiond-$GOOS-$GOARCH}"
 
 WEBUI_DIST="internal/webui/site"
 
@@ -32,12 +33,15 @@ fi
 rm -rf "$WEBUI_DIST"; mkdir -p "$WEBUI_DIST"
 cp -r frontend/dist/. "$WEBUI_DIST/"
 
-# 4) 编译 roami（内嵌前端 + CLI；版本号由 ROAMI_BUILD_VERSION 注入，默认 dev）
-mkdir -p "$(dirname "$OUT")"
+# 4) 编译 roami（内嵌前端 + CLI）与原生终端宿主 roami-sessiond
+mkdir -p "$(dirname "$OUT")" "$(dirname "$SESSIOND_OUT")"
 VER="${ROAMI_BUILD_VERSION:-dev}"
 CHANNEL="${ROAMI_BUILD_CHANNEL:-release}"
 case "$CHANNEL" in release|development) ;; *) echo "Unknown build channel: $CHANNEL" >&2; exit 1 ;; esac
 CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
   go build -ldflags "-X main.version=${VER} -X main.buildChannel=${CHANNEL}" -o "$ROOT/$OUT" ./cmd/roami
+CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+  go build -o "$ROOT/$SESSIOND_OUT" ./cmd/roami-sessiond
 
 echo "built $OUT ($(du -h "$OUT" | cut -f1))"
+echo "built $SESSIOND_OUT ($(du -h "$SESSIOND_OUT" | cut -f1))"

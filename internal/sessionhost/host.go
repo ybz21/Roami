@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -251,6 +252,20 @@ func (h *Host) sessionRef(sessionID string, reused bool) (sessionbackend.Session
 }
 
 func (h *Host) spawnPane(ctx context.Context, sessionID, paneID string, spec terminal.LaunchSpec) (*managedPane, error) {
+	hasEnv := func(prefix string) bool {
+		for _, kv := range spec.Env {
+			if strings.HasPrefix(kv, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	if !hasEnv("ROAMI_SESSION=") {
+		spec.Env = append(spec.Env, "ROAMI_SESSION="+sessionID)
+	}
+	if !hasEnv("ROAMI_PANE=") {
+		spec.Env = append(spec.Env, "ROAMI_PANE="+paneID)
+	}
 	term, err := h.backend.Start(ctx, spec)
 	if err != nil {
 		return nil, err

@@ -9,10 +9,17 @@ VERSION="${ROAMI_BUILD_VERSION:-dev}"
 PYTHON_VERSION=3.12.13
 ASSET="roami-$TARGET"
 BINARY="${ROAMI_BUNDLE_BINARY:-$ROOT/backend/dist/$ASSET}"
+SESSIOND_BINARY="${ROAMI_BUNDLE_SESSIOND_BINARY:-$ROOT/backend/dist/roami-sessiond-$TARGET}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/package/bin" "$WORK/package/runtime/wheels" "$ROOT/backend/dist"
 cp "$BINARY" "$WORK/package/bin/roami"
+if [ -f "$SESSIOND_BINARY" ]; then
+  cp "$SESSIOND_BINARY" "$WORK/package/bin/roami-sessiond"
+else
+  CGO_ENABLED=0 go build -o "$WORK/package/bin/roami-sessiond" ./cmd/roami-sessiond
+fi
+chmod +x "$WORK/package/bin/roami" "$WORK/package/bin/roami-sessiond"
 PYTHON_STORE="${UV_PYTHON_INSTALL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/roami-build/python}"
 uv python install "$PYTHON_VERSION" --install-dir "$PYTHON_STORE" --no-bin
 PYTHON_EXE="$(UV_PYTHON_INSTALL_DIR="$PYTHON_STORE" uv python find --managed-python --no-python-downloads "$PYTHON_VERSION")"

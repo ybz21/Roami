@@ -8,9 +8,12 @@ import os
 import secrets
 import shlex
 import shutil
+import signal
+import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -50,6 +53,70 @@ def identity(state):
     if token != state["token"] or pid != state["pid"]:
         raise RuntimeError("Isolated tmux server identity changed; refusing access")
     return pid
+
+
+def stop_sessiond_hosts(root):
+    db_path = root / "session-host.db"
+    if not db_path.exists():
+        return
+    try:
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute("SELECT pid FROM host_registry WHERE pid > 0").fetchall()
+        conn.close()
+    except sqlite3.Error:
+        return
+    root_str = str(root)
+    targets = []
+    for (host_pid,) in rows:
+        cmdline = ""
+        proc_cmd = Path("/proc") / str(host_pid) / "cmdline"
+        if proc_cmd.exists():
+            try:
+                cmdline = proc_cmd.read_bytes().decode("utf-8", errors="ignore")
+            except OSError:
+                continue
+        else:
+            res = subprocess.run(
+                ["ps", "-p", str(host_pid), "-o", "args="],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if res.returncode != 0:
+                continue
+            cmdline = res.stdout
+        if "roami-sessiond" not in cmdline or root_str not in cmdline:
+            continue
+        targets.append(host_pid)
+    # First SIGTERM enters draining; a second SIGTERM triggers immediate host.Shutdown().
+    for host_pid in targets:
+        try:
+            os.kill(host_pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    if targets:
+        time.sleep(0.1)
+        for host_pid in targets:
+            try:
+                os.kill(host_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        deadline = time.monotonic() + 3.5
+        remaining = set(targets)
+        while remaining and time.monotonic() < deadline:
+            for host_pid in list(remaining):
+                try:
+                    os.kill(host_pid, 0)
+                except ProcessLookupError:
+                    remaining.discard(host_pid)
+            if remaining:
+                time.sleep(0.1)
+        for host_pid in remaining:
+            try:
+                os.kill(host_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def main():
@@ -133,6 +200,7 @@ def main():
                 result = query(state["binary"], socket, "kill-server")
                 if result.returncode:
                     raise RuntimeError(result.stderr.strip())
+            stop_sessiond_hosts(root)
             print("Stopped recorded test tmux instance: " + str(root))
             return
         if not pid:

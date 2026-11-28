@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ybz21/Roami/internal/sessionbackend"
+	"github.com/ybz21/Roami/internal/sessionstore"
 )
 
 func nativeSessionIdentity(hostID, sessionID string) string {
@@ -20,6 +21,71 @@ func nativeSessionIdentity(hostID, sessionID string) string {
 
 func isNativeIdentity(identity string) bool {
 	return strings.HasPrefix(identity, "native:")
+}
+
+func (a *API) resolveSessionIdentity(ctx context.Context, name string) (string, error) {
+	if st, ok := a.nativeSession(ctx, name); ok {
+		return nativeSessionIdentity(st.HostInstanceID, st.SessionID), nil
+	}
+	return lifecycleRuntime(ctx).SessionIdentity(name)
+}
+
+func (a *API) submitNativeText(ctx context.Context, name, payload string, enter bool) error {
+	if a.NativeBackend == nil {
+		return fmt.Errorf("native terminal backend unavailable")
+	}
+	subCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_, err := a.NativeBackend.Submit(subCtx, sessionbackend.Target{SessionID: name}, sessionbackend.SubmitReq{
+		RequestID:      "api-" + uuid.NewString(),
+		Payload:        payload,
+		SubmitEnter:    enter,
+		BracketedPaste: false,
+	})
+	return err
+}
+
+func (a *API) forkNativeSession(ctx context.Context, parent, label, dir string) (string, error) {
+	if a.NativeBackend == nil {
+		return "", fmt.Errorf("native terminal backend unavailable")
+	}
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		if st, ok := a.nativeSession(ctx, parent); ok && strings.TrimSpace(st.Cwd) != "" {
+			dir = strings.TrimSpace(st.Cwd)
+		} else if home := a.WT.SessionHome(parent); home != "" {
+			dir = home
+		}
+	}
+	createCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+	ref, err := a.NativeBackend.Create(createCtx, sessionbackend.CreateSpec{
+		Label:      strings.TrimSpace(label),
+		Dir:        dir,
+		LoginShell: true,
+	})
+	if err != nil {
+		return "", err
+	}
+	rt := lifecycleRuntime(ctx)
+	meta := sessmeta.New(rt.HomeDir)
+	meta.DataDir = rt.DataDir
+	_ = meta.Put(sessmeta.Row{
+		Session:        ref.SessionID,
+		Label:          strings.TrimSpace(label),
+		Parent:         parent,
+		CreatedBy:      "fork",
+		InitialCwd:     dir,
+		Backend:        string(sessionbackend.BackendNative),
+		HostInstanceID: ref.HostInstanceID,
+	})
+	if dir != "" {
+		if repo, err := a.WT.ResolveRepo(ctx, dir); err == nil {
+			_ = meta.SetHome(ref.SessionID, dir, repo.Root)
+		}
+		a.WT.BindSessionHome(ref.SessionID, dir)
+	}
+	return ref.SessionID, nil
 }
 
 func (a *API) nativeSession(ctx context.Context, name string) (sessionbackend.SessionState, bool) {

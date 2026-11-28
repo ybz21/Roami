@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ybz21/Roami/backend/ttmux"
 	"github.com/ybz21/Roami/internal/sessionbackend"
 	"github.com/ybz21/Roami/internal/sessionhost"
 )
@@ -322,5 +323,74 @@ func TestNativeTerminalActionAndWindowsAPI(t *testing.T) {
 	code, closeWinBody := postJSON("/sessions/"+ref.SessionID+"/terminal-action", map[string]any{"action": "close-window", "windowId": win2ID})
 	if code != http.StatusOK || len(closeWinBody["data"].(map[string]any)["windows"].([]any)) != 1 {
 		t.Fatalf("close-window failed: code=%d body=%v", code, closeWinBody)
+	}
+}
+
+func TestNativeSendForkAndIdentityResolution(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix /bin/sh integration test")
+	}
+	tmp := t.TempDir()
+	isolateTestStorage(t, tmp)
+	host := sessionhost.NewHost(sessionhost.Config{
+		HostID:  "host-api-test",
+		LogsDir: tmp,
+	})
+	t.Cleanup(func() { host.Shutdown(context.Background()) })
+
+	ref, err := host.Create(context.Background(), sessionbackend.CreateSpec{
+		SessionID: "2026-1128-1455-aaaa",
+		Label:     "native-root",
+		Dir:       tmp,
+		Exe:       "/bin/sh",
+	})
+	if err != nil {
+		t.Fatalf("create native session: %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	h := New(ttmux.New(filepath.Join(tmp, "roami-absent")), "", tmp, "")
+	h.NativeBackend = host
+	r := gin.New()
+	r.POST("/tasks/_/send", h.Send)
+	r.POST("/sessions/:name/fork", h.SessionFork)
+
+	// 1. resolveSessionIdentity resolves native sessions without tmux.
+	identity, err := h.resolveSessionIdentity(context.Background(), ref.SessionID)
+	if err != nil || identity != "native:host-api-test:"+ref.SessionID {
+		t.Fatalf("resolveSessionIdentity = (%q, %v)", identity, err)
+	}
+
+	// 2. Send routes cleanly to native PTY and delivers command.
+	body, _ := json.Marshal(map[string]any{"sess": ref.SessionID, "msg": "echo API_NATIVE_SEND_OK"})
+	req := httptest.NewRequest(http.MethodPost, "/tasks/_/send", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST /tasks/_/send = %d: %s", w.Code, w.Body.String())
+	}
+
+	// 3. SessionFork creates a native child session inheriting parent cwd.
+	forkBody, _ := json.Marshal(map[string]any{"child": "native-child"})
+	forkReq := httptest.NewRequest(http.MethodPost, "/sessions/"+ref.SessionID+"/fork", bytes.NewReader(forkBody))
+	forkReq.Header.Set("Content-Type", "application/json")
+	forkW := httptest.NewRecorder()
+	r.ServeHTTP(forkW, forkReq)
+	if forkW.Code != http.StatusOK {
+		t.Fatalf("POST /sessions/:name/fork = %d: %s", forkW.Code, forkW.Body.String())
+	}
+	var forkResp struct {
+		Name string `json:"name"`
+		Data struct {
+			Session string `json:"session"`
+			Parent  string `json:"parent"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(forkW.Body.Bytes(), &forkResp); err != nil || forkResp.Name == "" || forkResp.Data.Parent != ref.SessionID {
+		t.Fatalf("unexpected fork response: %s (%v)", forkW.Body.String(), err)
+	}
+	if _, ok := h.nativeSession(context.Background(), forkResp.Name); !ok {
+		t.Fatalf("forked child %q not found on native backend", forkResp.Name)
 	}
 }

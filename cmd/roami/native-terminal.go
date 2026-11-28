@@ -20,14 +20,12 @@ func nativeTerminalEnabled() bool {
 	if v == "0" || v == "false" || v == "off" {
 		return false
 	}
-	if v == "1" || v == "true" || v == "on" {
-		return true
-	}
-	return runtime.GOOS == "windows"
+	return true
 }
 
-// maybeConnectNativeTerminal enables the native roami-sessiond backend when ROAMI_NATIVE_TERMINAL=1.
-// Default remains unset (100% tmux) until rollout gates complete.
+// maybeConnectNativeTerminal enables the native roami-sessiond backend by default on all platforms.
+// Set ROAMI_NATIVE_TERMINAL=0 to disable and stay on tmux; if roami-sessiond is missing or fails
+// to start on Unix, it logs and falls back to tmux.
 func maybeConnectNativeTerminal(roamiBin, instanceRoot string) (sessionbackend.SessionBackend, func()) {
 	if !nativeTerminalEnabled() {
 		return nil, func() {}

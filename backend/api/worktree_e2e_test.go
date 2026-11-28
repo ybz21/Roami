@@ -55,6 +55,7 @@ func e2eSetup(t *testing.T) (*gin.Engine, string, func(...string) string) {
 		t.Fatal(err)
 	}
 	t.Setenv("TMUX_BIN", wrapper)
+	t.Setenv("ROAMI_NATIVE_TERMINAL", "0") // 本测试通过隔离 tmux socket 校验 worktree 会话编排
 	isolateTestStorage(t, tmp)
 	t.Setenv("TMUX", "") // 测试进程可能跑在 tmux 里，避免 CLI 误判
 	t.Cleanup(func() { _ = exec.Command("tmux", "-L", sock, "kill-server").Run() })

@@ -82,7 +82,7 @@ func (a *API) waitWorktreeCreate(c *gin.Context, parent, name, dir, branch, base
 	parentIdentity := ""
 	if parent != "" {
 		var err error
-		parentIdentity, err = lifecycleRuntime(c.Request.Context()).SessionIdentity(parent)
+		parentIdentity, err = a.resolveSessionIdentity(c.Request.Context(), parent)
 		if err != nil || parentIdentity == "" {
 			lifecycleError(c, context.Canceled)
 			return

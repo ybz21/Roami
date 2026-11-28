@@ -27,8 +27,8 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 		t.Fatalf("build roami-sessiond: %v\n%s", err, out)
 	}
 
-	// Verify Plan B works WITHOUT setting ROAMI_NATIVE_TERMINAL=1:
-	// explicit `--backend native` creates the session, and all subsequent commands auto-route.
+	// Verify native PTY is the default on Unix without setting ROAMI_NATIVE_TERMINAL,
+	// while --backend tmux and ROAMI_NATIVE_TERMINAL=0 still fall back cleanly to tmux.
 	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
 	t.Setenv("ROAMI_SESSIOND_BIN", sessiondBin)
 	t.Setenv("ROAMI_HOME", filepath.Join(tmp, "home"))
@@ -52,15 +52,22 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 		return strings.TrimSpace(out.String()), strings.TrimSpace(errOut.String()), handled, code
 	}
 
-	// Before any native host exists, `new` without --backend native stays on tmux (handled=false).
-	if _, _, handled, _ := run("new", "plain-tmux"); handled {
-		t.Fatalf("new without --backend native should stay on tmux by default")
+	// Explicit --backend tmux always stays on tmux (handled=false).
+	if _, _, handled, _ := run("new", "--backend", "tmux", "plain-tmux"); handled {
+		t.Fatalf("new --backend tmux should stay on tmux")
 	}
 
-	// Explicit --backend native creates on roami-sessiond without any env var.
-	out, errOut, handled, code := run("new", "--backend", "native", "--size", "100x30", "--detach", "cli-e2e", "--", "/bin/sh")
+	// ROAMI_NATIVE_TERMINAL=0 opts out to tmux on Unix.
+	t.Setenv("ROAMI_NATIVE_TERMINAL", "0")
+	if _, _, handled, _ := run("new", "optout-tmux"); handled {
+		t.Fatalf("new with ROAMI_NATIVE_TERMINAL=0 should stay on tmux")
+	}
+	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
+
+	// Default `new` (without --backend or env var) creates on roami-sessiond.
+	out, errOut, handled, code := run("new", "--size", "100x30", "--detach", "cli-e2e", "--", "/bin/sh")
 	if !handled || code != 0 || out != "cli-e2e" {
-		t.Fatalf("new --backend native failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
+		t.Fatalf("default new failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
 	}
 	defer func() {
 		_, _, _, _ = run("kill", "cli-e2e")
@@ -76,6 +83,25 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 	_, errOut, handled, code = run("rename", "cli-e2e", "friendly-cli")
 	if !handled || code != 0 {
 		t.Fatalf("rename failed: handled=%v code=%d err=%q", handled, code, errOut)
+	}
+
+	// Resolve native session by friendly label (plain and --strict --json).
+	out, errOut, handled, code = run("resolve", "friendly-cli", "--strict")
+	if !handled || code != 0 || out != "cli-e2e" {
+		t.Fatalf("resolve --strict failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
+	}
+	out, errOut, handled, code = run("resolve", "friendly-cli", "--strict", "--json")
+	if !handled || code != 0 || !strings.Contains(out, `"session":"cli-e2e"`) || !strings.Contains(out, `"backend":"native"`) {
+		t.Fatalf("resolve --strict --json failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
+	}
+
+	// Fork a child native session from friendly-cli and kill it afterwards.
+	forkOut, errOut, handled, code := run("fork", "friendly-cli", "forked-child", "--detach", "--json")
+	if !handled || code != 0 || !strings.Contains(forkOut, `"parent":"cli-e2e"`) || !strings.Contains(forkOut, `"backend":"native"`) {
+		t.Fatalf("fork failed: handled=%v code=%d out=%q err=%q", handled, code, forkOut, errOut)
+	}
+	if _, errOut, handled, code = run("kill", "forked-child"); !handled || code != 0 {
+		t.Fatalf("kill forked child failed: handled=%v code=%d err=%q", handled, code, errOut)
 	}
 
 	// List sessions with `--backend native` (plain and --json) without env var.
@@ -198,5 +224,49 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 	_, _, handled, _ = run("a", "nonexistent-tmux-only-session")
 	if handled {
 		t.Fatalf("unknown native session should fall back to tmux (handled=false)")
+	}
+}
+
+func TestNativeTerminalEnabledDefaultAndOptOut(t *testing.T) {
+	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
+	if !nativeTerminalEnabled() {
+		t.Fatal("nativeTerminalEnabled() should default to true")
+	}
+	for _, off := range []string{"0", "false", "OFF", " False "} {
+		t.Setenv("ROAMI_NATIVE_TERMINAL", off)
+		if nativeTerminalEnabled() {
+			t.Fatalf("nativeTerminalEnabled() should be false for %q", off)
+		}
+	}
+	for _, on := range []string{"1", "true", "on"} {
+		t.Setenv("ROAMI_NATIVE_TERMINAL", on)
+		if !nativeTerminalEnabled() {
+			t.Fatalf("nativeTerminalEnabled() should be true for %q", on)
+		}
+	}
+}
+
+func TestDefaultNewFallsBackToTmuxWhenSessiondMissingOnUnix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix fallback test")
+	}
+	tmp := t.TempDir()
+	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
+	t.Setenv("ROAMI_SESSIOND_BIN", "")
+	t.Setenv("PATH", tmp)
+	t.Setenv("ROAMI_HOME", filepath.Join(tmp, "home"))
+	t.Setenv("ROAMI_DATA", filepath.Join(tmp, "data"))
+
+	var out, errOut bytes.Buffer
+	handled, code := dispatchNativeSessionCLI("new", []string{"--detach", "fallback-demo"}, bytes.NewReader(nil), &out, &errOut)
+	if handled || code != 0 {
+		t.Fatalf("implicit default new without roami-sessiond should fall back to tmux: handled=%v code=%d out=%q err=%q", handled, code, out.String(), errOut.String())
+	}
+
+	out.Reset()
+	errOut.Reset()
+	handled, code = dispatchNativeSessionCLI("new", []string{"--backend", "native", "--detach", "strict-demo"}, bytes.NewReader(nil), &out, &errOut)
+	if !handled || code == 0 {
+		t.Fatalf("explicit --backend native without roami-sessiond should fail fast: handled=%v code=%d out=%q err=%q", handled, code, out.String(), errOut.String())
 	}
 }

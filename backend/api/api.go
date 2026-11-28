@@ -227,6 +227,16 @@ func (a *API) resolveSession(token string) string {
 	if token == "" || id.Valid(token) {
 		return token
 	}
+	if a.NativeBackend != nil {
+		if st, ok := a.nativeSession(context.Background(), token); ok {
+			return st.SessionID
+		}
+		for _, s := range a.listNativeSummaries(context.Background()) {
+			if s.ID == token || strings.TrimSpace(s.Label) == token {
+				return s.ID
+			}
+		}
+	}
 	out, err := a.TT.Run("list-sessions", "-F", "#{session_name}\t#{"+labelOption+"}")
 	if err != nil {
 		return token
@@ -519,6 +529,15 @@ func (a *API) Send(c *gin.Context) {
 		return
 	}
 	b.Sess = SanitizeSessionName(b.Sess)
+	if _, ok := a.nativeSession(c.Request.Context(), b.Sess); ok {
+		if err := a.submitNativeText(c.Request.Context(), b.Sess, b.Msg, true); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "NATIVE_ERROR", "message": err.Error()}})
+			return
+		}
+		a.Footprints.Record(b.Activity, 1)
+		c.JSON(http.StatusOK, gin.H{"data": "ok"})
+		return
+	}
 	unlock, leaseErr := lifecycleRuntime(c.Request.Context()).InputLease("=" + b.Sess)
 	if leaseErr != nil {
 		lifecycleError(c, leaseErr)

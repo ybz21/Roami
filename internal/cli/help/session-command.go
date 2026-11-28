@@ -39,7 +39,7 @@ func sessionCommandPage(command string) (Page, bool) {
 		}, []Entry{{"roami session ls", ""}, {"roami session ls --tree", ""}, {"roami session ls --backend native", ""}}, nil},
 
 		"new": {"新建独立会话", "[NAME] [选项]", []Entry{
-			{"--backend native|tmux", "选择终端引擎（native 为原生 PTY；Windows 默认 native，Unix 默认 tmux，可用 ROAMI_NATIVE_TERMINAL=1 切换默认）"},
+			{"--backend native|tmux", "选择终端引擎（native 为原生 PTY，全平台默认启用；Unix 可用 --backend tmux 或 ROAMI_NATIVE_TERMINAL=0 回退 tmux）"},
 			{"--dir PATH, -c PATH", "工作目录"},
 			{"--size WIDTHxHEIGHT", "终端初始尺寸"},
 			{"--detach, -d", "后台创建，不进入终端"},

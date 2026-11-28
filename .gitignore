@@ -17,6 +17,7 @@
 # 不加前导 /：曾经在 backend/ 里再编一次，产物落到 backend/backend/ttmux-web，
 # 锚定到根的规则盖不住它，34MB 的二进制就这么混进了一次提交。
 ttmux-web
+roami-sessiond
 /backend/roam
 /backend/roami
 /backend/internal/webui/site/*
