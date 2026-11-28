@@ -3,22 +3,23 @@
 import hashlib
 import json
 import logging
-import re
 
 from roami_agent.conversation.idle import assert_main_idle
-from roami_agent.dispatch.swarm_provider_generations import validate_prepared_member
+from roami_agent.dispatch.native_model_selection import (
+    BEFORE_INPUT,
+    claim_model_selection,
+    model_selection_still_claimed,
+    select_bound_model,
+)
 from roami_agent.protocol.errors import DomainError
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.protocol.serialization import encoded
 from roami_agent.storage.database import event, row
 from roami_agent.storage.transcript_repository import owned
 from roami_okr.intake import assert_project_main
-from roami_okr.native_main import NativeMain
 
 log = logging.getLogger(__name__)
 JOB_KIND = "project.main.select_model"
-NATIVE_DIGEST = re.compile(r"[a-f0-9]{64}")
-BEFORE_INPUT = {"SESSION_MODEL_SELECTION_TARGET_UNCONFIRMED", "SESSION_MODEL_PICKER_NOT_OPENED"}
 
 
 def pending_model_selection(db, cid):
@@ -92,21 +93,9 @@ class MainModelSelections:
         return result
 
     async def advance(self, job):
-        def claim(db):
-            current = row(
-                db,
-                "SELECT * FROM jobs WHERE id=? AND kind=? AND state='queued' AND available_ms<=?",
-                (job["id"], JOB_KIND, now_ms()),
-            )
-            if current:
-                # Keep the queue fence across process shutdown and CLI timeouts.
-                db.execute(
-                    "UPDATE jobs SET attempts=attempts+1,available_ms=? WHERE id=?",
-                    (now_ms() + 60_000, current["id"]),
-                )
-            return current
-
-        operation = await self.db.call(claim, write=True)
+        operation = await self.db.call(
+            lambda db: claim_model_selection(db, job["id"], JOB_KIND), write=True
+        )
         if not operation:
             return
         value = json.loads(operation["payload_json"])
@@ -121,10 +110,12 @@ class MainModelSelections:
             request["allowMetered"] = True
         try:
             previous = await self.db.call(lambda db: self.binding(db, operation, value))
-            command = self.executions.executor.command
-            selected = await command("select-model", "--file", "-", spec=request)
-            prepared = await command("prepared", "--key", value["launchKey"])
-            self.verify(previous, request, selected, prepared)
+            selected = await select_bound_model(
+                self.executions.executor.command,
+                previous,
+                request,
+                "PROJECT_MAIN_MODEL_SELECTION_UNCONFIRMED",
+            )
             await self.db.call(
                 lambda db: self.finish(db, operation, value, previous, selected), write=True
             )
@@ -152,42 +143,8 @@ class MainModelSelections:
             raise DomainError("PROJECT_MAIN_MODEL_SELECTION_UNCONFIRMED", 409)
         return binding
 
-    def verify(self, binding, request, selected, prepared):
-        proof = selected.get("proof")
-        digest = proof.get("sourceSha256") if isinstance(proof, dict) else None
-        if (
-            any(selected.get(field) != expected for field, expected in request.items())
-            or selected.get("allowMetered", False) is not request.get("allowMetered", False)
-            or selected.get("sessionId") != binding["session_id"]
-            or selected.get("providerConversationId") != binding["provider_id"]
-            or not isinstance(digest, str)
-            or not NATIVE_DIGEST.fullmatch(digest)
-        ):
-            raise DomainError("PROJECT_MAIN_MODEL_SELECTION_UNCONFIRMED", 409)
-        persisted = json.loads(binding["binding_json"])
-        validate_prepared_member(
-            {
-                "preparedLaunchKey": binding["launch_key"],
-                "executor": "claude",
-                "model": request["model"],
-            },
-            prepared,
-            persisted["directory"],
-        )
-        NativeMain({**binding, "binding": persisted}, {}, self.executions.executor.command).verify(
-            {"session": prepared["sessionId"], "sessionBinding": prepared["sessionBinding"]}
-        )
-
-    @staticmethod
-    def still_claimed(db, operation):
-        return row(
-            db,
-            "SELECT id FROM jobs WHERE id=? AND state='queued' AND attempts=?",
-            (operation["id"], operation["attempts"] + 1),
-        )
-
     def finish(self, db, operation, value, previous, selected):
-        if not self.still_claimed(db, operation):
+        if not model_selection_still_claimed(db, operation):
             return
         current = self.binding(db, operation, value)
         if current != previous:
@@ -216,7 +173,7 @@ class MainModelSelections:
         )
 
     def observation(self, db, operation, value, code):
-        if not self.still_claimed(db, operation):
+        if not model_selection_still_claimed(db, operation):
             return
         value["reason"] = code
         db.execute(

@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 from fastapi import Header, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import Field
+from pydantic import Field, StrictBool
 
 from roami_agent.protocol.http import Payload
 from roami_agent.protocol.serialization import encoded
@@ -88,6 +88,17 @@ class MigrateExecution(Payload):
     commandKey: str = Field(min_length=1, max_length=200)
     expectedRevision: int = Field(ge=1)
     members: list[ExecutionMember] = Field(min_length=1, max_length=100)
+
+
+class MemberModelSelection(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    taskId: str = Field(min_length=1, max_length=200)
+    expectedGeneration: int = Field(ge=1)
+    expectedTaskRevision: int = Field(ge=1)
+    expectedRunId: str = Field(min_length=1, max_length=200)
+    expectedModel: str = Field(min_length=1, max_length=300)
+    model: str = Field(min_length=1, max_length=200)
+    allowMetered: StrictBool = False
 
 
 class PlanSwarm(Payload):
@@ -178,6 +189,16 @@ def mount_swarm_routes(app, runtime):
     @app.post("/v1/swarms/{sid}/execution-migrations")
     async def migrate_execution(sid: str, body: MigrateExecution, owner: Owner):
         return {"data": await runtime.swarms.migrate_execution(owner, sid, body.model_dump())}
+
+    @app.post("/v1/swarms/{sid}/members/{member_id}/model", status_code=202)
+    async def select_member_model(
+        sid: str, member_id: str, body: MemberModelSelection, owner: Owner
+    ):
+        return {
+            "data": await runtime.member_model_selections.request(
+                owner, sid, member_id, body.model_dump(exclude_defaults=True)
+            )
+        }
 
     @app.get("/v1/swarms/{sid}/members/{member_id}")
     async def member(

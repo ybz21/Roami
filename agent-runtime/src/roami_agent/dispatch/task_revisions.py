@@ -19,6 +19,7 @@ from roami_agent.storage.swarm_coordination_tasks import (
     current_authority,
     request_context,
 )
+from roami_agent.storage.swarm_members import require_member_model_settled
 from roami_agent.storage.swarm_repository import group
 from roami_agent.storage.swarm_scopes import require_scope
 from roami_agent.storage.task_request import member_authorization_context, task_user_request
@@ -137,6 +138,7 @@ class TaskRevisions:
 
             assert_member_active(db, task_id)
             assert_session_open(db, task_id)
+            require_member_model_settled(db, task_id)
             if task["revision"] != expected_revision:
                 raise DomainError("TASK_REVISION_CHANGED", 409)
             if row(
@@ -573,6 +575,18 @@ class TaskRevisions:
                         "sessionId": session["session_id"],
                         "nodeId": session["node_id"] or "local",
                     }
+                    from roami_agent.dispatch.swarm_provider_generations import provider_for_work
+
+                    work = row(db, "SELECT id FROM swarm_work_items WHERE task_id=?", (task["id"],))
+                    binding = provider_for_work(db, work["id"]) if work else None
+                    if (
+                        binding
+                        and binding["model"]
+                        and binding["session_id"] == session["session_id"]
+                        and binding["provider_id"] == session["agent_conversation_id"]
+                    ):
+                        intent["model"] = binding["model"]
+
                 elif (
                     intent["target"]["kind"] != "session"
                     and target.get("workspaceId")

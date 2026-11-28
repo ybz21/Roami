@@ -5,6 +5,21 @@ from roami_agent.protocol.executor_kind import is_executor
 from roami_agent.protocol.identity import identity, now_ms
 from roami_agent.storage.database import row, rows
 
+MEMBER_MODEL_JOB = "swarm.member.select_model"
+
+
+def pending_member_model_selection(db, task_id):
+    return row(
+        db,
+        "SELECT id FROM jobs WHERE kind=? AND aggregate_id=? AND state='queued'",
+        (MEMBER_MODEL_JOB, task_id),
+    )
+
+
+def require_member_model_settled(db, task_id):
+    if pending_member_model_selection(db, task_id):
+        raise DomainError("SWARM_MEMBER_MODEL_SELECTION_PENDING", 409)
+
 
 def member_for_plan(db, group, name, executor, duty, member_id=None):
     if (
