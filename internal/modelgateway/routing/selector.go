@@ -29,6 +29,11 @@ type Snapshot struct {
 	Revision string
 }
 
+type Requirements struct {
+	Protocol string
+	Images   bool
+}
+
 type DirectoryEvidence struct {
 	Details    []agentproviders.SourceModelDetail
 	ObservedAt time.Time

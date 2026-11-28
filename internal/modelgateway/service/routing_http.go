@@ -7,6 +7,7 @@ import (
 	modelcatalog "github.com/ybz21/Roami/internal/modelgateway/catalog"
 	"github.com/ybz21/Roami/internal/modelgateway/httpapi"
 	"github.com/ybz21/Roami/internal/modelgateway/monitor"
+	"github.com/ybz21/Roami/internal/modelgateway/routing"
 )
 
 func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +35,7 @@ func (h *Handler) routingView(w http.ResponseWriter, r *http.Request) {
 		httpapi.Reject(w, 404, "MODEL_NOT_CONFIGURED")
 		return
 	}
-	choice, err := h.newRoutingChoice(r.Context(), catalog, *model, "", true)
+	choice, err := h.newRoutingChoice(r.Context(), catalog, *model, routing.Requirements{}, true)
 	if err != nil {
 		httpapi.Reject(w, 503, "MODEL_ROUTE_UNAVAILABLE")
 		return

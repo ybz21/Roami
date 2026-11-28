@@ -188,8 +188,8 @@ func routeAllowed(model catalog.CatalogModel, candidate catalog.ModelCandidate, 
 	}
 	return pluginModel != nil && (pluginModel.Free || model.AllowPlan && pluginModel.Rate > 0 && quota.Known && quota.Remaining != nil && *quota.Remaining > 0)
 }
-func (s *Selector) Choose(ctx context.Context, snapshot Snapshot, model catalog.CatalogModel, requiredProtocol string, inspect bool, deps Dependencies) (*Choice, error) {
-	facts, err := s.routingFacts(ctx, snapshot, model, inspect, deps)
+func (s *Selector) Choose(ctx context.Context, snapshot Snapshot, model catalog.CatalogModel, request Requirements, inspect bool, deps Dependencies) (*Choice, error) {
+	facts, err := s.routingFacts(ctx, snapshot, model, inspect || request.Images, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -287,23 +287,29 @@ func (s *Selector) Choose(ctx context.Context, snapshot Snapshot, model catalog.
 					return nil, errors.New("MODEL_ROUTE_TOO_LARGE")
 				}
 			}
-			if requiredProtocol != "" {
+			if request.Protocol != "" {
 				effective := fact.source.Protocol
 				if pluginModel != nil {
 					effective = modelplugins.ModelProtocol(*pluginModel, fact.plugin)
 				}
-				if effective != requiredProtocol {
+				if effective != request.Protocol {
 					continue
 				}
 			}
 			advertised := AccountPricingModel(pluginModel, len(accounts))
+			imageUnsupported := pluginModel != nil && !pluginModel.Image
 			if fact.source.PluginSourceID == "" {
 				for _, detail := range fact.directory.Details {
 					if detail.ID == candidate.Model {
 						advertised = &modelplugins.Model{Tools: detail.Tools != nil && *detail.Tools, Context: detail.Context}
+						imageUnsupported = len(detail.InputModalities) > 0 && !slices.Contains(detail.InputModalities, "image")
 						break
 					}
 				}
+			}
+			if request.Images && imageUnsupported {
+				choice.blocks[candidate] = "image"
+				continue
 			}
 			if advertised != nil && advertised.Context > 0 {
 				choice.contexts[candidate] = advertised.Context

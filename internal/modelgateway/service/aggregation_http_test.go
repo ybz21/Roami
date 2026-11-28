@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -98,6 +99,63 @@ func TestRoutingChecksAPIMemberCapabilitiesAutomatically(t *testing.T) {
 	w := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"hello"}`)
 	if w.Code != http.StatusOK || calls.Load() != 1 || reads.Load() != 1 {
 		t.Fatalf("dispatch did not use the same checked capability: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAggregateRoutesImagesWithoutSendingThemToTextOnlyModels(t *testing.T) {
+	for _, fixture := range []struct {
+		name, directory string
+		status, hits    int
+	}{
+		{"advertised image support", `"architecture":{"input_modalities":["text","image"]}`, 200, 1},
+		{"unknown support", `"name":"Fixture"`, 200, 1},
+		{"only text models", `"architecture":{"input_modalities":["text"]}`, 503, 0},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			var textRequests, imageRequests, directoryRequests atomic.Int64
+			h := aggregateFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					directoryRequests.Add(1)
+					_, _ = io.WriteString(w, `{"data":[{"id":"fixture","architecture":{"input_modalities":["text"]}}]}`)
+					return
+				}
+				textRequests.Add(1)
+				responseFixture(w, r)
+			}, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					directoryRequests.Add(1)
+					_, _ = io.WriteString(w, `{"data":[{"id":"fixture",`+fixture.directory+`}]}`)
+					return
+				}
+				imageRequests.Add(1)
+				data, err := io.ReadAll(r.Body)
+				if err != nil || !strings.Contains(string(data), "data:image/png;base64,ZmFrZQ==") {
+					t.Errorf("lost image in upstream conversion: %s (%v)", data, err)
+				}
+				responseFixture(w, r)
+			})
+			catalog := h.Catalog.snapshot()
+			catalog.Models[0].Strategy = "order"
+			if err := h.Catalog.update(context.Background(), catalog); err != nil {
+				t.Fatal(err)
+			}
+			text := catalogRequest(h, "/v1/responses", `{"model":"coding-main","input":"text only"}`)
+			if text.Code != 200 || textRequests.Load() != 1 || directoryRequests.Load() != 0 {
+				t.Fatalf("changed text routing or added a directory fetch: %d %s", text.Code, text.Body)
+			}
+			reply := requestWithKey(h, h.Catalog.credential("claude"), "/v1/messages",
+				`{"model":"coding-main","max_tokens":100,"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"read","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"ZmFrZQ=="}}]}]}]}`)
+			if reply.Code != fixture.status || int(imageRequests.Load()) != fixture.hits || textRequests.Load() != 1 || directoryRequests.Load() != 2 {
+				t.Fatalf("image routing: %d %s, primary=%d backup=%d directory=%d",
+					reply.Code, reply.Body, textRequests.Load(), imageRequests.Load(), directoryRequests.Load())
+			}
+			if fixture.status == http.StatusServiceUnavailable {
+				rows, _, err := h.Monitor.Snapshot()
+				if err != nil || len(rows) != 3 || rows[2].Blocks["image"] != 2 || rows[2].Attempts != 0 {
+					t.Fatalf("image routing block is missing: %+v (%v)", rows, err)
+				}
+			}
+		})
 	}
 }
 func TestAggregateRetriesRejectedSourceHonorsCooldownAndKeepsAttempts(t *testing.T) {
@@ -380,7 +438,7 @@ func TestAggregateCompactionFiltersUnsupportedSourceBeforeScheduling(t *testing.
 	if err := h.Catalog.update(context.Background(), value); err != nil {
 		t.Fatal(err)
 	}
-	choice, err := h.newRoutingChoice(context.Background(), h.Catalog.snapshot(), h.Catalog.value.Models[0], "openai-responses", false)
+	choice, err := h.newRoutingChoice(context.Background(), h.Catalog.snapshot(), h.Catalog.value.Models[0], routing.Requirements{Protocol: "openai-responses"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
