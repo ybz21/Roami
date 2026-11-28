@@ -21,6 +21,57 @@ def digest(body):
     return hashlib.sha256(body).hexdigest()
 
 
+def schedule_entries(config):
+    version = config["schemaVersion"]
+    slots = config["slots"]
+    if type(version) is not int or version not in {1, 2} or not isinstance(slots, list):
+        raise ValueError
+    if version == 1:
+        if len(slots) != 1:
+            raise ValueError
+        slots = [
+            {
+                "slot": slots[0],
+                "schedulerJob": config["schedulerJob"],
+                "dailyAt": config["dailyAt"],
+                "cron": config["cron"],
+            }
+        ]
+    if not slots:
+        raise ValueError
+    entries = []
+    for entry in slots:
+        slot, job, daily_at = entry["slot"], entry["schedulerJob"], entry["dailyAt"]
+        if (
+            not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", slot)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,199}", job)
+            or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", daily_at)
+        ):
+            raise ValueError
+        hour, minute = map(int, daily_at.split(":"))
+        cron = f"{minute} {hour} * * *"
+        if entry.get("cron", cron) != cron:
+            raise ValueError
+        entries.append((slot, job, hour, minute, cron))
+    if len({entry[0] for entry in entries}) != len(entries) or len(
+        {entry[1] for entry in entries}
+    ) != len(entries):
+        raise ValueError
+    return entries
+
+
+def next_due(value, zone, hour, minute):
+    date = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+    due = date.replace(tzinfo=zone)
+    if (
+        (date.hour, date.minute, date.second) != (hour, minute, 0)
+        or due.utcoffset() != due.replace(fold=1).utcoffset()
+        or due.astimezone(ZoneInfo("UTC")).astimezone(zone).replace(tzinfo=None) != date
+    ):
+        raise ValueError
+    return due
+
+
 class ProjectGoalSchedule:
     def __init__(self, settings, targets, files, registry):
         self.settings, self.targets, self.files, self.registry = settings, targets, files, registry
@@ -48,7 +99,7 @@ class ProjectGoalSchedule:
         return source["version"]
 
     @staticmethod
-    def wake_command(command, root, scope, config, cli_bin):
+    def wake_command(command, root, scope, timezone, slot, cli_bin):
         if not isinstance(command, str):
             raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
         try:
@@ -82,8 +133,8 @@ class ProjectGoalSchedule:
             "--conversation": scope["mainConversationId"],
             "--swarm": scope["swarmId"],
             "--delegation": scope["delegationId"],
-            "--timezone": config["timezone"],
-            "--slot": config["slots"][0],
+            "--timezone": timezone,
+            "--slot": slot,
         }
         pairs = list(zip(argv[2::2], argv[3::2], strict=True))
         if len(pairs) != len(expected) or dict(pairs) != expected:
@@ -97,25 +148,16 @@ class ProjectGoalSchedule:
         try:
             config = json.loads(raw)
             valid = (
-                type(config.get("schemaVersion")) is int
-                and config["schemaVersion"] == 1
-                and config.get("enabled") is True
+                config.get("enabled") is True
                 and all(config.get(key) == value for key, value in scope.items())
                 and config.get("schedulerPlugin") in {"cron", "roam.cron"}
-                and isinstance(config.get("schedulerJob"), str)
-                and bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,199}", config["schedulerJob"]))
-                and isinstance(config.get("slots"), list)
-                and len(config["slots"]) == 1
-                and isinstance(config["slots"][0], str)
-                and bool(re.fullmatch(r"[a-z][a-z0-9-]{0,39}", config["slots"][0]))
-                and bool(re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", config.get("dailyAt", "")))
             )
             if not valid:
                 raise ValueError
             zone = ZoneInfo(config["timezone"])
-            hour, minute = map(int, config["dailyAt"].split(":"))
-            cron = f"{minute} {hour} * * *"
-            if config.get("cron") != cron:
+            entries = schedule_entries(config)
+            runner_scope = config.get("runnerScope", "project")
+            if runner_scope not in {"project", "shared"}:
                 raise ValueError
         except (ValueError, TypeError, KeyError, AttributeError, ZoneInfoNotFoundError):
             raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409) from None
@@ -139,43 +181,16 @@ class ProjectGoalSchedule:
         jobs = data.get("jobs") if isinstance(data, dict) else None
         if not isinstance(jobs, list) or data.get("scopedScheduler") is not True:
             raise DomainError("GOAL_SCHEDULE_UNAVAILABLE", 503)
-        selected = [
-            job
-            for job in jobs
-            if isinstance(job, dict) and job.get("name") == config["schedulerJob"]
+        due_slots = [
+            self.verify_slot(jobs, entry, zone, root, scope, config["timezone"])
+            for entry in entries
         ]
-        if len(selected) != 1:
-            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
-        job = selected[0]
-        if (
-            job.get("enabled") is not True
-            or job.get("action") != "exec"
-            or job.get("timezone") != config["timezone"]
-            or job.get("cron") != cron
-        ):
-            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
-        self.wake_command(job.get("command"), root, scope, config, self.settings.cli_bin)
-        try:
-            date = datetime.strptime(job["nextRunAt"], "%Y-%m-%d %H:%M:%S")
-            if (date.hour, date.minute, date.second) != (hour, minute, 0):
-                raise ValueError
-            due = date.replace(tzinfo=zone)
-            if (
-                due.utcoffset() != due.replace(fold=1).utcoffset()
-                or due.astimezone(ZoneInfo("UTC")).astimezone(zone).replace(tzinfo=None) != date
-            ):
-                raise ValueError
-            due_ms = int(due.timestamp() * 1000)
-        except (ValueError, TypeError, KeyError):
-            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409) from None
-        if not int(time.time() * 1000) < due_ms <= int(time.time() * 1000) + 26 * 3600000:
-            raise DomainError("GOAL_SCHEDULE_NOT_FUTURE", 409)
-        runner_scope = config.get("runnerScope", "project")
-        if not isinstance(runner_scope, str) or runner_scope not in {"project", "shared"}:
-            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
+        due, slot, job = min(due_slots, key=lambda entry: (entry[0], entry[1]))
+        due_ms = int(due.timestamp() * 1000)
+        names = tuple(entry[1] for entry in entries)
         runner = await self.runner.probe(
             config.get("runnerUnit"),
-            job["name"],
+            names[0] if len(names) == 1 else names,
             allow_short_command=True,
             **({"shared": True} if runner_scope == "shared" else {}),
         )
@@ -192,7 +207,7 @@ class ProjectGoalSchedule:
             "kind": "registered_goal_schedule",
             **scope,
             "jobName": job["name"],
-            "slot": config["slots"][0],
+            "slot": slot,
             "timezone": config["timezone"],
             "nextDueMs": due_ms,
             "nextRunAt": due.isoformat(),
@@ -202,3 +217,27 @@ class ProjectGoalSchedule:
             **runner,
             "observedAtMs": int(time.time() * 1000),
         }
+
+    def verify_slot(self, jobs, entry, zone, root, scope, timezone):
+        slot, name, hour, minute, cron = entry
+        selected = [job for job in jobs if isinstance(job, dict) and job.get("name") == name]
+        if len(selected) != 1:
+            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
+        job = selected[0]
+        if (
+            job.get("enabled") is not True
+            or job.get("action") != "exec"
+            or job.get("timezone") != timezone
+            or job.get("cron") != cron
+        ):
+            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
+        self.wake_command(job.get("command"), root, scope, timezone, slot, self.settings.cli_bin)
+        try:
+            due = next_due(job["nextRunAt"], zone, hour, minute)
+        except (ValueError, TypeError, KeyError):
+            raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409) from None
+        due_ms = int(due.timestamp() * 1000)
+        now = int(time.time() * 1000)
+        if not now < due_ms <= now + 26 * 3600000:
+            raise DomainError("GOAL_SCHEDULE_NOT_FUTURE", 409)
+        return due, slot, job

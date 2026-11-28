@@ -100,13 +100,14 @@ async def scheduled_project(tmp_path):
     }
     plugins = [{"manifest": {"id": "roam.cron", "name": "cron"}, "enabled": True}]
     calls = []
+    jobs = [job]
 
     async def query(*argv):
         calls.append(argv)
         if argv == ("plugin", "ls", "--json"):
             return plugins
         assert argv == ("plugin", "run", "roam.cron:list")
-        return {"scopedScheduler": True, "jobs": [job]}
+        return {"scopedScheduler": True, "jobs": jobs}
 
     async def runner(unit, name, **kwargs):
         assert unit == config["runnerUnit"] and name == job["name"]
@@ -126,6 +127,7 @@ async def scheduled_project(tmp_path):
             plan=plan,
             driver=driver,
             job=job,
+            jobs=jobs,
             plugins=plugins,
             calls=calls,
             root=root,
@@ -249,5 +251,68 @@ async def test_invalid_runner_scope_cannot_fall_back_to_shared(scheduled_project
     f = scheduled_project
     f.config["runnerScope"] = scope
     f.plan.write_text(json.dumps(f.config))
+    with pytest.raises(DomainError, match="GOAL_SCHEDULE_CONFIGURATION_CONFLICT"):
+        await f.source.read(f.scope)
+
+
+@pytest.fixture
+def project_with_two_slots(scheduled_project):
+    f = scheduled_project
+    f.config["schemaVersion"] = 2
+    for key in ("dailyAt", "cron", "schedulerJob"):
+        del f.config[key]
+    next_slot = datetime.now(ZoneInfo(f.config["timezone"])).replace(second=0, microsecond=0)
+    slots = []
+    for minutes, slot in ((40, "morning"), (20, "production-review")):
+        due = next_slot + timedelta(minutes=minutes)
+        entry = {
+            "slot": slot,
+            "schedulerJob": "project-a-" + slot,
+            "dailyAt": due.strftime("%H:%M"),
+        }
+        slots.append(entry)
+        f.jobs.append(
+            {
+                **f.job,
+                "name": entry["schedulerJob"],
+                "cron": f"{due.minute} {due.hour} * * *",
+                "nextRunAt": due.strftime("%Y-%m-%d %H:%M:%S"),
+                "command": f.job["command"].replace("--slot morning", "--slot " + slot),
+            }
+        )
+    del f.jobs[0]
+    f.config["slots"] = slots
+    f.plan.write_text(json.dumps(f.config))
+    return f
+
+
+async def test_next_of_multiple_project_slots_is_verified(project_with_two_slots):
+    f = project_with_two_slots
+    expected_names = ("project-a-morning", "project-a-production-review")
+    seen = []
+
+    async def probe(unit, jobs, **options):
+        seen.append((unit, jobs, options))
+        return {"unit": unit, "service": "project-a.service", "nextTickMs": 1}
+
+    f.source.runner.probe = probe
+    proof = await f.source.read(f.scope)
+    assert seen == [("project-a.timer", expected_names, {"allow_short_command": True})]
+    assert proof["slot"] == "production-review" and proof["jobName"] == expected_names[1]
+    assert proof["nextRunAt"] == f.jobs[1]["nextRunAt"].replace(" ", "T") + "+08:00"
+    assert proof["scheduleSha256"] == hashlib.sha256(f.plan.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("fault", ["duplicate_slot", "duplicate_job", "missing_job", "foreign_job"])
+async def test_all_declared_slots_must_match_verified_jobs(project_with_two_slots, fault):
+    f = project_with_two_slots
+    if fault in {"duplicate_slot", "duplicate_job"}:
+        field = "slot" if fault == "duplicate_slot" else "schedulerJob"
+        f.config["slots"][0][field] = f.config["slots"][1][field]
+        f.plan.write_text(json.dumps(f.config))
+    elif fault == "missing_job":
+        del f.jobs[0]
+    else:
+        f.jobs[0]["command"] = f.jobs[0]["command"].replace("--project project-a", "--project b")
     with pytest.raises(DomainError, match="GOAL_SCHEDULE_CONFIGURATION_CONFLICT"):
         await f.source.read(f.scope)

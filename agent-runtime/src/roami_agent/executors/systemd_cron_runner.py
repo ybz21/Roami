@@ -108,13 +108,19 @@ class SystemdCronRunner:
         ):
             raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
         scope = argv[4:]
+        expected = (job,) if isinstance(job, str) else job
         if scope[:1] == ["--names"] and len(scope) == 2:
             try:
-                valid = json.loads(scope[1]) == [job]
+                names = json.loads(scope[1])
+                valid = (
+                    isinstance(names, list)
+                    and all(isinstance(name, str) for name in names)
+                    and sorted(names) == sorted(expected)
+                )
             except ValueError:
                 valid = False
         else:
-            valid = scope == ["--name", job]
+            valid = len(expected) == 1 and scope == ["--name", expected[0]]
         if not valid:
             raise DomainError("GOAL_SCHEDULE_CONFIGURATION_CONFLICT", 409)
         if await self.property(path, "Unit", "ActiveState", "s") != "active":
