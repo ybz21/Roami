@@ -41,6 +41,14 @@ type claudeModelSelection struct {
 	TurnID       string             `json:"turnId"`
 }
 
+type claudeModelRejection struct {
+	Spec         ModelSelectionSpec `json:"spec"`
+	CommandID    string             `json:"commandId"`
+	SourceDigest string             `json:"sourceSha256"`
+}
+
+var claudePickerTargetUnconfirmed = errors.New("SESSION_MODEL_SELECTION_TARGET_UNCONFIRMED")
+
 func (state sessionLifecycle) configuredModel() string {
 	if state.SelectedModel != nil {
 		return state.SelectedModel.Model
@@ -82,6 +90,18 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return ClaudeModelSelection{}, err
 	}
+	rejectionPath := filepath.Join(dir, "unchanged.json")
+	var rejection claudeModelRejection
+	if err = readJSON(rejectionPath, &rejection); err == nil {
+		if rejection.Spec != spec {
+			return ClaudeModelSelection{}, fmt.Errorf("SESSION_MODEL_SELECTION_KEY_CONFLICT")
+		}
+		if !codexThreadID.MatchString(rejection.CommandID) || !claudeRequestSHA.MatchString(rejection.SourceDigest) {
+			return ClaudeModelSelection{}, claudePickerUnavailable
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return ClaudeModelSelection{}, err
+	}
 
 	launchDir, err := s.directory(spec.PreparedFrom)
 	if err != nil {
@@ -112,6 +132,10 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 		stateUnlock()
 		return ClaudeModelSelection{}, fmt.Errorf("SESSION_MODEL_SELECTION_ORIGIN_UNCONFIRMED")
 	}
+	if rejection.Spec == spec {
+		defer stateUnlock()
+		return ClaudeModelSelection{}, clearUnchangedModelSelection(statePath, state, spec)
+	}
 	if prior := state.SelectedModel; prior != nil && prior.Key == spec.Key {
 		stateUnlock()
 		if prior.ModelSelectionSpec != spec {
@@ -131,7 +155,7 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 		target, resolveErr := s.claudePickerTarget(ctx, spec.Model, settings, spec.AllowMetered)
 		if resolveErr != nil || !anchorOK || settings == nil {
 			stateUnlock()
-			return ClaudeModelSelection{}, fmt.Errorf("SESSION_MODEL_SELECTION_TARGET_UNCONFIRMED")
+			return ClaudeModelSelection{}, claudePickerTargetUnconfirmed
 		}
 		state.ModelSelection = &claudeModelSelection{Spec: spec, Target: target, Anchor: anchor, SettingsHash: claudeSettingsHash(settings), CompletedKey: state.CompletedKey, TurnID: state.TurnID}
 		if err = writeJSON(statePath, state); err != nil {
@@ -174,9 +198,22 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 		}
 		return ClaudeModelSelection{}, claudePickerNotOpened
 	}
-	proof, proven := claudeSessionModelProof(state.Binding, intent.Anchor, []string{intent.Target.Display, intent.Target.NativeID})
-	if settings := readClaudeModelSettings(state.Binding); settings == nil || claudeSettingsHash(settings) != intent.SettingsHash || !proven {
+	if settings := readClaudeModelSettings(state.Binding); settings == nil || claudeSettingsHash(settings) != intent.SettingsHash {
 		return ClaudeModelSelection{}, fmt.Errorf("SESSION_MODEL_SELECTION_UNCONFIRMED")
+	}
+	proof, proven := claudeSessionModelProof(state.Binding, intent.Anchor, []string{intent.Target.Display, intent.Target.NativeID})
+	if !proven {
+		appendix := claudeModelAppend(state.Binding, intent.Anchor)
+		command, unchanged := claudeUnchangedModelProof(appendix, state.Binding, state.configuredModel())
+		if !unchanged {
+			return ClaudeModelSelection{}, fmt.Errorf("SESSION_MODEL_SELECTION_UNCONFIRMED")
+		}
+		digest := sha256.Sum256(appendix)
+		rejection := claudeModelRejection{Spec: spec, CommandID: command, SourceDigest: hex.EncodeToString(digest[:])}
+		if err := writeJSON(rejectionPath, rejection); err != nil {
+			return ClaudeModelSelection{}, err
+		}
+		return ClaudeModelSelection{}, clearUnchangedModelSelection(statePath, state, spec)
 	}
 	if err = ctx.Err(); err != nil {
 		return ClaudeModelSelection{}, err
@@ -187,6 +224,16 @@ func (s Service) SelectClaudeModel(ctx context.Context, spec ModelSelectionSpec)
 		return ClaudeModelSelection{}, err
 	}
 	return prior, writeJSON(receiptPath, prior)
+}
+
+func clearUnchangedModelSelection(path string, state sessionLifecycle, spec ModelSelectionSpec) error {
+	if state.ModelSelection != nil && state.ModelSelection.Spec == spec {
+		state.ModelSelection = nil
+		if err := writeJSON(path, state); err != nil {
+			return err
+		}
+	}
+	return claudePickerTargetUnconfirmed
 }
 
 func waitForClaudeModelProof(ctx context.Context, binding SessionBinding, intent claudeModelSelection) {

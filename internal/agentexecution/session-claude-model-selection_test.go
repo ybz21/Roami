@@ -2,6 +2,7 @@ package agentexecution
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,57 @@ import (
 
 	"github.com/ybz21/Roami/internal/modelgateway/catalog"
 )
+
+func TestClaudePickerCanSettleAnUnchangedModel(t *testing.T) {
+	binding := SessionBinding{ProviderID: completionThread, Directory: t.TempDir()}
+	const commandID = "11111111-1111-4111-8111-111111111111"
+	const resultID = "22222222-2222-4222-8222-222222222222"
+	command := map[string]any{
+		"type": "system", "subtype": "local_command", "level": "info", "sessionId": binding.ProviderID,
+		"cwd": binding.Directory, "uuid": commandID,
+		"content": "<command-name>/model</command-name>\n <command-message>model</command-message>\n <command-args></command-args>",
+	}
+	result := map[string]any{
+		"type": "system", "subtype": "local_command", "level": "info", "sessionId": binding.ProviderID,
+		"cwd": binding.Directory, "uuid": resultID, "parentUuid": commandID,
+		"content":    "<local-command-stdout>Kept model as `free`</local-command-stdout>",
+		"commandRun": map[string]string{"command": "model", "args": ""},
+	}
+	first, err := json.Marshal(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := string(first) + "\n" + string(second) + "\n"
+	if id, ok := claudeUnchangedModelProof([]byte(data), binding, "free"); id != commandID || !ok {
+		t.Fatal("original model was not confirmed")
+	}
+	for _, modified := range []string{
+		strings.Replace(data, `"parentUuid":"`+commandID+`"`, `"parentUuid":"`+resultID+`"`, 1),
+		strings.Replace(data, "Kept model as", "Set model to", 1),
+		strings.Replace(data, "`free`", "`other`", 1),
+		strings.Replace(data, `"args":""`, `"args":"free"`, 1),
+		strings.Replace(data, binding.ProviderID, resultID, 1),
+		data + `{"type":"api-request"}` + "\n",
+	} {
+		if _, ok := claudeUnchangedModelProof([]byte(modified), binding, "free"); ok {
+			t.Fatalf("unbound unchanged receipt accepted: %s", modified)
+		}
+	}
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	spec := ModelSelectionSpec{Key: "test", ExpectedModel: "free", Model: "another"}
+	state := sessionLifecycle{Binding: binding, Model: "free", ModelSelection: &claudeModelSelection{Spec: spec}}
+	if err := clearUnchangedModelSelection(statePath, state, spec); !errors.Is(err, claudePickerTargetUnconfirmed) {
+		t.Fatal(err)
+	}
+	var saved sessionLifecycle
+	if err := readJSON(statePath, &saved); err != nil || saved.ModelSelection != nil || saved.configuredModel() != "free" {
+		t.Fatalf("unchanged result did not release only its own request: %v", err)
+	}
+}
 
 func TestClaudeSessionModelProofOnlyAcceptsBoundLocalSelection(t *testing.T) {
 	base := t.TempDir()
