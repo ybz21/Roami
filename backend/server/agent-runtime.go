@@ -65,6 +65,7 @@ func mountAgentRuntime(g *gin.RouterGroup, cfg Config) {
 		{"POST", "/agent/improvement/research/:action_id/resume"},
 		{"GET", "/agent/conversations/:cid/identity"}, {"GET", "/agent/conversations/:cid/debug"}, {"GET", "/agent/conversations/:cid/debug/trace"},
 		{"GET", "/agent/conversations/:cid/execution"}, {"PUT", "/agent/conversations/:cid/execution"},
+		{"POST", "/agent/conversations/:cid/execution/model"},
 		{"DELETE", "/agent/attachments/:attachment"},
 		{"GET", "/agent/model-settings"}, {"PUT", "/agent/model-settings"}, {"POST", "/agent/model-settings/verify"}, {"GET", "/agent/model-usage"}, {"GET", "/agent/models"}, {"POST", "/agent/models"},
 		{"GET", "/agent/conversations/:cid/messages/:mid"},

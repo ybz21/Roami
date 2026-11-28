@@ -85,6 +85,7 @@ def create_app(runtime, *, manage_lifecycle=True):
             "projectOkr": True,
             "projectOkrMain": True,
             "projectMainExecution": True,
+            "projectMainModelSelection": True,
             "okrMessageContext": True,
             "projectMainWake": True,
             "projectGoalDailyWake": True,

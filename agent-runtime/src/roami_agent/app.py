@@ -106,6 +106,7 @@ from roami_okr.main_execution import (
     conversation_model_binding,
     require_project_provider_available,
 )
+from roami_okr.main_model_selection import JOB_KIND, MainModelSelections, pending_model_selection
 from roami_okr.native_main_capabilities import NativeMainCapabilities
 from roami_okr.native_workspace_queue import native_turn_binding, running_native_mains
 from roami_okr.swarm_memory import ProjectSwarmMemory
@@ -339,7 +340,7 @@ class Runtime:
 
         self.context.request_context = main_context
 
-        self.mailbox = TurnMailbox(database)
+        self.mailbox = TurnMailbox(database, hold_turn=pending_model_selection)
         self.journal = TurnJournal(database)
         self.gateway = ToolGateway(database, self.tools, self.wakeup)
         self.cli_commands = CLICommands(database, self.tools, self.journal)
@@ -438,6 +439,8 @@ class Runtime:
         self.main_executions = MainExecutions(
             self.db, self.settings, self.executor, capabilities=self.main_capabilities
         )
+        self.main_model_selections = MainModelSelections(self.main_executions, self.wakeup)
+        self.scheduler.control_jobs[JOB_KIND] = self.main_model_selections.advance
         if isinstance(self.executor, CodingExecutor):
             self.executor.capabilities = self.professional_capabilities
 
