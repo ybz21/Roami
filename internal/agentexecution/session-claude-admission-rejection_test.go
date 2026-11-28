@@ -12,7 +12,15 @@ import (
 )
 
 func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
-	for _, scenario := range []string{"complete", "compaction refusal", "compaction input rejected", "unowned attachment", "route exhausted", "untyped 503", "wrong route code", "prior history", "owned child", "cancelled", "existing session", "nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input", "ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage", "server error", "other quota", "real output before", "tool before", "later input", "later request", "escaping cwd", "pending tool", "live process", "other writer"} {
+	for _, scenario := range []string{
+		"complete", "gateway input rejected", "untyped 400", "wrong 400 code", "compaction refusal",
+		"compaction input rejected", "unowned attachment", "route exhausted", "untyped 503",
+		"wrong route code", "prior history", "owned child", "cancelled", "existing session",
+		"nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input",
+		"ordinary assistant", "not api error", "missing no-tool flag", "input usage", "output usage",
+		"server error", "other quota", "real output before", "tool before", "later input", "later request",
+		"escaping cwd", "pending tool", "live process", "other writer",
+	} {
 		t.Run(scenario, func(t *testing.T) {
 			s, binding, spec, transcript, _ := rejectedClaudeTask(t)
 			dir, _ := s.directory(spec.Key)
@@ -69,6 +77,18 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			message := records[1]["message"].(map[string]any)
 			message["content"] = []any{map[string]any{"type": "text", "text": "API Error: 402 {\"error\":{\"code\":\"MODEL_PROXY_DAILY_LIMIT\"}}"}}
 			switch scenario {
+			case "gateway input rejected", "untyped 400", "wrong 400 code":
+				records[1]["apiErrorStatus"] = 400
+				records[1]["apiErrorType"] = "api_error"
+				records[1]["error"] = "unknown"
+				refusal := "API Error: 400 MODEL_HTTP_400"
+				if scenario == "untyped 400" {
+					delete(records[1], "apiErrorType")
+				}
+				if scenario == "wrong 400 code" {
+					refusal = "API Error: 400 INVALID_REQUEST"
+				}
+				message["content"] = []any{map[string]any{"type": "text", "text": refusal}}
 			case "compaction input rejected", "unowned attachment":
 				delete(records[1], "apiErrorStatus")
 				delete(records[1], "failedResponseHadNoToolCall")
@@ -173,8 +193,20 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				defer func() { _ = child.Process.Kill(); _ = child.Wait() }()
 			}
 			result, err := s.ReconcileSession(context.Background(), spec.Key)
-			good := scenario == "complete" || scenario == "compaction refusal" || scenario == "compaction input rejected" || scenario == "route exhausted" || scenario == "existing session" || scenario == "prior history" || scenario == "owned child" || scenario == "cancelled"
-			if !good {
+			var code string
+			switch scenario {
+			case "complete", "existing session", "prior history", "owned child", "cancelled":
+				code = "MODEL_PROXY_DAILY_LIMIT"
+			case "gateway input rejected":
+				code = "MODEL_HTTP_400"
+			case "compaction refusal":
+				code = "CLAUDE_COMPACTION_FAILED"
+			case "compaction input rejected":
+				code = "CLAUDE_COMPACTION_INPUT_REJECTED"
+			case "route exhausted":
+				code = "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
+			}
+			if code == "" {
 				if err == nil || result.Result != nil {
 					t.Fatalf("accepted %s: %+v %v", scenario, result, err)
 				}
@@ -186,15 +218,6 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 			want := "failed"
 			if scenario == "cancelled" {
 				want = "cancelled"
-			}
-			code := "MODEL_PROXY_DAILY_LIMIT"
-			switch scenario {
-			case "compaction refusal":
-				code = "CLAUDE_COMPACTION_FAILED"
-			case "compaction input rejected":
-				code = "CLAUDE_COMPACTION_INPUT_REJECTED"
-			case "route exhausted":
-				code = "MODEL_ROUTE_NO_AVAILABLE_MEMBER"
 			}
 			if err != nil || result.Result == nil || result.State != want || result.Result.ErrorCode != code || result.Result.InputStopped == nil || !*result.Result.InputStopped || result.Result.OutcomeKnown == nil || !*result.Result.OutcomeKnown || len(result.Result.StopEvidence) != 64 {
 				t.Fatalf("rejection not preserved as known failure: %+v %v", result, err)
