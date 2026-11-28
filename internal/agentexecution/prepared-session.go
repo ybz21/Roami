@@ -18,6 +18,7 @@ type PreparedSession struct {
 	RouteRefusal     *PreparedRefusal `json:"routeRefusal,omitempty"`
 	ContextRejection *PreparedRefusal `json:"contextRejection,omitempty"`
 	RecoveredFrom    string           `json:"recoveredFrom,omitempty"`
+	completedKey     string
 }
 
 type PreparedRefusal struct {
@@ -75,7 +76,7 @@ func preparedSelection(key string, spec Spec, receipt Receipt, state sessionLife
 	if spec.Key != key || !spec.Persistent || !preparedModelOrigin(spec, receipt) || spec.Executor == "" || receipt.Binding == nil || receipt.Workspace == nil || receipt.Session != state.Binding.ID || state.State != "idle" || state.LaunchKey != "" || state.CompletedKey != settledKey || state.UnknownReason != "" || state.ProviderConflict != nil || state.EndedIdle || len(state.Tools) != 0 || state.Executor != spec.Executor || state.Model != spec.Model || !samePreparedProvider(*receipt.Binding, state.Binding) || receipt.Workspace.Directory != state.Binding.Directory || result.State != "succeeded" || result.InputStopped == nil || !*result.InputStopped || result.OutcomeKnown == nil || !*result.OutcomeKnown {
 		return PreparedSession{}, fmt.Errorf("SESSION_PREPARATION_UNCONFIRMED")
 	}
-	selected := PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.Model, Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true, RecoveredFrom: receipt.RecoveredFrom}
+	selected := PreparedSession{LaunchKey: key, SessionID: receipt.Session, Executor: spec.Executor, ConfiguredModel: state.configuredModel(), Binding: state.Binding, Workspace: *receipt.Workspace, Ready: true, RecoveredFrom: receipt.RecoveredFrom, completedKey: settledKey}
 	if spec.Executor == "claude" && settledKey != key && settledKey != "" && later[0].Spec.Persistent &&
 		later[0].Spec.PreparedFrom == key {
 		r := later[0].Result
@@ -122,6 +123,9 @@ func (s Service) PreparedSession(key string) (PreparedSession, error) {
 	var state sessionLifecycle
 	if readJSON(path, &state) != nil {
 		return PreparedSession{}, fmt.Errorf("SESSION_LIFECYCLE_UNAVAILABLE")
+	}
+	if state.ModelSelection != nil {
+		return PreparedSession{}, fmt.Errorf("SESSION_MODEL_SELECTION_PENDING")
 	}
 	if normalized, _, ok := s.provenClaudeModelIdle(state); ok {
 		state = normalized

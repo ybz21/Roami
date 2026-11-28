@@ -16,16 +16,17 @@ import (
 )
 
 type Runtime struct {
-	Context   context.Context
-	Output    io.Writer
-	HomeDir   string
-	DataDir   string
-	LogsDir   string
-	GroupsDir string
-	MetaDir   string
-	EnvFile   string
-	TmuxBin   string
-	Now       func() time.Time
+	Context    context.Context
+	Output     io.Writer
+	HomeDir    string
+	DataDir    string
+	LogsDir    string
+	GroupsDir  string
+	MetaDir    string
+	EnvFile    string
+	TmuxBin    string
+	Now        func() time.Time
+	inputFence map[string]bool
 }
 
 func New() Runtime {

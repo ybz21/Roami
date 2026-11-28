@@ -48,7 +48,7 @@ func claudeNativeIdleEvidence(data []byte, state sessionLifecycle) bool {
 				return false
 			}
 		case "assistant":
-			if final || strings.TrimPrefix(r.Message.Model, "roami-claude/") != strings.TrimPrefix(state.Model, "roami-claude/") {
+			if final || strings.TrimPrefix(r.Message.Model, "roami-claude/") != strings.TrimPrefix(state.claudeTranscriptModel(), "roami-claude/") {
 				return false
 			}
 			if claudeReportText(r.Message.Content) == stop.Summary && r.Message.StopReason == "end_turn" {
