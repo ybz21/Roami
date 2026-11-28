@@ -24,20 +24,7 @@ func (s Service) reconcileClaudeToolCompletion(ctx context.Context, key, dir, pa
 
 func claudeFinalGatewayRefusal(record claudeCompletionRecord, blocks []claudeInterruptedBlock, text string) string {
 	usage := record.Message.Usage
-	if record.Meta || record.Compact || record.Message.Role != "assistant" || record.Message.Model != "<synthetic>" || record.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 || len(blocks) != 1 || blocks[0].Type != "text" {
-		return ""
-	}
-	switch record.APIStatus {
-	case 400:
-		// Claude omits the indicator for this wire shape after earlier tools finished.
-		if record.NoToolCall != nil && !*record.NoToolCall {
-			return ""
-		}
-	case 503:
-		if record.NoToolCall == nil || !*record.NoToolCall {
-			return ""
-		}
-	default:
+	if (record.APIStatus != 400 && record.APIStatus != 503) || !record.NoToolCall || record.Meta || record.Compact || record.Message.Role != "assistant" || record.Message.Model != "<synthetic>" || record.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 || len(blocks) != 1 || blocks[0].Type != "text" {
 		return ""
 	}
 	return claudeGatewayAdmissionCode(claudeFailureRecord{APIStatus: record.APIStatus, APIType: record.APIType, Failure: record.APIFailure}, text)
