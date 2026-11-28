@@ -11,7 +11,19 @@ import (
 )
 
 func TestClaudeSessionModelProofOnlyAcceptsBoundLocalSelection(t *testing.T) {
-	binding := SessionBinding{ProviderID: completionThread, ProviderHome: t.TempDir(), Directory: "/fixture"}
+	base := t.TempDir()
+	binding := SessionBinding{ProviderID: completionThread, ProviderHome: t.TempDir(), Directory: filepath.Join(base, "fixture")}
+	subdirectory := filepath.Join(binding.Directory, "materials", "snapshot")
+	sibling := filepath.Join(base, "fixture-other")
+	for _, path := range []string{subdirectory, sibling} {
+		if err := os.MkdirAll(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	escape := filepath.Join(binding.Directory, "escape")
+	if err := os.Symlink(sibling, escape); err != nil {
+		t.Fatal(err)
+	}
 	dir := filepath.Join(binding.ProviderHome, "projects", "fixture")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -41,24 +53,38 @@ func TestClaudeSessionModelProofOnlyAcceptsBoundLocalSelection(t *testing.T) {
 	}
 	prefix := record("picker", claudeLocalCommandCaveat, true) + record("picker", command, false)
 	proof := prefix + record("picker", selected, false)
+	atDirectory := func(data, directory string) string {
+		from, _ := json.Marshal(binding.Directory)
+		to, _ := json.Marshal(directory)
+		return strings.ReplaceAll(data, string(from), string(to))
+	}
 	commandWithArgs := strings.Replace(command, "<command-args></command-args>", "<command-args>free</command-args>", 1)
-	for name, suffix := range map[string]string{
-		"valid scoped selection": proof,
-		"saved default":          prefix + record("picker", strings.ReplaceAll(selected, "for this session only", "and saved as your default for new sessions"), false),
-		"other model":            prefix + record("picker", strings.ReplaceAll(selected, "openrouter/free", "paid"), false),
-		"other prompt":           prefix + record("another-prompt", selected, false),
-		"explicit model":         record("picker", claudeLocalCommandCaveat, true) + record("picker", commandWithArgs, false) + record("picker", selected, false),
-		"next request":           proof + "{\"type\":\"api-request\"}\n",
-		"repeated selection":     proof + proof,
-		"partial record":         strings.TrimSuffix(proof, "\n"),
+	for _, tc := range []struct {
+		name, suffix string
+		accepted     bool
+	}{
+		{"valid scoped selection", proof, true},
+		{"valid workspace subdirectory", atDirectory(proof, subdirectory), true},
+		{"foreign sibling", atDirectory(proof, sibling), false},
+		{"escaping symlink", atDirectory(proof, escape), false},
+		{"relative directory", atDirectory(proof, "materials/snapshot"), false},
+		{"missing directory", atDirectory(proof, ""), false},
+		{"changed directory", atDirectory(prefix, subdirectory) + record("picker", selected, false), false},
+		{"saved default", prefix + record("picker", strings.ReplaceAll(selected, "for this session only", "and saved as your default for new sessions"), false), false},
+		{"other model", prefix + record("picker", strings.ReplaceAll(selected, "openrouter/free", "paid"), false), false},
+		{"other prompt", prefix + record("another-prompt", selected, false), false},
+		{"explicit model", record("picker", claudeLocalCommandCaveat, true) + record("picker", commandWithArgs, false) + record("picker", selected, false), false},
+		{"next request", proof + "{\"type\":\"api-request\"}\n", false},
+		{"repeated selection", proof + proof, false},
+		{"partial record", strings.TrimSuffix(proof, "\n"), false},
 	} {
-		t.Run(name, func(t *testing.T) {
-			if err := os.WriteFile(transcript, append(append([]byte{}, before...), []byte(suffix)...), 0600); err != nil {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.WriteFile(transcript, append(append([]byte{}, before...), []byte(tc.suffix)...), 0600); err != nil {
 				t.Fatal(err)
 			}
 			got, ok := claudeSessionModelProof(binding, anchor, []string{model})
-			if want := name == "valid scoped selection"; ok != want || want && (got.PromptID != "picker" || len(got.Digest) != 64) {
-				t.Fatalf("proof = %#v, %v, want accepted = %v", got, ok, want)
+			if ok != tc.accepted || tc.accepted && (got.PromptID != "picker" || len(got.Digest) != 64) {
+				t.Fatalf("proof = %#v, %v, want accepted = %v", got, ok, tc.accepted)
 			}
 		})
 	}
