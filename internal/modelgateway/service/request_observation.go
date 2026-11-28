@@ -81,6 +81,7 @@ func (o *requestObservation) attempt(record monitor.Record, candidate ModelCandi
 	}
 	o.unknownSend = !notSent && record.Error == "MODEL_TRANSPORT_FAILED"
 	o.Error = record.Error
+	o.UpstreamRejection = record.UpstreamRejection
 }
 
 func (o *requestObservation) finish(r *http.Request, w *observedRequestWriter, h *Handler) {

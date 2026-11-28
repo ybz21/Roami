@@ -50,6 +50,7 @@ func (h *Handler) observeAttempt(r *http.Request, leaf routing.Leaf, call accoun
 		attempt = 0
 	}
 	record := monitor.Record{At: h.state.now().UnixMilli(), SourceID: call.SourceID, Model: call.Model, RouteID: call.RouteID, Account: routing.AccountLabel(leaf.Account), Success: successful, Status: status, Error: monitor.ErrorCode(code), Duration: o.Elapsed(finished).Milliseconds(), FirstToken: first, TokensPerSecond: speed, Quality: quality, QualityRule: rule, RequestID: requestID, Attempt: attempt, CallID: call.ID}
+	record.UpstreamRejection = o.RequestRejection(status)
 	if requestID != "" {
 		for i := len(leaf.Ancestors) - 1; i >= 0; i-- {
 			record.GroupPath = append(record.GroupPath, strings.TrimPrefix(leaf.Ancestors[i], "group/"))

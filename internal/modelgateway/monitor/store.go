@@ -29,31 +29,32 @@ type TokenUsage struct {
 }
 
 type Record struct {
-	Sequence        uint64         `json:"sequence"`
-	At              int64          `json:"at"`
-	SourceID        string         `json:"sourceId"`
-	Model           string         `json:"model"`
-	RouteID         string         `json:"routeId,omitempty"`
-	Account         string         `json:"account,omitempty"`
-	Success         bool           `json:"success"`
-	Status          int            `json:"status"`
-	Error           string         `json:"error,omitempty"`
-	Duration        int64          `json:"durationMs"`
-	FirstToken      *float64       `json:"firstTokenMs"`
-	TokensPerSecond *float64       `json:"tokensPerSecond"`
-	Quality         string         `json:"quality"`
-	QualityRule     string         `json:"qualityRule,omitempty"`
-	RequestID       string         `json:"requestId,omitempty"`
-	CallID          string         `json:"callId,omitempty"`
-	Outcome         string         `json:"outcome,omitempty"`
-	Caller          string         `json:"caller,omitempty"`
-	Revision        string         `json:"revision,omitempty"`
-	UpstreamModel   string         `json:"upstreamModel,omitempty"`
-	Attempts        int            `json:"attempts,omitempty"`
-	Attempt         int            `json:"attempt,omitempty"`
-	Switch          string         `json:"switch,omitempty"`
-	Blocks          map[string]int `json:"blocks,omitempty"`
-	GroupPath       []string       `json:"groupPath,omitempty"`
+	Sequence          uint64         `json:"sequence"`
+	At                int64          `json:"at"`
+	SourceID          string         `json:"sourceId"`
+	Model             string         `json:"model"`
+	RouteID           string         `json:"routeId,omitempty"`
+	Account           string         `json:"account,omitempty"`
+	Success           bool           `json:"success"`
+	Status            int            `json:"status"`
+	Error             string         `json:"error,omitempty"`
+	UpstreamRejection string         `json:"upstreamRejection,omitempty"`
+	Duration          int64          `json:"durationMs"`
+	FirstToken        *float64       `json:"firstTokenMs"`
+	TokensPerSecond   *float64       `json:"tokensPerSecond"`
+	Quality           string         `json:"quality"`
+	QualityRule       string         `json:"qualityRule,omitempty"`
+	RequestID         string         `json:"requestId,omitempty"`
+	CallID            string         `json:"callId,omitempty"`
+	Outcome           string         `json:"outcome,omitempty"`
+	Caller            string         `json:"caller,omitempty"`
+	Revision          string         `json:"revision,omitempty"`
+	UpstreamModel     string         `json:"upstreamModel,omitempty"`
+	Attempts          int            `json:"attempts,omitempty"`
+	Attempt           int            `json:"attempt,omitempty"`
+	Switch            string         `json:"switch,omitempty"`
+	Blocks            map[string]int `json:"blocks,omitempty"`
+	GroupPath         []string       `json:"groupPath,omitempty"`
 
 	TokenUsage *TokenUsage `json:"tokenUsage,omitempty"`
 }
@@ -121,6 +122,9 @@ func Open(path string, capacity int, now func() time.Time) (*Store, error) {
 	return store, nil
 }
 func validMonitorRecord(record Record) bool {
+	if len(record.UpstreamRejection) > 32 {
+		return false
+	}
 	if usage := record.TokenUsage; usage != nil && (usage.Input < 0 || usage.Input > 100_000_000 || usage.Output < 0 || usage.Output > 100_000_000) {
 		return false
 	}

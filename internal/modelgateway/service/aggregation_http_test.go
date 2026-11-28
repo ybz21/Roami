@@ -207,6 +207,42 @@ func TestAggregateRequestRejectionDoesNotRetryOrCoolDown(t *testing.T) {
 		})
 	}
 }
+
+func TestGatewayAuditKeepsTheStructuredRejectionAcrossProtocolBridge(t *testing.T) {
+	var backups atomic.Int64
+	h := aggregateFixture(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"private-upstream-value","metadata":{"raw":"{\"error\":{\"code\":\"context_length_exceeded\"}}"}}}`))
+	}, func(w http.ResponseWriter, r *http.Request) {
+		backups.Add(1)
+		responseFixture(w, r)
+	})
+	catalog := h.Catalog.snapshot()
+	catalog.Models[0].Strategy = "order"
+	if err := h.Catalog.update(context.Background(), catalog); err != nil {
+		t.Fatal(err)
+	}
+	reply := requestWithKey(h, h.Catalog.credential("claude"), "/v1/messages",
+		`{"model":"coding-main","messages":[{"role":"user","content":"hello"}],"max_tokens":100}`)
+	if reply.Code != http.StatusBadRequest || backups.Load() != 0 || strings.Contains(reply.Body.String(), "private-upstream-value") {
+		t.Fatalf("unexpected inference response: %d %s, backups=%d", reply.Code, reply.Body, backups.Load())
+	}
+	detail := httptest.NewRecorder()
+	h.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/v1/model-gateway/monitor/requests/"+reply.Header().Get(requestHeader), nil))
+	var result struct {
+		Data struct {
+			Request  monitor.Record
+			Attempts []monitor.Record
+		}
+	}
+	if err := json.Unmarshal(detail.Body.Bytes(), &result); err != nil || detail.Code != http.StatusOK ||
+		result.Data.Request.UpstreamRejection != "context_limit" || result.Data.Request.Error != "MODEL_HTTP_400" ||
+		len(result.Data.Attempts) != 1 || result.Data.Attempts[0].UpstreamRejection != "context_limit" ||
+		strings.Contains(detail.Body.String(), "private-upstream-value") {
+		t.Fatalf("rejection audit: %d %s (%v)", detail.Code, detail.Body, err)
+	}
+}
 func TestAggregateNeverReplaysAfterStreamStartsAndRejectsPaidZeroPrice(t *testing.T) {
 	var backup atomic.Int64
 	h := aggregateFixture(t, func(w http.ResponseWriter, r *http.Request) {
