@@ -80,23 +80,30 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 				return nil, "", nil
 			}
 		}
-		// Earlier deferred work must not disappear behind the selected prompt or compaction.
-		if record.Type == "assistant" {
-			for _, block := range blocks {
-				if block.Type == "tool_use" && !synchronousClaudeTool(block) {
-					return nil, "", nil
-				}
-			}
-		}
 		text := claudeReportText(record.Message.Content)
 		if !matched {
+			// Earlier deferred work must not disappear behind the selected prompt or compaction.
+			if record.Type == "assistant" {
+				for _, block := range blocks {
+					if block.Type == "tool_use" && !synchronousClaudeTool(block) && !companions.call(block) {
+						return nil, "", nil
+					}
+				}
+			}
+			if record.Type == "user" && record.SessionID == binding.ProviderID {
+				companions.accept(record, record.PromptID)
+				companions.observe(record, blocks)
+			}
 			if record.Type != "user" || record.Meta || record.Compact || record.PromptID != turn || claudeInputHash(text, promptHash) != promptHash {
 				continue
 			}
 			stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)
-			if err != nil || stamp.UnixMilli() > since || record.SessionID != binding.ProviderID || record.UUID == "" || record.Cwd != binding.Directory {
+			_, inWorkspace := reportDirectory(binding.Directory, record.Cwd)
+			if err != nil || stamp.UnixMilli() > since || record.SessionID != binding.ProviderID || record.UUID == "" || !inWorkspace || !companions.settled() {
 				return nil, "", nil
 			}
+			companions = newClaudeCompanions(binding)
+			companions.observe(record, nil)
 			matched, reachable[record.UUID] = true, true
 			continue
 		}
@@ -196,7 +203,7 @@ func claudeInterruptedEvidence(binding SessionBinding, turn, promptHash string, 
 		companions.observe(record, blocks)
 	}
 	after, err := file.Stat()
-	if !matched || !terminal || err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
+	if !matched || !terminal || !companions.settled() || err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
 		return nil, "", nil
 	}
 	for _, stamp := range completed {
