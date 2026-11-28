@@ -113,11 +113,11 @@ func validClaudeAdmissionSuffix(suffix []byte, binding SessionBinding, state ses
 		return false
 	}
 	decoder := json.NewDecoder(bytes.NewReader(suffix))
-	closed := false
+	sawCommand, closed := false, false
 	for {
 		var entry claudeAdmissionLocalRecord
 		if err := decoder.Decode(&entry); err == io.EOF {
-			return closed
+			return closed || !sawCommand
 		} else if err != nil || entry.Sidechain || entry.Compact || entry.SessionID != "" && entry.SessionID != binding.ProviderID ||
 			entry.Cwd != "" && !claudeInputDirectory(binding, entry.Cwd) {
 			return false
@@ -126,6 +126,7 @@ func validClaudeAdmissionSuffix(suffix []byte, binding SessionBinding, state ses
 		case "file-history-snapshot", "last-prompt", "mode", "permission-mode", "atis-latch", "cost-state", "ai-title":
 			continue
 		case "system":
+			sawCommand = true
 			var output claudeAdmissionLocalRecord
 			if closed || !entry.ownedBy(binding) || entry.Subtype != "local_command" || entry.Meta ||
 				entry.Run != nil || !claudeModelPickerCommand.MatchString(entry.Content) ||
@@ -137,10 +138,12 @@ func validClaudeAdmissionSuffix(suffix []byte, binding SessionBinding, state ses
 				return false
 			}
 		case "user":
+			if closed {
+				return false
+			}
+			sawCommand = true
 			command, output := claudeAdmissionLocalCommand(decoder, entry, binding)
 			switch {
-			case closed:
-				return false
 			case claudeLocalExitCommand.MatchString(command) && claudeLocalExitReceipt(output):
 				closed = true
 			case claudeModelPickerCommand.MatchString(command) && claudeSameDefaultModelReceipt(output, state.configuredModel()):
