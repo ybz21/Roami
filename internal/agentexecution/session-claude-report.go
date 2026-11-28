@@ -145,6 +145,11 @@ func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*
 
 var claudeLocalExitCommand = regexp.MustCompile(`^<command-name>/exit</command-name>\n[ \t]*<command-message>exit</command-message>\n[ \t]*<command-args></command-args>$`)
 
+func claudeLocalExitReceipt(value string) bool {
+	return value == "<local-command-stdout>Bye!</local-command-stdout>" ||
+		value == "<local-command-stdout>Goodbye!</local-command-stdout>"
+}
+
 func claudeReportWithExit(binding SessionBinding, turn, promptHash, launchDir string, stoppedIdle bool) (*ReportedProgress, *ReportedToolError, *NativeToolActivity) {
 	if turn == "" || promptHash == "" {
 		return nil, nil, nil
@@ -204,7 +209,7 @@ func claudeReportWithExit(binding SessionBinding, turn, promptHash, launchDir st
 					exitPrompt, exitDirectory, exitPhase = record.PromptID, record.Cwd, 1
 				case exitPhase == 1 && !record.Meta && record.PromptID == exitPrompt && record.Cwd == exitDirectory && claudeLocalExitCommand.MatchString(local):
 					exitPhase = 2
-				case exitPhase == 2 && !record.Meta && record.PromptID == exitPrompt && record.Cwd == exitDirectory && local == "<local-command-stdout>Bye!</local-command-stdout>":
+				case exitPhase == 2 && !record.Meta && record.PromptID == exitPrompt && record.Cwd == exitDirectory && claudeLocalExitReceipt(local):
 					exitPhase = 3
 				default:
 					valid = false

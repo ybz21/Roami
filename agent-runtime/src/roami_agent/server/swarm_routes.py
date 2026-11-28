@@ -101,6 +101,17 @@ class MemberModelSelection(Payload):
     allowMetered: StrictBool = False
 
 
+class MemberExecutionRecovery(Payload):
+    commandKey: str = Field(min_length=1, max_length=200)
+    taskId: str = Field(min_length=1, max_length=200)
+    expectedGeneration: int = Field(ge=1)
+    expectedTaskRevision: int = Field(ge=1)
+    expectedRunId: str = Field(min_length=1, max_length=200)
+    expectedModel: str = Field(min_length=1, max_length=300)
+    model: str = Field(min_length=1, max_length=200)
+    preparedLaunchKey: str = Field(min_length=1, max_length=200)
+
+
 class PlanSwarm(Payload):
     commandKey: str = Field(min_length=1, max_length=200)
     expectedRevision: int = Field(ge=1)
@@ -198,6 +209,16 @@ def mount_swarm_routes(app, runtime):
             "data": await runtime.member_model_selections.request(
                 owner, sid, member_id, body.model_dump(exclude_defaults=True)
             )
+        }
+
+    @app.put("/v1/swarms/{sid}/members/{member_id}/execution")
+    async def recover_member_execution(
+        sid: str, member_id: str, body: MemberExecutionRecovery, owner: Owner
+    ):
+        from roami_agent.dispatch.swarm_member_recovery import recover_member
+
+        return {
+            "data": await recover_member(runtime.swarms, owner, sid, member_id, body.model_dump())
         }
 
     @app.get("/v1/swarms/{sid}/members/{member_id}")

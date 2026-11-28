@@ -30,7 +30,17 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 		return nil, "", nil
 	}
 	digest := sha256.New()
-	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
+	result := readClaudeAdmissionRejection(binding, turn, hash, since, io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
+	after, err := file.Stat()
+	current, problem := os.Lstat(path)
+	if result == nil || err != nil || problem != nil || !sameClaudeInputFile(info, after) || !sameClaudeInputFile(info, current) {
+		return nil, "", nil
+	}
+	return result, hex.EncodeToString(digest.Sum(nil)), map[string]int64{}
+}
+
+func readClaudeAdmissionRejection(binding SessionBinding, turn, hash string, since int64, input io.Reader) *Result {
+	decoder := json.NewDecoder(input)
 	root := ""
 	var promptTime time.Time
 	parent := ""
@@ -40,7 +50,7 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 		if err := decoder.Decode(&r); err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, "", nil
+			return nil
 		}
 		if root == "" {
 			if r.Type != "user" || r.PromptID != turn {
@@ -49,17 +59,17 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 			_, owned := reportDirectory(binding.Directory, r.Cwd)
 			stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
 			if r.Sidechain || r.Meta || r.Compact || r.UUID == "" || r.SessionID != binding.ProviderID || !filepath.IsAbs(r.Cwd) || !owned || claudeInputHash(claudeReportText(r.Message.Content), hash) != hash || problem != nil || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
-				return nil, "", nil
+				return nil
 			}
 			root, parent, promptTime = r.UUID, r.UUID, stamp
 			continue
 		}
 		if r.Sidechain || (r.SessionID != "" && r.SessionID != binding.ProviderID) {
-			return nil, "", nil
+			return nil
 		}
 		if r.Cwd != "" {
 			if _, owned := reportDirectory(binding.Directory, r.Cwd); !filepath.IsAbs(r.Cwd) || !owned {
-				return nil, "", nil
+				return nil
 			}
 		}
 		switch r.Type {
@@ -68,48 +78,43 @@ func claudeAdmissionRejectedEvidence(binding SessionBinding, turn, hash string, 
 			code := claudeCompactionFailureCode(r)
 			compaction := code != ""
 			if result != nil || r.ParentUUID != parent || r.UUID == "" || r.SessionID != binding.ProviderID || (!compaction && !r.NoToolCall) || !r.APIError || r.Message.Model != "<synthetic>" || r.Message.Role != "assistant" || r.Message.StopReason != "stop_sequence" || usage == nil || usage.Input == nil || usage.Output == nil || *usage.Input != 0 || *usage.Output != 0 {
-				return nil, "", nil
+				return nil
 			}
 			var blocks []struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
 			}
 			if json.Unmarshal(r.Message.Content, &blocks) != nil || len(blocks) != 1 || blocks[0].Type != "text" {
-				return nil, "", nil
+				return nil
 			}
 			if !compaction {
 				code = claudeGatewayAdmissionCode(r, blocks[0].Text)
 				if code == "" {
-					return nil, "", nil
+					return nil
 				}
 			}
 			stamp, problem := time.Parse(time.RFC3339Nano, r.Timestamp)
 			if problem != nil || stamp.Before(promptTime) || stamp.After(time.Now().Add(time.Second)) {
-				return nil, "", nil
+				return nil
 			}
 			result = &Result{State: "failed", ErrorCode: code, Summary: code, ExitCode: -1, FinishedMS: stamp.UnixMilli()}
 		case "attachment":
 			if result != nil || r.UUID == "" || r.ParentUUID != parent ||
 				r.SessionID != binding.ProviderID || r.Cwd == "" ||
 				(r.Attachment.Type != "date" && r.Attachment.Type != "model") {
-				return nil, "", nil
+				return nil
 			}
 			parent = r.UUID
 		case "api-request", "api-request-blob", "api-request-shape", "file-history-snapshot":
 			if result != nil {
-				return nil, "", nil
+				return nil
 			}
 		case "last-prompt", "mode", "permission-mode", "atis-latch", "cost-state", "ai-title":
 		default:
-			return nil, "", nil
+			return nil
 		}
 	}
-	after, err := file.Stat()
-	current, problem := os.Lstat(path)
-	if root == "" || result == nil || err != nil || problem != nil || !os.SameFile(info, after) || !os.SameFile(info, current) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) || current.Mode().Perm()&0022 != 0 {
-		return nil, "", nil
-	}
-	return result, hex.EncodeToString(digest.Sum(nil)), map[string]int64{}
+	return result
 }
 
 func claudeGatewayAdmissionCode(record claudeFailureRecord, text string) string {
@@ -117,6 +122,10 @@ func claudeGatewayAdmissionCode(record claudeFailureRecord, text string) string 
 	if status == 400 && record.APIType == "api_error" && record.Failure == "unknown" &&
 		text == "API Error: 400 MODEL_HTTP_400" {
 		return "MODEL_HTTP_400"
+	}
+	if status == 429 && record.APIType == "api_error" && record.Failure == "rate_limit" &&
+		text == "API Error: Request rejected (429) · MODEL_HTTP_429" {
+		return "MODEL_HTTP_429"
 	}
 	if status != 402 && (status != 503 || record.Failure != "server_error") {
 		return ""

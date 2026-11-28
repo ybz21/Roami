@@ -13,7 +13,8 @@ import (
 
 func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 	for _, scenario := range []string{
-		"complete", "gateway input rejected", "untyped 400", "wrong 400 code", "compaction refusal",
+		"complete", "gateway input rejected", "untyped 400", "wrong 400 code", "gateway rate limit",
+		"untyped 429", "compaction refusal",
 		"compaction input rejected", "unowned attachment", "route exhausted", "untyped 503",
 		"wrong route code", "prior history", "owned child", "cancelled", "existing session",
 		"nonpersistent", "changed model", "wrong hash", "wrong parent", "wrong provider", "stale input",
@@ -87,6 +88,15 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				}
 				if scenario == "wrong 400 code" {
 					refusal = "API Error: 400 INVALID_REQUEST"
+				}
+				message["content"] = []any{map[string]any{"type": "text", "text": refusal}}
+			case "gateway rate limit", "untyped 429":
+				records[1]["apiErrorStatus"] = 429
+				records[1]["apiErrorType"] = "api_error"
+				records[1]["error"] = "rate_limit"
+				refusal := "API Error: Request rejected (429) · MODEL_HTTP_429"
+				if scenario == "untyped 429" {
+					refusal = "API Error: 429 Unavailable"
 				}
 				message["content"] = []any{map[string]any{"type": "text", "text": refusal}}
 			case "compaction input rejected", "unowned attachment":
@@ -199,6 +209,8 @@ func TestPreparedClaudeQuotaRefusalRequiresOwnedZeroWorkEvidence(t *testing.T) {
 				code = "MODEL_PROXY_DAILY_LIMIT"
 			case "gateway input rejected":
 				code = "MODEL_HTTP_400"
+			case "gateway rate limit":
+				code = "MODEL_HTTP_429"
 			case "compaction refusal":
 				code = "CLAUDE_COMPACTION_FAILED"
 			case "compaction input rejected":
