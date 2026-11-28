@@ -14,6 +14,7 @@ func TestClaudeRecoveryUsesBoundGatewayRefusalAndIdleCommandReceipts(t *testing.
 		"exact", "exit", "unchanged model and exit", "saved same model and exit",
 		"wrong receipt", "wrong finish", "wrong source digest", "wrong model", "partial exit",
 		"foreign directory", "foreign provider", "new work", "no idle proof",
+		"passive records without exit", "passive records without idle", "foreign passive record", "model without exit",
 	} {
 		t.Run(name, func(t *testing.T) {
 			binding, path, launch, prompt := reportFixture(t)
@@ -64,7 +65,7 @@ func TestClaudeRecoveryUsesBoundGatewayRefusalAndIdleCommandReceipts(t *testing.
 				}
 			}
 			switch name {
-			case "unchanged model and exit":
+			case "unchanged model and exit", "model without exit":
 				first, second := "00000000-0000-4000-8000-000000000090", "00000000-0000-4000-8000-000000000091"
 				records = append(records,
 					map[string]any{"type": "system", "subtype": "local_command", "uuid": first, "sessionId": binding.ProviderID, "cwd": binding.Directory, "content": command("model")},
@@ -81,7 +82,19 @@ func TestClaudeRecoveryUsesBoundGatewayRefusalAndIdleCommandReceipts(t *testing.
 			case "wrong source digest":
 				result.StopEvidence = strings.Repeat("a", 64)
 			}
-			if name != "exact" {
+			switch name {
+			case "exact", "model without exit":
+			case "passive records without exit", "passive records without idle", "foreign passive record":
+				state.EndedIdle = name != "passive records without idle"
+				records = append(records,
+					map[string]any{"type": "cost-state"},
+					map[string]any{"type": "last-prompt"},
+					map[string]any{"type": "file-history-snapshot"},
+				)
+				if name == "foreign passive record" {
+					records[len(records)-1]["sessionId"] = "other"
+				}
+			default:
 				exit := "<local-command-stdout>Bye!</local-command-stdout>"
 				if name == "saved same model and exit" {
 					exit = "<local-command-stdout>Goodbye!</local-command-stdout>"
@@ -101,7 +114,7 @@ func TestClaudeRecoveryUsesBoundGatewayRefusalAndIdleCommandReceipts(t *testing.
 				state.EndedIdle = false
 			}
 			writeReportRecords(t, path, records)
-			want := name == "exact" || name == "exit" || name == "unchanged model and exit" || name == "saved same model and exit"
+			want := name == "exact" || name == "exit" || name == "unchanged model and exit" || name == "saved same model and exit" || name == "passive records without exit"
 			if got := claudeAdmissionRecoveryProven(state, launch, result); got != want {
 				t.Fatalf("recovery accepted=%v, expected=%v", got, want)
 			}
