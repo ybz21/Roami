@@ -184,6 +184,47 @@ func TestClaudeInterruptedEvidenceRecognizesBoundImageReadCompanion(t *testing.T
 	}
 }
 
+func TestClaudeInterruptedEvidenceAcceptsOnlySettledEarlierInlineSkills(t *testing.T) {
+	for _, mode := range []string{"inline", "inline in subdirectory", "missing expansion", "fork result", "foreign expansion"} {
+		t.Run(mode, func(t *testing.T) {
+			binding, path, _, prompt := reportFixture(t)
+			since := time.Now().UnixMilli()
+			history := completionCompanionTrace(binding, "Previous input", since-1000)[:5]
+			history[0]["uuid"] = "previous-root"
+			history[1]["parentUuid"] = "previous-root"
+			switch mode {
+			case "missing expansion":
+				history = history[:4]
+			case "fork result":
+				history[2]["toolUseResult"].(map[string]any)["context"] = "fork"
+			case "foreign expansion":
+				history[4]["sessionId"] = "other"
+			}
+			current := interruptedClaudeRecords(binding, prompt, "turn", since, false)
+			if mode == "inline in subdirectory" {
+				subdir := filepath.Join(binding.Directory, "project-material")
+				if err := os.Mkdir(subdir, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				for _, record := range current {
+					if record["cwd"] != nil {
+						record["cwd"] = subdir
+					}
+				}
+			}
+			writeReportRecords(t, path, append(history, current...))
+			result, _, completed := claudeInterruptedEvidence(binding, "turn", workspaceHash(prompt), since)
+			if mode == "inline" || mode == "inline in subdirectory" {
+				if result == nil || len(completed) != 2 || completed["skill-1"] != 0 {
+					t.Fatalf("incorrect current interruption: %+v %+v", result, completed)
+				}
+			} else if result != nil {
+				t.Fatalf("accepted unproved earlier skill: %+v", result)
+			}
+		})
+	}
+}
+
 func interruptedClaudeTask(t *testing.T) (Service, SessionBinding, Spec, string, []map[string]any) {
 	t.Helper()
 	s, binding := sessionFixture(t)
