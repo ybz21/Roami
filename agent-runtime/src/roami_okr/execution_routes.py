@@ -19,6 +19,7 @@ class MainExecution(Payload):
     model: str = Field(min_length=1, max_length=300)
     preparedLaunchKey: str = Field(min_length=1, max_length=200)
     recoverFromLaunchKey: str | None = Field(default=None, min_length=1, max_length=200)
+    recoverProviderFromLaunchKey: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 def mount_main_execution_routes(app, runtime):

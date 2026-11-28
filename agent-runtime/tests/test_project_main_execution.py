@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import sqlite3
 from types import SimpleNamespace
 
 import httpx
@@ -11,6 +12,7 @@ from test_swarm_provider_generations import prepared
 from roami_agent.executors.targets import TargetDirectory
 from roami_agent.protocol.errors import DomainError
 from roami_agent.storage.database import row
+from roami_agent.storage.migrations import schema_file
 from roami_okr.http import create_app
 from roami_okr.intake import wake_project
 from roami_okr.main import open_main
@@ -392,6 +394,176 @@ async def test_group_chat_reaches_same_bound_main_and_native_provider(
     assert (await runtime.swarms.snapshot("alice", group["id"], include_memory=False))[
         "mainConversationId"
     ] == main["id"]
+
+
+@pytest.mark.parametrize("change", [None, "profile", "source", "unknown", "wrong-turn"])
+async def test_main_adopts_same_provider_after_proven_recovery(
+    wake_runtime, store, monkeypatch, change
+):
+    runtime, main, spec, original, _ = await setup_main(wake_runtime, monkeypatch)
+    cid = main["id"]
+    original["sessionBinding"].update(
+        providerHome="/profile", providerHomeProof="profile-proof", providerHomeExplicit=False
+    )
+    await runtime.main_executions.configure("alice", cid, spec)
+    source = await runtime.chat.submit("alice", cid, "failed-input", "Continue yesterday's review")
+    turn_id = source["turnId"]
+    await store.call(
+        lambda db: (
+            db.execute("UPDATE turns SET state='failed' WHERE id=?", (turn_id,)),
+            db.execute("UPDATE jobs SET state='failed' WHERE aggregate_id=?", (turn_id,)),
+        ),
+        write=True,
+    )
+    group = await runtime.swarms.create(
+        "alice",
+        {
+            "commandKey": "original-team",
+            "name": "Original team",
+            "goal": "Coordinate original members",
+            "mainConversationId": cid,
+            "target": {"kind": "project", "projectId": "project"},
+        },
+    )
+    recovery_source = f"project-main:{'f' * 32 if change == 'wrong-turn' else turn_id}:{'b' * 24}"
+    recovered = prepared("recovered-main", session="recovered-session", model="gateway-vision")
+    recovered["recoveredFrom"] = "unrelated-turn" if change == "source" else recovery_source
+    recovered["sessionBinding"].update(
+        providerConversationId=original["sessionBinding"]["providerConversationId"],
+        providerHome="/other-profile" if change == "profile" else "/profile",
+        providerHomeProof="profile-proof",
+        providerHomeExplicit=False,
+    )
+    launches = []
+
+    async def command(sub, *args, **kwargs):
+        if sub == "prepared":
+            assert args == ("--key", recovered["launchKey"])
+            return copy.deepcopy(recovered)
+        if sub == "status":
+            assert args == ("--key", recovery_source)
+            return {
+                "state": "failed",
+                **stopped(
+                    {"session_id": original["sessionId"], "binding": original["sessionBinding"]},
+                    state="failed",
+                    known=change != "unknown",
+                ),
+            }
+        assert sub == "launch"
+        launches.append(kwargs["spec"])
+        return stopped(
+            {"session_id": recovered["sessionId"], "binding": recovered["sessionBinding"]}
+        )
+
+    runtime.main_executions.executor.command = command
+    request = {
+        **spec,
+        "commandKey": "adopt-recovered-main",
+        "expectedGeneration": 1,
+        "model": recovered["configuredModel"],
+        "preparedLaunchKey": recovered["launchKey"],
+        "recoverProviderFromLaunchKey": recovery_source,
+    }
+    before = (await runtime.conversations.messages("alice", cid))["messages"]
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(runtime)),
+        base_url="http://agent",
+        headers={"X-Roami-Owner": "alice"},
+    ) as client:
+        url = f"/v1/conversations/{cid}/execution"
+        response = await client.put(url, json=request)
+        if change is not None:
+            assert response.status_code == 409, response.text
+            assert (await client.get(url)).json()["data"]["generation"] == 1
+            assert not launches
+            return
+        assert response.status_code == 200, response.text
+        assert response.json()["data"] == {
+            "conversationId": cid,
+            "projectId": "project",
+            "generation": 2,
+            "executor": "claude",
+            "model": recovered["configuredModel"],
+            "sessionId": recovered["sessionId"],
+        }
+        assert (await client.put(url, json=request)).json() == response.json()
+    assert (await runtime.conversations.messages("alice", cid))["messages"] == before
+    assert not (await runtime.swarms.snapshot("alice", group["id"], include_memory=False))["paused"]
+    assert await store.call(
+        lambda db: [
+            tuple(item)
+            for item in db.execute(
+                "SELECT generation,session_id,provider_id FROM project_okr_main_providers "
+                "WHERE conversation_id=? ORDER BY generation",
+                (cid,),
+            )
+        ]
+    ) == [
+        (1, original["sessionId"], original["sessionBinding"]["providerConversationId"]),
+        (2, recovered["sessionId"], original["sessionBinding"]["providerConversationId"]),
+    ]
+    await runtime.start()
+    follow = await runtime.swarms.send(
+        "alice", group["id"], {"commandKey": "follow-recovery", "text": "@main Confirm the history"}
+    )
+    await until(
+        store,
+        lambda db: row(
+            db, "SELECT id FROM turns WHERE id=? AND state='completed'", (follow["turnId"],)
+        ),
+    )
+    sent = next(item for item in launches if follow["turnId"] in item["key"])
+    assert (
+        sent["sessionId"] == recovered["sessionId"]
+        and sent["preparedFrom"] == recovered["launchKey"]
+    )
+
+
+def test_provider_recovery_schema_preserves_existing_bindings_and_exclusive_ownership():
+    with sqlite3.connect(":memory:") as db:
+        db.execute("PRAGMA foreign_keys=ON")
+        db.executescript(
+            "CREATE TABLE project_okr_mains (owner_id TEXT,project_id TEXT,conversation_id TEXT);"
+            "INSERT INTO project_okr_mains VALUES ('alice','project','main'),('bob','other','another');"
+            + schema_file("0032_project_main_providers.sql")
+        )
+        insert = "INSERT INTO project_okr_main_providers VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+        original = (
+            "alice",
+            "project",
+            "main",
+            1,
+            "claude",
+            "free",
+            "old",
+            "old",
+            "provider",
+            "{}",
+            1,
+        )
+        db.execute(insert, original)
+        db.executescript(schema_file("0034_project_main_provider_recovery.sql"))
+        assert db.execute("SELECT * FROM project_okr_main_providers").fetchone() == original
+        db.execute(insert, (*original[:3], 2, "claude", "vision", "new", "new", *original[8:]))
+        with pytest.raises(
+            sqlite3.IntegrityError, match="PROJECT_MAIN_PROVIDER_OWNERSHIP_CONFLICT"
+        ):
+            db.execute(
+                insert,
+                (
+                    "bob",
+                    "other",
+                    "another",
+                    1,
+                    "claude",
+                    "vision",
+                    "foreign",
+                    "foreign",
+                    *original[8:],
+                ),
+            )
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
 async def test_native_provider_cannot_be_reused_by_another_project(wake_runtime, monkeypatch):
