@@ -60,7 +60,11 @@ func TestClaudeRecoveryUsesSavedFreeModelWithoutWritingProviderSettings(t *testi
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"models": rows, "revision": "fixture"}})
 		case "/v1/model-gateway/catalog":
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]string{"baseUrl": gateway, "revision": "fixture"}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
+				"baseUrl": gateway, "revision": "fixture",
+				"models":            []map[string]string{{"id": selected, "name": "Vision"}, {"id": "quota-model", "name": "Approval"}},
+				"qualifiedModelIds": map[string]string{"quota-model": "workbuddy/approval"},
+			}})
 		default:
 			http.NotFound(w, req)
 		}
@@ -109,6 +113,16 @@ func TestClaudeRecoveryUsesSavedFreeModelWithoutWritingProviderSettings(t *testi
 	if got, err := service.claudeRecoveryModel(ctx, selected); err != nil || got != "roami-claude/"+selected {
 		t.Fatalf("startup flag = %q, %v", got, err)
 	}
+	binding := SessionBinding{ProviderHome: profileHome}
+	spec := Spec{Executor: "claude", Persistent: true, Model: selected, ClassifierModel: "quota-model"}
+	if _, _, err := service.claudeLaunchRoutes(ctx, spec, binding); err == nil {
+		t.Fatal("classifier plan route accepted without explicit opt-in")
+	}
+	spec.AllowMetered = true
+	primary, classifier, err := service.claudeLaunchRoutes(ctx, spec, binding)
+	if err != nil || primary != "roami-claude/"+selected || classifier != "roami-claude/workbuddy/approval" {
+		t.Fatalf("scoped routes = %q, %q (%v)", primary, classifier, err)
+	}
 	after, err := os.ReadFile(configPath)
 	if err != nil || string(after) != string(before) {
 		t.Fatal("existing profile settings changed")
@@ -116,6 +130,23 @@ func TestClaudeRecoveryUsesSavedFreeModelWithoutWritingProviderSettings(t *testi
 	t.Setenv("ANTHROPIC_BASE_URL", "http://127.0.0.1:19148")
 	if _, err := service.claudeRecoveryModel(ctx, selected); err == nil || err.Error() != "SESSION_RECOVERY_GATEWAY_PROFILE_REQUIRED" {
 		t.Fatalf("different gateway accepted: %v", err)
+	}
+	if _, _, err := service.claudeLaunchRoutes(ctx, spec, binding); err == nil || err.Error() != "SESSION_RECOVERY_GATEWAY_PROFILE_REQUIRED" {
+		t.Fatalf("classifier accepted on a foreign gateway: %v", err)
+	}
+}
+
+func TestClaudeClassifierOptionRequiresManagedLaunch(t *testing.T) {
+	for _, spec := range []Spec{
+		{Executor: "codex", Persistent: true, Model: "main", ClassifierModel: "approval"},
+		{Executor: "claude", Model: "main", ClassifierModel: "approval"},
+		{Executor: "claude", Persistent: true, ClassifierModel: "approval"},
+		{Executor: "claude", Persistent: true, Model: "main", AllowMetered: true},
+		{Executor: "claude", Persistent: true, Model: "main", ClassifierModel: "approval", SessionID: "existing"},
+	} {
+		if err := validateClassifierLaunch(spec); err == nil {
+			t.Fatalf("unexpected classifier launch: %+v", spec)
+		}
 	}
 }
 

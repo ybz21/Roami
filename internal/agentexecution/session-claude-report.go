@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -139,6 +140,12 @@ func claudeReportedState(binding SessionBinding, turn, promptHash, launchDir str
 }
 
 func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*ReportedProgress, *ReportedToolError, *NativeToolActivity) {
+	return claudeReportWithExit(binding, turn, promptHash, launchDir, false)
+}
+
+var claudeLocalExitCommand = regexp.MustCompile(`^<command-name>/exit</command-name>\n[ \t]*<command-message>exit</command-message>\n[ \t]*<command-args></command-args>$`)
+
+func claudeReportWithExit(binding SessionBinding, turn, promptHash, launchDir string, stoppedIdle bool) (*ReportedProgress, *ReportedToolError, *NativeToolActivity) {
 	if turn == "" || promptHash == "" {
 		return nil, nil, nil
 	}
@@ -150,6 +157,9 @@ func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*
 
 	snapshot := claudeReportSnapshot{Format: 3, Path: path, Size: info.Size(), ModifiedNS: info.ModTime().UnixNano(), Inode: ino, ProviderID: binding.ProviderID, PromptID: turn, PromptHash: promptHash, Directory: binding.Directory}
 	cache := filepath.Join(launchDir, "reported-progress.json")
+	if stoppedIdle {
+		cache = filepath.Join(launchDir, "reported-recovery-progress.json")
+	}
 	var previous claudeReportSnapshot
 	if readJSON(cache, &previous) == nil && previous.Format == snapshot.Format && previous.Path == snapshot.Path && previous.Size == snapshot.Size && previous.ModifiedNS == snapshot.ModifiedNS && previous.Inode == snapshot.Inode && previous.ProviderID == snapshot.ProviderID && previous.PromptID == snapshot.PromptID && previous.PromptHash == snapshot.PromptHash && previous.Directory == snapshot.Directory {
 		return previous.Progress, previous.ToolError, previous.ToolActivity
@@ -169,6 +179,8 @@ func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*
 	var progress *ReportedProgress
 	observation := claudeToolErrorState{tools: map[string]string{}, classifierErrors: map[string]int{}}
 	valid := true
+	var exitPrompt, exitDirectory string
+	exitPhase := 0
 	activityKnown, activityMS := true, int64(0)
 	for {
 		var record claudeReportRecord
@@ -177,6 +189,31 @@ func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*
 		} else if err != nil {
 			valid = false
 			break
+		}
+		if stoppedIdle && matched && progress != nil {
+			owner := record.Type == "user" && !record.Sidechain && !record.Compact &&
+				record.SessionID == binding.ProviderID && record.PromptID != "" && record.PromptID != turn
+			if exitPhase > 0 || owner && record.Meta && claudeReportText(record.Message.Content) == claudeLocalCommandCaveat {
+				var local string
+				if !owner || json.Unmarshal(record.Message.Content, &local) != nil {
+					valid = false
+					break
+				}
+				switch {
+				case exitPhase == 0 && claudeInputDirectory(binding, record.Cwd):
+					exitPrompt, exitDirectory, exitPhase = record.PromptID, record.Cwd, 1
+				case exitPhase == 1 && !record.Meta && record.PromptID == exitPrompt && record.Cwd == exitDirectory && claudeLocalExitCommand.MatchString(local):
+					exitPhase = 2
+				case exitPhase == 2 && !record.Meta && record.PromptID == exitPrompt && record.Cwd == exitDirectory && local == "<local-command-stdout>Bye!</local-command-stdout>":
+					exitPhase = 3
+				default:
+					valid = false
+				}
+				if !valid {
+					break
+				}
+				continue
+			}
 		}
 		if record.Type == "user" || record.Type == "assistant" || record.Type == "api-request" || record.Type == "api-request-shape" || record.Type == "api-request-blob" || record.Type == "attachment" && record.Attachment.Type == "queued_command" {
 			stamp, problem := time.Parse(time.RFC3339Nano, record.Timestamp)
@@ -240,6 +277,7 @@ func claudeReport(binding SessionBinding, turn, promptHash, launchDir string) (*
 	if err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
 		return nil, nil, nil
 	}
+	valid = valid && (exitPhase == 0 || exitPhase == 3)
 	if !valid {
 		progress = nil
 		observation.report = nil

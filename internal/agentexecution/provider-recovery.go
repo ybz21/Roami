@@ -78,7 +78,11 @@ func (s Service) restoreProviderSession(ctx context.Context, dir string, spec Sp
 	if err != nil {
 		return Status{}, err
 	}
-	if spec.Model != "" {
+	if spec.ClassifierModel != "" {
+		if _, _, err = s.claudeLaunchRoutes(ctx, spec, *source.Receipt.Binding); err != nil {
+			return Status{}, err
+		}
+	} else if spec.Model != "" {
 		if _, err = s.claudeRecoveryGateway(ctx, spec.Model); err != nil {
 			return Status{}, err
 		}
@@ -188,6 +192,12 @@ func providerStopped(binding SessionBinding) bool {
 // The caller holds the original lifecycle lock until it records the recovery claim.
 func (s Service) providerRecovery(ctx context.Context, spec Spec, source providerRecoverySource) (Workspace, error) {
 	prior, receipt, state := source.Spec, source.Receipt, source.Lifecycle
+	if spec.ClassifierModel != "" && state.ModelSelection != nil {
+		return Workspace{}, fmt.Errorf("SESSION_MODEL_SELECTION_PENDING")
+	}
+	if state.ClassifierModel != "" && spec.ClassifierModel == "" {
+		return Workspace{}, fmt.Errorf("SESSION_RECOVERY_CLASSIFIER_REQUIRED")
+	}
 	if spec.ResumeFrom == "" || spec.ResumeFrom == spec.Key || prior.Key != spec.ResumeFrom || !spec.Persistent || !prior.Persistent || prior.Executor != spec.Executor || (spec.Executor != "codex" && spec.Executor != "claude") || receipt.Binding == nil || receipt.Workspace == nil || spec.SessionID != receipt.Session || receipt.Binding.ID != receipt.Session || !codexThreadID.MatchString(spec.ResumeProvider) || receipt.Binding.ProviderID != spec.ResumeProvider {
 		return Workspace{}, fmt.Errorf("SESSION_RECOVERY_BINDING_CONFLICT")
 	}
@@ -224,7 +234,7 @@ func (s Service) providerRecovery(ctx context.Context, spec Spec, source provide
 		if !ok || terminal == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != evidence || result.FinishedMS != terminal.FinishedMS {
 			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")
 		}
-	} else if progress := claudeReportedProgress(binding, state.TurnID, state.PromptHash, dir); progress == nil || progress.Directory != binding.Directory {
+	} else if progress, _, _ := claudeReportWithExit(binding, state.TurnID, state.PromptHash, dir, state.EndedIdle); progress == nil {
 		observed, digest := claudeExplicitRejectionEvidence(binding, state.TurnID, state.PromptHash)
 		if result.ErrorCode != "CLAUDE_API_REQUEST_FAILED" || observed == nil || !nativeEvidenceDigest.MatchString(result.StopEvidence) || result.StopEvidence != digest {
 			return Workspace{}, fmt.Errorf("SESSION_RECOVERY_TRANSCRIPT_UNAVAILABLE")

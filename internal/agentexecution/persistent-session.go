@@ -43,13 +43,24 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 		if err := restoreProviderHome(spec.Executor, binding); err != nil {
 			return s.failPersistent(dir, err)
 		}
-		if spec.Model != "" {
+		if spec.Model != "" && spec.ClassifierModel == "" {
 			recoveryModel, err = s.claudeRecoveryModel(ctx, spec.Model)
 			if err != nil {
 				return s.failPersistent(dir, err)
 			}
 			ac.Model = spec.Model
 		}
+	}
+	if spec.ClassifierModel != "" {
+		profile := binding
+		if spec.ResumeFrom == "" {
+			profile.ProviderHome = providerHome("claude")
+		}
+		recoveryModel, ac.ClaudeClassifierModel, err = s.claudeLaunchRoutes(ctx, spec, profile)
+		if err != nil {
+			return s.failPersistent(dir, err)
+		}
+		ac.Model = spec.Model
 	}
 	ac, err = ac.PrepareInteractive(s.Runtime)
 	if err != nil {
@@ -74,7 +85,7 @@ func (s Service) runPersistent(ctx context.Context, dir string, spec Spec) error
 		}
 		binding.Scope, binding.Processes = scope, processes
 	}
-	state := sessionLifecycle{Binding: binding, Executor: spec.Executor, Model: ac.Model, Permission: ac.Permission, Workspace: receipt.Workspace, State: "submitting", LaunchKey: spec.Key, InitialLaunch: true, Tools: map[string]bool{}, UpdatedMS: time.Now().UnixMilli()}
+	state := sessionLifecycle{Binding: binding, Executor: spec.Executor, Model: ac.Model, ClassifierModel: spec.ClassifierModel, Permission: ac.Permission, Workspace: receipt.Workspace, State: "submitting", LaunchKey: spec.Key, InitialLaunch: true, Tools: map[string]bool{}, UpdatedMS: time.Now().UnixMilli()}
 	state.Resuming = spec.ResumeFrom != ""
 	if err = writeJSON(path, state); err != nil {
 		return err
@@ -143,6 +154,7 @@ func (s Service) bindInitialSession(dir string, state *sessionLifecycle, binding
 		return fmt.Errorf("SESSION_BINDING_CONFLICT")
 	}
 	receipt.Binding, receipt.State = &binding, "running"
+	receipt.ClassifierModel = state.ClassifierModel
 	if state.Resuming {
 		receipt.ConfiguredModel = state.Model
 	}

@@ -24,7 +24,7 @@ func claudeHooks(command string) map[string]any {
 	return map[string]any{"hooks": hooks}
 }
 
-// PrepareClaude adds observers only; existing hook, policy and permission settings keep applying.
+// PrepareClaude scopes callbacks and an optional classifier model to one invocation.
 func PrepareClaude(ctx context.Context, options SessionOptions) ([]string, error) {
 	for _, path := range []string{options.Executable, options.Directory, options.DataDir} {
 		if !filepath.IsAbs(path) {
@@ -50,7 +50,14 @@ func PrepareClaude(ctx context.Context, options SessionOptions) ([]string, error
 	for index, arg := range args {
 		quoted[index] = shellQuote(arg)
 	}
-	settings, err := json.Marshal(claudeHooks(strings.Join(quoted, " ")))
+	config := claudeHooks(strings.Join(quoted, " "))
+	if options.ClaudeClassifierModel != "" {
+		config["env"] = map[string]string{
+			"CLAUDE_CODE_AUTO_MODE_MODEL":  options.ClaudeClassifierModel,
+			"CLAUDE_CODE_AUTO_MODE_SERVER": "0",
+		}
+	}
+	settings, err := json.Marshal(config)
 	if err != nil {
 		return nil, fmt.Errorf("CLAUDE_LIFECYCLE_UNAVAILABLE")
 	}

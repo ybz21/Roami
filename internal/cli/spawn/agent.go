@@ -16,14 +16,15 @@ import (
 
 // AgentConfig captures the knobs lib/agent.sh exposed via AGENT_* env vars.
 type AgentConfig struct {
-	ClaudeBin   string
-	CodexBin    string
-	Kind        string // agent registry kind
-	Interactive bool   // resident TUI member (vs one-shot task)
-	Permission  string
-	Model       string
-	Workdir     string
-	MaxTurns    string
+	ClaudeBin             string
+	CodexBin              string
+	Kind                  string // agent registry kind
+	Interactive           bool   // resident TUI member (vs one-shot task)
+	Permission            string
+	Model                 string
+	ClaudeClassifierModel string
+	Workdir               string
+	MaxTurns              string
 	// SessionUUID 让我们**指定** Claude Code 那一侧的对话 id（--session-id）。
 	// 不指定的话，「哪份 transcript 属于哪个会话」只能靠 cwd + 取最新文件猜，
 	// 而会话一死这个猜法就失准（同目录的别的会话会赢）。指定之后关联由构造保证，
@@ -146,6 +147,7 @@ func (c AgentConfig) PrepareInteractive(rt runtime.Runtime) (AgentConfig, error)
 	args, err := prepare(ctx, agentlifecycle.SessionOptions{
 		Binary: c.bin(c.resolve()), Executable: executable, Directory: c.Workdir,
 		HomeDir: paths.Home, DataDir: paths.Data, DatabaseDir: paths.Database, BackupDir: paths.Backup, TmuxBin: rt.TmuxBin,
+		ClaudeClassifierModel: c.ClaudeClassifierModel,
 	})
 	if err != nil {
 		return c, err
