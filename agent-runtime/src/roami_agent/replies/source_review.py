@@ -113,7 +113,11 @@ class SourceReplyReview:
         self.contexts = {}
         self.verdicts = {}
 
-    def observe_context(self, turn, prompt, source_ids=None):
+    def model_for(self, context):
+        configured = context.get("review_model")
+        return configured if configured is not None else self.model()
+
+    def observe_context(self, turn, prompt, source_ids=None, *, review_model=None):
         if turn.get("executionRunId"):
             return
         previous = self.contexts.get(turn["id"])
@@ -125,6 +129,7 @@ class SourceReplyReview:
             "messages": deepcopy(prompt),
             "source_ids": frozenset(source_ids) if source_ids is not None else None,
             "trigger": turn.get("trigger_kind", "user"),
+            "review_model": review_model,
             "source_readings": {},
         }
         if previous and all(
@@ -205,7 +210,7 @@ class SourceReplyReview:
         context, source = await self.sources(binding)
         if context["trigger"] != "user":
             return DraftVerdict(True, "")
-        model = self.model()
+        model = self.model_for(context)
         settings_hash = getattr(model, "settings_hash", None)
 
         async def assert_current_source():
@@ -213,7 +218,7 @@ class SourceReplyReview:
             if (
                 new_context is not context
                 or new_source != source
-                or self.model() is not model
+                or self.model_for(new_context) is not model
                 or getattr(model, "settings_hash", None) != settings_hash
             ):
                 raise DomainError("REPLY_REVIEW_SOURCE_CHANGED", 409)

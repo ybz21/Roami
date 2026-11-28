@@ -89,6 +89,22 @@ async def active_review(store, model, text="人数改成7，只回复整数"):
     return runtime, review, turn, binding
 
 
+async def test_independent_review_uses_its_turn_route_without_changing_default(store):
+    default = ReviewModel([])
+    selected = ReviewModel([{"accepted": True, "feedback": "Reviewed"}])
+    selected.model = "project-route"
+    _runtime, reviewer, turn, binding = await active_review(store, default)
+    reviewer.observe_context(turn, [], review_model=selected)
+    result = await reviewer.evaluate({"text": "7"}, binding, "answer")
+    assert result.accepted
+    assert len(selected.requests) == 1 and not default.requests
+    assert reviewer.model() is default
+    evidence = await store.call(
+        lambda db: row(db, "SELECT payload_json FROM events WHERE kind='reply.source_review'")
+    )
+    assert json.loads(evidence["payload_json"])["model"] == "project-route"
+
+
 @pytest.mark.parametrize(
     "arguments", [{}, {"text": "x", "json": 1}, {"json": float("nan")}, {"text": ""}, {"text": 1}]
 )

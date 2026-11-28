@@ -1,5 +1,7 @@
 from typing import Any, Protocol
 
+from roami_agent.protocol.models import Model
+
 
 class LoopSettings(Protocol):
     timeout_seconds: int
@@ -87,6 +89,9 @@ class ToolInvoker(Protocol):
 
 
 class ReplyReviewer(Protocol):
-    def observe_context(self, turn: dict, prompt: list, source_ids=None) -> None: ...
+    def model(self) -> Model: ...
+    def observe_context(
+        self, turn: dict, prompt: list, source_ids=None, *, review_model: Model | None = None
+    ) -> None: ...
     async def final_error(self, turn: dict, text: str) -> str | None: ...
     def forget_turn(self, turn: dict) -> None: ...

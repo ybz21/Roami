@@ -51,6 +51,7 @@ class AgentLoop:
         self.manifests, self.charge_task, self.turn_tasks = manifests, charge_task, turn_tasks
         self.clock = clock
         self.gateway, self.reply_reviewer = gateway, reply_reviewer
+        self.review_route: tuple[str, bool] | None = None
         self.require_final_tool = require_final_tool
         self.preemptible = set()
 
@@ -117,6 +118,7 @@ class AgentLoop:
         tid, cid, owner = (turn[k] for k in ["id", "conversation_id", "owner_id"])
         self.turn_tasks[tid] = asyncio.current_task()
         leases = ExitStack()
+        review_lease = ExitStack()
 
         selected_source = None
 
@@ -137,6 +139,14 @@ class AgentLoop:
         phase = "context"
         try:
             model = select_model()
+            review_model = None
+            if role == "main" and self.review_route is not None and self.reply_reviewer is not None:
+                source = self.reply_reviewer.model()
+                provider = review_lease.enter_context(
+                    source.lease() if hasattr(source, "lease") else nullcontext(source)
+                )
+                name, free_only = self.review_route
+                review_model = provider.with_model(name, free_only=free_only)
             execution_deadline = asyncio.timeout(turn.get("executionTimeoutSeconds"))
             async with execution_deadline:
                 instructions = (
@@ -181,6 +191,7 @@ class AgentLoop:
                             turn,
                             prompt,
                             source_ids=plan["modelSourceMessageIds"],
+                            review_model=review_model,
                         )
                     if task_id:
                         await self.charge_task(task_id)
@@ -582,6 +593,7 @@ class AgentLoop:
             raise
         finally:
             leases.close()
+            review_lease.close()
             self.preemptible.discard(tid)
             if self.reply_reviewer is not None:
                 self.reply_reviewer.forget_turn(turn)
