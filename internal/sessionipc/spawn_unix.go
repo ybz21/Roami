@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-// SpawnDetached launches roami-sessiond in its own session so parent exit never kills PTYs.
+// SpawnDetached launches roami-term in its own session so parent exit never kills PTYs.
 func SpawnDetached(binary string, args ...string) (int, error) {
 	cmd := exec.Command(binary, args...)
 	cmd.Stdin = nil

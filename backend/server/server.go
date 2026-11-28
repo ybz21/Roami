@@ -74,7 +74,7 @@ type Config struct {
 	Bind       string
 	TLSEnabled bool
 
-	// NativeSessionBackend mounts the native roami-sessiond WebSocket bridge when configured.
+	// NativeSessionBackend mounts the native roami-term WebSocket bridge when configured.
 	NativeSessionBackend sessionbackend.SessionBackend
 }
 

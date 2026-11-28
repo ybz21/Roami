@@ -8,18 +8,18 @@ roami_bin() {
     mkdir -p "$INSTALL_DIR"
     if [[ -f "${GO_SRC}/go.mod" ]]; then
         (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami.next" ./cmd/roami && mv -f "${INSTALL_DIR}/roami.next" "${INSTALL_DIR}/roami")
-        (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami-sessiond.next" ./cmd/roami-sessiond && mv -f "${INSTALL_DIR}/roami-sessiond.next" "${INSTALL_DIR}/roami-sessiond")
+        (cd "$GO_SRC" && CGO_ENABLED=0 go build -o "${INSTALL_DIR}/roami-term.next" ./cmd/roami-term && mv -f "${INSTALL_DIR}/roami-term.next" "${INSTALL_DIR}/roami-term")
     else
         if [[ ! -x "${INSTALL_DIR}/roami" ]]; then
             download_asset roami "roami-$(release_target)" || die "Roami download failed"
             chmod +x "${INSTALL_DIR}/roami"
         fi
-        if [[ ! -x "${INSTALL_DIR}/roami-sessiond" ]]; then
-            if download_asset roami-sessiond "roami-sessiond-$(release_target)"; then
-                chmod +x "${INSTALL_DIR}/roami-sessiond"
+        if [[ ! -x "${INSTALL_DIR}/roami-term" ]]; then
+            if download_asset roami-term "roami-term-$(release_target)"; then
+                chmod +x "${INSTALL_DIR}/roami-term"
             else
-                rm -f "${INSTALL_DIR}/roami-sessiond"
-                warn "未能下载 roami-sessiond，将回退到 tmux"
+                rm -f "${INSTALL_DIR}/roami-term"
+                warn "未能下载 roami-term，将回退到 tmux"
             fi
         fi
     fi

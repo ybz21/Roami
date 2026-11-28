@@ -23,15 +23,15 @@ func nativeTerminalEnabled() bool {
 	return true
 }
 
-// maybeConnectNativeTerminal enables the native roami-sessiond backend by default on all platforms.
-// Set ROAMI_NATIVE_TERMINAL=0 to disable and stay on tmux; if roami-sessiond is missing or fails
+// maybeConnectNativeTerminal enables the native roami-term backend by default on all platforms.
+// Set ROAMI_NATIVE_TERMINAL=0 to disable and stay on tmux; if roami-term is missing or fails
 // to start on Unix, it logs and falls back to tmux.
 func maybeConnectNativeTerminal(roamiBin, instanceRoot string) (sessionbackend.SessionBackend, func()) {
 	if !nativeTerminalEnabled() {
 		return nil, func() {}
 	}
-	sessiondBin := resolveSessiondBin(roamiBin)
-	mgr := sessionipc.NewManager(instanceRoot, sessiondBin)
+	termBin := resolveTermBin(roamiBin)
+	mgr := sessionipc.NewManager(instanceRoot, termBin)
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 	router, err := mgr.Router(ctx, tmuxrt.New().Backend())
@@ -40,17 +40,19 @@ func maybeConnectNativeTerminal(roamiBin, instanceRoot string) (sessionbackend.S
 		mgr.Close()
 		return nil, func() {}
 	}
-	log.Printf("原生终端已启用（roami-sessiond=%s）", sessiondBin)
+	log.Printf("原生终端已启用（roami-term=%s）", termBin)
 	return router, mgr.Close
 }
 
-func resolveSessiondBin(roamiBin string) string {
-	if explicit := strings.TrimSpace(os.Getenv("ROAMI_SESSIOND_BIN")); explicit != "" {
-		return explicit
+func resolveTermBin(roamiBin string) string {
+	for _, key := range []string{"ROAMI_TERM_BIN", "ROAMI_SESSIOND_BIN"} {
+		if explicit := strings.TrimSpace(os.Getenv(key)); explicit != "" {
+			return explicit
+		}
 	}
-	binName := "roami-sessiond"
+	binName := "roami-term"
 	if runtime.GOOS == "windows" {
-		binName = "roami-sessiond.exe"
+		binName = "roami-term.exe"
 	}
 	if roamiBin != "" {
 		sibling := filepath.Join(filepath.Dir(roamiBin), binName)

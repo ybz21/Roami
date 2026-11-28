@@ -49,7 +49,7 @@ func TestBundleActivationReplacesDirectorySymlinkAndPreservesPrevious(t *testing
 		t.Fatal(err)
 	}
 	entry := filepath.Join(bindir, "roami")
-	sessiondEntry := filepath.Join(bindir, "roami-sessiond")
+	termEntry := filepath.Join(bindir, "roami-term")
 	os.WriteFile(entry, []byte("old single binary"), 0755)
 	var slots []string
 	for _, name := range []string{"first", "second"} {
@@ -57,7 +57,7 @@ func TestBundleActivationReplacesDirectorySymlinkAndPreservesPrevious(t *testing
 		os.MkdirAll(filepath.Join(slot, "bin"), 0755)
 		os.WriteFile(filepath.Join(slot, "ready"), []byte("{}"), 0600)
 		os.WriteFile(filepath.Join(slot, "bin", "roami"), []byte(name), 0755)
-		os.WriteFile(filepath.Join(slot, "bin", "roami-sessiond"), []byte("sessiond-"+name), 0755)
+		os.WriteFile(filepath.Join(slot, "bin", "roami-term"), []byte("term-"+name), 0755)
 		if err := activateAgentBundle(slot, bindir); err != nil {
 			t.Fatal(err)
 		}
@@ -65,9 +65,9 @@ func TestBundleActivationReplacesDirectorySymlinkAndPreservesPrevious(t *testing
 		if err != nil || string(content) != name {
 			t.Fatalf("entry %s: %s %v", name, content, err)
 		}
-		sessiondContent, err := os.ReadFile(sessiondEntry)
-		if err != nil || string(sessiondContent) != "sessiond-"+name {
-			t.Fatalf("sessiond entry %s: %s %v", name, sessiondContent, err)
+		termContent, err := os.ReadFile(termEntry)
+		if err != nil || string(termContent) != "term-"+name {
+			t.Fatalf("term entry %s: %s %v", name, termContent, err)
 		}
 		slots = append(slots, slot)
 	}

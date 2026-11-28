@@ -55,7 +55,7 @@ def identity(state):
     return pid
 
 
-def stop_sessiond_hosts(root):
+def stop_term_hosts(root):
     db_path = root / "session-host.db"
     if not db_path.exists():
         return
@@ -86,7 +86,7 @@ def stop_sessiond_hosts(root):
             if res.returncode != 0:
                 continue
             cmdline = res.stdout
-        if "roami-sessiond" not in cmdline or root_str not in cmdline:
+        if ("roami-term" not in cmdline and "roami-sessiond" not in cmdline) or root_str not in cmdline:
             continue
         targets.append(host_pid)
     # First SIGTERM enters draining; a second SIGTERM triggers immediate host.Shutdown().
@@ -200,7 +200,7 @@ def main():
                 result = query(state["binary"], socket, "kill-server")
                 if result.returncode:
                     raise RuntimeError(result.stderr.strip())
-            stop_sessiond_hosts(root)
+            stop_term_hosts(root)
             print("Stopped recorded test tmux instance: " + str(root))
             return
         if not pid:

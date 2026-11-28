@@ -237,7 +237,7 @@ def wait_status(previous=None):
 
 try:
     install("fresh")
-    assert (root / "bin/roami-sessiond").exists(), "roami-sessiond symlink missing after install"
+    assert (root / "bin/roami-term").exists(), "roami-term symlink missing after install"
     first = wait_status()
     assert first["managed"]
     browser = urllib.request.build_opener(

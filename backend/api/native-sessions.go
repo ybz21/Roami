@@ -120,7 +120,7 @@ func (a *API) listNativeSummaries(ctx context.Context) []sessionbackend.SessionS
 	return out
 }
 
-// mergeNativeSessionsJSON merges native roami-sessiond sessions into /api/sessions JSON output
+// mergeNativeSessionsJSON merges native roami-term sessions into /api/sessions JSON output
 // (supporting both flat array and tree=1 format) without disturbing tmux rows.
 func (a *API) mergeNativeSessionsJSON(ctx context.Context, raw []byte) []byte {
 	nativeRows := a.listNativeSummaries(ctx)

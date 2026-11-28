@@ -1,5 +1,5 @@
 // Package sessionipc implements the yamux-multiplexed local IPC transport,
-// peer/token authentication, server, client, and detached host spawner for roami-sessiond.
+// peer/token authentication, server, client, and detached host spawner for roami-term.
 package sessionipc
 
 import (

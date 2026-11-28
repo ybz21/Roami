@@ -26,7 +26,7 @@ import (
 	"github.com/ybz21/Roami/internal/ttyraw"
 )
 
-// maybeRunNativeSessionCLI integrates native roami-sessiond sessions into `roami session`:
+// maybeRunNativeSessionCLI integrates native roami-term sessions into `roami session`:
 //   - `new`: routes to native by default on all platforms unless `--backend tmux` or `ROAMI_NATIVE_TERMINAL=0`.
 //   - `ls`: merges live native sessions alongside legacy tmux sessions (plain and --json).
 //   - target commands (`a/attach/sp/kp/nw/lw/kw/capture/send/rename/kill`): auto-route by ID
@@ -130,8 +130,8 @@ func dispatchNativeSessionCLI(cmd string, args []string, in io.Reader, out, errO
 			selfBin = resolved
 		}
 	}
-	sessiondBin := resolveSessiondBin(selfBin)
-	mgr := sessionipc.NewManager(paths.Data, sessiondBin)
+	termBin := resolveTermBin(selfBin)
+	mgr := sessionipc.NewManager(paths.Data, termBin)
 	defer mgr.Close()
 
 	connCtx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
@@ -139,14 +139,14 @@ func dispatchNativeSessionCLI(cmd string, args []string, in io.Reader, out, errO
 	if wantNativeCreate || explicitNative {
 		cli, _, err = mgr.ConnectActive(connCtx)
 	} else {
-		// Never spawn roami-sessiond just to list or probe whether an existing target lives in native.
+		// Never spawn roami-term just to list or probe whether an existing target lives in native.
 		cli, _, err = mgr.ConnectExisting(connCtx)
 	}
 	cancel()
 	if err != nil {
-		// On Unix, an implicit default `new` gracefully falls back to tmux when roami-sessiond
+		// On Unix, an implicit default `new` gracefully falls back to tmux when roami-term
 		// is not installed (matching roami server); explicit --backend native and Windows fail fast.
-		if wantNativeCreate && !explicitNative && sessiondBin == "" {
+		if wantNativeCreate && !explicitNative && termBin == "" {
 			return false, 0
 		}
 		if wantNativeCreate || explicitNative {

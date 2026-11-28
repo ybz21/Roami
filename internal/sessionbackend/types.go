@@ -1,5 +1,5 @@
 // Package sessionbackend defines the business-level session, pane, and window layout contracts
-// shared by the tmux compatibility adapter and the native roami-sessiond host.
+// shared by the tmux compatibility adapter and the native roami-term host.
 package sessionbackend
 
 import (

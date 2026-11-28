@@ -21,16 +21,16 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	sessiondBin := filepath.Join(tmp, "roami-sessiond")
-	build := exec.Command("go", "build", "-o", sessiondBin, "../roami-sessiond")
+	termBin := filepath.Join(tmp, "roami-term")
+	build := exec.Command("go", "build", "-o", termBin, "../roami-term")
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build roami-sessiond: %v\n%s", err, out)
+		t.Fatalf("build roami-term: %v\n%s", err, out)
 	}
 
 	// Verify native PTY is the default on Unix without setting ROAMI_NATIVE_TERMINAL,
 	// while --backend tmux and ROAMI_NATIVE_TERMINAL=0 still fall back cleanly to tmux.
 	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
-	t.Setenv("ROAMI_SESSIOND_BIN", sessiondBin)
+	t.Setenv("ROAMI_TERM_BIN", termBin)
 	t.Setenv("ROAMI_HOME", filepath.Join(tmp, "home"))
 	t.Setenv("ROAMI_DATA", filepath.Join(tmp, "data"))
 	t.Cleanup(func() {
@@ -64,7 +64,7 @@ func TestNativeSessionCLIEndToEnd(t *testing.T) {
 	}
 	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
 
-	// Default `new` (without --backend or env var) creates on roami-sessiond.
+	// Default `new` (without --backend or env var) creates on roami-term.
 	out, errOut, handled, code := run("new", "--size", "100x30", "--detach", "cli-e2e", "--", "/bin/sh")
 	if !handled || code != 0 || out != "cli-e2e" {
 		t.Fatalf("default new failed: handled=%v code=%d out=%q err=%q", handled, code, out, errOut)
@@ -246,12 +246,13 @@ func TestNativeTerminalEnabledDefaultAndOptOut(t *testing.T) {
 	}
 }
 
-func TestDefaultNewFallsBackToTmuxWhenSessiondMissingOnUnix(t *testing.T) {
+func TestDefaultNewFallsBackToTmuxWhenTermBinMissingOnUnix(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("unix fallback test")
 	}
 	tmp := t.TempDir()
 	t.Setenv("ROAMI_NATIVE_TERMINAL", "")
+	t.Setenv("ROAMI_TERM_BIN", "")
 	t.Setenv("ROAMI_SESSIOND_BIN", "")
 	t.Setenv("PATH", tmp)
 	t.Setenv("ROAMI_HOME", filepath.Join(tmp, "home"))
@@ -260,13 +261,13 @@ func TestDefaultNewFallsBackToTmuxWhenSessiondMissingOnUnix(t *testing.T) {
 	var out, errOut bytes.Buffer
 	handled, code := dispatchNativeSessionCLI("new", []string{"--detach", "fallback-demo"}, bytes.NewReader(nil), &out, &errOut)
 	if handled || code != 0 {
-		t.Fatalf("implicit default new without roami-sessiond should fall back to tmux: handled=%v code=%d out=%q err=%q", handled, code, out.String(), errOut.String())
+		t.Fatalf("implicit default new without roami-term should fall back to tmux: handled=%v code=%d out=%q err=%q", handled, code, out.String(), errOut.String())
 	}
 
 	out.Reset()
 	errOut.Reset()
 	handled, code = dispatchNativeSessionCLI("new", []string{"--backend", "native", "--detach", "strict-demo"}, bytes.NewReader(nil), &out, &errOut)
 	if !handled || code == 0 {
-		t.Fatalf("explicit --backend native without roami-sessiond should fail fast: handled=%v code=%d out=%q err=%q", handled, code, out.String(), errOut.String())
+		t.Fatalf("explicit --backend native without roami-term should fail fast: handled=%v code=%d out=%q err=%q", handled, code, out.String(), errOut.String())
 	}
 }

@@ -102,7 +102,7 @@ esac
 #    也可编辑 config.yaml 的 web.password，或用「设置 → 修改登录口令」。
 #    这里不再生成/写回口令，避免用环境变量覆盖掉「首次设置」流程。
 BIN=backend/ttmux-web
-SESSIOND_BIN=backend/roami-sessiond
+TERM_BIN=backend/roami-term
 
 # ── dev：从源码刷新 ttmux CLI + chrome + skills ─────────────────────
 # 原 install.sh 的源码构建编排已并入这里（后端/前端由本脚本下面自行增量编译）。
@@ -176,11 +176,11 @@ build_backend() {
     return 1
   }
   mv -f backend/ttmux-web.next "$BIN"
-  go build -o backend/roami-sessiond.next ./cmd/roami-sessiond || {
-    rm -f backend/roami-sessiond.next
+  go build -o backend/roami-term.next ./cmd/roami-term || {
+    rm -f backend/roami-term.next
     return 1
   }
-  mv -f backend/roami-sessiond.next "$SESSIOND_BIN"
+  mv -f backend/roami-term.next "$TERM_BIN"
 }
 if [ "$DEV" = 1 ]; then
   # Build flags select the development channel even when source timestamps are unchanged.
@@ -188,7 +188,7 @@ if [ "$DEV" = 1 ]; then
   build_backend
 elif [ ! -x "$BIN" ]; then
   echo "✘ 未找到 $BIN —— 先构建：bash install.sh   或   bash start.sh --dev"; exit 1
-elif [ ! -x "$SESSIOND_BIN" ] || { [ -d backend/api ] && [ "$(find backend cmd internal pkg plugins \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) \( -newer "$BIN" -o -newer "$SESSIOND_BIN" \) 2>/dev/null | head -1)" ]; }; then
+elif [ ! -x "$TERM_BIN" ] || { [ -d backend/api ] && [ "$(find backend cmd internal pkg plugins \( -name '*.go' -o -name '*.tmpl' -o -name '*.html' \) \( -newer "$BIN" -o -newer "$TERM_BIN" \) 2>/dev/null | head -1)" ]; }; then
   echo "==> 检测到后端源码变更，自动重新编译..."
   build_backend
 fi
