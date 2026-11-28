@@ -54,7 +54,16 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 		return nil, "", nil
 	}
 	digest := sha256.New()
-	decoder := json.NewDecoder(io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
+	result, completed := readClaudeTerminalOutcome(binding, turn, promptHash, since, model, allowFailureAfterTools, io.TeeReader(io.LimitReader(file, (64<<20)+1), digest))
+	after, err := file.Stat()
+	if result == nil || err != nil || !sameClaudeInputFile(info, after) {
+		return nil, "", nil
+	}
+	return result, hex.EncodeToString(digest.Sum(nil)), completed
+}
+
+func readClaudeTerminalOutcome(binding SessionBinding, turn, promptHash string, since int64, model string, allowFailureAfterTools bool, input io.Reader) (*Result, map[string]int64) {
+	decoder := json.NewDecoder(input)
 	matched, terminal, compact := false, false, false
 	companions := newClaudeCompanions(binding)
 	reachable, pending, completed := map[string]bool{}, map[string]bool{}, map[string]int64{}
@@ -65,21 +74,21 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 		if err := decoder.Decode(&record); err == io.EOF {
 			break
 		} else if err != nil || record.Sidechain {
-			return nil, "", nil
+			return nil, nil
 		}
 		normal := record.Type == "user" || record.Type == "assistant"
 		var blocks []claudeInterruptedBlock
 		content := bytes.TrimSpace(record.Message.Content)
 		if normal && len(content) > 0 && content[0] == '[' {
 			if json.Unmarshal(record.Message.Content, &blocks) != nil {
-				return nil, "", nil
+				return nil, nil
 			}
 		}
 		// Earlier deferred work must not disappear behind the selected prompt or compaction.
 		if record.Type == "assistant" {
 			for _, block := range blocks {
 				if !companions.call(block) {
-					return nil, "", nil
+					return nil, nil
 				}
 			}
 		}
@@ -95,17 +104,17 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 			stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)
 			_, directoryOK := reportDirectory(binding.Directory, record.Cwd)
 			if err != nil || stamp.UnixMilli() < since || record.SessionID != binding.ProviderID || record.UUID == "" || !filepath.IsAbs(record.Cwd) || !directoryOK {
-				return nil, "", nil
+				return nil, nil
 			}
 			matched, reachable[record.UUID] = true, true
 			continue
 		}
 		if record.SessionID != "" && record.SessionID != binding.ProviderID {
-			return nil, "", nil
+			return nil, nil
 		}
 		if record.Cwd != "" {
 			if _, ok := reportDirectory(binding.Directory, record.Cwd); !ok {
-				return nil, "", nil
+				return nil, nil
 			}
 		}
 		if terminal {
@@ -116,12 +125,12 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 			if record.Type == "system" && record.Subtype == "turn_duration" {
 				continue
 			}
-			return nil, "", nil
+			return nil, nil
 		}
 		linked := reachable[record.Parent] || reachable[record.LogicalParent]
 		if record.UUID != "" && linked {
 			if reachable[record.UUID] {
-				return nil, "", nil
+				return nil, nil
 			}
 			reachable[record.UUID] = true
 		}
@@ -130,58 +139,58 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 			case "system":
 				if record.Subtype == "stop_hook_summary" {
 					if !linked || finalText == "" || len(pending) != 0 || !companions.settled() || record.SnakeSessionID != binding.ProviderID || record.PreventedContinuation == nil || *record.PreventedContinuation || record.HookErrors == nil || len(*record.HookErrors) != 0 || record.FailedHooks == nil || len(*record.FailedHooks) != 0 || record.AddedContext == nil || len(*record.AddedContext) != 0 {
-						return nil, "", nil
+						return nil, nil
 					}
 					stamp, problem := time.Parse(time.RFC3339Nano, record.Timestamp)
 					if problem != nil || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
-						return nil, "", nil
+						return nil, nil
 					}
 					terminal, finished = true, stamp.UnixMilli()
 				}
 				if record.Subtype == "compact_boundary" {
 					if !linked || len(pending) != 0 || record.SessionID != binding.ProviderID || record.Cwd != binding.Directory {
-						return nil, "", nil
+						return nil, nil
 					}
 					compact = true
 				}
 			case "attachment", "last-prompt", "mode", "permission-mode", "atis-latch", "tools-used", "api-request-blob", "api-request", "api-request-shape", "file-history-snapshot", "file-history-delta", "cost-state", "ai-title":
 			default:
-				return nil, "", nil
+				return nil, nil
 			}
 			continue
 		}
 		if !linked || record.UUID == "" || record.SessionID != binding.ProviderID || record.PromptID != "" && record.PromptID != turn {
-			return nil, "", nil
+			return nil, nil
 		}
 		stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)
 		if err != nil {
-			return nil, "", nil
+			return nil, nil
 		}
 		if record.Type == "assistant" {
 			if allowFailureAfterTools && record.APIError {
 				if finalText != "" || compact || len(pending) != 0 || len(completed) == 0 || !companions.settled() || stamp.UnixMilli() < since || stamp.After(time.Now().Add(time.Second)) {
-					return nil, "", nil
+					return nil, nil
 				}
 				refusal = claudeFinalGatewayRefusal(record, blocks, text)
 				if refusal == "" {
-					return nil, "", nil
+					return nil, nil
 				}
 				terminal, finished = true, stamp.UnixMilli()
 				continue
 			}
 			if finalText != "" || model != "" && strings.TrimPrefix(record.Message.Model, "roami-claude/") != strings.TrimPrefix(model, "roami-claude/") {
-				return nil, "", nil
+				return nil, nil
 			}
 			for _, block := range blocks {
 				switch block.Type {
 				case "text", "thinking", "redacted_thinking":
 				case "tool_use":
 					if block.ID == "" || pending[block.ID] || completed[block.ID] != 0 {
-						return nil, "", nil
+						return nil, nil
 					}
 					pending[block.ID] = true
 				default:
-					return nil, "", nil
+					return nil, nil
 				}
 			}
 			if record.Message.StopReason == "end_turn" && len(pending) == 0 && text != "" {
@@ -190,11 +199,11 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 			continue
 		}
 		if record.PromptID != turn {
-			return nil, "", nil
+			return nil, nil
 		}
 		if record.Compact {
 			if !compact || !record.VisibleOnly || len(pending) != 0 {
-				return nil, "", nil
+				return nil, nil
 			}
 			compact = false
 			continue
@@ -204,23 +213,22 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 			continue
 		}
 		if text != "" || len(blocks) == 0 {
-			return nil, "", nil
+			return nil, nil
 		}
 		for _, block := range blocks {
 			if block.Type != "tool_result" || !pending[block.ToolUseID] || stamp.UnixMilli() > time.Now().Add(time.Second).UnixMilli() {
-				return nil, "", nil
+				return nil, nil
 			}
 			delete(pending, block.ToolUseID)
 			completed[block.ToolUseID] = stamp.UnixMilli()
 		}
 	}
-	after, err := file.Stat()
-	if !matched || !terminal || err != nil || !os.SameFile(info, after) || after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
-		return nil, "", nil
+	if !matched || !terminal {
+		return nil, nil
 	}
 	for _, stamp := range completed {
 		if stamp > finished {
-			return nil, "", nil
+			return nil, nil
 		}
 	}
 	result := &Result{State: "succeeded", Summary: finalText, ExitCode: 0, FinishedMS: finished}
@@ -228,7 +236,7 @@ func claudeTerminalEvidence(binding SessionBinding, turn, promptHash string, sin
 		// This is a partial execution and must not trigger a no-work retry.
 		result.State, result.ErrorCode, result.Summary, result.ExitCode = "failed", "CLAUDE_MODEL_REQUEST_FAILED_AFTER_TOOLS", refusal, -1
 	}
-	return result, hex.EncodeToString(digest.Sum(nil)), completed
+	return result, completed
 }
 
 func ownedClaudePastedTurn(binding SessionBinding, promptHash string, since int64) string {
