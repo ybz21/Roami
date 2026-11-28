@@ -1,4 +1,4 @@
-import { Spin } from 'antd'
+import { Alert, Button, Spin } from 'antd'
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { type AgentKind } from '../agent-kind'
 import { useAgentInbox } from '../components/agent/useAgentInbox'
@@ -53,7 +53,7 @@ type AppRoutesProps = {
   isMobile: boolean
   active: string | null
   projects: TreeSrc['projects']
-  projectDirectory?: { loaded: boolean; error: boolean; retry: () => void; projectSwarms?: ProjectSwarm[] | null }
+  projectDirectory?: { loaded: boolean; error: boolean; retry: () => void; projectSwarms?: ProjectSwarm[] | null; projectSwarmsError?: boolean }
   actions: RouteActions
   mobileProject: MobileProject
   mobileSearchNonce: number
@@ -96,6 +96,14 @@ function AppRouteContent({ foreground, routing, isMobile, hasDock, active, proje
     const query = getHashParams().toString()
     location.replace('#/' + projectSwarmPath(linkedProject) + (query ? '?' + query : ''))
   }, [foreground, linkedProject])
+  let swarmPage = <Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => {
+    location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm'
+  }} />
+  if (swarmSub && (projectSwarms === null || linkedProject)) {
+    swarmPage = projectDirectory?.projectSwarmsError
+      ? <Alert type="error" role="alert" message={t('okr.swarmLoadFailed')} action={<Button onClick={projectDirectory.retry}>{t('agent.retry')}</Button>} />
+      : <Spin />
+  }
   const mobileSessions = (
     <MobileSessions initialProjectKey={projectSub || undefined} projectSwarms={projectSwarms} onOpen={(n) => openTerm(n)} openProject={mobileProject} searchNonce={mobileSearchNonce}
       onNewTask={actions.newTask}
@@ -104,7 +112,7 @@ function AppRouteContent({ foreground, routing, isMobile, hasDock, active, proje
   const pages = {
     okr: definePage(okrProject ? <ProjectOkr key={`${curNodeId || 'local'}:${okrProject}`} projectId={okrProject} projectName={projects.find(p => p.key === okrProject)?.name} projectDir={projects.find(p => p.key === okrProject)?.dir} onSession={openTerm} fromOverview />
       : <OkrProjects projects={projects} loaded={projectDirectory?.loaded ?? true} error={projectDirectory?.error ?? false} retry={projectDirectory?.retry || (() => {})} />, { lifetime: 'retain' }),
-    swarm: definePage(swarmSub && (projectSwarms === null || linkedProject) ? <Spin /> : <Swarm openTerm={openTerm} initialSwarm={swarmSub || undefined} onNav={(n) => { location.hash = n ? '#/swarm/' + encodeURIComponent(n) : '#/swarm' }} />, { lifetime: 'retain' }),
+    swarm: definePage(swarmPage, { lifetime: 'retain' }),
     projects: definePage(projectSub && projectView === 'okr' ? <ProjectOkr key={`${curNodeId || 'local'}:${projectSub}`} projectId={projectSub} projectName={projects.find(p => p.key === projectSub)?.name} projectDir={projects.find(p => p.key === projectSub)?.dir} openSwarm={projectSwarm} onSession={openTerm} /> : isMobile
       ? mobileSessions
       : <Projects openTerm={openTerm} closeTerm={closeTerm} initialKey={projectSub || undefined} activeTerm={active} projectSwarms={projectSwarms} />, { lifetime: 'retain' }),

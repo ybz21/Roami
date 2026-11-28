@@ -12,7 +12,10 @@ export function loadOkrDirectory(): Promise<OkrOverview[]> {
   if (!request) {
     const abort = new AbortController(), timeout = setTimeout(() => abort.abort(), 15000)
     request = api('GET', '/okr', undefined, { signal: abort.signal })
-      .then(value => (value.data || []) as OkrOverview[])
+      .then(value => {
+        if (!Array.isArray(value?.data)) throw new Error('OKR_DIRECTORY_UNAVAILABLE')
+        return value.data as OkrOverview[]
+      })
       .finally(() => { clearTimeout(timeout); pending.delete(scope) })
     pending.set(scope, request)
   }
