@@ -1,6 +1,7 @@
 """Typed node observations prove the live timer ticks only the selected cron job."""
 
 import copy
+import json
 import time
 from types import SimpleNamespace
 
@@ -115,3 +116,24 @@ async def test_qualified_command_and_single_named_list_keep_exact_scope(runner_c
     command = props["ExecStart"][1][0]
     command[1][3:] = ["roam.cron:tick", "--names", '["project-morning"]']
     assert await runner.probe("project.timer", "project-morning", allow_short_command=False)
+
+
+@pytest.mark.parametrize(
+    "observed,verified",
+    [
+        (["project-review", "project-morning"], True),
+        (["project-morning"], False),
+        (["project-morning", "project-review", "foreign-project"], False),
+        (["project-morning", "project-review", "project-review"], False),
+    ],
+)
+async def test_project_timer_must_run_exact_declared_jobs(runner_case, observed, verified):
+    runner, props, _ = runner_case
+    command = props["ExecStart"][1][0]
+    command[1][3:] = ["roam.cron:tick", "--names", json.dumps(observed)]
+    names = ("project-morning", "project-review")
+    if verified:
+        assert await runner.probe("project.timer", names, allow_short_command=False)
+    else:
+        with pytest.raises(DomainError, match="GOAL_SCHEDULE_CONFIGURATION_CONFLICT"):
+            await runner.probe("project.timer", names, allow_short_command=False)
