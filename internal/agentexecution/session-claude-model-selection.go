@@ -100,12 +100,14 @@ func claudeSessionModelSuffix(data []byte, binding SessionBinding, models []stri
 	if len(data) == 0 || data[len(data)-1] != '\n' || binding.ProviderID == "" || binding.Directory == "" {
 		return "", false
 	}
-	prompt, phase := "", 0
+	// The Claude session can change directories without changing its workspace binding.
+	var prompt, directory string
+	phase := 0
 	for _, line := range bytes.Split(data[:len(data)-1], []byte("\n")) {
 		var record claudeInterruptedRecord
 		if json.Unmarshal(line, &record) != nil || record.Sidechain ||
 			(record.SessionID != "" && record.SessionID != binding.ProviderID) ||
-			(record.Cwd != "" && record.Cwd != binding.Directory) {
+			(record.Cwd != "" && !claudeInputDirectory(binding, record.Cwd)) {
 			return "", false
 		}
 		switch record.Type {
@@ -116,7 +118,7 @@ func claudeSessionModelSuffix(data []byte, binding SessionBinding, models []stri
 				continue
 			}
 		case "user":
-			if record.Compact || record.SessionID != binding.ProviderID || record.Cwd != binding.Directory || record.PromptID == "" {
+			if record.Compact || record.SessionID != binding.ProviderID || record.Cwd == "" || record.PromptID == "" {
 				return "", false
 			}
 			var value string
@@ -126,16 +128,16 @@ func claudeSessionModelSuffix(data []byte, binding SessionBinding, models []stri
 			switch phase {
 			case 0:
 				if record.Meta && value == claudeLocalCommandCaveat {
-					prompt, phase = record.PromptID, 1
+					prompt, directory, phase = record.PromptID, record.Cwd, 1
 					continue
 				}
 			case 1:
-				if !record.Meta && record.PromptID == prompt && claudeModelPickerCommand.MatchString(value) {
+				if !record.Meta && record.PromptID == prompt && record.Cwd == directory && claudeModelPickerCommand.MatchString(value) {
 					phase = 2
 					continue
 				}
 			case 2:
-				if !record.Meta && record.PromptID == prompt && claudeSessionModelOutput(value, models) {
+				if !record.Meta && record.PromptID == prompt && record.Cwd == directory && claudeSessionModelOutput(value, models) {
 					phase = 3
 					continue
 				}
