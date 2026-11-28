@@ -117,7 +117,7 @@ class AutomaticModeReview:
         ):
             raise DomainError("INVALID_PUBLICATION_ACCOUNT_SCOPE")
         context, _ = await self.reviewer.sources(binding)
-        model = self.reviewer.model()
+        model = self.reviewer.model_for(context)
         if model is None or not callable(getattr(model, "stream", None)):
             raise DomainError("PUBLICATION_POLICY_REVIEW_UNAVAILABLE", 409)
         settings = getattr(model, "settings_hash", None)
@@ -143,7 +143,7 @@ class AutomaticModeReview:
         if (
             latest is not context
             or current != payload
-            or self.reviewer.model() is not model
+            or self.reviewer.model_for(latest) is not model
             or getattr(model, "settings_hash", None) != settings
         ):
             raise DomainError("PUBLICATION_POLICY_SOURCE_CHANGED", 409)

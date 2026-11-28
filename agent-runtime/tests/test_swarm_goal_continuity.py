@@ -42,7 +42,8 @@ class Reviewer:
         self.context = object()
         self.calls = []
 
-    def model(self):
+    def model_for(self, context):
+        assert context is self.context
         return self.current
 
     async def sources(self, binding):

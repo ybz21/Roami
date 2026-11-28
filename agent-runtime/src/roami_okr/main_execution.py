@@ -20,6 +20,7 @@ from roami_agent.storage.swarm_repository import receipt
 from roami_agent.storage.transcript_repository import owned
 from roami_okr.intake import assert_project_main
 from roami_okr.main_model_selection import main_model_selection_status, pending_model_selection
+from roami_okr.main_review_model import main_review_route
 from roami_okr.native_main import NativeMain
 from roami_okr.settled_route_recovery import recover_route_wait, recovery_candidates
 
@@ -94,6 +95,8 @@ def main_configuration(db, owner, cid):
     )
     if selection := pending_model_selection(db, cid):
         config["modelSelection"] = main_model_selection_status(selection)
+    if review := main_review_route(db, owner, cid):
+        config["reviewRoute"] = review
     return config
 
 
@@ -312,13 +315,16 @@ class MainExecutions:
         return launch[1], refusal
 
     async def loop_for(self, loop, turn):
-        binding = await self.db.call(
-            lambda db: main_binding(db, turn["owner_id"], turn["conversation_id"])
+        owner, cid = turn["owner_id"], turn["conversation_id"]
+        binding, review = await self.db.call(
+            lambda db: (main_binding(db, owner, cid), main_review_route(db, owner, cid))
         )
         if binding is None:
             return loop
         binding["binding"] = json.loads(binding.pop("binding_json"))
         selected = copy(loop)
+        if review and review["model"] is not None and selected.reply_reviewer is not None:
+            selected.review_route = (review["model"], review["freeOnly"])
 
         async def observe_delivery(launch_key, state):
             def write(db):

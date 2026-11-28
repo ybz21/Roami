@@ -172,7 +172,7 @@ class GoalContinuityReview:
         if self.reviewer is None:
             raise DomainError("SWARM_GOAL_POLICY_REVIEW_UNAVAILABLE", 409)
         context, _ = await self.reviewer.sources(binding)
-        model = self.reviewer.model()
+        model = self.reviewer.model_for(context)
         if model is None or not callable(getattr(model, "stream", None)):
             raise DomainError("SWARM_GOAL_POLICY_REVIEW_UNAVAILABLE", 409)
         settings = getattr(model, "settings_hash", None)
@@ -186,7 +186,7 @@ class GoalContinuityReview:
         latest, _ = await self.reviewer.sources(binding)
         if (
             latest is not context
-            or self.reviewer.model() is not model
+            or self.reviewer.model_for(latest) is not model
             or getattr(model, "settings_hash", None) != settings
         ):
             raise DomainError("SWARM_GOAL_POLICY_SOURCE_CHANGED", 409)
