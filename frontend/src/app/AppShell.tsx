@@ -115,7 +115,8 @@ function AppShellContent({ routing, logout }: AppShellProps) {
     actions={{ openTerm, closeTerm, renameOpenTerm, newTerminalInTask }} />
   openTermRef.current = (n) => openTerm(n)
   const page = <AppRoutes visible={workspace.pageVisible} openPages={pageTabsState.pageTabs} hasDock={terms.length > 0} routing={routing} isMobile={isMobile} active={active} projects={treeSrc.projects}
-    projectDirectory={{ loaded: directory.projectsLoaded, error: directory.projectsError, retry: directory.refresh, projectSwarms: directory.projectSwarms }}
+    projectDirectory={{ loaded: directory.projectsLoaded, error: directory.projectsError, retry: directory.refresh,
+      projectSwarms: directory.projectSwarms, projectSwarmsError: directory.projectSwarmsError }}
     actions={{ openTerm, closeTerm, newTerminalAt, logout, newTask: projectActions.newTask, openProject: (p) => { const project = treeSrc.projects.find(item => item.dir === p.dir); if (project) { setMobileProject(null); go(projectPath(project.key)) } else { setMobileProject({ ...p, at: Date.now() }); go('projects') } } }}
     mobileProject={mobileProject} mobileSearchNonce={mobileSearchNonce} mobileActionsHost={mobileActionsHost}
     fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined}

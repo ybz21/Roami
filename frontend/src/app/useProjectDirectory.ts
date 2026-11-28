@@ -25,8 +25,10 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
   const treeReload = useRef<(() => void) | null>(null)
   const [unfinished, setUnfinished] = useState(0)
   const [swarmCount, setSwarmCount] = useState(0)
-  const [swarmIndex, setSwarmIndex] = useState<{ node: string | null; teams: ProjectSwarm[] }>()
-  const projectSwarms = swarmIndex?.node === node ? swarmIndex.teams : null
+  const [swarmIndex, setSwarmIndex] = useState<{ node: string | null; teams: ProjectSwarm[] | 'failed' }>()
+  const teams = swarmIndex?.node === node ? swarmIndex.teams : undefined
+  const projectSwarms = Array.isArray(teams) ? teams : null
+  const projectSwarmsError = teams === 'failed'
   const [git, setGit] = useState<{ branch: string; ahead: number; behind: number; files: number; state: string; conflicts: number } | null>(null)
   const gitDirRef = useRef(gitDir)
   gitDirRef.current = gitDir
@@ -55,8 +57,10 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
           if (stop) return
           if (sw) setSwarmCount(sw.filter(group => !group.archived).length)
           const linked = sw && okrs ? projectSwarmDirectory(okrs, sw) : null
-          setSwarmIndex(prior => prior?.node === node && (!linked || JSON.stringify(prior.teams) === JSON.stringify(linked))
-            ? prior : { node, teams: linked || [] })
+          setSwarmIndex(prior => {
+            if (prior?.node === node && (!linked || JSON.stringify(prior.teams) === JSON.stringify(linked))) return prior
+            return { node, teams: linked ?? 'failed' }
+          })
         })
         void anP.then((an) => {
           if (stop || !an?.data) return
@@ -99,6 +103,6 @@ export function useProjectDirectory(hasSider: boolean, gitDir: string) {
     return () => { stop = true; clearInterval(i); treeReload.current = null }
   }, [hasSider, node])
 
-  return { treeSrc, setTreeSrc, treeSrcRef, projectsLoaded, projectsError, unfinished, swarmCount, projectSwarms, git, refresh: () => treeReload.current?.() }
+  return { treeSrc, setTreeSrc, treeSrcRef, projectsLoaded, projectsError, unfinished, swarmCount, projectSwarms, projectSwarmsError, git, refresh: () => treeReload.current?.() }
 }
 export type ProjectDirectory = ReturnType<typeof useProjectDirectory>

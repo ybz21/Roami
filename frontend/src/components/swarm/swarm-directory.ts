@@ -8,7 +8,12 @@ export function loadSwarmDirectory(): Promise<SwarmSnapshot[]> {
   let request = pending.get(scope)
   if (!request) {
     const abort = new AbortController(), timeout = setTimeout(() => abort.abort(), 15000)
-    request = api('GET', '/agent/swarms', undefined, { signal: abort.signal }).then(value => value.data as SwarmSnapshot[]).finally(() => { clearTimeout(timeout); pending.delete(scope) })
+    request = api('GET', '/agent/swarms', undefined, { signal: abort.signal })
+      .then(value => {
+        if (!Array.isArray(value?.data)) throw new Error('SWARM_DIRECTORY_UNAVAILABLE')
+        return value.data as SwarmSnapshot[]
+      })
+      .finally(() => { clearTimeout(timeout); pending.delete(scope) })
     pending.set(scope, request)
   }
   return request
