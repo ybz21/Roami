@@ -325,5 +325,6 @@
 - [执行器迁移与 free 模型](executor-migration.md)：保留成员身份和旧执行证据，明确 Main 适配与实际项目迁移边界。
 
 - [项目 Main 原生执行器接入](native-main-adapter.md)
+- [原生会话内切换模型](native-model-selection.md)
 
 - [Claude 完成回调的 Skill 与图片伴随记录](claude-completion-companions.md)：原输入完成后按完整证据收尾工具并交回原 Main（#985）。
