@@ -19,12 +19,13 @@ import { pollWhileVisible } from '../../visible-poll'
 import SessionHierarchy from '../sessions/SessionHierarchy'
 import SessionLocation from '../sessions/SessionLocation'
 import { absTime, relTime } from '../../time-format'
+import { canCleanupMergedWorktree, MergedWorktreeCleanupButton, useMergedWorktreeCleanup } from '../projects/merged-worktree-cleanup'
 
 const GitPanel = lazy(() => import('../git/GitPanel'))
 import { BranchIcon } from '../git/parts'
 import type { OverviewItem } from './MobileSessions'
 
-type Wt = { path: string; branch: string; isMain: boolean; directoryOnly?: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; locked?: boolean; prunable?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
+type Wt = { path: string; branch: string; head: string; isMain: boolean; external?: boolean; directoryOnly?: boolean; dirty: number; untracked: number; committedAhead: number; behind: number; mergedInto?: string; locked?: boolean; prunable?: boolean; sessions: { session: string; primary?: boolean; dormant?: boolean }[] | null }
 
 const canRemove = (w: Wt) => !!w.branch && !w.isMain && !w.directoryOnly && !w.locked && !w.prunable && !w.sessions?.length
 
@@ -41,6 +42,12 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
   const [loaded, setLoaded] = useState<{ dir: string; node: typeof node; worktrees: Wt[] } | null>(null)
   const wts = loaded?.dir === dir && loaded.node === node ? loaded.worktrees : null
   const [revision, setRevision] = useState(0)
+  const confirmMergedCleanup = useMergedWorktreeCleanup(dir, removed => {
+    setLoaded(current => current?.dir === dir && current.node === node ? {
+      ...current, worktrees: current.worktrees.filter(w => !removed.has(w.path)),
+    } : current)
+    setRevision(value => value + 1)
+  })
   const confirmation = useRef<ReturnType<typeof modal.confirm>>()
   // worktree 接口只给会话名；名字 / agent / 活状态从 overview 补，和会话页同一份
   const overview = useSessionOverview(), native = useNativeSessionList()
@@ -117,40 +124,48 @@ export default function MobileProjectDetail({ projectId, dir, onOpenSession, onN
       if (groups.some(group => group.sessions.some(item => item.session === session.name))) continue
       const directory = session.worktree || session.cwd || ''
       let group = groups.find(worktree => worktree.path === directory)
-      if (!group) { group = { path: directory, branch: session.branch || '', isMain: directory === dir, directoryOnly: true, dirty: 0, untracked: 0, committedAhead: 0, behind: 0, sessions: [] }; groups.push(group) }
+      if (!group) { group = { path: directory, branch: session.branch || '', head: '', isMain: directory === dir, directoryOnly: true, dirty: 0, untracked: 0, committedAhead: 0, behind: 0, sessions: [] }; groups.push(group) }
       if (!group.sessions.some(item => item.session === session.name)) group.sessions.push({ session: session.name })
     }
     return groups
   }, [wts, overview.value, owned, dir, projectId])
   const quiet = all.filter((w) => !busy(w) && !w.isMain)
+  const cleanupCandidates = quiet.filter(canCleanupMergedWorktree)
   const rank = (w: Wt) => ((w.sessions || []).length ? 0 : busy(w) ? 1 : 2)
-  const shown = [...all.filter((w) => busy(w) || w.isMain).sort((a, b) => rank(a) - rank(b)), ...(showQuiet ? quiet : [])]
+  const shown = all.filter((w) => busy(w) || w.isMain).sort((a, b) => rank(a) - rank(b))
+  const renderWorktree = (w: Wt) => (
+    <div key={w.path} className="tt-mproj-wt">
+      <div className="wn">{w.directoryOnly ? <FolderIcon size={12} /> : <BranchIcon size={12} />}<b>{w.isMain ? t('session.wt.mainRepo') : w.branch || w.path.split('/').pop() || t('tree.loose')}</b>{w.isMain && w.branch && <span>{w.branch}</span>}{!w.directoryOnly && <span>{wtStatus(w)}</span>}</div>
+      {w.path && <SessionLocation cwd={w.path} />}
+      <SessionHierarchy sessions={(w.sessions || []).map(s => ({ ...s, name: s.session, label: live.get(s.session)?.label, parent: live.get(s.session)?.parent }))} allSessions={[...live.values()]} renderRow={s => {
+        const o = live.get(s.name)
+        return (
+          <button key={s.session} type="button" className={`tt-msess-row sub${o?.waiting ? ' wait' : ''}${s.dormant || o?.dormant ? ' dormant' : ''}`} onClick={() => onOpenSession(s.session)}>
+            <span className="ic">{o?.agent ? <AgentLogo kind={o.agent} size={16} /> : <TerminalIcon size={16} />}</span>
+            <span className="t"><b>{o?.label || s.session}</b><span className="st"><i>{status(o, s.dormant)}</i>{o && (o.waiting || o.running) && o.tail ? <span className="tail"> · {o.tail}</span> : null}</span></span>
+            <em title={absTime(o?.lastActivity)}>{relTime(o?.lastActivity, t)}</em><ChevronRight size={14} />
+          </button>
+        )
+      }} />
+      {w.path && <div className="acts">
+        {agents.map(agent => <button key={agent.kind} type="button" className="tt-act" disabled={!agent.interactive} onClick={() => onNewInWorktree(agent.kind, w.path)}><AgentLogo kind={agent.kind} size={13} />{agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName })}</button>)}
+        <button type="button" className="tt-act" onClick={() => onNewInWorktree('shell', w.path)}><TerminalIcon size={13} />{t('tabs.newTerminal')}</button>
+        {(w.dirty + w.untracked > 0 || w.committedAhead > 0) && <button type="button" className="tt-act" onClick={() => setGitAt(w.path)}><DiffIcon size={13} />{t('git.changes')}</button>}
+        {canRemove(w) && <button type="button" className="tt-act danger" onClick={() => removeWorktree(w)}><TrashIcon size={13} />{t('project.wt.delete')}</button>}
+      </div>}
+    </div>
+  )
   return (
     <div className="tt-mproj">
       {projectId && <a className="tt-msess-row" href={'#/' + projectPath(projectId, true) + (getHashParams().toString() ? '?' + getHashParams().toString() : '')}><span className="ic"><TargetIcon /></span><span className="t"><b>{t('okr.title')}</b></span><ChevronRight /></a>}
       {wts === null && <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}><Spin /></div>}
-      {shown.map((w) => (
-        <div key={w.path} className="tt-mproj-wt">
-          <div className="wn">{w.directoryOnly ? <FolderIcon size={12} /> : <BranchIcon size={12} />}<b>{w.isMain ? t('session.wt.mainRepo') : w.branch || w.path.split('/').pop() || t('tree.loose')}</b>{w.isMain && w.branch && <span>{w.branch}</span>}{!w.directoryOnly && <span>{wtStatus(w)}</span>}</div>
-          {w.path && <SessionLocation cwd={w.path} />}
-          <SessionHierarchy sessions={(w.sessions || []).map(s => ({ ...s, name: s.session, label: live.get(s.session)?.label, parent: live.get(s.session)?.parent }))} allSessions={[...live.values()]} renderRow={s => {
-            const o = live.get(s.name)
-            return (
-              <button key={s.session} type="button" className={`tt-msess-row sub${o?.waiting ? ' wait' : ''}${s.dormant || o?.dormant ? ' dormant' : ''}`} onClick={() => onOpenSession(s.session)}>
-                <span className="ic">{o?.agent ? <AgentLogo kind={o.agent} size={16} /> : <TerminalIcon size={16} />}</span>
-                <span className="t"><b>{o?.label || s.session}</b><span className="st"><i>{status(o, s.dormant)}</i>{o && (o.waiting || o.running) && o.tail ? <span className="tail"> · {o.tail}</span> : null}</span></span>
-                <em title={absTime(o?.lastActivity)}>{relTime(o?.lastActivity, t)}</em><ChevronRight size={14} />
-              </button>
-            )
-          }} />
-          {w.path && <div className="acts">
-            {agents.map(agent => <button key={agent.kind} type="button" className="tt-act" disabled={!agent.interactive} onClick={() => onNewInWorktree(agent.kind, w.path)}><AgentLogo kind={agent.kind} size={13} />{agent.interactive ? agent.displayName : t('capabilities.agents.taskOnly', { name: agent.displayName })}</button>)}
-            <button type="button" className="tt-act" onClick={() => onNewInWorktree('shell', w.path)}><TerminalIcon size={13} />{t('tabs.newTerminal')}</button>
-            {(w.dirty + w.untracked > 0 || w.committedAhead > 0) && <button type="button" className="tt-act" onClick={() => setGitAt(w.path)}><DiffIcon size={13} />{t('git.changes')}</button>}
-            {canRemove(w) && <button type="button" className="tt-act danger" onClick={() => removeWorktree(w)}><TrashIcon size={13} />{t('project.wt.delete')}</button>}
-          </div>}
-        </div>
-      ))}
+      {shown.map(renderWorktree)}
+      {cleanupCandidates.length > 0 && <div className="tt-mproj-cleanup">
+        <b>{t('project.section.cleanable')}</b>
+        <span>{cleanupCandidates.length}</span>
+        <MergedWorktreeCleanupButton onClick={() => confirmMergedCleanup(cleanupCandidates)} />
+      </div>}
+      {showQuiet && quiet.map(renderWorktree)}
       {quiet.length > 0 && (
         <button type="button" className="tt-mproj-more" onClick={() => setShowQuiet((v) => !v)}>
           {showQuiet ? t('mobile.proj.hideQuiet') : t('mobile.proj.showQuiet', { n: quiet.length })}

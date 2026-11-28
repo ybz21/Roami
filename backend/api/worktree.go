@@ -18,6 +18,7 @@ import (
 	"github.com/ybz21/Roami/backend/project"
 	"github.com/ybz21/Roami/backend/ttmux"
 	"github.com/ybz21/Roami/backend/worktree"
+	"github.com/ybz21/Roami/internal/sessionbackend"
 	"github.com/ybz21/Roami/internal/sessionlifecycle"
 )
 
@@ -71,6 +72,22 @@ func (a *API) WorktreeList(c *gin.Context) {
 	if err != nil {
 		wtErr(c, err)
 		return
+	}
+	for _, session := range a.listNativeSummaries(ctx) {
+		if session.Dir == "" {
+			continue
+		}
+		dir := resolveWorktreePath(session.Dir)
+		var owner *worktree.Worktree
+		for i := range list {
+			w := &list[i]
+			if withinWorktree(dir, w.Path) && (owner == nil || len(w.Path) > len(owner.Path)) {
+				owner = w
+			}
+		}
+		if owner != nil {
+			owner.Sessions = append(owner.Sessions, worktree.SessRef{Session: session.ID, Primary: true})
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"data": list})
 }
@@ -158,6 +175,69 @@ func (a *API) WorktreeRemove(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true}})
+}
+
+// WorktreeCleanupMerged POST /git/worktree/cleanup-merged {path, branch, head}
+func (a *API) WorktreeCleanupMerged(c *gin.Context) {
+	var b struct {
+		Path   string `json:"path"`
+		Branch string `json:"branch"`
+		Head   string `json:"head"`
+	}
+	if err := c.ShouldBindJSON(&b); err != nil || !filepath.IsAbs(b.Path) || b.Head == "" {
+		wtErr(c, &worktree.Err{Code: "BAD_REQUEST"})
+		return
+	}
+	ctx, cancel := wtCtx(c)
+	defer cancel()
+	if a.NativeBackend != nil {
+		listCtx, stop := context.WithTimeout(ctx, 3*time.Second)
+		list := a.NativeBackend.List
+		if router, ok := a.NativeBackend.(*sessionbackend.Router); ok {
+			list = func(ctx context.Context) ([]sessionbackend.SessionSummary, error) {
+				return router.ListByKind(ctx, sessionbackend.BackendNative)
+			}
+		}
+		rows, err := list(listCtx)
+		stop()
+		if err != nil {
+			wtErr(c, &worktree.Err{Code: "WORKTREE_SESSIONS_UNKNOWN"})
+			return
+		}
+		root := resolveWorktreePath(b.Path)
+		for _, row := range rows {
+			if row.Backend != sessionbackend.BackendNative || row.Dir == "" {
+				continue
+			}
+			if withinWorktree(resolveWorktreePath(row.Dir), root) {
+				wtErr(c, &worktree.Err{Code: "SESSIONS_INSIDE"})
+				return
+			}
+		}
+	}
+	gone, err := a.WT.RemoveMerged(ctx, b.Path, b.Branch, b.Head)
+	if err != nil {
+		wtErr(c, err)
+		return
+	}
+	if repo, err := a.WT.ResolveRepo(ctx, filepath.Dir(gone.Path)); err == nil {
+		a.Projects.Trace(project.TraceEntry{
+			Repo: repo.Root, Branch: gone.Branch, HeadOid: gone.Head, Base: gone.Base,
+			Action: "cleaned", MergedInto: gone.MergedInto, MergedKind: gone.MergedKind,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"ok": true}})
+}
+
+func resolveWorktreePath(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
+}
+
+func withinWorktree(path, root string) bool {
+	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
 }
 
 // WorktreeSync POST /git/worktree/sync {dir} —— 远端轻量同步（10 设计 §3）：

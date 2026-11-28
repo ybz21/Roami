@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1236,6 +1237,17 @@ type RemoveReq struct {
 }
 
 func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
+	return s.remove(ctx, req, nil)
+}
+
+// RemoveMerged rechecks the confirmed checkout under the repository lock.
+func (s *Service) RemoveMerged(ctx context.Context, path, branch, head string) (Worktree, error) {
+	merged := Worktree{Branch: branch, Head: head}
+	err := s.remove(ctx, RemoveReq{Path: path}, &merged)
+	return merged, err
+}
+
+func (s *Service) remove(ctx context.Context, req RemoveReq, merged *Worktree) error {
 	if s.lifecycle != nil {
 		if err := s.lifecycle.Check(ctx, "", req.Path); err != nil {
 			return err
@@ -1262,6 +1274,31 @@ func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
 	}
 	defer unlock()
 	defer s.invalidate(repo)
+	if merged != nil {
+		current, err := s.LifecycleDetails(ctx, path)
+		if err != nil {
+			return err
+		}
+		if current.External || current.Head != merged.Head || current.Branch != merged.Branch {
+			return errf("WORKTREE_CHANGED", "worktree changed after confirmation")
+		}
+		s.enrichWorktree(ctx, &current, remoteState{})
+		if current.MergedInto == "" {
+			return errf("WORKTREE_NOT_MERGED", "worktree is no longer merged")
+		}
+		rt := runtime.New()
+		rt.Context = ctx
+		// Native-only Windows nodes have no tmux observer.
+		if _, lookupErr := exec.LookPath(rt.TmuxBin); goruntime.GOOS != "windows" || lookupErr == nil {
+			if _, err := rt.ObserveSessionRows(); err != nil {
+				return errf("WORKTREE_SESSIONS_UNKNOWN", "cannot observe live sessions")
+			}
+		}
+		if len(s.joinSessions(ctx, []Worktree{current})[0].Sessions) > 0 {
+			return errf("SESSIONS_INSIDE", "sessions are still using this worktree")
+		}
+		*merged = current
+	}
 	if req.ExpectedSnapshot != "" {
 		actual, e := s.Snapshot(ctx, path)
 		if e != nil {
@@ -1289,9 +1326,15 @@ func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
 			return &Err{Code: "SESSIONS_INSIDE", Message: "sessions are still using this worktree", Extra: map[string]any{"sessions": dedup(inside)}}
 		}
 	}
-	branch, _ := git(ctx, path, "rev-parse", "--abbrev-ref", "HEAD")
+	var branch string
+	if req.DeleteBranch || req.ForceDeleteBranch {
+		branch, _ = git(ctx, path, "rev-parse", "--abbrev-ref", "HEAD")
+	}
 	if !req.ForceWorktree {
-		st, _ := git(ctx, path, "status", "--porcelain=v1")
+		st, err := git(ctx, path, "status", "--porcelain=v1")
+		if err != nil && merged != nil {
+			return errf("GIT_ERROR", "%s", st)
+		}
 		if strings.TrimSpace(st) != "" {
 			dirty, untracked := 0, 0
 			for _, l := range strings.Split(st, "\n") {
@@ -1302,6 +1345,13 @@ func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
 				}
 			}
 			return &Err{Code: "WORKTREE_DIRTY", Message: "worktree has uncommitted changes", Extra: map[string]any{"dirty": dirty, "untracked": untracked}}
+		}
+	}
+	if merged != nil {
+		head, headErr := s.Head(ctx, path)
+		ref, refErr := lifecycleBranch(ctx, path)
+		if headErr != nil || refErr != nil || head != merged.Head || strings.TrimPrefix(ref, "refs/heads/") != merged.Branch {
+			return errf("WORKTREE_CHANGED", "worktree changed after confirmation")
 		}
 	}
 	args := []string{"worktree", "remove"}
@@ -1322,7 +1372,18 @@ func (s *Service) Remove(ctx context.Context, req RemoveReq) error {
 		}
 		_, _ = git(ctx, repo.Root, "worktree", "prune", "--expire", "now")
 	}
-	if (req.DeleteBranch || req.ForceDeleteBranch) && branch != "" && branch != "HEAD" {
+	if merged != nil && !merged.Adopted && merged.Branch != "" {
+		ref := "refs/heads/" + merged.Branch
+		checkedOut, err := git(ctx, repo.Root, "for-each-ref", "--format=%(worktreepath)", ref)
+		if err != nil || checkedOut != "" {
+			return errf("WORKTREE_BRANCH_RETAINED", "worktree removed; branch %q is still in use", merged.Branch)
+		}
+		// Keep a newer branch tip if another Git process moved it during removal.
+		if out, err := git(ctx, repo.Root, "update-ref", "--no-deref", "-d", ref, merged.Head); err != nil {
+			return errf("WORKTREE_BRANCH_RETAINED", "%s", out)
+		}
+	}
+	if branch != "" && branch != "HEAD" {
 		flag := "-d"
 		if req.ForceDeleteBranch {
 			flag = "-D"
