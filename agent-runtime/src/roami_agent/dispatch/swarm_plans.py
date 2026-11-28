@@ -36,6 +36,7 @@ class SwarmPlans:
         open_leader=None,
         memory_backend=None,
         check_reserved_provider=None,
+        coordinator_sessions=None,
     ):
         self.db, self.tasks, self.conversations, self.wakeup = (
             database,
@@ -47,6 +48,7 @@ class SwarmPlans:
         self.open_leader = open_leader
         self.memory_backend = memory_backend
         self.check_reserved_provider = check_reserved_provider
+        self.coordinator_sessions = coordinator_sessions
         self.chat = None
         self.locks = {}
 
@@ -198,14 +200,41 @@ class SwarmPlans:
         return result
 
     async def list(self, owner):
-        ids = await self.db.call(
-            lambda db: rows(
+        def read(db):
+            ids = rows(
                 db,
                 "SELECT g.id FROM swarm_groups g JOIN conversations c ON c.id=g.conversation_id WHERE g.owner_id=? AND c.deleted_ms IS NULL ORDER BY g.updated_ms DESC",
                 (owner,),
             )
-        )
-        return [await self.snapshot(owner, item["id"], include_memory=False) for item in ids]
+            result = []
+            for item in ids:
+                value = snapshot(db, owner, item["id"])
+                value["sessionIds"] = self.navigation_sessions(db, owner, value)
+                result.append(value)
+            return result
+
+        return await self.db.call(read)
+
+    def navigation_sessions(self, db, owner, value):
+        sid = value["id"]
+        sessions = {
+            entry["session_id"]
+            for entry in rows(
+                db,
+                "SELECT a.session_id FROM task_attempts a JOIN tasks t ON t.id=a.task_id "
+                "JOIN swarm_work_items w ON w.task_id=t.id WHERE w.swarm_id=? AND t.owner_id=? "
+                "AND t.origin_conversation_id=? AND a.session_id IS NOT NULL "
+                "UNION SELECT session_id FROM swarm_member_provider_generations "
+                "WHERE swarm_id=? AND owner_id=? AND session_id IS NOT NULL",
+                (sid, owner, value["mainConversationId"], sid, owner),
+            )
+        }
+        for member in (*value["members"], *value["retiredMembers"]):
+            if native := (member.get("instance") or {}).get("nativeSessionId"):
+                sessions.add("roami:" + native)
+        if self.coordinator_sessions:
+            sessions.update(self.coordinator_sessions(db, owner, value))
+        return sorted(sessions)
 
     async def snapshot(self, owner, sid, *, include_memory=True):
         value = await self.db.call(lambda db: snapshot(db, owner, sid))

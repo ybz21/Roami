@@ -518,6 +518,10 @@ async def test_main_adopts_same_provider_after_proven_recovery(
         sent["sessionId"] == recovered["sessionId"]
         and sent["preparedFrom"] == recovered["launchKey"]
     )
+    [listed] = await runtime.swarms.list("alice")
+    assert listed["id"] == group["id"]
+    assert set(listed["sessionIds"]) == {original["sessionId"], recovered["sessionId"]}
+    assert not await runtime.swarms.list("bob")
 
 
 def test_provider_recovery_schema_preserves_existing_bindings_and_exclusive_ownership():

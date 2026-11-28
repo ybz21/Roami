@@ -5,7 +5,8 @@ import { Dropdown, Tooltip } from 'antd'
 import { useI18n } from '../../i18n'
 import type { AgentKind } from '../../agent-kind'
 
-import { AgentLogo, ChevronDown, CloseIcon, HomeIcon, MoreIcon, OpenInIcon, PencilIcon, PlusIcon, TerminalIcon, TrashIcon } from '../../icons'
+import { AgentLogo, ChevronDown, CloseIcon, HomeIcon, MoreIcon, OpenInIcon, PencilIcon, PlusIcon, SwarmIcon, TerminalIcon, TrashIcon } from '../../icons'
+import type { ProjectSwarm } from '../projects/okr/okr-directory'
 import { isLooseTask, taskKeyOf, type TaskKey } from '../sessions/task-key'
 import { sessionBranches, type SessionBranch } from './session-lineage'
 import type { TaskTree, TreeSession } from './task-tree'
@@ -39,13 +40,16 @@ function dot(o: { running?: boolean; waiting?: boolean }, label: string): ReactN
   return tone ? <i className={`dot ${tone}`} role="img" aria-label={label} /> : null
 }
 
-export function ProjectTree({ tree, activeTask, activeSession, onProject, onSession, onAddProject, onRename, onNewTask, onKill, onNewInTask, onRemoveProject }: {
+export function ProjectTree({ tree, activeTask, activeSession, projectSwarms, activeSwarmProject, onProject, onSession, onSwarm, onAddProject, onRename, onNewTask, onKill, onNewInTask, onRemoveProject }: {
   tree: TaskTree
   activeTask: TaskKey | null
   /** 当前会话用文字和选中线标识。 */
   activeSession: string | null
+  projectSwarms?: ProjectSwarm[] | null
+  activeSwarmProject?: string
   onProject: (key: string) => void
   onSession: (key: TaskKey, name: string) => void
+  onSwarm?: (project: string) => void
   onAddProject?: () => void
   /** 双击 / 右键会话行：改会话展示名 */
   onRename?: (session: string) => void
@@ -60,6 +64,7 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
 }) {
   const agents = useRegisteredAgents()
   const { t } = useI18n()
+  const managedSessions = new Set(projectSwarms?.flatMap(swarm => swarm.sessionIds))
   const [closed, setClosed] = useState<Set<string>>(readClosed)
   const [, tick] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
@@ -134,7 +139,8 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
 
       {tree.projects.map((p) => {
         const open = !closed.has(p.key)
-        const branches = sessionBranches(p.tasks.flatMap(task => task.sessions.map(session => ({ session, task }))))
+        const swarm = projectSwarms?.find(team => team.projectId === p.key)
+        const branches = sessionBranches(p.tasks.flatMap(task => task.sessions.filter(session => !managedSessions.has(session.name)).map(session => ({ session, task }))))
         return (
           <div key={p.key} className="tt-tree-proj">
             {/* 项目展开状态本地保留；项目主页从菜单进入。 */}
@@ -156,15 +162,21 @@ export function ProjectTree({ tree, activeTask, activeSession, onProject, onSess
               <span className="chev" role="button" aria-label={open ? t('common.collapse') : t('common.expand')}
                 onClick={(e) => { e.stopPropagation(); toggle(p.key) }}><ChevronDown size={14} /></span>
             </button>
-            {open && <div className="tt-tree-sessions tt-tree-roots">{branches.map(branch => branchRows(branch))}</div>}
+            {open && <div className="tt-tree-sessions tt-tree-roots">
+              {swarm && onSwarm && <button type="button" className={`tt-nav-item tt-tree-row tt-tree-swarm${activeSwarmProject === p.key ? ' on' : ''}`} title={swarm.name}
+                aria-current={activeSwarmProject === p.key ? 'page' : undefined} onClick={() => onSwarm(p.key)}>
+                <span className="ic"><SwarmIcon size={15} /></span><span className="nm">{t('nav.swarm')}</span>
+              </button>}
+              {branches.map(branch => branchRows(branch))}
+            </div>}
           </div>
         )
       })}
 
-      {tree.loose.length > 0 && (
+      {tree.loose.some(session => !managedSessions.has(session.name)) && (
         <div className="tt-tree-proj loose">
           <div className="gl">{t('tree.loose')}</div>
-          <div className="tt-tree-sessions tt-tree-roots">{sessionBranches(tree.loose.map(session => ({ session, task: null }))).map(branch => branchRows(branch))}</div>
+          <div className="tt-tree-sessions tt-tree-roots">{sessionBranches(tree.loose.filter(session => !managedSessions.has(session.name)).map(session => ({ session, task: null }))).map(branch => branchRows(branch))}</div>
         </div>
       )}
 

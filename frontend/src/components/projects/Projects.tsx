@@ -59,7 +59,8 @@ import FileBrowser from '../files/FileBrowser'
 import { AgentLogo, ArchiveIcon, ArrowDown, ArrowUp, CheckIcon, ChevronDown, CloseIcon, DiffIcon, ForkIcon, MergeIcon, PlayIcon, PlusIcon, PushIcon, SwarmIcon, TerminalIcon, TrashIcon, WarnIcon, WindowsIcon } from '../../icons'
 import { BranchIcon } from '../git/parts'
 import { getHashParams } from '../../route-hash'
-import { projectPath } from './okr/okr-workspace'
+import { projectPath, projectSwarmPath } from './okr/okr-workspace'
+import type { ProjectSwarm } from './okr/okr-directory'
 import { lazyRetry } from '../lazy-retry'
 
 const WorktreePanel = lazyRetry(() => import('../git/WorktreePanel'))
@@ -308,7 +309,7 @@ export function Lifec({ done, cur }: { done: number; cur?: number }) {
   )
 }
 
-export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }: { openTerm: (n: string) => void; closeTerm: (n: string) => void; initialKey?: string; activeTerm?: string | null }) {
+export default function Projects({ openTerm, closeTerm, initialKey, activeTerm, projectSwarms }: { openTerm: (n: string) => void; closeTerm: (n: string) => void; initialKey?: string; activeTerm?: string | null; projectSwarms?: ProjectSwarm[] | null }) {
   const [data, setData] = useState<{ projects: Proj[]; loose: ProjSession[] }>({ projects: [], loose: [] })
   const [loaded, setLoaded] = useState(false)
   const native = useNativeSessionList()
@@ -339,7 +340,7 @@ export default function Projects({ openTerm, closeTerm, initialKey, activeTerm }
     <>
       <style>{PRJ_CSS + NEEDS_CSS + CARD_CSS + RAIL_CSS + SESSION_ACTIVITY_CSS}</style>
       {initialKey
-        ? <ProjectHome proj={displayed.projects.find((x) => x.key === initialKey)} allProjects={displayed.projects} loaded={loaded} openTerm={openTerm} closeTerm={closeTerm} refresh={load} activeTerm={activeTerm} />
+        ? <ProjectHome proj={displayed.projects.find((x) => x.key === initialKey)} allProjects={displayed.projects} loaded={loaded} openTerm={openTerm} closeTerm={closeTerm} refresh={load} activeTerm={activeTerm} swarm={projectSwarms?.find(team => team.projectId === initialKey)} />
         : <ProjectList data={displayed} loaded={loaded} openTerm={openTerm} refresh={load} />}
     </>
   )
@@ -817,8 +818,9 @@ function FinishModal({ w, base, onClose, onDone, onRevive }: {
 }
 
 // ── P2 项目主页：头部 + composer(hero) + 任务流/Worktree/编队/活动 ──
-function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, activeTerm }: {
+function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, activeTerm, swarm }: {
   activeTerm?: string | null
+  swarm?: ProjectSwarm
   proj?: Proj; allProjects: Proj[]; loaded: boolean; openTerm: (n: string) => void; closeTerm: (n: string) => void; refresh: () => void
 }) {
   const { t } = useI18n()
@@ -956,15 +958,16 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
   const mine = useMemo(() => [...cliMine, ...native.value.filter(session => session.projectId === proj?.key).map(session => {
     const record = nativeSessionRecord(session)
     return { ...record, last_activity: record.lastActivity }
-  })].sort((a, b) => (b.last_activity || 0) - (a.last_activity || 0) || a.name.localeCompare(b.name)), [cliMine, native.value, proj?.key])
+  })].filter(session => !swarm?.sessionIds.includes(session.name))
+    .sort((a, b) => (b.last_activity || 0) - (a.last_activity || 0) || a.name.localeCompare(b.name)), [cliMine, native.value, proj?.key, swarm])
   usePageEffect(() => {
     if (!isGit) return
     return pollWhileVisible(async signal => {
       const groups = await loadSwarmDirectory()
-      const matching = groups.filter(group => !group.archived && swarmProjectMatches(group.target, { key: proj?.key, dir }))
+      const matching = groups.filter(group => group.id !== swarm?.id && !group.archived && swarmProjectMatches(group.target, { key: proj?.key, dir }))
       if (!signal.aborted) setSwarms(matching)
     }, 10000).stop
-  }, [isGit, dir, proj?.key, swarmScope])
+  }, [isGit, dir, proj?.key, swarmScope, swarm?.id])
   const swarmMap = useMemo(() => {
     const members: Record<string, { swarm: string }> = {}
     for (const group of swarms) for (const work of group.work) {
@@ -1276,6 +1279,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
       {label}{n !== undefined && n > 0 && <span className="n">{n}</span>}
     </button>
   )
+  const projectQuery = getHashParams().toString()
 
   return (
     // 这里**不能**加 overflow:auto——任何非 visible 的祖先都会成为 sticky 的
@@ -1333,6 +1337,7 @@ function ProjectHome({ proj, allProjects, loaded, openTerm, closeTerm, refresh, 
         {/* Tabs：任务 | Worktree | 编队 | 活动（非 git 只有任务）。同样 sticky，贴在项目头下面 */}
         <div className="prj-tabs prj-in" style={{ animationDelay: '110ms' }}>
           {tabBtn('tasks', t('nav.sessions'), mine.length)}
+          {swarm && <a className="prj-tab" href={'#/' + projectSwarmPath(proj.key) + (projectQuery ? '?' + projectQuery : '')}>{t('nav.swarm')}</a>}
           {isGit && tabBtn('wt', 'Worktree', wts.length)}
           {isGit && tabBtn('race', t('project.tab.race'), races.length + swarms.length)}
           {isGit && tabBtn('act', t('project.tab.activity'))}

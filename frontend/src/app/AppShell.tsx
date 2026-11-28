@@ -8,7 +8,7 @@ import { useAgentInbox } from '../components/agent/useAgentInbox'
 import { hubReasonText } from '../components/cluster/hub-health'
 import { useCurrentNodeId } from '../components/cluster/node-url'
 import { NodeMark, nodeDotColor } from '../components/cluster/NodeMark'
-import { projectPath } from '../components/projects/okr/okr-workspace'
+import { projectPath, projectSwarmPath } from '../components/projects/okr/okr-workspace'
 import MobilePullRefresh from '../components/mobile/MobilePullRefresh'
 import { ICONS } from '../components/nav-icons'
 import { sessionDisplay, sessionLabel } from '../components/sessions/session-label'
@@ -115,7 +115,7 @@ function AppShellContent({ routing, logout }: AppShellProps) {
     actions={{ openTerm, closeTerm, renameOpenTerm, newTerminalInTask }} />
   openTermRef.current = (n) => openTerm(n)
   const page = <AppRoutes visible={workspace.pageVisible} openPages={pageTabsState.pageTabs} hasDock={terms.length > 0} routing={routing} isMobile={isMobile} active={active} projects={treeSrc.projects}
-    projectDirectory={{ loaded: directory.projectsLoaded, error: directory.projectsError, retry: directory.refresh }}
+    projectDirectory={{ loaded: directory.projectsLoaded, error: directory.projectsError, retry: directory.refresh, projectSwarms: directory.projectSwarms }}
     actions={{ openTerm, closeTerm, newTerminalAt, logout, newTask: projectActions.newTask, openProject: (p) => { const project = treeSrc.projects.find(item => item.dir === p.dir); if (project) { setMobileProject(null); go(projectPath(project.key)) } else { setMobileProject({ ...p, at: Date.now() }); go('projects') } } }}
     mobileProject={mobileProject} mobileSearchNonce={mobileSearchNonce} mobileActionsHost={mobileActionsHost}
     fullscreen={isMobile && fsSupported ? { active: isFs, toggle: toggleFs } : undefined}
@@ -204,12 +204,14 @@ function AppShellContent({ routing, logout }: AppShellProps) {
             collapsed={navRail}
             style={{ position: 'sticky', top: 0, height: '100%', background: 'var(--bg-base)', borderRight: '1px solid var(--border-subtle)' }}>
             <Navigation
-              rail={navRail} active={tab === 'projects' && routing.projectView === 'okr' ? 'okr' : tab} groups={navGroups} onGo={selectPage}
+              rail={navRail} active={tab === 'projects' && routing.projectView === 'okr' && !routing.projectSwarm ? 'okr' : tab} groups={navGroups} onGo={selectPage}
               settings={{ key: 'settings', label: t('nav.env'), icon: ICONS.settings }}
               nodeMenu={nodeItems}
               onSearch={openPalette}
               searchHint={keys.search.label}
               tree={<ProjectTree tree={tree} activeTask={activeTask} activeSession={active}
+                projectSwarms={directory.projectSwarms} activeSwarmProject={routing.projectSwarm ? routing.projectSub : undefined}
+                onSwarm={project => go(projectSwarmPath(project))}
                 onProject={onTreeProject} onSession={(key, name) => openTerm(name, key)}
                 onAddProject={projectActions.addProject}
                 onRename={projectActions.renameSession}

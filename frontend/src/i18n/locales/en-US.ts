@@ -290,7 +290,7 @@ const enUS = {
   'okr.tab.data': "Data",
   'okr.tab.review': "Reviews",
   'okr.tab.board': "OKR & dashboard",
-  'okr.tab.activities': 'Team',
+  'okr.tab.activities': 'Swarm',
   'okr.tab.files': 'Project files',
   'okr.fileTeam': 'Team',
   'okr.fileMemory': 'Memory',

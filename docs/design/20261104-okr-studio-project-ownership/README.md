@@ -60,3 +60,12 @@ SQLite 采集层的 [源库实施与验收范围](sqlite-source-store.md) 单独
 本轮需求合并到[原技术方案](implementation.md#看板分层的通用框架契约)和[原运行态文档](../20261104-okr-main-workspace/README.md#看板的分级与分层)：框架支持项目定义的分组、嵌套与叶子视图；[宣传工作量原型](../20261104-okr-main-workspace/workload-dashboard.html)仅是项目示例。通用导航不得写死X/B站、三个Tab或运营角色。当前原型与新增框架设计的实现/验收状态分开记录。
 
 - [聊天搭建第一版实现与边界](chat-building-implementation.md)。
+## 项目 Swarm 的进入路径
+
+项目导航和项目详情各提供一个指向已确认 OKR 绑定的 Swarm 入口。当前职责来自项目的
+team 定义，原 Swarm 保留成员及任务历史。相同 Swarm 的直接链接转到项目 OKR 的蜂群
+页，独立 Swarm 仍有自己的入口。
+
+目录路径只决定普通会话归属。项目导航通过宿主确认的 Main 执行代次、成员执行绑定和
+任务回执识别蜂群会话，并把这些会话入口放在蜂群内。同目录内自行创建的会话继续单独
+打开。项目匹配同时检查确认的 Swarm ID 和宿主目标 projectId。

@@ -19,6 +19,7 @@ type ResultOverview struct {
 
 type Overview struct {
 	ProjectID  string           `json:"projectId"`
+	Swarm      string           `json:"swarm,omitempty"`
 	Objective  string           `json:"objective"`
 	StartDate  string           `json:"startDate"`
 	EndDate    string           `json:"endDate"`
@@ -28,7 +29,7 @@ type Overview struct {
 }
 
 func overview(w Workspace) Overview {
-	result := Overview{ProjectID: w.ProjectID, Objective: w.Objective, StartDate: w.StartDate, EndDate: w.EndDate, UpdatedAt: w.UpdatedAt, Revision: w.Revision, KeyResults: []ResultOverview{}}
+	result := Overview{ProjectID: w.ProjectID, Swarm: w.Swarm, Objective: w.Objective, StartDate: w.StartDate, EndDate: w.EndDate, UpdatedAt: w.UpdatedAt, Revision: w.Revision, KeyResults: []ResultOverview{}}
 	for _, kr := range w.KeyResults {
 		r := ResultOverview{KeyResult: kr}
 		for _, m := range w.Metrics {

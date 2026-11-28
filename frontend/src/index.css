@@ -660,6 +660,7 @@ html[data-pointer="coarse"] .tt-tree .tt-tree-row { min-height: var(--tap); }
 .tt-tree-sessions .tt-tree-row { padding-left: var(--sp-3); padding-right: var(--sp-2); min-height: var(--row-compact); border-radius: var(--r-xs); margin: 0; width: 100%; gap: var(--sp-2); }
 .tt-tree-sessions .tt-tree-row .nm { flex: 1 1 auto; }
 .tt-tree-sessions .tt-tree-row .nm { color: var(--text-dim); font-size: var(--fs-sm); font-weight: 400; }
+.tt-tree-swarm .ic { color: var(--swarm); }
 /* 休眠会话（重启带走、点开即在原目录重开）：整行淡一档 */
 .tt-tree-row.dormant .ic, .tt-tree-row.dormant .nm { opacity: .55; }
 .tt-tree-sessions .tt-tree-row.on .nm { color: var(--text-bright); }
